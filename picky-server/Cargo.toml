@@ -1,0 +1,26 @@
+[package]
+name = "picky-server"
+version = "0.1.0"
+authors = ["jtrepanier-devolutions <jtrepanier@devolutions.net>"]
+edition = "2018"
+
+[dependencies]
+clap = {features = ["yaml"], version = "2.32.0"}
+multihash = "0.8.0"
+chrono = "0.4.6"
+picky-core = {path = "../picky-core"}
+config = "0.9"
+mbedtls = { git = "https://github.com/Devolutions/rust-mbedtls.git", branch = "wayk"}
+mongodb = { git = "https://github.com/Devolutions/mongo-rust-driver-prototype.git", features = ["ssl"] }
+bson = "0.13.0"
+serde_json = "1.0.39"
+serde_derive = "1.0.89"
+serde = "1.0.90"
+log = "0.4.1"
+log4rs = "0.8.1"
+saphir = "0.9.2"
+base64 = "0.10.1"
+regex = "1.1.5"
+hex = "0.3.2"
+ring = "0.14.6"
+

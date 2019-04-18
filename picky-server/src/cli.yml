@@ -1,0 +1,42 @@
+name: picky
+author: Jonathan Trépanier <jtrepanier@devolutions.net>
+about: A custom public key infrastructure server
+args:
+  - log-level:
+      short: l
+      long: level
+      value_name: LOGLEVEL
+      help: Verbosity level of the logger
+      takes_value: true
+      possible_values:
+        - off
+        - error
+        - warn
+        - info
+        - debug
+        - trace
+      empty_values: false
+  - realm:
+      short: r
+      long: realm
+      value_name: REALM
+      help: The realm used to create root and intermediate ca configuration
+      takes_value: true
+      empty_values: false
+  - db_url:
+      long: db_url
+      value_name: DB_URL
+      help: Url of the database used by the service.
+      long_help: Url on which the listener will listen.
+      takes_value: true
+      empty_values: false
+  - api_key:
+      long: api_key
+      value_name: API_KEY
+      help: The api key used by the server to authenticate client queries.
+      takes_value: true
+      empty_values: false
+  - show-config:
+      long: show-config
+      help: Show the current config before startup
+      takes_value: false
