@@ -118,6 +118,7 @@ impl Cert{
     fn generate_certificate(&mut self, hash_type: mbedtls::hash::Type, valid_from: X509Time, valid_to: X509Time, ca: bool, pathlen: Option<u32>) -> &mut Self{
         if self.issuer.is_none(){
             self.issuer = Some(self.common_name.clone());
+            self.issuer_key = Some(self.keys.key_pem.clone());
         } else {
             if let Ok(ca) = Certificate::from_pem(self.issuer.clone().unwrap().as_bytes()){
                 self.issuer = Some(ca.subject().unwrap());
@@ -131,11 +132,11 @@ impl Cert{
         let key_usage;
         if ca{
             subject_key = Keys::get_pk_from_private(format!("{}{}", self.keys.key_pem.clone(), "\0").as_bytes());
-            issuer_key = Keys::get_pk_from_private(format!("{}{}", self.keys.key_pem.clone(), "\0").as_bytes());
+            issuer_key = Keys::get_pk_from_private(format!("{}{}", self.issuer_key.clone().unwrap().clone(), "\0").as_bytes());
             key_usage = key_usage::DIGITAL_SIGNATURE | key_usage::KEY_CERT_SIGN | key_usage::CRL_SIGN | key_usage::KEY_ENCIPHERMENT | key_usage::KEY_AGREEMENT;
         } else {
             subject_key = Keys::get_pk_from_public(format!("{}{}", self.keys.key_pem.clone(), "\0").as_bytes());
-            issuer_key = Keys::get_pk_from_public(format!("{}{}", self.keys.key_pem.clone(), "\0").as_bytes());
+            issuer_key = Keys::get_pk_from_private(format!("{}{}", self.issuer_key.clone().unwrap().clone(), "\0").as_bytes());
             key_usage = key_usage::DIGITAL_SIGNATURE | key_usage::KEY_ENCIPHERMENT;
         }
 
@@ -154,6 +155,8 @@ impl Cert{
             //.serial(serial.as_slice()).unwrap()
             .signature_hash(hash_type.clone())
             .key_usage(key_usage).unwrap()
+            .set_subject_key_identifier().unwrap()
+            .set_authority_key_identifier().unwrap()
             .write_pem_string(&mut get_rng(&mut entropy)).unwrap();
         self.certificate_pem.push_str("\0");
         self
@@ -173,7 +176,7 @@ impl Cert{
         cert
     }
 
-    pub fn generate_intermediate(root: &str, root_key: &str/*root: &Cert*/, realm: &str, hash_type: mbedtls::hash::Type, key_type: mbedtls::pk::Type, bits: u32) -> Cert{
+    pub fn generate_intermediate(root: &str, root_key: &str, realm: &str, hash_type: mbedtls::hash::Type, key_type: mbedtls::pk::Type, bits: u32) -> Cert{
         let keys = Keys::new(key_type, bits);
         let pk = Keys::get_pk_from_private(format!("{}{}", keys.key_pem, "\0").as_bytes());
 
@@ -196,7 +199,7 @@ impl Cert{
         intermediate
     }
 
-    pub fn generate_from_csr(csr: &str, authority: &str, authority_key: &str/*parent: &Cert*/, hash_type: mbedtls::hash::Type) -> Cert{
+    pub fn generate_from_csr(csr: &str, authority: &str, authority_key: &str, hash_type: mbedtls::hash::Type) -> Cert{
         let mut csr_struct = Csr::from_pem(format!("{}{}", csr, "\0").as_bytes()).unwrap();
         let mut leaf_key = csr_struct.public_key_mut();
 
@@ -285,5 +288,128 @@ pub fn get_rng<'a>(entropy: &'a mut OsEntropy) -> CtrDrbg<'a>{
 
 #[cfg(test)]
 mod tests{
+    use super::*;
+    use x509_parser::{TbsCertificate, X509Extension, parse_x509_der, pem::pem_to_der, error};
+    use der_parser::{oid, DerError};
 
+    static PEM: &'static [u8] = include_bytes!("../../test_files/intermediate_ca.crt");
+
+    static PEM_STR: &'static str = "-----BEGIN CERTIFICATE-----
+MIIDPzCCAiegAwIBAgIBATANBgkqhkiG9w0BAQUFADA7MQswCQYDVQQGEwJOTDER
+MA8GA1UECgwIUG9sYXJTU0wxGTAXBgNVBAMMEFBvbGFyU1NMIFRlc3QgQ0EwHhcN
+MTEwMjEyMTQ0NDA2WhcNMjEwMjEyMTQ0NDA2WjA8MQswCQYDVQQGEwJOTDERMA8G
+A1UECgwIUG9sYXJTU0wxGjAYBgNVBAMMEVBvbGFyU1NMIFNlcnZlciAxMIIBIjAN
+BgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqQIfPUBq1VVTi/027oJlLhVhXom/
+uOhFkNvuiBZS0/FDUEeWEllkh2v9K+BG+XO+3c+S4ZFb7Wagb4kpeUWA0INq1UFD
+d185fAkER4KwVzlw7aPsFRkeqDMIR8EFQqn9TMO0390GH00QUUBncxMPQPhtgSVf
+CrFTxjB+FTms+Vruf5KepgVb5xOXhbUjktnUJAbVCSWJdQfdphqPPwkZvq1lLGTr
+lZvc/kFeF6babFtpzAK6FCwWJJxK3M3Q91Jnc/EtoCP9fvQxyi1wyokLBNsupk9w
+bp7OvViJ4lNZnm5akmXiiD8MlBmj3eXonZUT7Snbq3AS3FrKaxerUoJUsQIDAQAB
+o00wSzAJBgNVHRMEAjAAMB0GA1UdDgQWBBQfdNY/KcF0dEU7BRIsPai9Q1kCpjAf
+BgNVHSMEGDAWgBS0WuSls97SUva51aaVD+s+vMf9/zANBgkqhkiG9w0BAQUFAAOC
+AQEAm9GKWy4Z6eS483GoR5omwx32meCStm/vFuW+nozRwqwTG5d2Etx4TPnz73s8
+fMtM1QB0QbfBDDHxfGymEsKwICmCkJszKE7c03j3mkddrrvN2eIYiL6358S3yHMj
+iLVCraRUoEm01k7iytjxrcKb//hxFvHoxD1tdMqbuvjMlTS86kJSrkUMDw68UzfL
+jvo3oVjiexfasjsICXFNoncjthKtS7v4zrsgXNPz92h58NgXnDtQU+Eb9tVA9kUs
+Ln/az3v5DdgrNoAO60zK1zYAmekLil7pgba/jBLPeAQ2fZVgFxttKv33nUnUBzKA
+Od8i323fM5dQS1qQpBjBc/5fPw==
+-----END CERTIFICATE-----
+";
+
+    #[test]
+    fn key_id_test_with_file(){
+        let intermediate = pem_to_der(PEM);
+
+        let der = match intermediate{
+            Ok((rem, pem)) => {
+                assert_eq!(rem.is_empty(), true);
+                pem.contents.clone()
+            },
+            Err(e) => {
+                panic!()
+            }
+        };
+
+        let empty = &b""[..];
+
+        let res = parse_x509_der(&der);
+
+        match res{
+            Ok((e, cert)) => {
+                assert_eq!(e, empty);
+
+                let tbs_cert = cert.tbs_certificate;
+
+                let ext = tbs_cert.extensions;
+
+                for x in ext{
+                    if x.oid == oid::Oid::from(&[2, 5, 29, 14]){
+                        let mut ski = x.value.to_vec();
+                        let ski_hex= hex::encode(&ski[2..]);
+                        assert_eq!("1f74d63f29c17474453b05122c3da8bd435902a6", ski_hex);
+                    }
+
+                    if x.oid == oid::Oid::from(&[2, 5, 29, 35]){
+                        let mut aki = x.value.to_vec();
+                        let aki = hex::encode(&aki[4..]);
+                        assert_eq!("b45ae4a5b3ded252f6b9d5a6950feb3ebcc7fdff", aki);
+                    }
+                }
+            },
+            Err(e) => {
+                panic!()
+            }
+        }
+    }
+
+    #[test]
+    fn key_id_test_with_str(){
+
+        let pem: &[u8] = PEM_STR.as_bytes();
+        let pem_inc: &[u8] = include_bytes!("../../test_files/intermediate_ca.crt");
+        assert_eq!(pem, pem_inc);
+
+        let intermediate = pem_to_der(&pem);
+
+        let der = match intermediate{
+            Ok((rem, pem)) => {
+                assert_eq!(rem.is_empty(), true);
+                pem.contents.clone()
+            },
+            Err(e) => {
+                panic!()
+            }
+        };
+
+        let empty = &b""[..];
+
+        let res = parse_x509_der(&der);
+
+        match res{
+            Ok((e, cert)) => {
+                assert_eq!(e, empty);
+
+                let tbs_cert = cert.tbs_certificate;
+
+                let ext = tbs_cert.extensions;
+
+                for x in ext{
+                    if x.oid == oid::Oid::from(&[2, 5, 29, 14]){
+                        let mut ski = x.value.to_vec();
+                        let ski_hex= hex::encode(&ski[2..]);
+                        assert_eq!("1f74d63f29c17474453b05122c3da8bd435902a6", ski_hex);
+                    }
+
+                    if x.oid == oid::Oid::from(&[2, 5, 29, 35]){
+                        let mut aki = x.value.to_vec();
+                        let aki = hex::encode(&aki[4..]);
+                        assert_eq!("b45ae4a5b3ded252f6b9d5a6950feb3ebcc7fdff", aki);
+                    }
+                }
+            },
+            Err(e) => {
+                panic!()
+            }
+        }
+    }
 }
