@@ -1,0 +1,8 @@
+.git
+.gitignore
+.gitmodules
+.DS_Store
+Dockerfile
+Jenkinsfile
+target/
+
