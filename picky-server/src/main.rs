@@ -22,9 +22,7 @@ use crate::configuration::ServerConfig;
 use crate::server::Server;
 
 fn main() {
-    let mut conf = ServerConfig::new();
-    conf.load_cli();
-    conf.load_env();
+    let conf = ServerConfig::new();
 
     init_logs(&conf);
 

@@ -93,22 +93,4 @@ mod tests{
         assert_eq!(encoded, p);
         assert_eq!(decoded, der.to_vec());
     }
-
-    #[test]
-    fn test(){
-        use ring::digest::{Context, Digest, SHA256};
-
-        let p = pem.replace("\n", "");
-        let d = pem_to_der(&p).unwrap();
-
-        let mut context = Context::new(&SHA256);
-        context.update(d.as_slice());
-        let digest = context.finish();
-
-        let d = multihash::encode(Hash::SHA2256,d.as_slice()).unwrap();
-        let a = multihash::decode(d.as_slice()).unwrap();
-
-        assert_eq!(a.digest, digest.as_ref());
-        let test = 1;
-    }
 }
