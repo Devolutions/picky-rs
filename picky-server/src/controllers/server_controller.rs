@@ -81,7 +81,7 @@ pub fn cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncR
     if let Some(multihash) = req.captures().get("api-key").and_then(|c| base64::decode_config(c, URL_SAFE_NO_PAD).ok()){
         let decoded = String::from_utf8_lossy(&multihash);
 
-        if let Ok(certs) = repos.find(decoded.clone().trim_matches('"'){
+        if let Ok(certs) = repos.find(decoded.clone().trim_matches('"')){
             for cert in certs{
                 if let Ok(Some(c)) = repos.get(&cert.value){
                     res.body(c.0);
