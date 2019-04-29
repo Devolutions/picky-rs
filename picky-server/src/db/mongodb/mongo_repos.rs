@@ -161,7 +161,7 @@ impl BackendStorage for MongoRepos{
         Err("No hash found".to_string())
     }
 
-    fn get_cert(&self, hash: &str) -> Result<String, String>{
+    fn get_cert(&self, hash: &str, format: Option<u8>) -> Result<String, String>{
         let doc = doc!{"key": hash};
         let mut model_vec: Vec<Storage> = Vec::new();
         let document_cursor = match self.certificates.get_collection()?.find(Some(doc), None){
@@ -178,7 +178,14 @@ impl BackendStorage for MongoRepos{
         }
 
         if model_vec.len() > 0 {
-            return Ok(utils::der_to_pem(model_vec[0].value.as_bytes()));
+            if let Some(f) = format{
+                if f == 1 {
+                    return Ok(utils::der_to_pem(model_vec[0].value.as_bytes()));
+                } else {
+                    return Ok(model_vec[0].value.clone());
+                }
+            }
+            return Ok(model_vec[0].value.clone());
         }
 
         Err("Error finding cert".to_string())

@@ -13,6 +13,11 @@ const CERT_SUFFIX: &str = "\n-----END CERTIFICATE-----\n";
 const SUBJECT_KEY_IDENTIFIER: &[u64] = &[2, 5, 29, 14];
 const AUTHORITY_KEY_IDENTIFIER_OID: &[u64] = &[2, 5, 29, 35];
 
+pub enum CertFormat{
+    Der = 0,
+    Pem = 1
+}
+
 pub struct ControllerData{
     pub repos: Box<BackendStorage>,
     pub config: ServerConfig
@@ -33,6 +38,8 @@ impl ServerController {
         dispatch.add(Method::GET, "/chain/<api-key>", chains);
         dispatch.add(Method::POST, "/signcert/", sign_cert);
         dispatch.add(Method::POST, "/name/", request_name);
+        dispatch.add(Method::GET, "/health/", health);
+        dispatch.add(Method::GET, "/cert/<format>/<multihash>", cert);
 
         ServerController {
             dispatch
@@ -50,6 +57,20 @@ impl Controller for ServerController{
     }
 }
 
+impl From<String> for CertFormat{
+    fn from(format: String) -> Self{
+        if format.to_lowercase().eq("der"){
+            return CertFormat::Der;
+        } else {
+            return CertFormat::Pem;
+        }
+    }
+}
+
+pub fn health(_controller_data: &ControllerData, _req: &SyncRequest, res: &mut SyncResponse){
+    res.status(StatusCode::OK).body("Everything should be alright!");
+}
+
 pub fn sign_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse){
     res.status(StatusCode::BAD_REQUEST);
     let repo = &controller_data.repos;
@@ -63,7 +84,7 @@ pub fn sign_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut 
 
             if let Ok(ca) = repo.find(ca.trim_matches('"')) {
                 if ca.len() > 0{
-                    if let Ok(ca_cert) = repo.get_cert(&ca[0].value){
+                    if let Ok(ca_cert) = repo.get_cert(&ca[0].value, Some(CertFormat::Pem as u8)){
                         if let Ok(ca_key) = repo.get_key(&ca[0].value){
                             if let Some(cert) = CoreController::generate_certificate_from_csr(&ca_cert, &ca_key, controller_data.config.key_config.hash_type, &csr){
                                 res.body(cert);
@@ -81,15 +102,15 @@ pub fn cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncR
     res.status(StatusCode::BAD_REQUEST);
     let repos = &controller_data.repos;
 
-    if let Some(multihash) = req.captures().get("api-key").and_then(|c| base64::decode_config(c, URL_SAFE_NO_PAD).ok()) {
-        let decoded = String::from_utf8_lossy(&multihash);
-
-        if let Ok(certs) = repos.find(decoded.clone().trim_matches('"')) {
-            for cert in certs {
-                if let Ok(ca_cert) = repos.get_cert(&cert.value) {
+    if let Some(multihash) = req.captures().get("multihash"){
+        if let Some(format) = req.captures().get("format"){
+            if let Ok(ca_cert) = repos.get_cert(multihash, Some(CertFormat::from(format.to_string()) as u8)) {
+                if format.to_lowercase() == "der"{
                     res.body(ca_cert);
-                    res.status(StatusCode::OK);
+                } else {
+                    res.body(format!("{}{}{}", CERT_PREFIX, ca_cert, CERT_SUFFIX));
                 }
+                res.status(StatusCode::OK);
             }
         }
     }
@@ -104,7 +125,7 @@ pub fn chains(controller_data: &ControllerData, req: &SyncRequest, res: &mut Syn
 
         if let Ok(intermediate) = repos.find(decoded.clone().trim_matches('"').trim_matches('\0')) {
             if intermediate.len() > 0{
-                if let Ok(cert) = repos.get_cert(&intermediate[0].value){
+                if let Ok(cert) = repos.get_cert(&intermediate[0].value, Some(CertFormat::Pem as u8)){
                     let mut pem = format!("{}{}{}", CERT_PREFIX, &cert, CERT_SUFFIX);
                     let mut chain = pem.clone();
 
@@ -118,7 +139,7 @@ pub fn chains(controller_data: &ControllerData, req: &SyncRequest, res: &mut Syn
                             key_identifier = aki.clone();
 
                             if let Ok(hash) = repos.get_hash_from_key_identifier(&aki){
-                                if let Ok(cert) = repos.get_cert(&hash){
+                                if let Ok(cert) = repos.get_cert(&hash, Some(CertFormat::Pem as u8)){
                                     pem = format!("{}{}{}", CERT_PREFIX, &cert, CERT_SUFFIX);
                                     chain.push_str(&pem.clone());
                                 } else {
@@ -185,7 +206,7 @@ pub fn generate_intermediate(config: &ServerConfig, repos: &mut Box<BackendStora
         }
     };
 
-    if let Ok(root_cert) = repos.get_cert(&root[0].value){
+    if let Ok(root_cert) = repos.get_cert(&root[0].value, Some(CertFormat::Pem as u8)){
         if let Ok(root_key) = repos.get_key(&root[0].value){
             if let Some(intermediate) = CoreController::generate_intermediate_ca(&root_cert, &root_key, &config.realm, config.key_config.hash_type, config.key_config.key_type){
                 if let Ok(ski) = CoreController::get_key_identifier(&intermediate.certificate_pem, SUBJECT_KEY_IDENTIFIER){

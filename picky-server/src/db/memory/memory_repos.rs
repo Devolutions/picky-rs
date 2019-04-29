@@ -109,10 +109,16 @@ impl BackendStorage for MemoryRepos{
         Err("Hash not found".to_string())
     }
 
-    fn get_cert(&self, hash: &str) -> Result<String, String>{
+    fn get_cert(&self, hash: &str, format: Option<u8>) -> Result<String, String>{
         if let Some(c) = self.cert.get_collection()?.get(hash){
-            let cert = utils::der_to_pem(c.as_bytes());
-            return Ok(cert);
+            let cert;
+            if let Some(f) = format{
+                if f == 1{
+                    cert = utils::der_to_pem(c.as_bytes());
+                    return Ok(cert);
+                }
+            }
+            return Ok(c.to_string());
         }
 
         Err("Cert not found".to_string())

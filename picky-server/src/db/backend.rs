@@ -25,8 +25,8 @@ impl Backend {
         self.db.store(name, cert, key, key_identifier)
     }
 
-    pub fn get_cert(&self, hash: &str) -> Result<String, String>{
-        self.db.get_cert(hash)
+    pub fn get_cert(&self, hash: &str, format: Option<u8>) -> Result<String, String>{
+        self.db.get_cert(hash, format)
     }
 
     pub fn get_key(&self, hash: &str) -> Result<String, String>{
@@ -52,7 +52,7 @@ pub trait BackendStorage: Send + Sync{
     fn init(&mut self) -> Result<(), String>;
     fn store(&mut self, name: &str, cert: &str, key: &str, key_identifier: &str) -> Result<bool, String>;
     fn find(&self, name: &str) -> Result<Vec<Storage>, String>;
-    fn get_cert(&self, hash: &str) -> Result<String, String>;
+    fn get_cert(&self, hash: &str, format: Option<u8>) -> Result<String, String>;
     fn get_key(&self, hash: &str) -> Result<String, String>;
     fn get_key_identifier_from_hash(&self, hash: &str) -> Result<String, String>;
     fn get_hash_from_key_identifier(&self, hash: &str) -> Result<String, String>;
