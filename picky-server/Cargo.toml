@@ -10,8 +10,7 @@ multihash = "0.8.0"
 chrono = "0.4.6"
 picky-core = {path = "../picky-core"}
 config = "0.9"
-#mbedtls = { git = "https://github.com/Devolutions/rust-mbedtls.git", branch = "wayk"}
-mbedtls = { path = "/opt/wayk/dev/rust-mbedtls/mbedtls" }
+mbedtls = { git = "https://github.com/Devolutions/rust-mbedtls.git", branch = "wayk"}
 mongodb = { git = "https://github.com/Devolutions/mongo-rust-driver-prototype.git", features = ["ssl"] }
 bson = "0.13.0"
 serde_json = "1.0.39"
