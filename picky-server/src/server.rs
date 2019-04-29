@@ -5,26 +5,30 @@ use crate::db::mongodb::mongo_repos::MongoRepos;
 use saphir::{Middleware, SyncRequest, SyncResponse, RequestContinuation, StatusCode, header};
 use saphir::Server as SaphirServer;
 use crate::controllers::server_controller::{ServerController, generate_root_ca, generate_intermediate};
+use crate::db::backend::Backend;
+use std::sync::Arc;
 
 pub struct Server{
 }
 
 impl Server{
     pub fn run(config: ServerConfig) {
-        let mongo = MongoConnection::new(&config.database.url).expect("Cannot start Picky without a database");
-        let mut repos = MongoRepos::new(mongo.clone());
-        repos.load_repositories().expect("Picky cannot start without fully initializing its repos");
+        /// Todo check for type of backend
+        /*let mongo = MongoConnection::new(&config.database.url).expect("Cannot start Picky without a database");
+        lest mut repos = MongoRepos::new(mongo.clone());*/
+        let mut repos = Backend::from(&config).db;
+        repos.init().expect("Picky cannot start without fully initializing its repos");
 
 
         info!("Creating root...");
-        generate_root_ca(&config, &repos).and_then(|created|{
+        generate_root_ca(&config, &mut repos).and_then(|created|{
             if created {
                 info!("Root CA Created");
             } else {
                 info!("Root CA already exists");
             }
             info!("Creating intermediate...");
-            generate_intermediate(&config, &repos)
+            generate_intermediate(&config, &mut repos)
         }).map(|created|{
             if created {
                 info!("Intermediate Created");
@@ -35,7 +39,7 @@ impl Server{
 
         let _server = SaphirServer::builder()
             .configure_middlewares(|middle_stack|{
-                middle_stack.apply(AuthMiddleware::new(config.clone()), ["/"].to_vec(), Some(vec![r"^/chain", r"^/json-chain", r"^/signcert", r"^/health", r"^/authority"]))
+                middle_stack.apply(AuthMiddleware::new(config.clone()), ["/"].to_vec(), Some(vec![r"^/chain", r"^/json-chain", r"^/health", r"^/authority"]))
             }).configure_router(|router|{
             let controller = ServerController::new(repos.clone(), config.clone());
             router.add(controller)

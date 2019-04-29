@@ -3,12 +3,41 @@ use mbedtls::hash::Type as HashType;
 use mbedtls::pk::Type as KeyType;
 use std::env;
 use clap::App;
+use crate::db::backend::Backend;
+use std::error::Error;
 
 const DEFAULT_PICKY_REALM: &'static str = "Picky";
 
 const PICKY_REALM_ENV: &'static str = "PICKY_REALM";
 const PICKY_DATABASE_URL_ENV: &'static str = "PICKY_DATABASE_URL";
 const PICKY_API_KEY_ENV: &'static str = "PICKY_API_KEY";
+const PICKY_BACKEND_ENV: &'static str = "PICKY_BACKEND";
+
+#[derive(PartialEq, Clone)]
+pub enum BackendType{
+    MySQL,
+    SQLite,
+    MongoDb,
+    Memory
+}
+
+impl From<&str> for BackendType{
+    fn from(backend: &str) -> Self{
+        match backend{
+            "mysql" => BackendType::MySQL,
+            "sqlite" => BackendType::SQLite,
+            "mongodb" => BackendType::MongoDb,
+            "memory" => BackendType::Memory,
+            _ => BackendType::default()
+        }
+    }
+}
+
+impl Default for BackendType{
+    fn default() -> Self{
+        BackendType::MongoDb
+    }
+}
 
 #[derive(Clone)]
 pub struct ServerConfig{
@@ -16,14 +45,17 @@ pub struct ServerConfig{
     pub api_key: String,
     pub database: Database,
     pub realm: String,
-    pub key_config: KeyConfig
+    pub key_config: KeyConfig,
+    pub backend: BackendType
 }
 
 impl ServerConfig{
     pub fn new() -> Self{
-        ServerConfig::default()
+        let mut config = ServerConfig::default();
+        config.load_cli();
+        config.load_env();
+        config
     }
-
 
     pub fn level_filter(&self) -> LevelFilter {
         match self.log_level.to_lowercase().as_str() {
@@ -37,7 +69,7 @@ impl ServerConfig{
         }
     }
 
-    pub fn load_cli(&mut self) {
+    fn load_cli(&mut self) {
         let yaml = load_yaml!("cli.yml");
         let app = App::from_yaml(yaml);
         let matches = app.get_matches();
@@ -52,18 +84,25 @@ impl ServerConfig{
             None => ()
         }
 
-        match matches.value_of("db_url"){
+        match matches.value_of("db-url"){
             Some(v) => self.database.url = v.to_string(),
             None => ()
         }
 
-        match matches.value_of("api_key"){
+        match matches.value_of("api-key"){
             Some(v) => self.api_key = v.to_string(),
+            None => ()
+        }
+
+        match matches.value_of("backend"){
+            Some(v) => {
+                self.backend = BackendType::from(v);
+            },
             None => ()
         }
     }
 
-    pub fn load_env(&mut self) {
+    fn load_env(&mut self) {
         if let Ok(val) = env::var(PICKY_REALM_ENV){
             self.realm = val;
         }
@@ -75,6 +114,10 @@ impl ServerConfig{
         if let Ok(val) = env::var(PICKY_DATABASE_URL_ENV){
             self.database.url = val;
         }
+
+        if let Ok(val) = env::var(PICKY_BACKEND_ENV){
+            self.backend = BackendType::from(val.as_str());
+        }
     }
 }
 
@@ -85,7 +128,8 @@ impl Default for ServerConfig{
             api_key: String::default(),
             database: Database::default(),
             realm: DEFAULT_PICKY_REALM.to_string(),
-            key_config: KeyConfig::default()
+            key_config: KeyConfig::default(),
+            backend: BackendType::default()
         }
     }
 }
@@ -127,7 +171,5 @@ mod tests{
         let mut conf = ServerConfig::new();
         conf.load_cli();
         conf.load_env();
-
-
     }
 }

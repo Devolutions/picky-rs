@@ -1,4 +1,4 @@
-use crate::controllers::db_controller::{Repo, Storage};
+use crate::db::backend::{Repo, Storage};
 use crate::db::mongodb::mongo_repos::RepositoryError;
 use crate::db::mongodb::mongo_connection::MongoConnection;
 use mongodb::coll::Collection;
@@ -66,7 +66,7 @@ impl Repo for MongoRepo{
         }
     }
 
-    fn store(&self, key: &str, value: &str) -> Result<(), String>{
+    fn store(&mut self, key: &str, value: &str) -> Result<(), String>{
         let model = Storage{
             key: key.to_string(),
             value: value.to_string()
