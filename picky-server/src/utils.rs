@@ -37,6 +37,11 @@ pub fn multihash_encode(value: &[u8]) -> Result<String, String>{
     }
 }
 
+pub fn sha256_to_multihash(hash: &str) -> Result<String, String>{
+    let mut hash = format!("{}{}", "1220", hash);
+    Ok(hash)
+}
+
 pub fn der_to_string(value: &[u8]) -> String{
     to_hex(value)
 }
@@ -46,6 +51,7 @@ mod tests{
     use super::*;
     use core::str::Matches;
     use regex::Regex;
+    use multihash::Hash;
 
     const pem: &str = "-----BEGIN CERTIFICATE-----\n\
     MIIEwTCCAqmgAwIBAgIAMA0GCSqGSIb3DQEBCwUAMBIxEDAOBgNVBAMMB0NOPXRl\n\
@@ -92,5 +98,20 @@ mod tests{
 
         assert_eq!(encoded, p);
         assert_eq!(decoded, der.to_vec());
+    }
+
+    #[test]
+    fn test_der(){
+        use mbedtls::hash::{Md, Type};
+
+        let p = "MIIFFzCCAv+gAwIBAgIAMA0GCSqGSIb3DQEBCwUAMB0xGzAZBgNVBAMMEm15X2Rlbi5sb2wgUm9vdCBDQTAeFw0xOTA0MjYxOTU3MzRaFw0yOTA0MjMxOTU3MzRaMB0xGzAZBgNVBAMMEm15X2Rlbi5sb2wgUm9vdCBDQTCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBAMeocTRad5IZ8chKiGMtIkmzxigUwTB6YEdsaTimfsr3qZCsFd+eRHmevlamAl8SuNCzc9vzygFRgMDU4Cg15yKB5p7UGKaktBGPLEcpQpQ2bIFKP4QSrsEIDGibMhY9NUmU5RWABpD9Q0GvWYorIl1aVnBNL8fectPFwTyM+XYhezXxcc5p6LkVGhoSi25ZdWW2pZH2bdUqFEqyR/fG1IJiXjFXriYUy+QpOySWu2mbWbBaom0QhKJBXavywEr9Nz6ipBKWJkm6owwUUoPLvPqp9VaQk+10dwbQxLuLSaV1CwSiu0uv7PJKqpTOtIYDqIdA+G5/avQkaYoqIhoaoWRtZK8cyd6wdyBp8djBWrBO8ioKZsc8kQ/46TgaBkOYWpT/XLbWWNlO3dRl/ZbBcaAapPl1gsmqL4ZhqU+X/mG/VRky09Nuzfkp7vQ3dBjOFY7HDZfwPl8zhJNomqv7rfA75Al8g7HyikQYkn5JUb0kJ1jOSsvmuoeuVTW8f1BsPUcLURXpCabPE+DqdTvdS72GLhjwN76TiXC3GpL5wnGH8VBJpAANHIxXcyDSHcIISDHM3tEkfZo1zwLWokK4SXf4PWTfPIw3ibvHs0+0u67amtOF8nkw8uMyANCnI+KUrLfZ2Zuf46dKulmamqzY8M01hyk+nQwbcSeft8zyxZ61AgMBAAGjYzBhMA8GA1UdEwQIMAYBAf8CAQEwDgYDVR0PAQH/BAQDAgGuMB0GA1UdDgQWBBT4Me4n9TU9enVKqZfYlXS8kTQvaTAfBgNVHSMEGDAWgBT4Me4n9TU9enVKqZfYlXS8kTQvaTANBgkqhkiG9w0BAQsFAAOCAgEAIOb304jnSyDawALJS3DNyu9PdjKb8H0OOLxbm5SBwzx4X6xBJGdQyagIoaBsyPfDMKOxx8h+kJkbFhT7wZRSWFJqRBSVpINN01bWeANZQEtCRDbbzK9p3irbGK01J3lzGeGP81lZS3QBoR2gIyPvZdw3Heh8NBMBXtfmf2tx645R4+EeOlITvOBavZC+BHh3KqKylSe2PG/v9N/8piD2171XbQYqo1tEnUgu9JutvilALeCPrc5QtEanZPw+xKYn7/MXwduHOy9acWLR863gezCWflL6bmy5YauFZEouY36+N2Za7gfnueNHuahTGymEZI+vsiT0jvCBYFGlv0Oupky5jtfSEXIyYAqQ6jw6f5rWjI9yabHHjA7kpgnT3p/9r67CivB1fMqVi99z7L0GQQbwLp5cgMYJHAfgMNMNggtrDtnPR4Zolk1MZNerLiX82E0/ObT2k0gwkykfYhILXeA/cITi6+1O64+iG9OKflTV4tS7lvKFkYUgWugR4BKKIDG5YKz4DA72LNgnP8ssLNxgaT0yf/EJNO/1ui3a6LkOG1jqiA5pEOM78mC+aG83FM72dXqnuLjy5SXBHshyUSnTClTbXpAp0sAouFctaPWRcd9bDVkII59nL5PJCWkBYQFPLnnL/8jMFnSlZxis+A1AEnYmABMFX3ei6nZW9AA=";
+        let d = pem_to_der(p).unwrap();
+
+        let mut res: [u8; 2048] = [0u8; 2048];
+        let hash = Md::hash(Type::Sha256, &d, &mut res).unwrap();
+        let hex = to_hex(&res[0..hash]);
+
+        assert_eq!(hex, "6a6eba242e7a03c59375634409d720a60750e5cd74c539ed8d52c9343b1abed4");
+
     }
 }

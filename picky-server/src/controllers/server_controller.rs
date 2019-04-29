@@ -104,13 +104,27 @@ pub fn cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncR
 
     if let Some(multihash) = req.captures().get("multihash"){
         if let Some(format) = req.captures().get("format"){
-            if let Ok(ca_cert) = repos.get_cert(multihash, Some(CertFormat::from(format.to_string()) as u8)) {
-                if format.to_lowercase() == "der"{
-                    res.body(ca_cert);
-                } else {
-                    res.body(format!("{}{}{}", CERT_PREFIX, ca_cert, CERT_SUFFIX));
+            match repos.get_cert(multihash, Some(CertFormat::from(format.to_string()) as u8)) {
+                Ok(ca_cert) => {
+                    if format.to_lowercase() == "der"{
+                        res.body(ca_cert);
+                    } else {
+                        res.body(format!("{}{}{}", CERT_PREFIX, ca_cert, CERT_SUFFIX));
+                    }
+                    res.status(StatusCode::OK);
+                },
+                Err(e) => {
+                    if let Ok(multihash) = sha256_to_multihash(multihash) {
+                        if let Ok(ca_cert) = repos.get_cert(&multihash, Some(CertFormat::from(format.to_string()) as u8)){
+                            if format.to_lowercase() == "der"{
+                                res.body(ca_cert);
+                            } else {
+                                res.body(format!("{}{}{}", CERT_PREFIX, ca_cert, CERT_SUFFIX));
+                            }
+                            res.status(StatusCode::OK);
+                        }
+                    }
                 }
-                res.status(StatusCode::OK);
             }
         }
     }
