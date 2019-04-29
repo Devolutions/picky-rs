@@ -39,7 +39,7 @@ impl Server{
 
         let _server = SaphirServer::builder()
             .configure_middlewares(|middle_stack|{
-                middle_stack.apply(AuthMiddleware::new(config.clone()), ["/"].to_vec(), Some(vec![r"^/chain", r"^/json-chain", r"^/signcert", r"^/health", r"^/authority"]))
+                middle_stack.apply(AuthMiddleware::new(config.clone()), ["/"].to_vec(), Some(vec![r"^/chain", r"^/json-chain", r"^/health", r"^/authority"]))
             }).configure_router(|router|{
             let controller = ServerController::new(repos.clone(), config.clone());
             router.add(controller)

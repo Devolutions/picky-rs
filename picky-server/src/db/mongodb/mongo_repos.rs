@@ -123,18 +123,19 @@ impl BackendStorage for MongoRepos{
 
     fn get_key_identifier_from_hash(&self, hash: &str) -> Result<String, String>{
         let hash = hash.to_string();
+        let storage: Storage;
         let doc = doc!{"value": hash};
 
-        let opt: Option<Document> = match self.key_identifiers.get_collection()?.find_one(Some(doc), None){
-            Ok(key_identifier) => key_identifier,
+        let opt = match self.key_identifiers.get_collection()?.find_one(Some(doc), None){
+            Ok(hash) => hash,
             Err(e) => return Err(e.to_string())
         };
 
-        if let Some(key_identifier_doc) = opt{
-            let key_identifier: Storage = match from_bson(Bson::Document(key_identifier_doc)){
-                Ok(k) => return Ok(k),
-                Err(e) => return Err(e.to_string())
-            };
+        if let Some(model_doc) = opt{
+            if let Ok(model) = from_bson(Bson::Document(model_doc)){
+                storage = model;
+                return Ok(storage.key);
+            }
         }
 
         Err("No key identifier found".to_string())
@@ -142,18 +143,19 @@ impl BackendStorage for MongoRepos{
 
     fn get_hash_from_key_identifier(&self, key_identifier: &str) -> Result<String, String>{
         let key_identifier= key_identifier.to_string();
-        let doc = doc!{"key_identifier": key_identifier};
+        let storage: Storage;
+        let doc = doc!{"key": key_identifier};
 
-        let opt: Option<Document> = match self.key_identifiers.get_collection()?.find_one(Some(doc), None){
+        let opt = match self.key_identifiers.get_collection()?.find_one(Some(doc), None){
             Ok(hash) => hash,
             Err(e) => return Err(e.to_string())
         };
 
-        if let Some(hash_doc) = opt{
-            let hash: Storage = match from_bson(Bson::Document(hash_doc)){
-                Ok(h) => return Ok(h),
-                Err(e) => return Err(e.to_string())
-            };
+        if let Some(model_doc) = opt{
+            if let Ok(model) = from_bson(Bson::Document(model_doc)){
+                storage = model;
+                return Ok(storage.value);
+            }
         }
 
         Err("No hash found".to_string())
