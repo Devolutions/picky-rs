@@ -89,20 +89,16 @@ impl BackendStorage for MongoRepos{
         Ok(())
     }
 
-    fn store(&mut self, name: &str, cert: &str, key: &str, key_identifier: &str) -> Result<bool, String>{
-        if let Ok(mut der_cert) = utils::pem_to_der(cert){
-            if let Ok(mut der_cert_hash) = utils::multihash_encode(der_cert.as_slice()){
-                if let Ok(mut der_key) = utils::pem_to_der(key){
-                    self.name.insert(name, multihash_to_string(&der_cert_hash))?;
-                    self.certificates.insert(&multihash_to_string(&der_cert_hash), u8_to_i8_vec(der_cert.as_slice()))?;
-                    self.keys.insert(&multihash_to_string(&der_cert_hash), u8_to_i8_vec(der_key.as_slice()))?;
-                    self.key_identifiers.insert(key_identifier, multihash_to_string(&der_cert_hash))?;
-                }
+    fn store(&mut self, name: &str, cert: &[u8], key: &[u8], key_identifier: &str) -> Result<bool, String>{
+        if let Ok(mut cert_hash) = utils::multihash_encode(cert){
+                self.name.insert(name, multihash_to_string(&cert_hash))?;
+                self.certificates.insert(&multihash_to_string(&cert_hash), u8_to_i8_vec(cert))?;
+                self.keys.insert(&multihash_to_string(&cert_hash), u8_to_i8_vec(key))?;
+                self.key_identifiers.insert(key_identifier, multihash_to_string(&cert_hash))?;
                 return Ok(true);
-            }
-            return Err("Can\'t encode certificate".to_string());
         }
-        Err("Invalid certificate".to_string())
+
+        Err("Can\'t encode certificate".to_string())
     }
 
     fn find(&self, name: &str) -> Result<Vec<Model<String>>, String>{
@@ -142,7 +138,7 @@ impl BackendStorage for MongoRepos{
         if model_vec.len() > 0 {
             if let Some(f) = format{
                 if f == 1 {
-                    return Ok(der_to_pem(&i8_to_u8_vec(model_vec[0].value.as_slice())));
+                    return Ok(i8_to_u8_vec(&model_vec[0].value));
                 } else {
                     return Ok(i8_to_u8_vec(&model_vec[0].value));
                 }
@@ -170,7 +166,7 @@ impl BackendStorage for MongoRepos{
         }
 
         if model_vec.len() > 0 {
-            return Ok(der_to_pem(&i8_to_u8_vec(&model_vec[0].value)));
+            return Ok(i8_to_u8_vec(&model_vec[0].value));
         }
 
         Err("Error finding key".to_string())

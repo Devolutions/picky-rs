@@ -32,9 +32,9 @@ pub struct Cert{
     pub common_name: String,
     pub cert_type: CertificateType,
     pub issuer: Option<String>,
-    pub issuer_key: Option<String>,
+    pub issuer_key: Option<Vec<u8>>,
     pub keys: Keys,
-    pub certificate_pem: String,
+    pub certificate_der: Vec<u8>,
 }
 
 impl Cert{
@@ -45,7 +45,7 @@ impl Cert{
             issuer_key: None,
             keys: Keys::new(mbedtls::pk::Type::Rsa, 4096),
             cert_type: certificate_type,
-            certificate_pem: String::default(),
+            certificate_der: Vec::new(),
         }
     }
 
@@ -54,7 +54,7 @@ impl Cert{
            key_type: Option<mbedtls::pk::Type>,
            cn: &str,
            issuer: Option<&str>,
-           issuer_key: Option<&str>,
+           issuer_key: Option<&[u8]>,
            key: Option<Keys>,
            valid_from: X509Time,
            valid_to: X509Time, ca: bool) -> Self{
@@ -80,12 +80,12 @@ impl Cert{
         self
     }
 
-    fn set_issuer(&mut self, issuer: Option<&str>, issuer_key: Option<&str>) -> &mut Self{
+    fn set_issuer(&mut self, issuer: Option<&str>, issuer_key: Option<&[u8]>) -> &mut Self{
         if let Some(i) = issuer{
             self.issuer = Some(i.to_string());
 
             if let Some(k) = issuer_key{
-                self.issuer_key = Some(k.to_string())
+                self.issuer_key = Some(k.to_vec())
             }
         }
         self
@@ -102,7 +102,7 @@ impl Cert{
     }
 
     fn create_serial(&mut self, hash_type: &mbedtls::hash::Type) -> Result<Vec<u8>, String>{
-        let mut pk =  Pk::from_private_key(format!("{}{}", self.keys.key_pem, "\0").as_bytes(), None).unwrap();
+        let mut pk =  Pk::from_private_key(&self.keys.key_der, None).unwrap();
         let pub_key = pk.write_public_pem_string().unwrap();
         let mut out = [0u8; 60];
 
@@ -118,7 +118,7 @@ impl Cert{
     fn generate_certificate(&mut self, hash_type: mbedtls::hash::Type, valid_from: X509Time, valid_to: X509Time, ca: bool, pathlen: Option<u32>) -> &mut Self{
         if self.issuer.is_none(){
             self.issuer = Some(self.common_name.clone());
-            self.issuer_key = Some(self.keys.key_pem.clone());
+            self.issuer_key = Some(self.keys.key_der.clone());
         } else {
             if let Ok(ca) = Certificate::from_pem(self.issuer.clone().unwrap().as_bytes()){
                 self.issuer = Some(ca.subject().unwrap());
@@ -131,12 +131,12 @@ impl Cert{
         let mut issuer_key;
         let key_usage;
         if ca{
-            subject_key = Keys::get_pk_from_private(format!("{}{}", self.keys.key_pem.clone(), "\0").as_bytes());
-            issuer_key = Keys::get_pk_from_private(format!("{}{}", self.issuer_key.clone().unwrap().clone(), "\0").as_bytes());
+            subject_key = Keys::get_pk_from_private(&self.keys.key_der.clone());
+            issuer_key = Keys::get_pk_from_private(&self.issuer_key.clone().unwrap().clone());
             key_usage = key_usage::DIGITAL_SIGNATURE | key_usage::KEY_CERT_SIGN | key_usage::CRL_SIGN | key_usage::KEY_ENCIPHERMENT | key_usage::KEY_AGREEMENT;
         } else {
-            subject_key = Keys::get_pk_from_public(format!("{}{}", self.keys.key_pem.clone(), "\0").as_bytes());
-            issuer_key = Keys::get_pk_from_private(format!("{}{}", self.issuer_key.clone().unwrap().clone(), "\0").as_bytes());
+            subject_key = Keys::get_pk_from_public(&self.keys.key_der.clone());
+            issuer_key = Keys::get_pk_from_private(&self.issuer_key.clone().unwrap().clone());
             key_usage = key_usage::DIGITAL_SIGNATURE | key_usage::KEY_ENCIPHERMENT;
         }
 
@@ -145,7 +145,7 @@ impl Cert{
             Err(e) => Vec::new()
         };*/
 
-        self.certificate_pem = certificate::Builder::new()
+        self.certificate_der = certificate::Builder::new()
             .subject_key(&mut subject_key)
             .subject_with_nul(&format!("CN={}{}", self.common_name, "\0")).unwrap()
             .issuer_key(&mut issuer_key)
@@ -157,8 +157,7 @@ impl Cert{
             .key_usage(key_usage).unwrap()
             .set_subject_key_identifier().unwrap()
             .set_authority_key_identifier().unwrap()
-            .write_pem_string(&mut get_rng(&mut entropy)).unwrap();
-        self.certificate_pem.push_str("\0");
+            .write_der_vec(&mut get_rng(&mut entropy)).unwrap();
         self
     }
 
@@ -176,9 +175,9 @@ impl Cert{
         cert
     }
 
-    pub fn generate_intermediate(root: &str, root_key: &str, realm: &str, hash_type: mbedtls::hash::Type, key_type: mbedtls::pk::Type, bits: u32) -> Cert{
+    pub fn generate_intermediate(root: &[u8], root_key: &[u8], realm: &str, hash_type: mbedtls::hash::Type, key_type: mbedtls::pk::Type, bits: u32) -> Cert{
         let keys = Keys::new(key_type, bits);
-        let pk = Keys::get_pk_from_private(format!("{}{}", keys.key_pem, "\0").as_bytes());
+        let pk = Keys::get_pk_from_private(&keys.key_der);
 
         let csr = CertificateSignRequest::generate_csr(&format!("CN={} Authority", realm), pk);
 
@@ -189,7 +188,7 @@ impl Cert{
             hash_type,
             Some(key_type),
             &(csr_struct.subject().unwrap().trim_start_matches("CN=")),
-            Some(root),
+            Some(&String::from_utf8_lossy(root)),
             Some(root_key),
             Some(keys.clone()),
             X509Time::from(Utc::now()),
@@ -199,7 +198,7 @@ impl Cert{
         intermediate
     }
 
-    pub fn generate_from_csr(csr: &str, authority: &str, authority_key: &str, hash_type: mbedtls::hash::Type) -> Cert{
+    pub fn generate_from_csr(csr: &str, authority: &[u8], authority_key: &[u8], hash_type: mbedtls::hash::Type) -> Cert{
         let mut csr_struct = Csr::from_pem(format!("{}{}", csr, "\0").as_bytes()).unwrap();
         let mut leaf_key = csr_struct.public_key_mut();
 
@@ -210,7 +209,7 @@ impl Cert{
             hash_type,
             None,
             &csr_struct.subject().unwrap(),
-            Some(authority),
+            Some(&String::from_utf8_lossy(authority)),
             Some(authority_key),
             Some(leaf_key),
             X509Time::from(Utc::now()),

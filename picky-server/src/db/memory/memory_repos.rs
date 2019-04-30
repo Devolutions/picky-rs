@@ -54,20 +54,15 @@ impl BackendStorage for MemoryRepos{
         Ok(())
     }
 
-    fn store(&mut self, name :&str, cert: &str, key: &str, key_identifier: &str) -> Result<bool, String>{
-        if let Ok(der_cert) = utils::pem_to_der(cert){
-            if let Ok(der_cert_hash) = utils::multihash_encode(der_cert.as_slice()){
-                if let Ok(der_key) = utils::pem_to_der(key){
-                    self.name.insert(name, utils::multihash_to_string(&der_cert_hash))?;
-                    self.cert.insert(&utils::multihash_to_string(&der_cert_hash), der_cert)?;
-                    self.keys.insert(&utils::multihash_to_string(&der_cert_hash), der_key)?;
-                    self.key_identifiers.insert(key_identifier, utils::multihash_to_string(&der_cert_hash))?;
-                }
-                return Ok(true);
-            }
-            return Err("Can\'t encode certificate".to_string());
+    fn store(&mut self, name :&str, cert: &[u8], key: &[u8], key_identifier: &str) -> Result<bool, String>{
+        if let Ok(cert_hash) = utils::multihash_encode(cert){
+            self.name.insert(name, utils::multihash_to_string(&cert_hash))?;
+            self.cert.insert(&utils::multihash_to_string(&cert_hash), cert.to_vec())?;
+            self.keys.insert(&utils::multihash_to_string(&cert_hash), key.to_vec())?;
+            self.key_identifiers.insert(key_identifier, utils::multihash_to_string(&cert_hash))?;
+            return Ok(true);
         }
-        Err("Invalide certificate".to_string())
+        Err("Can\'t encode certificate".to_string())
     }
 
     fn find(&self, name: &str) -> Result<Vec<Model<String>>, String>{

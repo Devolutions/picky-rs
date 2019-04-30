@@ -12,7 +12,7 @@ use mbedtls::rng::{CtrDrbg};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Keys{
-    pub key_pem: String,
+    pub key_der: Vec<u8>,
 }
 
 impl Keys{
@@ -25,16 +25,16 @@ impl Keys{
 
     pub fn new_from_pk(pk: &mut Pk) -> Self{
         Keys{
-            key_pem: {
-                pk.write_private_pem_string().unwrap()
+            key_der: {
+                pk.write_private_der_vec().unwrap()
             }
         }
     }
 
     pub fn new_from_pk_public(pk: &mut Pk) -> Self{
         Keys{
-            key_pem: {
-                pk.write_public_pem_string().unwrap()
+            key_der: {
+                pk.write_public_der_vec().unwrap()
             }
         }
     }
@@ -61,11 +61,11 @@ mod tests{
         let key = Keys::new_from_pk(&mut pk);
 
         let pub_key = pk.write_public_pem_string().unwrap();
-        let private_key = pk.write_private_pem_string().unwrap();
+        let private_key = pk.write_private_der_vec().unwrap();
 
-        let key_pk = Keys::get_pk_from_public(key.key_pem.as_bytes());
+        let key_pk = Keys::get_pk_from_public(&key.key_der);
 
-        assert_eq!(private_key, key.key_pem);
+        assert_eq!(private_key, key.key_der);
         assert_eq!(key_pk.rsa_public_exponent().unwrap(), 0x10001);
     }
 }
