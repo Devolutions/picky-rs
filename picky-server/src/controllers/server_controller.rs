@@ -236,3 +236,17 @@ pub fn generate_intermediate(config: &ServerConfig, repos: &mut Box<BackendStora
 
     Err("Error while creating intermediate".to_string())
 }
+
+pub fn rebuild(repos: &mut Box<BackendStorage>) -> Result<(), String>{
+    if let Ok(result) = repos.rebuild(){
+        for res in result{
+            if let Ok(ski) = CoreController::get_key_identifier(&res.1, SUBJECT_KEY_IDENTIFIER){
+                if let Err(e) = repos.store(&res.0, &res.1, &res.2, &ski){
+                    return Err(e);
+                }
+            }
+        }
+    }
+
+    Ok(())
+}

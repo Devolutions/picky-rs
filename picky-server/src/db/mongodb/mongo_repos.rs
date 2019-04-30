@@ -13,6 +13,7 @@ const REPO_CERTIFICATE: &str = "Certificate Store";
 const REPO_KEY: &str = "Key Store";
 const REPO_CERTNAME: &str = "Name Store";
 const REPO_CERTKEY: &str = "Key Identifier Store";
+const OLD_REPO_NAME: &str = "certificate";
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -84,6 +85,7 @@ impl BackendStorage for MongoRepos{
         if let Err(e) = self.load_repositories(){
             return Err(format!("{:?}", e));
         }
+
         Ok(())
     }
 
@@ -216,5 +218,44 @@ impl BackendStorage for MongoRepos{
 
     fn clone_box(&self) -> Box<BackendStorage>{
         Box::new(self.clone())
+    }
+
+    fn rebuild(&mut self) -> Result<Vec<(String, String, String)>, ()>{
+        let mut old_repo: MongoRepo = Default::default();
+        old_repo.init(self.db_instance.clone(), OLD_REPO_NAME);
+        if let Ok(coll) = old_repo.get_collection(){
+            if let Ok(cursor) = coll.find(None, None){
+                let mut datas = Vec::new();
+
+                for res in cursor{
+                    let mut common_name = String::default();
+                    let mut cert_pem = String::default();
+                    let mut key = String::default();
+
+                    if let Ok(item) = res{
+                        if let Some(&Bson::String(ref cert)) = item.get("cert") {
+                            cert_pem = cert.to_string();
+
+                            if let Some(&Bson::String(ref cn)) = item.get("common_name") {
+                                common_name = cn.to_string();
+
+                                if let Some(&Bson::String(ref k)) = item.get("key") {
+                                    key = k.to_string();
+
+                                    datas.push((common_name, cert_pem, key));
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if datas.len() > 0 {
+                    return Ok(datas);
+                }
+            }
+        }
+
+        info!("Could not find old picky repo. Initializing new certificates...");
+        Err(())
     }
 }

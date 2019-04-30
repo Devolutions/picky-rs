@@ -78,7 +78,12 @@ impl Repo for MongoRepo{
         };
 
         if let Bson::Document(document) = serialized_model {
-            if let Err(e) = self.get_collection()?.insert_one(document, None){
+            if let Ok(cursor) = self.get_collection()?.find(Some(document.clone()), None){
+                info!("Data already found in database...");
+                return Ok(())
+            }
+
+            if let Err(e) = self.get_collection()?.insert_one(document.clone(), None){
                 return Err(e.to_string());
             }
             Ok(())
