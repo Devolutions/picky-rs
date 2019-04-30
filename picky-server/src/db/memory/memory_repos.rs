@@ -1,14 +1,14 @@
 use crate::db::memory::memory_repo::MemoryRepo;
 use std::collections::HashMap;
 use crate::utils;
-use crate::db::backend::{BackendStorage, Storage, Repo};
+use crate::db::backend::{BackendStorage, Model, Repo};
 
 #[derive(Clone)]
 pub struct MemoryRepos{
-    pub name: MemoryRepo,
-    pub cert: MemoryRepo,
-    pub keys: MemoryRepo,
-    pub key_identifiers: MemoryRepo
+    pub name: MemoryRepo<String>,
+    pub cert: MemoryRepo<Vec<u8>>,
+    pub keys: MemoryRepo<Vec<u8>>,
+    pub key_identifiers: MemoryRepo<String>
 }
 
 impl MemoryRepos{
@@ -58,10 +58,10 @@ impl BackendStorage for MemoryRepos{
         if let Ok(der_cert) = utils::pem_to_der(cert){
             if let Ok(der_cert_hash) = utils::multihash_encode(der_cert.as_slice()){
                 if let Ok(der_key) = utils::pem_to_der(key){
-                    self.name.store(name, &der_cert_hash).expect("Error storing name");
-                    self.cert.store(&der_cert_hash, &utils::der_to_string(der_cert.as_slice())).expect("Error storing cert");
-                    self.keys.store(&der_cert_hash, &utils::der_to_string(der_key.as_slice())).expect("Error storing keys");
-                    self.key_identifiers.store(key_identifier, &der_cert_hash).expect("Error storing key identifier");
+                    self.name.insert(name, utils::multihash_to_string(&der_cert_hash))?;
+                    self.cert.insert(&utils::multihash_to_string(&der_cert_hash), der_cert)?;
+                    self.keys.insert(&utils::multihash_to_string(&der_cert_hash), der_key)?;
+                    self.key_identifiers.insert(key_identifier, utils::multihash_to_string(&der_cert_hash))?;
                 }
                 return Ok(true);
             }
@@ -70,11 +70,11 @@ impl BackendStorage for MemoryRepos{
         Err("Invalide certificate".to_string())
     }
 
-    fn find(&self, name: &str) -> Result<Vec<Storage>, String>{
+    fn find(&self, name: &str) -> Result<Vec<Model<String>>, String>{
         let mut model_vec = Vec::new();
 
         if let Some(model) = self.name.get_collection()?.get(name){
-            model_vec.push(Storage{
+            model_vec.push(Model{
                 key: name.to_string(),
                 value: model.to_string()
             });
@@ -109,24 +109,24 @@ impl BackendStorage for MemoryRepos{
         Err("Hash not found".to_string())
     }
 
-    fn get_cert(&self, hash: &str, format: Option<u8>) -> Result<String, String>{
+    fn get_cert(&self, hash: &str, format: Option<u8>) -> Result<Vec<u8>, String>{
         if let Some(c) = self.cert.get_collection()?.get(hash){
             let cert;
             if let Some(f) = format{
                 if f == 1{
-                    cert = utils::der_to_pem(c.as_bytes());
+                    cert = utils::der_to_pem(c);
                     return Ok(cert);
                 }
             }
-            return Ok(c.to_string());
+            return Ok(c.clone());
         }
 
         Err("Cert not found".to_string())
     }
 
-    fn get_key(&self, hash: &str) -> Result<String, String>{
+    fn get_key(&self, hash: &str) -> Result<Vec<u8>, String>{
         if let Some(k) = self.keys.get_collection()?.get(hash){
-            let key = utils::der_to_pem(k.as_bytes());
+            let key = utils::der_to_pem(k);
             return Ok(key);
         }
 
@@ -137,7 +137,7 @@ impl BackendStorage for MemoryRepos{
         Box::new(self.clone())
     }
 
-    fn rebuild(&mut self) -> Result<Vec<(String, String, String)>, ()>{
+    /*fn rebuild(&mut self) -> Result<Vec<(String, String, String)>, ()>{
         Err(())
-    }
+    }*/
 }

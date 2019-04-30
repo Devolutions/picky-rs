@@ -5,9 +5,9 @@ use hex::decode as hex_decode;
 
 const PICKY_HASH: Hash =  Hash::SHA2256;
 
-pub fn der_to_pem(der: &[u8]) -> String{
-    let der = hex_decode(der).unwrap();
-    base64_encode(der.as_slice())
+pub fn der_to_pem(der: &[u8]) -> Vec<u8>{
+    //let der = hex_decode(der).unwrap();
+    base64_encode(der).as_bytes().to_vec()
 }
 
 pub fn pem_to_der(pem: &str) -> Result<Vec<u8>, String>{
@@ -30,9 +30,20 @@ pub fn pem_to_der(pem: &str) -> Result<Vec<u8>, String>{
     }
 }
 
-pub fn multihash_encode(value: &[u8]) -> Result<String, String>{
+pub fn multihash_encode(value: &[u8]) -> Result<Vec<u8>, String>{
     match encode(PICKY_HASH, value){
-        Ok(result) => Ok(to_hex(result.as_slice())),
+        Ok(result) => Ok(result),
+        Err(e) => Err(e.to_string())
+    }
+}
+
+pub fn multihash_to_string(value: &[u8]) -> String{
+    to_hex(value)
+}
+
+pub fn multihash_decode(value: &[u8]) -> Result<Vec<u8>, String>{
+    match decode(value) {
+        Ok(result) => Ok(result.digest.to_vec()),
         Err(e) => Err(e.to_string())
     }
 }
@@ -44,6 +55,22 @@ pub fn sha256_to_multihash(hash: &str) -> Result<String, String>{
 
 pub fn der_to_string(value: &[u8]) -> String{
     to_hex(value)
+}
+
+pub fn u8_to_i8_vec(data: &[u8]) -> Vec<i8>{
+    let mut res: Vec<i8> = Vec::new();
+    for u in data{
+        res.push(u.clone() as i8);
+    }
+    res
+}
+
+pub fn i8_to_u8_vec(data: &[i8]) -> Vec<u8>{
+    let mut res: Vec<u8> = Vec::new();
+    for i in data{
+        res.push(i.clone() as u8);
+    }
+    res
 }
 
 #[cfg(test)]

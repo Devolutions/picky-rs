@@ -1,4 +1,4 @@
-use crate::db::backend::{Repo, Storage};
+use crate::db::backend::{Repo, Model};
 use crate::db::mongodb::mongo_repos::RepositoryError;
 use crate::db::mongodb::mongo_connection::MongoConnection;
 use mongodb::coll::Collection;
@@ -7,47 +7,53 @@ use bson::Bson;
 use bson::Document;
 use bson::{to_bson, from_bson};
 use serde::{Deserialize, Serialize};
+use std::marker::PhantomData;
 
-pub struct MongoRepo{
+pub struct MongoRepo<T>{
     db_instance: Option<MongoConnection>,
-    repo_name: String
+    repo_name: String,
+    pd: PhantomData<T>
 }
 
-impl MongoRepo{
+impl <T>MongoRepo<T>{
     pub fn new(name: &str) -> Self{
         MongoRepo{
             db_instance: None,
-            repo_name: name.to_string()
+            repo_name: name.to_string(),
+            pd: PhantomData
         }
     }
 }
 
-impl Clone for MongoRepo{
+impl <T>Clone for MongoRepo<T>{
     fn clone(&self) -> Self{
         if let Some(ref db) = self.db_instance{
             MongoRepo{
                 db_instance: Some(db.clone()),
-                repo_name: self.repo_name.clone()
+                repo_name: self.repo_name.clone(),
+                pd: PhantomData
             }
         } else {
             MongoRepo{
                 db_instance: None,
-                repo_name: self.repo_name.clone()
+                repo_name: self.repo_name.clone(),
+                pd: PhantomData
             }
         }
     }
 }
 
-impl Default for MongoRepo{
+impl <T>Default for MongoRepo<T>{
     fn default() -> Self{
         MongoRepo{
             db_instance: None,
-            repo_name: String::default()
+            repo_name: String::default(),
+            pd: PhantomData
         }
     }
 }
 
-impl Repo for MongoRepo{
+impl<T> Repo<T> for MongoRepo<T> where T: Clone + Serialize{
     type Instance = MongoConnection;
     type RepoError = RepositoryError;
     type RepoCollection = Collection;
@@ -66,10 +72,10 @@ impl Repo for MongoRepo{
         }
     }
 
-    fn store(&mut self, key: &str, value: &str) -> Result<(), String>{
-        let model = Storage{
+    fn insert(&mut self, key: &str, value: T) -> Result<(), String>{
+        let model = Model{
             key: key.to_string(),
-            value: value.to_string()
+            value
         };
 
         let serialized_model = match to_bson(&model){
@@ -79,8 +85,10 @@ impl Repo for MongoRepo{
 
         if let Bson::Document(document) = serialized_model {
             if let Ok(cursor) = self.get_collection()?.find(Some(document.clone()), None){
-                info!("Data already found in database...");
-                return Ok(())
+                if cursor.count() > 0{
+                    info!("Data already found in database...");
+                    return Ok(())
+                }
             }
 
             if let Err(e) = self.get_collection()?.insert_one(document.clone(), None){

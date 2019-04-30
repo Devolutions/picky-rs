@@ -4,7 +4,7 @@ use crate::db::mongodb::mongo_repos::MongoRepos;
 
 use saphir::{Middleware, SyncRequest, SyncResponse, RequestContinuation, StatusCode, header};
 use saphir::Server as SaphirServer;
-use crate::controllers::server_controller::{ServerController, generate_root_ca, generate_intermediate, rebuild};
+use crate::controllers::server_controller::{ServerController, generate_root_ca, generate_intermediate};
 use crate::db::backend::Backend;
 use std::sync::Arc;
 
@@ -15,9 +15,9 @@ impl Server{
     pub fn run(config: ServerConfig) {
         let mut repos = Backend::from(&config).db;
         repos.init().expect("Picky cannot start without fully initializing its repos");
-        if let Err(e) = rebuild(&mut repos){
+        /*if let Err(e) = rebuild(&mut repos){
             panic!(e);
-        }
+        }*/
 
         info!("Creating root...");
         generate_root_ca(&config, &mut repos).and_then(|created|{
