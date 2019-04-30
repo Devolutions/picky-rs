@@ -219,19 +219,6 @@ impl Cert{
 
         leaf
     }
-
-    pub fn pem_to_der(cert: &str) -> Result<Vec<u8>, String>{
-        if let Ok(cert) = certificate::Certificate::from_pem(format!("{}{}", cert, "\0").as_bytes()){
-            let cert = cert.as_der().to_vec().clone();
-            return Ok(cert);
-        }
-
-        Err("Invalid certificate pem".to_string())
-    }
-
-    pub fn der_to_pem(cert: &[u8]) -> String{
-        encode(cert)
-    }
 }
 
 #[derive( Debug, Clone)]
@@ -291,6 +278,8 @@ mod tests{
     use super::*;
     use x509_parser::{TbsCertificate, X509Extension, parse_x509_der, pem::pem_to_der, error};
     use der_parser::{oid, DerError};
+    use crate::controllers::core_controller::CoreController;
+    use std::thread::Builder;
 
     static PEM: &'static [u8] = include_bytes!("../../test_files/intermediate_ca.crt");
 
