@@ -21,7 +21,7 @@ LABEL maintainer "Devolutions Inc."
 WORKDIR /opt/wayk/dist
 
 RUN apt-get update
-RUN apt-get install -y --no-install-recommends libssl1.1 ca-certificates libcurl4-openssl-dev
+RUN apt-get install -y --no-install-recommends libssl1.1 libssl1.0.2 ca-certificates libcurl4-openssl-dev
 RUN rm -rf /var/lib/apt/lists/*
 
 # copy artifacts from build container
