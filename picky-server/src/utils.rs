@@ -11,7 +11,7 @@ pub fn der_to_pem(der: &[u8]) -> Vec<u8>{
 }
 
 pub fn pem_to_der(pem: &str) -> Result<Vec<u8>, String>{
-    let pem = pem.replace("\n", "");
+    /*let pem = pem.replace("\n", "");
     let re = Regex::new(r"-([\w/+]+)[=]*-").unwrap();
 
     if let Some(pem) = re.captures(&pem){
@@ -22,7 +22,7 @@ pub fn pem_to_der(pem: &str) -> Result<Vec<u8>, String>{
             };
         }
         return Err("Invalid certificate".to_string());
-    }
+    }*/
 
     match base64_decode(pem.as_bytes()){
         Ok(d) => Ok(d),
@@ -51,26 +51,6 @@ pub fn multihash_decode(value: &[u8]) -> Result<Vec<u8>, String>{
 pub fn sha256_to_multihash(hash: &str) -> Result<String, String>{
     let mut hash = format!("{}{}", "1220", hash);
     Ok(hash)
-}
-
-pub fn der_to_string(value: &[u8]) -> String{
-    to_hex(value)
-}
-
-pub fn u8_to_i8_vec(data: &[u8]) -> Vec<i8>{
-    let mut res: Vec<i8> = Vec::new();
-    for u in data{
-        res.push(u.clone() as i8);
-    }
-    res
-}
-
-pub fn i8_to_u8_vec(data: &[i8]) -> Vec<u8>{
-    let mut res: Vec<u8> = Vec::new();
-    for i in data{
-        res.push(i.clone() as u8);
-    }
-    res
 }
 
 #[cfg(test)]

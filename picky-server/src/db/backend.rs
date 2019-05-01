@@ -43,7 +43,7 @@ impl Backend {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct Model<T>{
+pub struct Model<T> {
     pub key: String,
     pub value: T
 }
@@ -57,8 +57,6 @@ pub trait BackendStorage: Send + Sync{
     fn get_key_identifier_from_hash(&self, hash: &str) -> Result<String, String>;
     fn get_hash_from_key_identifier(&self, hash: &str) -> Result<String, String>;
     fn clone_box(&self) -> Box<BackendStorage>;
-    ///// Return tuple (common name, certificate pem, key pem)
-    //fn rebuild(&mut self) -> Result<Vec<(String, String, String)>, ()>;
 }
 
 impl Clone for Box<BackendStorage>{

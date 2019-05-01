@@ -120,7 +120,7 @@ impl Cert{
             self.issuer = Some(self.common_name.clone());
             self.issuer_key = Some(self.keys.key_der.clone());
         } else {
-            if let Ok(ca) = Certificate::from_pem(self.issuer.clone().unwrap().as_bytes()){
+            if let Ok(ca) = Certificate::from_der(self.issuer.clone().unwrap().as_bytes()){
                 self.issuer = Some(ca.subject().unwrap());
             }
         }
