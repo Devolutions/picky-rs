@@ -36,9 +36,9 @@ impl CoreController{
         Some(intermediate)
     }
 
-    pub fn generate_certificate_from_csr(authority: &[u8], authority_key: &[u8], hash_type: HashType, csr: &str) -> Option<Vec<u8>>{
+    pub fn generate_certificate_from_csr(authority: &[u8], authority_key: &[u8], hash_type: HashType, csr: &str) -> Option<Cert>{
         let leaf = Cert::generate_from_csr(csr, authority, authority_key, hash_type);
-        Some(leaf.certificate_der)
+        Some(leaf)
     }
 
     pub fn get_key_identifier(der: &[u8], oid: &[u64]) -> Result<String, String>{
@@ -56,11 +56,19 @@ impl CoreController{
         Err("Could not get identifier".to_string())
     }
 
+    pub fn get_subject_name(der: &[u8]) -> Result<String, String> {
+        if let Ok((e, cert)) = parse_x509_der(&der){
+            return Ok(cert.tbs_certificate.subject.to_string());
+        }
+
+        Err("Could not get subject_name".to_string())
+    }
+
     pub fn request_name(csr: &str) -> Result<String, String>{
         CertificateSignRequest::get_csr_common_name(csr)
     }
 
-    fn fix_string(pem: &str) -> Result<Vec<u8>, String>{
+    pub fn fix_string(pem: &str) -> Result<Vec<u8>, String>{
         let mut pem = pem;
         if pem.contains("BEGIN CERTIFICATE"){
             pem = &pem[27..pem.len()-26];

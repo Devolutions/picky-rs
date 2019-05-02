@@ -11,23 +11,27 @@ pub fn der_to_pem(der: &[u8]) -> Vec<u8>{
 }
 
 pub fn pem_to_der(pem: &str) -> Result<Vec<u8>, String>{
-    /*let pem = pem.replace("\n", "");
-    let re = Regex::new(r"-([\w/+]+)[=]*-").unwrap();
+    if let Ok(pem) = strip_pem_tag(pem){
+        match base64_decode(pem.as_bytes()){
+            Ok(d) => { return Ok(d);},
+            Err(e) => { return Err(e.to_string()); }
+        }
+    }
+
+    Err("Error while formating pem to der".to_string())
+}
+
+pub fn strip_pem_tag(pem: &str) -> Result<String, String>{
+    let pem = pem.replace("\n", "");
+    let re = Regex::new(r"-([\w/+]+[=]*)-").unwrap();
 
     if let Some(pem) = re.captures(&pem){
         if pem.len() > 1{
-            match base64_decode(&pem[1]){
-                Ok(d) => return Ok(d),
-                Err(e) => return Err(e.to_string())
-            };
+            return Ok(pem[1].to_string());
         }
-        return Err("Invalid certificate".to_string());
-    }*/
-
-    match base64_decode(pem.as_bytes()){
-        Ok(d) => Ok(d),
-        Err(e) => Err(e.to_string())
     }
+
+    Ok(pem)
 }
 
 pub fn multihash_encode(value: &[u8]) -> Result<Vec<u8>, String>{

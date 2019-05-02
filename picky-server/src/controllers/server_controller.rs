@@ -73,7 +73,7 @@ pub fn health(_controller_data: &ControllerData, _req: &SyncRequest, res: &mut S
 
 pub fn sign_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse){
     res.status(StatusCode::BAD_REQUEST);
-    let repo = &controller_data.repos;
+    let mut repos = &mut controller_data.repos.clone();
 
     if let Ok(body) = String::from_utf8(req.body().clone()) {
         if let Ok(json) = serde_json::from_str::<Value>(body.as_ref()) {
@@ -82,13 +82,18 @@ pub fn sign_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut 
             let mut csr = json["csr"].to_string().trim_matches('"').replace("\\n", "\n").to_string();
             csr = csr.trim_matches('"').to_string();
 
-            if let Ok(ca) = repo.find(ca.trim_matches('"')) {
+            if let Ok(ca) = repos.find(ca.trim_matches('"')) {
                 if ca.len() > 0{
-                    if let Ok(ca_cert) = repo.get_cert(&ca[0].value, Some(CertFormat::Der as u8)){
-                        if let Ok(ca_key) = repo.get_key(&ca[0].value){
+                    if let Ok(ca_cert) = repos.get_cert(&ca[0].value, Some(CertFormat::Der as u8)){
+                        if let Ok(ca_key) = repos.get_key(&ca[0].value){
                             if let Some(cert) = CoreController::generate_certificate_from_csr(&ca_cert, &ca_key, controller_data.config.key_config.hash_type, &csr){
-                                res.body(format!("{}{}{}", CERT_PREFIX, String::from_utf8_lossy(&der_to_pem(&cert)), CERT_SUFFIX));
-                                res.status(StatusCode::OK);
+                                if let Ok(ski) = CoreController::get_key_identifier(&cert.certificate_der, SUBJECT_KEY_IDENTIFIER){
+                                    if let Err(e) = repos.store(&cert.common_name.clone(), &cert.certificate_der.clone(), &cert.keys.key_der.clone() , &ski.clone()){
+                                        return info!("{}",&format!("Insertion error for leaf {}: {}", &cert.common_name.clone(), e));
+                                    }
+                                    res.body(format!("{}{}{}", CERT_PREFIX, String::from_utf8_lossy(&der_to_pem(&cert.certificate_der)), CERT_SUFFIX));
+                                    res.status(StatusCode::OK);
+                                }
                             }
                         }
                     }
@@ -153,7 +158,7 @@ pub fn chains(controller_data: &ControllerData, req: &SyncRequest, res: &mut Syn
                             key_identifier = aki.clone();
 
                             if let Ok(hash) = repos.get_hash_from_key_identifier(&aki){
-                                if let Ok(cert) = repos.get_cert(&hash, Some(CertFormat::Pem as u8)){
+                                if let Ok(cert) = repos.get_cert(&hash, Some(CertFormat::Der as u8)){
                                     pem = format!("{}{}{}", CERT_PREFIX, String::from_utf8_lossy(&der_to_pem(&cert)), CERT_SUFFIX);
                                     chain.push_str(&pem.clone());
                                 } else {
@@ -236,8 +241,42 @@ pub fn generate_intermediate(config: &ServerConfig, repos: &mut Box<BackendStora
     Err("Error while creating intermediate".to_string())
 }
 
-pub fn rebuild(repos: &mut Box<BackendStorage>) -> Result<(), String>{
+pub fn check_certs_in_env(config: &ServerConfig, repos: &mut Box<BackendStorage>) -> Result<(), String> {
+    if !config.root_cert.is_empty() && !config.root_key.is_empty() {
+        if let Err(e) = get_and_store_env_cert_info(&config.root_cert, &config.root_key, repos) {
+            return Err(e);
+        }
+    }
 
+    if !config.intermediate_cert.is_empty() && !config.intermediate_key.is_empty() {
+        if let Err(e) = get_and_store_env_cert_info(&config.intermediate_cert, &config.intermediate_key, repos) {
+            return Err(e);
+        }
+    }
 
     Ok(())
+}
+
+fn get_and_store_env_cert_info(cert: &str, key: &str, repos: &mut Box<BackendStorage>) -> Result<(), String>{
+    if let Ok(cert) = CoreController::fix_string(cert) {
+        if let Ok(key) = pem_to_der(key){
+            match CoreController::get_key_identifier(&cert, SUBJECT_KEY_IDENTIFIER) {
+                Ok(ski) => {
+                    match CoreController::get_subject_name(&cert){
+                        Ok(name) => {
+                            let name = name.trim_start_matches("CN=");
+                            if let Err(e) = repos.store(name, &cert, &key, &ski){
+                                return Err(e);
+                            }
+                            return Ok(());
+                        },
+                        Err(e) => return Err(e)
+                    }
+                },
+                Err(e) => return Err(e)
+            };
+        }
+    }
+
+    Err("Error while fetching certificate info".to_string())
 }

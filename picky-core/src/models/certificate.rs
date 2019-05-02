@@ -120,7 +120,7 @@ impl Cert{
             self.issuer = Some(self.common_name.clone());
             self.issuer_key = Some(self.keys.key_der.clone());
         } else {
-            if let Ok(ca) = Certificate::from_der(self.issuer.clone().unwrap().as_bytes()){
+            if let Ok(ca) = Certificate::from_der(&base64::decode(&self.issuer.clone().unwrap()).unwrap()){
                 self.issuer = Some(ca.subject().unwrap());
             }
         }
@@ -149,7 +149,7 @@ impl Cert{
             .subject_key(&mut subject_key)
             .subject_with_nul(&format!("CN={}{}", self.common_name, "\0")).unwrap()
             .issuer_key(&mut issuer_key)
-            .issuer_with_nul(&format!("CN={}{}", self.issuer.clone().unwrap(), "\0")).unwrap()
+            .issuer_with_nul(&format!("{}{}", self.issuer.clone().unwrap(), "\0")).unwrap()
             .basic_constraints(ca, pathlen).unwrap()
             .validity(valid_from.to_time_native(), valid_to.to_time_native()).unwrap()
             //.serial(serial.as_slice()).unwrap()
@@ -188,7 +188,7 @@ impl Cert{
             hash_type,
             Some(key_type),
             &(csr_struct.subject().unwrap().trim_start_matches("CN=")),
-            Some(&String::from_utf8_lossy(root)),
+            Some(&base64::encode(root)),
             Some(root_key),
             Some(keys.clone()),
             X509Time::from(Utc::now()),
@@ -209,7 +209,7 @@ impl Cert{
             hash_type,
             None,
             &csr_struct.subject().unwrap(),
-            Some(&String::from_utf8_lossy(authority)),
+            Some(&base64::encode(authority)),
             Some(authority_key),
             Some(leaf_key),
             X509Time::from(Utc::now()),

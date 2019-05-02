@@ -12,6 +12,10 @@ const PICKY_REALM_ENV: &'static str = "PICKY_REALM";
 const PICKY_DATABASE_URL_ENV: &'static str = "PICKY_DATABASE_URL";
 const PICKY_API_KEY_ENV: &'static str = "PICKY_API_KEY";
 const PICKY_BACKEND_ENV: &'static str = "PICKY_BACKEND";
+const PICKY_ROOT_CERT_ENV: &'static str = "PICKY_ROOT_CERT";
+const PICKY_ROOT_KEY_ENV: &'static str = "PICKY_ROOT_KEY";
+const PICKY_INTERMEDIATE_CERT_ENV: &'static str = "PICKY_INTERMEDIATE_CERT";
+const PICKY_INTERMEDIATE_KEY_ENV: &'static str = "PICKY_INTERMEDIATE_KEY";
 
 #[derive(PartialEq, Clone)]
 pub enum BackendType{
@@ -46,7 +50,11 @@ pub struct ServerConfig{
     pub database: Database,
     pub realm: String,
     pub key_config: KeyConfig,
-    pub backend: BackendType
+    pub backend: BackendType,
+    pub root_cert: String,
+    pub root_key: String,
+    pub intermediate_cert: String,
+    pub intermediate_key: String
 }
 
 impl ServerConfig{
@@ -118,6 +126,22 @@ impl ServerConfig{
         if let Ok(val) = env::var(PICKY_BACKEND_ENV){
             self.backend = BackendType::from(val.as_str());
         }
+
+        if let Ok(val) = env::var(PICKY_ROOT_CERT_ENV){
+            self.root_cert = val;
+        }
+
+        if let Ok(val) = env::var(PICKY_ROOT_KEY_ENV){
+            self.root_key = val;
+        }
+
+        if let Ok(val) = env::var(PICKY_INTERMEDIATE_CERT_ENV){
+            self.intermediate_cert = val;
+        }
+
+        if let Ok(val) = env::var(PICKY_INTERMEDIATE_KEY_ENV){
+            self.intermediate_key = val;
+        }
     }
 }
 
@@ -129,7 +153,11 @@ impl Default for ServerConfig{
             database: Database::default(),
             realm: DEFAULT_PICKY_REALM.to_string(),
             key_config: KeyConfig::default(),
-            backend: BackendType::default()
+            backend: BackendType::default(),
+            root_cert: String::default(),
+            root_key: String::default(),
+            intermediate_cert: String::default(),
+            intermediate_key: String::default()
         }
     }
 }
