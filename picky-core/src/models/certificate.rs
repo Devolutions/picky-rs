@@ -278,7 +278,6 @@ mod tests{
     use x509_parser::{TbsCertificate, X509Extension, parse_x509_der, pem::pem_to_der, error};
     use der_parser::{oid, DerError};
     use crate::controllers::core_controller::CoreController;
-    use std::thread::Builder;
 
     static PEM: &'static [u8] = include_bytes!("../../test_files/intermediate_ca.crt");
 

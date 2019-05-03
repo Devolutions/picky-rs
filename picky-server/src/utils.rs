@@ -1,17 +1,16 @@
 use base64::{encode as base64_encode, decode as base64_decode, DecodeError};
 use regex::Regex;
 use multihash::{encode, decode, Hash, to_hex};
-use hex::decode as hex_decode;
 
 const PICKY_HASH: Hash =  Hash::SHA2256;
 
 pub fn der_to_pem(der: &[u8]) -> Vec<u8>{
-    //let der = hex_decode(der).unwrap();
     base64_encode(der).as_bytes().to_vec()
 }
 
 pub fn pem_to_der(pem: &str) -> Result<Vec<u8>, String>{
     if let Ok(pem) = strip_pem_tag(pem){
+        let pem = pem.replace(" ", "");
         match base64_decode(pem.as_bytes()){
             Ok(d) => { return Ok(d);},
             Err(e) => { return Err(e.to_string()); }

@@ -131,8 +131,4 @@ impl BackendStorage for MemoryRepos{
     fn clone_box(&self) -> Box<BackendStorage>{
         Box::new(self.clone())
     }
-
-    /*fn rebuild(&mut self) -> Result<Vec<(String, String, String)>, ()>{
-        Err(())
-    }*/
 }

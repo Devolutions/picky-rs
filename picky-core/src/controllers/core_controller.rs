@@ -69,11 +69,11 @@ impl CoreController{
     }
 
     pub fn fix_string(pem: &str) -> Result<Vec<u8>, String>{
-        let mut pem = pem;
-        if pem.contains("BEGIN CERTIFICATE"){
-            pem = &pem[27..pem.len()-26];
-        }
-        let mut pem= pem.replace("\n", "").clone();
+        let mut pem = pem.clone().replace("\n", "")
+            .replace("-----BEGIN CERTIFICATE-----", "")
+            .replace("-----END CERTIFICATE-----", "")
+            .replace(" ", "");
+
         let mut fixed_pem = String::default();
 
         while pem.len()/64 > 0{
