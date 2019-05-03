@@ -2,17 +2,19 @@ use bson::Bson;
 use bson::Document;
 use bson::{to_bson, from_bson};
 use serde::{Deserialize, Serialize};
+use base64::decode;
 
 use crate::utils;
-use crate::db::backend::{BackendStorage, Repo, Storage};
+use crate::db::backend::{BackendStorage, Repo, Model};
 use crate::db::mongodb::mongo_connection::MongoConnection;
 use crate::db::mongodb::mongo_repo::MongoRepo;
-use crate::utils::pem_to_der;
+use crate::utils::{pem_to_der, multihash_to_string, der_to_pem};
 
 const REPO_CERTIFICATE: &str = "Certificate Store";
 const REPO_KEY: &str = "Key Store";
 const REPO_CERTNAME: &str = "Name Store";
 const REPO_CERTKEY: &str = "Key Identifier Store";
+const OLD_REPO_NAME: &str = "certificate";
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -53,10 +55,10 @@ impl From<mongodb::Error> for RepositoryError {
 #[derive(Clone)]
 pub struct MongoRepos{
     db_instance: MongoConnection,
-    pub name: MongoRepo,
-    pub certificates: MongoRepo,
-    pub keys: MongoRepo,
-    pub key_identifiers: MongoRepo
+    pub name: MongoRepo<String>,
+    pub certificates: MongoRepo<String>,
+    pub keys: MongoRepo<String>,
+    pub key_identifiers: MongoRepo<String>
 }
 
 impl MongoRepos{
@@ -84,26 +86,23 @@ impl BackendStorage for MongoRepos{
         if let Err(e) = self.load_repositories(){
             return Err(format!("{:?}", e));
         }
+
         Ok(())
     }
 
-    fn store(&mut self, name: &str, cert: &str, key: &str, key_identifier: &str) -> Result<bool, String>{
-        if let Ok(der_cert) = utils::pem_to_der(cert){
-            if let Ok(der_cert_hash) = utils::multihash_encode(der_cert.as_slice()){
-                if let Ok(der_key) = utils::pem_to_der(key){
-                    self.name.store(name, &der_cert_hash)?;
-                    self.certificates.store(&der_cert_hash, &utils::der_to_string(der_cert.as_slice()))?;
-                    self.keys.store(&der_cert_hash, &utils::der_to_string(der_key.as_slice()))?;
-                    self.key_identifiers.store(key_identifier, &der_cert_hash)?;
-                }
+    fn store(&mut self, name: &str, cert: &[u8], key: &[u8], key_identifier: &str) -> Result<bool, String>{
+        if let Ok(mut cert_hash) = utils::multihash_encode(cert){
+                self.name.insert(name, multihash_to_string(&cert_hash))?;
+                self.certificates.insert(&multihash_to_string(&cert_hash), String::from_utf8(der_to_pem(cert)).unwrap())?;
+                self.keys.insert(&multihash_to_string(&cert_hash), String::from_utf8(der_to_pem(key)).unwrap())?;
+                self.key_identifiers.insert(key_identifier, multihash_to_string(&cert_hash))?;
                 return Ok(true);
-            }
-            return Err("Can\'t encode certificate".to_string());
         }
-        Err("Invalid certificate".to_string())
+
+        Err("Can\'t encode certificate".to_string())
     }
 
-    fn find(&self, name: &str) -> Result<Vec<Storage>, String>{
+    fn find(&self, name: &str) -> Result<Vec<Model<String>>, String>{
         let doc = doc!{"key": name};
         let mut model_vec = Vec::new();
         let document_cursor = match self.name.get_collection()?.find(Some(doc), None){
@@ -121,9 +120,62 @@ impl BackendStorage for MongoRepos{
         Ok(model_vec)
     }
 
+    fn get_cert(&self, hash: &str, format: Option<u8>) -> Result<Vec<u8>, String>{
+        let doc = doc!{"key": hash};
+        let mut model_vec: Vec<Model<String>> = Vec::new();
+        let document_cursor = match self.certificates.get_collection()?.find(Some(doc), None){
+            Ok(d) => d,
+            Err(e) => return Err(e.to_string())
+        };
+
+        for doc_res in document_cursor{
+            if let Ok(model_document) = doc_res {
+                if let Ok(model) = from_bson(Bson::Document(model_document)) {
+                    model_vec.push(model);
+                }
+            }
+        }
+
+        if model_vec.len() > 0 {
+            if let Some(f) = format{
+                if f == 1 {
+                    return Ok(model_vec[0].value.clone().as_bytes().to_vec());
+                } else {
+                    return Ok(pem_to_der(&model_vec[0].value.clone()).unwrap());
+                }
+            }
+            return Ok(pem_to_der(&model_vec[0].value.clone()).unwrap());
+        }
+
+        Err("Error finding cert".to_string())
+    }
+
+    fn get_key(&self, hash: &str) -> Result<Vec<u8>, String>{
+        let doc = doc!{"key": hash};
+        let mut model_vec: Vec<Model<String>> = Vec::new();
+        let document_cursor = match self.keys.get_collection()?.find(Some(doc), None){
+            Ok(d) => d,
+            Err(e) => return Err(e.to_string())
+        };
+
+        for doc_res in document_cursor{
+            if let Ok(model_document) = doc_res {
+                if let Ok(model) = from_bson(Bson::Document(model_document)) {
+                    model_vec.push(model);
+                }
+            }
+        }
+
+        if model_vec.len() > 0 {
+            return Ok(pem_to_der(&model_vec[0].value.clone()).unwrap());
+        }
+
+        Err("Error finding key".to_string())
+    }
+
     fn get_key_identifier_from_hash(&self, hash: &str) -> Result<String, String>{
         let hash = hash.to_string();
-        let storage: Storage;
+        let storage: Model<String>;
         let doc = doc!{"value": hash};
 
         let opt = match self.key_identifiers.get_collection()?.find_one(Some(doc), None){
@@ -143,7 +195,7 @@ impl BackendStorage for MongoRepos{
 
     fn get_hash_from_key_identifier(&self, key_identifier: &str) -> Result<String, String>{
         let key_identifier= key_identifier.to_string();
-        let storage: Storage;
+        let storage: Model<String>;
         let doc = doc!{"key": key_identifier};
 
         let opt = match self.key_identifiers.get_collection()?.find_one(Some(doc), None){
@@ -161,60 +213,7 @@ impl BackendStorage for MongoRepos{
         Err("No hash found".to_string())
     }
 
-    fn get_cert(&self, hash: &str, format: Option<u8>) -> Result<String, String>{
-        let doc = doc!{"key": hash};
-        let mut model_vec: Vec<Storage> = Vec::new();
-        let document_cursor = match self.certificates.get_collection()?.find(Some(doc), None){
-            Ok(d) => d,
-            Err(e) => return Err(e.to_string())
-        };
-
-        for doc_res in document_cursor{
-            if let Ok(model_document) = doc_res {
-                if let Ok(model) = from_bson(Bson::Document(model_document)) {
-                    model_vec.push(model);
-                }
-            }
-        }
-
-        if model_vec.len() > 0 {
-            if let Some(f) = format{
-                if f == 1 {
-                    return Ok(utils::der_to_pem(model_vec[0].value.as_bytes()));
-                } else {
-                    return Ok(model_vec[0].value.clone());
-                }
-            }
-            return Ok(model_vec[0].value.clone());
-        }
-
-        Err("Error finding cert".to_string())
-    }
-
-    fn get_key(&self, hash: &str) -> Result<String, String>{
-        let doc = doc!{"key": hash};
-        let mut model_vec: Vec<Storage> = Vec::new();
-        let document_cursor = match self.keys.get_collection()?.find(Some(doc), None){
-            Ok(d) => d,
-            Err(e) => return Err(e.to_string())
-        };
-
-        for doc_res in document_cursor{
-            if let Ok(model_document) = doc_res {
-                if let Ok(model) = from_bson(Bson::Document(model_document)) {
-                    model_vec.push(model);
-                }
-            }
-        }
-
-        if model_vec.len() > 0 {
-            return Ok(utils::der_to_pem(model_vec[0].value.as_bytes()));
-        }
-
-        Err("Error finding key".to_string())
-    }
-
-    fn clone_box(&self) -> Box<BackendStorage>{
+    fn clone_box(&self) -> Box<BackendStorage> {
         Box::new(self.clone())
     }
 }

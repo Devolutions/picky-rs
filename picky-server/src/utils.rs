@@ -1,38 +1,52 @@
 use base64::{encode as base64_encode, decode as base64_decode, DecodeError};
 use regex::Regex;
 use multihash::{encode, decode, Hash, to_hex};
-use hex::decode as hex_decode;
 
 const PICKY_HASH: Hash =  Hash::SHA2256;
 
-pub fn der_to_pem(der: &[u8]) -> String{
-    let der = hex_decode(der).unwrap();
-    base64_encode(der.as_slice())
+pub fn der_to_pem(der: &[u8]) -> Vec<u8>{
+    base64_encode(der).as_bytes().to_vec()
 }
 
 pub fn pem_to_der(pem: &str) -> Result<Vec<u8>, String>{
+    if let Ok(pem) = strip_pem_tag(pem){
+        let pem = pem.replace(" ", "");
+        match base64_decode(pem.as_bytes()){
+            Ok(d) => { return Ok(d);},
+            Err(e) => { return Err(e.to_string()); }
+        }
+    }
+
+    Err("Error while formating pem to der".to_string())
+}
+
+pub fn strip_pem_tag(pem: &str) -> Result<String, String>{
     let pem = pem.replace("\n", "");
-    let re = Regex::new(r"-([\w/+]+)[=]*-").unwrap();
+    let re = Regex::new(r"-([\w/+]+[=]*)-").unwrap();
 
     if let Some(pem) = re.captures(&pem){
         if pem.len() > 1{
-            match base64_decode(&pem[1]){
-                Ok(d) => return Ok(d),
-                Err(e) => return Err(e.to_string())
-            };
+            return Ok(pem[1].to_string());
         }
-        return Err("Invalid certificate".to_string());
     }
 
-    match base64_decode(pem.as_bytes()){
-        Ok(d) => Ok(d),
+    Ok(pem)
+}
+
+pub fn multihash_encode(value: &[u8]) -> Result<Vec<u8>, String>{
+    match encode(PICKY_HASH, value){
+        Ok(result) => Ok(result),
         Err(e) => Err(e.to_string())
     }
 }
 
-pub fn multihash_encode(value: &[u8]) -> Result<String, String>{
-    match encode(PICKY_HASH, value){
-        Ok(result) => Ok(to_hex(result.as_slice())),
+pub fn multihash_to_string(value: &[u8]) -> String{
+    to_hex(value)
+}
+
+pub fn multihash_decode(value: &[u8]) -> Result<Vec<u8>, String>{
+    match decode(value) {
+        Ok(result) => Ok(result.digest.to_vec()),
         Err(e) => Err(e.to_string())
     }
 }
@@ -40,10 +54,6 @@ pub fn multihash_encode(value: &[u8]) -> Result<String, String>{
 pub fn sha256_to_multihash(hash: &str) -> Result<String, String>{
     let mut hash = format!("{}{}", "1220", hash);
     Ok(hash)
-}
-
-pub fn der_to_string(value: &[u8]) -> String{
-    to_hex(value)
 }
 
 #[cfg(test)]
