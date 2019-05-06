@@ -88,10 +88,11 @@ pub fn sign_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut 
                         if let Ok(ca_key) = repos.get_key(&ca[0].value){
                             if let Some(cert) = CoreController::generate_certificate_from_csr(&pem_to_der(&ca_cert).unwrap(), &pem_to_der(&ca_key).unwrap(), controller_data.config.key_config.hash_type, &csr){
                                 if let Ok(ski) = CoreController::get_key_identifier(&cert.certificate_der, SUBJECT_KEY_IDENTIFIER){
-                                    if let Err(e) = repos.store(&cert.common_name.clone(), &der_to_pem(&cert.certificate_der), &der_to_pem(&cert.keys.key_der), &ski.clone()){
+                                    let pem = format!("{}{}{}", CERT_PREFIX, &der_to_pem(&cert.certificate_der), CERT_SUFFIX);
+                                    if let Err(e) = repos.store(&cert.common_name.clone(), &pem , &der_to_pem(&cert.keys.key_der), &ski.clone()){
                                         return info!("{}",&format!("Insertion error for leaf {}: {}", &cert.common_name.clone(), e));
                                     }
-                                    res.body(der_to_pem(&cert.certificate_der));
+                                    res.body(pem);
                                     res.status(StatusCode::OK);
                                 }
                             }
@@ -199,10 +200,8 @@ pub fn generate_root_ca(config: &ServerConfig, repos: &mut Box<BackendStorage>) 
     }
 
     if let Some(root) = CoreController::generate_root_ca(&config.realm, config.key_config.hash_type, config.key_config.key_type){
-        let pem = der_to_pem(&root.certificate_der);
-        let der = CoreController::fix_string(&pem).unwrap();
         let ski = CoreController::get_key_identifier(&root.certificate_der, SUBJECT_KEY_IDENTIFIER)?;
-        if let Err(e) = repos.store(&root.common_name.clone(), &der_to_pem(&root.certificate_der.clone()), &der_to_pem(&root.keys.key_der.clone()) , &ski.clone()){
+        if let Err(e) = repos.store(&root.common_name.clone(), &format!("{}{}{}", CERT_PREFIX, &der_to_pem(&root.certificate_der.clone()), CERT_SUFFIX), &der_to_pem(&root.keys.key_der.clone()) , &ski.clone()){
             return Err(format!("Insertion error: {:?}", e));
         }
     }
@@ -228,7 +227,7 @@ pub fn generate_intermediate(config: &ServerConfig, repos: &mut Box<BackendStora
         if let Ok(root_key) = repos.get_key(&root[0].value){
             if let Some(intermediate) = CoreController::generate_intermediate_ca(&pem_to_der(&root_cert).unwrap(), &pem_to_der(&root_key).unwrap(), &config.realm, config.key_config.hash_type, config.key_config.key_type){
                 if let Ok(ski) = CoreController::get_key_identifier(&intermediate.certificate_der, SUBJECT_KEY_IDENTIFIER){
-                    if let Err(e) = repos.store(&intermediate.common_name.clone(), &der_to_pem(&intermediate.certificate_der), &der_to_pem(&intermediate.keys.key_der) , &ski.clone()){
+                    if let Err(e) = repos.store(&intermediate.common_name.clone(), &format!("{}{}{}", CERT_PREFIX, &der_to_pem(&intermediate.certificate_der), CERT_SUFFIX), &der_to_pem(&intermediate.keys.key_der) , &ski.clone()){
                         return Err(format!("Insertion error: {:?}", e));
                     }
                     return Ok(true)

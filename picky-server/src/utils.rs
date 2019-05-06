@@ -3,9 +3,12 @@ use regex::Regex;
 use multihash::{encode, decode, Hash, to_hex};
 
 const PICKY_HASH: Hash =  Hash::SHA2256;
+const CERT_PREFIX: &str = "-----BEGIN CERTIFICATE-----";
+const CERT_SUFFIX: &str = "-----END CERTIFICATE-----";
+const SHA256_MULTIHASH_PREFIX: &str = "1220";
 
 pub fn der_to_pem(der: &[u8]) -> String{
-    format!("{}{}{}", "-----BEGIN CERTIFICATE-----", base64_encode(der), "-----END CERTIFICATE-----")
+    base64_encode(der)
 }
 
 pub fn pem_to_der(pem: &str) -> Result<Vec<u8>, String>{
@@ -42,7 +45,7 @@ pub fn multihash_decode(value: &[u8]) -> Result<Vec<u8>, String>{
 }
 
 pub fn sha256_to_multihash(hash: &str) -> Result<String, String>{
-    let mut hash = format!("{}{}", "1220", hash);
+    let mut hash = format!("{}{}", SHA256_MULTIHASH_PREFIX, hash);
     Ok(hash)
 }
 
