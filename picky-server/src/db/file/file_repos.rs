@@ -5,10 +5,10 @@ use std::marker::PhantomData;
 use std::fs::File;
 use std::io::Read;
 
-const REPO_CERTIFICATE: &str = "CertificateStore";
-const REPO_KEY: &str = "KeyStore";
-const REPO_CERTNAME: &str = "NameStore";
-const REPO_KEYIDENTIFIER: &str = "KeyIdentifierStore";
+const REPO_CERTIFICATE: &str = "CertificateStore/";
+const REPO_KEY: &str = "KeyStore/";
+const REPO_CERTNAME: &str = "NameStore/";
+const REPO_KEYIDENTIFIER: &str = "KeyIdentifierStore/";
 
 #[derive(Clone)]
 pub struct FileRepos{
@@ -54,21 +54,23 @@ impl BackendStorage for FileRepos{
 
     fn store(&mut self, name: &str, cert: &str, key: &str, key_identifier: &str) -> Result<bool, String> {
         if let Ok(cert_hash) = utils::multihash_encode(cert){
-            self.name.insert(&name.to_string(), &cert_hash)?;
-            self.cert.insert(&cert_hash, &cert.to_string())?;
-            self.keys.insert(&cert_hash, &key.to_string())?;
-            self.key_identifiers.insert(key_identifier, &cert_hash)?;
+            self.name.insert(&format!("{}{}", name.replace(" ", "_").to_string(), ".txt"), &cert_hash)?;
+            self.cert.insert(&format!("{}{}",cert_hash,".pem"), &cert.to_string())?;
+            self.keys.insert(&format!("{}{}",cert_hash, ".pem"), &key.to_string())?;
+            self.key_identifiers.insert(&format!("{}{}", key_identifier, ".txt"), &cert_hash)?;
             return Ok(true);
         }
-        Err("Could not encore certificate".to_string())
+        Err("Could not encode certificate".to_string())
     }
 
     fn find(&self, name: &str) -> Result<Vec<Model<String>>, String> {
         let mut model_vec = Vec::new();
+        let name = format!("{}{}", name, ".txt").replace(" ", "_");
         if let Ok(model) = self.name.get_collection(){
-            model.iter().map(|n|{
-                if name.eq(n) {
-                    if let Ok(mut file)= File::open(format!("{}{}",self.name.repo, n)){
+            for n in model{
+                if name.eq(&n){
+                    let test = format!("{}{}",self.name.repo, &n);
+                    if let Ok(mut file) = File::open(format!("{}{}",self.name.repo, n)){
                         let mut buf = String::default();
                         let res = file.read_to_string(&mut buf).expect("Error reading file");
                         model_vec.push(Model{
@@ -77,7 +79,7 @@ impl BackendStorage for FileRepos{
                         })
                     }
                 }
-            });
+            }
 
             return Ok(model_vec);
         }
@@ -87,16 +89,18 @@ impl BackendStorage for FileRepos{
 
     fn get_cert(&self, hash: &str) -> Result<String, String> {
         let mut cert= String::default();
-        if let Ok(c) = self.cert.get_collection(){
-            c.iter().map(|h|{
-                if hash.eq(h){
-                    if let Ok(mut file) = File::open(format!("{}{}", self.cert.repo, h)){
+        let hash = format!("{}{}", hash, ".pem");
+        if let Ok(certs) = self.cert.get_collection(){
+            for c in certs{
+                if hash.eq(&c){
+                    if let Ok(mut file) = File::open(format!("{}{}", self.cert.repo, c)){
                         let mut buf = String::default();
                         let res = file.read_to_string(&mut buf).expect("Error reading file");
                         cert = buf;
                     }
                 }
-            });
+            }
+
             if !cert.is_empty(){
                 return Ok(cert);
             }
@@ -107,15 +111,18 @@ impl BackendStorage for FileRepos{
 
     fn get_key(&self, hash: &str) -> Result<String, String> {
         let mut key = String::default();
-        self.keys.get_collection()?.iter().map(|h|{
-            if hash.eq(h) {
-                if let Ok(mut file) = File::open(format!("{}{}", self.keys.repo, h)){
-                    let mut buf = String::default();
-                    let res = file.read_to_string(&mut buf).expect("Error reading file");
-                    key = buf;
+        let hash = format!("{}{}", hash, ".pem");
+        if let Ok(keys) = self.keys.get_collection(){
+            for k in keys{
+                if hash.eq(&k) {
+                    if let Ok(mut file) = File::open(format!("{}{}", self.keys.repo, k)){
+                        let mut buf = String::default();
+                        let res = file.read_to_string(&mut buf).expect("Error reading file");
+                        key = buf;
+                    }
                 }
             }
-        });
+        }
 
         if !key.is_empty(){
             return Ok(key);
@@ -130,15 +137,18 @@ impl BackendStorage for FileRepos{
 
     fn get_hash_from_key_identifier(&self, key_identifier: &str) -> Result<String, String> {
         let mut hash = String::default();
-        self.key_identifiers.get_collection()?.iter().map(|kid|{
-            if key_identifier.eq(kid) {
-                if let Ok(mut file) = File::open(format!("{}{}", self.keys.repo, kid)){
-                    let mut buf = String::default();
-                    let res = file.read_to_string(&mut buf).expect("Error reading file");
-                    hash = buf;
+        let key_identifier = format!("{}{}", key_identifier, ".txt");
+        if let Ok(key_identifiers) = self.key_identifiers.get_collection(){
+            for kid in key_identifiers{
+                if key_identifier.eq(&kid) {
+                    if let Ok(mut file) = File::open(format!("{}{}", self.keys.repo, kid)){
+                        let mut buf = String::default();
+                        let res = file.read_to_string(&mut buf).expect("Error reading file");
+                        hash = buf;
+                    }
                 }
             }
-        });
+        }
 
         if !hash.is_empty(){
             return Ok(hash);

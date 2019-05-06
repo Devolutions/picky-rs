@@ -79,7 +79,7 @@ impl From<&ServerConfig> for Backend{
                 return Backend::new(Box::new(MemoryRepos::new())).expect("Bad configuration");
             },
             BackendType::File => {
-                return Backend::new(Box::new(FileRepos::new("~/Desktop/filebase/"))).expect("Error creating backend for file base");
+                return Backend::new(Box::new(FileRepos::new("./filebase/"))).expect("Error creating backend for file base");
             },
             _ => panic!("not yet implemented")
         }

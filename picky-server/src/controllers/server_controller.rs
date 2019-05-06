@@ -224,7 +224,9 @@ pub fn generate_intermediate(config: &ServerConfig, repos: &mut Box<BackendStora
     };
 
     if let Ok(root_cert) = repos.get_cert(&root[0].value){
+        println!("{:?}", &root_cert);
         if let Ok(root_key) = repos.get_key(&root[0].value){
+            println!("{:?}", &root_key);
             if let Some(intermediate) = CoreController::generate_intermediate_ca(&pem_to_der(&root_cert).unwrap(), &pem_to_der(&root_key).unwrap(), &config.realm, config.key_config.hash_type, config.key_config.key_type){
                 if let Ok(ski) = CoreController::get_key_identifier(&intermediate.certificate_der, SUBJECT_KEY_IDENTIFIER){
                     if let Err(e) = repos.store(&intermediate.common_name.clone(), &format!("{}{}{}", CERT_PREFIX, &der_to_pem(&intermediate.certificate_der), CERT_SUFFIX), &der_to_pem(&intermediate.keys.key_der) , &ski.clone()){
