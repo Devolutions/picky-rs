@@ -149,7 +149,7 @@ impl Cert{
             .subject_key(&mut subject_key)
             .subject_with_nul(&format!("CN={}{}", self.common_name, "\0")).unwrap()
             .issuer_key(&mut issuer_key)
-            .issuer_with_nul(&format!("{}{}", self.issuer.clone().unwrap(), "\0")).unwrap()
+            .issuer_with_nul(&format!("CN={}{}", self.issuer.clone().unwrap(), "\0")).unwrap()
             .basic_constraints(ca, pathlen).unwrap()
             .validity(valid_from.to_time_native(), valid_to.to_time_native()).unwrap()
             //.serial(serial.as_slice()).unwrap()
