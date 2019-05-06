@@ -141,7 +141,7 @@ impl BackendStorage for FileRepos{
         if let Ok(key_identifiers) = self.key_identifiers.get_collection(){
             for kid in key_identifiers{
                 if key_identifier.eq(&kid) {
-                    if let Ok(mut file) = File::open(format!("{}{}", self.keys.repo, kid)){
+                    if let Ok(mut file) = File::open(format!("{}{}", self.key_identifiers.repo, kid)){
                         let mut buf = String::default();
                         let res = file.read_to_string(&mut buf).expect("Error reading file");
                         hash = buf;
