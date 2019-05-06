@@ -42,7 +42,7 @@ impl CoreController{
     }
 
     pub fn get_key_identifier(der: &[u8], oid: &[u64]) -> Result<String, String>{
-        if let Ok((e, cert)) = parse_x509_der(&der){
+        if let Ok((e, cert)) = parse_x509_der(der){
             let extensions = cert.tbs_certificate.extensions;
 
             for x in extensions{
@@ -69,7 +69,8 @@ impl CoreController{
     }
 
     pub fn fix_string(pem: &str) -> Result<Vec<u8>, String>{
-        let mut pem = pem.clone().replace("\n", "")
+        let mut pem = pem.clone()
+            .replace("\n", "")
             .replace("-----BEGIN CERTIFICATE-----", "")
             .replace("-----END CERTIFICATE-----", "")
             .replace(" ", "");

@@ -21,15 +21,15 @@ impl Backend {
         Ok(backend)
     }
 
-    pub fn store(&mut self, name: &str, cert: &[u8], key: &[u8], key_identifier: &str) -> Result<bool, String>{
+    pub fn store(&mut self, name: &str, cert: &str, key: &str, key_identifier: &str) -> Result<bool, String>{
         self.db.store(name, cert, key, key_identifier)
     }
 
-    pub fn get_cert(&self, hash: &str, format: Option<u8>) -> Result<Vec<u8>, String>{
-        self.db.get_cert(hash, format)
+    pub fn get_cert(&self, hash: &str) -> Result<String, String>{
+        self.db.get_cert(hash)
     }
 
-    pub fn get_key(&self, hash: &str) -> Result<Vec<u8>, String>{
+    pub fn get_key(&self, hash: &str) -> Result<String, String>{
         self.db.get_key(hash)
     }
 
@@ -50,10 +50,10 @@ pub struct Model<T> {
 
 pub trait BackendStorage: Send + Sync{
     fn init(&mut self) -> Result<(), String>;
-    fn store(&mut self, name: &str, cert: &[u8], key: &[u8], key_identifier: &str) -> Result<bool, String>;
+    fn store(&mut self, name: &str, cert: &str, key: &str, key_identifier: &str) -> Result<bool, String>;
     fn find(&self, name: &str) -> Result<Vec<Model<String>>, String>;
-    fn get_cert(&self, hash: &str, format: Option<u8>) -> Result<Vec<u8>, String>;
-    fn get_key(&self, hash: &str) -> Result<Vec<u8>, String>;
+    fn get_cert(&self, hash: &str) -> Result<String, String>;
+    fn get_key(&self, hash: &str) -> Result<String, String>;
     fn get_key_identifier_from_hash(&self, hash: &str) -> Result<String, String>;
     fn get_hash_from_key_identifier(&self, hash: &str) -> Result<String, String>;
     fn clone_box(&self) -> Box<BackendStorage>;
