@@ -22,7 +22,8 @@ pub enum BackendType{
     MySQL,
     SQLite,
     MongoDb,
-    Memory
+    Memory,
+    File
 }
 
 impl From<&str> for BackendType{
@@ -32,6 +33,7 @@ impl From<&str> for BackendType{
             "sqlite" => BackendType::SQLite,
             "mongodb" => BackendType::MongoDb,
             "memory" => BackendType::Memory,
+            "file" => BackendType::File,
             _ => BackendType::default()
         }
     }

@@ -72,7 +72,7 @@ impl<T> Repo<T> for MongoRepo<T> where T: Clone + Serialize{
         }
     }
 
-    fn insert(&mut self, key: &str, value: T) -> Result<(), String>{
+    fn insert(&mut self, key: &str, value: &T) -> Result<(), String>{
         let model = Model{
             key: key.to_string(),
             value

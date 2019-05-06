@@ -56,10 +56,10 @@ impl BackendStorage for MemoryRepos{
 
     fn store(&mut self, name :&str, cert: &str, key: &str, key_identifier: &str) -> Result<bool, String>{
         if let Ok(cert_hash) = utils::multihash_encode(cert){
-            self.name.insert(name, cert_hash.clone())?;
-            self.cert.insert(&cert_hash, cert.to_string())?;
-            self.keys.insert(&cert_hash, key.to_string())?;
-            self.key_identifiers.insert(key_identifier, cert_hash)?;
+            self.name.insert(name, &cert_hash.clone())?;
+            self.cert.insert(&cert_hash, &cert.to_string())?;
+            self.keys.insert(&cert_hash, &key.to_string())?;
+            self.key_identifiers.insert(key_identifier, &cert_hash)?;
             return Ok(true);
         }
         Err("Can\'t encode certificate".to_string())
