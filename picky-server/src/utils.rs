@@ -3,45 +3,37 @@ use regex::Regex;
 use multihash::{encode, decode, Hash, to_hex};
 
 const PICKY_HASH: Hash =  Hash::SHA2256;
+const CERT_PREFIX: &str = "-----BEGIN CERTIFICATE-----";
+const CERT_SUFFIX: &str = "-----END CERTIFICATE-----";
 
-pub fn der_to_pem(der: &[u8]) -> Vec<u8>{
-    base64_encode(der).as_bytes().to_vec()
+pub fn der_to_pem(der: &[u8]) -> String{
+    base64_encode(der)
 }
 
 pub fn pem_to_der(pem: &str) -> Result<Vec<u8>, String>{
-    if let Ok(pem) = strip_pem_tag(pem){
-        let pem = pem.replace(" ", "");
-        match base64_decode(pem.as_bytes()){
-            Ok(d) => { return Ok(d);},
-            Err(e) => { return Err(e.to_string()); }
-        }
+    let pem= strip_pem_tag(pem);
+    let pem = pem.replace(" ", "");
+    match base64_decode(pem.as_bytes()){
+        Ok(d) => { return Ok(d);},
+        Err(e) => { return Err(e.to_string()); }
     }
 
     Err("Error while formating pem to der".to_string())
 }
 
-pub fn strip_pem_tag(pem: &str) -> Result<String, String>{
-    let pem = pem.replace("\n", "");
-    let re = Regex::new(r"-([\w/+]+[=]*)-").unwrap();
+pub fn strip_pem_tag(pem: &str) -> String{
+    let pem = pem.replace("\n", "")
+        .replace(CERT_PREFIX, "")
+        .replace(CERT_SUFFIX, "");
 
-    if let Some(pem) = re.captures(&pem){
-        if pem.len() > 1{
-            return Ok(pem[1].to_string());
-        }
-    }
-
-    Ok(pem)
+    pem
 }
 
-pub fn multihash_encode(value: &[u8]) -> Result<Vec<u8>, String>{
-    match encode(PICKY_HASH, value){
-        Ok(result) => Ok(result),
+pub fn multihash_encode(value: &str) -> Result<String, String>{
+    match encode(PICKY_HASH, strip_pem_tag(value).as_bytes()){
+        Ok(result) => Ok(to_hex(&result)),
         Err(e) => Err(e.to_string())
     }
-}
-
-pub fn multihash_to_string(value: &[u8]) -> String{
-    to_hex(value)
 }
 
 pub fn multihash_decode(value: &[u8]) -> Result<Vec<u8>, String>{

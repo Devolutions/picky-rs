@@ -121,7 +121,7 @@ impl Cert{
             self.issuer_key = Some(self.keys.key_der.clone());
         } else {
             if let Ok(ca) = Certificate::from_der(&base64::decode(&self.issuer.clone().unwrap()).unwrap()){
-                self.issuer = Some(ca.subject().unwrap());
+                self.issuer = Some(ca.subject().unwrap().replace("CN=", ""));
             }
         }
 
