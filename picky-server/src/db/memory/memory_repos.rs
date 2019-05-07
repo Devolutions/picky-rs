@@ -106,7 +106,7 @@ impl BackendStorage for MemoryRepos{
 
     fn get_cert(&self, hash: &str) -> Result<String, String>{
         if let Some(c) = self.cert.get_collection()?.get(hash){
-
+            return Ok(c.to_string());
         }
 
         Err("Cert not found".to_string())

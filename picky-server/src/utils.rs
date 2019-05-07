@@ -24,8 +24,8 @@ pub fn pem_to_der(pem: &str) -> Result<Vec<u8>, String>{
 
 pub fn strip_pem_tag(pem: &str) -> String{
     let pem = pem.replace("\n", "")
-        .replace("-----BEGIN CERTIFICATE-----", "")
-        .replace("-----END CERTIFICATE-----", "");
+        .replace(CERT_PREFIX, "")
+        .replace(CERT_SUFFIX, "");
 
     pem
 }

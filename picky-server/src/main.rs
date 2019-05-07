@@ -10,6 +10,9 @@ extern crate log;
 #[macro_use]
 extern crate serde_derive;
 
+#[macro_use(json)]
+extern crate serde_json;
+
 mod db;
 mod configuration;
 mod server;

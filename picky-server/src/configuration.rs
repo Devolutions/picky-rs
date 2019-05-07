@@ -62,7 +62,7 @@ pub struct ServerConfig{
 impl ServerConfig{
     pub fn new() -> Self{
         let mut config = ServerConfig::default();
-        config.load_cli();
+        //config.load_cli();
         config.load_env();
         config
     }
