@@ -10,6 +10,8 @@ use crate::utils::*;
 
 const CERT_PREFIX: &str = "-----BEGIN CERTIFICATE-----\n";
 const CERT_SUFFIX: &str = "\n-----END CERTIFICATE-----\n";
+const KEY_PREFIX: &str = "-----BEGIN RSA PRIVATE KEY-----\n";
+const KEY_SUFFIX: &str = "\n-----END RSA PRIVATE KEY-----";
 const SUBJECT_KEY_IDENTIFIER: &[u64] = &[2, 5, 29, 14];
 const AUTHORITY_KEY_IDENTIFIER_OID: &[u64] = &[2, 5, 29, 35];
 
@@ -73,7 +75,7 @@ pub fn health(_controller_data: &ControllerData, _req: &SyncRequest, res: &mut S
 
 pub fn sign_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse){
     res.status(StatusCode::BAD_REQUEST);
-    let mut repos = &mut controller_data.repos.clone();
+    let repos = &mut controller_data.repos.clone();
 
     if let Ok(body) = String::from_utf8(req.body().clone()) {
         if let Ok(json) = serde_json::from_str::<Value>(body.as_ref()) {
@@ -92,7 +94,7 @@ pub fn sign_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut 
                                     if let Err(e) = repos.store(&cert.common_name.clone(), &pem , &der_to_pem(&cert.keys.key_der), &ski.clone()){
                                         return info!("{}",&format!("Insertion error for leaf {}: {}", &cert.common_name.clone(), e));
                                     }
-                                    res.body(pem);
+                                    res.body(fix_pem(&pem));
                                     res.status(StatusCode::OK);
                                 }
                             }
@@ -125,10 +127,12 @@ pub fn cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncR
                             if (CertFormat::from(format.to_string()) as u8) == 0{
                                 res.body(pem_to_der(&ca_cert).unwrap());
                             } else {
-                                res.body(ca_cert);
+                                res.body(fix_pem(&ca_cert));
                             }
                             res.status(StatusCode::OK);
                         }
+                    } else {
+                        error!("{}", e);
                     }
                 }
             }
@@ -146,7 +150,7 @@ pub fn chains(controller_data: &ControllerData, req: &SyncRequest, res: &mut Syn
         if let Ok(intermediate) = repos.find(decoded.clone().trim_matches('"').trim_matches('\0')) {
             if intermediate.len() > 0{
                 if let Ok(cert) = repos.get_cert(&intermediate[0].value){
-                    let mut chain = cert.clone();
+                    let mut chain = fix_pem(&cert.clone());
 
                     let mut key_identifier = String::default();
                     loop {
@@ -159,7 +163,7 @@ pub fn chains(controller_data: &ControllerData, req: &SyncRequest, res: &mut Syn
 
                             if let Ok(hash) = repos.get_hash_from_key_identifier(&aki){
                                 if let Ok(cert) = repos.get_cert(&hash){
-                                    chain.push_str(&cert.clone());
+                                    chain.push_str(&fix_pem(&cert.clone()));
                                 } else {
                                     break;
                                 }
@@ -262,7 +266,8 @@ fn get_and_store_env_cert_info(cert: &str, key: &str, repos: &mut Box<BackendSto
             match CoreController::get_subject_name(&der){
                 Ok(name) => {
                     let name = name.trim_start_matches("CN=");
-                    if let Err(e) = repos.store(name, cert, key, &ski){
+                    let key = key.replace(KEY_PREFIX, "").replace(KEY_SUFFIX, "");
+                    if let Err(e) = repos.store(name, cert, &key, &ski){
                         return Err(e);
                     }
                     return Ok(());
