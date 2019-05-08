@@ -1,7 +1,6 @@
 use mbedtls::pk::Type as KeyType;
 use mbedtls::hash::Type as HashType;
-use x509_parser::{TbsCertificate, X509Extension, parse_x509_der, pem::pem_to_der, error};
-use der_parser::{oid, DerError};
+use x509_parser::{parse_x509_der, pem::pem_to_der, error};
 
 use crate::models::certificate::Cert;
 use crate::models::csr::CertificateSignRequest;
@@ -11,10 +10,8 @@ pub const DEFAULT_DURATION: i64 = 156;
 pub const ROOT_DURATION: i64 = 520;
 pub const INTERMEDIATE_DURATION: i64 = 260;
 
-const CERT_PREFIX: &str = "-----BEGIN CERTIFICATE-----\n";
-const CERT_SUFFIX: &str = "\n-----END CERTIFICATE-----\0";
-const RSA_KEY_PREFIX: &str = "-----BEGIN RSA PRIVATE KEY-----\n";
-const RSA_KEY_SUFFIX: &str = "\n-----END RSA PRIVATE KEY-----\0";
+const CERT_PREFIX: &str = "-----BEGIN CERTIFICATE-----";
+const CERT_SUFFIX: &str = "-----END CERTIFICATE-----";
 
 pub enum Order{
     RootIntermediate,
@@ -24,7 +21,6 @@ pub enum Order{
 pub struct CoreController{
 }
 
-/// TODO: Add bits length for key in config
 impl CoreController{
     pub fn generate_root_ca(realm: &str, hash_type: HashType, key_type: KeyType) -> Option<Cert>{
         let root = Cert::generate_root(realm, hash_type, key_type, 4096);
@@ -71,8 +67,8 @@ impl CoreController{
     pub fn fix_string(pem: &str) -> Result<Vec<u8>, String>{
         let mut pem = pem.clone()
             .replace("\n", "")
-            .replace("-----BEGIN CERTIFICATE-----", "")
-            .replace("-----END CERTIFICATE-----", "")
+            .replace(CERT_PREFIX, "")
+            .replace(CERT_SUFFIX, "")
             .replace(" ", "");
 
         let mut fixed_pem = String::default();
@@ -84,7 +80,7 @@ impl CoreController{
         }
 
         fixed_pem.push_str(&format!("{}{}", pem, "\n"));
-        let fixed_pem = format!("{}{}{}", "-----BEGIN CERTIFICATE-----\n", fixed_pem, "-----END CERTIFICATE-----\n");
+        let fixed_pem = format!("{}{}{}", format!("{}{}", CERT_PREFIX, "\n"), fixed_pem, format!("{}{}", CERT_SUFFIX, "\n"));
 
         match pem_to_der(fixed_pem.as_bytes()){
             Ok((rem, pem)) => {

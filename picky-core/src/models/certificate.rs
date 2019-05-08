@@ -1,20 +1,16 @@
 use mbedtls::x509::{key_usage, Certificate};
 use mbedtls::x509::{certificate, Time};
 use mbedtls::x509::csr::Csr;
-use mbedtls::pk::Pk;
-use mbedtls::hash::Type::{Sha256};
-use mbedtls::hash::Md;
 use mbedtls::rng::os_entropy::{OsEntropy};
 use mbedtls::rng::ctr_drbg::CtrDrbg;
-use mbedtls::Error;
-use base64::{encode, decode};
+use base64;
+use chrono::{DateTime, Duration, Utc, Datelike, Timelike};
+use rand::Rng;
 
 use crate::models::key::{Keys};
 use crate::models::csr::CertificateSignRequest;
 
-use chrono::{DateTime, Duration, Utc, Datelike, Timelike};
-
-const HASH: mbedtls::hash::Type = Sha256;
+const CN: &str = "CN=";
 
 const DEFAULT_DURATION: i64 = 26280;
 const ROOT_DURATION: i64 = 87600;
@@ -101,27 +97,25 @@ impl Cert{
         self
     }
 
-    fn create_serial(&mut self, hash_type: &mbedtls::hash::Type) -> Result<Vec<u8>, String>{
-        let mut pk =  Pk::from_private_key(&self.keys.key_der, None).unwrap();
-        let pub_key = pk.write_public_pem_string().unwrap();
-        let mut out = [0u8; 60];
+    fn create_serial(&mut self) -> Vec<u8>{
+        let mut rng = rand::thread_rng();
+        let x: u32 = rng.gen();
 
-        if let Ok(size) = Md::hash(hash_type.clone(), pub_key.as_bytes(), &mut out) {
-            if size > 20{
-                return Ok(out[0 .. 19].to_vec());
-            }
-            return Ok(out[0 .. size].to_vec());
-        }
-        Err("Could not serialize...".to_string())
+        let b1 = ((x >> 24) & 0xff) as u8;
+        let b2 = ((x >> 16) & 0xff) as u8;
+        let b3 = ((x >> 8) & 0xff) as u8;
+        let b4 = (x & 0xff) as u8;
+        vec![b1, b2, b3, b4]
+
     }
 
     fn generate_certificate(&mut self, hash_type: mbedtls::hash::Type, valid_from: X509Time, valid_to: X509Time, ca: bool, pathlen: Option<u32>) -> &mut Self{
         if self.issuer.is_none(){
-            self.issuer = Some(self.common_name.clone());
+            self.issuer = Some(self.common_name.clone().replace(CN, ""));
             self.issuer_key = Some(self.keys.key_der.clone());
         } else {
             if let Ok(ca) = Certificate::from_der(&base64::decode(&self.issuer.clone().unwrap()).unwrap()){
-                self.issuer = Some(ca.subject().unwrap().replace("CN=", ""));
+                self.issuer = Some(ca.subject().unwrap().replace(CN, ""));
             }
         }
 
@@ -140,19 +134,14 @@ impl Cert{
             key_usage = key_usage::DIGITAL_SIGNATURE | key_usage::KEY_ENCIPHERMENT;
         }
 
-        /*let serial = match self.create_serial(hash_type){
-            Ok(s) => s,
-            Err(e) => Vec::new()
-        };*/
-
         self.certificate_der = certificate::Builder::new()
             .subject_key(&mut subject_key)
-            .subject_with_nul(&format!("CN={}{}", self.common_name, "\0")).unwrap()
+            .subject_with_nul(&format!("{}{}{}", CN, self.common_name, "\0")).unwrap()
             .issuer_key(&mut issuer_key)
-            .issuer_with_nul(&format!("CN={}{}", self.issuer.clone().unwrap(), "\0")).unwrap()
+            .issuer_with_nul(&format!("{}{}{}", CN, self.issuer.clone().unwrap(), "\0")).unwrap()
             .basic_constraints(ca, pathlen).unwrap()
             .validity(valid_from.to_time_native(), valid_to.to_time_native()).unwrap()
-            //.serial(serial.as_slice()).unwrap()
+            .serial(&self.create_serial()).unwrap()
             .signature_hash(hash_type.clone())
             .key_usage(key_usage).unwrap()
             .set_subject_key_identifier().unwrap()
@@ -179,7 +168,7 @@ impl Cert{
         let keys = Keys::new(key_type, bits);
         let pk = Keys::get_pk_from_private(&keys.key_der);
 
-        let csr = CertificateSignRequest::generate_csr(&format!("CN={} Authority", realm), pk);
+        let csr = CertificateSignRequest::generate_csr(&format!("{}{} Authority", CN, realm), pk);
 
         let csr_struct = Csr::from_pem(csr.as_bytes()).unwrap();
 
@@ -187,7 +176,7 @@ impl Cert{
             CertificateType::Intermediate,
             hash_type,
             Some(key_type),
-            &(csr_struct.subject().unwrap().trim_start_matches("CN=")),
+            &(csr_struct.subject().unwrap().trim_start_matches(CN)),
             Some(&base64::encode(root)),
             Some(root_key),
             Some(keys.clone()),
@@ -208,7 +197,7 @@ impl Cert{
             CertificateType::Leaf,
             hash_type,
             None,
-            &csr_struct.subject().unwrap(),
+            &csr_struct.subject().unwrap().trim_start_matches(CN),
             Some(&base64::encode(authority)),
             Some(authority_key),
             Some(leaf_key),

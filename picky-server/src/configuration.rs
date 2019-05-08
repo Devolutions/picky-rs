@@ -3,8 +3,6 @@ use mbedtls::hash::Type as HashType;
 use mbedtls::pk::Type as KeyType;
 use std::env;
 use clap::App;
-use crate::db::backend::Backend;
-use std::error::Error;
 
 const DEFAULT_PICKY_REALM: &'static str = "Picky";
 
@@ -22,7 +20,8 @@ pub enum BackendType{
     MySQL,
     SQLite,
     MongoDb,
-    Memory
+    Memory,
+    File
 }
 
 impl From<&str> for BackendType{
@@ -32,6 +31,7 @@ impl From<&str> for BackendType{
             "sqlite" => BackendType::SQLite,
             "mongodb" => BackendType::MongoDb,
             "memory" => BackendType::Memory,
+            "file" => BackendType::File,
             _ => BackendType::default()
         }
     }

@@ -2,7 +2,9 @@ use crate::configuration::{BackendType, ServerConfig};
 use crate::db::mongodb::mongo_repos::MongoRepos;
 use crate::db::mongodb::mongo_connection::MongoConnection;
 use crate::db::memory::memory_repos::MemoryRepos;
-use crate::configuration::BackendType::Memory;
+use crate::db::file::file_repos::FileRepos;
+
+pub const DEFAULT_FILEBASE_PATH: &str = "../filebase/";
 
 pub struct Backend {
     pub db: Box<BackendStorage>
@@ -74,9 +76,11 @@ impl From<&ServerConfig> for Backend{
                         return Backend::new(dbstorage).expect("Wrong server configuration");
                 },
             BackendType::Memory => {
-                // For testing
                 return Backend::new(Box::new(MemoryRepos::new())).expect("Bad configuration");
-            }
+            },
+            BackendType::File => {
+                return Backend::new(Box::new(FileRepos::new(DEFAULT_FILEBASE_PATH))).expect("Error creating backend for file base");
+            },
             _ => panic!("not yet implemented")
         }
     }
@@ -89,7 +93,7 @@ pub trait Repo<T>{
 
     fn init(&mut self, db_instance: Self::Instance, name: &str) -> Result<(), String>;
     fn get_collection(&self) -> Result<Self::RepoCollection, String>;
-    fn insert(&mut self, key: &str, value: T) -> Result<(), String>;
+    fn insert(&mut self, key: &str, value: &T) -> Result<(), String>;
 }
 
 #[cfg(test)]
@@ -97,8 +101,6 @@ mod tests{
     use super::*;
     use crate::Server;
     use std::env;
-    use crate::utils;
-    use picky_core::controllers::core_controller::CoreController;
 
     #[test]
     fn server_with_memory_backend_test(){

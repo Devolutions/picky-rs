@@ -10,6 +10,8 @@ use crate::utils::*;
 
 const CERT_PREFIX: &str = "-----BEGIN CERTIFICATE-----\n";
 const CERT_SUFFIX: &str = "\n-----END CERTIFICATE-----\n";
+const KEY_PREFIX: &str = "-----BEGIN RSA PRIVATE KEY-----\n";
+const KEY_SUFFIX: &str = "\n-----END RSA PRIVATE KEY-----";
 const SUBJECT_KEY_IDENTIFIER: &[u64] = &[2, 5, 29, 14];
 const AUTHORITY_KEY_IDENTIFIER_OID: &[u64] = &[2, 5, 29, 35];
 
@@ -73,7 +75,7 @@ pub fn health(_controller_data: &ControllerData, _req: &SyncRequest, res: &mut S
 
 pub fn sign_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse){
     res.status(StatusCode::BAD_REQUEST);
-    let mut repos = &mut controller_data.repos.clone();
+    let repos = &mut controller_data.repos.clone();
 
     if let Ok(body) = String::from_utf8(req.body().clone()) {
         if let Ok(json) = serde_json::from_str::<Value>(body.as_ref()) {
@@ -92,7 +94,7 @@ pub fn sign_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut 
                                     if let Err(e) = repos.store(&cert.common_name.clone(), &pem , &der_to_pem(&cert.keys.key_der), &ski.clone()){
                                         return info!("{}",&format!("Insertion error for leaf {}: {}", &cert.common_name.clone(), e));
                                     }
-                                    res.body(pem);
+                                    res.body(fix_pem(&pem));
                                     res.status(StatusCode::OK);
                                 }
                             }
@@ -125,10 +127,12 @@ pub fn cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncR
                             if (CertFormat::from(format.to_string()) as u8) == 0{
                                 res.body(pem_to_der(&ca_cert).unwrap());
                             } else {
-                                res.body(ca_cert);
+                                res.body(fix_pem(&ca_cert));
                             }
                             res.status(StatusCode::OK);
                         }
+                    } else {
+                        error!("{}", e);
                     }
                 }
             }
@@ -146,7 +150,7 @@ pub fn chains(controller_data: &ControllerData, req: &SyncRequest, res: &mut Syn
         if let Ok(intermediate) = repos.find(decoded.clone().trim_matches('"').trim_matches('\0')) {
             if intermediate.len() > 0{
                 if let Ok(cert) = repos.get_cert(&intermediate[0].value){
-                    let mut chain = cert.clone();
+                    let mut chain = fix_pem(&cert.clone());
 
                     let mut key_identifier = String::default();
                     loop {
@@ -159,7 +163,7 @@ pub fn chains(controller_data: &ControllerData, req: &SyncRequest, res: &mut Syn
 
                             if let Ok(hash) = repos.get_hash_from_key_identifier(&aki){
                                 if let Ok(cert) = repos.get_cert(&hash){
-                                    chain.push_str(&cert.clone());
+                                    chain.push_str(&fix_pem(&cert.clone()));
                                 } else {
                                     break;
                                 }
@@ -262,7 +266,8 @@ fn get_and_store_env_cert_info(cert: &str, key: &str, repos: &mut Box<BackendSto
             match CoreController::get_subject_name(&der){
                 Ok(name) => {
                     let name = name.trim_start_matches("CN=");
-                    if let Err(e) = repos.store(name, cert, key, &ski){
+                    let key = key.replace(KEY_PREFIX, "").replace(KEY_SUFFIX, "");
+                    if let Err(e) = repos.store(name, cert, &key, &ski){
                         return Err(e);
                     }
                     return Ok(());
@@ -271,53 +276,5 @@ fn get_and_store_env_cert_info(cert: &str, key: &str, repos: &mut Box<BackendSto
             }
         },
         Err(e) => return Err(e)
-    };
-
-    Err("Error while fetching certificate info".to_string())
-}
-
-#[cfg(test)]
-mod tests{
-    use super::*;
-    use crate::utils;
-
-    static PEM: &'static str = "-----BEGIN CERTIFICATE-----
-MIIFHDCCAwSgAwIBAgIAMA0GCSqGSIb3DQEBCwUAMCAxHjAcBgNVBAMMFUNOPW1
-5X2Rlbi5sb2wgUm9vdCBDQTAeFw0xOTA0MjYxOTU3NDFaFw0yNDA0MjQxOTU3ND
-FaMB8xHTAbBgNVBAMMFG15X2Rlbi5sb2wgQXV0aG9yaXR5MIICIjANBgkqhkiG9
-w0BAQEFAAOCAg8AMIICCgKCAgEA1dnnBcD5rQ70DG/hn/iPxBZ/ppwDHeDK4bzZ
-fHASOka+CzP7hc3NW0ppUt8Atj++2hOu1GR6TsJegRILkrJ9dxfOMdjoxpAWcmc
-qM9vtmZOkC2RlaV5b/GtB52aQTyJF227axD0rhF+Vga55+B20XStyUwoLdJ3Tnf
-iil6FWeLQNisM7sCntRe/EbzVpvc2IU+TPjsNomZYJA/Yl6Wl2Qzp4g7eRKg2DP
-ZrRwiYpphuv5r0BCI8K/X1CZP18FJF6+QFDXeo0L3g8E8HIa0r3N7Yr48jd7oYr
-HJHXoXmFbnQYr1x+tsj1vd91cJHXHhDAEFZuzi27PbDg+Otp38Quuiu7MPTmGac
-NQAMIQzxasAf3Qm3mafIU0TRmJ7dXHlsKxjzM2OiYlLXwdIFqk/nXO/1ZSNd45s
-w8Mv0ruG3Br1LPLpdw3DW49DO1T6GPFWHtY1bm5uULG3U7lJe5vzsSJ9uL3jBpT
-RaYvM3+wSC0L1HPmvl1GPSmDjeafu2tSRFqptnZiQc8vuRt+pIOxjuTkxxn40WB
-E+iLGjkXD1VWA6XdhT6M+Tt2Zfgl83gtOmh1o2z4jm4P1QJ4v0NHc81wOZ2ksqF
-cWVDA3J3t1Um2yUfw0VxirI+ytWiAC8lzwfwnVzT8H9WIuAgcpidujxdYhnbf0W
-FCsZOR/Fv81k6opVMCAwEAAaNjMGEwDwYDVR0TBAgwBgEB/wIBADAOBgNVHQ8BA
-f8EBAMCAa4wHQYDVR0OBBYEFJo+UnDnuGNchrYBKXO3gNvgNCf2MB8GA1UdIwQY
-MBaAFPgx7if1NT16dUqpl9iVdLyRNC9pMA0GCSqGSIb3DQEBCwUAA4ICAQA7tlP
-sZhoSiIjJGfpsO+XBWZbnHLIQ8a+Cn0V1oWyOspP4jLOTT7efUQYZWIzuk3IMkb
-eK71U2PDIpTSvUHAUchtNKl8YcBSU6TAPKdrk3TGb1UvglMVi+xkaVYpUYYnN+L
-peeyKrN4TE/qbTiju0RYH9vo6Y68G0kZVVU5ievoqpi3tOaa0BIdTBKEvwSrmm/
-lQTruPAB9rGCI95sAvsmtYJIsPfaQZA3vAxoWlOrwfh3VkMoXB1QSPFt9okXpxZ
-SGE1zpnBjvreuDjSS3HmIxQBYwy4TNQ3duUnDOJAFQvnhLoUzTDprXpmDnXqqLq
-ZYtpU06DYuHVIOuPGIpipUl5182YS1iCSXl2RyfbYTk2+qRYlbUkUmHVgnJMA8a
-uOWhKWtXdi5eJiiSciVAYpBwFXJeSCMYuBQRHaUsXcu55i+jlfDiBVZOZkYgpje
-iOoyJEjTw9KFlPIHMC2qMmPkOlQjGK+CHXMY3kwFZcpz2CgRBSgVvN7Mb+Val38
-Kpskn+WYe7umSp9k0laSvJghxUGYXpVxGwNCiyojsAMUoSJ7xUx5bjfOFOL7SWC
-+juKXytSs4iWqXN9igFBLPd54pj6wdAI5FieHsP6PwaM8Bt20BlJsCa1nj1uR9o
-dK9RO0Wys/X1CAeFnsen7+BVKFvjx0CHZuiNgdTE+BbYBTfgg==
------END CERTIFICATE-----";
-
-    #[test]
-    fn key_id_and_cert_test(){
-        let kid = "9a3e5270e7b8635c86b6012973b780dbe03427f6";
-        let cert = utils::pem_to_der(PEM).unwrap();
-
-        let key_id = CoreController::get_key_identifier(&cert, &[2, 5, 29, 14]).unwrap();
-        assert_eq!(&key_id, kid);
     }
 }

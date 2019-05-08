@@ -1,20 +1,15 @@
 use bson::Bson;
-use bson::Document;
-use bson::{to_bson, from_bson};
-use serde::{Deserialize, Serialize};
-use base64::decode;
+use bson::from_bson;
 
 use crate::utils;
 use crate::db::backend::{BackendStorage, Repo, Model};
 use crate::db::mongodb::mongo_connection::MongoConnection;
 use crate::db::mongodb::mongo_repo::MongoRepo;
-use crate::utils::{pem_to_der, der_to_pem};
 
 const REPO_CERTIFICATE: &str = "Certificate Store";
 const REPO_KEY: &str = "Key Store";
 const REPO_CERTNAME: &str = "Name Store";
 const REPO_CERTKEY: &str = "Key Identifier Store";
-const OLD_REPO_NAME: &str = "certificate";
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -91,11 +86,11 @@ impl BackendStorage for MongoRepos{
     }
 
     fn store(&mut self, name: &str, cert: &str, key: &str, key_identifier: &str) -> Result<bool, String>{
-        if let Ok(mut cert_hash) = utils::multihash_encode(cert){
-                self.name.insert(name, cert_hash.clone())?;
-                self.certificates.insert(&cert_hash.clone(), cert.clone().to_string())?;
-                self.keys.insert(&cert_hash.clone(), key.to_string())?;
-                self.key_identifiers.insert(key_identifier, cert_hash)?;
+        if let Ok(cert_hash) = utils::multihash_encode(cert){
+                self.name.insert(name, &cert_hash.clone())?;
+                self.certificates.insert(&cert_hash.clone(), &cert.clone().to_string())?;
+                self.keys.insert(&cert_hash.clone(), &key.to_string())?;
+                self.key_identifiers.insert(key_identifier, &cert_hash)?;
                 return Ok(true);
         }
 
