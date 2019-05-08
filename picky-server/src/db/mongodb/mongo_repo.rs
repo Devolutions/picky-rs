@@ -4,25 +4,14 @@ use crate::db::mongodb::mongo_connection::MongoConnection;
 use mongodb::coll::Collection;
 use mongodb::db::ThreadedDatabase;
 use bson::Bson;
-use bson::Document;
-use bson::{to_bson, from_bson};
-use serde::{Deserialize, Serialize};
+use bson::to_bson;
+use serde::Serialize;
 use std::marker::PhantomData;
 
 pub struct MongoRepo<T>{
     db_instance: Option<MongoConnection>,
     repo_name: String,
     pd: PhantomData<T>
-}
-
-impl <T>MongoRepo<T>{
-    pub fn new(name: &str) -> Self{
-        MongoRepo{
-            db_instance: None,
-            repo_name: name.to_string(),
-            pd: PhantomData
-        }
-    }
 }
 
 impl <T>Clone for MongoRepo<T>{

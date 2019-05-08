@@ -1,12 +1,9 @@
 use crate::configuration::ServerConfig;
-use crate::db::mongodb::mongo_connection::MongoConnection;
-use crate::db::mongodb::mongo_repos::MongoRepos;
 
 use saphir::{Middleware, SyncRequest, SyncResponse, RequestContinuation, StatusCode, header};
 use saphir::Server as SaphirServer;
 use crate::controllers::server_controller::{ServerController, generate_root_ca, generate_intermediate, check_certs_in_env};
 use crate::db::backend::Backend;
-use std::sync::Arc;
 
 pub struct Server{
 }
@@ -110,17 +107,11 @@ mod tests{
     use super::*;
     use std::env::set_var;
     use curl;
-    use curl::easy::{Easy, List, Auth};
+    use curl::easy::{Easy, List};
     use std::thread;
-    use std::sync::mpsc::Receiver;
-    use std::sync::mpsc::{channel, RecvTimeoutError, Sender};
-    use std::sync::{Arc, Mutex};
-    use std::thread::{JoinHandle, Thread, sleep};
+    use std::thread::sleep;
     use log::LevelFilter;
-    use mongodb::error::ErrorCode::OK;
     use std::time::Duration;
-    use serde_json;
-    use crate::utils;
 
     const TEST_CSR: &'static [u8] = include_bytes!("../../assets/test_csr.csr");
     const TEST_ROOT: &'static [u8] = include_bytes!("../../assets/test_root.crt");
@@ -141,6 +132,7 @@ mod tests{
     const LISTENING_URL: &'static str = "http://0.0.0.0:12345/";
     const URL_REALM: &'static str = "bXlfZGVuLmxvbCBBdXRob3JpdHk";
     const PICKY_API_KEY: &'static str = "11d9f888-3334-4b25-a812-7d0d64d5f235";
+    const PICKY_REALM: &'static str = "my_den.lol";
 
     fn init_logs(config: &ServerConfig) {
         use log4rs::append::console::ConsoleAppender;
@@ -168,8 +160,8 @@ mod tests{
 
     fn set_env(backend: &str){
         set_var(PICKY_BACKEND_ENV, backend);
-        set_var(PICKY_REALM_ENV, "my_den.lol");
-        set_var(PICKY_API_KEY_ENV, "11d9f888-3334-4b25-a812-7d0d64d5f235");
+        set_var(PICKY_REALM_ENV, PICKY_REALM);
+        set_var(PICKY_API_KEY_ENV, PICKY_API_KEY);
         set_var(PICKY_ROOT_CERT_ENV, String::from_utf8_lossy(TEST_ROOT).to_string());
         set_var(PICKY_ROOT_KEY_ENV, String::from_utf8_lossy(TEST_ROOT_KEY).to_string());
         set_var(PICKY_INTERMEDIATE_CERT_ENV, String::from_utf8_lossy(TEST_INTERMEDIATE).to_string());
@@ -193,8 +185,8 @@ mod tests{
         easy.get(true).unwrap();
 
         let mut list = List::new();
-        list.append("Content-Type: application/json").unwrap();
-        list.append("Authorization: Bearer 11d9f888-3334-4b25-a812-7d0d64d5f235");
+        list.append("Content-Type: application/json").expect("Error adding content-type");
+        list.append("Authorization: Bearer 11d9f888-3334-4b25-a812-7d0d64d5f235").expect("Error adding Authorization Bearer");
         easy.http_headers(list).unwrap();
         easy
     }
@@ -217,7 +209,7 @@ mod tests{
     fn call_get_chain() -> Result<(), curl::Error>{
         let mut easy = initialize_curl_call();
         let url = format!("{}{}{}", LISTENING_URL, "chain/", URL_REALM);
-        easy.url(&url);
+        easy.url(&url)?;
 
         let chain = String::from_utf8(get_curl_data(&mut easy)).unwrap();
         println!("Chain : {:?}", chain);
@@ -228,13 +220,13 @@ mod tests{
         let mut easy = initialize_curl_call();
         let url = format!("{}{}", LISTENING_URL, "signcert/");
         let csr = String::from_utf8_lossy(TEST_CSR);
-        easy.url(&url);
+        easy.url(&url)?;
         let json_body: String = json!({
                 "csr": csr,
                 "ca": format!("{} Authority", "my_den.lol")
             }).to_string();
 
-        easy.post_fields_copy(json_body.as_bytes());
+        easy.post_fields_copy(json_body.as_bytes())?;
 
         let cert = String::from_utf8(get_curl_data(&mut easy)).unwrap();
         println!("SignCert : {:?}", cert);
@@ -246,12 +238,12 @@ mod tests{
         let mut easy = initialize_curl_call();
         let url = format!("{}{}", LISTENING_URL, "name/");
         let csr = String::from_utf8_lossy(TEST_CSR);
-        easy.url(&url);
+        easy.url(&url)?;
         let json_body: String = json!({
                 "csr": csr
             }).to_string();
 
-        easy.post_fields_copy(json_body.as_bytes());
+        easy.post_fields_copy(json_body.as_bytes())?;
 
         let name = String::from_utf8(get_curl_data(&mut easy)).unwrap();
         println!("Request Name : {:?}", name);
@@ -262,7 +254,7 @@ mod tests{
     fn call_get_cert_pem_from_hash() -> Result<(), curl::Error>{
         let mut easy = initialize_curl_call();
         let url = format!("{}{}{}{}", LISTENING_URL, "cert/", "pem/", TEST_HASH);
-        easy.url(&url);
+        easy.url(&url)?;
 
         let pem = String::from_utf8(get_curl_data(&mut easy)).unwrap();
         println!("Cert Pem : {:?}", pem);
@@ -272,7 +264,7 @@ mod tests{
     fn call_get_cert_der_from_hash() -> Result<(), curl::Error>{
         let mut easy = initialize_curl_call();
         let url = format!("{}{}{}{}", LISTENING_URL, "cert/", "der/", TEST_HASH);
-        easy.url(&url);
+        easy.url(&url)?;
 
         let der = get_curl_data(&mut easy);
         println!("Cert Der : {:?}", der);

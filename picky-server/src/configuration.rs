@@ -3,8 +3,6 @@ use mbedtls::hash::Type as HashType;
 use mbedtls::pk::Type as KeyType;
 use std::env;
 use clap::App;
-use crate::db::backend::Backend;
-use std::error::Error;
 
 const DEFAULT_PICKY_REALM: &'static str = "Picky";
 
@@ -62,7 +60,7 @@ pub struct ServerConfig{
 impl ServerConfig{
     pub fn new() -> Self{
         let mut config = ServerConfig::default();
-        //config.load_cli();
+        config.load_cli();
         config.load_env();
         config
     }
