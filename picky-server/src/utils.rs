@@ -36,8 +36,8 @@ pub fn strip_pem_tag(pem: &str) -> String {
     pem
 }
 
-pub fn multihash_encode(value: &str) -> Result<String, String> {
-    match encode(PICKY_HASH, strip_pem_tag(value).as_bytes()){
+pub fn multihash_encode(value: &[u8]) -> Result<String, String> {
+    match encode(PICKY_HASH, value){
         Ok(result) => Ok(to_hex(&result)),
         Err(e) => Err(e.to_string())
     }
@@ -65,7 +65,7 @@ pub fn fix_pem(pem: &str) -> String {
     let mut fixed_pem = String::default();
 
     while pem.len()/64 > 0{
-        let s = pem.split_at(63);
+        let s = pem.split_at(64);
         fixed_pem.push_str(&format!("{}{}", s.0, "\n"));
         pem = s.1.to_string();
     }

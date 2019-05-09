@@ -13,7 +13,7 @@ pub struct FileRepo<T> {
     pub phantom_data: PhantomData<T>
 }
 
-impl<T> Repo<T> for FileRepo<T> where T: Eq + Clone + ToString{
+impl<T> Repo<T> for FileRepo<T> where T: Eq + Clone + AsRef<[u8]>{
     type Instance = Option<String>;
     type RepoError = Error;
     type RepoCollection = Vec<String>;
@@ -62,7 +62,7 @@ impl<T> Repo<T> for FileRepo<T> where T: Eq + Clone + ToString{
         }
 
         if let Ok(mut file) = File::create(format!("{}{}", &self.repo, key)){
-            file.write_all(value.to_string().as_bytes()).expect(&format!("Error writing data to {}", key));
+            file.write_all(value.as_ref()).expect(&format!("Error writing data to {}", key));
             return Ok(());
         }
 

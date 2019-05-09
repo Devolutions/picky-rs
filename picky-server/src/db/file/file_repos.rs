@@ -10,14 +10,14 @@ const REPO_KEY: &str = "KeyStore/";
 const REPO_CERTNAME: &str = "NameStore/";
 const REPO_KEYIDENTIFIER: &str = "KeyIdentifierStore/";
 const TXT_EXT: &str = ".txt";
-const PEM_EXT: &str = ".pem";
+const DER_EXT: &str = ".der";
 
 #[derive(Clone)]
 pub struct FileRepos{
     pub path: String,
     pub name: FileRepo<String>,
-    pub cert: FileRepo<String>,
-    pub keys: FileRepo<String>,
+    pub cert: FileRepo<Vec<u8>>,
+    pub keys: FileRepo<Vec<u8>>,
     pub key_identifiers: FileRepo<String>
 }
 
@@ -54,13 +54,13 @@ impl BackendStorage for FileRepos{
         Ok(())
     }
 
-    fn store(&mut self, name: &str, cert: &str, key: Option<&str>, key_identifier: &str) -> Result<bool, String> {
+    fn store(&mut self, name: &str, cert: &[u8], key: Option<&[u8]>, key_identifier: &str) -> Result<bool, String> {
         if let Ok(cert_hash) = utils::multihash_encode(cert){
             self.name.insert(&format!("{}{}", name.replace(" ", "_").to_string(), TXT_EXT), &cert_hash)?;
-            self.cert.insert(&format!("{}{}",cert_hash, PEM_EXT), &cert.to_string())?;
+            self.cert.insert(&format!("{}{}",cert_hash, DER_EXT), &cert.to_vec())?;
 
             if let Some(key) = key {
-                self.keys.insert(&format!("{}{}",cert_hash, PEM_EXT), &key.to_string())?;
+                self.keys.insert(&format!("{}{}",cert_hash, DER_EXT), &key.to_vec())?;
             }
 
             self.key_identifiers.insert(&format!("{}{}", key_identifier, TXT_EXT), &cert_hash)?;
@@ -92,9 +92,9 @@ impl BackendStorage for FileRepos{
         Err("Not found".to_string())
     }
 
-    fn get_cert(&self, hash: &str) -> Result<String, String> {
+    fn get_cert(&self, hash: &str) -> Result<Vec<u8>, String> {
         let mut cert= String::default();
-        let hash = format!("{}{}", hash, PEM_EXT);
+        let hash = format!("{}{}", hash, DER_EXT);
         if let Ok(certs) = self.cert.get_collection(){
             for c in certs{
                 if hash.eq(&c){
@@ -107,16 +107,16 @@ impl BackendStorage for FileRepos{
             }
 
             if !cert.is_empty(){
-                return Ok(cert);
+                return Ok(cert.as_bytes().to_vec());
             }
         }
 
         Err("Cert not found".to_string())
     }
 
-    fn get_key(&self, hash: &str) -> Result<String, String> {
+    fn get_key(&self, hash: &str) -> Result<Vec<u8>, String> {
         let mut key = String::default();
-        let hash = format!("{}{}", hash, PEM_EXT);
+        let hash = format!("{}{}", hash, DER_EXT);
         if let Ok(keys) = self.keys.get_collection(){
             for k in keys{
                 if hash.eq(&k) {
@@ -130,7 +130,7 @@ impl BackendStorage for FileRepos{
         }
 
         if !key.is_empty(){
-            return Ok(key);
+            return Ok(key.as_bytes().to_vec());
         }
 
         Err("Key not found".to_string())

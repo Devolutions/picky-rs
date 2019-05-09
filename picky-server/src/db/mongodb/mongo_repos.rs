@@ -5,6 +5,9 @@ use crate::utils;
 use crate::db::backend::{BackendStorage, Repo, Model};
 use crate::db::mongodb::mongo_connection::MongoConnection;
 use crate::db::mongodb::mongo_repo::MongoRepo;
+use bson::spec::BinarySubtype;
+use bson::spec::ElementType::Binary;
+use crate::utils::pem_to_der;
 
 const REPO_CERTIFICATE: &str = "Certificate Store";
 const REPO_KEY: &str = "Key Store";
@@ -51,8 +54,8 @@ impl From<mongodb::Error> for RepositoryError {
 pub struct MongoRepos{
     db_instance: MongoConnection,
     pub name: MongoRepo<String>,
-    pub certificates: MongoRepo<String>,
-    pub keys: MongoRepo<String>,
+    pub certificates: MongoRepo<Bson>,
+    pub keys: MongoRepo<Bson>,
     pub key_identifiers: MongoRepo<String>
 }
 
@@ -85,13 +88,13 @@ impl BackendStorage for MongoRepos{
         Ok(())
     }
 
-    fn store(&mut self, name: &str, cert: &str, key: Option<&str>, key_identifier: &str) -> Result<bool, String>{
+    fn store(&mut self, name: &str, cert: &[u8], key: Option<&[u8]>, key_identifier: &str) -> Result<bool, String>{
         if let Ok(cert_hash) = utils::multihash_encode(cert){
             self.name.insert(name, &cert_hash.clone())?;
-            self.certificates.insert(&cert_hash.clone(), &cert.clone().to_string())?;
+            self.certificates.insert(&cert_hash.clone(), &Bson::Binary(BinarySubtype::Generic, cert.to_vec()))?;
 
             if let Some(key) = key{
-                self.keys.insert(&cert_hash.clone(), &key.to_string())?;
+                self.keys.insert(&cert_hash.clone(), &Bson::Binary(BinarySubtype::Generic, key.to_vec()))?;
             }
             self.key_identifiers.insert(key_identifier, &cert_hash)?;
             return Ok(true);
@@ -118,9 +121,9 @@ impl BackendStorage for MongoRepos{
         Ok(model_vec)
     }
 
-    fn get_cert(&self, hash: &str) -> Result<String, String>{
+    fn get_cert(&self, hash: &str) -> Result<Vec<u8>, String>{
         let doc = doc!{"key": hash};
-        let mut model_vec: Vec<Model<String>> = Vec::new();
+        let mut model_vec: Vec<Model<Vec<u8>>> = Vec::new();
         let document_cursor = match self.certificates.get_collection()?.find(Some(doc), None){
             Ok(d) => d,
             Err(e) => return Err(e.to_string())
@@ -128,7 +131,8 @@ impl BackendStorage for MongoRepos{
 
         for doc_res in document_cursor{
             if let Ok(model_document) = doc_res {
-                if let Ok(model) = from_bson(Bson::Document(model_document)) {
+                if let Some(&Bson::Binary(BinarySubtype::Generic, ref bin)) = model_document.get("value"){
+                    let model = Model{key: hash.to_string(), value: bin.clone().to_owned()};
                     model_vec.push(model);
                 }
             }
@@ -141,9 +145,9 @@ impl BackendStorage for MongoRepos{
         Err("Error finding cert".to_string())
     }
 
-    fn get_key(&self, hash: &str) -> Result<String, String>{
+    fn get_key(&self, hash: &str) -> Result<Vec<u8>, String>{
         let doc = doc!{"key": hash};
-        let mut model_vec: Vec<Model<String>> = Vec::new();
+        let mut model_vec: Vec<Model<Vec<u8>>> = Vec::new();
         let document_cursor = match self.keys.get_collection()?.find(Some(doc), None){
             Ok(d) => d,
             Err(e) => return Err(e.to_string())
@@ -151,7 +155,8 @@ impl BackendStorage for MongoRepos{
 
         for doc_res in document_cursor{
             if let Ok(model_document) = doc_res {
-                if let Ok(model) = from_bson(Bson::Document(model_document)) {
+                if let Some(&Bson::Binary(BinarySubtype::Generic, ref bin)) = model_document.get("value"){
+                    let model = Model{key: hash.to_string(), value: bin.clone().to_owned()};
                     model_vec.push(model);
                 }
             }
