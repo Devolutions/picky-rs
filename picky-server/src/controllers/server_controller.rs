@@ -37,7 +37,7 @@ impl ServerController {
         };
 
         let dispatch = ControllerDispatch::new(controller_data);
-        dispatch.add(Method::GET, "/chain/<api-key>", chains);
+        dispatch.add(Method::GET, "/chain/<ca>", chains);
         dispatch.add(Method::POST, "/signcert/", sign_cert);
         dispatch.add(Method::POST, "/name/", request_name);
         dispatch.add(Method::GET, "/health/", health);
@@ -144,7 +144,7 @@ pub fn chains(controller_data: &ControllerData, req: &SyncRequest, res: &mut Syn
     res.status(StatusCode::BAD_REQUEST);
     let repos = &controller_data.repos;
 
-    if let Some(common_name) = req.captures().get("api-key").and_then(|c| base64::decode_config(c, URL_SAFE_NO_PAD).ok()){
+    if let Some(common_name) = req.captures().get("ca").and_then(|c| base64::decode_config(c, URL_SAFE_NO_PAD).ok()){
         let decoded = String::from_utf8_lossy(&common_name);
 
         if let Ok(intermediate) = repos.find(decoded.clone().trim_matches('"').trim_matches('\0')) {
