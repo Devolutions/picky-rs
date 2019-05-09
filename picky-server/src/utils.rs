@@ -2,8 +2,10 @@ use base64::{encode as base64_encode, decode as base64_decode};
 use multihash::{encode, decode, Hash, to_hex};
 
 const PICKY_HASH: Hash =  Hash::SHA2256;
-const CERT_PREFIX: &str = "-----BEGIN CERTIFICATE-----";
-const CERT_SUFFIX: &str = "-----END CERTIFICATE-----";
+pub const CERT_PREFIX: &str = "-----BEGIN CERTIFICATE-----";
+pub const CERT_SUFFIX: &str = "-----END CERTIFICATE-----";
+pub const KEY_PREFIX: &str = "-----BEGIN RSA PRIVATE KEY-----";
+pub const KEY_SUFFIX: &str = "-----END RSA PRIVATE KEY-----";
 const SHA256_MULTIHASH_PREFIX: &str = "1220";
 
 pub fn der_to_pem(der: &[u8]) -> String{
@@ -11,8 +13,8 @@ pub fn der_to_pem(der: &[u8]) -> String{
 }
 
 pub fn pem_to_der(pem: &str) -> Result<Vec<u8>, String>{
-    let pem= strip_pem_tag(pem);
-    let pem = pem.replace(" ", "");
+    let mut pem = strip_pem_tag(&pem);
+    pem = pem.replace(" ", "");
     match base64_decode(pem.as_bytes()){
         Ok(d) => { return Ok(d);},
         Err(e) => { return Err(e.to_string()); }
@@ -20,9 +22,16 @@ pub fn pem_to_der(pem: &str) -> Result<Vec<u8>, String>{
 }
 
 pub fn strip_pem_tag(pem: &str) -> String {
-    let pem = pem.replace("\n", "")
-        .replace(CERT_PREFIX, "")
-        .replace(CERT_SUFFIX, "");
+    let mut pem = pem.replace("\\n", "");
+    let mut pem = pem.replace("\n", "");
+
+    if pem.contains(CERT_PREFIX){
+        pem = pem.replace(CERT_PREFIX, "")
+            .replace(CERT_SUFFIX, "");
+    } else {
+        pem = pem.replace(KEY_PREFIX, "")
+            .replace(KEY_SUFFIX, "");
+    }
 
     pem
 }

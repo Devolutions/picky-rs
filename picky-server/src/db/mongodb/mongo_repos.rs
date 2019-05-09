@@ -85,13 +85,16 @@ impl BackendStorage for MongoRepos{
         Ok(())
     }
 
-    fn store(&mut self, name: &str, cert: &str, key: &str, key_identifier: &str) -> Result<bool, String>{
+    fn store(&mut self, name: &str, cert: &str, key: Option<&str>, key_identifier: &str) -> Result<bool, String>{
         if let Ok(cert_hash) = utils::multihash_encode(cert){
-                self.name.insert(name, &cert_hash.clone())?;
-                self.certificates.insert(&cert_hash.clone(), &cert.clone().to_string())?;
+            self.name.insert(name, &cert_hash.clone())?;
+            self.certificates.insert(&cert_hash.clone(), &cert.clone().to_string())?;
+
+            if let Some(key) = key{
                 self.keys.insert(&cert_hash.clone(), &key.to_string())?;
-                self.key_identifiers.insert(key_identifier, &cert_hash)?;
-                return Ok(true);
+            }
+            self.key_identifiers.insert(key_identifier, &cert_hash)?;
+            return Ok(true);
         }
 
         Err("Can\'t encode certificate".to_string())

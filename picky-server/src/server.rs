@@ -13,7 +13,7 @@ impl Server{
         let mut repos = Backend::from(&config).db;
         repos.init().expect("Picky cannot start without fully initializing its repos");
         if let Err(e) = check_certs_in_env(&config, &mut repos){
-            info!("Error loading certificates in environment: {}", e);
+            error!("Error loading certificates in environment: {}", e);
         }
 
         info!("Creating root...");

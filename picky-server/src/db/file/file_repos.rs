@@ -54,11 +54,15 @@ impl BackendStorage for FileRepos{
         Ok(())
     }
 
-    fn store(&mut self, name: &str, cert: &str, key: &str, key_identifier: &str) -> Result<bool, String> {
+    fn store(&mut self, name: &str, cert: &str, key: Option<&str>, key_identifier: &str) -> Result<bool, String> {
         if let Ok(cert_hash) = utils::multihash_encode(cert){
             self.name.insert(&format!("{}{}", name.replace(" ", "_").to_string(), TXT_EXT), &cert_hash)?;
             self.cert.insert(&format!("{}{}",cert_hash, PEM_EXT), &cert.to_string())?;
-            self.keys.insert(&format!("{}{}",cert_hash, PEM_EXT), &key.to_string())?;
+
+            if let Some(key) = key {
+                self.keys.insert(&format!("{}{}",cert_hash, PEM_EXT), &key.to_string())?;
+            }
+
             self.key_identifiers.insert(&format!("{}{}", key_identifier, TXT_EXT), &cert_hash)?;
             return Ok(true);
         }
