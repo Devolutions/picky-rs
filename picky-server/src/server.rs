@@ -33,7 +33,7 @@ impl Server{
             }
         }).expect("Unable to configure picky");
 
-        let _server = SaphirServer::builder()
+        let server = SaphirServer::builder()
             .configure_middlewares(|middle_stack|{
                 middle_stack.apply(AuthMiddleware::new(config.clone()), ["/"].to_vec(), Some(vec!["/chain", "/json-chain", "/health", "/authority"]))
             }).configure_router(|router|{
@@ -41,8 +41,11 @@ impl Server{
             router.add(controller)
         }).configure_listener(|listener_config|{
             listener_config.set_uri("http://0.0.0.0:12345")
-        }).build()
-            .run();
+        }).build();
+
+        if let Err(e) = server.run(){
+            error!("{}", e);
+        }
     }
 }
 
