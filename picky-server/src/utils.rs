@@ -70,7 +70,10 @@ pub fn fix_pem(pem: &str) -> String {
         pem = s.1.to_string();
     }
 
-    fixed_pem.push_str(&format!("{}{}", pem, "\n"));
+    if !pem.is_empty(){
+        fixed_pem.push_str(&format!("{}{}", pem, "\n"));
+    }
+
     let fixed_pem = format!("{}{}{}", format!("{}{}", CERT_PREFIX, "\n"), fixed_pem, format!("{}{}", CERT_SUFFIX, "\n"));
     fixed_pem
 }
@@ -139,6 +142,5 @@ mod tests{
         let hex = to_hex(&res[0..hash]);
 
         assert_eq!(hex, "6a6eba242e7a03c59375634409d720a60750e5cd74c539ed8d52c9343b1abed4");
-
     }
 }
