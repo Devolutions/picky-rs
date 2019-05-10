@@ -63,7 +63,7 @@ mod tests{
         let pub_key = pk.write_public_pem_string().unwrap();
         let private_key = pk.write_private_der_vec().unwrap();
 
-        let key_pk = Keys::get_pk_from_public(&key.key_der);
+        let key_pk = Keys::get_pk_from_private(&key.key_der);
 
         assert_eq!(private_key, key.key_der);
         assert_eq!(key_pk.rsa_public_exponent().unwrap(), 0x10001);

@@ -13,7 +13,7 @@ impl Server{
         let mut repos = Backend::from(&config).db;
         repos.init().expect("Picky cannot start without fully initializing its repos");
         if let Err(e) = check_certs_in_env(&config, &mut repos){
-            info!("Error loading certificates in environment: {}", e);
+            error!("Error loading certificates in environment: {}", e);
         }
 
         info!("Creating root...");
@@ -33,16 +33,19 @@ impl Server{
             }
         }).expect("Unable to configure picky");
 
-        let _server = SaphirServer::builder()
+        let server = SaphirServer::builder()
             .configure_middlewares(|middle_stack|{
-                middle_stack.apply(AuthMiddleware::new(config.clone()), ["/"].to_vec(), Some(vec![r"^/chain", r"^/json-chain", r"^/health", r"^/authority"]))
+                middle_stack.apply(AuthMiddleware::new(config.clone()), ["/"].to_vec(), Some(vec!["/chain", "/json-chain", "/health", "/authority"]))
             }).configure_router(|router|{
             let controller = ServerController::new(repos.clone(), config.clone());
             router.add(controller)
         }).configure_listener(|listener_config|{
             listener_config.set_uri("http://0.0.0.0:12345")
-        }).build()
-            .run();
+        }).build();
+
+        if let Err(e) = server.run(){
+            error!("{}", e);
+        }
     }
 }
 

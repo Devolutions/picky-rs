@@ -4,6 +4,8 @@ use multihash::{encode, decode, Hash, to_hex};
 const PICKY_HASH: Hash =  Hash::SHA2256;
 const CERT_PREFIX: &str = "-----BEGIN CERTIFICATE-----";
 const CERT_SUFFIX: &str = "-----END CERTIFICATE-----";
+const KEY_PREFIX: &str = "-----BEGIN RSA PRIVATE KEY-----";
+const KEY_SUFFIX: &str = "-----END RSA PRIVATE KEY-----";
 const SHA256_MULTIHASH_PREFIX: &str = "1220";
 
 pub fn der_to_pem(der: &[u8]) -> String{
@@ -11,8 +13,8 @@ pub fn der_to_pem(der: &[u8]) -> String{
 }
 
 pub fn pem_to_der(pem: &str) -> Result<Vec<u8>, String>{
-    let pem= strip_pem_tag(pem);
-    let pem = pem.replace(" ", "");
+    let mut pem = strip_pem_tag(&pem);
+    pem = pem.replace(" ", "");
     match base64_decode(pem.as_bytes()){
         Ok(d) => { return Ok(d);},
         Err(e) => { return Err(e.to_string()); }
@@ -20,15 +22,22 @@ pub fn pem_to_der(pem: &str) -> Result<Vec<u8>, String>{
 }
 
 pub fn strip_pem_tag(pem: &str) -> String {
-    let pem = pem.replace("\n", "")
-        .replace(CERT_PREFIX, "")
-        .replace(CERT_SUFFIX, "");
+    let mut pem = pem.replace("\\n", "");
+    let mut pem = pem.replace("\n", "");
+
+    if pem.contains(CERT_PREFIX){
+        pem = pem.replace(CERT_PREFIX, "")
+            .replace(CERT_SUFFIX, "");
+    } else {
+        pem = pem.replace(KEY_PREFIX, "")
+            .replace(KEY_SUFFIX, "");
+    }
 
     pem
 }
 
-pub fn multihash_encode(value: &str) -> Result<String, String> {
-    match encode(PICKY_HASH, strip_pem_tag(value).as_bytes()){
+pub fn multihash_encode(value: &[u8]) -> Result<String, String> {
+    match encode(PICKY_HASH, value){
         Ok(result) => Ok(to_hex(&result)),
         Err(e) => Err(e.to_string())
     }
@@ -56,12 +65,15 @@ pub fn fix_pem(pem: &str) -> String {
     let mut fixed_pem = String::default();
 
     while pem.len()/64 > 0{
-        let s = pem.split_at(63);
+        let s = pem.split_at(64);
         fixed_pem.push_str(&format!("{}{}", s.0, "\n"));
         pem = s.1.to_string();
     }
 
-    fixed_pem.push_str(&format!("{}{}", pem, "\n"));
+    if !pem.is_empty(){
+        fixed_pem.push_str(&format!("{}{}", pem, "\n"));
+    }
+
     let fixed_pem = format!("{}{}{}", format!("{}{}", CERT_PREFIX, "\n"), fixed_pem, format!("{}{}", CERT_SUFFIX, "\n"));
     fixed_pem
 }
@@ -130,6 +142,5 @@ mod tests{
         let hex = to_hex(&res[0..hash]);
 
         assert_eq!(hex, "6a6eba242e7a03c59375634409d720a60750e5cd74c539ed8d52c9343b1abed4");
-
     }
 }

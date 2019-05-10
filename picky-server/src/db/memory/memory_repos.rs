@@ -6,8 +6,8 @@ use crate::db::backend::{BackendStorage, Model, Repo};
 #[derive(Clone)]
 pub struct MemoryRepos{
     pub name: MemoryRepo<String>,
-    pub cert: MemoryRepo<String>,
-    pub keys: MemoryRepo<String>,
+    pub cert: MemoryRepo<Vec<u8>>,
+    pub keys: MemoryRepo<Vec<u8>>,
     pub key_identifiers: MemoryRepo<String>
 }
 
@@ -54,11 +54,15 @@ impl BackendStorage for MemoryRepos{
         Ok(())
     }
 
-    fn store(&mut self, name :&str, cert: &str, key: &str, key_identifier: &str) -> Result<bool, String>{
+    fn store(&mut self, name :&str, cert: &[u8], key: Option<&[u8]>, key_identifier: &str) -> Result<bool, String>{
         if let Ok(cert_hash) = utils::multihash_encode(cert){
             self.name.insert(name, &cert_hash.clone())?;
-            self.cert.insert(&cert_hash, &cert.to_string())?;
-            self.keys.insert(&cert_hash, &key.to_string())?;
+            self.cert.insert(&cert_hash, &cert.to_vec())?;
+
+            if let Some(key) = key {
+                self.keys.insert(&cert_hash, &key.to_vec())?;
+            }
+
             self.key_identifiers.insert(key_identifier, &cert_hash)?;
             return Ok(true);
         }
@@ -104,17 +108,17 @@ impl BackendStorage for MemoryRepos{
         Err("Hash not found".to_string())
     }
 
-    fn get_cert(&self, hash: &str) -> Result<String, String>{
+    fn get_cert(&self, hash: &str) -> Result<Vec<u8>, String>{
         if let Some(c) = self.cert.get_collection()?.get(hash){
-            return Ok(c.to_string());
+            return Ok(c.clone());
         }
 
         Err("Cert not found".to_string())
     }
 
-    fn get_key(&self, hash: &str) -> Result<String, String>{
+    fn get_key(&self, hash: &str) -> Result<Vec<u8>, String>{
         if let Some(k) = self.keys.get_collection()?.get(hash){
-            return Ok(k.to_string());
+            return Ok(k.clone());
         }
 
         Err("Key not found".to_string())
