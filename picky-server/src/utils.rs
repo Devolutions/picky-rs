@@ -2,10 +2,10 @@ use base64::{encode as base64_encode, decode as base64_decode};
 use multihash::{encode, decode, Hash, to_hex};
 
 const PICKY_HASH: Hash =  Hash::SHA2256;
-pub const CERT_PREFIX: &str = "-----BEGIN CERTIFICATE-----";
-pub const CERT_SUFFIX: &str = "-----END CERTIFICATE-----";
-pub const KEY_PREFIX: &str = "-----BEGIN RSA PRIVATE KEY-----";
-pub const KEY_SUFFIX: &str = "-----END RSA PRIVATE KEY-----";
+const CERT_PREFIX: &str = "-----BEGIN CERTIFICATE-----";
+const CERT_SUFFIX: &str = "-----END CERTIFICATE-----";
+const KEY_PREFIX: &str = "-----BEGIN RSA PRIVATE KEY-----";
+const KEY_SUFFIX: &str = "-----END RSA PRIVATE KEY-----";
 const SHA256_MULTIHASH_PREFIX: &str = "1220";
 
 pub fn der_to_pem(der: &[u8]) -> String{
