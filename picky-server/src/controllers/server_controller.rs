@@ -8,10 +8,6 @@ use picky_core::controllers::core_controller::CoreController;
 use crate::db::backend::BackendStorage;
 use crate::utils::*;
 
-const CERT_PREFIX: &str = "-----BEGIN CERTIFICATE-----\n";
-const CERT_SUFFIX: &str = "\n-----END CERTIFICATE-----\n";
-const KEY_PREFIX: &str = "-----BEGIN RSA PRIVATE KEY-----\n";
-const KEY_SUFFIX: &str = "\n-----END RSA PRIVATE KEY-----";
 const SUBJECT_KEY_IDENTIFIER: &[u64] = &[2, 5, 29, 14];
 const AUTHORITY_KEY_IDENTIFIER_OID: &[u64] = &[2, 5, 29, 35];
 
@@ -275,8 +271,6 @@ fn get_and_store_env_cert_info(cert: &str, key: &str, repos: &mut Box<BackendSto
         },
         Err(e) => return Err(e)
     };
-
-    Err("Error while fetching certificate info".to_string())
 }
 
 #[cfg(test)]

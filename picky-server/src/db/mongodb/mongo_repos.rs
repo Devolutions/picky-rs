@@ -7,7 +7,6 @@ use crate::db::mongodb::mongo_connection::MongoConnection;
 use crate::db::mongodb::mongo_repo::MongoRepo;
 use bson::spec::BinarySubtype;
 use bson::spec::ElementType::Binary;
-use crate::utils::pem_to_der;
 
 const REPO_CERTIFICATE: &str = "Certificate Store";
 const REPO_KEY: &str = "Key Store";
