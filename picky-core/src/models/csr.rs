@@ -39,7 +39,7 @@ impl CertificateSignRequest{
         if let Ok(csr) = csr::Csr::from_pem(format!("{}{}", csr, "\0").as_bytes()){
             return match csr.subject() {
                 Ok(cn) => {
-                    let re = Regex::new(r"CN=([\w\d.]*)").unwrap();
+                    let re = Regex::new(r"CN=(.*)").unwrap();
                     let cn = re.find(&cn).unwrap().as_str().to_string();
                     Ok(cn[3..].to_string())
 
