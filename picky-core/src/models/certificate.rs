@@ -29,7 +29,7 @@ pub struct Cert{
     pub cert_type: CertificateType,
     pub issuer: Option<String>,
     pub issuer_key: Option<Vec<u8>>,
-    pub keys: Keys,
+    pub keys: Option<Keys>,
     pub certificate_der: Vec<u8>,
 }
 
@@ -39,7 +39,7 @@ impl Cert{
             common_name: String::default(),
             issuer: None,
             issuer_key: None,
-            keys: Keys::new(mbedtls::pk::Type::Rsa, 4096),
+            keys: None,
             cert_type: certificate_type,
             certificate_der: Vec::new(),
         }
@@ -90,9 +90,9 @@ impl Cert{
     fn set_key(&mut self, key_type: Option<mbedtls::pk::Type>, key: Option<Keys>) -> &mut Self{
         match key {
             Some(k) => {
-                self.keys = k
+                self.keys = Some(k)
             },
-            None => self.keys = Keys::new(key_type.unwrap(),4096)
+            None => self.keys = Some(Keys::new(key_type.unwrap(),4096))
         }
         self
     }
@@ -112,7 +112,10 @@ impl Cert{
     fn generate_certificate(&mut self, hash_type: mbedtls::hash::Type, valid_from: X509Time, valid_to: X509Time, ca: bool, pathlen: Option<u32>) -> &mut Self{
         if self.issuer.is_none(){
             self.issuer = Some(self.common_name.clone().replace(CN, ""));
-            self.issuer_key = Some(self.keys.key_der.clone());
+            self.issuer_key = match self.keys.clone(){
+                Some(key) => Some(key.key_der),
+                None => Some(Keys::new(mbedtls::pk::Type::Rsa, 4096).key_der)
+            };
         } else {
             if let Ok(ca) = Certificate::from_der(&base64::decode(&self.issuer.clone().unwrap()).unwrap()){
                 self.issuer = Some(ca.subject().unwrap().replace(CN, ""));
@@ -125,12 +128,12 @@ impl Cert{
         let mut issuer_key;
         let key_usage;
         if ca{
-            subject_key = Keys::get_pk_from_private(&self.keys.key_der.clone());
-            issuer_key = Keys::get_pk_from_private(&self.issuer_key.clone().unwrap().clone());
+            subject_key = Keys::get_pk_from_private(&self.keys.clone().expect("No subject key").key_der.clone());
+            issuer_key = Keys::get_pk_from_private(&self.issuer_key.clone().expect("No issuer key").clone());
             key_usage = key_usage::DIGITAL_SIGNATURE | key_usage::KEY_CERT_SIGN | key_usage::CRL_SIGN | key_usage::KEY_ENCIPHERMENT | key_usage::KEY_AGREEMENT;
         } else {
-            subject_key = Keys::get_pk_from_public(&self.keys.key_der.clone());
-            issuer_key = Keys::get_pk_from_private(&self.issuer_key.clone().unwrap().clone());
+            subject_key = Keys::get_pk_from_public(&self.keys.clone().expect("No subject key").key_der.clone());
+            issuer_key = Keys::get_pk_from_private(&self.issuer_key.clone().expect("No issuer key").clone());
             key_usage = key_usage::DIGITAL_SIGNATURE | key_usage::KEY_ENCIPHERMENT;
         }
 
