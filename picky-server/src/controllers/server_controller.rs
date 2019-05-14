@@ -200,7 +200,7 @@ pub fn generate_root_ca(config: &ServerConfig, repos: &mut Box<BackendStorage>) 
 
     if let Some(root) = CoreController::generate_root_ca(&config.realm, config.key_config.hash_type, config.key_config.key_type){
         let ski = CoreController::get_key_identifier(&root.certificate_der, SUBJECT_KEY_IDENTIFIER)?;
-        if let Err(e) = repos.store(&root.common_name.clone(), &root.certificate_der, Some(&root.keys.key_der), &ski.clone()){
+        if let Err(e) = repos.store(&root.common_name.clone(), &root.certificate_der, Some(&root.keys.expect("Could not store root key, key is empty").key_der), &ski.clone()){
             return Err(format!("Insertion error: {:?}", e));
         }
     }
@@ -226,7 +226,7 @@ pub fn generate_intermediate(config: &ServerConfig, repos: &mut Box<BackendStora
         if let Ok(root_key) = repos.get_key(&root[0].value){
             if let Some(intermediate) = CoreController::generate_intermediate_ca(&root_cert, &root_key, &config.realm, config.key_config.hash_type, config.key_config.key_type){
                 if let Ok(ski) = CoreController::get_key_identifier(&intermediate.certificate_der, SUBJECT_KEY_IDENTIFIER){
-                    if let Err(e) = repos.store(&intermediate.common_name.clone(), &intermediate.certificate_der, Some(&intermediate.keys.key_der), &ski.clone()){
+                    if let Err(e) = repos.store(&intermediate.common_name.clone(), &intermediate.certificate_der, Some(&intermediate.keys.expect("Could not store intermediate key, key is empty").key_der), &ski.clone()){
                         return Err(format!("Insertion error: {:?}", e));
                     }
                     return Ok(true)
