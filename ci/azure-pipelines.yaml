@@ -28,7 +28,7 @@ jobs:
           . activate.sh
           cargo build --release
           mkdir -p $(Build.ArtifactStagingDirectory)/linux/x86_64
-          cp $(Build.Repository.LocalPath)/target/release/picky $(Build.ArtifactStagingDirectory)/linux/x86_64/
+          cp $(Build.Repository.LocalPath)/target/release/picky-server $(Build.ArtifactStagingDirectory)/linux/x86_64/
         displayName: Building picky-rs
 
       - task: PublishBuildArtifacts@1
@@ -55,7 +55,7 @@ jobs:
           .\activate.ps1
           cargo build --release
           mkdir $(Build.ArtifactStagingDirectory)/windows/x86_64
-          cp $(Build.Repository.LocalPath)/target/release/picky.exe $(Build.ArtifactStagingDirectory)/windows/x86_64/
+          cp $(Build.Repository.LocalPath)/target/release/picky-server.exe $(Build.ArtifactStagingDirectory)/windows/x86_64/
         displayName: Building picky-rs
 
       - task: PublishBuildArtifacts@1
