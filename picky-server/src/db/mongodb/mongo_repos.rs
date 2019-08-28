@@ -6,7 +6,7 @@ use crate::db::backend::{BackendStorage, Repo, Model};
 use crate::db::mongodb::mongo_connection::MongoConnection;
 use crate::db::mongodb::mongo_repo::MongoRepo;
 use bson::spec::BinarySubtype;
-use bson::spec::ElementType::Binary;
+
 
 const REPO_CERTIFICATE: &str = "Certificate Store";
 const REPO_KEY: &str = "Key Store";
@@ -208,7 +208,7 @@ impl BackendStorage for MongoRepos{
         Err("No hash found".to_string())
     }
 
-    fn clone_box(&self) -> Box<BackendStorage> {
+    fn clone_box(&self) -> Box<dyn BackendStorage> {
         Box::new(self.clone())
     }
 }

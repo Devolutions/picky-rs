@@ -1,6 +1,6 @@
 use mbedtls::pk::Type as KeyType;
 use mbedtls::hash::Type as HashType;
-use x509_parser::{parse_x509_der, pem::pem_to_der, error};
+use x509_parser::{parse_x509_der, pem::pem_to_der};
 
 use crate::models::certificate::Cert;
 use crate::models::csr::CertificateSignRequest;
@@ -38,12 +38,12 @@ impl CoreController{
     }
 
     pub fn get_key_identifier(der: &[u8], oid: &[u64]) -> Result<String, String>{
-        if let Ok((e, cert)) = parse_x509_der(der){
+        if let Ok((_e, cert)) = parse_x509_der(der){
             let extensions = cert.tbs_certificate.extensions;
 
             for x in extensions{
                 if  x.oid ==  Oid::from(oid){
-                    let mut res = x.value.to_vec();
+                    let res = x.value.to_vec();
                     return Ok(hex::encode(&res[res.len() - 20..]));
                 }
             }
@@ -53,7 +53,7 @@ impl CoreController{
     }
 
     pub fn get_subject_name(der: &[u8]) -> Result<String, String> {
-        if let Ok((e, cert)) = parse_x509_der(&der){
+        if let Ok((_e, cert)) = parse_x509_der(&der){
             return Ok(cert.tbs_certificate.subject.to_string());
         }
 
@@ -83,10 +83,10 @@ impl CoreController{
         let fixed_pem = format!("{}{}{}", format!("{}{}", CERT_PREFIX, "\n"), fixed_pem, format!("{}{}", CERT_SUFFIX, "\n"));
 
         match pem_to_der(fixed_pem.as_bytes()){
-            Ok((rem, pem)) => {
+            Ok((_rem, pem)) => {
                 Ok(pem.contents.clone())
             },
-            Err(e) => {
+            Err(_e) => {
                 Err("Can\'t fix pem".to_string())
             }
         }
@@ -101,7 +101,7 @@ mod tests{
     fn get_identifier_test() {
         if let Some(root) = CoreController::generate_root_ca("test", HashType::Sha256, KeyType::Rsa) {
             if let Ok(ski) = CoreController::get_key_identifier(&root.certificate_der, &[2, 5, 29, 14]) {
-                let ski = ski;
+                let _ski = ski;
                 assert!(true);
             }
         }

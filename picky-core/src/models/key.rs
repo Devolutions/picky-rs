@@ -16,7 +16,7 @@ pub struct Keys{
 }
 
 impl Keys{
-    pub fn new(key_type: mbedtls::pk::Type, bits: u32) -> Self{
+    pub fn new(_key_type: mbedtls::pk::Type, bits: u32) -> Self{
         let mut entropy = OsEntropy::new();
         let mut rng = CtrDrbg::new(&mut entropy, None).unwrap();
         let mut pk = Pk::generate_rsa(&mut rng, bits, 0x10001).unwrap();
@@ -60,7 +60,7 @@ mod tests{
         let mut pk = Pk::generate_rsa(&mut rng, 4096, 0x10001).unwrap();
         let key = Keys::new_from_pk(&mut pk);
 
-        let pub_key = pk.write_public_pem_string().unwrap();
+        let _pub_key = pk.write_public_pem_string().unwrap();
         let private_key = pk.write_private_der_vec().unwrap();
 
         let key_pk = Keys::get_pk_from_private(&key.key_der);

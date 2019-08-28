@@ -124,7 +124,7 @@ impl BackendStorage for MemoryRepos{
         Err("Key not found".to_string())
     }
 
-    fn clone_box(&self) -> Box<BackendStorage>{
+    fn clone_box(&self) -> Box<dyn BackendStorage>{
         Box::new(self.clone())
     }
 }
