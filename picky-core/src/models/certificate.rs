@@ -153,7 +153,7 @@ impl Cert{
         self
     }
 
-    pub fn generate_root(realm: &str, hash_type: mbedtls::hash::Type, key_type: mbedtls::pk::Type, bits: u32) -> Cert{
+    pub fn generate_root(realm: &str, hash_type: mbedtls::hash::Type, key_type: mbedtls::pk::Type, _bits: u32) -> Cert{
         let cert = Cert::new(CertificateType::Root,
                              hash_type,
                              Some(key_type),
@@ -266,10 +266,10 @@ pub fn get_rng<'a>(entropy: &'a mut OsEntropy) -> CtrDrbg<'a>{
 
 #[cfg(test)]
 mod tests{
-    use super::*;
+    
     use x509_parser::{TbsCertificate, X509Extension, parse_x509_der, pem::pem_to_der, error};
-    use der_parser::{oid, DerError};
-    use crate::controllers::core_controller::CoreController;
+    use der_parser::{oid};
+    
 
     static PEM: &'static [u8] = include_bytes!("../../test_files/intermediate_ca.crt");
 
@@ -304,7 +304,7 @@ Od8i323fM5dQS1qQpBjBc/5fPw==
                 assert_eq!(rem.is_empty(), true);
                 pem.contents.clone()
             },
-            Err(e) => {
+            Err(_e) => {
                 panic!()
             }
         };
@@ -323,19 +323,19 @@ Od8i323fM5dQS1qQpBjBc/5fPw==
 
                 for x in ext{
                     if x.oid == oid::Oid::from(&[2, 5, 29, 14]){
-                        let mut ski = x.value.to_vec();
+                        let ski = x.value.to_vec();
                         let ski_hex= hex::encode(&ski[2..]);
                         assert_eq!("1f74d63f29c17474453b05122c3da8bd435902a6", ski_hex);
                     }
 
                     if x.oid == oid::Oid::from(&[2, 5, 29, 35]){
-                        let mut aki = x.value.to_vec();
+                        let aki = x.value.to_vec();
                         let aki = hex::encode(&aki[4..]);
                         assert_eq!("b45ae4a5b3ded252f6b9d5a6950feb3ebcc7fdff", aki);
                     }
                 }
             },
-            Err(e) => {
+            Err(_e) => {
                 panic!()
             }
         }
@@ -355,7 +355,7 @@ Od8i323fM5dQS1qQpBjBc/5fPw==
                 assert_eq!(rem.is_empty(), true);
                 pem.contents.clone()
             },
-            Err(e) => {
+            Err(_e) => {
                 panic!()
             }
         };
@@ -374,19 +374,19 @@ Od8i323fM5dQS1qQpBjBc/5fPw==
 
                 for x in ext{
                     if x.oid == oid::Oid::from(&[2, 5, 29, 14]){
-                        let mut ski = x.value.to_vec();
+                        let ski = x.value.to_vec();
                         let ski_hex= hex::encode(&ski[2..]);
                         assert_eq!("1f74d63f29c17474453b05122c3da8bd435902a6", ski_hex);
                     }
 
                     if x.oid == oid::Oid::from(&[2, 5, 29, 35]){
-                        let mut aki = x.value.to_vec();
+                        let aki = x.value.to_vec();
                         let aki = hex::encode(&aki[4..]);
                         assert_eq!("b45ae4a5b3ded252f6b9d5a6950feb3ebcc7fdff", aki);
                     }
                 }
             },
-            Err(e) => {
+            Err(_e) => {
                 panic!()
             }
         }

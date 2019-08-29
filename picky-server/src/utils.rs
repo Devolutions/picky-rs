@@ -22,7 +22,7 @@ pub fn pem_to_der(pem: &str) -> Result<Vec<u8>, String>{
 }
 
 pub fn strip_pem_tag(pem: &str) -> String {
-    let mut pem = pem.replace("\\n", "");
+    let pem = pem.replace("\\n", "");
     let mut pem = pem.replace("\n", "");
 
     if pem.contains(CERT_PREFIX){

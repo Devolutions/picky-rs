@@ -17,7 +17,7 @@ pub enum CertFormat{
 }
 
 pub struct ControllerData{
-    pub repos: Box<BackendStorage>,
+    pub repos: Box<dyn BackendStorage>,
     pub config: ServerConfig
 }
 
@@ -26,7 +26,7 @@ pub struct ServerController{
 }
 
 impl ServerController {
-    pub fn new(repos: Box<BackendStorage>, config: ServerConfig) -> Self{
+    pub fn new(repos: Box<dyn BackendStorage>, config: ServerConfig) -> Self{
         let controller_data = ControllerData{
             repos,
             config
@@ -191,7 +191,7 @@ pub fn request_name(_controller_data: &ControllerData, req: &SyncRequest, res: &
     }
 }
 
-pub fn generate_root_ca(config: &ServerConfig, repos: &mut Box<BackendStorage>) -> Result<bool, String>{
+pub fn generate_root_ca(config: &ServerConfig, repos: &mut Box<dyn BackendStorage>) -> Result<bool, String>{
     if let Ok(certs) = repos.find(&format!("{} Root CA", config.realm)) {
         if certs.len() > 0 {
             return Ok(false);
@@ -208,7 +208,7 @@ pub fn generate_root_ca(config: &ServerConfig, repos: &mut Box<BackendStorage>) 
     Ok(true)
 }
 
-pub fn generate_intermediate(config: &ServerConfig, repos: &mut Box<BackendStorage>) -> Result<bool, String>{
+pub fn generate_intermediate(config: &ServerConfig, repos: &mut Box<dyn BackendStorage>) -> Result<bool, String>{
     if let Ok(certs) = repos.find(&format!("{} Authority", config.realm)) {
         if certs.len() > 0 {
             return Ok(false);
@@ -238,7 +238,7 @@ pub fn generate_intermediate(config: &ServerConfig, repos: &mut Box<BackendStora
     Err("Error while creating intermediate".to_string())
 }
 
-pub fn check_certs_in_env(config: &ServerConfig, repos: &mut Box<BackendStorage>) -> Result<(), String> {
+pub fn check_certs_in_env(config: &ServerConfig, repos: &mut Box<dyn BackendStorage>) -> Result<(), String> {
     if !config.root_cert.is_empty() && !config.root_key.is_empty() {
         if let Err(e) = get_and_store_env_cert_info(&config.root_cert, &config.root_key, repos) {
             return Err(e);
@@ -254,7 +254,7 @@ pub fn check_certs_in_env(config: &ServerConfig, repos: &mut Box<BackendStorage>
     Ok(())
 }
 
-fn get_and_store_env_cert_info(cert: &str, key: &str, repos: &mut Box<BackendStorage>) -> Result<(), String>{
+fn get_and_store_env_cert_info(cert: &str, key: &str, repos: &mut Box<dyn BackendStorage>) -> Result<(), String>{
     let der = pem_to_der(&cert)?;
     match CoreController::get_key_identifier(&der, SUBJECT_KEY_IDENTIFIER) {
         Ok(ski) => {

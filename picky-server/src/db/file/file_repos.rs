@@ -136,7 +136,7 @@ impl BackendStorage for FileRepos{
         Err("Key not found".to_string())
     }
 
-    fn get_key_identifier_from_hash(&self, hash: &str) -> Result<String, String> {
+    fn get_key_identifier_from_hash(&self, _hash: &str) -> Result<String, String> {
         unimplemented!()
     }
 
@@ -162,7 +162,7 @@ impl BackendStorage for FileRepos{
         Err("Hash not found".to_string())
     }
 
-    fn clone_box(&self) -> Box<BackendStorage> {
+    fn clone_box(&self) -> Box<dyn BackendStorage> {
         Box::new(self.clone())
     }
 }
