@@ -60,14 +60,38 @@ Describe 'Picky tests' {
 	}
 
 	It 'signs certificates' {
-		# https://www.digicert.com/ssl-support/openssl-quick-reference-guide.htm
-		& 'openssl' 'genrsa' '-out' 'test.key' '2048'
-		& 'openssl' 'rsa' '-text' '-in' 'test.key' '-noout'
-		& 'openssl' 'req' '-new' '-key' 'test.key' '-out' 'test.csr' `
-			'-subj' "/CN=test.${picky_realm}"
-		& 'openssl' 'req' '-text' '-in' 'test.csr' '-noout' '-verify'
+		# https://stackoverflow.com/questions/48196350/generate-and-sign-certificate-request-using-pure-net-framework
+		# https://www.powershellgallery.com/packages/SelfSignedCertificate/0.0.4/Content/SelfSignedCertificate.psm1
+		
+		$key_size = 2048
+		$subject = "CN=test.${picky_realm}"
+		$rsa_key = [System.Security.Cryptography.RSA]::Create($key_size)
 
-		$csr = Get-Content ".\test.csr" | Out-String
+		$certRequest = [System.Security.Cryptography.X509Certificates.CertificateRequest]::new(
+            $subject, $rsa_key,
+            [System.Security.Cryptography.HashAlgorithmName]::SHA256,
+            [System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
+
+        $csr_der = $certRequest.CreateSigningRequest()
+
+        $sb = [System.Text.StringBuilder]::new()
+        $csr_base64 = [Convert]::ToBase64String($csr_der)
+        
+        $offset = 0
+        $line_length = 64
+        $sb.AppendLine("-----BEGIN CERTIFICATE REQUEST-----")
+        while ($offset -lt $csr_base64.Length) {
+        	$line_end = [Math]::Min($offset + $line_length, $csr_base64.Length)
+        	$sb.AppendLine($csr_base64.Substring($offset, $line_end - $offset))
+        	$offset = $line_end
+        }
+        $sb.AppendLine("-----END CERTIFICATE REQUEST-----")
+        $csr_pem = $sb.ToString()
+
+        Write-Host $csr_pem
+
+        Set-Content -Value $csr_pem -Path ".\test.csr"
+        $csr = Get-Content ".\test.csr" | Out-String
 
 		$headers = @{
 			"Authorization" = "Bearer $picky_api_key"
