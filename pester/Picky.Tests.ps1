@@ -35,7 +35,7 @@ Describe 'Picky tests' {
 		$request.StatusCode | Should -Be 200
 	}
 
-	It 'gets the CA chain' {
+	It 'gets CA chain' {
 		$authority_base64 = ConvertTo-Base64Url $picky_authority
 		$contents = Invoke-RestMethod -Uri $picky_url/chain/$authority_base64 -Method 'GET' `
 			-ContentType 'text/plain'
@@ -46,11 +46,11 @@ Describe 'Picky tests' {
 			-Allmatches | ForEach-Object {$_.Matches} | ForEach-Object { $ca_chain += $_.Value }
 
 		$ca_chain.Count | Should -Be 2
-		Set-Content -Value $ca_chain[0] -Path ".\intermediate_ca.pem"
-		Set-Content -Value $ca_chain[1] -Path ".\root_ca.pem"
+		Set-Content -Value $ca_chain[0] -Path "$TestDrive/intermediate_ca.pem"
+		Set-Content -Value $ca_chain[1] -Path "$TestDrive/root_ca.pem"
 
-		$root_ca = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2("root_ca.pem")
-		$intermediate_ca = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2("intermediate_ca.pem")
+		$root_ca = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2("$TestDrive/root_ca.pem")
+		$intermediate_ca = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2("$TestDrive/intermediate_ca.pem")
 
 		$intermediate_ca.Subject | Should -Be "CN=${picky_realm} Authority"
 		$intermediate_ca.Issuer | Should -Be "CN=${picky_realm} Root CA"
@@ -90,8 +90,8 @@ Describe 'Picky tests' {
 
         Write-Host $csr_pem
 
-        Set-Content -Value $csr_pem -Path ".\test.csr"
-        $csr = Get-Content ".\test.csr" | Out-String
+        Set-Content -Value $csr_pem -Path "$TestDrive/test.csr"
+        $csr = Get-Content "$TestDrive/test.csr" | Out-String
 
 		$headers = @{
 			"Authorization" = "Bearer $picky_api_key"
@@ -109,8 +109,8 @@ Describe 'Picky tests' {
 			-ContentType 'application/json' `
 			-Body $payload
 
-		Set-Content -Value $cert -Path ".\test.crt"
-		$leaf_cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2("test.crt")
+		Set-Content -Value $cert -Path "$TestDrive/test.crt"
+		$leaf_cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2("$TestDrive/test.crt")
 
 		Write-Host $leaf_cert
 		$leaf_cert.Subject | Should -Be "CN=test.${picky_realm}"
