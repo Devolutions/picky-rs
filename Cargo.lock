@@ -1152,7 +1152,7 @@ dependencies = [
 
 [[package]]
 name = "picky-server"
-version = "3.2.0"
+version = "3.3.0"
 dependencies = [
  "base64 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "bson 0.13.0 (registry+https://github.com/rust-lang/crates.io-index)",
