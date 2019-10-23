@@ -1,5 +1,5 @@
 [package]
-name = "picky-core"
+name = "picky"
 version = "3.0.0"
 authors = ["jtrepanier-devolutions <jtrepanier@devolutions.net>"]
 edition = "2018"

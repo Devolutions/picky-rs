@@ -1,5 +1,5 @@
 [workspace]
 members = [
-    "picky-core",
+    "picky",
     "picky-server"
 ]
