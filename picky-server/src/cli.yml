@@ -35,18 +35,22 @@ args:
         - mysql
         - memory
   - db-url:
-      long: db_url
+      long: db-url
       value_name: DB_URL
       help: Url of the database used by the service.
       long_help: Url on which the listener will listen.
       takes_value: true
       empty_values: false
   - api-key:
-      long: api_key
+      long: api-key
       value_name: API_KEY
       help: The api key used by the server to authenticate client queries.
       takes_value: true
       empty_values: false
+  - save-certificate:
+      long: save-certificate
+      help: Flag to save all certificates generated in backend
+      takes_value: false
   - show-config:
       long: show-config
       help: Show the current config before startup

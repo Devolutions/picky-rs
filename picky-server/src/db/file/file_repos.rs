@@ -165,4 +165,8 @@ impl BackendStorage for FileRepos{
     fn clone_box(&self) -> Box<dyn BackendStorage> {
         Box::new(self.clone())
     }
+
+    fn health(&self) -> Result<(), String> {
+        Ok(())
+    }
 }

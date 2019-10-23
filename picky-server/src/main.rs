@@ -10,13 +10,13 @@ extern crate log;
 #[macro_use]
 extern crate serde_derive;
 
-#[macro_use(json)]
+#[macro_use]
 extern crate serde_json;
 
 mod db;
 mod configuration;
+mod http;
 mod server;
-mod controllers;
 mod utils;
 
 use log::LevelFilter;

@@ -1,8 +1,8 @@
 use crate::configuration::{BackendType, ServerConfig};
-use crate::db::mongodb::mongo_repos::MongoRepos;
-use crate::db::mongodb::mongo_connection::MongoConnection;
 use crate::db::memory::memory_repos::MemoryRepos;
 use crate::db::file::file_repos::FileRepos;
+use crate::db::mongodb::mongo_connection::MongoConnection;
+use crate::db::mongodb::model::RepositoryCollection;
 
 pub const DEFAULT_FILEBASE_PATH: &str = "../filebase/";
 
@@ -22,26 +22,6 @@ impl Backend {
 
         Ok(backend)
     }
-
-    pub fn store(&mut self, name: &str, cert: &[u8], key: Option<&[u8]>, key_identifier: &str) -> Result<bool, String>{
-        self.db.store(name, cert, key, key_identifier)
-    }
-
-    pub fn get_cert(&self, hash: &str) -> Result<Vec<u8>, String>{
-        self.db.get_cert(hash)
-    }
-
-    pub fn get_key(&self, hash: &str) -> Result<Vec<u8>, String>{
-        self.db.get_key(hash)
-    }
-
-    pub fn find(&self, name: &str) -> Result<Vec<Model<String>>, String>{
-        self.db.find(name)
-    }
-
-    pub fn init(&mut self) -> Result<(), String>{
-        self.db.init()
-    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -57,8 +37,9 @@ pub trait BackendStorage: Send + Sync{
     fn get_cert(&self, hash: &str) -> Result<Vec<u8>, String>;
     fn get_key(&self, hash: &str) -> Result<Vec<u8>, String>;
     fn get_key_identifier_from_hash(&self, hash: &str) -> Result<String, String>;
-    fn get_hash_from_key_identifier(&self, hash: &str) -> Result<String, String>;
+    fn get_hash_from_key_identifier(&self, key_identifier: &str) -> Result<String, String>;
     fn clone_box(&self) -> Box<dyn BackendStorage>;
+    fn health(&self) -> Result<(), String>;
 }
 
 impl Clone for Box<dyn BackendStorage>{
@@ -72,7 +53,7 @@ impl From<&ServerConfig> for Backend{
         match config.backend {
             BackendType::MongoDb => {
                         let conn= MongoConnection::new(&config.database.url).expect("Invalid server url");
-                        let dbstorage = Box::new(MongoRepos::new(conn));
+                        let dbstorage = Box::new(RepositoryCollection::new(conn));
                         return Backend::new(dbstorage).expect("Wrong server configuration");
                 },
             BackendType::Memory => {

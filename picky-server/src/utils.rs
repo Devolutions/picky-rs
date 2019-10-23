@@ -43,6 +43,7 @@ pub fn multihash_encode(value: &[u8]) -> Result<String, String> {
     }
 }
 
+#[allow(dead_code)]
 pub fn multihash_decode(value: &[u8]) -> Result<Vec<u8>, String> {
     match decode(value) {
         Ok(result) => Ok(result.digest.to_vec()),

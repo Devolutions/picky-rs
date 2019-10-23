@@ -1,9 +1,7 @@
 use crate::configuration::ServerConfig;
-
-use saphir::{Middleware, SyncRequest, SyncResponse, RequestContinuation, StatusCode, header};
-use saphir::Server as SaphirServer;
-use crate::controllers::server_controller::{ServerController, generate_root_ca, generate_intermediate, check_certs_in_env};
+use crate::http::controllers::server_controller::{generate_root_ca, generate_intermediate, check_certs_in_env};
 use crate::db::backend::Backend;
+use crate::http::http_server::HttpServer;
 
 pub struct Server{
 }
@@ -33,76 +31,10 @@ impl Server{
             }
         }).expect("Unable to configure picky");
 
-        let server = SaphirServer::builder()
-            .configure_middlewares(|middle_stack|{
-                middle_stack.apply(AuthMiddleware::new(config.clone()), ["/"].to_vec(), Some(vec!["/chain", "/json-chain", "/health", "/authority"]))
-            }).configure_router(|router|{
-            let controller = ServerController::new(repos.clone(), config.clone());
-            router.add(controller)
-        }).configure_listener(|listener_config|{
-            listener_config.set_uri("http://0.0.0.0:12345")
-        }).build();
-
-        if let Err(e) = server.run(){
-            error!("{}", e);
-        }
+        info!("Starting http server ...");
+        let http_server = HttpServer::new(config.clone(), repos.clone());
+        http_server.run();
     }
-}
-
-pub struct AuthMiddleware{
-    config: ServerConfig
-}
-
-impl AuthMiddleware{
-    pub fn new(config: ServerConfig) -> Self{
-        AuthMiddleware{
-            config
-        }
-    }
-}
-
-impl Middleware for AuthMiddleware{
-    fn resolve(&self, req: &mut SyncRequest, res: &mut SyncResponse) -> RequestContinuation{
-        res.status(StatusCode::UNAUTHORIZED);
-
-        let header = match req.headers_map().get(header::AUTHORIZATION){
-            Some(h) => h.clone(),
-            None => {
-                res.status(StatusCode::UNAUTHORIZED);
-                return RequestContinuation::Stop;
-            }
-        };
-
-        let auth_str = match header.to_str() {
-            Ok(s) => s,
-            Err(_e) => {
-                res.status(StatusCode::UNAUTHORIZED);
-                return RequestContinuation::Stop;
-            }
-        };
-
-        validate_api_key(&self.config, auth_str, res)
-    }
-}
-
-fn validate_api_key(config: &ServerConfig, auth_str: &str, res: &mut SyncResponse) -> RequestContinuation{
-    let auth_vec = auth_str.split(' ').collect::<Vec<&str>>();
-
-    if auth_vec.len() != 2{
-        res.status(StatusCode::UNAUTHORIZED);
-        return RequestContinuation::Stop;
-    }
-
-    let method = auth_vec[0].to_lowercase();
-    let api_key = auth_vec[1];
-    if let "bearer" = method.as_str() {
-        if api_key.eq(config.api_key.as_str()) {
-            return RequestContinuation::Continue;
-        }
-    }
-
-    res.status(StatusCode::UNAUTHORIZED);
-    RequestContinuation::Stop
 }
 
 #[cfg(test)]

@@ -14,6 +14,7 @@ const PICKY_ROOT_CERT_ENV: &'static str = "PICKY_ROOT_CERT";
 const PICKY_ROOT_KEY_ENV: &'static str = "PICKY_ROOT_KEY";
 const PICKY_INTERMEDIATE_CERT_ENV: &'static str = "PICKY_INTERMEDIATE_CERT";
 const PICKY_INTERMEDIATE_KEY_ENV: &'static str = "PICKY_INTERMEDIATE_KEY";
+const PICKY_SAVE_CERTIFICATE_ENV: &'static str = "PICKY_SAVE_CERTIFICATE";
 
 #[derive(PartialEq, Clone)]
 pub enum BackendType{
@@ -54,7 +55,9 @@ pub struct ServerConfig{
     pub root_cert: String,
     pub root_key: String,
     pub intermediate_cert: String,
-    pub intermediate_key: String
+    pub intermediate_key: String,
+
+    pub save_certificate: bool,
 }
 
 impl ServerConfig{
@@ -108,6 +111,10 @@ impl ServerConfig{
             },
             None => ()
         }
+
+        if matches.is_present("save-certificate") {
+            self.save_certificate = true;
+        }
     }
 
     fn load_env(&mut self) {
@@ -142,6 +149,12 @@ impl ServerConfig{
         if let Ok(val) = env::var(PICKY_INTERMEDIATE_KEY_ENV){
             self.intermediate_key = val;
         }
+
+        if let Ok(val) = env::var(PICKY_SAVE_CERTIFICATE_ENV) {
+            if let Ok(save_certificate) = val.parse::<bool>() {
+                self.save_certificate = save_certificate;
+            }
+        }
     }
 }
 
@@ -157,7 +170,8 @@ impl Default for ServerConfig{
             root_cert: String::default(),
             root_key: String::default(),
             intermediate_cert: String::default(),
-            intermediate_key: String::default()
+            intermediate_key: String::default(),
+            save_certificate: false,
         }
     }
 }

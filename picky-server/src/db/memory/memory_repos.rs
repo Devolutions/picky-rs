@@ -127,4 +127,8 @@ impl BackendStorage for MemoryRepos{
     fn clone_box(&self) -> Box<dyn BackendStorage>{
         Box::new(self.clone())
     }
+
+    fn health(&self) -> Result<(), String> {
+        Ok(())
+    }
 }

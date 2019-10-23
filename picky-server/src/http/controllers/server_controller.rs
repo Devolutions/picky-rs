@@ -65,8 +65,13 @@ impl From<String> for CertFormat{
     }
 }
 
-pub fn health(_controller_data: &ControllerData, _req: &SyncRequest, res: &mut SyncResponse){
-    res.status(StatusCode::OK).body("Everything should be alright!");
+pub fn health(controller_data: &ControllerData, _req: &SyncRequest, res: &mut SyncResponse){
+    if let Ok(_) = controller_data.repos.health() {
+        res.status(StatusCode::OK).body("Everything should be alright!");
+    } else {
+        res.status(StatusCode::SERVICE_UNAVAILABLE);
+    }
+
 }
 
 pub fn sign_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse){
@@ -85,13 +90,18 @@ pub fn sign_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut 
                     if let Ok(ca_cert) = repos.get_cert(&ca[0].value){
                         if let Ok(ca_key) = repos.get_key(&ca[0].value){
                             if let Some(cert) = CoreController::generate_certificate_from_csr(&ca_cert, &ca_key, controller_data.config.key_config.hash_type, &csr){
-                                if let Ok(ski) = CoreController::get_key_identifier(&cert.certificate_der, SUBJECT_KEY_IDENTIFIER){
-                                    if let Err(e) = repos.store(&cert.common_name.clone(), &cert.certificate_der, None, &ski.clone()){
-                                        return error!("{}",&format!("Insertion error for leaf {}: {}", &cert.common_name.clone(), e));
+
+                                // Save certificate in backend if needed
+                                if controller_data.config.save_certificate {
+                                    if let Ok(ski) = CoreController::get_key_identifier(&cert.certificate_der, SUBJECT_KEY_IDENTIFIER) {
+                                        if let Err(e) = repos.store(&cert.common_name.clone(), &cert.certificate_der, None, &ski.clone()) {
+                                            error!("Insertion error for leaf {}: {}", cert.common_name.clone(), e);
+                                        }
                                     }
-                                    res.body(fix_pem(&der_to_pem(&cert.certificate_der)));
-                                    res.status(StatusCode::OK);
                                 }
+
+                                res.body(fix_pem(&der_to_pem(&cert.certificate_der)));
+                                res.status(StatusCode::OK);
                             }
                         }
                     }
@@ -142,38 +152,66 @@ pub fn chains(controller_data: &ControllerData, req: &SyncRequest, res: &mut Syn
     if let Some(common_name) = req.captures().get("ca").and_then(|c| base64::decode_config(c, URL_SAFE_NO_PAD).ok()){
         let decoded = String::from_utf8_lossy(&common_name);
 
-        if let Ok(intermediate) = repos.find(decoded.clone().trim_matches('"').trim_matches('\0')) {
-            if intermediate.len() > 0{
-                if let Ok(cert) = repos.get_cert(&intermediate[0].value){
-                    let mut chain = fix_pem(&der_to_pem(&cert.clone()));
+        match repos.find(decoded.clone().trim_matches('"').trim_matches('\0')) {
+            Ok(intermediate) => {
 
-                    let mut key_identifier = String::default();
-                    loop {
-                        if let Ok(aki) = CoreController::get_key_identifier(&cert, AUTHORITY_KEY_IDENTIFIER_OID){
-                            if key_identifier == aki{
-                                break;
-                            }
+                if intermediate.len() > 0 {
+                    match repos.get_cert(&intermediate[0].value) {
+                        Ok(cert) => {
+                            let mut chain = fix_pem(&der_to_pem(&cert.clone()));
 
-                            key_identifier = aki.clone();
+                            let mut key_identifier = String::default();
+                            loop {
+                                match CoreController::get_key_identifier(&cert, AUTHORITY_KEY_IDENTIFIER_OID) {
+                                    Ok(aki) => {
+                                        if key_identifier == aki {
+                                            // The authority is itself. It is a root
+                                            break;
+                                        }
 
-                            if let Ok(hash) = repos.get_hash_from_key_identifier(&aki){
-                                if let Ok(cert) = repos.get_cert(&hash){
-                                    chain.push_str(&fix_pem(&der_to_pem(&cert.clone())));
-                                } else {
-                                    break;
+                                        key_identifier = aki.clone();
+
+                                        match repos.get_hash_from_key_identifier(&aki) {
+                                            Ok(hash) => {
+                                                match repos.get_cert(&hash) {
+                                                    Ok(cert) => {
+                                                        chain.push_str(&fix_pem(&der_to_pem(&cert.clone())));
+                                                    }
+                                                    Err(e) => {
+                                                        error!("repos.get_cert failed: {}", e);
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                            Err(e) => {
+                                                error!("repos.get_hash_from_key_identifier {} failed: {}", aki, e);
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        error!("get_key_identifier failed: {}", e);
+                                        break;
+                                    }
                                 }
-                            } else {
-                                break;
                             }
-                        } else {
-                            break;
+                            res.body(chain.to_string());
+                            res.status(StatusCode::OK);
+                        }
+                        Err(e) => {
+                            error!("Intermediate cert can't be found: {}", e);
                         }
                     }
-                    res.body(chain.to_string());
-                    res.status(StatusCode::OK);
+                } else {
+                    error!("No intermediate found!");
                 }
             }
+            Err(e) => {
+                error!("No intermediate found: {}", e);
+            }
         }
+    } else {
+        error!("Wrong path or can't decode base64: {}", req.captures().get("ca").unwrap_or(&"No capture ca".to_string()));
     }
 }
 
