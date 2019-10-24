@@ -5,10 +5,11 @@ authors = ["jtrepanier-devolutions <jtrepanier@devolutions.net>"]
 edition = "2018"
 
 [lib]
-name = "picky_core"
+name = "picky_core" # FIXME: rename to picky?
 
 [dependencies]
 mbedtls = { git = "https://github.com/Devolutions/rust-mbedtls.git", branch = "wayk"}
+serde_asn1_der = { git = "https://github.com/Devolutions/serde_asn1_der", features = ["extra_types", "chrono_conversion"] }
 chrono = "0.4.6"
 serde_json = "1.0.39"
 serde = "1.0.89"
@@ -21,3 +22,8 @@ base64 = "0.10.1"
 hex = "0.3.2"
 x509-parser = "0.4.1"
 der-parser = "1.1.1"
+oid = { version = "^0.1.1", features = ["serde_support"] }
+
+[dev-dependencies]
+pretty_assertions = "0.6"
+num-bigint-dig = "0.5"
