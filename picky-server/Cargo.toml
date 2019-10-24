@@ -8,7 +8,7 @@ edition = "2018"
 clap = {features = ["yaml"], version = "2.32.0"}
 multihash = "0.8.0"
 chrono = "0.4.6"
-picky-core = {path = "../picky-core"}
+picky = {path = "../picky"}
 config = "0.9"
 mbedtls = { git = "https://github.com/Devolutions/rust-mbedtls", branch = "wayk"}
 mongodb = { git = "https://github.com/Devolutions/mongo-rust-driver-prototype", branch = "master", features = ["ssl"] }

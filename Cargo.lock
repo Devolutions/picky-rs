@@ -1132,7 +1132,7 @@ version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "picky-core"
+name = "picky"
 version = "3.0.0"
 dependencies = [
  "base64 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1165,7 +1165,7 @@ dependencies = [
  "mbedtls 0.3.0 (git+https://github.com/Devolutions/rust-mbedtls.git?branch=wayk)",
  "mongodb 0.3.12 (git+https://github.com/Devolutions/mongo-rust-driver-prototype)",
  "multihash 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "picky-core 3.0.0",
+ "picky 3.0.0",
  "portpicker 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "r2d2 0.8.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 1.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
