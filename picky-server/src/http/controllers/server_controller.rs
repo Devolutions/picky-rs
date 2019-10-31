@@ -7,6 +7,9 @@ use crate::configuration::ServerConfig;
 use picky_core::controllers::core_controller::CoreController;
 use crate::db::backend::BackendStorage;
 use crate::utils::*;
+use std::str;
+
+use crate::http::controllers::utils::{SyncRequestUtil};
 
 const SUBJECT_KEY_IDENTIFIER: &[u64] = &[2, 5, 29, 14];
 const AUTHORITY_KEY_IDENTIFIER_OID: &[u64] = &[2, 5, 29, 35];
@@ -74,40 +77,104 @@ pub fn health(controller_data: &ControllerData, _req: &SyncRequest, res: &mut Sy
 
 }
 
+
 pub fn sign_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse){
     res.status(StatusCode::BAD_REQUEST);
     let repos = &mut controller_data.repos.clone();
 
-    if let Ok(body) = String::from_utf8(req.body().clone()) {
-        if let Ok(json) = serde_json::from_str::<Value>(body.as_ref()) {
-            let mut ca = json["ca"].to_string();
-            ca = ca.trim_matches('"').to_string();
-            let mut csr = json["csr"].to_string().trim_matches('"').replace("\\n", "\n").to_string();
-            csr = csr.trim_matches('"').to_string();
+    let mut ca = format!("{} Authority", &controller_data.config.realm);
+    let csr;
 
-            if let Ok(ca) = repos.find(ca.trim_matches('"')) {
-                if ca.len() > 0{
-                    if let Ok(ca_cert) = repos.get_cert(&ca[0].value){
-                        if let Ok(ca_key) = repos.get_key(&ca[0].value){
-                            if let Some(cert) = CoreController::generate_certificate_from_csr(&ca_cert, &ca_key, controller_data.config.key_config.hash_type, &csr){
-
-                                // Save certificate in backend if needed
-                                if controller_data.config.save_certificate {
-                                    if let Ok(ski) = CoreController::get_key_identifier(&cert.certificate_der, SUBJECT_KEY_IDENTIFIER) {
-                                        if let Err(e) = repos.store(&cert.common_name.clone(), &cert.certificate_der, None, &ski.clone()) {
-                                            error!("Insertion error for leaf {}: {}", cert.common_name.clone(), e);
-                                        }
-                                    }
-                                }
-
-                                res.body(fix_pem(&der_to_pem(&cert.certificate_der)));
-                                res.status(StatusCode::OK);
-                            }
+    // If ContentType == application/pkcs10 get the CSR in Binary or Base64
+    // If ContentType == application/json get the CA and the CSR
+    if let Some(content_type) = req.get_header_string_value("Content-Type") {
+        if content_type.to_lowercase().eq("application/pkcs10") {
+            if let Some(content_encoding) = req.get_header_string_value("Content-Transfer-Encoding") {
+                csr = match content_encoding.to_lowercase().as_str() {
+                    "base64" => {
+                        if let Ok(body) = String::from_utf8(req.body().clone()){
+                            body
                         }
+                        else{
+                            error!("error invalid utf8 body");
+                            return;
+                        }
+                    },
+                    "binary" => {
+                        // TODO temporary
+                        let pem = der_to_pem(req.body()).to_owned();
+                        format!("-----BEGIN CERTIFICATE REQUEST-----\n{}\n-----END CERTIFICATE REQUEST-----", pem)
+                    },
+                    _ => String::new(),
+                };
+
+                if csr.eq("") {
+                    error!("Content-Transfer-Encoding is only supported with base64 or binary");
+                    return;
+                }
+            } else {
+                error!("Content-Transfer-Encoding is needed with content-type: application/pkcs10");
+                return;
+            }
+        } else if content_type.to_lowercase().eq("application/json") {
+            if let Ok(body) = String::from_utf8(req.body().clone()){
+                if let Ok(json) = serde_json::from_str::<Value>(body.as_ref()) {
+                    if !(json["ca"].is_null()) {
+                        ca = json["ca"].to_string();
+                        ca = ca.trim_matches('"').to_string();
                     }
+
+                    csr = json["csr"].to_string().trim_matches('"').replace("\\n", "\n").to_string();
+                } else {
+                    error!("error parsing the body as json");
+                    return;
                 }
             }
+            else {
+                error!("error invalid utf8 body");
+                return;
+            }
         }
+        else {
+            error!("Content-Type not supported");
+            return;
+        }
+    } else {
+        error!("Content-Type is needed");
+        return;
+    }
+
+    //Sign CSR
+    if let Ok(ca) = repos.find(ca.trim_matches('"')) {
+        if ca.len() > 0 {
+            if let Ok(ca_cert) = repos.get_cert(&ca[0].value) {
+                if let Ok(ca_key) = repos.get_key(&ca[0].value) {
+                    if let Some(cert) = CoreController::generate_certificate_from_csr(&ca_cert, &ca_key, controller_data.config.key_config.hash_type, &csr) {
+                        // Save certificate in backend if needed
+                        if controller_data.config.save_certificate {
+                            if let Ok(ski) = CoreController::get_key_identifier(&cert.certificate_der, SUBJECT_KEY_IDENTIFIER) {
+                                if let Err(e) = repos.store(&cert.common_name.clone(), &cert.certificate_der, None, &ski.clone()) {
+                                    error!("Insertion error for leaf {}: {}", cert.common_name.clone(), e);
+                                }
+                            }
+                        }
+
+                        res.body(fix_pem(&der_to_pem(&cert.certificate_der)));
+                        res.status(StatusCode::OK);
+                    } else {
+                        error!("generate certificate from csr error");
+                    }
+                } else {
+                    error!("get key with ca error");
+                }
+            } else {
+                error!("get cert with ca error");
+            }
+        } else {
+            error!("ca length error");
+        }
+    } else {
+        error!("{} CA can't be found in backend", ca)
     }
 }
 

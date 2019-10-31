@@ -1,5 +1,9 @@
 . "$PSScriptRoot/Private/Base64Url.ps1"
 
+#1 Start Mongo manually: 'docker run -p 27017:27017 -d --name picky-mongo library/mongo:4.1-bionic'
+#2 Set the environnement variable of the build if they are not set
+#3 Run Picky Server with Clion
+#4 Run Pester './PickyDebug.Test'
 Describe 'Picky tests' {
 	BeforeAll {
 		$picky_url = "http://127.0.0.1:12345"
@@ -8,44 +12,15 @@ Describe 'Picky tests' {
 		$picky_api_key = "secret"
 		$picky_backend = "mongodb"
 		$picky_database_url = "mongodb://picky-mongo:27017"
-		if ($picky_backend -Eq 'mongodb') {
-			& 'docker' 'stop' 'picky-mongo'
-			& 'docker' 'rm' 'picky-mongo'
-		    & 'docker' 'run' '-d' '--network=picky' '--name' 'picky-mongo' `
-		    'library/mongo:4.1-bionic'
-
-			Start-Sleep -s 5 # wait for picky-mongo to be ready
-		}
 
 		& 'docker' 'stop' 'picky-server'
 		& 'docker' 'rm' 'picky-server'
-		& 'docker' 'run' '-p' '12345:12345' '-d' '--network=picky' '--name' 'picky-server' `
-			'-e' "PICKY_REALM=$picky_realm" `
-			'-e' "PICKY_API_KEY=$picky_api_key" `
-			'-e' "PICKY_BACKEND=$picky_backend" `
-			'-e' "PICKY_DATABASE_URL=$picky_database_url" `
-			'devolutions/picky:3.3.0-buster-dev'
 	}
 
 	It 'checks health' {
-		$s = 0
-		$code = 400
-		while($s -lt 30){
-			Start-Sleep -Seconds 2
-			try{
-				$s = $s + 2
-				$result = Invoke-WebRequest -Uri "$picky_url/health" -Method GET
-				$code = $result.StatusCode
-				if($code -eq 200){
-					break;
-				}
-			}
-			catch{
-				#miam
-			}
-		}
-		
-		$s | Should -Not -Be 30
+		Write-Host "$picky_url/health"
+		$request = Invoke-WebRequest -Uri $picky_url/health -Method 'GET' -ContentType 'text/plain'
+		$request.StatusCode | Should -Be 200
 	}
 
 	It 'gets CA chain' {
@@ -115,6 +90,13 @@ Describe 'Picky tests' {
 			csr="$csr"
 		} | ConvertTo-Json
 
+		$Bytes = [System.Text.Encoding]::Unicode.GetBytes($csr)
+		$body = [Convert]::ToBase64String($Bytes)
+
+		Write-Host $body
+
+		Write-Host $payload
+
 		$cert = Invoke-RestMethod -Uri $picky_url/signcert/ -Method 'POST' `
 			-Headers $headers `
 			-ContentType 'application/json' `
@@ -128,7 +110,7 @@ Describe 'Picky tests' {
 		$leaf_cert.Issuer | Should -Be "CN=${picky_realm} Authority"
 	}
 
-	It 'signs certificates with CSR as base64' {
+	It 'signs certificates With CSR as base64' {
 		# https://stackoverflow.com/questions/48196350/generate-and-sign-certificate-request-using-pure-net-framework
 		# https://www.powershellgallery.com/packages/SelfSignedCertificate/0.0.4/Content/SelfSignedCertificate.psm1
 
@@ -241,7 +223,7 @@ Describe 'Picky tests' {
 	}
 
 
-	It 'signs certificates which failed, Send without Content-Transfert-Encoding' {
+	It 'signs certificates Who failed, Send without Content-Transfert-Encoding' {
 		# https://stackoverflow.com/questions/48196350/generate-and-sign-certificate-request-using-pure-net-framework
 		# https://www.powershellgallery.com/packages/SelfSignedCertificate/0.0.4/Content/SelfSignedCertificate.psm1
 
@@ -290,11 +272,5 @@ Describe 'Picky tests' {
 		}
 
 		throw "This test sould catch the web-request"
-	}
-	AfterAll{
-		& 'docker' 'stop' 'picky-mongo'
-		& 'docker' 'rm' 'picky-mongo'
-		& 'docker' 'stop' 'picky-server'
-		& 'docker' 'rm' 'picky-server'
 	}
 }
