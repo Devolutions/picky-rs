@@ -2,6 +2,7 @@ use saphir::*;
 use serde_json;
 use serde_json::Value;
 use base64::URL_SAFE_NO_PAD;
+use base64::STANDARD;
 
 use crate::configuration::ServerConfig;
 use picky_core::controllers::core_controller::CoreController;
@@ -40,7 +41,8 @@ impl ServerController {
         dispatch.add(Method::POST, "/signcert/", sign_cert);
         dispatch.add(Method::POST, "/name/", request_name);
         dispatch.add(Method::GET, "/health/", health);
-        dispatch.add(Method::GET, "/cert/<format>/<multihash>", cert);
+        dispatch.add(Method::GET, "/cert/<format>/<multihash>", cert_old);
+        dispatch.add(Method::GET, "/cert/<multihash>", cert);
 
         ServerController {
             dispatch
@@ -178,7 +180,7 @@ pub fn sign_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut 
     }
 }
 
-pub fn cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse){
+pub fn cert_old(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse){
     res.status(StatusCode::BAD_REQUEST);
     let repos = &controller_data.repos;
 
@@ -206,6 +208,47 @@ pub fn cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncR
                     } else {
                         error!("{}", e);
                     }
+                }
+            }
+        }
+    }
+}
+
+pub fn set_content_type_body(req: &SyncRequest, res: &mut SyncResponse, ca_cert:Vec<u8>){
+    if let Some(content_type) = req.get_header_string_value("Accept-Encoding") {
+        if content_type.to_lowercase().eq("binary") {
+            res.body(ca_cert);
+        } else if content_type.to_lowercase().eq("base64") {
+            res.body(base64::encode_config(&ca_cert, STANDARD));
+        } else {
+            res.body(fix_pem(&der_to_pem(&ca_cert)));
+        }
+    }
+    else{
+        res.body(fix_pem(&der_to_pem(&ca_cert)));
+    }
+    res.status(StatusCode::OK);
+}
+
+pub fn cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse){
+    res.status(StatusCode::BAD_REQUEST);
+    let repos = &controller_data.repos;
+
+    if let Some(multihash) = req.captures().get("multihash"){
+        match repos.get_cert(multihash) {
+            Ok(ca_cert) => {
+                set_content_type_body(req, res , ca_cert);
+            },
+            Err(e) => {
+                if let Ok(multihash) = sha256_to_multihash(multihash) {
+                    if let Ok(ca_cert) = repos.get_cert(&multihash){
+                        set_content_type_body(req, res , ca_cert);
+                    }
+                    else{
+                        error!("{}", e);
+                    }
+                } else {
+                    error!("{}", e);
                 }
             }
         }

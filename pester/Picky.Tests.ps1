@@ -1,4 +1,5 @@
 . "$PSScriptRoot/Private/Base64Url.ps1"
+. "$PSScriptRoot/Private/SHA256.ps1"
 
 Describe 'Picky tests' {
 	BeforeAll {
@@ -290,6 +291,121 @@ Describe 'Picky tests' {
 		}
 
 		throw "This test sould catch the web-request"
+	}
+
+	It 'Get cert in binary with sha256' {
+		$key_size = 2048
+		$subject = "CN=test.${picky_realm}"
+		$rsa_key = [System.Security.Cryptography.RSA]::Create($key_size)
+
+		$certRequest = [System.Security.Cryptography.X509Certificates.CertificateRequest]::new(
+				$subject, $rsa_key,
+				[System.Security.Cryptography.HashAlgorithmName]::SHA256,
+				[System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
+
+		$csr_der = $certRequest.CreateSigningRequest()
+
+		$headers = @{
+			"Authorization" = "Bearer $picky_api_key"
+			"Content-Transfer-Encoding" = "binary"
+			"Content-Disposition" = "attachment"
+		}
+
+		$cert = Invoke-RestMethod -Uri $picky_url/signcert/ -Method 'POST' `
+                -ContentType 'application/pkcs10' `
+                -Headers $headers `
+                -Body $csr_der
+
+		$cert = $cert -Replace "`n","" -Replace "`r",""
+		$cert = $cert -Replace "-----BEGIN CERTIFICATE-----", ""
+		$cert = $cert -Replace "-----END CERTIFICATE-----", ""
+		$cert = [Convert]::FromBase64String($cert)
+		$file_hash = Get-HashFromByte($cert)
+
+		$headers = @{
+			"Authorization" = "Bearer $picky_api_key"
+			"Accept-Encoding" = "binary"
+		}
+
+		$get_cert = Invoke-RestMethod -Uri "$picky_url/cert/$file_hash" -Method 'GET' `
+                -Headers $headers
+	}
+	It 'Get cert in base64 with sha256' {
+		$key_size = 2048
+		$subject = "CN=test.${picky_realm}"
+		$rsa_key = [System.Security.Cryptography.RSA]::Create($key_size)
+
+		$certRequest = [System.Security.Cryptography.X509Certificates.CertificateRequest]::new(
+				$subject, $rsa_key,
+				[System.Security.Cryptography.HashAlgorithmName]::SHA256,
+				[System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
+
+		$csr_der = $certRequest.CreateSigningRequest()
+
+		$headers = @{
+			"Authorization" = "Bearer $picky_api_key"
+			"Content-Transfer-Encoding" = "binary"
+			"Content-Disposition" = "attachment"
+		}
+
+		$cert = Invoke-RestMethod -Uri $picky_url/signcert/ -Method 'POST' `
+                -ContentType 'application/pkcs10' `
+                -Headers $headers `
+                -Body $csr_der
+
+		$cert = $cert -Replace "`n","" -Replace "`r",""
+		$cert = $cert -Replace "-----BEGIN CERTIFICATE-----", ""
+		$cert = $cert -Replace "-----END CERTIFICATE-----", ""
+		$cert = [Convert]::FromBase64String($cert)
+		$file_hash = Get-HashFromByte($cert)
+
+		$headers = @{
+			"Authorization" = "Bearer $picky_api_key"
+			"Accept-Encoding" = "base64"
+		}
+
+		$get_cert = Invoke-RestMethod -Uri "$picky_url/cert/$file_hash" -Method 'GET' `
+                -Headers $headers
+
+		Write-Host $get_cert
+	}
+	It 'Get cert in pem with sha256' {
+		$key_size = 2048
+		$subject = "CN=test.${picky_realm}"
+		$rsa_key = [System.Security.Cryptography.RSA]::Create($key_size)
+
+		$certRequest = [System.Security.Cryptography.X509Certificates.CertificateRequest]::new(
+				$subject, $rsa_key,
+				[System.Security.Cryptography.HashAlgorithmName]::SHA256,
+				[System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
+
+		$csr_der = $certRequest.CreateSigningRequest()
+
+		$headers = @{
+			"Authorization" = "Bearer $picky_api_key"
+			"Content-Transfer-Encoding" = "binary"
+			"Content-Disposition" = "attachment"
+		}
+
+		$cert = Invoke-RestMethod -Uri $picky_url/signcert/ -Method 'POST' `
+                -ContentType 'application/pkcs10' `
+                -Headers $headers `
+                -Body $csr_der
+
+		$cert = $cert -Replace "`n","" -Replace "`r",""
+		$cert = $cert -Replace "-----BEGIN CERTIFICATE-----", ""
+		$cert = $cert -Replace "-----END CERTIFICATE-----", ""
+		$cert = [Convert]::FromBase64String($cert)
+		$file_hash = Get-HashFromByte($cert)
+
+		$headers = @{
+			"Authorization" = "Bearer $picky_api_key"
+		}
+
+		$get_cert = Invoke-RestMethod -Uri "$picky_url/cert/$file_hash" -Method 'GET' `
+                -Headers $headers
+
+		Write-Host $get_cert
 	}
 	AfterAll{
 		& 'docker' 'stop' 'picky-mongo'
