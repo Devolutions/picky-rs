@@ -396,4 +396,11 @@ Describe 'Picky tests' {
 
 		Write-Host $get_cert
 	}
+
+	It 'Get default CA chain' {
+		$contents = Invoke-RestMethod -Uri $picky_url/chain/ -Method 'GET' `
+					-ContentType 'text/plain'
+
+		$contents | Should -Be -Not $null
+	}
 }

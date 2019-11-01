@@ -37,7 +37,8 @@ impl ServerController {
         };
 
         let dispatch = ControllerDispatch::new(controller_data);
-        dispatch.add(Method::GET, "/chain/<ca>", chains);
+        dispatch.add(Method::GET, "/chain/<ca>", chain);
+        dispatch.add(Method::GET, "/chain/", chain_default);
         dispatch.add(Method::POST, "/signcert/", sign_cert);
         dispatch.add(Method::POST, "/name/", request_name);
         dispatch.add(Method::GET, "/health/", health);
@@ -255,71 +256,82 @@ pub fn cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncR
     }
 }
 
-pub fn chains(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse){
-    res.status(StatusCode::BAD_REQUEST);
+pub fn find_ca_chain(controller_data: &ControllerData, ca:String, res: &mut SyncResponse){
     let repos = &controller_data.repos;
+
+    match repos.find(ca.clone().trim_matches('"').trim_matches('\0')) {
+        Ok(intermediate) => {
+            if intermediate.len() > 0 {
+                match repos.get_cert(&intermediate[0].value) {
+                    Ok(cert) => {
+                        let mut chain = fix_pem(&der_to_pem(&cert.clone()));
+
+                        let mut key_identifier = String::default();
+                        loop {
+                            match CoreController::get_key_identifier(&cert, AUTHORITY_KEY_IDENTIFIER_OID) {
+                                Ok(aki) => {
+                                    if key_identifier == aki {
+                                        // The authority is itself. It is a root
+                                        break;
+                                    }
+
+                                    key_identifier = aki.clone();
+
+                                    match repos.get_hash_from_key_identifier(&aki) {
+                                        Ok(hash) => {
+                                            match repos.get_cert(&hash) {
+                                                Ok(cert) => {
+                                                    chain.push_str(&fix_pem(&der_to_pem(&cert.clone())));
+                                                }
+                                                Err(e) => {
+                                                    error!("repos.get_cert failed: {}", e);
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        Err(e) => {
+                                            error!("repos.get_hash_from_key_identifier {} failed: {}", aki, e);
+                                            break;
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    error!("get_key_identifier failed: {}", e);
+                                    break;
+                                }
+                            }
+                        }
+                        res.body(chain.to_string());
+                        res.status(StatusCode::OK);
+                    }
+                    Err(e) => {
+                        error!("Intermediate cert can't be found: {}", e);
+                    }
+                }
+            } else {
+                error!("No intermediate found!");
+            }
+        }
+        Err(e) => {
+            error!("No intermediate found: {}", e);
+        }
+    }
+}
+
+pub fn chain_default(controller_data: &ControllerData, _: &SyncRequest, res: &mut SyncResponse){
+    res.status(StatusCode::BAD_REQUEST);
+    let ca = format!("{} Authority", &controller_data.config.realm);
+    find_ca_chain(controller_data, ca, res);
+}
+
+pub fn chain(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse){
+    res.status(StatusCode::BAD_REQUEST);
 
     if let Some(common_name) = req.captures().get("ca").and_then(|c| base64::decode_config(c, URL_SAFE_NO_PAD).ok()){
         let decoded = String::from_utf8_lossy(&common_name);
 
-        match repos.find(decoded.clone().trim_matches('"').trim_matches('\0')) {
-            Ok(intermediate) => {
+        find_ca_chain(controller_data, decoded.into(), res);
 
-                if intermediate.len() > 0 {
-                    match repos.get_cert(&intermediate[0].value) {
-                        Ok(cert) => {
-                            let mut chain = fix_pem(&der_to_pem(&cert.clone()));
-
-                            let mut key_identifier = String::default();
-                            loop {
-                                match CoreController::get_key_identifier(&cert, AUTHORITY_KEY_IDENTIFIER_OID) {
-                                    Ok(aki) => {
-                                        if key_identifier == aki {
-                                            // The authority is itself. It is a root
-                                            break;
-                                        }
-
-                                        key_identifier = aki.clone();
-
-                                        match repos.get_hash_from_key_identifier(&aki) {
-                                            Ok(hash) => {
-                                                match repos.get_cert(&hash) {
-                                                    Ok(cert) => {
-                                                        chain.push_str(&fix_pem(&der_to_pem(&cert.clone())));
-                                                    }
-                                                    Err(e) => {
-                                                        error!("repos.get_cert failed: {}", e);
-                                                        break;
-                                                    }
-                                                }
-                                            }
-                                            Err(e) => {
-                                                error!("repos.get_hash_from_key_identifier {} failed: {}", aki, e);
-                                                break;
-                                            }
-                                        }
-                                    }
-                                    Err(e) => {
-                                        error!("get_key_identifier failed: {}", e);
-                                        break;
-                                    }
-                                }
-                            }
-                            res.body(chain.to_string());
-                            res.status(StatusCode::OK);
-                        }
-                        Err(e) => {
-                            error!("Intermediate cert can't be found: {}", e);
-                        }
-                    }
-                } else {
-                    error!("No intermediate found!");
-                }
-            }
-            Err(e) => {
-                error!("No intermediate found: {}", e);
-            }
-        }
     } else {
         error!("Wrong path or can't decode base64: {}", req.captures().get("ca").unwrap_or(&"No capture ca".to_string()));
     }
