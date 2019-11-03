@@ -413,6 +413,135 @@ Describe 'Picky tests' {
 
 		$contents | Should -Be -Not $null
 	}
+	Context 'Register Certificate for John but not store on picky, John Send its signed certificate to Mary in multiple format, Mary check if the certificate is signed by is CA, and save the certificate' {
+		It 'Send to Mary in base64'{
+			$key_size = 2048
+			$subject = "CN=test.${picky_realm}"
+			$rsa_key = [System.Security.Cryptography.RSA]::Create($key_size)
+
+			$certRequest = [System.Security.Cryptography.X509Certificates.CertificateRequest]::new(
+					$subject, $rsa_key,
+					[System.Security.Cryptography.HashAlgorithmName]::SHA256,
+					[System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
+
+			$csr_der = $certRequest.CreateSigningRequest()
+
+			$headers = @{
+				"Authorization" = "Bearer $picky_api_key"
+				"Content-Transfer-Encoding" = "binary"
+				"Content-Disposition" = "attachment"
+			}
+
+			$cert = Invoke-RestMethod -Uri $picky_url/signcert/ -Method 'POST' `
+                -ContentType 'application/pkcs10' `
+                -Headers $headers `
+                -Body $csr_der
+
+			$headers = @{
+				"Authorization" = "Bearer $picky_api_key"
+				"Content-Transfer-Encoding" = "base64"
+				"Content-Disposition" = "attachment"
+			}
+
+			$postCert = Invoke-RestMethod -Uri $picky_url/cert/ -Method 'POST' `
+                -ContentType 'application/pkcs10' `
+                -Headers $headers `
+                -Body $cert
+			$postCert | Should -Not -Be $null
+		}
+		It 'Send To Mary in Binary and check if the Certificat can be fetch fron picky'{
+			$key_size = 2048
+			$subject = "CN=test.${picky_realm}"
+			$rsa_key = [System.Security.Cryptography.RSA]::Create($key_size)
+
+			$certRequest = [System.Security.Cryptography.X509Certificates.CertificateRequest]::new(
+					$subject, $rsa_key,
+					[System.Security.Cryptography.HashAlgorithmName]::SHA256,
+					[System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
+
+			$csr_der = $certRequest.CreateSigningRequest()
+
+			$headers = @{
+				"Authorization" = "Bearer $picky_api_key"
+				"Content-Transfer-Encoding" = "binary"
+				"Content-Disposition" = "attachment"
+			}
+
+			$cert = Invoke-RestMethod -Uri $picky_url/signcert/ -Method 'POST' `
+                -ContentType 'application/pkcs10' `
+                -Headers $headers `
+                -Body $csr_der
+
+			$headers = @{
+				"Authorization" = "Bearer $picky_api_key"
+				"Content-Transfer-Encoding" = "binary"
+				"Content-Disposition" = "attachment"
+			}
+
+			$cert = $cert -Replace "`n","" -Replace "`r",""
+			$cert = $cert -Replace "-----BEGIN CERTIFICATE-----", ""
+			$cert = $cert -Replace "-----END CERTIFICATE-----", ""
+			$cert = [Convert]::FromBase64String($cert)
+
+			$file_hash = Get-HashFromByte($cert)
+
+			$headers = @{
+				"Authorization" = "Bearer $picky_api_key"
+				"Content-Transfer-Encoding" = "binary"
+			}
+
+			{  Invoke-RestMethod -Uri "$picky_url/cert/$file_hash" -Method 'GET' `
+                -Headers $headers } | Should -Throw
+
+			$postCert = Invoke-RestMethod -Uri $picky_url/cert/ -Method 'POST' `
+                -ContentType 'application/pkcs10' `
+                -Headers $headers `
+                -Body $cert
+
+			$postCert | Should -Not -Be $null
+
+			$get_cert = Invoke-RestMethod -Uri "$picky_url/cert/$file_hash" -Method 'GET' `
+                -Headers $headers
+
+			$get_cert | Should -Not -Be $null
+		}
+		It 'Send To Mary in Json'{
+			$key_size = 2048
+			$subject = "CN=test.${picky_realm}"
+			$rsa_key = [System.Security.Cryptography.RSA]::Create($key_size)
+
+			$certRequest = [System.Security.Cryptography.X509Certificates.CertificateRequest]::new(
+					$subject, $rsa_key,
+					[System.Security.Cryptography.HashAlgorithmName]::SHA256,
+					[System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
+
+			$csr_der = $certRequest.CreateSigningRequest()
+
+			$headers = @{
+				"Authorization" = "Bearer $picky_api_key"
+				"Content-Transfer-Encoding" = "binary"
+				"Content-Disposition" = "attachment"
+			}
+
+			$cert = Invoke-RestMethod -Uri $picky_url/signcert/ -Method 'POST' `
+                -ContentType 'application/pkcs10' `
+                -Headers $headers `
+                -Body $csr_der
+
+			$headers = @{
+				"Authorization" = "Bearer $picky_api_key"
+			}
+			$json = @{
+				"certificate" = $cert
+			} | ConvertTo-Json
+
+			$postCert = Invoke-RestMethod -Uri $picky_url/cert/ -Method 'POST' `
+                -ContentType 'application/json' `
+                -Headers $headers `
+                -Body $json
+			$postCert | Should -Not -Be $null
+		}
+	}
 	AfterAll{
 		& 'docker' 'stop' 'picky-mongo'
 		& 'docker' 'rm' 'picky-mongo'

@@ -60,6 +60,14 @@ impl CoreController{
         Err("Could not get subject_name".to_string())
     }
 
+    pub fn get_issuer_name(der: &[u8]) -> Result<String, String> {
+        if let Ok((_e, cert)) = parse_x509_der(&der){
+            return Ok(cert.tbs_certificate.issuer.to_string());
+        }
+
+        Err("Could not get subject_name".to_string())
+    }
+
     pub fn request_name(csr: &str) -> Result<String, String>{
         CertificateSignRequest::get_csr_common_name(csr)
     }
