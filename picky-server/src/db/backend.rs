@@ -76,18 +76,3 @@ pub trait Repo<T>{
     fn get_collection(&self) -> Result<Self::RepoCollection, String>;
     fn insert(&mut self, key: &str, value: &T) -> Result<(), String>;
 }
-
-#[cfg(test)]
-mod tests{
-    use super::*;
-    use crate::Server;
-    use std::env;
-
-    #[test]
-    fn server_with_memory_backend_test(){
-        env::set_var("PICKY_BACKEND", "memory");
-        let conf = ServerConfig::new();
-
-        Server::run(conf);
-    }
-}

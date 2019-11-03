@@ -242,19 +242,4 @@ mod tests{
 
         server_thread.join().unwrap();
     }
-
-    #[test]
-    fn mongodb_server_test(){
-        set_env("mongodb");
-        set_var(PICKY_DATABASE_URL_ENV, "mongodb://127.0.0.1:27017");
-        let server_thread = thread::spawn(||{
-            run_server();
-        });
-
-        sleep(Duration::new(5,0));
-
-        call_rest_api();
-
-        server_thread.join().unwrap();
-    }
 }

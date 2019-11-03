@@ -1,3 +1,9 @@
+param(
+	[switch] $UseMongo,
+	[switch] $UseMemory,
+	[switch] $UseFile
+)
+
 . "$PSScriptRoot/Private/Base64Url.ps1"
 . "$PSScriptRoot/Private/SHA256.ps1"
 
@@ -7,8 +13,19 @@ Describe 'Picky tests' {
 		$picky_realm = "WaykDen"
 		$picky_authority = "${picky_realm} Authority"
 		$picky_api_key = "secret"
-		$picky_backend = "mongodb"
-		$picky_database_url = "mongodb://picky-mongo:27017"
+
+		if ($UseMemory){
+			$picky_backend = "memory"
+			$picky_database_url = ""
+		}
+		elseif($UseFile){
+			$picky_backend = "file"
+			$picky_database_url = $TestDrive
+		}
+		else{
+			$picky_backend = "mongodb"
+			$picky_database_url = "mongodb://picky-mongo:27017"
+		}
 		if ($picky_backend -Eq 'mongodb') {
 			& 'docker' 'stop' 'picky-mongo'
 			& 'docker' 'rm' 'picky-mongo'
