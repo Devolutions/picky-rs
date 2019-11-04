@@ -1,0 +1,58 @@
+
+:toc:
+:toclevels: 4
+
+= Picky Certificate Authority
+
+This document covers the design principles and protocol specification of the Picky Certificate Authority.
+
+== Relevant specifications
+
+multihash: https://github.com/multiformats/multihash
+
+HTTP signatures: https://tools.ietf.org/html/draft-cavage-http-signatures-12
+
+RFC4158: Internet X.509 Public Key Infrastructure: Certification Path Building
+
+RFC7468: Textual Encodings of PKIX, PKCS, and CMS Structures
+
+RFC2585: Internet X.509 Public Key Infrastructure Operational Protocols: FTP and HTTP
+
+RFC7093: Additional Methods for Generating Key Identifiers Values
+
+RFC4387: Internet X.509 Public Key Infrastructure Operational Protocols: Certificate Store Access via HTTP
+
+RFC4043: Internet X.509 Public Key Infrastructure Permanent Identifier
+
+RFC8649: Hash Of Root Key Certificate Extension
+
+== HTTP API
+
+=== Requesting a certificate
+
+Request:
+POST /picky/sign HTTP/1.1
+Content-Type: application/pkcs10
+
+Response:
+HTTP/1.1 200 OK
+Content-Type: application/pkix-cert
+
+=== Fetching a certificate
+
+Request:
+GET /picky/cert HTTP/1.1
+Accept: application/pkix-cert
+
+Response:
+HTTP/1.1 200 OK
+Content-Type: application/pkix-cert
+
+=== Pushing a certificate
+
+Request:
+POST /picky/cert HTTP/1.1
+Content-Type: application/pkix-cert
+
+Response:
+HTTP/1.1 200 OK
