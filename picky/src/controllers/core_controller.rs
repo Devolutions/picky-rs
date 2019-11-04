@@ -57,7 +57,7 @@ impl CoreController{
             return Ok(cert.tbs_certificate.subject.to_string());
         }
 
-        Err("Could not get subject_name".to_string())
+        Err("Could not get subject name".to_string())
     }
 
     pub fn get_issuer_name(der: &[u8]) -> Result<String, String> {
@@ -65,7 +65,7 @@ impl CoreController{
             return Ok(cert.tbs_certificate.issuer.to_string());
         }
 
-        Err("Could not get subject_name".to_string())
+        Err("Could not get issuer name".to_string())
     }
 
     pub fn request_name(csr: &str) -> Result<String, String>{
