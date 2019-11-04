@@ -21,7 +21,7 @@ pub struct FileRepos{
     pub key_identifiers: FileRepo<String>
 }
 
-impl FileRepos{
+impl FileRepos {
     pub fn new(path: &str) -> Self{
         FileRepos{
             path: path.to_string(),
@@ -43,9 +43,35 @@ impl FileRepos{
             }
         }
     }
+
+    #[inline]
+    fn __helper_get(&self, hash: &str, collection: &FileRepo<Vec<u8>>, type_err: &'static str) -> Result<Vec<u8>, String> {
+        let hash = format!("{}{}", hash, DER_EXT);
+        let certs = if let Ok(certs) = collection.get_collection() {
+            certs
+        } else {
+            return Err(format!("{} not found", type_err));
+        };
+
+        let mut cert = Vec::new();
+        for c in certs {
+            if hash.eq(&c) {
+                if let Ok(mut file) = File::open(format!("{}{}", self.cert.repo, c)) {
+                    file.read_to_end(&mut cert).map_err(|e| format!("Error reading file: {}", e))?;
+                    break;
+                }
+            }
+        }
+
+        if cert.is_empty() {
+            Err(format!("{} file not found", type_err))
+        } else {
+            Ok(cert)
+        }
+    }
 }
 
-impl BackendStorage for FileRepos{
+impl BackendStorage for FileRepos {
     fn init(&mut self) -> Result<(), String> {
         self.name.init(Some(self.path.clone()), REPO_CERTNAME)?;
         self.cert.init(Some(self.path.clone()), REPO_CERTIFICATE)?;
@@ -93,47 +119,11 @@ impl BackendStorage for FileRepos{
     }
 
     fn get_cert(&self, hash: &str) -> Result<Vec<u8>, String> {
-        let mut cert= String::default();
-        let hash = format!("{}{}", hash, DER_EXT);
-        if let Ok(certs) = self.cert.get_collection(){
-            for c in certs{
-                if hash.eq(&c){
-                    if let Ok(mut file) = File::open(format!("{}{}", self.cert.repo, c)){
-                        let mut buf = String::default();
-                        let _res = file.read_to_string(&mut buf).expect("Error reading file");
-                        cert = buf;
-                    }
-                }
-            }
-
-            if !cert.is_empty(){
-                return Ok(cert.as_bytes().to_vec());
-            }
-        }
-
-        Err("Cert not found".to_string())
+        self.__helper_get(hash, &self.cert, "Cert")
     }
 
     fn get_key(&self, hash: &str) -> Result<Vec<u8>, String> {
-        let mut key = String::default();
-        let hash = format!("{}{}", hash, DER_EXT);
-        if let Ok(keys) = self.keys.get_collection(){
-            for k in keys{
-                if hash.eq(&k) {
-                    if let Ok(mut file) = File::open(format!("{}{}", self.keys.repo, k)){
-                        let mut buf = String::default();
-                        let _res = file.read_to_string(&mut buf).expect("Error reading file");
-                        key = buf;
-                    }
-                }
-            }
-        }
-
-        if !key.is_empty(){
-            return Ok(key.as_bytes().to_vec());
-        }
-
-        Err("Key not found".to_string())
+        self.__helper_get(hash, &self.keys, "Key")
     }
 
     fn get_key_identifier_from_hash(&self, _hash: &str) -> Result<String, String> {
