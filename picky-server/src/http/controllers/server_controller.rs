@@ -44,6 +44,7 @@ impl ServerController {
         dispatch.add(Method::GET, "/health/", health);
         dispatch.add(Method::GET, "/cert/<format>/<multihash>", cert_old);
         dispatch.add(Method::GET, "/cert/<multihash>", cert);
+        dispatch.add(Method::POST, "/cert/", post_cert);
 
         ServerController {
             dispatch
@@ -80,6 +81,117 @@ pub fn health(controller_data: &ControllerData, _req: &SyncRequest, res: &mut Sy
 
 }
 
+pub fn post_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse){
+    res.status(StatusCode::BAD_REQUEST);
+    let repos = &mut controller_data.repos.clone();
+
+    let ca = format!("{} Authority", &controller_data.config.realm);
+    let certificate;
+
+    // If ContentType == application/pkcs10 get the certificate in Binary or Base64
+    // If ContentType == application/json get the CA and the certificate
+    let content_type = if let Some(content_type) = req.get_header_string_value("Content-Type") {
+        content_type
+    } else {
+        error!("Content-Type is needed");
+        return;
+    };
+
+    match content_type.to_lowercase().as_str() {
+        "application/pkcs10" => {
+            let content_encoding = if let Some(content_encoding) = req.get_header_string_value("Content-Transfer-Encoding") {
+                content_encoding
+            } else {
+                error!("Content-Transfer-Encoding is needed with content-type: application/pkcs10");
+                return;
+            };
+
+            certificate = match content_encoding.to_lowercase().as_str() {
+                "base64" => {
+                    if let Ok(body) = String::from_utf8(req.body().clone()){
+                        fix_pem(body.as_ref())
+                    } else {
+                        error!("error invalid utf8 body");
+                        return;
+                    }
+                },
+                "binary" => {
+                    fix_pem(der_to_pem(req.body()).as_ref())
+                },
+                _ => String::new(),
+            };
+
+            if certificate.eq("") {
+                error!("Content-Transfer-Encoding is only supported with base64 or binary");
+                return;
+            }
+        }
+        "application/json" => {
+            if let Ok(body) = String::from_utf8(req.body().clone()){
+                if let Ok(json) = serde_json::from_str::<Value>(body.as_ref()) {
+                    certificate = fix_pem(json["certificate"].to_string().trim_matches('"').replace("\\n", "\n").to_string().as_ref());
+                } else {
+                    error!("error parsing the body as json");
+                    return;
+                }
+            } else {
+                error!("error invalid utf8 body");
+                return;
+            }
+        }
+        _ => {
+            error!("Content-Type not supported");
+            return;
+        }
+    }
+
+    let der = match pem_to_der(&certificate) {
+        Ok(der) => der,
+        Err(source) => {
+            error!("Couldn't parse pem: {}", source);
+            return;
+        }
+    };
+
+    let ski = match CoreController::get_key_identifier(&der, SUBJECT_KEY_IDENTIFIER) {
+        Ok(ski) => {
+            ski
+        },
+        Err(e) => {
+            error!("error: {}", e);
+            return;
+        },
+    };
+
+    let name = match CoreController::get_issuer_name(&der){
+        Ok(name) => {
+            name
+        },
+        Err(e) => {
+            error!("error: {}", e);
+            return;
+        },
+    };
+
+    let name = name.trim_start_matches("CN=");
+    if name == ca {
+        match CoreController::get_subject_name(&der) {
+            Ok(common_name) => {
+                if let Err(e) = repos.store(&common_name, &der, None, &ski) {
+                    error!("Insertion error for leaf {}: {}", &common_name, e);
+                } else{
+                    res.status(StatusCode::OK);
+                }
+            },
+            Err(e) => {
+                error!("error: {}", e);
+            },
+        };
+    }
+    else{
+        error!("this certificate was not signed by the CA of this server.");
+    }
+}
 
 pub fn sign_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse){
     res.status(StatusCode::BAD_REQUEST);
