@@ -5,12 +5,11 @@ use base64::URL_SAFE_NO_PAD;
 use base64::STANDARD;
 
 use crate::configuration::ServerConfig;
-use picky_core::controllers::core_controller::CoreController;
 use crate::db::backend::BackendStorage;
 use crate::utils::*;
+use crate::http::controllers::utils::SyncRequestUtil;
+use picky::controllers::core_controller::CoreController;
 use std::str;
-
-use crate::http::controllers::utils::{SyncRequestUtil};
 
 pub enum CertFormat{
     Der = 0,
@@ -22,7 +21,7 @@ pub struct ControllerData{
     pub config: ServerConfig
 }
 
-pub struct ServerController{
+pub struct ServerController {
     dispatch: ControllerDispatch<ControllerData>
 }
 
