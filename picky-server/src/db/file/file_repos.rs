@@ -47,26 +47,26 @@ impl FileRepos {
     #[inline]
     fn __helper_get(&self, hash: &str, collection: &FileRepo<Vec<u8>>, type_err: &'static str) -> Result<Vec<u8>, String> {
         let hash = format!("{}{}", hash, DER_EXT);
-        let certs = if let Ok(certs) = collection.get_collection() {
-            certs
+        let repo_collection = if let Ok(repo_collection) = collection.get_collection() {
+            repo_collection
         } else {
             return Err(format!("{} not found", type_err));
         };
 
-        let mut cert = Vec::new();
-        for c in certs {
-            if hash.eq(&c) {
-                if let Ok(mut file) = File::open(format!("{}{}", self.cert.repo, c)) {
-                    file.read_to_end(&mut cert).map_err(|e| format!("Error reading file: {}", e))?;
+        let mut found_item = Vec::new();
+        for item in repo_collection {
+            if hash.eq(&item) {
+                if let Ok(mut file) = File::open(format!("{}{}", collection.repo, item)) {
+                    file.read_to_end(&mut found_item).map_err(|e| format!("Error reading file: {}", e))?;
                     break;
                 }
             }
         }
 
-        if cert.is_empty() {
+        if found_item.is_empty() {
             Err(format!("{} file not found", type_err))
         } else {
-            Ok(cert)
+            Ok(found_item)
         }
     }
 }
