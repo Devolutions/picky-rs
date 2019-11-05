@@ -3,40 +3,15 @@
 
 use picky_core::{
     pem::parse_pem,
-    serde::{AttributeTypeAndValueParameters, Certificate},
+    serde::Certificate,
 };
 use std::{cmp::min, fs};
+use picky_core::serde::NamePrettyFormatter;
 
 const ALL_STARS_FILE_PATH: &str = "./test_files/mkcert_all_root_ca_2019_10.txt";
 
 fn print_issuer(cert: &Certificate) {
-    print!("Decoded CA ({:?}):", *cert.tbs_certificate.version);
-    for name in &cert.tbs_certificate.issuer.0 {
-        match &name.0[0].value {
-            AttributeTypeAndValueParameters::CommonName(name) => {
-                print!(" <common name: {}>", name);
-            }
-            AttributeTypeAndValueParameters::SerialNumber(name) => {
-                print!(" <serial number: {}>", name);
-            }
-            AttributeTypeAndValueParameters::CountryName(name) => {
-                print!(" <country: {}>", name);
-            }
-            AttributeTypeAndValueParameters::LocalityName(name) => {
-                print!(" <locality: {}>", name);
-            }
-            AttributeTypeAndValueParameters::StateOrProvinceName(name) => {
-                print!(" <state or province: {}>", name);
-            }
-            AttributeTypeAndValueParameters::OrganisationName(name) => {
-                print!(" <organisation: {}>", name);
-            }
-            AttributeTypeAndValueParameters::OrganisationalUnitName(name) => {
-                print!(" <organisational unit: {}>", name);
-            }
-        }
-    }
-    println!();
+    println!("Decoded CA ({:?}): {}", *cert.tbs_certificate.version, NamePrettyFormatter(&cert.tbs_certificate.issuer));
 }
 
 fn substract_no_underflow(val: usize, sub: usize) -> usize {
@@ -83,7 +58,7 @@ fn all_stars_parsing() {
         };
         assert_eq!(pem.label, "CERTIFICATE");
 
-        match Certificate::from_bytes(&pem.data) {
+        match Certificate::from_der(&pem.data) {
             Ok(cert) => {
                 print_issuer(&cert);
                 number_decoded += 1;

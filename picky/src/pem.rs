@@ -1,7 +1,6 @@
 use base64::DecodeError;
 use serde::export::Formatter;
-use std::{fmt, str::FromStr};
-use std::error::Error;
+use std::{error::Error, fmt, str::FromStr};
 
 const PEM_HEADER_START: &str = "-----BEGIN";
 const PEM_HEADER_END: &str = "-----END";
@@ -144,7 +143,7 @@ mod tests {
     #[test]
     fn read_pem_and_parse_certificate() {
         let pem = parse_pem(PEM_BYTES).unwrap();
-        let cert = Certificate::from_bytes(&pem.data).unwrap();
+        let cert = Certificate::from_der(&pem.data).unwrap();
 
         assert_eq!(cert.tbs_certificate.version.0, Version::V3);
         assert_eq!(cert.tbs_certificate.serial_number, BigInt::from(1));

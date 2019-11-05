@@ -1,14 +1,24 @@
-use crate::serde::{
-    AlgorithmIdentifier, AttributeTypeAndValue, Extensions, SubjectPublicKeyInfo, Validity, Version,
+use crate::{
+    oids,
+    serde::{
+        AlgorithmIdentifier, AttributeTypeAndValue, AttributeTypeAndValueParameters,
+        AuthorityKeyIdentifier, ExtensionValue, Extensions, SubjectPublicKeyInfo, Validity,
+        Version,
+    },
 };
-use serde::de;
+use serde::{
+    de,
+    export::{fmt::Error, Formatter},
+};
 use serde_asn1_der::asn1_wrapper::{
     ApplicationTag0, ApplicationTag3, Asn1SequenceOf, Asn1SetOf, BitStringAsn1, IntegerAsn1,
+    OctetStringAsn1Container,
 };
 use std::{convert::TryFrom, fmt};
 
 pub type RelativeDistinguishedName = Asn1SetOf<AttributeTypeAndValue>;
-pub type Name = Asn1SequenceOf<RelativeDistinguishedName>;
+pub type GeneralNames = Asn1SequenceOf<RelativeDistinguishedName>;
+pub type Name = GeneralNames;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Certificate {
@@ -18,12 +28,54 @@ pub struct Certificate {
 }
 
 impl Certificate {
-    pub fn from_bytes(bytes: &[u8]) -> serde_asn1_der::Result<Self> {
-        serde_asn1_der::from_bytes(bytes)
+    pub fn from_der(der: &[u8]) -> serde_asn1_der::Result<Self> {
+        serde_asn1_der::from_bytes(der)
     }
 
-    pub fn to_vec(&self) -> serde_asn1_der::Result<Vec<u8>> {
+    pub fn to_der(&self) -> serde_asn1_der::Result<Vec<u8>> {
         serde_asn1_der::to_vec(self)
+    }
+
+    pub fn get_subject_key_identifier(&self) -> Result<String, String> {
+        let key_identifier_oid = oids::subject_key_identifier();
+        let ext = (self.tbs_certificate.extensions.0)
+            .0
+            .iter()
+            .find(|ext| ext.extn_id == key_identifier_oid)
+            .ok_or_else(|| "subject key identifier extension not found".to_owned())?;
+
+        match &ext.extn_value {
+            ExtensionValue::SubjectKeyIdentifier(ski) => Ok(hex::encode(&(ski.0).0)),
+            _ => unreachable!("invalid extension (expected subject key identifier)"),
+        }
+    }
+
+    pub fn get_authority_key_identifier(&self) -> Result<String, String> {
+        let key_identifier_oid = oids::authority_key_identifier();
+        let ext = (self.tbs_certificate.extensions.0)
+            .0
+            .iter()
+            .find(|ext| ext.extn_id == key_identifier_oid)
+            .ok_or_else(|| "authority key identifier extension not found".to_owned())?;
+
+        match &ext.extn_value {
+            ExtensionValue::AuthorityKeyIdentifier(OctetStringAsn1Container(
+                AuthorityKeyIdentifier {
+                    key_identifier: Some(key_identifier),
+                    authority_cert_issuer: _,
+                    authority_cert_serial_number: _,
+                },
+            )) => Ok(hex::encode(&(key_identifier.0).0)),
+            _ => unreachable!("invalid extension (expected authority key identifier)"),
+        }
+    }
+
+    pub fn get_subject_name(&self) -> String {
+        NamePrettyFormatter(&self.tbs_certificate.subject).to_string()
+    }
+
+    pub fn get_issuer_name(&self) -> String {
+        NamePrettyFormatter(&self.tbs_certificate.issuer).to_string()
     }
 }
 
@@ -31,7 +83,7 @@ impl TryFrom<&[u8]> for Certificate {
     type Error = serde_asn1_der::SerdeAsn1DerError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        Self::from_bytes(value)
+        Self::from_der(value)
     }
 }
 
@@ -88,17 +140,46 @@ impl<'de> de::Deserialize<'de> for TBSCertificate {
             }
         }
 
-        const FIELDS: &[&str] = &[
-            "version",
-            "serial_number",
-            "signature",
-            "issuer",
-            "validity",
-            "subject",
-            "subject_public_key_info",
-            "extensions",
-        ];
-        deserializer.deserialize_struct("Duration", FIELDS, Visitor)
+        deserializer.deserialize_seq(Visitor)
+    }
+}
+
+pub struct NamePrettyFormatter<'a>(pub &'a Name);
+impl fmt::Display for NamePrettyFormatter<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+        let mut first = true;
+        for name in &(self.0).0 {
+            if first {
+                first = false;
+            } else {
+                write!(f, " ")?;
+            }
+
+            match &name.0[0].value {
+                AttributeTypeAndValueParameters::CommonName(name) => {
+                    write!(f, "{}", name)?;
+                }
+                AttributeTypeAndValueParameters::SerialNumber(name) => {
+                    write!(f, "{}", name)?;
+                }
+                AttributeTypeAndValueParameters::CountryName(name) => {
+                    write!(f, "{}", name)?;
+                }
+                AttributeTypeAndValueParameters::LocalityName(name) => {
+                    write!(f, "{}", name)?;
+                }
+                AttributeTypeAndValueParameters::StateOrProvinceName(name) => {
+                    write!(f, "{}", name)?;
+                }
+                AttributeTypeAndValueParameters::OrganisationName(name) => {
+                    write!(f, "{}", name)?;
+                }
+                AttributeTypeAndValueParameters::OrganisationalUnitName(name) => {
+                    write!(f, "{}", name)?;
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -107,7 +188,7 @@ mod tests {
     use super::*;
     use crate::{
         oids,
-        serde::{AttributeTypeAndValue, Extension, ExtensionValue, KeyUsage},
+        serde::{AttributeTypeAndValue, Extension, ExtensionValue, KeyIdentifier, KeyUsage},
     };
     use num_bigint_dig::{BigInt, Sign};
     use serde_asn1_der::{
@@ -187,16 +268,12 @@ mod tests {
                 extn_value: ExtensionValue::Generic(encoded[440..442].to_vec().into()),
             },
             Extension::new_key_usage(key_usage),
-            Extension {
-                extn_id: oids::subject_key_identifier().into(),
-                critical: false.into(),
-                extn_value: ExtensionValue::Generic(encoded[467..489].to_vec().into()),
-            },
-            Extension {
-                extn_id: oids::authority_key_identifier().into(),
-                critical: false.into(),
-                extn_value: ExtensionValue::Generic(encoded[498..522].to_vec().into()),
-            },
+            Extension::new_subject_key_identifier(&encoded[469..489]),
+            Extension::new_authority_key_identifier(
+                KeyIdentifier::from(encoded[502..522].to_vec()),
+                None,
+                None,
+            ),
         ]);
         check_serde!(extensions: Extensions in encoded[429..522]);
 

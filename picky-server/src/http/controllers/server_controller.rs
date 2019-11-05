@@ -12,9 +12,6 @@ use std::str;
 
 use crate::http::controllers::utils::{SyncRequestUtil};
 
-const SUBJECT_KEY_IDENTIFIER: &[u64] = &[2, 5, 29, 14];
-const AUTHORITY_KEY_IDENTIFIER_OID: &[u64] = &[2, 5, 29, 35];
-
 pub enum CertFormat{
     Der = 0,
     Pem = 1
@@ -152,7 +149,7 @@ pub fn post_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut 
         }
     };
 
-    let ski = match CoreController::get_key_identifier(&der, SUBJECT_KEY_IDENTIFIER) {
+    let ski = match CoreController::get_subject_key_identifier(&der) {
         Ok(ski) => {
             ski
         },
@@ -265,7 +262,7 @@ pub fn sign_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut 
                     if let Some(cert) = CoreController::generate_certificate_from_csr(&ca_cert, &ca_key, controller_data.config.key_config.hash_type, &csr) {
                         // Save certificate in backend if needed
                         if controller_data.config.save_certificate {
-                            if let Ok(ski) = CoreController::get_key_identifier(&cert.certificate_der, SUBJECT_KEY_IDENTIFIER) {
+                            if let Ok(ski) = CoreController::get_subject_key_identifier(&cert.certificate_der) {
                                 if let Err(e) = controller_data.repos.store(&cert.common_name.clone(), &cert.certificate_der, None, &ski.clone()) {
                                     error!("Insertion error for leaf {}: {}", cert.common_name.clone(), e);
                                 }
@@ -377,7 +374,7 @@ pub fn find_ca_chain(controller_data: &ControllerData, ca:String, res: &mut Sync
 
                         let mut key_identifier = String::default();
                         loop {
-                            match CoreController::get_key_identifier(&cert, AUTHORITY_KEY_IDENTIFIER_OID) {
+                            match CoreController::get_authority_key_identifier(&cert) {
                                 Ok(aki) => {
                                     if key_identifier == aki {
                                         // The authority is itself. It is a root
@@ -468,7 +465,7 @@ pub fn generate_root_ca(config: &ServerConfig, repos: &mut Box<dyn BackendStorag
     }
 
     if let Some(root) = CoreController::generate_root_ca(&config.realm, config.key_config.hash_type, config.key_config.key_type){
-        let ski = CoreController::get_key_identifier(&root.certificate_der, SUBJECT_KEY_IDENTIFIER)?;
+        let ski = CoreController::get_subject_key_identifier(&root.certificate_der)?;
         if let Err(e) = repos.store(&root.common_name.clone(), &root.certificate_der, Some(&root.keys.expect("Could not store root key, key is empty").key_der), &ski.clone()){
             return Err(format!("Insertion error: {:?}", e));
         }
@@ -494,7 +491,7 @@ pub fn generate_intermediate(config: &ServerConfig, repos: &mut Box<dyn BackendS
     if let Ok(root_cert) = repos.get_cert(&root[0].value){
         if let Ok(root_key) = repos.get_key(&root[0].value){
             if let Some(intermediate) = CoreController::generate_intermediate_ca(&root_cert, &root_key, &config.realm, config.key_config.hash_type, config.key_config.key_type){
-                if let Ok(ski) = CoreController::get_key_identifier(&intermediate.certificate_der, SUBJECT_KEY_IDENTIFIER){
+                if let Ok(ski) = CoreController::get_subject_key_identifier(&intermediate.certificate_der) {
                     if let Err(e) = repos.store(&intermediate.common_name.clone(), &intermediate.certificate_der, Some(&intermediate.keys.expect("Could not store intermediate key, key is empty").key_der), &ski.clone()){
                         return Err(format!("Insertion error: {:?}", e));
                     }
@@ -525,7 +522,7 @@ pub fn check_certs_in_env(config: &ServerConfig, repos: &mut Box<dyn BackendStor
 
 fn get_and_store_env_cert_info(cert: &str, key: &str, repos: &mut Box<dyn BackendStorage>) -> Result<(), String>{
     let der = pem_to_der(&cert)?;
-    match CoreController::get_key_identifier(&der, SUBJECT_KEY_IDENTIFIER) {
+    match CoreController::get_subject_key_identifier(&der) {
         Ok(ski) => {
             match CoreController::get_subject_name(&der){
                 Ok(name) => {

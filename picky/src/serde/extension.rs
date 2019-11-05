@@ -1,8 +1,9 @@
-use crate::oids;
+use crate::{oids, serde::GeneralNames};
 use serde::{de, ser};
 use serde_asn1_der::{
     asn1_wrapper::{
-        BitStringAsn1, Implicit, ObjectIdentifierAsn1, OctetStringAsn1, OctetStringAsn1Container,
+        ApplicationTag1, ApplicationTag4, BitStringAsn1, ContextTag0, ContextTag2, Implicit,
+        IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1, OctetStringAsn1Container,
     },
     bit_string::BitString,
 };
@@ -28,6 +29,45 @@ impl Extension {
             extn_value: ExtensionValue::KeyUsage(key_usage.into()),
         }
     }
+
+    pub fn new_subject_key_identifier<V: Into<Vec<u8>>>(ski: V) -> Self {
+        Self {
+            extn_id: oids::subject_key_identifier().into(),
+            // Conforming CAs MUST mark this extension as non-critical
+            critical: false.into(),
+            extn_value: ExtensionValue::SubjectKeyIdentifier(OctetStringAsn1(ski.into()).into()),
+        }
+    }
+
+    pub fn new_authority_key_identifier<KI, I, SN>(
+        key_identifier: KI,
+        authority_cert_issuer: I,
+        authority_cert_serial_number: SN,
+    ) -> Self
+    where
+        KI: Into<Option<KeyIdentifier>>,
+        I: Into<Option<GeneralNames>>,
+        SN: Into<Option<IntegerAsn1>>,
+    {
+        Self {
+            extn_id: oids::authority_key_identifier().into(),
+            // Conforming CAs MUST mark this extension as non-critical
+            critical: false.into(),
+            extn_value: ExtensionValue::AuthorityKeyIdentifier(
+                AuthorityKeyIdentifier {
+                    key_identifier: key_identifier.into().map(ContextTag0),
+                    authority_cert_issuer: authority_cert_issuer
+                        .into()
+                        .map(ApplicationTag4)
+                        .map(ApplicationTag1),
+                    authority_cert_serial_number: authority_cert_serial_number
+                        .into()
+                        .map(ContextTag2),
+                }
+                .into(),
+            ),
+        }
+    }
 }
 
 impl ser::Serialize for Extension {
@@ -46,14 +86,7 @@ impl ser::Serialize for Extension {
             seq.serialize_element(&self.critical)?;
         }
 
-        match &self.extn_value {
-            ExtensionValue::KeyUsage(key_usage) => {
-                seq.serialize_element(key_usage)?;
-            }
-            ExtensionValue::Generic(octet_string) => {
-                seq.serialize_element(octet_string)?;
-            }
-        }
+        seq.serialize_element(&self.extn_value)?;
 
         seq.end()
     }
@@ -81,6 +114,12 @@ impl<'de> de::Deserialize<'de> for Extension {
                 let critical: Implicit<bool> = seq.next_element()?.unwrap();
                 let value = match Into::<String>::into(&id.0).as_str() {
                     oids::KEY_USAGE => ExtensionValue::KeyUsage(seq.next_element()?.unwrap()),
+                    oids::SUBJECT_KEY_IDENTIFIER => {
+                        ExtensionValue::SubjectKeyIdentifier(seq.next_element()?.unwrap())
+                    }
+                    oids::AUTHORITY_KEY_IDENTIFIER => {
+                        ExtensionValue::AuthorityKeyIdentifier(seq.next_element()?.unwrap())
+                    }
                     _ => ExtensionValue::Generic(seq.next_element()?.unwrap()),
                 };
 
@@ -98,8 +137,8 @@ impl<'de> de::Deserialize<'de> for Extension {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum ExtensionValue {
-    //AuthorityKeyIdentifier(OctetStringAsn1Container<AuthorityKeyIdentifier>),
-    //SubjectKeyIdentifier(OctetStringAsn1Container<SubjectKeyIdentifier>),
+    AuthorityKeyIdentifier(OctetStringAsn1Container<AuthorityKeyIdentifier>),
+    SubjectKeyIdentifier(OctetStringAsn1Container<SubjectKeyIdentifier>),
     KeyUsage(OctetStringAsn1Container<KeyUsage>),
     //CertificatePolicies(OctetStringAsn1Container<Asn1SequenceOf<PolicyInformation>>),
     //PolicyMappings(OctetStringAsn1Container<Asn1SequenceOfPolicyMapping>>),
@@ -116,13 +155,68 @@ pub enum ExtensionValue {
     Generic(OctetStringAsn1),
 }
 
+impl ser::Serialize for ExtensionValue {
+    fn serialize<S>(
+        &self,
+        serializer: S,
+    ) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
+    where
+        S: ser::Serializer,
+    {
+        match self {
+            ExtensionValue::AuthorityKeyIdentifier(aki) => aki.serialize(serializer),
+            ExtensionValue::SubjectKeyIdentifier(ski) => ski.serialize(serializer),
+            ExtensionValue::KeyUsage(key_usage) => key_usage.serialize(serializer),
+            ExtensionValue::Generic(octet_string) => octet_string.serialize(serializer),
+        }
+    }
+}
+
 /// https://tools.ietf.org/html/rfc5280#section-4.2.1.1
-/*#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct AuthorityKeyIdentifier {
-    key_identifier: Implicit<Option<ApplicationTag0<KeyIdentifier>>>,
-    authority_cert_issuer: Implicit<Option<ApplicationTag1<Asn1SequenceOf<GeneralName>>>>,
-    authority_cert_serial_number: Implicit<Option<ApplicationTag2<CertificateSerialNumber>>>,
-}*/
+    pub key_identifier: Option<ContextTag0<KeyIdentifier>>,
+    pub authority_cert_issuer: Option<ApplicationTag1<ApplicationTag4<GeneralNames>>>,
+    pub authority_cert_serial_number: Option<ContextTag2<IntegerAsn1>>,
+}
+
+pub type KeyIdentifier = OctetStringAsn1;
+
+impl<'de> de::Deserialize<'de> for AuthorityKeyIdentifier {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = AuthorityKeyIdentifier;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a valid DER-encoded algorithm identifier")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                Ok(AuthorityKeyIdentifier {
+                    key_identifier: seq.next_element().unwrap_or(Some(None)).unwrap_or(None),
+                    authority_cert_issuer: seq.next_element().unwrap_or(Some(None)).unwrap_or(None),
+                    authority_cert_serial_number: seq
+                        .next_element()
+                        .unwrap_or(Some(None))
+                        .unwrap_or(None),
+                })
+            }
+        }
+
+        deserializer.deserialize_seq(Visitor)
+    }
+}
+
+/// https://tools.ietf.org/html/rfc5280#section-4.2.1.2
+pub type SubjectKeyIdentifier = OctetStringAsn1;
 
 /// https://tools.ietf.org/html/rfc5280#section-4.2.1.3
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
