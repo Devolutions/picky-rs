@@ -2,68 +2,60 @@ use crate::db::memory::memory_repo::MemoryRepo;
 use std::collections::HashMap;
 use crate::utils;
 use crate::db::backend::{BackendStorage, Model, Repo};
+use std::sync::{RwLock};
 
-#[derive(Clone)]
 pub struct MemoryRepos{
-    pub name: MemoryRepo<String>,
-    pub cert: MemoryRepo<Vec<u8>>,
-    pub keys: MemoryRepo<Vec<u8>>,
-    pub key_identifiers: MemoryRepo<String>
+    pub name: RwLock<MemoryRepo<String>>,
+    pub cert: RwLock<MemoryRepo<Vec<u8>>>,
+    pub keys: RwLock<MemoryRepo<Vec<u8>>>,
+    pub key_identifiers: RwLock<MemoryRepo<String>>
 }
 
 impl MemoryRepos{
     pub fn new() -> Self{
         MemoryRepos{
-            name:MemoryRepo{
+            name: RwLock::new(MemoryRepo{
                 repo: HashMap::new()
-            },
+            }),
 
-            cert:MemoryRepo{
+            cert: RwLock::new(MemoryRepo{
                 repo: HashMap::new()
-            },
+            }),
 
-            keys:MemoryRepo{
-                repo: HashMap::new()
-            },
+            keys: RwLock::new(MemoryRepo{
+                repo:HashMap::new()
+            }),
 
-            key_identifiers:MemoryRepo{
+            key_identifiers: RwLock::new(MemoryRepo{
                 repo: HashMap::new()
-            }
+            })
         }
     }
 }
 
-impl BackendStorage for MemoryRepos{
+impl BackendStorage for MemoryRepos {
     fn init(&mut self) -> Result<(), String>{
-        self.name = MemoryRepo{
-            repo: HashMap::new()
-        };
+        self.name.write().unwrap().repo = HashMap::new();
 
-        self.keys = MemoryRepo{
-            repo: HashMap::new()
-        };
+        self.keys.write().unwrap().repo = HashMap::new();
 
-        self.cert = MemoryRepo{
-            repo: HashMap::new()
-        };
+        self.cert.write().unwrap().repo = HashMap::new();
 
-        self.key_identifiers = MemoryRepo{
-            repo: HashMap::new()
-        };
+        self.key_identifiers.write().unwrap().repo = HashMap::new();
 
         Ok(())
     }
 
-    fn store(&mut self, name :&str, cert: &[u8], key: Option<&[u8]>, key_identifier: &str) -> Result<bool, String>{
+    fn store(&self, name :&str, cert: &[u8], key: Option<&[u8]>, key_identifier: &str) -> Result<bool, String>{
         if let Ok(cert_hash) = utils::multihash_encode(cert){
-            self.name.insert(name, &cert_hash.clone())?;
-            self.cert.insert(&cert_hash, &cert.to_vec())?;
+            self.name.write().unwrap().insert(name, &cert_hash.clone())?;
+            self.cert.write().unwrap().insert(&cert_hash, &cert.to_vec())?;
 
             if let Some(key) = key {
-                self.keys.insert(&cert_hash, &key.to_vec())?;
+                self.keys.write().unwrap().insert(&cert_hash, &key.to_vec())?;
             }
 
-            self.key_identifiers.insert(key_identifier, &cert_hash)?;
+            self.key_identifiers.write().unwrap().insert(key_identifier, &cert_hash)?;
             return Ok(true);
         }
         Err("Can\'t encode certificate".to_string())
@@ -72,7 +64,7 @@ impl BackendStorage for MemoryRepos{
     fn find(&self, name: &str) -> Result<Vec<Model<String>>, String>{
         let mut model_vec = Vec::new();
 
-        if let Some(model) = self.name.get_collection()?.get(name){
+        if let Some(model) = self.name.read().unwrap().repo.get(name){
             model_vec.push(Model{
                 key: name.to_string(),
                 value: model.to_string()
@@ -85,8 +77,8 @@ impl BackendStorage for MemoryRepos{
 
     fn get_key_identifier_from_hash(&self, hash: &str) -> Result<String, String>{
         let mut key_identifier: Option<String> = None;
-        self.key_identifiers.get_collection()?.keys().for_each(|k|{
-            if let Some(v) = self.key_identifiers.repo.get(k){
+        self.key_identifiers.read().unwrap().repo.keys().for_each(|k|{
+            if let Some(v) = self.key_identifiers.read().unwrap().repo.get(k){
                 if v == hash{
                     key_identifier = Some(k.to_string());
                 }
@@ -101,7 +93,7 @@ impl BackendStorage for MemoryRepos{
     }
 
     fn get_hash_from_key_identifier(&self, key_identifier: &str) -> Result<String, String>{
-        if let Some(h) = self.key_identifiers.get_collection()?.get(key_identifier){
+        if let Some(h) = self.key_identifiers.read().unwrap().repo.get(key_identifier){
             return Ok(h.to_string());
         }
 
@@ -109,7 +101,7 @@ impl BackendStorage for MemoryRepos{
     }
 
     fn get_cert(&self, hash: &str) -> Result<Vec<u8>, String>{
-        if let Some(c) = self.cert.get_collection()?.get(hash){
+        if let Some(c) = self.cert.read().unwrap().repo.get(hash){
             return Ok(c.clone());
         }
 
@@ -117,15 +109,11 @@ impl BackendStorage for MemoryRepos{
     }
 
     fn get_key(&self, hash: &str) -> Result<Vec<u8>, String>{
-        if let Some(k) = self.keys.get_collection()?.get(hash){
+        if let Some(k) = self.keys.read().unwrap().get_collection()?.get(hash){
             return Ok(k.clone());
         }
 
         Err("Key not found".to_string())
-    }
-
-    fn clone_box(&self) -> Box<dyn BackendStorage>{
-        Box::new(self.clone())
     }
 
     fn health(&self) -> Result<(), String> {

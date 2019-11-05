@@ -32,20 +32,13 @@ pub struct Model<T> {
 
 pub trait BackendStorage: Send + Sync{
     fn init(&mut self) -> Result<(), String>;
-    fn store(&mut self, name: &str, cert: &[u8], key: Option<&[u8]>, key_identifier: &str) -> Result<bool, String>;
+    fn store(&self, name: &str, cert: &[u8], key: Option<&[u8]>, key_identifier: &str) -> Result<bool, String>;
     fn find(&self, name: &str) -> Result<Vec<Model<String>>, String>;
     fn get_cert(&self, hash: &str) -> Result<Vec<u8>, String>;
     fn get_key(&self, hash: &str) -> Result<Vec<u8>, String>;
     fn get_key_identifier_from_hash(&self, hash: &str) -> Result<String, String>;
     fn get_hash_from_key_identifier(&self, key_identifier: &str) -> Result<String, String>;
-    fn clone_box(&self) -> Box<dyn BackendStorage>;
     fn health(&self) -> Result<(), String>;
-}
-
-impl Clone for Box<dyn BackendStorage>{
-    fn clone(&self) -> Self{
-        self.clone_box()
-    }
 }
 
 impl From<&ServerConfig> for Backend{

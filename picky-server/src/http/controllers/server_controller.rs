@@ -83,7 +83,6 @@ pub fn health(controller_data: &ControllerData, _req: &SyncRequest, res: &mut Sy
 
 pub fn post_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse){
     res.status(StatusCode::BAD_REQUEST);
-    let repos = &mut controller_data.repos.clone();
 
     let ca = format!("{} Authority", &controller_data.config.realm);
     let certificate;
@@ -177,7 +176,7 @@ pub fn post_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut 
     if name == ca {
         match CoreController::get_subject_name(&der) {
             Ok(common_name) => {
-                if let Err(e) = repos.store(&common_name, &der, None, &ski) {
+                if let Err(e) = controller_data.repos.store(&common_name, &der, None, &ski) {
                     error!("Insertion error for leaf {}: {}", &common_name, e);
                 } else{
                     res.status(StatusCode::OK);
@@ -195,7 +194,6 @@ pub fn post_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut 
 
 pub fn sign_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse){
     res.status(StatusCode::BAD_REQUEST);
-    let repos = &mut controller_data.repos.clone();
 
     let mut ca = format!("{} Authority", &controller_data.config.realm);
     let csr;
@@ -260,15 +258,15 @@ pub fn sign_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut 
     }
 
     //Sign CSR
-    if let Ok(ca) = repos.find(ca.trim_matches('"')) {
+    if let Ok(ca) = controller_data.repos.find(ca.trim_matches('"')) {
         if ca.len() > 0 {
-            if let Ok(ca_cert) = repos.get_cert(&ca[0].value) {
-                if let Ok(ca_key) = repos.get_key(&ca[0].value) {
+            if let Ok(ca_cert) = controller_data.repos.get_cert(&ca[0].value) {
+                if let Ok(ca_key) = controller_data.repos.get_key(&ca[0].value) {
                     if let Some(cert) = CoreController::generate_certificate_from_csr(&ca_cert, &ca_key, controller_data.config.key_config.hash_type, &csr) {
                         // Save certificate in backend if needed
                         if controller_data.config.save_certificate {
                             if let Ok(ski) = CoreController::get_key_identifier(&cert.certificate_der, SUBJECT_KEY_IDENTIFIER) {
-                                if let Err(e) = repos.store(&cert.common_name.clone(), &cert.certificate_der, None, &ski.clone()) {
+                                if let Err(e) = controller_data.repos.store(&cert.common_name.clone(), &cert.certificate_der, None, &ski.clone()) {
                                     error!("Insertion error for leaf {}: {}", cert.common_name.clone(), e);
                                 }
                             }
@@ -345,16 +343,15 @@ pub fn set_content_type_body(req: &SyncRequest, res: &mut SyncResponse, ca_cert:
 
 pub fn cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse){
     res.status(StatusCode::BAD_REQUEST);
-    let repos = &controller_data.repos;
 
     if let Some(multihash) = req.captures().get("multihash"){
-        match repos.get_cert(multihash) {
+        match controller_data.repos.get_cert(multihash) {
             Ok(ca_cert) => {
                 set_content_type_body(req, res , ca_cert);
             },
             Err(e) => {
                 if let Ok(multihash) = sha256_to_multihash(multihash) {
-                    if let Ok(ca_cert) = repos.get_cert(&multihash){
+                    if let Ok(ca_cert) = controller_data.repos.get_cert(&multihash){
                         set_content_type_body(req, res , ca_cert);
                     }
                     else{
