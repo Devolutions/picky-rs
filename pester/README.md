@@ -1,10 +1,10 @@
 Docker is needed and your user need to be in docker group before running the script. 
 
-Start Test:
+Start Test:SavePickyCertificates
 
 *  Start a non admin PowerShell session
 *  Install pester: `Install-Module -Name Pester -Force`
-*  Start test by running: './Picky.Test' with parameter -UseMongo -UseMemory or -UseFile, the default is mongodb
+*  Start test by running: './Picky.Test' with parameter -UseMongo -UseMemory or -UseFile, the default is mongodb, use -SavePickyCertificates to save the certificates on backend. 
 
 Start Test with debug:
 
