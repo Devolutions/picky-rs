@@ -3,7 +3,7 @@ use std::fmt::Error;
 use crate::db::backend::Repo;
 use std::hash::Hash;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MemoryRepo<T>{
     pub repo: HashMap<String, T>
 }

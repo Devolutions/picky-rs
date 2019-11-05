@@ -1,25 +1,21 @@
 use saphir::Server as SaphirServer;
+use saphir::router::Builder;
 use crate::http::middlewares::auth::AuthMiddleware;
-use crate::http::controllers::server_controller::ServerController;
 use crate::configuration::ServerConfig;
-use crate::db::backend::BackendStorage;
 
 pub struct HttpServer {
     pub server: SaphirServer,
 }
 
 impl HttpServer {
-    pub fn new(config: ServerConfig, repos: Box<dyn BackendStorage>) -> Self {
-
+    pub fn new<F>(config: ServerConfig, route_configurator: F) -> Self where F: Fn(Builder) -> Builder {
         let server = SaphirServer::builder()
-            .configure_middlewares(|middle_stack|{
+            .configure_middlewares(|middle_stack| {
                 middle_stack.apply(AuthMiddleware::new(config.clone()), ["/"].to_vec(), Some(vec!["/chain", "/json-chain", "/health", "/authority"]))
-            }).configure_router(|router|{
-            let controller = ServerController::new(repos.clone(), config.clone());
-            router.add(controller)
-        }).configure_listener(|listener_config|{
-            listener_config.set_uri("http://0.0.0.0:12345")
-        }).build();
+            })
+            .configure_router(route_configurator).configure_listener(|listener_config|{
+                listener_config.set_uri("http://0.0.0.0:12345")
+            }).build();
 
         HttpServer {
             server

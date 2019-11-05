@@ -83,7 +83,6 @@ pub fn health(controller_data: &ControllerData, _req: &SyncRequest, res: &mut Sy
 
 pub fn post_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse){
     res.status(StatusCode::BAD_REQUEST);
-    let repos = &mut controller_data.repos.clone();
 
     let ca = format!("{} Authority", &controller_data.config.realm);
     let certificate;
@@ -177,7 +176,7 @@ pub fn post_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut 
     if name == ca {
         match CoreController::get_subject_name(&der) {
             Ok(common_name) => {
-                if let Err(e) = repos.store(&common_name, &der, None, &ski) {
+                if let Err(e) = controller_data.repos.store(&common_name, &der, None, &ski) {
                     error!("Insertion error for leaf {}: {}", &common_name, e);
                 } else{
                     res.status(StatusCode::OK);
@@ -195,7 +194,6 @@ pub fn post_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut 
 
 pub fn sign_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse){
     res.status(StatusCode::BAD_REQUEST);
-    let repos = &mut controller_data.repos.clone();
 
     let mut ca = format!("{} Authority", &controller_data.config.realm);
     let csr;
@@ -260,15 +258,15 @@ pub fn sign_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut 
     }
 
     //Sign CSR
-    if let Ok(ca) = repos.find(ca.trim_matches('"')) {
+    if let Ok(ca) = controller_data.repos.find(ca.trim_matches('"')) {
         if ca.len() > 0 {
-            if let Ok(ca_cert) = repos.get_cert(&ca[0].value) {
-                if let Ok(ca_key) = repos.get_key(&ca[0].value) {
+            if let Ok(ca_cert) = controller_data.repos.get_cert(&ca[0].value) {
+                if let Ok(ca_key) = controller_data.repos.get_key(&ca[0].value) {
                     if let Some(cert) = CoreController::generate_certificate_from_csr(&ca_cert, &ca_key, controller_data.config.key_config.hash_type, &csr) {
                         // Save certificate in backend if needed
                         if controller_data.config.save_certificate {
                             if let Ok(ski) = CoreController::get_key_identifier(&cert.certificate_der, SUBJECT_KEY_IDENTIFIER) {
-                                if let Err(e) = repos.store(&cert.common_name.clone(), &cert.certificate_der, None, &ski.clone()) {
+                                if let Err(e) = controller_data.repos.store(&cert.common_name.clone(), &cert.certificate_der, None, &ski.clone()) {
                                     error!("Insertion error for leaf {}: {}", cert.common_name.clone(), e);
                                 }
                             }
@@ -345,16 +343,15 @@ pub fn set_content_type_body(req: &SyncRequest, res: &mut SyncResponse, ca_cert:
 
 pub fn cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse){
     res.status(StatusCode::BAD_REQUEST);
-    let repos = &controller_data.repos;
 
     if let Some(multihash) = req.captures().get("multihash"){
-        match repos.get_cert(multihash) {
+        match controller_data.repos.get_cert(multihash) {
             Ok(ca_cert) => {
                 set_content_type_body(req, res , ca_cert);
             },
             Err(e) => {
                 if let Ok(multihash) = sha256_to_multihash(multihash) {
-                    if let Ok(ca_cert) = repos.get_cert(&multihash){
+                    if let Ok(ca_cert) = controller_data.repos.get_cert(&multihash){
                         set_content_type_body(req, res , ca_cert);
                     }
                     else{
@@ -543,50 +540,4 @@ fn get_and_store_env_cert_info(cert: &str, key: &str, repos: &mut Box<dyn Backen
         },
         Err(e) => return Err(e)
     };
-}
-
-#[cfg(test)]
-mod tests{
-    use super::*;
-    use crate::utils;
-
-    static PEM: &'static str = "-----BEGIN CERTIFICATE-----
-MIIFHDCCAwSgAwIBAgIAMA0GCSqGSIb3DQEBCwUAMCAxHjAcBgNVBAMMFUNOPW1
-5X2Rlbi5sb2wgUm9vdCBDQTAeFw0xOTA0MjYxOTU3NDFaFw0yNDA0MjQxOTU3ND
-FaMB8xHTAbBgNVBAMMFG15X2Rlbi5sb2wgQXV0aG9yaXR5MIICIjANBgkqhkiG9
-w0BAQEFAAOCAg8AMIICCgKCAgEA1dnnBcD5rQ70DG/hn/iPxBZ/ppwDHeDK4bzZ
-fHASOka+CzP7hc3NW0ppUt8Atj++2hOu1GR6TsJegRILkrJ9dxfOMdjoxpAWcmc
-qM9vtmZOkC2RlaV5b/GtB52aQTyJF227axD0rhF+Vga55+B20XStyUwoLdJ3Tnf
-iil6FWeLQNisM7sCntRe/EbzVpvc2IU+TPjsNomZYJA/Yl6Wl2Qzp4g7eRKg2DP
-ZrRwiYpphuv5r0BCI8K/X1CZP18FJF6+QFDXeo0L3g8E8HIa0r3N7Yr48jd7oYr
-HJHXoXmFbnQYr1x+tsj1vd91cJHXHhDAEFZuzi27PbDg+Otp38Quuiu7MPTmGac
-NQAMIQzxasAf3Qm3mafIU0TRmJ7dXHlsKxjzM2OiYlLXwdIFqk/nXO/1ZSNd45s
-w8Mv0ruG3Br1LPLpdw3DW49DO1T6GPFWHtY1bm5uULG3U7lJe5vzsSJ9uL3jBpT
-RaYvM3+wSC0L1HPmvl1GPSmDjeafu2tSRFqptnZiQc8vuRt+pIOxjuTkxxn40WB
-E+iLGjkXD1VWA6XdhT6M+Tt2Zfgl83gtOmh1o2z4jm4P1QJ4v0NHc81wOZ2ksqF
-cWVDA3J3t1Um2yUfw0VxirI+ytWiAC8lzwfwnVzT8H9WIuAgcpidujxdYhnbf0W
-FCsZOR/Fv81k6opVMCAwEAAaNjMGEwDwYDVR0TBAgwBgEB/wIBADAOBgNVHQ8BA
-f8EBAMCAa4wHQYDVR0OBBYEFJo+UnDnuGNchrYBKXO3gNvgNCf2MB8GA1UdIwQY
-MBaAFPgx7if1NT16dUqpl9iVdLyRNC9pMA0GCSqGSIb3DQEBCwUAA4ICAQA7tlP
-sZhoSiIjJGfpsO+XBWZbnHLIQ8a+Cn0V1oWyOspP4jLOTT7efUQYZWIzuk3IMkb
-eK71U2PDIpTSvUHAUchtNKl8YcBSU6TAPKdrk3TGb1UvglMVi+xkaVYpUYYnN+L
-peeyKrN4TE/qbTiju0RYH9vo6Y68G0kZVVU5ievoqpi3tOaa0BIdTBKEvwSrmm/
-lQTruPAB9rGCI95sAvsmtYJIsPfaQZA3vAxoWlOrwfh3VkMoXB1QSPFt9okXpxZ
-SGE1zpnBjvreuDjSS3HmIxQBYwy4TNQ3duUnDOJAFQvnhLoUzTDprXpmDnXqqLq
-ZYtpU06DYuHVIOuPGIpipUl5182YS1iCSXl2RyfbYTk2+qRYlbUkUmHVgnJMA8a
-uOWhKWtXdi5eJiiSciVAYpBwFXJeSCMYuBQRHaUsXcu55i+jlfDiBVZOZkYgpje
-iOoyJEjTw9KFlPIHMC2qMmPkOlQjGK+CHXMY3kwFZcpz2CgRBSgVvN7Mb+Val38
-Kpskn+WYe7umSp9k0laSvJghxUGYXpVxGwNCiyojsAMUoSJ7xUx5bjfOFOL7SWC
-+juKXytSs4iWqXN9igFBLPd54pj6wdAI5FieHsP6PwaM8Bt20BlJsCa1nj1uR9o
-dK9RO0Wys/X1CAeFnsen7+BVKFvjx0CHZuiNgdTE+BbYBTfgg==
------END CERTIFICATE-----";
-
-    #[test]
-    fn key_id_and_cert_test(){
-        let kid = "9a3e5270e7b8635c86b6012973b780dbe03427f6";
-        let cert = utils::pem_to_der(PEM).unwrap();
-
-        let key_id = CoreController::get_key_identifier(&cert, &[2, 5, 29, 14]).unwrap();
-        assert_eq!(&key_id, kid);
-    }
 }

@@ -1,3 +1,10 @@
+param(
+	[switch] $UseMongo,
+	[switch] $UseMemory,
+	[switch] $UseFile,
+	[switch] $SavePickyCertificates
+)
+
 . "$PSScriptRoot/Private/Base64Url.ps1"
 . "$PSScriptRoot/Private/SHA256.ps1"
 
@@ -7,8 +14,25 @@ Describe 'Picky tests' {
 		$picky_realm = "WaykDen"
 		$picky_authority = "${picky_realm} Authority"
 		$picky_api_key = "secret"
-		$picky_backend = "mongodb"
-		$picky_database_url = "mongodb://picky-mongo:27017"
+
+		if ($UseMemory){
+			$picky_backend = "memory"
+			$picky_database_url = ""
+		}
+		elseif($UseFile){
+			$picky_backend = "file"
+			$picky_database_url = $TestDrive
+		}
+		else{
+			$picky_backend = "mongodb"
+			$picky_database_url = "mongodb://picky-mongo:27017"
+		}
+
+		$network = $(docker network ls -qf "name=picky")
+		if(!($network)){
+			docker network create picky
+		}
+
 		if ($picky_backend -Eq 'mongodb') {
 			& 'docker' 'stop' 'picky-mongo'
 			& 'docker' 'rm' 'picky-mongo'
@@ -18,6 +42,11 @@ Describe 'Picky tests' {
 			Start-Sleep -s 5 # wait for picky-mongo to be ready
 		}
 
+		$SavePickyCertificatesString = 'false'
+		if($SavePickyCertificates){
+			$SavePickyCertificatesString = 'true'
+		}
+
 		& 'docker' 'stop' 'picky-server'
 		& 'docker' 'rm' 'picky-server'
 		& 'docker' 'run' '-p' '12345:12345' '-d' '--network=picky' '--name' 'picky-server' `
@@ -25,6 +54,7 @@ Describe 'Picky tests' {
 			'-e' "PICKY_API_KEY=$picky_api_key" `
 			'-e' "PICKY_BACKEND=$picky_backend" `
 			'-e' "PICKY_DATABASE_URL=$picky_database_url" `
+			'-e' "PICKY_SAVE_CERTIFICATE=$SavePickyCertificatesString" `
 			'devolutions/picky:3.3.0-buster-dev'
 	}
 
@@ -326,9 +356,14 @@ Describe 'Picky tests' {
 			"Authorization" = "Bearer $picky_api_key"
 			"Accept-Encoding" = "binary"
 		}
-
-		$get_cert = Invoke-RestMethod -Uri "$picky_url/cert/$file_hash" -Method 'GET' `
+		if($SavePickyCertificates){
+			Invoke-RestMethod -Uri "$picky_url/cert/$file_hash" -Method 'GET' `
                 -Headers $headers
+		}
+		else{
+			{ Invoke-RestMethod -Uri "$picky_url/cert/$file_hash" -Method 'GET' `
+                -Headers $headers } | Should -Throw
+		}
 	}
 	It 'Get cert in base64 with sha256' {
 		$key_size = 2048
@@ -364,10 +399,14 @@ Describe 'Picky tests' {
 			"Accept-Encoding" = "base64"
 		}
 
-		$get_cert = Invoke-RestMethod -Uri "$picky_url/cert/$file_hash" -Method 'GET' `
+		if($SavePickyCertificates){
+			Invoke-RestMethod -Uri "$picky_url/cert/$file_hash" -Method 'GET' `
                 -Headers $headers
-
-		Write-Host $get_cert
+		}
+		else{
+			{ Invoke-RestMethod -Uri "$picky_url/cert/$file_hash" -Method 'GET' `
+                -Headers $headers } | Should -Throw
+		}
 	}
 	It 'Get cert in pem with sha256' {
 		$key_size = 2048
@@ -402,10 +441,14 @@ Describe 'Picky tests' {
 			"Authorization" = "Bearer $picky_api_key"
 		}
 
-		$get_cert = Invoke-RestMethod -Uri "$picky_url/cert/$file_hash" -Method 'GET' `
+		if($SavePickyCertificates){
+			Invoke-RestMethod -Uri "$picky_url/cert/$file_hash" -Method 'GET' `
                 -Headers $headers
-
-		Write-Host $get_cert
+		}
+		else{
+			{ Invoke-RestMethod -Uri "$picky_url/cert/$file_hash" -Method 'GET' `
+                -Headers $headers } | Should -Throw
+		}
 	}
 	It 'Get default CA chain' {
 		$contents = Invoke-RestMethod -Uri $picky_url/chain/ -Method 'GET' `
@@ -489,9 +532,14 @@ Describe 'Picky tests' {
 				"Authorization" = "Bearer $picky_api_key"
 				"Content-Transfer-Encoding" = "binary"
 			}
-
-			{  Invoke-RestMethod -Uri "$picky_url/cert/$file_hash" -Method 'GET' `
+			if($SavePickyCertificates){
+				Invoke-RestMethod -Uri "$picky_url/cert/$file_hash" -Method 'GET' `
+                -Headers $headers
+			}
+			else{
+				{  Invoke-RestMethod -Uri "$picky_url/cert/$file_hash" -Method 'GET' `
                 -Headers $headers } | Should -Throw
+			}
 
 			$postCert = Invoke-RestMethod -Uri $picky_url/cert/ -Method 'POST' `
                 -ContentType 'application/pkcs10' `

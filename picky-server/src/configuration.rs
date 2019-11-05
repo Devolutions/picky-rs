@@ -203,15 +203,3 @@ impl Default for KeyConfig{
         }
     }
 }
-
-#[cfg(test)]
-mod tests{
-    use super::*;
-
-    #[test]
-    fn get_root_n_intermediate(){
-        let mut conf = ServerConfig::new();
-        conf.load_cli();
-        conf.load_env();
-    }
-}

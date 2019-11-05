@@ -114,7 +114,7 @@ impl BackendStorage for RepositoryCollection {
         self.load_repositories().map_err(|e| e.to_string())
     }
 
-    fn store(&mut self, name: &str, cert: &[u8], key: Option<&[u8]>, key_identifier: &str) -> Result<bool, String> {
+    fn store(&self, name: &str, cert: &[u8], key: Option<&[u8]>, key_identifier: &str) -> Result<bool, String> {
         if let Ok(cert_hash) = utils::multihash_encode(cert){
             let name_item = NameStore::new(name, &cert_hash);
             self.name_store.update_with_options(doc!("key": name.clone()), name_item, true)?;
@@ -192,10 +192,6 @@ impl BackendStorage for RepositoryCollection {
         } else {
             Err("Key identifier not found".to_string())
         }
-    }
-
-    fn clone_box(&self) -> Box<dyn BackendStorage> {
-        Box::new(self.clone())
     }
 
     fn health(&self) -> Result<(), String> {
