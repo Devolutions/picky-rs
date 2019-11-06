@@ -48,16 +48,22 @@ Describe 'Picky tests' {
 			$SavePickyCertificatesString = 'true'
 		}
 
+
+		$currentPath = Get-Location
+		if(!(Test-Path "$currentPath/database/")){
+			& 'mkdir' './database/'
+		}
+
 		& 'docker' 'stop' 'picky-server'
 		& 'docker' 'rm' 'picky-server'
 		& 'docker' 'run' '-p' '12345:12345' '-d' '--network=picky' '--name' 'picky-server' `
-		    '--mount' 'source=pickyvolume,target=/usr/share/picky/' `
+		    '--mount' "source=pickyvolume,target=$currentPath/database/" `
 			'-e' "PICKY_REALM=$picky_realm" `
 			'-e' "PICKY_API_KEY=$picky_api_key" `
 			'-e' "PICKY_BACKEND=$picky_backend" `
 			'-e' "PICKY_DATABASE_URL=$picky_database_url" `
 			'-e' "PICKY_SAVE_CERTIFICATE=$SavePickyCertificatesString" `
-            '-e' "PICKY_BACKEND_FILE_PATH=/usr/share/picky/" `
+            '-e' "RUST_BACKTRACE=1" `
 			'devolutions/picky:3.3.0-buster-dev'
 	}
 

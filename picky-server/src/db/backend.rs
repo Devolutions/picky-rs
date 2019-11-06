@@ -4,7 +4,7 @@ use crate::db::file::file_repos::FileRepos;
 use crate::db::mongodb::mongo_connection::MongoConnection;
 use crate::db::mongodb::model::RepositoryCollection;
 
-pub const DEFAULT_FILEBASE_PATH: &str = "../filebase/";
+pub const DEFAULT_FILEBASE_PATH: &str = "database/";
 
 pub struct Backend {
     pub db: Box<dyn BackendStorage>
@@ -57,7 +57,7 @@ impl From<&ServerConfig> for Backend{
                 if config.save_file_path.eq(""){
                     save_file_path = DEFAULT_FILEBASE_PATH.to_owned();
                 }else{
-                    save_file_path = format!("{}{}",&config.save_file_path, "filebase/");
+                    save_file_path = format!("{}{}",&config.save_file_path, DEFAULT_FILEBASE_PATH);
                 }
 
                 return Backend::new(Box::new(FileRepos::new(save_file_path.as_str()))).expect("Error creating backend for file base");
