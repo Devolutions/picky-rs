@@ -53,7 +53,14 @@ impl From<&ServerConfig> for Backend{
                 return Backend::new(Box::new(MemoryRepos::new())).expect("Bad configuration");
             },
             BackendType::File => {
-                return Backend::new(Box::new(FileRepos::new(DEFAULT_FILEBASE_PATH))).expect("Error creating backend for file base");
+                let save_file_path;
+                if config.save_file_path.eq(""){
+                    save_file_path = DEFAULT_FILEBASE_PATH.to_owned();
+                }else{
+                    save_file_path = format!("{}{}",&config.save_file_path, "filebase/");
+                }
+
+                return Backend::new(Box::new(FileRepos::new(save_file_path.as_str()))).expect("Error creating backend for file base");
             },
             _ => panic!("not yet implemented")
         }

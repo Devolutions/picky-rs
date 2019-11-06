@@ -2,7 +2,8 @@ param(
 	[switch] $UseMongo,
 	[switch] $UseMemory,
 	[switch] $UseFile,
-	[switch] $SavePickyCertificates
+	[switch] $SavePickyCertificates,
+	[switch] $Silent
 )
 
 . "$PSScriptRoot/Private/Base64Url.ps1"
@@ -50,11 +51,13 @@ Describe 'Picky tests' {
 		& 'docker' 'stop' 'picky-server'
 		& 'docker' 'rm' 'picky-server'
 		& 'docker' 'run' '-p' '12345:12345' '-d' '--network=picky' '--name' 'picky-server' `
+		    '--mount' 'source=pickyvolume,target=/usr/share/picky/' `
 			'-e' "PICKY_REALM=$picky_realm" `
 			'-e' "PICKY_API_KEY=$picky_api_key" `
 			'-e' "PICKY_BACKEND=$picky_backend" `
 			'-e' "PICKY_DATABASE_URL=$picky_database_url" `
 			'-e' "PICKY_SAVE_CERTIFICATE=$SavePickyCertificatesString" `
+            '-e' "PICKY_BACKEND_FILE_PATH=/usr/share/picky/" `
 			'devolutions/picky:3.3.0-buster-dev'
 	}
 
@@ -132,7 +135,9 @@ Describe 'Picky tests' {
 		$sb.AppendLine("-----END CERTIFICATE REQUEST-----")
 		$csr_pem = $sb.ToString()
 
-		Write-Host $csr_pem
+		if(!($Silent)){
+			Write-Host $csr_pem
+		}
 
 		Set-Content -Value $csr_pem -Path "$TestDrive/test.csr"
 		$csr = Get-Content "$TestDrive/test.csr" | Out-String
@@ -153,8 +158,9 @@ Describe 'Picky tests' {
 
 		Set-Content -Value $cert -Path "$TestDrive/test.crt"
 		$leaf_cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2("$TestDrive/test.crt")
-
-		Write-Host $leaf_cert
+		if(!($Silent))		{
+			Write-Host $leaf_cert
+		}
 		$leaf_cert.Subject | Should -Be "CN=test.${picky_realm}"
 		$leaf_cert.Issuer | Should -Be "CN=${picky_realm} Authority"
 	}
@@ -188,7 +194,9 @@ Describe 'Picky tests' {
 		$sb.AppendLine("-----END CERTIFICATE REQUEST-----")
 		$csr_pem = $sb.ToString()
 
-		Write-Host $csr_pem
+		if(!($Silent)){
+			Write-Host $csr_pem
+		}
 
 		Set-Content -Value $csr_pem -Path "$TestDrive/test.csr"
 		$csr = Get-Content "$TestDrive/test.csr" | Out-String
@@ -199,10 +207,6 @@ Describe 'Picky tests' {
 			"Content-Disposition" = "attachment"
 		}
 
-		Write-Host $body
-
-		Write-Host $payload
-
 		$cert = Invoke-RestMethod -Uri $picky_url/signcert/ -Method 'POST' `
                 -ContentType 'application/pkcs10' `
                 -Headers $headers `
@@ -211,7 +215,10 @@ Describe 'Picky tests' {
 		Set-Content -Value $cert -Path "$TestDrive/test.crt"
 		$leaf_cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2("$TestDrive/test.crt")
 
-		Write-Host $leaf_cert
+		if(!($Silent)){
+			Write-Host $leaf_cert
+		}
+
 		$leaf_cert.Subject | Should -Be "CN=test.${picky_realm}"
 		$leaf_cert.Issuer | Should -Be "CN=${picky_realm} Authority"
 	}
@@ -245,7 +252,9 @@ Describe 'Picky tests' {
 		$sb.AppendLine("-----END CERTIFICATE REQUEST-----")
 		$csr_pem = $sb.ToString()
 
-		Write-Host $csr_pem
+		if(!($Silent)){
+			Write-Host $csr_pem
+		}
 
 		Set-Content -Value $csr_pem -Path "$TestDrive/test.csr"
 		$csr = Get-Content "$TestDrive/test.csr" | Out-String
@@ -265,8 +274,10 @@ Describe 'Picky tests' {
 
 		Set-Content -Value $cert -Path "$TestDrive/test.crt"
 		$leaf_cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2("$TestDrive/test.crt")
+		if(!($Silent)){
+			Write-Host $leaf_cert
+		}
 
-		Write-Host $leaf_cert
 		$leaf_cert.Subject | Should -Be "CN=test.${picky_realm}"
 		$leaf_cert.Issuer | Should -Be "CN=${picky_realm} Authority"
 	}
@@ -316,7 +327,9 @@ Describe 'Picky tests' {
 			-Body $csr
 		}
 		catch{
-			Write-Host $_
+			if(!($Silent)){
+				Write-Host $_
+			}
 			return;
 		}
 
