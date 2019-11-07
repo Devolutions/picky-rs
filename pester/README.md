@@ -1,20 +1,27 @@
 Docker is needed and your user need to be in docker group before running the script. 
 
-Start Test:
-
+Before start a case for the first time, you need to:
+* Install Powershell Core 
+`https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell?view=powershell-6`
 *  Start a non admin PowerShell session
 *  Install pester: `Install-Module -Name Pester -Force`
-*  Start test by running: './Picky.Tests.ps1' with parameter:
- -UseMongo  -UseMemory or -UseFile the default is mongodb,
- -SavePickyCertificates to save the certificates on backend.
- -Silent to hide all the Write-Host
 
- To start all test in one time use './Picky.AllCase.Tests.ps1'
+Start Test with docker:
 
-Start Test with debug:
+*  Start test by running: `./Picky.Tests.ps1` with parameters:
+ `-UseMongo`  `-UseMemory` or `-UseFile` the default is mongodb,
+ `-SavePickyCertificates` to save the certificates on backend.
+ `-Silent` to hide all the Write-Host
 
-*  Install pester: `Install-Module -Name Pester -Force`
-*  1 Start Mongo manually: 'docker run -p 27017:27017 -d --name picky-mongo library/mongo:4.1-bionic'
-*  2 Set the environement variable of the build if they are not set : PICKY_REALM=WaykDen;PICKY_API_KEY=secret;PICKY_SAVE_CERTIFICATE=true
-*  3 Run Picky Server with Clion
-*  4 Run Pester './PickyDebug.Tests.ps1'
+Start Test in debug:
+*  Run Pester `./Picky.Tests.ps1` `-Debug`, with the same parameters
+
+Start All Test with Docker
+*  Run Pester `./Picky.AllCase.ps1`
+ 
+ Start All Test in Debug
+*  Install Rust `https://www.rust-lang.org/tools/install`
+*  Run Pester `./Picky.AllCase.ps1` `-Debug`
+ 
+
+

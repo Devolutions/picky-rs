@@ -3,26 +3,30 @@ param(
 	[switch] $UseMemory,
 	[switch] $UseFile,
 	[switch] $SavePickyCertificates,
-	[switch] $Silent
+	[switch] $Silent,
+	[switch] $Debug
 )
 
 . "$PSScriptRoot/Private/Base64Url.ps1"
 . "$PSScriptRoot/Private/SHA256.ps1"
 
+$picky_url = "http://127.0.0.1:12345"
+$picky_realm = "WaykDen"
+$picky_authority = "${picky_realm} Authority"
+$picky_api_key = "secret"
+
 Describe 'Picky tests' {
 	BeforeAll {
-		$picky_url = "http://127.0.0.1:12345"
 		$picky_realm = "WaykDen"
-		$picky_authority = "${picky_realm} Authority"
 		$picky_api_key = "secret"
 
 		if ($UseMemory){
 			$picky_backend = "memory"
-			$picky_database_url = ""
+			$picky_database_url = "memory"
 		}
 		elseif($UseFile){
 			$picky_backend = "file"
-			$picky_database_url = $TestDrive
+			$picky_database_url = "file"
 		}
 		else{
 			$picky_backend = "mongodb"
@@ -35,12 +39,19 @@ Describe 'Picky tests' {
 		}
 
 		if ($picky_backend -Eq 'mongodb') {
-			& 'docker' 'stop' 'picky-mongo'
-			& 'docker' 'rm' 'picky-mongo'
-		    & 'docker' 'run' '-d' '--network=picky' '--name' 'picky-mongo' `
+			if($Silent){
+				[void](& 'docker' 'stop' 'picky-mongo')
+				[void](& 'docker' 'rm' 'picky-mongo')
+				[void](& 'docker' 'run' '-d' '-p' '27017:27017' '--network=picky' '--name' 'picky-mongo' `
+		    'library/mongo:4.1-bionic')
+			}else{
+				& 'docker' 'stop' 'picky-mongo'
+				& 'docker' 'rm' 'picky-mongo'
+				& 'docker' 'run' '-d' '-p' '27017:27017' '--network=picky' '--name' 'picky-mongo' `
 		    'library/mongo:4.1-bionic'
+			}
 
-			Start-Sleep -s 5 # wait for picky-mongo to be ready
+			Start-Sleep -s 2 # wait for picky-mongo to be ready
 		}
 
 		$SavePickyCertificatesString = 'false'
@@ -48,15 +59,28 @@ Describe 'Picky tests' {
 			$SavePickyCertificatesString = 'true'
 		}
 
-
 		$currentPath = Get-Location
 		if(!(Test-Path "$currentPath/database/")){
 			& 'mkdir' './database/'
 		}
 
-		& 'docker' 'stop' 'picky-server'
-		& 'docker' 'rm' 'picky-server'
-		& 'docker' 'run' '-p' '12345:12345' '-d' '--network=picky' '--name' 'picky-server' `
+		if($Debug){
+			$location = Get-Location
+			$location = "$location/../Cargo.toml"
+			$location = Resolve-Path $location
+
+			Write-Host "Build Picky Server ..."
+			& 'cargo' 'build' '--manifest-path' '../Cargo.toml'
+			if($Silent){
+				Start-Process pwsh -Args "-File ./Private/RunPicky.ps1 $picky_realm $picky_api_key $picky_backend $SavePickyCertificatesString $location -Silent"
+			}else{
+				Start-Process pwsh -Args "-File ./Private/RunPicky.ps1 $picky_realm $picky_api_key $picky_backend $SavePickyCertificatesString $location"
+			}
+		}
+		else{
+			& 'docker' 'stop' 'picky-server'
+			& 'docker' 'rm' 'picky-server'
+			& 'docker' 'run' '-p' '12345:12345' '-d' '--network=picky' '--name' 'picky-server' `
 		    '--mount' "source=pickyvolume,target=$currentPath/database/" `
 			'-e' "PICKY_REALM=$picky_realm" `
 			'-e' "PICKY_API_KEY=$picky_api_key" `
@@ -65,6 +89,7 @@ Describe 'Picky tests' {
 			'-e' "PICKY_SAVE_CERTIFICATE=$SavePickyCertificatesString" `
             '-e' "RUST_BACKTRACE=1" `
 			'devolutions/picky:3.3.0-buster-dev'
+		}
 	}
 
 	It 'checks health' {
@@ -643,9 +668,27 @@ Describe 'Picky tests' {
 		}
 	}
 	AfterAll{
-		& 'docker' 'stop' 'picky-mongo'
-		& 'docker' 'rm' 'picky-mongo'
-		& 'docker' 'stop' 'picky-server'
-		& 'docker' 'rm' 'picky-server'
+		if($Silent)
+		{
+			[void](& 'docker' 'stop' 'picky-mongo')
+			[void](& 'docker' 'rm' 'picky-mongo')
+			if($Debug){
+				[void](Stop-Process -Name 'picky-server')
+			}else{
+				[void](& 'docker' 'stop' 'picky-server')
+				[void](& 'docker' 'rm' 'picky-server')
+			}
+		}else{
+			& 'docker' 'stop' 'picky-mongo'
+			& 'docker' 'rm' 'picky-mongo'
+
+			if($Debug){
+				Stop-Process -Name 'picky-server'
+			}else{
+				& 'docker' 'stop' 'picky-server'
+				& 'docker' 'rm' 'picky-server'
+			}
+		}
+
 	}
 }
