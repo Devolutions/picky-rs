@@ -11,6 +11,10 @@ pub struct AlgorithmIdentifier {
 }
 
 impl AlgorithmIdentifier {
+    pub fn is_a(&self, algorithm: ObjectIdentifier) -> bool {
+        algorithm.eq(&self.algorithm.0)
+    }
+
     pub fn new_sha1_with_rsa_encryption() -> Self {
         Self {
             algorithm: oids::sha1_with_rsa_encryption().into(),
@@ -18,9 +22,30 @@ impl AlgorithmIdentifier {
         }
     }
 
+    pub fn new_sha224_with_rsa_encryption() -> Self {
+        Self {
+            algorithm: oids::sha224_with_rsa_encryption().into(),
+            parameters: AlgorithmIdentifierParameters::Null,
+        }
+    }
+
     pub fn new_sha256_with_rsa_encryption() -> Self {
         Self {
             algorithm: oids::sha256_with_rsa_encryption().into(),
+            parameters: AlgorithmIdentifierParameters::Null,
+        }
+    }
+
+    pub fn new_sha384_with_rsa_encryption() -> Self {
+        Self {
+            algorithm: oids::sha384_with_rsa_encryption().into(),
+            parameters: AlgorithmIdentifierParameters::Null,
+        }
+    }
+
+    pub fn new_sha512_with_rsa_encryption() -> Self {
+        Self {
+            algorithm: oids::sha512_with_rsa_encryption().into(),
             parameters: AlgorithmIdentifierParameters::Null,
         }
     }
@@ -99,9 +124,10 @@ impl<'de> de::Deserialize<'de> for AlgorithmIdentifier {
                 let oid: ObjectIdentifierAsn1 = seq.next_element()?.unwrap();
 
                 let args = match Into::<String>::into(&oid.0).as_str() {
-                    oids::SHA256_WITH_RSA_ENCRYPTION
-                    | oids::RSA_ENCRYPTION
+                    oids::RSA_ENCRYPTION
                     | oids::SHA1_WITH_RSA_ENCRYPTION
+                    | oids::SHA224_WITH_RSA_ENCRYPTION
+                    | oids::SHA256_WITH_RSA_ENCRYPTION
                     | oids::SHA384_WITH_RSA_ENCRYPTION
                     | oids::SHA512_WITH_RSA_ENCRYPTION => {
                         seq.next_element::<()>()?.unwrap();
@@ -113,8 +139,7 @@ impl<'de> de::Deserialize<'de> for AlgorithmIdentifier {
                     oids::EC_PUBLIC_KEY => AlgorithmIdentifierParameters::EC(
                         seq.next_element::<ECParameters>()?.unwrap(),
                     ),
-                    oid => {
-                        println!("{}", oid);
+                    _ => {
                         return Err(de::Error::invalid_value(
                             de::Unexpected::Other(
                                 "[AlgorithmIdentifier] unsupported algorithm (unknown oid)",

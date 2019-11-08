@@ -1,6 +1,6 @@
 use crate::{
     oids,
-    serde::{AlgorithmIdentifier, ECParameters},
+    serde::{algorithm_identifier::ECParameters, AlgorithmIdentifier},
 };
 use serde::{de, ser};
 use serde_asn1_der::asn1_wrapper::{BitStringAsn1, BitStringAsn1Container, IntegerAsn1};

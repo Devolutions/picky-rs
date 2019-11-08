@@ -1,29 +1,21 @@
 use base64::DecodeError;
+use err_derive::Error;
 use serde::export::Formatter;
-use std::{error::Error, fmt, str::FromStr};
+use std::{fmt, str::FromStr};
 
 const PEM_HEADER_START: &str = "-----BEGIN";
 const PEM_HEADER_END: &str = "-----END";
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Error)]
 pub enum PemError {
+    #[error(display = "pem header not found")]
     HeaderNotFound,
+    #[error(display = "invalid pem header")]
     InvalidHeader,
+    #[error(display = "pem footer not found")]
     FooterNotFound,
+    #[error(display = "couldn't decode base64: {}", _0)]
     Base64Decoding(DecodeError),
-}
-
-impl Error for PemError {}
-
-impl fmt::Display for PemError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            PemError::HeaderNotFound => write!(f, "pem header not found"),
-            PemError::InvalidHeader => write!(f, "invalid pem header"),
-            PemError::FooterNotFound => write!(f, "pem footer not found"),
-            PemError::Base64Decoding(err) => write!(f, "couldn't decode base64: {}", err),
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -116,13 +108,13 @@ mod tests {
     use super::*;
     use crate::{
         oids,
-        serde::{AttributeTypeAndValueParameters, Certificate, Version},
+        serde::{name::NamePrettyFormatter, Certificate, Version},
     };
     use num_bigint_dig::BigInt;
     use serde_asn1_der::date::UTCTime;
 
-    static PEM_BYTES: &[u8] = include_bytes!("../test_files/intermediate_ca.crt");
-    static PEM_STR: &str = include_str!("../test_files/intermediate_ca.crt");
+    const PEM_BYTES: &[u8] = crate::test_files::INTERMEDIATE_CA.as_bytes();
+    const PEM_STR: &str = crate::test_files::INTERMEDIATE_CA;
 
     #[test]
     fn read_pem() {
@@ -160,19 +152,9 @@ mod tests {
             UTCTime::new(2021, 2, 12, 14, 44, 6).unwrap().into()
         );
 
-        for name in cert.tbs_certificate.issuer.0 {
-            match &name.0[0].value {
-                AttributeTypeAndValueParameters::CommonName(name) => {
-                    assert_eq!(name.to_utf8_lossy(), "PolarSSL Test CA");
-                }
-                AttributeTypeAndValueParameters::CountryName(name) => {
-                    assert_eq!(name.to_utf8_lossy(), "NL");
-                }
-                AttributeTypeAndValueParameters::OrganisationName(name) => {
-                    assert_eq!(name.to_utf8_lossy(), "PolarSSL");
-                }
-                _ => panic!("unexpected branch"),
-            }
-        }
+        assert_eq!(
+            NamePrettyFormatter(&cert.tbs_certificate.issuer).to_string(),
+            "C=NL,O=PolarSSL,CN=PolarSSL Test CA"
+        );
     }
 }

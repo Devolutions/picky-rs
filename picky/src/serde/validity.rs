@@ -1,12 +1,12 @@
 use serde::{de, ser};
 use serde_asn1_der::{
-    asn1_wrapper::{GeneralizedTimeAsn1, UTCTimeAsn1},
+    asn1_wrapper::{Asn1Wrapper, GeneralizedTimeAsn1, UTCTimeAsn1},
     date::{GeneralizedTime, UTCTime},
     tag_peeker::TagPeeker,
 };
 use std::fmt;
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Validity {
     pub not_before: Time,
     pub not_after: Time,

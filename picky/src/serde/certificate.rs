@@ -1,30 +1,35 @@
 use crate::{
     oids,
     serde::{
-        AlgorithmIdentifier, AttributeTypeAndValue, AttributeTypeAndValueParameters,
-        AuthorityKeyIdentifier, ExtensionValue, Extensions, SubjectPublicKeyInfo, Validity,
-        Version,
+        extension::{AuthorityKeyIdentifier, BasicConstraints, ExtensionValue},
+        AlgorithmIdentifier, Extensions, Name, SubjectPublicKeyInfo, Validity, Version,
     },
 };
-use serde::{
-    de,
-    export::{fmt::Error, Formatter},
-};
+use err_ctx::ResultExt;
+use serde::de;
 use serde_asn1_der::asn1_wrapper::{
-    ApplicationTag0, ApplicationTag3, Asn1SequenceOf, Asn1SetOf, BitStringAsn1, IntegerAsn1,
+    ApplicationTag0, ApplicationTag3, BitStringAsn1, Implicit, IntegerAsn1,
     OctetStringAsn1Container,
 };
 use std::{convert::TryFrom, fmt};
 
-pub type RelativeDistinguishedName = Asn1SetOf<AttributeTypeAndValue>;
-pub type GeneralNames = Asn1SequenceOf<RelativeDistinguishedName>;
-pub type Name = GeneralNames;
-
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Certificate {
     pub tbs_certificate: TBSCertificate,
     pub signature_algorithm: AlgorithmIdentifier,
     pub signature_value: BitStringAsn1,
+}
+
+macro_rules! find_ext {
+    ($oid:expr, $self:ident, $error_ctx:literal) => {{
+        let key_identifier_oid = $oid;
+        ($self.tbs_certificate.extensions.0)
+            .0
+            .iter()
+            .find(|ext| ext.extn_id == key_identifier_oid)
+            .ok_or(crate::error::Error::ExtensionNotFound)
+            .ctx($error_ctx)
+    }};
 }
 
 impl Certificate {
@@ -36,46 +41,48 @@ impl Certificate {
         serde_asn1_der::to_vec(self)
     }
 
-    pub fn get_subject_key_identifier(&self) -> Result<String, String> {
-        let key_identifier_oid = oids::subject_key_identifier();
-        let ext = (self.tbs_certificate.extensions.0)
-            .0
-            .iter()
-            .find(|ext| ext.extn_id == key_identifier_oid)
-            .ok_or_else(|| "subject key identifier extension not found".to_owned())?;
-
+    pub fn subject_key_identifier(&self) -> crate::error::Result<&[u8]> {
+        let ext = find_ext!(
+            oids::subject_key_identifier(),
+            self,
+            "couldn't fetch subject key identifier"
+        )?;
         match &ext.extn_value {
-            ExtensionValue::SubjectKeyIdentifier(ski) => Ok(hex::encode(&(ski.0).0)),
+            ExtensionValue::SubjectKeyIdentifier(ski) => Ok(&(ski.0).0),
             _ => unreachable!("invalid extension (expected subject key identifier)"),
         }
     }
 
-    pub fn get_authority_key_identifier(&self) -> Result<String, String> {
-        let key_identifier_oid = oids::authority_key_identifier();
-        let ext = (self.tbs_certificate.extensions.0)
-            .0
-            .iter()
-            .find(|ext| ext.extn_id == key_identifier_oid)
-            .ok_or_else(|| "authority key identifier extension not found".to_owned())?;
-
+    pub fn authority_key_identifier(&self) -> crate::error::Result<&[u8]> {
+        let ext = find_ext!(
+            oids::authority_key_identifier(),
+            self,
+            "couldn't fetch authority key identifier"
+        )?;
         match &ext.extn_value {
             ExtensionValue::AuthorityKeyIdentifier(OctetStringAsn1Container(
                 AuthorityKeyIdentifier {
                     key_identifier: Some(key_identifier),
-                    authority_cert_issuer: _,
-                    authority_cert_serial_number: _,
+                    ..
                 },
-            )) => Ok(hex::encode(&(key_identifier.0).0)),
+            )) => Ok(&(key_identifier.0).0),
             _ => unreachable!("invalid extension (expected authority key identifier)"),
         }
     }
 
-    pub fn get_subject_name(&self) -> String {
-        NamePrettyFormatter(&self.tbs_certificate.subject).to_string()
-    }
-
-    pub fn get_issuer_name(&self) -> String {
-        NamePrettyFormatter(&self.tbs_certificate.issuer).to_string()
+    pub fn basic_constraints(&self) -> crate::error::Result<(Option<bool>, Option<u8>)> {
+        let ext = find_ext!(
+            oids::basic_constraints(),
+            self,
+            "couldn't fetch basic constraints"
+        )?;
+        match &ext.extn_value {
+            ExtensionValue::BasicConstraints(OctetStringAsn1Container(BasicConstraints {
+                ca: Implicit(ca),
+                path_len_constraint: Implicit(len),
+            })) => Ok((*ca, *len)),
+            _ => unreachable!("invalid extension (expected basic constraints)"),
+        }
     }
 }
 
@@ -87,7 +94,7 @@ impl TryFrom<&[u8]> for Certificate {
     }
 }
 
-#[derive(Serialize, Debug, PartialEq)]
+#[derive(Serialize, Clone, Debug, PartialEq)]
 pub struct TBSCertificate {
     pub version: ApplicationTag0<Version>,
     pub serial_number: IntegerAsn1,
@@ -144,58 +151,19 @@ impl<'de> de::Deserialize<'de> for TBSCertificate {
     }
 }
 
-pub struct NamePrettyFormatter<'a>(pub &'a Name);
-impl fmt::Display for NamePrettyFormatter<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        let mut first = true;
-        for name in &(self.0).0 {
-            if first {
-                first = false;
-            } else {
-                write!(f, " ")?;
-            }
-
-            match &name.0[0].value {
-                AttributeTypeAndValueParameters::CommonName(name) => {
-                    write!(f, "{}", name)?;
-                }
-                AttributeTypeAndValueParameters::SerialNumber(name) => {
-                    write!(f, "{}", name)?;
-                }
-                AttributeTypeAndValueParameters::CountryName(name) => {
-                    write!(f, "{}", name)?;
-                }
-                AttributeTypeAndValueParameters::LocalityName(name) => {
-                    write!(f, "{}", name)?;
-                }
-                AttributeTypeAndValueParameters::StateOrProvinceName(name) => {
-                    write!(f, "{}", name)?;
-                }
-                AttributeTypeAndValueParameters::OrganisationName(name) => {
-                    write!(f, "{}", name)?;
-                }
-                AttributeTypeAndValueParameters::OrganisationalUnitName(name) => {
-                    write!(f, "{}", name)?;
-                }
-            }
-        }
-        Ok(())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{
-        oids,
-        serde::{AttributeTypeAndValue, Extension, ExtensionValue, KeyIdentifier, KeyUsage},
+        pem::parse_pem,
+        serde::{
+            extension::{KeyIdentifier, KeyUsage},
+            name::new_common_name,
+            Extension,
+        },
     };
     use num_bigint_dig::{BigInt, Sign};
-    use serde_asn1_der::{
-        asn1_wrapper::{Asn1SequenceOf, Asn1SetOf},
-        bit_string::BitString,
-        date::UTCTime,
-    };
+    use serde_asn1_der::{bit_string::BitString, date::UTCTime};
 
     #[test]
     fn x509_v3_certificate() {
@@ -227,9 +195,7 @@ mod tests {
 
         // Issuer
 
-        let issuer: Name = Asn1SequenceOf(vec![Asn1SetOf(vec![
-            AttributeTypeAndValue::new_common_name("contoso.local Authority"),
-        ])]);
+        let issuer: Name = new_common_name("contoso.local Authority");
         check_serde!(issuer: Name in encoded[34..70]);
 
         // Validity
@@ -242,9 +208,7 @@ mod tests {
 
         // Subject
 
-        let subject: Name = Asn1SequenceOf(vec![Asn1SetOf(vec![
-            AttributeTypeAndValue::new_common_name("test.contoso.local"),
-        ])]);
+        let subject: Name = new_common_name("test.contoso.local");
         check_serde!(subject: Name in encoded[102..133]);
 
         // SubjectPublicKeyInfo
@@ -262,11 +226,7 @@ mod tests {
         key_usage.set_key_encipherment(true);
 
         let extensions = Extensions(vec![
-            Extension {
-                extn_id: oids::basic_constraints().into(),
-                critical: false.into(),
-                extn_value: ExtensionValue::Generic(encoded[440..442].to_vec().into()),
-            },
+            Extension::new_basic_constraints(false, None, None),
             Extension::new_key_usage(key_usage),
             Extension::new_subject_key_identifier(&encoded[469..489]),
             Extension::new_authority_key_identifier(
@@ -304,5 +264,21 @@ mod tests {
             signature_value: BitString::with_bytes(&encoded[542..1054]).into(),
         };
         check_serde!(certificate: Certificate in encoded);
+    }
+
+    static PEM: &'static [u8] = include_bytes!("../../test_files/intermediate_ca.crt");
+
+    #[test]
+    fn key_id() {
+        let intermediate_cert_pem = parse_pem(PEM).unwrap();
+        let cert = Certificate::from_der(&intermediate_cert_pem.data).unwrap();
+        pretty_assertions::assert_eq!(
+            hex::encode(&cert.subject_key_identifier().unwrap()),
+            "1f74d63f29c17474453b05122c3da8bd435902a6"
+        );
+        pretty_assertions::assert_eq!(
+            hex::encode(&cert.authority_key_identifier().unwrap()),
+            "b45ae4a5b3ded252f6b9d5a6950feb3ebcc7fdff"
+        );
     }
 }

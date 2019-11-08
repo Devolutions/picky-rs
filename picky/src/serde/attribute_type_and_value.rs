@@ -2,6 +2,7 @@ use crate::oids;
 use serde::{de, export::Formatter, ser};
 use serde_asn1_der::{
     asn1_wrapper::{ObjectIdentifierAsn1, PrintableStringAsn1},
+    restricted_string::PrintableString,
     tag::Tag,
     tag_peeker::TagPeeker,
 };
@@ -235,6 +236,12 @@ impl From<&str> for DirectoryString {
 impl From<String> for DirectoryString {
     fn from(string: String) -> Self {
         Self::Utf8String(string)
+    }
+}
+
+impl From<PrintableString> for DirectoryString {
+    fn from(string: PrintableString) -> Self {
+        Self::PrintableString(string.into())
     }
 }
 

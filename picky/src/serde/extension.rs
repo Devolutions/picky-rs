@@ -1,4 +1,4 @@
-use crate::{oids, serde::GeneralNames};
+use crate::{oids, serde::name::GeneralNames};
 use serde::{de, ser};
 use serde_asn1_der::{
     asn1_wrapper::{
@@ -10,7 +10,7 @@ use serde_asn1_der::{
 use std::fmt;
 
 /// https://tools.ietf.org/html/rfc5280#section-4.1.2.9
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Extensions(pub Vec<Extension>);
 
 #[derive(Debug, PartialEq, Clone)]
@@ -68,6 +68,25 @@ impl Extension {
             ),
         }
     }
+
+    pub fn new_basic_constraints<CA: Into<Option<bool>>, PLC: Into<Option<u8>>>(
+        is_critical: bool,
+        ca: CA,
+        path_len_constraints: PLC,
+    ) -> Self {
+        Self {
+            extn_id: oids::basic_constraints().into(),
+            // FIXME: check details here: https://tools.ietf.org/html/rfc5280#section-4.2.1.9
+            critical: Implicit(is_critical),
+            extn_value: ExtensionValue::BasicConstraints(
+                BasicConstraints {
+                    ca: Implicit(ca.into()),
+                    path_len_constraint: Implicit(path_len_constraints.into()),
+                }
+                .into(),
+            ),
+        }
+    }
 }
 
 impl ser::Serialize for Extension {
@@ -120,6 +139,9 @@ impl<'de> de::Deserialize<'de> for Extension {
                     oids::AUTHORITY_KEY_IDENTIFIER => {
                         ExtensionValue::AuthorityKeyIdentifier(seq.next_element()?.unwrap())
                     }
+                    oids::BASIC_CONSTRAINTS => {
+                        ExtensionValue::BasicConstraints(seq.next_element()?.unwrap())
+                    }
                     _ => ExtensionValue::Generic(seq.next_element()?.unwrap()),
                 };
 
@@ -142,16 +164,16 @@ pub enum ExtensionValue {
     KeyUsage(OctetStringAsn1Container<KeyUsage>),
     //CertificatePolicies(OctetStringAsn1Container<Asn1SequenceOf<PolicyInformation>>),
     //PolicyMappings(OctetStringAsn1Container<Asn1SequenceOfPolicyMapping>>),
-    //SubjectAlternativeName(OctetStringAsn1Container<SubjectAltName>),
+    //SubjectAlternativeName(OctetStringAsn1Container<SubjectAltName>), TODO: prefer this extension
     //IssuerAlternativeName(OctetStringAsn1Container<IssuerAltName>),
     //SubjectDirectoryAttributes(OctetStringAsn1Container<Asn1SequenceOf<Attribute>>),
-    //BasicConstraints(…)
-    //NameConstraints(…)
-    //PolicyConstraints(…)
-    //ExtendedKeyUsage(…)
-    //CRLDistributionPoints(…)
-    //InhibitAnyPolicy(…)
-    //FreshestCRL(…)
+    BasicConstraints(OctetStringAsn1Container<BasicConstraints>),
+    //NameConstraints(…),
+    //PolicyConstraints(…),
+    //ExtendedKeyUsage(…),
+    //CRLDistributionPoints(…),
+    //InhibitAnyPolicy(…),
+    //FreshestCRL(…),
     Generic(OctetStringAsn1),
 }
 
@@ -167,6 +189,9 @@ impl ser::Serialize for ExtensionValue {
             ExtensionValue::AuthorityKeyIdentifier(aki) => aki.serialize(serializer),
             ExtensionValue::SubjectKeyIdentifier(ski) => ski.serialize(serializer),
             ExtensionValue::KeyUsage(key_usage) => key_usage.serialize(serializer),
+            ExtensionValue::BasicConstraints(basic_constraints) => {
+                basic_constraints.serialize(serializer)
+            }
             ExtensionValue::Generic(octet_string) => octet_string.serialize(serializer),
         }
     }
@@ -265,6 +290,44 @@ impl KeyUsage {
         crl_sign, set_crl_sign, 6;
         encipher_only, set_encipher_only, 7;
         decipher_only, set_decipher_only, 8;
+    }
+}
+
+// https://tools.ietf.org/html/rfc5280#section-4.2.1.9
+#[derive(Serialize, Debug, PartialEq, Clone)]
+pub struct BasicConstraints {
+    pub ca: Implicit<Option<bool>>, // default is false
+    pub path_len_constraint: Implicit<Option<u8>>,
+}
+
+impl<'de> de::Deserialize<'de> for BasicConstraints {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = BasicConstraints;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a valid DER-encoded basic constraints extension")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                Ok(BasicConstraints {
+                    ca: Implicit(seq.next_element().unwrap_or(Some(None)).unwrap_or(None)),
+                    path_len_constraint: Implicit(
+                        seq.next_element().unwrap_or(Some(None)).unwrap_or(None),
+                    ),
+                })
+            }
+        }
+
+        deserializer.deserialize_seq(Visitor)
     }
 }
 
