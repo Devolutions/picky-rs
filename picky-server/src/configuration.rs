@@ -1,21 +1,20 @@
 use log::LevelFilter;
-use mbedtls::hash::Type as HashType;
-use mbedtls::pk::Type as KeyType;
 use std::env;
 use clap::App;
+use picky::models::signature::SignatureHashType;
 
-const DEFAULT_PICKY_REALM: &'static str = "Picky";
+const DEFAULT_PICKY_REALM: &str = "Picky";
 
-const PICKY_REALM_ENV: &'static str = "PICKY_REALM";
-const PICKY_DATABASE_URL_ENV: &'static str = "PICKY_DATABASE_URL";
-const PICKY_API_KEY_ENV: &'static str = "PICKY_API_KEY";
-const PICKY_BACKEND_ENV: &'static str = "PICKY_BACKEND";
-const PICKY_ROOT_CERT_ENV: &'static str = "PICKY_ROOT_CERT";
-const PICKY_ROOT_KEY_ENV: &'static str = "PICKY_ROOT_KEY";
-const PICKY_INTERMEDIATE_CERT_ENV: &'static str = "PICKY_INTERMEDIATE_CERT";
-const PICKY_INTERMEDIATE_KEY_ENV: &'static str = "PICKY_INTERMEDIATE_KEY";
-const PICKY_SAVE_CERTIFICATE_ENV: &'static str = "PICKY_SAVE_CERTIFICATE";
-const PICKY_BACKEND_FILE_PATH_ENV: &'static str = "PICKY_BACKEND_FILE_PATH";
+const PICKY_REALM_ENV: &str = "PICKY_REALM";
+const PICKY_DATABASE_URL_ENV: &str = "PICKY_DATABASE_URL";
+const PICKY_API_KEY_ENV: &str = "PICKY_API_KEY";
+const PICKY_BACKEND_ENV: &str = "PICKY_BACKEND";
+const PICKY_ROOT_CERT_ENV: &str = "PICKY_ROOT_CERT";
+const PICKY_ROOT_KEY_ENV: &str = "PICKY_ROOT_KEY";
+const PICKY_INTERMEDIATE_CERT_ENV: &str = "PICKY_INTERMEDIATE_CERT";
+const PICKY_INTERMEDIATE_KEY_ENV: &str = "PICKY_INTERMEDIATE_KEY";
+const PICKY_SAVE_CERTIFICATE_ENV: &str = "PICKY_SAVE_CERTIFICATE";
+const PICKY_BACKEND_FILE_PATH_ENV: &str = "PICKY_BACKEND_FILE_PATH";
 
 #[derive(PartialEq, Clone)]
 pub enum BackendType{
@@ -51,7 +50,7 @@ pub struct ServerConfig{
     pub api_key: String,
     pub database: Database,
     pub realm: String,
-    pub key_config: KeyConfig,
+    pub key_config: SignatureHashType,
     pub backend: BackendType,
     pub root_cert: String,
     pub root_key: String,
@@ -171,7 +170,7 @@ impl Default for ServerConfig{
             api_key: String::default(),
             database: Database::default(),
             realm: DEFAULT_PICKY_REALM.to_string(),
-            key_config: KeyConfig::default(),
+            key_config: SignatureHashType::RsaSha256,
             backend: BackendType::default(),
             root_cert: String::default(),
             root_key: String::default(),
@@ -192,21 +191,6 @@ impl Default for Database {
     fn default() -> Self {
         Database {
             url: "mongodb://127.0.0.1:27017".to_string()
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct KeyConfig{
-    pub hash_type: HashType,
-    pub key_type: KeyType
-}
-
-impl Default for KeyConfig{
-    fn default() -> Self {
-        KeyConfig{
-            hash_type: mbedtls::hash::Type::Sha256,
-            key_type: mbedtls::pk::Type::Rsa
         }
     }
 }

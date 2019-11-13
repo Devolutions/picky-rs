@@ -163,7 +163,7 @@ impl RSAPrivateKey {
     }
 
     pub fn primes(&self) -> &[IntegerAsn1] {
-        &(self.0).0[3..]
+        &(self.0).0[4..]
     }
 
     pub fn into_public_components(self) -> (IntegerAsn1, IntegerAsn1) {

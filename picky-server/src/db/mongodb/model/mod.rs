@@ -117,7 +117,7 @@ impl BackendStorage for RepositoryCollection {
     fn store(&self, name: &str, cert: &[u8], key: Option<&[u8]>, key_identifier: &str) -> Result<bool, String> {
         if let Ok(cert_hash) = utils::multihash_encode(cert){
             let name_item = NameStore::new(name, &cert_hash);
-            self.name_store.update_with_options(doc!("key": name.clone()), name_item, true)?;
+            self.name_store.update_with_options(doc!("key": name), name_item, true)?;
 
             let certificate_item = CertificateStore::new(&cert_hash, Bson::Binary(BinarySubtype::Generic, cert.to_vec()));
             self.certificate_store.update_with_options(doc!("key": cert_hash.clone()), certificate_item, true)?;
@@ -128,7 +128,7 @@ impl BackendStorage for RepositoryCollection {
             }
 
             let key_identifier_item = KeyIdentifierStore::new(key_identifier, &cert_hash);
-            self.key_identifier_store.update_with_options(doc!("key": key_identifier.clone()), key_identifier_item, true)?;
+            self.key_identifier_store.update_with_options(doc!("key": key_identifier), key_identifier_item, true)?;
 
             return Ok(true);
         }
@@ -152,10 +152,10 @@ impl BackendStorage for RepositoryCollection {
         if let Some(cert) = self.certificate_store.get(doc!("key": hash))? {
             match cert.value {
                 Bson::Binary(BinarySubtype::Generic, bin) => {
-                    return Ok(bin);
+                    Ok(bin)
                 }
                 _ => {
-                    return Err("DB content is not binary".to_string());
+                    Err("DB content is not binary".to_string())
                 }
             }
         } else {
@@ -167,10 +167,10 @@ impl BackendStorage for RepositoryCollection {
         if let Some(key) = self.key_store.get(doc!("key": hash))? {
             match key.value {
                 Bson::Binary(BinarySubtype::Generic, bin) => {
-                    return Ok(bin);
+                    Ok(bin)
                 }
                 _ => {
-                    return Err("DB content is not binary".to_string());
+                    Err("DB content is not binary".to_string())
                 }
             }
         } else {
@@ -180,7 +180,7 @@ impl BackendStorage for RepositoryCollection {
 
     fn get_key_identifier_from_hash(&self, hash: &str) -> Result<String, String> {
         if let Some(key_identifier) = self.key_identifier_store.get(doc!("value": hash))? {
-            return Ok(key_identifier.key);
+            Ok(key_identifier.key)
         } else {
             Err("Key identifier not found".to_string())
         }
@@ -188,7 +188,7 @@ impl BackendStorage for RepositoryCollection {
 
     fn get_hash_from_key_identifier(&self, key_identifier: &str) -> Result<String, String> {
         if let Some(key_identifier) = self.key_identifier_store.get(doc!("key": key_identifier))? {
-            return Ok(key_identifier.value);
+            Ok(key_identifier.value)
         } else {
             Err("Key identifier not found".to_string())
         }

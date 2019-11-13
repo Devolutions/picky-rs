@@ -66,11 +66,11 @@ Describe 'Picky tests' {
 
 		if($Debug){
 			$location = Get-Location
-			$location = "$location/../Cargo.toml"
+			$location = "$location/../picky-server/Cargo.toml"
 			$location = Resolve-Path $location
 
 			Write-Host "Build Picky Server ..."
-			& 'cargo' 'build' '--manifest-path' '../Cargo.toml'
+			& 'cargo' 'build' '--manifest-path' '../picky-server/Cargo.toml'
 			if($Silent){
 				Start-Process pwsh -Args "-File ./Private/RunPicky.ps1 $picky_realm $picky_api_key $picky_backend $SavePickyCertificatesString $location -Silent"
 			}else{

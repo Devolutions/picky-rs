@@ -6,6 +6,7 @@ use crate::{
         private_key::PrivateKey,
         signature::SignatureHashType,
     },
+    pem::Pem,
     serde::{
         certificate::TBSCertificate,
         extension::{Extension, Extensions, KeyIdentifier, KeyUsage},
@@ -18,7 +19,6 @@ use num_bigint_dig::{BigInt, Sign};
 use rand::{rngs::OsRng, RngCore};
 use serde_asn1_der::{bit_string::BitString, date::GeneralizedTime};
 use std::cell::RefCell;
-use crate::pem::Pem;
 
 const DEFAULT_DURATION: i64 = 26280;
 const ROOT_DURATION: i64 = 87600;
@@ -60,7 +60,9 @@ impl Cert {
     }
 
     pub fn from_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self> {
-        Ok(Self::from_certificate(serde_asn1_der::from_bytes(der.as_ref())?)?)
+        Ok(Self::from_certificate(serde_asn1_der::from_bytes(
+            der.as_ref(),
+        )?)?)
     }
 
     pub fn ty(&self) -> CertificateType {

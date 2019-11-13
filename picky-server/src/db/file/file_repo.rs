@@ -62,10 +62,10 @@ impl<T> Repo<T> for FileRepo<T> where T: Eq + Clone + AsRef<[u8]>{
         }
 
         if let Ok(mut file) = File::create(format!("{}{}", &self.repo, key)){
-            file.write_all(value.as_ref()).expect(&format!("Error writing data to {}", key));
-            return Ok(());
+            file.write_all(value.as_ref()).map_err(|e| format!("Error writing data to {}: {}", key, e))?;
+            Ok(())
+        } else {
+            Err(format!("Could not create file for {} : ", key))
         }
-
-        Err(format!("Could not create file for {} : ", key))
     }
 }

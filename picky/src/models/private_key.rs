@@ -61,20 +61,14 @@ impl PrivateKey {
     }
 
     /// **Beware**: this is insanely slow in debug builds.
-    pub fn generate_rsa(bits: u32) -> Result<Self> {
+    pub fn generate_rsa(bits: usize) -> Result<Self> {
         use rand::rngs::OsRng;
         use rsa::{PublicKey, RSAPrivateKey};
-        use std::convert::TryFrom;
 
         let mut rng = OsRng::new().ctx("no secure randomness available")?;
-        let key = RSAPrivateKey::new(
-            &mut rng,
-            usize::try_from(bits)
-                .map_err(|_| crate::error::Error::Rsa)
-                .ctx("u32 value didn't fit in usize")?,
-        )
-        .map_err(|_| crate::error::Error::Rsa)
-        .ctx("failed to generate rsa key")?;
+        let key = RSAPrivateKey::new(&mut rng, bits)
+            .map_err(|_| crate::error::Error::Rsa)
+            .ctx("failed to generate rsa key")?;
 
         let modulus = BigInt::from_bytes_be(Sign::Plus, &key.n().to_bytes_be());
         let public_exponent = BigInt::from_bytes_be(Sign::Plus, &key.e().to_bytes_be());
