@@ -59,9 +59,9 @@ fn all_stars_parsing() {
                 panic!("couldn't parse pem");
             }
         };
-        assert_eq!(pem.label, "CERTIFICATE");
+        assert_eq!(pem.label(), "CERTIFICATE");
 
-        match Certificate::from_der(&pem.data) {
+        match Certificate::from_der(pem.data()) {
             Ok(cert) => {
                 print_issuer(&cert);
                 number_decoded += 1;

@@ -40,9 +40,11 @@ mod tests {
 
     #[test]
     fn deserialize_csr() {
-        let pem = crate::test_files::CSR.parse::<Pem>().expect("couldn't parse csr pem");
-        let encoded = &pem.data[..];
-        assert_eq!(pem.label, "CERTIFICATE REQUEST");
+        let pem = crate::test_files::CSR
+            .parse::<Pem>()
+            .expect("couldn't parse csr pem");
+        let encoded = pem.data();
+        assert_eq!(pem.label(), "CERTIFICATE REQUEST");
 
         let certification_request_info = CertificationRequestInfo::new(
             new_common_name(PrintableString::from_str("test.contoso.local").unwrap()),

@@ -399,8 +399,11 @@ mod tests {
 
     #[test]
     fn get_identifier() {
-        let pem = crate::test_files::RSA_2048_PK_1.parse::<Pem>().expect("couldn't parse pem");
-        let private_key = PrivateKey::from_pkcs8(pem.data).expect("couldn't extract private key from pkcs8");
+        let pem = crate::test_files::RSA_2048_PK_1
+            .parse::<Pem>()
+            .expect("couldn't parse pem");
+        let private_key =
+            PrivateKey::from_pkcs8(pem.data()).expect("couldn't extract private key from pkcs8");
 
         let root = Cert::generate_root("test", SignatureHashType::RsaSha256, &private_key)
             .expect("couldn't generate root ca");
@@ -413,8 +416,10 @@ mod tests {
     #[test]
     fn key_id_and_cert() {
         let kid = "9a3e5270e7b8635c86b6012973b780dbe03427f6";
-        let pem = crate::test_files::ROOT_CA.parse::<Pem>().expect("couldn't parse PEM");
-        let cert = Cert::from_der(&pem.data).expect("couldn't deserialize certificate");
+        let pem = crate::test_files::ROOT_CA
+            .parse::<Pem>()
+            .expect("couldn't parse PEM");
+        let cert = Cert::from_der(pem.data()).expect("couldn't deserialize certificate");
         assert_eq!(cert.ty(), CertificateType::Root);
         let key_id = cert
             .subject_key_identifier()

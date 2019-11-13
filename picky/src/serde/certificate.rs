@@ -271,7 +271,7 @@ mod tests {
     #[test]
     fn key_id() {
         let intermediate_cert_pem = parse_pem(PEM).unwrap();
-        let cert = Certificate::from_der(&intermediate_cert_pem.data).unwrap();
+        let cert = Certificate::from_der(intermediate_cert_pem.data()).unwrap();
         pretty_assertions::assert_eq!(
             hex::encode(&cert.subject_key_identifier().unwrap()),
             "1f74d63f29c17474453b05122c3da8bd435902a6"

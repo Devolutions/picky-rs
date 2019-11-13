@@ -1,7 +1,7 @@
 use base64::DecodeError;
 use err_derive::Error;
 use serde::export::Formatter;
-use std::{fmt, str::FromStr};
+use std::{borrow::Cow, fmt, str::FromStr};
 
 const PEM_HEADER_START: &str = "-----BEGIN";
 const PEM_HEADER_END: &str = "-----END";
@@ -19,12 +19,33 @@ pub enum PemError {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Pem {
-    pub label: String,
-    pub data: Vec<u8>,
+pub struct Pem<'a> {
+    label: String,
+    data: Cow<'a, [u8]>,
 }
 
-impl FromStr for Pem {
+impl<'a> Pem<'a> {
+    pub fn new<S: Into<String>, D: Into<Cow<'a, [u8]>>>(label: S, data: D) -> Self {
+        Self {
+            label: label.into(),
+            data: data.into(),
+        }
+    }
+
+    pub fn label(&self) -> &str {
+        &self.label
+    }
+
+    pub fn data(&self) -> &[u8] {
+        &self.data
+    }
+
+    pub fn into_data(self) -> Cow<'a, [u8]> {
+        self.data
+    }
+}
+
+impl FromStr for Pem<'static> {
     type Err = PemError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -32,7 +53,7 @@ impl FromStr for Pem {
     }
 }
 
-impl fmt::Display for Pem {
+impl fmt::Display for Pem<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -46,9 +67,9 @@ impl fmt::Display for Pem {
     }
 }
 
-impl Into<String> for Pem {
+impl Into<String> for Pem<'_> {
     fn into(self) -> String {
-        format!("{}", self)
+        self.to_string()
     }
 }
 
@@ -57,11 +78,11 @@ impl Into<String> for Pem {
 /// If the input contains line ending characters (`\r`, `\n`), a copy of input
 /// is allocated striping these. If you can strip these with minimal data copy
 /// you should do it beforehand.
-pub fn parse_pem<T: ?Sized + AsRef<[u8]>>(input: &T) -> Result<Pem, PemError> {
+pub fn parse_pem<T: ?Sized + AsRef<[u8]>>(input: &T) -> Result<Pem<'static>, PemError> {
     __parse_pem_impl(input.as_ref())
 }
 
-fn __parse_pem_impl(input: &[u8]) -> Result<Pem, PemError> {
+fn __parse_pem_impl(input: &[u8]) -> Result<Pem<'static>, PemError> {
     let header_start_idx =
         __find(input, PEM_HEADER_START.as_bytes()).ok_or(PemError::HeaderNotFound)?;
 
@@ -94,13 +115,25 @@ fn __parse_pem_impl(input: &[u8]) -> Result<Pem, PemError> {
         base64::decode(raw_data).map_err(PemError::Base64Decoding)?
     };
 
-    Ok(Pem { label, data })
+    Ok(Pem {
+        label,
+        data: Cow::Owned(data),
+    })
 }
 
 fn __find(buffer: &[u8], value: &[u8]) -> Option<usize> {
     buffer
         .windows(value.len())
         .position(|window| window == value)
+}
+
+/// Build a PEM-encoded structure into a String.
+pub fn to_pem<S, T>(label: S, data: &T) -> String
+where
+    S: Into<String>,
+    T: ?Sized + AsRef<[u8]>,
+{
+    Pem::new(label, data.as_ref()).to_string()
 }
 
 #[cfg(test)]
