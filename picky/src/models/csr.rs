@@ -8,6 +8,7 @@ use crate::{
 };
 use err_ctx::ResultExt;
 use serde_asn1_der::bit_string::BitString;
+use crate::pem::Pem;
 
 /// Certificate Signing Request
 pub struct Csr {
@@ -19,10 +20,18 @@ impl Csr {
         Self { inner: csr }
     }
 
-    pub fn from_der(der: &[u8]) -> serde_asn1_der::Result<Self> {
+    pub fn from_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> serde_asn1_der::Result<Self> {
         Ok(Self {
-            inner: serde_asn1_der::from_bytes(der)?,
+            inner: serde_asn1_der::from_bytes(der.as_ref())?,
         })
+    }
+
+    pub fn to_der(&self) -> serde_asn1_der::Result<Vec<u8>> {
+        serde_asn1_der::to_vec(&self.inner)
+    }
+
+    pub fn to_pem(&self) -> serde_asn1_der::Result<Pem<'static>> {
+        Ok(Pem::new("CERTIFICATE REQUEST", self.to_der()?))
     }
 
     pub fn generate(

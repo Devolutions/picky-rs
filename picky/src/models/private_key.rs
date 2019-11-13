@@ -35,7 +35,7 @@ impl From<PrivateKey> for SubjectPublicKeyInfo {
 }
 
 impl PrivateKey {
-    pub fn from_pkcs8<T: AsRef<[u8]>>(pkcs8: T) -> serde_asn1_der::Result<Self> {
+    pub fn from_pkcs8<T: ?Sized + AsRef<[u8]>>(pkcs8: &T) -> serde_asn1_der::Result<Self> {
         Ok(Self {
             inner: serde_asn1_der::from_bytes(pkcs8.as_ref())?,
         })
