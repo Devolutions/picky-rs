@@ -40,15 +40,15 @@ Describe 'Picky tests' {
 
 		if ($picky_backend -Eq 'mongodb') {
 			if($Silent){
-				[void](& 'docker' 'stop' 'picky-mongo')
-				[void](& 'docker' 'rm' 'picky-mongo')
+				& 'docker' 'stop' 'picky-mongo' 2>&1 | out-null
+				& 'docker' 'rm' 'picky-mongo' 2>&1 | out-null
 				[void](& 'docker' 'run' '-d' '-p' '27017:27017' '--network=picky' '--name' 'picky-mongo' `
-		    'library/mongo:4.1-bionic')
+		            'library/mongo:4.1-bionic')
 			}else{
 				& 'docker' 'stop' 'picky-mongo'
 				& 'docker' 'rm' 'picky-mongo'
 				& 'docker' 'run' '-d' '-p' '27017:27017' '--network=picky' '--name' 'picky-mongo' `
-		    'library/mongo:4.1-bionic'
+		            'library/mongo:4.1-bionic'
 			}
 
 			Start-Sleep -s 2 # wait for picky-mongo to be ready
@@ -59,38 +59,32 @@ Describe 'Picky tests' {
 			$SavePickyCertificatesString = 'true'
 		}
 
-		$currentPath = Get-Location
-		if(!(Test-Path "$currentPath/database/")){
-			& 'mkdir' './database/'
-		}
+        if ($Debug) {
+            Context "Build and run Picky Server ..." {
+                $location = Get-Location
+                $location = "$location/../picky-server/Cargo.toml"
+                $location = Resolve-Path $location
 
-		if($Debug){
-			$location = Get-Location
-			$location = "$location/../picky-server/Cargo.toml"
-			$location = Resolve-Path $location
-
-			Write-Host "Build Picky Server ..."
-			& 'cargo' 'build' '--manifest-path' '../picky-server/Cargo.toml'
-			if($Silent){
-				Start-Process pwsh -Args "-File ./Private/RunPicky.ps1 $picky_realm $picky_api_key $picky_backend $SavePickyCertificatesString $location -Silent"
-			}else{
-				Start-Process pwsh -Args "-File ./Private/RunPicky.ps1 $picky_realm $picky_api_key $picky_backend $SavePickyCertificatesString $location"
-			}
-		}
-		else{
-			& 'docker' 'stop' 'picky-server'
-			& 'docker' 'rm' 'picky-server'
-			& 'docker' 'run' '-p' '12345:12345' '-d' '--network=picky' '--name' 'picky-server' `
-		    '--mount' "source=pickyvolume,target=$currentPath/database/" `
-			'-e' "PICKY_REALM=$picky_realm" `
-			'-e' "PICKY_API_KEY=$picky_api_key" `
-			'-e' "PICKY_BACKEND=$picky_backend" `
-			'-e' "PICKY_DATABASE_URL=$picky_database_url" `
-			'-e' "PICKY_SAVE_CERTIFICATE=$SavePickyCertificatesString" `
-            '-e' "RUST_BACKTRACE=1" `
-			'devolutions/picky:3.3.0-buster-dev'
-		}
-	}
+                if ($Silent) {
+                    Start-Process pwsh -Args "-File ./Private/RunPicky.ps1 $picky_realm $picky_api_key $picky_backend $SavePickyCertificatesString $location -Silent"
+                } else {
+                    Start-Process pwsh -Args "-File ./Private/RunPicky.ps1 $picky_realm $picky_api_key $picky_backend $SavePickyCertificatesString $location"
+                }
+            }
+        } else {
+            & 'docker' 'stop' 'picky-server'
+            & 'docker' 'rm' 'picky-server'
+            & 'docker' 'run' '-p' '12345:12345' '-d' '--network=picky' '--name' 'picky-server' `
+                '--mount' "source=pickyvolume,target=$currentPath/database/" `
+                '-e' "PICKY_REALM=$picky_realm" `
+                '-e' "PICKY_API_KEY=$picky_api_key" `
+                '-e' "PICKY_BACKEND=$picky_backend" `
+                '-e' "PICKY_DATABASE_URL=$picky_database_url" `
+                '-e' "PICKY_SAVE_CERTIFICATE=$SavePickyCertificatesString" `
+                '-e' "RUST_BACKTRACE=1" `
+                'devolutions/picky:3.3.0-buster-dev'
+        }
+    }
 
 	It 'checks health' {
 		$s = 0
@@ -670,8 +664,13 @@ Describe 'Picky tests' {
 	AfterAll{
 		if($Silent)
 		{
-			[void](& 'docker' 'stop' 'picky-mongo')
-			[void](& 'docker' 'rm' 'picky-mongo')
+            if ($UseMongo) {
+                [void](& 'docker' 'stop' 'picky-mongo')
+                [void](& 'docker' 'rm' 'picky-mongo')
+            } elseif ($UseFile) {
+                [void](Remove-Item 'database' -Recurse)
+            }
+
 			if($Debug){
 				[void](Stop-Process -Name 'picky-server')
 			}else{
@@ -679,8 +678,12 @@ Describe 'Picky tests' {
 				[void](& 'docker' 'rm' 'picky-server')
 			}
 		}else{
-			& 'docker' 'stop' 'picky-mongo'
-			& 'docker' 'rm' 'picky-mongo'
+            if ($UseMongo) {
+                & 'docker' 'stop' 'picky-mongo'
+                & 'docker' 'rm' 'picky-mongo'
+            } elseif ($UseFile) {
+                Remove-Item 'database' -Recurse
+            }
 
 			if($Debug){
 				Stop-Process -Name 'picky-server'
