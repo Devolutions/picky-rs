@@ -917,7 +917,7 @@ dependencies = [
 [[package]]
 name = "mongodb"
 version = "0.3.12"
-source = "git+https://github.com/Devolutions/mongo-rust-driver-prototype#bb42225be769bc5ea7470b0db7ef841bb2fc1275"
+source = "git+https://github.com/Devolutions/mongo-rust-driver-prototype#509f3eb23924bb49fcce5edd727e5ebf3f240228"
 dependencies = [
  "bitflags 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bson 0.13.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -934,6 +934,9 @@ dependencies = [
  "scan_fmt 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "semver 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "separator 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.94 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 1.0.94 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_json 1.0.39 (registry+https://github.com/rust-lang/crates.io-index)",
  "sha-1 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "textnonce 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.42 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2206,7 +2209,7 @@ name = "yaml-rust"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "linked-hash-map 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "linked-hash-map 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [metadata]
