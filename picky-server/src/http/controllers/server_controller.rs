@@ -638,23 +638,23 @@ fn generate_private_key(bits: usize) -> Result<PrivateKey, String> {
     );
 
     const RSA_2048_PK_1: &str =
-        include_str!("../../../../picky/test_files/private_keys/rsa-2048-pk_1.key");
+        include_str!("../../../../test_assets/private_keys/rsa-2048-pk_1.key");
     const RSA_2048_PK_2: &str =
-        include_str!("../../../../picky/test_files/private_keys/rsa-2048-pk_2.key");
+        include_str!("../../../../test_assets/private_keys/rsa-2048-pk_2.key");
     const RSA_2048_PK_3: &str =
-        include_str!("../../../../picky/test_files/private_keys/rsa-2048-pk_3.key");
+        include_str!("../../../../test_assets/private_keys/rsa-2048-pk_3.key");
     const RSA_2048_PK_4: &str =
-        include_str!("../../../../picky/test_files/private_keys/rsa-2048-pk_4.key");
+        include_str!("../../../../test_assets/private_keys/rsa-2048-pk_4.key");
     const RSA_2048_PK_5: &str =
-        include_str!("../../../../picky/test_files/private_keys/rsa-2048-pk_5.key");
+        include_str!("../../../../test_assets/private_keys/rsa-2048-pk_5.key");
     const RSA_2048_PK_6: &str =
-        include_str!("../../../../picky/test_files/private_keys/rsa-2048-pk_6.key");
+        include_str!("../../../../test_assets/private_keys/rsa-2048-pk_6.key");
     const RSA_4096_PK_1: &str =
-        include_str!("../../../../picky/test_files/private_keys/rsa-4096-pk_1.key");
+        include_str!("../../../../test_assets/private_keys/rsa-4096-pk_1.key");
     const RSA_4096_PK_2: &str =
-        include_str!("../../../../picky/test_files/private_keys/rsa-4096-pk_2.key");
+        include_str!("../../../../test_assets/private_keys/rsa-4096-pk_2.key");
     //const RSA_4096_PK_3: &str =
-    //    include_str!("../../../../picky/test_files/private_keys/rsa-4096-pk_3.key");
+    //    include_str!("../../../../test_assets/private_keys/rsa-4096-pk_3.key");
 
     const RSA_2048_POOL: [&str; 6] = [
         RSA_2048_PK_1,

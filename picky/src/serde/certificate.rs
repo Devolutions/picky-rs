@@ -266,11 +266,9 @@ mod tests {
         check_serde!(certificate: Certificate in encoded);
     }
 
-    static PEM: &'static [u8] = include_bytes!("../../test_files/intermediate_ca.crt");
-
     #[test]
     fn key_id() {
-        let intermediate_cert_pem = parse_pem(PEM).unwrap();
+        let intermediate_cert_pem = parse_pem(crate::test_files::INTERMEDIATE_CA).unwrap();
         let cert = Certificate::from_der(intermediate_cert_pem.data()).unwrap();
         pretty_assertions::assert_eq!(
             hex::encode(&cert.subject_key_identifier().unwrap()),

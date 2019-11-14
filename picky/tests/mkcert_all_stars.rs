@@ -7,7 +7,7 @@ use picky::{
 };
 use std::{cmp::min, fs};
 
-const ALL_STARS_FILE_PATH: &str = "./test_files/mkcert_all_root_ca_2019_10.txt";
+const ALL_STARS_FILE_PATH: &str = "../test_assets/mkcert_all_root_ca_2019_10.txt";
 
 fn print_issuer(cert: &Certificate) {
     println!(
