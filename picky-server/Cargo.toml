@@ -1,26 +1,37 @@
 [package]
 name = "picky-server"
-version = "3.3.0"
-authors = ["jtrepanier-devolutions <jtrepanier@devolutions.net>"]
+version = "4.0.0"
+authors = [
+    "jtrepanier-devolutions <jtrepanier@devolutions.net>",
+    "Benoît CORTIER <benoit.cortier@fried-world.eu>",
+    "Johann Dufaud <jdufaud@devolutions.net>",
+]
 edition = "2018"
 
 [dependencies]
-clap = {features = ["yaml"], version = "2.32.0"}
-multihash = "0.8.0"
-chrono = "0.4.6"
-picky = {path = "../picky"}
-config = "0.9"
-mbedtls = { git = "https://github.com/Devolutions/rust-mbedtls", branch = "wayk"}
+picky = { path = "../picky", features = ["controller"] }
 mongodb = { git = "https://github.com/Devolutions/mongo-rust-driver-prototype", branch = "master", features = ["ssl"] }
-bson = "0.13.0"
-serde_json = "1.0.39"
-serde_derive = "1.0.89"
-serde = "1.0.90"
-log = "0.4.1"
-log4rs = "0.8.1"
-r2d2 = "0.8.4"
-saphir = "0.9.3"
-base64 = "0.10.1"
-regex = "1.1.5"
-portpicker = "0.1.0"
 curl = { git = "https://github.com/Devolutions/curl-rust", branch = "wayk" }
+clap = { features = ["yaml"], version = "2.32" }
+multihash = "0.8"
+config = "0.9"
+bson = "0.13"
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+log = "0.4"
+log4rs = "0.8"
+r2d2 = "0.8"
+saphir = "0.9"
+portpicker = "0.1"
+chrono = "0.4"
+base64 = "0.10"
+hex = "0.3"
+
+rand = { version = "0.7", optional = true }
+
+[dev-dependencies]
+rand = "0.7"
+
+[features]
+pre-gen-pk = ["rand"]

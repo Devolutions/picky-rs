@@ -1,5 +1,5 @@
 const DB_CONNECTION_TIMEOUT_MS: i64 = 5000;
-const DATABASE_NAME: &'static str = "picky";
+const DATABASE_NAME: &str = "picky";
 
 mod r2d2_mongo {
     use r2d2;
@@ -68,7 +68,7 @@ mod r2d2_mongo {
 
         fn connect(&self) -> Result<Self::Connection, Error> {
             let host = self.parsed_conn_string.hosts[0].host_name.clone();
-            let port = self.parsed_conn_string.hosts[0].port.clone();
+            let port = self.parsed_conn_string.hosts[0].port;
             let user = self.parsed_conn_string.user.clone();
             let pass = self.parsed_conn_string.password.clone();
             let db_name = DATABASE_NAME.to_string();
@@ -103,7 +103,7 @@ mod r2d2_mongo {
 
         fn is_valid(&self, conn: &mut Self::Connection) -> Result<(), Error> {
             let cmd = doc! { "ping": 1 };
-            conn.command(cmd, CommandType::Suppressed, None).map_err(|e| { Error::Other(e.to_string()) }).map(|_| { () })
+            conn.command(cmd, CommandType::Suppressed, None).map_err(|e| { Error::Other(e.to_string()) }).map(|_| {})
         }
 
         fn has_broken(&self, _conn: &mut Self::Connection) -> bool {
@@ -146,7 +146,7 @@ impl MongoConnection {
 
     pub fn ping(&self) -> Result<(), String> {
         let cmd = doc! { "ping": 1 };
-        self.get()?.command(cmd, CommandType::Suppressed, None).map_err(|e| { e.to_string() }).map(|_| { () })
+        self.get()?.command(cmd, CommandType::Suppressed, None).map_err(|e| { e.to_string() }).map(|_| {})
     }
 }
 

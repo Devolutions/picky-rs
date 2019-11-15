@@ -13,8 +13,8 @@ $Env:PICKY_BACKEND = $picky_backend
 $Env:PICKY_SAVE_CERTIFICATE = $SavePickyCertificatesString
 $Env:RUST_BACKTRACE = 1
 
-if($Silent){
-    [void](& 'cargo' 'run' '--manifest-path' "$location")
-}else{
-    & 'cargo' 'run' '--manifest-path' "$location"
+if ($Silent) {
+    [void](& 'cargo' 'run' '--features' 'pre-gen-pk' '--manifest-path' "$location")
+} else {
+    & 'cargo' 'run' '--features' 'pre-gen-pk' '--manifest-path' "$location"
 }

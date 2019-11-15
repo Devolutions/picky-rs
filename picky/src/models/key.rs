@@ -1,72 +1,146 @@
-extern crate mbedtls;
+use crate::{
+    error::Result,
+    serde::{private_key_info::PrivateKeyValue, PrivateKeyInfo, SubjectPublicKeyInfo},
+};
+use err_ctx::ResultExt;
+use num_bigint_dig::{BigInt, Sign};
+use serde_asn1_der::asn1_wrapper::OctetStringAsn1Container;
 
-extern crate rand;
-extern crate rand_chacha;
-extern crate rand_core;
+#[derive(Debug, Clone, PartialEq)]
+pub struct PrivateKey(PrivateKeyInfo);
 
-extern crate core;
-
-use mbedtls::pk::Pk;
-use mbedtls::rng::os_entropy::*;
-use mbedtls::rng::{CtrDrbg};
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Keys{
-    pub key_der: Vec<u8>,
+impl From<PrivateKeyInfo> for PrivateKey {
+    fn from(key: PrivateKeyInfo) -> Self {
+        Self(key)
+    }
 }
 
-impl Keys{
-    pub fn new(_key_type: mbedtls::pk::Type, bits: u32) -> Self{
-        let mut entropy = OsEntropy::new();
-        let mut rng = CtrDrbg::new(&mut entropy, None).unwrap();
-        let mut pk = Pk::generate_rsa(&mut rng, bits, 0x10001).unwrap();
-        Self::new_from_pk(&mut pk)
+impl From<PrivateKey> for PrivateKeyInfo {
+    fn from(key: PrivateKey) -> Self {
+        key.0
+    }
+}
+
+impl From<PrivateKey> for SubjectPublicKeyInfo {
+    fn from(key: PrivateKey) -> Self {
+        match key.0.private_key {
+            PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => {
+                let (modulus, public_exponent) = key.into_public_components();
+                SubjectPublicKeyInfo::new_rsa_key(modulus, public_exponent)
+            }
+        }
+    }
+}
+
+impl PrivateKey {
+    pub fn from_pkcs8<T: ?Sized + AsRef<[u8]>>(pkcs8: &T) -> serde_asn1_der::Result<Self> {
+        Ok(Self(serde_asn1_der::from_bytes(pkcs8.as_ref())?))
     }
 
-    pub fn new_from_pk(pk: &mut Pk) -> Self{
-        Keys{
-            key_der: {
-                pk.write_private_der_vec().unwrap()
+    pub fn to_pkcs8(&self) -> serde_asn1_der::Result<Vec<u8>> {
+        serde_asn1_der::to_vec(&self.0)
+    }
+
+    pub fn to_public_key(&self) -> PublicKey {
+        match &self.0.private_key {
+            PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => {
+                SubjectPublicKeyInfo::new_rsa_key(
+                    key.modulus().clone(),
+                    key.public_exponent().clone(),
+                )
+                .into()
             }
         }
     }
 
-    pub fn new_from_pk_public(pk: &mut Pk) -> Self{
-        Keys{
-            key_der: {
-                pk.write_public_der_vec().unwrap()
-            }
-        }
+    pub fn as_inner(&self) -> &PrivateKeyInfo {
+        &self.0
     }
 
-    pub fn get_pk_from_public(key: &[u8]) -> Pk{
-        Pk::from_public_key(key).unwrap()
+    /// **Beware**: this is insanely slow in debug builds.
+    pub fn generate_rsa(bits: usize) -> Result<Self> {
+        use rand::rngs::OsRng;
+        use rsa::{PublicKey, RSAPrivateKey};
+
+        let mut rng = OsRng::new().ctx("no secure randomness available")?;
+        let key = RSAPrivateKey::new(&mut rng, bits)
+            .map_err(|_| crate::error::Error::Rsa)
+            .ctx("failed to generate rsa key")?;
+
+        let modulus = BigInt::from_bytes_be(Sign::Plus, &key.n().to_bytes_be());
+        let public_exponent = BigInt::from_bytes_be(Sign::Plus, &key.e().to_bytes_be());
+        let private_exponent = BigInt::from_bytes_be(Sign::Plus, &key.d().to_bytes_be());
+
+        Ok(Self(PrivateKeyInfo::new_rsa_encryption(
+            modulus,
+            public_exponent,
+            private_exponent,
+            key.primes()
+                .iter()
+                .map(|p| BigInt::from_bytes_be(Sign::Plus, &p.to_bytes_be()))
+                .collect(),
+        )))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PublicKey(SubjectPublicKeyInfo);
+
+impl From<SubjectPublicKeyInfo> for PublicKey {
+    fn from(key: SubjectPublicKeyInfo) -> Self {
+        Self(key)
+    }
+}
+
+impl From<PublicKey> for SubjectPublicKeyInfo {
+    fn from(key: PublicKey) -> Self {
+        key.0
+    }
+}
+
+impl From<PrivateKey> for PublicKey {
+    fn from(key: PrivateKey) -> Self {
+        Self(key.into())
+    }
+}
+
+impl PublicKey {
+    pub fn from_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> serde_asn1_der::Result<Self> {
+        Ok(Self(serde_asn1_der::from_bytes(der.as_ref())?))
     }
 
-    pub fn get_pk_from_private(key: &[u8]) -> Pk{
-        Pk::from_private_key(key, None).unwrap()
+    pub fn to_der(&self) -> serde_asn1_der::Result<Vec<u8>> {
+        serde_asn1_der::to_vec(&self.0)
+    }
+
+    pub fn as_inner(&self) -> &SubjectPublicKeyInfo {
+        &self.0
     }
 }
 
 #[cfg(test)]
-mod tests{
+#[cfg(not(debug_assertions))]
+// Generating RSA keys in debug is very slow. Therefore, these tests only run in release mode.
+mod tests {
     use super::*;
+    use crate::models::{certificate::Cert, date::UTCDate, signature::SignatureHashType};
 
     #[test]
-    fn test_key(){
-        let mut entropy = OsEntropy::new();
-        let mut rng = CtrDrbg::new(&mut entropy, None).unwrap();
+    fn generate_rsa_keys() {
+        let private_key = PrivateKey::generate_rsa(4096).expect("couldn't generate rsa key");
 
-        let mut pk = Pk::generate_rsa(&mut rng, 4096, 0x10001).unwrap();
-        let key = Keys::new_from_pk(&mut pk);
+        // validity
+        let valid_from = UTCDate::ymd(2019, 10, 10).unwrap();
+        let valid_to = UTCDate::ymd(2019, 10, 11).unwrap();
 
-        let _pub_key = pk.write_public_pem_string().unwrap();
-        let private_key = pk.write_private_der_vec().unwrap();
-
-        let key_pk = Keys::get_pk_from_private(&key.key_der);
-
-        assert_eq!(private_key, key.key_der);
-        assert_eq!(key_pk.rsa_public_exponent().unwrap(), 0x10001);
+        // attempts to generate a full certificate using our newly generated private key
+        Cert::generate_root(
+            "test",
+            SignatureHashType::RsaSha256,
+            &private_key,
+            valid_from,
+            valid_to,
+        )
+        .expect("couldn't generate root ca");
     }
 }
-

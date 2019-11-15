@@ -12,7 +12,7 @@ pub mod utils {
         fn get_header_string_value(&self, header_name: &str) -> Option<String>
         {
             if let Some(hdr) = self.headers_map().get(header_name) {
-                if let Some(hdr_value) = hdr.to_str().ok() {
+                if let Ok(hdr_value) = hdr.to_str() {
                     if !hdr_value.is_empty() {
                         return Some(hdr_value.to_string());
                     }

@@ -1,23 +1,38 @@
 [package]
 name = "picky"
-version = "3.0.0"
-authors = ["jtrepanier-devolutions <jtrepanier@devolutions.net>"]
+version = "4.0.0"
+authors = [
+    "jtrepanier-devolutions <jtrepanier@devolutions.net>",
+    "Benoît CORTIER <benoit.cortier@fried-world.eu>",
+]
 edition = "2018"
 
-[lib]
-name = "picky_core"
-
 [dependencies]
-mbedtls = { git = "https://github.com/Devolutions/rust-mbedtls.git", branch = "wayk"}
-chrono = "0.4.6"
-serde_json = "1.0.39"
-serde = "1.0.89"
-serde_derive = "1.0.90"
-rand = "0.6.5"
-rand_chacha = "0.1.1"
-rand_core = "0.4.0"
-regex = "1.1.5"
-base64 = "0.10.1"
-hex = "0.3.2"
-x509-parser = "0.4.1"
-der-parser = "1.1.1"
+serde_asn1_der = { git = "https://github.com/Devolutions/serde_asn1_der", features = ["extra_types"] }
+oid = { version = "^0.1.1", features = ["serde_support"] }
+serde = "1.0"
+serde_derive = "1.0"
+base64 = "0.10"
+num-bigint-dig = "0.5" # TODO: remove this dependency
+err-derive = "0.2"
+err-ctx = "0.2"
+
+chrono = { version = "0.4", optional = true }
+
+# /!\ ===== cryptography dependencies ===== /!\
+# These should be updated as soon as possible.
+# /!\ ===================================== /!\
+
+sha-1 = "0.8"
+sha2 = "0.8"
+rsa = "0.1"
+rand = "0.6" # TODO: update to 0.7. Requires rsa crate to support 0.7 too.
+
+[dev-dependencies]
+pretty_assertions = "*"
+hex = "0.3"
+
+[features]
+default = []
+chrono_conversion = ["chrono", "serde_asn1_der/chrono_conversion"]
+controller = ["chrono_conversion"]

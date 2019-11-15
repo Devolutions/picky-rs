@@ -1,58 +1,93 @@
-use crate::models;
+use crate::{
+    error::{Error, Result},
+    models::{key::PrivateKey, name::Name, signature::SignatureHashType},
+    pem::Pem,
+    serde::{
+        certification_request::CertificationRequestInfo, CertificationRequest, SubjectPublicKeyInfo,
+    },
+};
+use err_ctx::ResultExt;
+use serde_asn1_der::bit_string::BitString;
 
-use mbedtls::x509::csr;
-use mbedtls::hash::Type::Sha256;
-use mbedtls::x509::key_usage;
-use mbedtls::rng::os_entropy::{OsEntropy};
-use mbedtls::rng::ctr_drbg::CtrDrbg;
-use mbedtls::pk::Pk;
-
-use models::key::*;
-
-use regex::Regex;
-
-const HASH: mbedtls::hash::Type = Sha256;
-
-pub struct CertificateSignRequest{
-    pub subject: String,
-    pub keys: Keys,
-    pub csr: String
+/// Certificate Signing Request
+pub struct Csr {
+    inner: CertificationRequest,
 }
 
-impl CertificateSignRequest{
-    pub fn generate_csr(subject: &str, mut pk: Pk) -> String {
-        let mut entropy = OsEntropy::new();
-        let mut rng = CtrDrbg::new(&mut entropy, None).unwrap();
-
-        let mut builder = csr::Builder::new();
-        let mut output = builder
-            .subject(subject).unwrap()
-            .key(&mut pk)
-            .signature_hash(HASH)
-            .key_usage(key_usage::DIGITAL_SIGNATURE | key_usage::KEY_CERT_SIGN | key_usage::CRL_SIGN | key_usage::KEY_ENCIPHERMENT | key_usage::DIGITAL_SIGNATURE).unwrap()
-            .write_pem_string(&mut rng).unwrap();
-        output.push('\0');
-        output
+impl Csr {
+    pub fn from_certification_request(csr: CertificationRequest) -> Self {
+        Self { inner: csr }
     }
 
-    pub fn get_csr_common_name(csr: &str) -> Result<String, String>{
-        if let Ok(csr) = csr::Csr::from_pem(format!("{}{}", csr, "\0").as_bytes()){
-            return match csr.subject() {
-                Ok(cn) => {
-                    let re = Regex::new(r"CN=(.*)").unwrap();
-                    let cn = re.find(&cn).unwrap().as_str().to_string();
-                    Ok(cn[3..].to_string())
-
-                },
-                Err(e) => Err(e.to_string())
-            };
-        }
-
-        Err("Invalid csr".to_string())
+    pub fn from_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> serde_asn1_der::Result<Self> {
+        Ok(Self {
+            inner: serde_asn1_der::from_bytes(der.as_ref())?,
+        })
     }
-}
 
-#[cfg(test)]
-mod tests{
+    pub fn to_der(&self) -> serde_asn1_der::Result<Vec<u8>> {
+        serde_asn1_der::to_vec(&self.inner)
+    }
 
+    pub fn to_pem(&self) -> serde_asn1_der::Result<Pem<'static>> {
+        Ok(Pem::new("CERTIFICATE REQUEST", self.to_der()?))
+    }
+
+    pub fn generate(
+        subject: Name,
+        private_key: &PrivateKey,
+        signature_hash_type: SignatureHashType,
+    ) -> Result<Self> {
+        let info =
+            CertificationRequestInfo::new(subject.into(), private_key.to_public_key().into());
+        let info_der = serde_asn1_der::to_vec(&info)
+            .ctx("couldn't serialize certification request info into der")?;
+        let signature = BitString::with_bytes(signature_hash_type.sign(&info_der, private_key)?);
+
+        Ok(Csr {
+            inner: CertificationRequest {
+                certification_request_info: info,
+                signature_algorithm: signature_hash_type.into(),
+                signature: signature.into(),
+            },
+        })
+    }
+
+    pub fn subject_name(&self) -> Name {
+        self.inner.certification_request_info.subject.clone().into()
+    }
+
+    pub fn subject_public_key_info(&self) -> &SubjectPublicKeyInfo {
+        &self
+            .inner
+            .certification_request_info
+            .subject_public_key_info
+    }
+
+    pub fn into_subject_infos(self) -> (Name, SubjectPublicKeyInfo) {
+        (
+            self.inner.certification_request_info.subject.into(),
+            self.inner
+                .certification_request_info
+                .subject_public_key_info,
+        )
+    }
+
+    pub fn verify(&self) -> Result<()> {
+        let hash_type =
+            SignatureHashType::from_algorithm_identifier(&self.inner.signature_algorithm)
+                .ok_or(Error::UnsupportedAlgorithm("unknown identifier"))?;
+
+        let public_key = &self
+            .inner
+            .certification_request_info
+            .subject_public_key_info;
+
+        let msg = serde_asn1_der::to_vec(&self.inner.certification_request_info)
+            .ctx("couldn't serialize certification request info into der")?;
+
+        hash_type.verify(&public_key.clone().into(), &msg, self.inner.signature.0.payload_view())?;
+
+        Ok(())
+    }
 }

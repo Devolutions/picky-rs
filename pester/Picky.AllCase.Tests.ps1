@@ -1,7 +1,16 @@
 param(
     [switch] $Debug
 )
-if($Debug){
+if ($Debug) {
+    Describe 'Rust Tests' {
+        Context 'debug mode' {
+            & 'cargo' 'test' '--manifest-path' '../Cargo.toml'
+        }
+        Context 'release mode' {
+            & 'cargo' 'test' '--manifest-path' '../Cargo.toml' '--release'
+        }
+    }
+
     Describe 'Start All cases test for picky'{
         Context 'Mongodb without save certificates on backend'{
             & ./Picky.Tests.ps1 -UseMongo -Silent -Debug
@@ -22,7 +31,7 @@ if($Debug){
             & ./Picky.Tests.ps1 -UseFile -SavePickyCertificates -Silent -Debug
         }
     }
-}else{
+} else {
     Describe 'Start All cases test for picky'{
         Context 'Mongodb without save certificates on backend'{
             & ./Picky.Tests.ps1 -UseMongo -Silent

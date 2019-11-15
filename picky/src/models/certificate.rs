@@ -1,394 +1,489 @@
-use mbedtls::x509::{key_usage, Certificate};
-use mbedtls::x509::{certificate, Time};
-use mbedtls::x509::csr::Csr;
-use mbedtls::rng::os_entropy::{OsEntropy};
-use mbedtls::rng::ctr_drbg::CtrDrbg;
-use base64;
-use chrono::{DateTime, Duration, Utc, Datelike, Timelike};
-use rand::Rng;
+use crate::{
+    error::{Error, Result},
+    models::{
+        csr::Csr,
+        date::UTCDate,
+        key::{PrivateKey, PublicKey},
+        key_id_gen_method::{KeyIdGenMethod, KeyIdHashAlgo},
+        name::Name,
+        signature::SignatureHashType,
+    },
+    pem::Pem,
+    serde::{
+        certificate::TBSCertificate,
+        extension::{Extension, Extensions, KeyIdentifier, KeyUsage},
+        Certificate, Validity, Version,
+    },
+};
+use err_ctx::ResultExt;
+use num_bigint_dig::{BigInt, Sign};
+use rand::{rngs::OsRng, RngCore};
+use serde_asn1_der::bit_string::BitString;
+use std::cell::RefCell;
 
-use crate::models::key::{Keys};
-use crate::models::csr::CertificateSignRequest;
-
-const CN: &str = "CN=";
-
-const DEFAULT_DURATION: i64 = 26280;
-const ROOT_DURATION: i64 = 87600;
-const INTERMEDIATE_DURATION: i64 = 43800;
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub enum CertificateType{
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CertType {
     Root,
     Intermediate,
-    Leaf
+    Leaf,
+    Unknown,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Cert{
-    pub common_name: String,
-    pub cert_type: CertificateType,
-    pub issuer: Option<String>,
-    pub issuer_key: Option<Vec<u8>>,
-    pub keys: Option<Keys>,
-    pub certificate_der: Vec<u8>,
+#[derive(Debug, Clone)]
+pub struct Cert {
+    inner: Certificate,
 }
 
-impl Cert{
-    fn init_empty(certificate_type: CertificateType) -> Self{
-        Cert{
-            common_name: String::default(),
-            issuer: None,
-            issuer_key: None,
-            keys: None,
-            cert_type: certificate_type,
-            certificate_der: Vec::new(),
+impl Cert {
+    pub fn new(certificate: Certificate) -> Self {
+        Self { inner: certificate }
+    }
+
+    pub fn from_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self> {
+        Ok(Self::new(serde_asn1_der::from_bytes(der.as_ref())?))
+    }
+
+    pub fn to_der(&self) -> serde_asn1_der::Result<Vec<u8>> {
+        self.inner.to_der()
+    }
+
+    pub fn to_pem(&self) -> serde_asn1_der::Result<Pem<'static>> {
+        Ok(Pem::new("CERTIFICATE", self.inner.to_der()?))
+    }
+
+    pub fn into_inner(self) -> Certificate {
+        self.inner
+    }
+
+    pub fn view_inner(&self) -> &Certificate {
+        &self.inner
+    }
+
+    pub fn ty(&self) -> CertType {
+        let (ca, len) = self.basic_constraints().unwrap_or((None, None));
+        match ca {
+            Some(true) => {
+                if let Some(0) = len {
+                    CertType::Root
+                } else {
+                    CertType::Intermediate
+                }
+            }
+            Some(false) => CertType::Leaf,
+            None => CertType::Unknown,
         }
     }
 
-    fn new(certificate_type: CertificateType,
-           hash_type: mbedtls::hash::Type,
-           key_type: Option<mbedtls::pk::Type>,
-           cn: &str,
-           issuer: Option<&str>,
-           issuer_key: Option<&[u8]>,
-           key: Option<Keys>,
-           valid_from: X509Time,
-           valid_to: X509Time, ca: bool) -> Self{
-        let mut cert = Self::init_empty(certificate_type.clone());
+    pub fn subject_key_identifier(&self) -> Result<&[u8]> {
+        self.inner.subject_key_identifier()
+    }
 
-        let pathlen: Option<u32> = match certificate_type{
-            CertificateType::Root => Some(1),
-            CertificateType::Intermediate => Some(0),
-            CertificateType::Leaf => None
+    pub fn authority_key_identifier(&self) -> Result<&[u8]> {
+        self.inner.authority_key_identifier()
+    }
+
+    pub fn basic_constraints(&self) -> Result<(Option<bool>, Option<u8>)> {
+        self.inner.basic_constraints()
+    }
+
+    pub fn subject_name(&self) -> Name {
+        self.inner.tbs_certificate.subject.clone().into()
+    }
+
+    pub fn issuer_name(&self) -> Name {
+        self.inner.tbs_certificate.issuer.clone().into()
+    }
+
+    pub fn generate_root(
+        realm_name: &str,
+        signature_hash_type: SignatureHashType,
+        private_key: &PrivateKey,
+        valid_from: UTCDate,
+        valid_to: UTCDate,
+    ) -> Result<Self> {
+        let common_name = Name::new_common_name(realm_name);
+
+        let root = CertificateBuilder::new(signature_hash_type)
+            .valididy(valid_from, valid_to)
+            .subject(common_name.clone(), private_key.to_public_key())
+            .issuer(common_name, &private_key)
+            .ca(true)
+            .pathlen(0)
+            .build()?;
+
+        Ok(Self::new(root))
+    }
+
+    pub fn generate_intermediate(
+        realm_name: Name,
+        realm_key: &PrivateKey,
+        intermediate_name: &str,
+        signature_hash_type: SignatureHashType,
+        private_key: &PrivateKey,
+        valid_from: UTCDate,
+        valid_to: UTCDate,
+    ) -> Result<Self> {
+        let subject_name = Name::new_common_name(intermediate_name);
+        let issuer_name = realm_name;
+
+        let intermediate = CertificateBuilder::new(signature_hash_type)
+            .valididy(valid_from, valid_to)
+            .subject(subject_name, private_key.to_public_key())
+            .issuer(issuer_name, realm_key)
+            .pathlen(1)
+            .ca(true)
+            .build()?;
+
+        Ok(Self::new(intermediate))
+    }
+
+    pub fn generate_leaf_from_csr(
+        csr: Csr,
+        authority_name: Name,
+        authority_key: &PrivateKey,
+        signature_hash_type: SignatureHashType,
+        valid_from: UTCDate,
+        valid_to: UTCDate,
+    ) -> Result<Self> {
+        csr.verify()?;
+
+        let (subject_name, subject_public_key) = csr.into_subject_infos();
+
+        let leaf = CertificateBuilder::new(signature_hash_type)
+            .valididy(valid_from, valid_to)
+            .subject(subject_name, subject_public_key.into())
+            .issuer(authority_name, authority_key)
+            .build()?;
+
+        Ok(Self::new(leaf))
+    }
+
+    pub fn verify(&self, now: &UTCDate) -> Result<()> {
+        let validity = &self.inner.tbs_certificate.validity;
+        let not_before: UTCDate = validity.not_before.clone().into();
+        let not_after: UTCDate = validity.not_after.clone().into();
+
+        if not_before.gt(now) {
+            return Err(Error::CertificateNotYetValid {
+                not_before,
+                now: now.clone(),
+            });
+        }
+
+        if not_after.lt(now) {
+            return Err(Error::CertificateExpired {
+                not_after,
+                now: now.clone(),
+            });
+        }
+
+        Ok(())
+    }
+
+    pub fn verify_chain(&self, chain: &[Cert], now: &UTCDate) -> Result<()> {
+        self.verify(now).ctx("invalid certificate")?;
+
+        let mut current_cert = self;
+        let mut current_pathlen = self.basic_constraints().map(|bc| bc.1).unwrap_or(None);
+
+        for parent_cert in chain {
+            if let Some(0) = current_pathlen {
+                return Err(Error::CAChainTooDeep);
+            }
+
+            parent_cert.verify(now).ctx("invalid parent certificate")?;
+
+            // validate current cert signature using parent public key
+            let hash_type =
+                SignatureHashType::from_algorithm_identifier(&current_cert.inner.signature_algorithm)
+                    .ok_or(Error::UnsupportedAlgorithm("unknown identifier"))?;
+            let public_key = &parent_cert
+                .inner
+                .tbs_certificate
+                .subject_public_key_info;
+            let msg = serde_asn1_der::to_vec(&current_cert.inner.tbs_certificate)
+                .ctx("couldn't serialize child certificate to der")?;
+            hash_type.verify(&public_key.clone().into(), &msg, current_cert.inner.signature_value.0.payload_view())?;
+
+            // update pathlen tracking
+            match (
+                current_pathlen,
+                parent_cert
+                    .basic_constraints()
+                    .map(|bc| bc.1)
+                    .unwrap_or(None),
+            ) {
+                (None, parent_pathlen) => current_pathlen = parent_pathlen,
+                (Some(current_value), Some(parent_value)) if parent_value < current_value => {
+                    current_pathlen = Some(parent_value)
+                }
+                (Some(current_value), _) => current_pathlen = Some(current_value - 1),
+            }
+
+            current_cert = parent_cert;
+        }
+
+        Ok(())
+    }
+}
+
+struct CertificateBuilderInner<'a> {
+    signature_hash_type: SignatureHashType,
+    valid_from: Option<UTCDate>,
+    valid_to: Option<UTCDate>,
+    subject_name: Option<Name>,
+    subject_public_key: Option<PublicKey>,
+    issuer_name: Option<Name>,
+    issuer_key: Option<&'a PrivateKey>,
+    ca: Option<bool>,
+    pathlen: Option<u8>,
+    key_id_gen_method: Option<KeyIdGenMethod>,
+}
+
+pub struct CertificateBuilder<'a> {
+    inner: RefCell<CertificateBuilderInner<'a>>,
+}
+
+impl<'a> CertificateBuilder<'a> {
+    pub fn new(signature_hash_type: SignatureHashType) -> Self {
+        Self {
+            inner: RefCell::new(CertificateBuilderInner {
+                signature_hash_type,
+                valid_from: None,
+                valid_to: None,
+                subject_name: None,
+                subject_public_key: None,
+                issuer_name: None,
+                issuer_key: None,
+                ca: None,
+                pathlen: None,
+                key_id_gen_method: None,
+            }),
+        }
+    }
+
+    /// Required
+    pub fn valididy(&self, valid_from: UTCDate, valid_to: UTCDate) -> &Self {
+        let mut inner_mut = self.inner.borrow_mut();
+        inner_mut.valid_from = Some(valid_from);
+        inner_mut.valid_to = Some(valid_to);
+        drop(inner_mut);
+        self
+    }
+
+    /// Required
+    pub fn subject(&self, subject_name: Name, public_key: PublicKey) -> &Self {
+        let mut inner_mut = self.inner.borrow_mut();
+        inner_mut.subject_name = Some(subject_name);
+        inner_mut.subject_public_key = Some(public_key);
+        self
+    }
+
+    /// Required
+    pub fn issuer(&'a self, issuer_name: Name, issuer_key: &'a PrivateKey) -> &'a Self {
+        let mut inner_mut = self.inner.borrow_mut();
+        inner_mut.issuer_name = Some(issuer_name);
+        inner_mut.issuer_key = Some(issuer_key);
+        self
+    }
+
+    /// Optional
+    pub fn ca(&self, ca: bool) -> &Self {
+        self.inner.borrow_mut().ca = Some(ca);
+        self
+    }
+
+    /// Optional.
+    pub fn pathlen(&self, pathlen: u8) -> &Self {
+        self.inner.borrow_mut().pathlen = Some(pathlen);
+        self
+    }
+
+    /// Optional.
+    pub fn key_id_gen_method(&self, key_id_gen_method: KeyIdGenMethod) -> &Self {
+        self.inner.borrow_mut().key_id_gen_method = Some(key_id_gen_method);
+        self
+    }
+
+    pub fn build(&self) -> Result<Certificate> {
+        let mut inner = self.inner.borrow_mut();
+        let signature_hash_type = inner.signature_hash_type;
+        let valid_from = inner
+            .valid_from
+            .take()
+            .ok_or(Error::MissingBuilderArgument("valid_from"))?;
+        let valid_to = inner
+            .valid_to
+            .take()
+            .ok_or(Error::MissingBuilderArgument("valid_to"))?;
+        let subject_name = inner
+            .subject_name
+            .take()
+            .ok_or(Error::MissingBuilderArgument("subject_name"))?;
+        let subject_public_key = inner
+            .subject_public_key
+            .take()
+            .ok_or(Error::MissingBuilderArgument("subject_public_key_info"))?;
+        let issuer_name = inner
+            .issuer_name
+            .take()
+            .ok_or(Error::MissingBuilderArgument("issuer_name"))?;
+        let issuer_key = inner
+            .issuer_key
+            .take()
+            .ok_or(Error::MissingBuilderArgument("issuer_key"))?;
+        let ca = inner.ca.take().unwrap_or(false);
+        let pathlen = inner.pathlen.take();
+        let key_id_gen_method = inner
+            .key_id_gen_method
+            .take()
+            .unwrap_or(KeyIdGenMethod::SPKFullDER(KeyIdHashAlgo::Sha256));
+        drop(inner);
+
+        let serial_number = BigInt::from_bytes_be(Sign::Plus, &generate_serial_number());
+
+        let validity = Validity {
+            not_before: valid_from.into(),
+            not_after: valid_to.into(),
         };
 
-        cert.set_common_name(cn)
-            .set_issuer(issuer, issuer_key)
-            .set_key(key_type, key)
-            .generate_certificate(hash_type, valid_from, valid_to, ca, pathlen);
-
-        cert
-    }
-
-    fn set_common_name(&mut self, name: &str) -> &mut Self{
-        let cn = name.to_string().clone();
-        self.common_name = cn;
-        self
-    }
-
-    fn set_issuer(&mut self, issuer: Option<&str>, issuer_key: Option<&[u8]>) -> &mut Self{
-        if let Some(i) = issuer{
-            self.issuer = Some(i.to_string());
-
-            if let Some(k) = issuer_key{
-                self.issuer_key = Some(k.to_vec())
-            }
-        }
-        self
-    }
-
-    fn set_key(&mut self, key_type: Option<mbedtls::pk::Type>, key: Option<Keys>) -> &mut Self{
-        match key {
-            Some(k) => {
-                self.keys = Some(k)
-            },
-            None => self.keys = Some(Keys::new(key_type.unwrap(),4096))
-        }
-        self
-    }
-
-    fn create_serial(&mut self) -> Vec<u8>{
-        let mut rng = rand::thread_rng();
-        let x: u32 = rng.gen();
-
-        let b1 = ((x >> 24) & 0xff) as u8;
-        let b2 = ((x >> 16) & 0xff) as u8;
-        let b3 = ((x >> 8) & 0xff) as u8;
-        let b4 = (x & 0xff) as u8;
-        vec![b1, b2, b3, b4]
-
-    }
-
-    fn generate_certificate(&mut self, hash_type: mbedtls::hash::Type, valid_from: X509Time, valid_to: X509Time, ca: bool, pathlen: Option<u32>) -> &mut Self{
-        if self.issuer.is_none(){
-            self.issuer = Some(self.common_name.clone().replace(CN, ""));
-            self.issuer_key = match self.keys.clone(){
-                Some(key) => Some(key.key_der),
-                None => Some(Keys::new(mbedtls::pk::Type::Rsa, 4096).key_der)
-            };
+        // https://tools.ietf.org/html/rfc4055#section-1.2
+        // If the keyUsage extension is present in an end-entity certificate
+        // that conveys an RSA public key with the id-RSASSA-PSS object
+        // identifier, then the keyUsage extension MUST contain one or both of
+        // the following values:
+        //
+        //      nonRepudiation; and
+        //      digitalSignature.
+        //
+        // If the keyUsage extension is present in a certification authority
+        // certificate that conveys an RSA public key with the id-RSASSA-PSS
+        // object identifier, then the keyUsage extension MUST contain one or
+        // more of the following values:
+        //
+        //      nonRepudiation;
+        //      digitalSignature;
+        //      keyCertSign; and
+        //      cRLSign.
+        //
+        // When a certificate conveys an RSA public key with the id-RSASSA-PSS
+        // object identifier, the certificate user MUST only use the certified
+        // RSA public key for RSASSA-PSS operations, and, if RSASSA-PSS-params
+        // is present, the certificate user MUST perform those operations using
+        // the one-way hash function, mask generation function, and trailer
+        // field identified in the subject public key algorithm identifier
+        // parameters within the certificate.
+        //
+        // If the keyUsage extension is present in a certificate conveys an RSA
+        // public key with the id-RSAES-OAEP object identifier, then the
+        // keyUsage extension MUST contain only the following values:
+        //
+        //      keyEncipherment; and
+        //      dataEncipherment.
+        //
+        // However, both keyEncipherment and dataEncipherment SHOULD NOT be
+        // present.
+        let mut key_usage = KeyUsage::new(7);
+        if ca {
+            key_usage.set_digital_signature(true);
+            key_usage.set_key_encipherment(true);
+            key_usage.set_key_cert_sign(true);
+            key_usage.set_crl_sign(true);
+            key_usage.set_key_agreement(true);
         } else {
-            if let Ok(ca) = Certificate::from_der(&base64::decode(&self.issuer.clone().unwrap()).unwrap()){
-                self.issuer = Some(ca.subject().unwrap().replace(CN, ""));
-            }
-        }
+            key_usage.set_digital_signature(true);
+            key_usage.set_key_encipherment(true);
+        };
 
-        let mut entropy = OsEntropy::new();
+        let ski = key_id_gen_method.generate_from(&subject_public_key)?;
+        let aki = key_id_gen_method.generate_from(&issuer_key.to_public_key())?;
 
-        let mut subject_key;
-        let mut issuer_key;
-        let key_usage;
-        if ca{
-            subject_key = Keys::get_pk_from_private(&self.keys.clone().expect("No subject key").key_der.clone());
-            issuer_key = Keys::get_pk_from_private(&self.issuer_key.clone().expect("No issuer key").clone());
-            key_usage = key_usage::DIGITAL_SIGNATURE | key_usage::KEY_CERT_SIGN | key_usage::CRL_SIGN | key_usage::KEY_ENCIPHERMENT | key_usage::KEY_AGREEMENT;
-        } else {
-            subject_key = Keys::get_pk_from_public(&self.keys.clone().expect("No subject key").key_der.clone());
-            issuer_key = Keys::get_pk_from_private(&self.issuer_key.clone().expect("No issuer key").clone());
-            key_usage = key_usage::DIGITAL_SIGNATURE | key_usage::KEY_ENCIPHERMENT;
-        }
+        let extensions = Extensions(vec![
+            Extension::new_basic_constraints(false, ca, pathlen),
+            Extension::new_key_usage(key_usage),
+            Extension::new_subject_key_identifier(ski),
+            Extension::new_authority_key_identifier(KeyIdentifier::from(aki), None, None),
+        ]);
 
-        self.certificate_der = certificate::Builder::new()
-            .subject_key(&mut subject_key)
-            .subject_with_nul(&format!("{}{}{}", CN, self.common_name, "\0")).unwrap()
-            .issuer_key(&mut issuer_key)
-            .issuer_with_nul(&format!("{}{}{}", CN, self.issuer.clone().unwrap(), "\0")).unwrap()
-            .basic_constraints(ca, pathlen).unwrap()
-            .validity(valid_from.to_time_native(), valid_to.to_time_native()).unwrap()
-            .serial(&self.create_serial()).unwrap()
-            .signature_hash(hash_type.clone())
-            .key_usage(key_usage).unwrap()
-            .set_subject_key_identifier().unwrap()
-            .set_authority_key_identifier().unwrap()
-            .write_der_vec(&mut get_rng(&mut entropy)).unwrap();
-        self
-    }
+        let tbs_certificate = TBSCertificate {
+            version: Version::V3.into(),
+            serial_number: serial_number.into(),
+            signature: signature_hash_type.into(),
+            issuer: issuer_name.into(),
+            validity,
+            subject: subject_name.into(),
+            subject_public_key_info: subject_public_key.into(),
+            extensions: extensions.into(),
+        };
 
-    pub fn generate_root(realm: &str, hash_type: mbedtls::hash::Type, key_type: mbedtls::pk::Type, _bits: u32) -> Cert{
-        let cert = Cert::new(CertificateType::Root,
-                             hash_type,
-                             Some(key_type),
-                             &format!("{} Root CA", realm),
-                             None,
-                             None,
-                             None,
-                             X509Time::from(Utc::now()),
-                             X509Time::from(Duration::hours(ROOT_DURATION)),
-                             true);
-        cert
-    }
+        let tbs_der = serde_asn1_der::to_vec(&tbs_certificate)
+            .ctx("couldn't serialize tbs certificate into der")?;
+        let signature_value =
+            BitString::with_bytes(signature_hash_type.sign(&tbs_der, issuer_key)?);
 
-    pub fn generate_intermediate(root: &[u8], root_key: &[u8], realm: &str, hash_type: mbedtls::hash::Type, key_type: mbedtls::pk::Type, bits: u32) -> Cert{
-        let keys = Keys::new(key_type, bits);
-        let pk = Keys::get_pk_from_private(&keys.key_der);
-
-        let csr = CertificateSignRequest::generate_csr(&format!("{}{} Authority", CN, realm), pk);
-
-        let csr_struct = Csr::from_pem(csr.as_bytes()).unwrap();
-
-        let intermediate= Cert::new(
-            CertificateType::Intermediate,
-            hash_type,
-            Some(key_type),
-            &(csr_struct.subject().unwrap().trim_start_matches(CN)),
-            Some(&base64::encode(root)),
-            Some(root_key),
-            Some(keys.clone()),
-            X509Time::from(Utc::now()),
-            X509Time::from(Duration::hours(INTERMEDIATE_DURATION)),
-            true);
-
-        intermediate
-    }
-
-    pub fn generate_from_csr(csr: &str, authority: &[u8], authority_key: &[u8], hash_type: mbedtls::hash::Type) -> Cert{
-        let mut csr_struct = Csr::from_pem(format!("{}{}", csr, "\0").as_bytes()).unwrap();
-        let mut leaf_key = csr_struct.public_key_mut();
-
-        let leaf_key = Keys::new_from_pk_public(&mut leaf_key);
-
-        let leaf= Cert::new(
-            CertificateType::Leaf,
-            hash_type,
-            None,
-            &csr_struct.subject().unwrap().trim_start_matches(CN),
-            Some(&base64::encode(authority)),
-            Some(authority_key),
-            Some(leaf_key),
-            X509Time::from(Utc::now()),
-            X509Time::from(Duration::hours(DEFAULT_DURATION)),
-            false);
-
-        leaf
+        Ok(Certificate {
+            tbs_certificate,
+            signature_algorithm: signature_hash_type.into(),
+            signature_value: signature_value.into(),
+        })
     }
 }
 
-#[derive( Debug, Clone)]
-pub struct X509Time{
-    year: u16,
-    month: u8,
-    day: u8,
-    hour: u8,
-    minute: u8,
-    second: u8
-}
-
-impl X509Time{
-    pub fn new(year:u16, month:u8, day: u8, hour:u8, minute:u8, second:u8) -> Self{
-        X509Time{
-            year,
-            month,
-            day,
-            hour,
-            minute,
-            second
-        }
-    }
-
-    pub fn to_time_native(&self) -> Time{
-        Time::new(self.year, self.month, self.day, self.hour, self.minute, self.second).unwrap()
-    }
-}
-
-impl From<Duration> for X509Time{
-    fn from(d: Duration) -> Self{
-        let date = Utc::now().checked_add_signed(d).unwrap();
-        X509Time::from(date)
-    }
-}
-
-impl From<DateTime<Utc>> for X509Time{
-    fn from(d: DateTime<Utc>) -> Self{
-        X509Time{
-            year: d.year() as u16,
-            month: d.month() as u8,
-            day: d.day() as u8,
-            hour: d.hour() as u8,
-            minute: d.minute() as u8,
-            second: d.second() as u8
-        }
-    }
-}
-
-pub fn get_rng<'a>(entropy: &'a mut OsEntropy) -> CtrDrbg<'a>{
-    let rng: CtrDrbg<'a> = CtrDrbg::new(entropy, None).unwrap();
-    rng
+fn generate_serial_number() -> Vec<u8> {
+    let mut rng = OsRng::new().expect("couldn't fetch OsRng");
+    let x = rng.next_u32();
+    let b1 = ((x >> 24) & 0xff) as u8;
+    let b2 = ((x >> 16) & 0xff) as u8;
+    let b3 = ((x >> 8) & 0xff) as u8;
+    let b4 = (x & 0xff) as u8;
+    vec![b1, b2, b3, b4]
 }
 
 #[cfg(test)]
-mod tests{
-    
-    use x509_parser::{TbsCertificate, X509Extension, parse_x509_der, pem::pem_to_der, error};
-    use der_parser::{oid};
-    
-
-    static PEM: &'static [u8] = include_bytes!("../../test_files/intermediate_ca.crt");
-
-    static PEM_STR: &'static str = "-----BEGIN CERTIFICATE-----
-MIIDPzCCAiegAwIBAgIBATANBgkqhkiG9w0BAQUFADA7MQswCQYDVQQGEwJOTDER
-MA8GA1UECgwIUG9sYXJTU0wxGTAXBgNVBAMMEFBvbGFyU1NMIFRlc3QgQ0EwHhcN
-MTEwMjEyMTQ0NDA2WhcNMjEwMjEyMTQ0NDA2WjA8MQswCQYDVQQGEwJOTDERMA8G
-A1UECgwIUG9sYXJTU0wxGjAYBgNVBAMMEVBvbGFyU1NMIFNlcnZlciAxMIIBIjAN
-BgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqQIfPUBq1VVTi/027oJlLhVhXom/
-uOhFkNvuiBZS0/FDUEeWEllkh2v9K+BG+XO+3c+S4ZFb7Wagb4kpeUWA0INq1UFD
-d185fAkER4KwVzlw7aPsFRkeqDMIR8EFQqn9TMO0390GH00QUUBncxMPQPhtgSVf
-CrFTxjB+FTms+Vruf5KepgVb5xOXhbUjktnUJAbVCSWJdQfdphqPPwkZvq1lLGTr
-lZvc/kFeF6babFtpzAK6FCwWJJxK3M3Q91Jnc/EtoCP9fvQxyi1wyokLBNsupk9w
-bp7OvViJ4lNZnm5akmXiiD8MlBmj3eXonZUT7Snbq3AS3FrKaxerUoJUsQIDAQAB
-o00wSzAJBgNVHRMEAjAAMB0GA1UdDgQWBBQfdNY/KcF0dEU7BRIsPai9Q1kCpjAf
-BgNVHSMEGDAWgBS0WuSls97SUva51aaVD+s+vMf9/zANBgkqhkiG9w0BAQUFAAOC
-AQEAm9GKWy4Z6eS483GoR5omwx32meCStm/vFuW+nozRwqwTG5d2Etx4TPnz73s8
-fMtM1QB0QbfBDDHxfGymEsKwICmCkJszKE7c03j3mkddrrvN2eIYiL6358S3yHMj
-iLVCraRUoEm01k7iytjxrcKb//hxFvHoxD1tdMqbuvjMlTS86kJSrkUMDw68UzfL
-jvo3oVjiexfasjsICXFNoncjthKtS7v4zrsgXNPz92h58NgXnDtQU+Eb9tVA9kUs
-Ln/az3v5DdgrNoAO60zK1zYAmekLil7pgba/jBLPeAQ2fZVgFxttKv33nUnUBzKA
-Od8i323fM5dQS1qQpBjBc/5fPw==
------END CERTIFICATE-----
-";
+mod tests {
+    use super::*;
+    use crate::pem::Pem;
 
     #[test]
-    fn key_id_test_with_file(){
-        let intermediate = pem_to_der(PEM);
+    fn get_identifier() {
+        let pem = crate::test_files::RSA_2048_PK_1
+            .parse::<Pem>()
+            .expect("couldn't parse pem");
+        let private_key =
+            PrivateKey::from_pkcs8(pem.data()).expect("couldn't extract private key from pkcs8");
 
-        let der = match intermediate{
-            Ok((rem, pem)) => {
-                assert_eq!(rem.is_empty(), true);
-                pem.contents.clone()
-            },
-            Err(_e) => {
-                panic!()
-            }
-        };
+        // validity
+        let valid_from = UTCDate::ymd(2019, 10, 10).unwrap();
+        let valid_to = UTCDate::ymd(2019, 10, 11).unwrap();
 
-        let empty = &b""[..];
+        let root = Cert::generate_root(
+            "test",
+            SignatureHashType::RsaSha256,
+            &private_key,
+            valid_from,
+            valid_to,
+        )
+        .expect("couldn't generate root ca");
 
-        let res = parse_x509_der(&der);
+        root.subject_key_identifier()
+            .expect("couldn't get subject key identifier");
+        root.authority_key_identifier()
+            .expect("couldn't get authority key identifier");
 
-        match res{
-            Ok((e, cert)) => {
-                assert_eq!(e, empty);
-
-                let tbs_cert = cert.tbs_certificate;
-
-                let ext = tbs_cert.extensions;
-
-                for x in ext{
-                    if x.oid == oid::Oid::from(&[2, 5, 29, 14]){
-                        let ski = x.value.to_vec();
-                        let ski_hex= hex::encode(&ski[2..]);
-                        assert_eq!("1f74d63f29c17474453b05122c3da8bd435902a6", ski_hex);
-                    }
-
-                    if x.oid == oid::Oid::from(&[2, 5, 29, 35]){
-                        let aki = x.value.to_vec();
-                        let aki = hex::encode(&aki[4..]);
-                        assert_eq!("b45ae4a5b3ded252f6b9d5a6950feb3ebcc7fdff", aki);
-                    }
-                }
-            },
-            Err(_e) => {
-                panic!()
-            }
-        }
+        assert_eq!(root.ty(), CertType::Root);
     }
 
     #[test]
-    fn key_id_test_with_str(){
-
-        let pem: &[u8] = PEM_STR.as_bytes();
-        let pem_inc: &[u8] = include_bytes!("../../test_files/intermediate_ca.crt");
-        assert_eq!(pem, pem_inc);
-
-        let intermediate = pem_to_der(&pem);
-
-        let der = match intermediate{
-            Ok((rem, pem)) => {
-                assert_eq!(rem.is_empty(), true);
-                pem.contents.clone()
-            },
-            Err(_e) => {
-                panic!()
-            }
-        };
-
-        let empty = &b""[..];
-
-        let res = parse_x509_der(&der);
-
-        match res{
-            Ok((e, cert)) => {
-                assert_eq!(e, empty);
-
-                let tbs_cert = cert.tbs_certificate;
-
-                let ext = tbs_cert.extensions;
-
-                for x in ext{
-                    if x.oid == oid::Oid::from(&[2, 5, 29, 14]){
-                        let ski = x.value.to_vec();
-                        let ski_hex= hex::encode(&ski[2..]);
-                        assert_eq!("1f74d63f29c17474453b05122c3da8bd435902a6", ski_hex);
-                    }
-
-                    if x.oid == oid::Oid::from(&[2, 5, 29, 35]){
-                        let aki = x.value.to_vec();
-                        let aki = hex::encode(&aki[4..]);
-                        assert_eq!("b45ae4a5b3ded252f6b9d5a6950feb3ebcc7fdff", aki);
-                    }
-                }
-            },
-            Err(_e) => {
-                panic!()
-            }
-        }
+    fn key_id_and_cert() {
+        let kid = "9a3e5270e7b8635c86b6012973b780dbe03427f6";
+        let pem = crate::test_files::ROOT_CA
+            .parse::<Pem>()
+            .expect("couldn't parse PEM");
+        let cert = Cert::from_der(pem.data()).expect("couldn't deserialize certificate");
+        assert_eq!(cert.ty(), CertType::Root);
+        let key_id = cert
+            .subject_key_identifier()
+            .expect("couldn't get subject key identifier");
+        pretty_assertions::assert_eq!(hex::encode(&key_id), kid);
     }
 }
