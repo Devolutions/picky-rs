@@ -12,9 +12,9 @@ pub enum Error {
     #[error(display = "{}", _0)]
     Boxed(BoxedError),
     #[error(display = "invalid pem: {}", _0)]
-    Pem(PemError),
+    Pem(#[error(source)] PemError),
     #[error(display = "asn1 (de)serialization error: {}", _0)]
-    Asn1(SerdeAsn1DerError),
+    Asn1(#[error(source)] SerdeAsn1DerError),
     #[error(display = "couldn't generate certificate")]
     CertGeneration,
     #[error(display = "RSA error")]
@@ -23,6 +23,10 @@ pub enum Error {
     BadSignature,
     #[error(display = "CA chain depth does't satisfy basic constraints extension")]
     CAChainTooDeep,
+    #[error(display = "CA chain is missing a root certificate")]
+    CAChainNoRoot,
+    #[error(display = "authority key id doesn't match (expected: {:?}, got: {:?})", expected, actual)]
+    AuthorityKeyIdMismatch { expected: Vec<u8>, actual: Vec<u8> },
     #[error(display = "extension not found: {}", _0)]
     ExtensionNotFound(&'static str),
     #[error(display = "missing required builder argument `{}`", _0)]
@@ -54,17 +58,5 @@ impl<T: 'static + Send + Sync + std::fmt::Debug + std::fmt::Display> From<Contex
 {
     fn from(e: ContextError<T>) -> Self {
         Self::Boxed(Box::new(e))
-    }
-}
-
-impl From<PemError> for Error {
-    fn from(e: PemError) -> Self {
-        Self::Pem(e)
-    }
-}
-
-impl From<SerdeAsn1DerError> for Error {
-    fn from(e: SerdeAsn1DerError) -> Self {
-        Self::Asn1(e)
     }
 }

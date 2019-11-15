@@ -76,7 +76,10 @@ impl Picky {
         )
     }
 
-    pub fn verify_chain(leaf: &Cert, chain: &[Cert]) -> Result<()> {
+    pub fn verify_chain<'a, Chain: Iterator<Item = &'a Cert>>(
+        leaf: &Cert,
+        chain: Chain,
+    ) -> Result<()> {
         leaf.verify_chain(chain, &UTCDate::now())
     }
 }

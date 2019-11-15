@@ -742,6 +742,6 @@ mod tests {
         assert_eq!(chain[0].subject_name().to_string(), "CN=Picky Authority");
         assert_eq!(chain[1].subject_name().to_string(), "CN=Picky Root CA");
 
-        Picky::verify_chain(&signed_cert, &chain).expect("couldn't validate ca chain");
+        Picky::verify_chain(&signed_cert, chain.iter()).expect("couldn't validate ca chain");
     }
 }

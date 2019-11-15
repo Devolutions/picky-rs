@@ -147,11 +147,9 @@ impl Cert {
     ) -> Result<Self> {
         csr.verify()?;
 
-        let (subject_name, subject_public_key) = csr.into_subject_infos();
-
         let leaf = CertificateBuilder::new(signature_hash_type)
             .valididy(valid_from, valid_to)
-            .subject(subject_name, subject_public_key.into())
+            .subject_from_csr(csr)
             .issuer(authority_name, authority_key)
             .build()?;
 
@@ -180,11 +178,16 @@ impl Cert {
         Ok(())
     }
 
-    pub fn verify_chain(&self, chain: &[Cert], now: &UTCDate) -> Result<()> {
+    pub fn verify_chain<'a, Chain: Iterator<Item = &'a Cert>>(
+        &self,
+        chain: Chain,
+        now: &UTCDate,
+    ) -> Result<()> {
         self.verify(now).ctx("invalid certificate")?;
 
         let mut current_cert = self;
         let mut current_pathlen = self.basic_constraints().map(|bc| bc.1).unwrap_or(None);
+        let mut root_ca_not_found = true;
 
         for parent_cert in chain {
             if let Some(0) = current_pathlen {
@@ -193,17 +196,29 @@ impl Cert {
 
             parent_cert.verify(now).ctx("invalid parent certificate")?;
 
+            // check current cert aki match parent ski
+            let parent_ski = parent_cert.subject_key_identifier().ctx("couldn't fetch parent ski")?;
+            let current_aki = current_cert.authority_key_identifier().ctx("couldn't fetch child aki")?;
+            if parent_ski != current_aki {
+                return Err(Error::AuthorityKeyIdMismatch {
+                    expected: current_aki.to_vec(),
+                    actual: parent_ski.to_vec(),
+                });
+            }
+
             // validate current cert signature using parent public key
-            let hash_type =
-                SignatureHashType::from_algorithm_identifier(&current_cert.inner.signature_algorithm)
-                    .ok_or(Error::UnsupportedAlgorithm("unknown identifier"))?;
-            let public_key = &parent_cert
-                .inner
-                .tbs_certificate
-                .subject_public_key_info;
+            let hash_type = SignatureHashType::from_algorithm_identifier(
+                &current_cert.inner.signature_algorithm,
+            )
+            .ok_or(Error::UnsupportedAlgorithm("unknown identifier"))?;
+            let public_key = &parent_cert.inner.tbs_certificate.subject_public_key_info;
             let msg = serde_asn1_der::to_vec(&current_cert.inner.tbs_certificate)
                 .ctx("couldn't serialize child certificate to der")?;
-            hash_type.verify(&public_key.clone().into(), &msg, current_cert.inner.signature_value.0.payload_view())?;
+            hash_type.verify(
+                &public_key.clone().into(),
+                &msg,
+                current_cert.inner.signature_value.0.payload_view(),
+            )?;
 
             // update pathlen tracking
             match (
@@ -220,7 +235,18 @@ impl Cert {
                 (Some(current_value), _) => current_pathlen = Some(current_value - 1),
             }
 
+            // check if this is a root CA
+            let parent_aki = parent_cert.authority_key_identifier().ctx("couldn't fetch parent aki")?;
+            if parent_ski == parent_aki {
+                root_ca_not_found = false;
+                break;
+            }
+
             current_cert = parent_cert;
+        }
+
+        if root_ca_not_found {
+            return Err(Error::CAChainNoRoot);
         }
 
         Ok(())
@@ -271,12 +297,18 @@ impl<'a> CertificateBuilder<'a> {
         self
     }
 
-    /// Required
+    /// Required (alternative: subject_from_csr)
     pub fn subject(&self, subject_name: Name, public_key: PublicKey) -> &Self {
         let mut inner_mut = self.inner.borrow_mut();
         inner_mut.subject_name = Some(subject_name);
         inner_mut.subject_public_key = Some(public_key);
         self
+    }
+
+    /// Required (alternative: subject)
+    pub fn subject_from_csr(&self, csr: Csr) -> &Self {
+        let (subject_name, public_key) = csr.into_subject_infos();
+        self.subject(subject_name, public_key)
     }
 
     /// Required
@@ -485,5 +517,157 @@ mod tests {
             .subject_key_identifier()
             .expect("couldn't get subject key identifier");
         pretty_assertions::assert_eq!(hex::encode(&key_id), kid);
+    }
+
+    fn parse_key(pem_str: &str) -> PrivateKey {
+        let pem = pem_str.parse::<Pem>().unwrap();
+        PrivateKey::from_pkcs8(pem.data()).unwrap()
+    }
+
+    #[test]
+    fn valid_ca_chain() {
+        let root_key = parse_key(crate::test_files::RSA_2048_PK_1);
+        let intermediate_key = parse_key(crate::test_files::RSA_2048_PK_2);
+        let leaf_key = parse_key(crate::test_files::RSA_2048_PK_3);
+
+        let root = Cert::generate_root(
+            "TheFuture.usodakedo Root CA",
+            SignatureHashType::RsaSha512,
+            &root_key,
+            UTCDate::ymd(2065, 6, 15).unwrap(),
+            UTCDate::ymd(2070, 6, 15).unwrap(),
+        )
+        .unwrap();
+
+        let intermediate = Cert::generate_intermediate(
+            root.subject_name(),
+            &root_key,
+            "TheFuture.usodakedo Authority",
+            SignatureHashType::RsaSha224,
+            &intermediate_key,
+            UTCDate::ymd(2068, 1, 1).unwrap(),
+            UTCDate::ymd(2071, 1, 1).unwrap(),
+        )
+        .unwrap();
+
+        let csr = Csr::generate(
+            Name::new_common_name("ChillingInTheFuture.usobakkari"),
+            &leaf_key,
+            SignatureHashType::RsaSha1,
+        )
+        .unwrap();
+
+        let signed_leaf = Cert::generate_leaf_from_csr(
+            csr,
+            intermediate.subject_name(),
+            &intermediate_key,
+            SignatureHashType::RsaSha384,
+            UTCDate::ymd(2069, 1, 1).unwrap(),
+            UTCDate::ymd(2072, 1, 1).unwrap(),
+        )
+        .unwrap();
+
+        let chain = [intermediate, root];
+
+        signed_leaf
+            .verify_chain(chain.iter(), &UTCDate::ymd(2069, 10, 1).unwrap())
+            .expect("couldn't verify chain");
+
+        let expired_err = signed_leaf
+            .verify_chain(chain.iter(), &UTCDate::ymd(2080, 10, 1).unwrap())
+            .unwrap_err();
+        assert_eq!(
+            expired_err.to_string(),
+            "invalid certificate: certificate expired (not after: 2072-01-01 00:00:00, now: 2080-10-01 00:00:00)"
+        );
+
+        let intermediate_expired_err = signed_leaf
+            .verify_chain(chain.iter(), &UTCDate::ymd(2071, 6, 1).unwrap())
+            .unwrap_err();
+        assert_eq!(
+            intermediate_expired_err.to_string(),
+            "invalid parent certificate: certificate expired (not after: 2071-01-01 00:00:00, now: 2071-06-01 00:00:00)"
+        );
+
+        let root_expired_err = signed_leaf
+            .verify_chain(chain.iter(), &UTCDate::ymd(2070, 6, 16).unwrap())
+            .unwrap_err();
+        assert_eq!(
+            root_expired_err.to_string(),
+            "invalid parent certificate: certificate expired (not after: 2070-06-15 00:00:00, now: 2070-06-16 00:00:00)"
+        );
+
+        let still_in_2019_err = signed_leaf
+            .verify_chain(chain.iter(), &UTCDate::ymd(2019, 11, 14).unwrap())
+            .unwrap_err();
+        assert_eq!(
+            still_in_2019_err.to_string(),
+            "invalid certificate: certificate is not yet valid (not before: 2069-01-01 00:00:00, now: 2019-11-14 00:00:00)"
+        );
+    }
+
+    #[test]
+    fn malicious_ca_chain() {
+        let root_key = parse_key(crate::test_files::RSA_2048_PK_1);
+        let intermediate_key = parse_key(crate::test_files::RSA_2048_PK_2);
+        let leaf_key = parse_key(crate::test_files::RSA_2048_PK_3);
+        let malicious_root_key = parse_key(crate::test_files::RSA_2048_PK_4);
+
+        let root = Cert::generate_root(
+            "VerySafe Root CA",
+            SignatureHashType::RsaSha512,
+            &root_key,
+            UTCDate::ymd(2065, 6, 15).unwrap(),
+            UTCDate::ymd(2070, 6, 15).unwrap(),
+        )
+        .unwrap();
+
+        let intermediate = Cert::generate_intermediate(
+            root.subject_name(),
+            &malicious_root_key,
+            "V.E.R.Y Legitimate VerySafe Authority",
+            SignatureHashType::RsaSha224,
+            &intermediate_key,
+            UTCDate::ymd(2068, 1, 1).unwrap(),
+            UTCDate::ymd(2071, 1, 1).unwrap(),
+        )
+        .unwrap();
+
+        let csr = Csr::generate(
+            Name::new_common_name("I Trust This V.E.R.Y Legitimate Intermediate Certificate"),
+            &leaf_key,
+            SignatureHashType::RsaSha1,
+        )
+        .unwrap();
+
+        let signed_leaf = Cert::generate_leaf_from_csr(
+            csr,
+            intermediate.subject_name(),
+            &intermediate_key,
+            SignatureHashType::RsaSha384,
+            UTCDate::ymd(2069, 1, 1).unwrap(),
+            UTCDate::ymd(2072, 1, 1).unwrap(),
+        )
+        .unwrap();
+
+        let chain = [intermediate, root];
+
+        let root_missing_err = signed_leaf
+            .verify_chain(chain[..1].iter(), &UTCDate::ymd(2069, 10, 1).unwrap())
+            .unwrap_err();
+
+        assert_eq!(
+            root_missing_err.to_string(),
+            "CA chain is missing a root certificate"
+        );
+
+        let invalid_sig_err = signed_leaf
+            .verify_chain(chain.iter(), &UTCDate::ymd(2069, 10, 1).unwrap())
+            .unwrap_err();
+
+        assert_eq!(
+            invalid_sig_err.to_string(),
+            "couldn\'t verify signature: invalid signature"
+        );
     }
 }

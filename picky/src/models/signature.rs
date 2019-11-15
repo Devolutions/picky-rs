@@ -1,16 +1,18 @@
 use crate::{
     error::{Error, Result},
-    models::key::PrivateKey,
+    models::key::{PrivateKey, PublicKey},
     oids, serde,
     serde::AlgorithmIdentifier,
 };
 use err_ctx::ResultExt;
 use rand::rngs::OsRng;
-use rsa::{hash::Hashes, BigUint, PaddingScheme, PublicKey as RsaPublicKeyInterface, RSAPrivateKey, RSAPublicKey};
+use rsa::{
+    hash::Hashes, BigUint, PaddingScheme, PublicKey as RsaPublicKeyInterface, RSAPrivateKey,
+    RSAPublicKey,
+};
 use serde_asn1_der::asn1_wrapper::{BitStringAsn1Container, OctetStringAsn1Container};
 use sha1::{Digest, Sha1};
 use sha2::{Sha224, Sha256, Sha384, Sha512};
-use crate::models::key::PublicKey;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SignatureHashType {
@@ -88,22 +90,15 @@ impl SignatureHashType {
         Ok(signature)
     }
 
-    pub fn verify(
-        self,
-        public_key: &PublicKey,
-        msg: &[u8],
-        signature: &[u8],
-    ) -> Result<()> {
+    pub fn verify(self, public_key: &PublicKey, msg: &[u8], signature: &[u8]) -> Result<()> {
         use crate::serde::subject_public_key_info::PublicKey as InnerPublicKey;
         let public_key = match &public_key.as_inner().subject_public_key {
-            InnerPublicKey::RSA(BitStringAsn1Container(key)) => {
-                RSAPublicKey::new(
-                    BigUint::from_bytes_be(&key.modulus.0.to_bytes_be().1),
-                    BigUint::from_bytes_be(&key.public_exponent.0.to_bytes_be().1),
-                )
-                .map_err(|_| Error::Rsa)
-                .ctx("couldn't build RSA public key from subject public key info")?
-            }
+            InnerPublicKey::RSA(BitStringAsn1Container(key)) => RSAPublicKey::new(
+                BigUint::from_bytes_be(&key.modulus.0.to_bytes_be().1),
+                BigUint::from_bytes_be(&key.public_exponent.0.to_bytes_be().1),
+            )
+            .map_err(|_| Error::Rsa)
+            .ctx("couldn't build RSA public key from subject public key info")?,
             InnerPublicKey::EC(_) => {
                 return Err(Error::UnsupportedAlgorithm("elliptic curves"));
             }
