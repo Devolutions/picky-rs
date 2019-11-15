@@ -471,7 +471,7 @@ fn request_name(_: &ControllerData, req: &SyncRequest, res: &mut SyncResponse) {
         "couldn't parse pem"
     );
     let csr = saphir_try!(Csr::from_der(csr_pem.data()), "couldn't deserialize CSR");
-    let subject_name = csr.subject_name().to_string();
+    let subject_name = csr.subject_name().to_string().replace("CN=", "");
 
     res.body(subject_name);
     res.status(StatusCode::OK);
