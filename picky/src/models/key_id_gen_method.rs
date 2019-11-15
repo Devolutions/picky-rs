@@ -1,7 +1,4 @@
-use crate::{
-    error::Result,
-    serde::{subject_public_key_info::PublicKey, SubjectPublicKeyInfo},
-};
+use crate::{error::Result, models::key::PublicKey};
 use err_ctx::ResultExt;
 use serde_asn1_der::asn1_wrapper::BitStringAsn1Container;
 use sha1::{Digest, Sha1};
@@ -48,20 +45,24 @@ macro_rules! hash {
 }
 
 impl KeyIdGenMethod {
-    pub fn generate_from(&self, spk: &SubjectPublicKeyInfo) -> Result<Vec<u8>> {
+    pub fn generate_from(&self, public_key: &PublicKey) -> Result<Vec<u8>> {
+        use crate::serde::subject_public_key_info::PublicKey as InnerPublicKey;
         match self {
-            KeyIdGenMethod::SPKValueHashedLeftmost160(hash_algo) => match &spk.subject_public_key {
-                PublicKey::RSA(BitStringAsn1Container(rsa_pk)) => {
-                    let der = serde_asn1_der::to_vec(rsa_pk)?;
-                    Ok(hash!(hash_algo, der)[..160].to_vec())
+            KeyIdGenMethod::SPKValueHashedLeftmost160(hash_algo) => {
+                match &public_key.as_inner().subject_public_key {
+                    InnerPublicKey::RSA(BitStringAsn1Container(rsa_pk)) => {
+                        let der = serde_asn1_der::to_vec(rsa_pk)?;
+                        Ok(hash!(hash_algo, der)[..160].to_vec())
+                    }
+                    InnerPublicKey::EC(bitstring) => {
+                        let der = bitstring.0.payload_view();
+                        Ok(hash!(hash_algo, der)[..160].to_vec())
+                    }
                 }
-                PublicKey::EC(bitstring) => {
-                    let der = bitstring.0.payload_view();
-                    Ok(hash!(hash_algo, der)[..160].to_vec())
-                }
-            },
+            }
             KeyIdGenMethod::SPKFullDER(hash_algo) => {
-                let der = serde_asn1_der::to_vec(&spk)
+                let der = public_key
+                    .to_der()
                     .ctx("couldn't serialize subject public key info to der")?;
                 Ok(hash!(hash_algo, der))
             }

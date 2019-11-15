@@ -5,7 +5,6 @@ use crate::{
         AlgorithmIdentifier, Extensions, Name, SubjectPublicKeyInfo, Validity, Version,
     },
 };
-use err_ctx::ResultExt;
 use serde::de;
 use serde_asn1_der::asn1_wrapper::{
     ApplicationTag0, ApplicationTag3, BitStringAsn1, Implicit, IntegerAsn1,
@@ -27,8 +26,7 @@ macro_rules! find_ext {
             .0
             .iter()
             .find(|ext| ext.extn_id == key_identifier_oid)
-            .ok_or(crate::error::Error::ExtensionNotFound)
-            .ctx($error_ctx)
+            .ok_or(crate::error::Error::ExtensionNotFound($error_ctx))
     }};
 }
 
@@ -45,7 +43,7 @@ impl Certificate {
         let ext = find_ext!(
             oids::subject_key_identifier(),
             self,
-            "couldn't fetch subject key identifier"
+            "subject key identifier"
         )?;
         match &ext.extn_value {
             ExtensionValue::SubjectKeyIdentifier(ski) => Ok(&(ski.0).0),
@@ -57,7 +55,7 @@ impl Certificate {
         let ext = find_ext!(
             oids::authority_key_identifier(),
             self,
-            "couldn't fetch authority key identifier"
+            "authority key identifier"
         )?;
         match &ext.extn_value {
             ExtensionValue::AuthorityKeyIdentifier(OctetStringAsn1Container(
@@ -71,11 +69,7 @@ impl Certificate {
     }
 
     pub fn basic_constraints(&self) -> crate::error::Result<(Option<bool>, Option<u8>)> {
-        let ext = find_ext!(
-            oids::basic_constraints(),
-            self,
-            "couldn't fetch basic constraints"
-        )?;
+        let ext = find_ext!(oids::basic_constraints(), self, "basic constraints")?;
         match &ext.extn_value {
             ExtensionValue::BasicConstraints(OctetStringAsn1Container(BasicConstraints {
                 ca: Implicit(ca),

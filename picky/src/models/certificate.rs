@@ -2,71 +2,45 @@ use crate::{
     error::{Error, Result},
     models::{
         csr::Csr,
+        date::UTCDate,
+        key::{PrivateKey, PublicKey},
         key_id_gen_method::{KeyIdGenMethod, KeyIdHashAlgo},
-        private_key::PrivateKey,
+        name::Name,
         signature::SignatureHashType,
     },
     pem::Pem,
     serde::{
         certificate::TBSCertificate,
         extension::{Extension, Extensions, KeyIdentifier, KeyUsage},
-        name::{new_common_name, Name},
-        Certificate, SubjectPublicKeyInfo, Validity, Version,
+        Certificate, Validity, Version,
     },
 };
 use err_ctx::ResultExt;
 use num_bigint_dig::{BigInt, Sign};
 use rand::{rngs::OsRng, RngCore};
-use serde_asn1_der::{bit_string::BitString, date::GeneralizedTime};
+use serde_asn1_der::bit_string::BitString;
 use std::cell::RefCell;
 
-const DEFAULT_DURATION: i64 = 26280;
-const ROOT_DURATION: i64 = 87600;
-const INTERMEDIATE_DURATION: i64 = 43800;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum CertificateType {
+pub enum CertType {
     Root,
     Intermediate,
     Leaf,
+    Unknown,
 }
 
 #[derive(Debug, Clone)]
 pub struct Cert {
-    ty: CertificateType,
     inner: Certificate,
 }
 
 impl Cert {
-    pub fn new(ty: CertificateType, certificate: Certificate) -> Self {
-        Self {
-            ty,
-            inner: certificate,
-        }
-    }
-
-    pub fn from_certificate(certificate: Certificate) -> Result<Self> {
-        let (ca, len) = certificate.basic_constraints()?;
-        let ty = if let Some(true) = ca {
-            if let Some(0) = len {
-                CertificateType::Root
-            } else {
-                CertificateType::Intermediate
-            }
-        } else {
-            CertificateType::Leaf
-        };
-        Ok(Self::new(ty, certificate))
+    pub fn new(certificate: Certificate) -> Self {
+        Self { inner: certificate }
     }
 
     pub fn from_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self> {
-        Ok(Self::from_certificate(serde_asn1_der::from_bytes(
-            der.as_ref(),
-        )?)?)
-    }
-
-    pub fn ty(&self) -> CertificateType {
-        self.ty
+        Ok(Self::new(serde_asn1_der::from_bytes(der.as_ref())?))
     }
 
     pub fn to_der(&self) -> serde_asn1_der::Result<Vec<u8>> {
@@ -85,6 +59,21 @@ impl Cert {
         &self.inner
     }
 
+    pub fn ty(&self) -> CertType {
+        let (ca, len) = self.basic_constraints().unwrap_or((None, None));
+        match ca {
+            Some(true) => {
+                if let Some(0) = len {
+                    CertType::Root
+                } else {
+                    CertType::Intermediate
+                }
+            }
+            Some(false) => CertType::Leaf,
+            None => CertType::Unknown,
+        }
+    }
+
     pub fn subject_key_identifier(&self) -> Result<&[u8]> {
         self.inner.subject_key_identifier()
     }
@@ -97,38 +86,32 @@ impl Cert {
         self.inner.basic_constraints()
     }
 
-    pub fn subject_name(&self) -> &Name {
-        &self.inner.tbs_certificate.subject
+    pub fn subject_name(&self) -> Name {
+        self.inner.tbs_certificate.subject.clone().into()
     }
 
-    pub fn issuer_name(&self) -> &Name {
-        &self.inner.tbs_certificate.issuer
+    pub fn issuer_name(&self) -> Name {
+        self.inner.tbs_certificate.issuer.clone().into()
     }
 
     pub fn generate_root(
         realm_name: &str,
         signature_hash_type: SignatureHashType,
         private_key: &PrivateKey,
+        valid_from: UTCDate,
+        valid_to: UTCDate,
     ) -> Result<Self> {
-        let common_name = new_common_name(realm_name);
-
-        // validity
-        let now = chrono::offset::Utc::now();
-        let valid_from = GeneralizedTime::from(now);
-        let valid_to = GeneralizedTime::from(now + chrono::Duration::seconds(ROOT_DURATION));
+        let common_name = Name::new_common_name(realm_name);
 
         let root = CertificateBuilder::new(signature_hash_type)
             .valididy(valid_from, valid_to)
-            .subject(
-                common_name.clone(),
-                private_key.to_subject_public_key_info(),
-            )
+            .subject(common_name.clone(), private_key.to_public_key())
             .issuer(common_name, &private_key)
             .ca(true)
             .pathlen(0)
             .build()?;
 
-        Ok(Self::new(CertificateType::Root, root))
+        Ok(Self::new(root))
     }
 
     pub fn generate_intermediate(
@@ -137,25 +120,21 @@ impl Cert {
         intermediate_name: &str,
         signature_hash_type: SignatureHashType,
         private_key: &PrivateKey,
+        valid_from: UTCDate,
+        valid_to: UTCDate,
     ) -> Result<Self> {
-        let subject_name = new_common_name(intermediate_name);
+        let subject_name = Name::new_common_name(intermediate_name);
         let issuer_name = realm_name;
-
-        // validity
-        let now = chrono::offset::Utc::now();
-        let valid_from = GeneralizedTime::from(now);
-        let valid_to =
-            GeneralizedTime::from(now + chrono::Duration::seconds(INTERMEDIATE_DURATION));
 
         let intermediate = CertificateBuilder::new(signature_hash_type)
             .valididy(valid_from, valid_to)
-            .subject(subject_name, private_key.to_subject_public_key_info())
+            .subject(subject_name, private_key.to_public_key())
             .issuer(issuer_name, realm_key)
             .pathlen(1)
             .ca(true)
             .build()?;
 
-        Ok(Self::new(CertificateType::Intermediate, intermediate))
+        Ok(Self::new(intermediate))
     }
 
     pub fn generate_leaf_from_csr(
@@ -163,32 +142,97 @@ impl Cert {
         authority_name: Name,
         authority_key: &PrivateKey,
         signature_hash_type: SignatureHashType,
+        valid_from: UTCDate,
+        valid_to: UTCDate,
     ) -> Result<Self> {
         csr.verify()?;
 
         let (subject_name, subject_public_key) = csr.into_subject_infos();
 
-        // validity
-        let now = chrono::offset::Utc::now();
-        let valid_from = GeneralizedTime::from(now);
-        let valid_to = GeneralizedTime::from(now + chrono::Duration::seconds(DEFAULT_DURATION));
-
         let leaf = CertificateBuilder::new(signature_hash_type)
             .valididy(valid_from, valid_to)
-            .subject(subject_name, subject_public_key)
+            .subject(subject_name, subject_public_key.into())
             .issuer(authority_name, authority_key)
             .build()?;
 
-        Ok(Self::new(CertificateType::Leaf, leaf))
+        Ok(Self::new(leaf))
+    }
+
+    pub fn verify(&self, now: &UTCDate) -> Result<()> {
+        let validity = &self.inner.tbs_certificate.validity;
+        let not_before: UTCDate = validity.not_before.clone().into();
+        let not_after: UTCDate = validity.not_after.clone().into();
+
+        if not_before.gt(now) {
+            return Err(Error::CertificateNotYetValid {
+                not_before,
+                now: now.clone(),
+            });
+        }
+
+        if not_after.lt(now) {
+            return Err(Error::CertificateExpired {
+                not_after,
+                now: now.clone(),
+            });
+        }
+
+        Ok(())
+    }
+
+    pub fn verify_chain(&self, chain: &[Cert], now: &UTCDate) -> Result<()> {
+        self.verify(now).ctx("invalid certificate")?;
+
+        let mut current_cert = self;
+        let mut current_pathlen = self.basic_constraints().map(|bc| bc.1).unwrap_or(None);
+
+        for parent_cert in chain {
+            if let Some(0) = current_pathlen {
+                return Err(Error::CAChainTooDeep);
+            }
+
+            parent_cert.verify(now).ctx("invalid parent certificate")?;
+
+            // validate current cert signature using parent public key
+            let hash_type =
+                SignatureHashType::from_algorithm_identifier(&current_cert.inner.signature_algorithm)
+                    .ok_or(Error::UnsupportedAlgorithm("unknown identifier"))?;
+            let public_key = &parent_cert
+                .inner
+                .tbs_certificate
+                .subject_public_key_info;
+            let msg = serde_asn1_der::to_vec(&current_cert.inner.tbs_certificate)
+                .ctx("couldn't serialize child certificate to der")?;
+            hash_type.verify(&public_key.clone().into(), &msg, current_cert.inner.signature_value.0.payload_view())?;
+
+            // update pathlen tracking
+            match (
+                current_pathlen,
+                parent_cert
+                    .basic_constraints()
+                    .map(|bc| bc.1)
+                    .unwrap_or(None),
+            ) {
+                (None, parent_pathlen) => current_pathlen = parent_pathlen,
+                (Some(current_value), Some(parent_value)) if parent_value < current_value => {
+                    current_pathlen = Some(parent_value)
+                }
+                (Some(current_value), _) => current_pathlen = Some(current_value - 1),
+            }
+
+            current_cert = parent_cert;
+        }
+
+        Ok(())
     }
 }
 
 struct CertificateBuilderInner<'a> {
     signature_hash_type: SignatureHashType,
-    valid_from: Option<GeneralizedTime>,
-    valid_to: Option<GeneralizedTime>,
+    valid_from: Option<UTCDate>,
+    valid_to: Option<UTCDate>,
     subject_name: Option<Name>,
-    subject_public_key_info: Option<SubjectPublicKeyInfo>,
+    subject_public_key: Option<PublicKey>,
     issuer_name: Option<Name>,
     issuer_key: Option<&'a PrivateKey>,
     ca: Option<bool>,
@@ -208,7 +252,7 @@ impl<'a> CertificateBuilder<'a> {
                 valid_from: None,
                 valid_to: None,
                 subject_name: None,
-                subject_public_key_info: None,
+                subject_public_key: None,
                 issuer_name: None,
                 issuer_key: None,
                 ca: None,
@@ -219,7 +263,7 @@ impl<'a> CertificateBuilder<'a> {
     }
 
     /// Required
-    pub fn valididy(&self, valid_from: GeneralizedTime, valid_to: GeneralizedTime) -> &Self {
+    pub fn valididy(&self, valid_from: UTCDate, valid_to: UTCDate) -> &Self {
         let mut inner_mut = self.inner.borrow_mut();
         inner_mut.valid_from = Some(valid_from);
         inner_mut.valid_to = Some(valid_to);
@@ -228,14 +272,10 @@ impl<'a> CertificateBuilder<'a> {
     }
 
     /// Required
-    pub fn subject(
-        &self,
-        subject_name: Name,
-        subject_public_key_info: SubjectPublicKeyInfo,
-    ) -> &Self {
+    pub fn subject(&self, subject_name: Name, public_key: PublicKey) -> &Self {
         let mut inner_mut = self.inner.borrow_mut();
         inner_mut.subject_name = Some(subject_name);
-        inner_mut.subject_public_key_info = Some(subject_public_key_info);
+        inner_mut.subject_public_key = Some(public_key);
         self
     }
 
@@ -280,8 +320,8 @@ impl<'a> CertificateBuilder<'a> {
             .subject_name
             .take()
             .ok_or(Error::MissingBuilderArgument("subject_name"))?;
-        let subject_public_key_info = inner
-            .subject_public_key_info
+        let subject_public_key = inner
+            .subject_public_key
             .take()
             .ok_or(Error::MissingBuilderArgument("subject_public_key_info"))?;
         let issuer_name = inner
@@ -355,8 +395,8 @@ impl<'a> CertificateBuilder<'a> {
             key_usage.set_key_encipherment(true);
         };
 
-        let ski = key_id_gen_method.generate_from(&subject_public_key_info)?;
-        let aki = key_id_gen_method.generate_from(&issuer_key.to_subject_public_key_info())?;
+        let ski = key_id_gen_method.generate_from(&subject_public_key)?;
+        let aki = key_id_gen_method.generate_from(&issuer_key.to_public_key())?;
 
         let extensions = Extensions(vec![
             Extension::new_basic_constraints(false, ca, pathlen),
@@ -369,10 +409,10 @@ impl<'a> CertificateBuilder<'a> {
             version: Version::V3.into(),
             serial_number: serial_number.into(),
             signature: signature_hash_type.into(),
-            issuer: issuer_name,
+            issuer: issuer_name.into(),
             validity,
-            subject: subject_name,
-            subject_public_key_info,
+            subject: subject_name.into(),
+            subject_public_key_info: subject_public_key.into(),
             extensions: extensions.into(),
         };
 
@@ -412,12 +452,25 @@ mod tests {
         let private_key =
             PrivateKey::from_pkcs8(pem.data()).expect("couldn't extract private key from pkcs8");
 
-        let root = Cert::generate_root("test", SignatureHashType::RsaSha256, &private_key)
-            .expect("couldn't generate root ca");
+        // validity
+        let valid_from = UTCDate::ymd(2019, 10, 10).unwrap();
+        let valid_to = UTCDate::ymd(2019, 10, 11).unwrap();
+
+        let root = Cert::generate_root(
+            "test",
+            SignatureHashType::RsaSha256,
+            &private_key,
+            valid_from,
+            valid_to,
+        )
+        .expect("couldn't generate root ca");
+
         root.subject_key_identifier()
             .expect("couldn't get subject key identifier");
         root.authority_key_identifier()
             .expect("couldn't get authority key identifier");
+
+        assert_eq!(root.ty(), CertType::Root);
     }
 
     #[test]
@@ -427,7 +480,7 @@ mod tests {
             .parse::<Pem>()
             .expect("couldn't parse PEM");
         let cert = Cert::from_der(pem.data()).expect("couldn't deserialize certificate");
-        assert_eq!(cert.ty(), CertificateType::Root);
+        assert_eq!(cert.ty(), CertType::Root);
         let key_id = cert
             .subject_key_identifier()
             .expect("couldn't get subject key identifier");

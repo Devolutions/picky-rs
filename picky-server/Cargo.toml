@@ -9,7 +9,7 @@ authors = [
 edition = "2018"
 
 [dependencies]
-picky = { path = "../picky" }
+picky = { path = "../picky", features = ["controller"] }
 mongodb = { git = "https://github.com/Devolutions/mongo-rust-driver-prototype", branch = "master", features = ["ssl"] }
 curl = { git = "https://github.com/Devolutions/curl-rust", branch = "wayk" }
 clap = { features = ["yaml"], version = "2.32" }
@@ -29,6 +29,9 @@ base64 = "0.10"
 hex = "0.3"
 
 rand = { version = "0.7", optional = true }
+
+[dev-dependencies]
+rand = "0.7"
 
 [features]
 pre-gen-pk = ["rand"]

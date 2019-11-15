@@ -53,12 +53,11 @@ impl From<&ServerConfig> for Backend{
                 Backend::new(Box::new(MemoryRepos::new())).expect("Bad configuration")
             },
             BackendType::File => {
-                let save_file_path;
-                if config.save_file_path.eq(""){
-                    save_file_path = DEFAULT_FILEBASE_PATH.to_owned();
-                }else{
-                    save_file_path = format!("{}{}",&config.save_file_path, DEFAULT_FILEBASE_PATH);
-                }
+                let save_file_path = if config.save_file_path.eq("") {
+                    DEFAULT_FILEBASE_PATH.to_owned()
+                } else {
+                    format!("{}{}",&config.save_file_path, DEFAULT_FILEBASE_PATH)
+                };
 
                 Backend::new(Box::new(FileRepos::new(save_file_path.as_str()))).expect("Error creating backend for file base")
             },

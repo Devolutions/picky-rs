@@ -4,9 +4,9 @@ use crate::{
 };
 use base64::{STANDARD, URL_SAFE_NO_PAD};
 use picky::{
-    models::{certificate::Cert, csr::Csr, private_key::PrivateKey},
+    controller::Picky,
+    models::{certificate::Cert, csr::Csr, key::PrivateKey},
     pem::{parse_pem, to_pem, Pem},
-    serde::name::NamePrettyFormatter,
 };
 use saphir::*;
 use serde_json::{self, Value};
@@ -161,14 +161,14 @@ fn post_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut Sync
         "couldn't fetch SKI"
     ));
 
-    let issuer_name = NamePrettyFormatter(cert.issuer_name()).to_string();
+    let issuer_name = cert.issuer_name().to_string();
     if issuer_name != format!("CN={} Authority", &controller_data.config.realm) {
         error!("this certificate was not signed by the CA of this server.");
         return;
     }
 
     let der = saphir_try!(cert.to_der(), "couldn't serialize certificate into der");
-    let subject_name = NamePrettyFormatter(cert.subject_name()).to_string();
+    let subject_name = cert.subject_name().to_string();
     if let Err(e) = controller_data.repos.store(&subject_name, &der, None, &ski) {
         error!("Insertion error for leaf {}: {}", subject_name, e);
     } else {
@@ -179,12 +179,12 @@ fn post_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut Sync
 fn sign_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse) {
     res.status(StatusCode::BAD_REQUEST);
 
-    let mut ca = format!("{} Authority", &controller_data.config.realm);
-
     let content_type = unwrap_opt!(
         req.get_header_string_value("Content-Type"),
         "Content-Type is required",
     );
+
+    let mut ca_name = format!("{} Authority", &controller_data.config.realm);
 
     let csr = match content_type.to_lowercase().as_str() {
         "application/pkcs10" => {
@@ -217,9 +217,8 @@ fn sign_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut Sync
                 "(json) couldn't parse json"
             );
 
-            if !json["ca"].is_null() {
-                ca = json["ca"].to_string();
-                ca = ca.trim_matches('"').to_string();
+            if let Some(ca) = json["ca"].as_str() {
+                ca_name = ca.trim_matches('"').to_owned();
             }
 
             let pem = saphir_try!(
@@ -242,57 +241,14 @@ fn sign_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut Sync
     };
 
     // Sign CSR
-    let ca = saphir_try!(
-        controller_data.repos.find(ca.trim_matches('"')),
-        "couldn't fetch CA"
-    );
-    if ca.is_empty() {
-        error!("ca string empty");
-        return;
-    }
-
-    let ca_cert_der = saphir_try!(
-        controller_data.repos.get_cert(&ca[0].value),
-        "couldn't get CA cert der"
-    );
-    let ca_cert = saphir_try!(Cert::from_der(&ca_cert_der), "couldn't deserialize CA cert");
-
-    let ca_pk_der = saphir_try!(
-        controller_data.repos.get_key(&ca[0].value),
-        "couldn't fetch CA private key"
-    );
-    let ca_pk = saphir_try!(
-        PrivateKey::from_pkcs8(&ca_pk_der),
-        "couldn't build private key from pkcs8"
-    );
-
-    let signed_cert = saphir_try!(
-        Cert::generate_leaf_from_csr(
-            csr,
-            ca_cert.subject_name().clone(),
-            &ca_pk,
-            controller_data.config.key_config
-        ),
-        "couldn't sign certificate"
-    );
-
-    if controller_data.config.save_certificate {
-        let ski = hex::encode(saphir_try!(
-            signed_cert.subject_key_identifier(),
-            "couldn't get SKI"
-        ));
-        let name = NamePrettyFormatter(signed_cert.subject_name()).to_string();
-        let cert_der = saphir_try!(
-            signed_cert.to_der(),
-            "couldn't serialize certificate to der"
-        );
-        if let Err(e) = controller_data.repos.store(&name, &cert_der, None, &ski) {
-            error!("Insertion error for leaf {}: {}", name, e);
-        }
-    }
+    let signed_cert = saphir_try!(sign_certificate(
+        &ca_name,
+        csr,
+        &controller_data.config,
+        controller_data.repos.as_ref()
+    ));
 
     let pem = saphir_try!(signed_cert.to_pem(), "couldn't get certificate pem");
-
     res.body(pem.to_string());
     res.status(StatusCode::OK);
 }
@@ -369,53 +325,111 @@ fn cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncRespo
     }
 }
 
-fn find_ca_chain(controller_data: &ControllerData, ca_name: &str, res: &mut SyncResponse) {
-    let repos = &controller_data.repos;
+fn sign_certificate(
+    ca_name: &str,
+    csr: Csr,
+    config: &ServerConfig,
+    repos: &dyn BackendStorage,
+) -> Result<Cert, String> {
+    let ca_hashes = repos
+        .find(ca_name)
+        .map_err(|e| format!("couldn't fetch CA: {}", e))?;
+    let ca_hash = if ca_hashes.is_empty() {
+        return Err("ca hash empty".to_owned());
+    } else {
+        &ca_hashes[0].value
+    };
 
-    let ca_hash = saphir_try!(repos.find(ca_name), "couldn't fetch CA hash id");
+    let ca_cert_der = repos
+        .get_cert(ca_hash)
+        .map_err(|e| format!("couldn't get CA cert der: {}", e))?;
+    let ca_cert =
+        Cert::from_der(&ca_cert_der).map_err(|e| format!("couldn't deserialize CA cert: {}", e))?;
+
+    let ca_pk_der = repos
+        .get_key(ca_hash)
+        .map_err(|e| format!("couldn't fetch CA private key: {}", e))?;
+    let ca_pk = PrivateKey::from_pkcs8(&ca_pk_der)
+        .map_err(|e| format!("couldn't build private key from pkcs8: {}", e))?;
+
+    let signed_cert = Picky::generate_leaf_from_csr(
+        csr,
+        ca_cert.subject_name().clone(),
+        &ca_pk,
+        config.key_config,
+    )
+    .map_err(|e| format!("couldn't generate leaf certificate: {}", e))?;
+
+    if config.save_certificate {
+        let name = signed_cert.subject_name().to_string();
+        let cert_der = signed_cert
+            .to_der()
+            .map_err(|e| format!("couldn't serialize certificate to der: {}", e))?;
+        let ski = hex::encode(
+            signed_cert
+                .subject_key_identifier()
+                .map_err(|e| format!("couldn't get SKI: {}", e))?,
+        );
+
+        repos
+            .store(&name, &cert_der, None, &ski)
+            .map_err(|e| format!("Insertion error for leaf {}: {}", name, e))?;
+    }
+
+    Ok(signed_cert)
+}
+
+fn find_ca_chain(repos: &dyn BackendStorage, ca_name: &str) -> Result<Vec<String>, String> {
+    let ca_hash = repos
+        .find(ca_name)
+        .map_err(|e| format!("couldn't fetch CA hash id for {}: {}", ca_name, e))?;
     let ca_hash = if ca_hash.is_empty() {
-        error!("No intermediate found!");
-        return;
+        return Err("No intermediate certificate found!".to_owned());
     } else {
         &ca_hash[0].value
     };
 
-    let mut cert_der = saphir_try!(repos.get_cert(ca_hash), "couldn't fetch CA certificate der");
+    let mut cert_der = repos
+        .get_cert(ca_hash)
+        .map_err(|e| format!("couldn't fetch CA certificate der: {}", e))?;
     let mut chain = vec![to_pem("CERTIFICATE", &cert_der)];
     let mut current_key_id = String::default();
     loop {
-        let cert = saphir_try!(
-            Cert::from_der(&cert_der),
-            "couldn't deserialize certificate"
+        let cert = Cert::from_der(&cert_der)
+            .map_err(|e| format!("couldn't deserialize certificate: {}", e))?;
+
+        let parent_key_id = hex::encode(
+            cert.authority_key_identifier()
+                .map_err(|e| format!("couldn't fetch authority key identifier: {}", e))?,
         );
-        let parent_key_id = hex::encode(saphir_try!(
-            cert.authority_key_identifier(),
-            "couldn't fetch AKI"
-        ));
 
         if current_key_id == parent_key_id {
             // The authority is itself. It is a root.
             break;
         }
 
-        let hash = saphir_try!(
-            repos.get_hash_from_key_identifier(&parent_key_id),
-            "couldn't fetch hash"
-        );
-        cert_der = saphir_try!(repos.get_cert(&hash), "couldn't fetch certificate der");
+        let hash = repos
+            .get_hash_from_key_identifier(&parent_key_id)
+            .map_err(|e| format!("couldn't fetch hash: {}", e))?;
+
+        cert_der = repos
+            .get_cert(&hash)
+            .map_err(|e| format!("couldn't fetch certificate der: {}", e))?;
+
         chain.push(to_pem("CERTIFICATE", &cert_der));
 
         current_key_id = parent_key_id;
     }
 
-    res.body(chain.join("\n"));
-    res.status(StatusCode::OK);
+    Ok(chain)
 }
 
 fn chain_default(controller_data: &ControllerData, _: &SyncRequest, res: &mut SyncResponse) {
     res.status(StatusCode::BAD_REQUEST);
     let ca = format!("{} Authority", &controller_data.config.realm);
-    find_ca_chain(controller_data, &ca, res);
+    let chain = saphir_try!(find_ca_chain(controller_data.repos.as_ref(), &ca));
+    res.body(chain.join("\n"));
+    res.status(StatusCode::OK);
 }
 
 fn chain(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse) {
@@ -427,7 +441,9 @@ fn chain(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResp
         .and_then(|c| base64::decode_config(c, URL_SAFE_NO_PAD).ok())
     {
         let decoded = String::from_utf8_lossy(&common_name);
-        find_ca_chain(controller_data, &decoded, res);
+        let chain = saphir_try!(find_ca_chain(controller_data.repos.as_ref(), &decoded));
+        res.body(chain.join("\n"));
+        res.status(StatusCode::OK);
     } else {
         error!(
             "Wrong path or can't decode base64: {}",
@@ -455,16 +471,13 @@ fn request_name(_: &ControllerData, req: &SyncRequest, res: &mut SyncResponse) {
         "couldn't parse pem"
     );
     let csr = saphir_try!(Csr::from_der(csr_pem.data()), "couldn't deserialize CSR");
-    let subject_name = NamePrettyFormatter(csr.subject_name()).to_string();
+    let subject_name = csr.subject_name().to_string();
 
     res.body(subject_name);
     res.status(StatusCode::OK);
 }
 
-pub fn generate_root_ca(
-    config: &ServerConfig,
-    repos: &mut Box<dyn BackendStorage>,
-) -> Result<bool, String> {
+pub fn generate_root_ca(config: &ServerConfig, repos: &dyn BackendStorage) -> Result<bool, String> {
     let name = format!("{} Root CA", config.realm);
 
     if let Ok(certs) = repos.find(&name) {
@@ -476,7 +489,7 @@ pub fn generate_root_ca(
 
     let pk =
         generate_private_key(4096).map_err(|e| format!("couldn't generate private key: {}", e))?;
-    let root = Cert::generate_root(&name, config.key_config, &pk)
+    let root = Picky::generate_root(&name, config.key_config, &pk)
         .map_err(|e| format!("couldn't generate root certificate: {}", e))?;
     let ski = root
         .subject_key_identifier()
@@ -499,7 +512,7 @@ pub fn generate_root_ca(
 
 pub fn generate_intermediate(
     config: &ServerConfig,
-    repos: &mut Box<dyn BackendStorage>,
+    repos: &dyn BackendStorage,
 ) -> Result<bool, String> {
     let root_name = format!("{} Root CA", config.realm);
     let intermediate_name = format!("{} Authority", config.realm);
@@ -537,7 +550,7 @@ pub fn generate_intermediate(
     let root_key = PrivateKey::from_pkcs8(&root_key)
         .map_err(|e| format!("couldn't parse private key from pkcs8: {}", e))?;
 
-    let intermediate_cert = Cert::generate_intermediate(
+    let intermediate_cert = Picky::generate_intermediate(
         root_cert.subject_name().clone(),
         &root_key,
         &intermediate_name,
@@ -573,10 +586,7 @@ pub fn generate_intermediate(
     Ok(true)
 }
 
-pub fn check_certs_in_env(
-    config: &ServerConfig,
-    repos: &mut Box<dyn BackendStorage>,
-) -> Result<(), String> {
+pub fn check_certs_in_env(config: &ServerConfig, repos: &dyn BackendStorage) -> Result<(), String> {
     if !config.root_cert.is_empty() && !config.root_key.is_empty() {
         if let Err(e) = get_and_store_env_cert_info(&config.root_cert, &config.root_key, repos) {
             return Err(e);
@@ -597,7 +607,7 @@ pub fn check_certs_in_env(
 fn get_and_store_env_cert_info(
     cert_pem: &str,
     key_pem: &str,
-    repos: &mut Box<dyn BackendStorage>,
+    repos: &dyn BackendStorage,
 ) -> Result<(), String> {
     let cert_pem = cert_pem
         .parse::<Pem>()
@@ -608,7 +618,7 @@ fn get_and_store_env_cert_info(
         cert.subject_key_identifier()
             .map_err(|e| format!("couldn't parse fetch subject key identifier: {}", e))?,
     );
-    let subject_name = NamePrettyFormatter(cert.subject_name()).to_string();
+    let subject_name = cert.subject_name().to_string();
 
     let key_pem = key_pem
         .parse::<Pem>()
@@ -619,7 +629,8 @@ fn get_and_store_env_cert_info(
     Ok(())
 }
 
-#[cfg(not(feature = "pre-gen-pk"))]
+// This function is also used by tests in release mode.
+#[cfg(not(any(feature = "pre-gen-pk", all(debug_assertions, test))))]
 fn generate_private_key(bits: usize) -> Result<PrivateKey, String> {
     PrivateKey::generate_rsa(bits).map_err(|e| format!("couldn't generate private key: {}", e))
 }
@@ -628,33 +639,15 @@ fn generate_private_key(bits: usize) -> Result<PrivateKey, String> {
 // Private Key generation is insanely slow on debug builds.
 // Therefore this function (only to be used in debug profile please) doesn't generate new private keys.
 // It returns a random pre-generated private key from a pool: security-wise, this is extremely bad.
-#[cfg(feature = "pre-gen-pk")]
+#[cfg(any(feature = "pre-gen-pk", all(debug_assertions, test)))]
 fn generate_private_key(bits: usize) -> Result<PrivateKey, String> {
+    use crate::test_files::*;
     use rand::prelude::*;
 
     warn!(
         "FETCHING A PRE-GENERATED PRIVATE KEY. \
          THIS BUILD IS FOR DEBUG PURPOSE ONLY, DON'T USE THIS BUILD IN PRODUCTION."
     );
-
-    const RSA_2048_PK_1: &str =
-        include_str!("../../../../test_assets/private_keys/rsa-2048-pk_1.key");
-    const RSA_2048_PK_2: &str =
-        include_str!("../../../../test_assets/private_keys/rsa-2048-pk_2.key");
-    const RSA_2048_PK_3: &str =
-        include_str!("../../../../test_assets/private_keys/rsa-2048-pk_3.key");
-    const RSA_2048_PK_4: &str =
-        include_str!("../../../../test_assets/private_keys/rsa-2048-pk_4.key");
-    const RSA_2048_PK_5: &str =
-        include_str!("../../../../test_assets/private_keys/rsa-2048-pk_5.key");
-    const RSA_2048_PK_6: &str =
-        include_str!("../../../../test_assets/private_keys/rsa-2048-pk_6.key");
-    const RSA_4096_PK_1: &str =
-        include_str!("../../../../test_assets/private_keys/rsa-4096-pk_1.key");
-    const RSA_4096_PK_2: &str =
-        include_str!("../../../../test_assets/private_keys/rsa-4096-pk_2.key");
-    //const RSA_4096_PK_3: &str =
-    //    include_str!("../../../../test_assets/private_keys/rsa-4096-pk_3.key");
 
     const RSA_2048_POOL: [&str; 6] = [
         RSA_2048_PK_1,
@@ -696,4 +689,59 @@ fn generate_private_key(bits: usize) -> Result<PrivateKey, String> {
 
     PrivateKey::from_pkcs8(pem.data())
         .map_err(|e| format!("couldn't parse private key from pkcs8: {}", e))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{configuration::BackendType, db::backend::Backend};
+    use picky::models::{name::Name, signature::SignatureHashType};
+
+    fn config() -> ServerConfig {
+        let mut config = ServerConfig::default();
+        config.backend = BackendType::Memory;
+        config
+    }
+
+    #[test]
+    fn generate_chain_and_verify() {
+        let config = config();
+        let backend = Backend::from(&config);
+
+        let ca_name = format!("{} Authority", config.realm);
+
+        generate_root_ca(&config, backend.db.as_ref()).expect("couldn't generate root ca");
+        generate_intermediate(&config, backend.db.as_ref())
+            .expect("couldn't generate intermediate ca");
+
+        let pk = generate_private_key(2048).expect("couldn't generate private key");
+        let csr = Csr::generate(
+            Name::new_common_name("Mister Bushidô"),
+            &pk,
+            SignatureHashType::RsaSha384,
+        )
+        .expect("couldn't generate csr");
+
+        let signed_cert = sign_certificate(&ca_name, csr, &config, backend.db.as_ref())
+            .expect("couldn't sign certificate");
+
+        let issuer_name = signed_cert.issuer_name().to_string().replace("CN=", "");
+        let chain_pem =
+            find_ca_chain(backend.db.as_ref(), &issuer_name).expect("couldn't fetch CA chain");
+
+        assert_eq!(chain_pem.len(), 2);
+
+        let chain = chain_pem
+            .iter()
+            .map(|cert_pem| {
+                let pem = cert_pem.parse::<Pem>().expect("couldn't parse cert pem");
+                Cert::from_der(pem.data()).expect("couldn't parse cert from der")
+            })
+            .collect::<Vec<Cert>>();
+
+        assert_eq!(chain[0].subject_name().to_string(), "CN=Picky Authority");
+        assert_eq!(chain[1].subject_name().to_string(), "CN=Picky Root CA");
+
+        Picky::verify_chain(&signed_cert, &chain).expect("couldn't validate ca chain");
+    }
 }

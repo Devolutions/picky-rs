@@ -8,15 +8,16 @@ authors = [
 edition = "2018"
 
 [dependencies]
-serde_asn1_der = { git = "https://github.com/Devolutions/serde_asn1_der", features = ["extra_types", "chrono_conversion"] }
+serde_asn1_der = { git = "https://github.com/Devolutions/serde_asn1_der", features = ["extra_types"] }
 oid = { version = "^0.1.1", features = ["serde_support"] }
-chrono = "0.4"
 serde = "1.0"
 serde_derive = "1.0"
 base64 = "0.10"
-num-bigint-dig = "0.5"
+num-bigint-dig = "0.5" # TODO: remove this dependency
 err-derive = "0.2"
 err-ctx = "0.2"
+
+chrono = { version = "0.4", optional = true }
 
 # /!\ ===== cryptography dependencies ===== /!\
 # These should be updated as soon as possible.
@@ -30,3 +31,8 @@ rand = "0.6" # TODO: update to 0.7. Requires rsa crate to support 0.7 too.
 [dev-dependencies]
 pretty_assertions = "*"
 hex = "0.3"
+
+[features]
+default = []
+chrono_conversion = ["chrono", "serde_asn1_der/chrono_conversion"]
+controller = ["chrono_conversion"]

@@ -19,33 +19,35 @@ impl fmt::Display for NamePrettyFormatter<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut first = true;
         for name in &(self.0).0 {
-            if first {
-                first = false;
-            } else {
-                write!(f, ",")?;
-            }
+            for attr in &name.0 {
+                if first {
+                    first = false;
+                } else {
+                    write!(f, ",")?;
+                }
 
-            match &name.0[0].value {
-                AttributeTypeAndValueParameters::CommonName(name) => {
-                    write!(f, "CN={}", name)?;
-                }
-                AttributeTypeAndValueParameters::SerialNumber(name) => {
-                    write!(f, "SN={}", name)?;
-                }
-                AttributeTypeAndValueParameters::CountryName(name) => {
-                    write!(f, "C={}", name)?;
-                }
-                AttributeTypeAndValueParameters::LocalityName(name) => {
-                    write!(f, "L={}", name)?;
-                }
-                AttributeTypeAndValueParameters::StateOrProvinceName(name) => {
-                    write!(f, "ST={}", name)?;
-                }
-                AttributeTypeAndValueParameters::OrganisationName(name) => {
-                    write!(f, "O={}", name)?;
-                }
-                AttributeTypeAndValueParameters::OrganisationalUnitName(name) => {
-                    write!(f, "OU={}", name)?;
+                match &attr.value {
+                    AttributeTypeAndValueParameters::CommonName(name) => {
+                        write!(f, "CN={}", name)?;
+                    }
+                    AttributeTypeAndValueParameters::SerialNumber(name) => {
+                        write!(f, "SN={}", name)?;
+                    }
+                    AttributeTypeAndValueParameters::CountryName(name) => {
+                        write!(f, "C={}", name)?;
+                    }
+                    AttributeTypeAndValueParameters::LocalityName(name) => {
+                        write!(f, "L={}", name)?;
+                    }
+                    AttributeTypeAndValueParameters::StateOrProvinceName(name) => {
+                        write!(f, "ST={}", name)?;
+                    }
+                    AttributeTypeAndValueParameters::OrganisationName(name) => {
+                        write!(f, "O={}", name)?;
+                    }
+                    AttributeTypeAndValueParameters::OrganisationalUnitName(name) => {
+                        write!(f, "OU={}", name)?;
+                    }
                 }
             }
         }

@@ -86,31 +86,24 @@ impl ServerConfig{
         let app = App::from_yaml(yaml);
         let matches = app.get_matches();
 
-        match matches.value_of("log-level"){
-            Some(v) => self.log_level = v.to_string(),
-            None => ()
+        if let Some(v) = matches.value_of("log-level") {
+            self.log_level = v.to_owned();
         }
 
-        match matches.value_of("realm"){
-            Some(v) => self.realm = v.to_string(),
-            None => ()
+        if let Some(v) = matches.value_of("realm") {
+            self.realm = v.to_string();
         }
 
-        match matches.value_of("db-url"){
-            Some(v) => self.database.url = v.to_string(),
-            None => ()
+        if let Some(v) = matches.value_of("db-url") {
+            self.database.url = v.to_string();
         }
 
-        match matches.value_of("api-key"){
-            Some(v) => self.api_key = v.to_string(),
-            None => ()
+        if let Some(v) = matches.value_of("api-key") {
+            self.api_key = v.to_string();
         }
 
-        match matches.value_of("backend"){
-            Some(v) => {
-                self.backend = BackendType::from(v);
-            },
-            None => ()
+        if let Some(v) = matches.value_of("backend") {
+            self.backend = BackendType::from(v);
         }
 
         if matches.is_present("save-certificate") {

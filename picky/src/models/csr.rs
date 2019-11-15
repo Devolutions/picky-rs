@@ -1,10 +1,9 @@
 use crate::{
     error::{Error, Result},
-    models::{private_key::PrivateKey, signature::SignatureHashType},
+    models::{key::PrivateKey, name::Name, signature::SignatureHashType},
     pem::Pem,
     serde::{
-        certification_request::CertificationRequestInfo, name::Name, CertificationRequest,
-        SubjectPublicKeyInfo,
+        certification_request::CertificationRequestInfo, CertificationRequest, SubjectPublicKeyInfo,
     },
 };
 use err_ctx::ResultExt;
@@ -36,11 +35,11 @@ impl Csr {
 
     pub fn generate(
         subject: Name,
-        subject_public_key_info: SubjectPublicKeyInfo,
         private_key: &PrivateKey,
         signature_hash_type: SignatureHashType,
     ) -> Result<Self> {
-        let info = CertificationRequestInfo::new(subject, subject_public_key_info);
+        let info =
+            CertificationRequestInfo::new(subject.into(), private_key.to_public_key().into());
         let info_der = serde_asn1_der::to_vec(&info)
             .ctx("couldn't serialize certification request info into der")?;
         let signature = BitString::with_bytes(signature_hash_type.sign(&info_der, private_key)?);
@@ -54,8 +53,8 @@ impl Csr {
         })
     }
 
-    pub fn subject_name(&self) -> &Name {
-        &self.inner.certification_request_info.subject
+    pub fn subject_name(&self) -> Name {
+        self.inner.certification_request_info.subject.clone().into()
     }
 
     pub fn subject_public_key_info(&self) -> &SubjectPublicKeyInfo {
@@ -67,7 +66,7 @@ impl Csr {
 
     pub fn into_subject_infos(self) -> (Name, SubjectPublicKeyInfo) {
         (
-            self.inner.certification_request_info.subject,
+            self.inner.certification_request_info.subject.into(),
             self.inner
                 .certification_request_info
                 .subject_public_key_info,
@@ -77,7 +76,7 @@ impl Csr {
     pub fn verify(&self) -> Result<()> {
         let hash_type =
             SignatureHashType::from_algorithm_identifier(&self.inner.signature_algorithm)
-                .ok_or(Error::UnsupportedAlgorithm)?;
+                .ok_or(Error::UnsupportedAlgorithm("unknown identifier"))?;
 
         let public_key = &self
             .inner
@@ -87,7 +86,7 @@ impl Csr {
         let msg = serde_asn1_der::to_vec(&self.inner.certification_request_info)
             .ctx("couldn't serialize certification request info into der")?;
 
-        hash_type.verify(public_key, &msg, self.inner.signature.0.payload_view())?;
+        hash_type.verify(&public_key.clone().into(), &msg, self.inner.signature.0.payload_view())?;
 
         Ok(())
     }
