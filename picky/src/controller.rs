@@ -6,9 +6,9 @@ use crate::{
     },
 };
 
-const ROOT_DURATION: i64 = 87600;
-const INTERMEDIATE_DURATION: i64 = 43800;
-const DEFAULT_DURATION: i64 = 26280;
+const ROOT_DURATION_DAYS: i64 = 3650;
+const INTERMEDIATE_DURATION_DAYS: i64 = 1825;
+const LEAF_DURATION_DAYS: i64 = 365;
 
 pub struct Picky;
 
@@ -21,7 +21,7 @@ impl Picky {
         // validity
         let now = chrono::offset::Utc::now();
         let valid_from = UTCDate::from(now);
-        let valid_to = UTCDate::from(now + chrono::Duration::seconds(ROOT_DURATION));
+        let valid_to = UTCDate::from(now + chrono::Duration::days(ROOT_DURATION_DAYS));
 
         Cert::generate_root(
             realm_name,
@@ -42,7 +42,7 @@ impl Picky {
         // validity
         let now = chrono::offset::Utc::now();
         let valid_from = UTCDate::from(now);
-        let valid_to = UTCDate::from(now + chrono::Duration::seconds(INTERMEDIATE_DURATION));
+        let valid_to = UTCDate::from(now + chrono::Duration::days(INTERMEDIATE_DURATION_DAYS));
 
         Cert::generate_intermediate(
             realm_name,
@@ -64,7 +64,7 @@ impl Picky {
         // validity
         let now = chrono::offset::Utc::now();
         let valid_from = UTCDate::from(now);
-        let valid_to = UTCDate::from(now + chrono::Duration::seconds(DEFAULT_DURATION));
+        let valid_to = UTCDate::from(now + chrono::Duration::days(LEAF_DURATION_DAYS));
 
         Cert::generate_leaf_from_csr(
             csr,
