@@ -1,6 +1,10 @@
 use crate::{
     error::{Error, Result},
-    models::{key::PrivateKey, name::Name, signature::SignatureHashType},
+    models::{
+        key::{PrivateKey, PublicKey},
+        name::Name,
+        signature::SignatureHashType,
+    },
     pem::Pem,
     serde::{
         certification_request::CertificationRequestInfo, CertificationRequest, SubjectPublicKeyInfo,
@@ -8,9 +12,9 @@ use crate::{
 };
 use err_ctx::ResultExt;
 use serde_asn1_der::bit_string::BitString;
-use crate::models::key::PublicKey;
 
 /// Certificate Signing Request
+#[derive(Clone, Debug, PartialEq)]
 pub struct Csr {
     inner: CertificationRequest,
 }

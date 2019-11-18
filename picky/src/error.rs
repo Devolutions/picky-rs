@@ -25,7 +25,11 @@ pub enum Error {
     CAChainTooDeep,
     #[error(display = "CA chain is missing a root certificate")]
     CAChainNoRoot,
-    #[error(display = "authority key id doesn't match (expected: {:?}, got: {:?})", expected, actual)]
+    #[error(
+        display = "authority key id doesn't match (expected: {:?}, got: {:?})",
+        expected,
+        actual
+    )]
     AuthorityKeyIdMismatch { expected: Vec<u8>, actual: Vec<u8> },
     #[error(display = "extension not found: {}", _0)]
     ExtensionNotFound(&'static str),

@@ -14,7 +14,7 @@ use serde_asn1_der::asn1_wrapper::{BitStringAsn1Container, OctetStringAsn1Contai
 use sha1::{Digest, Sha1};
 use sha2::{Sha224, Sha256, Sha384, Sha512};
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SignatureHashType {
     RsaSha1,
     RsaSha224,

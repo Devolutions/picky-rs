@@ -352,13 +352,8 @@ fn sign_certificate(
     let ca_pk = PrivateKey::from_pkcs8(&ca_pk_der)
         .map_err(|e| format!("couldn't build private key from pkcs8: {}", e))?;
 
-    let signed_cert = Picky::generate_leaf_from_csr(
-        csr,
-        ca_cert.subject_name().clone(),
-        &ca_pk,
-        config.key_config,
-    )
-    .map_err(|e| format!("couldn't generate leaf certificate: {}", e))?;
+    let signed_cert = Picky::generate_leaf_from_csr(csr, &ca_cert, &ca_pk, config.key_config)
+        .map_err(|e| format!("couldn't generate leaf certificate: {}", e))?;
 
     if config.save_certificate {
         let name = signed_cert.subject_name().to_string();
@@ -489,7 +484,7 @@ pub fn generate_root_ca(config: &ServerConfig, repos: &dyn BackendStorage) -> Re
 
     let pk =
         generate_private_key(4096).map_err(|e| format!("couldn't generate private key: {}", e))?;
-    let root = Picky::generate_root(&name, config.key_config, &pk)
+    let root = Picky::generate_root(&name, &pk, config.key_config)
         .map_err(|e| format!("couldn't generate root certificate: {}", e))?;
     let ski = root
         .subject_key_identifier()
@@ -551,11 +546,11 @@ pub fn generate_intermediate(
         .map_err(|e| format!("couldn't parse private key from pkcs8: {}", e))?;
 
     let intermediate_cert = Picky::generate_intermediate(
-        root_cert.subject_name().clone(),
-        &root_key,
         &intermediate_name,
+        pk.to_public_key(),
+        &root_cert,
+        &root_key,
         config.key_config,
-        &pk,
     )
     .map_err(|e| format!("couldn't generate intermediate certificate: {}", e))?;
 
