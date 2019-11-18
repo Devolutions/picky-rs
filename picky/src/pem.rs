@@ -18,6 +18,7 @@ pub enum PemError {
     Base64Decoding(DecodeError),
 }
 
+// https://tools.ietf.org/html/rfc7468
 #[derive(Debug, Clone, PartialEq)]
 pub struct Pem<'a> {
     label: String,
@@ -55,15 +56,18 @@ impl FromStr for Pem<'static> {
 
 impl fmt::Display for Pem<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{} {}-----\n{}\n{} {}-----",
-            PEM_HEADER_START,
-            self.label,
-            base64::encode(&self.data),
-            PEM_HEADER_END,
-            self.label,
-        )
+        writeln!(f, "{} {}-----", PEM_HEADER_START, self.label)?;
+
+        let encoded = base64::encode(&self.data);
+        let bytes = encoded.as_bytes();
+        for chunk in bytes.chunks(64) {
+            let chunk = std::str::from_utf8(chunk).map_err(|_| fmt::Error)?;
+            writeln!(f, "{}", chunk)?;
+        }
+
+        write!(f, "{} {}-----", PEM_HEADER_END, self.label)?;
+
+        Ok(())
     }
 }
 
@@ -155,14 +159,14 @@ mod tests {
         assert_eq!(pem_from_bytes.label, "CERTIFICATE");
 
         let pem_from_str = PEM_STR.parse::<Pem>().unwrap();
-        assert_eq!(pem_from_bytes, pem_from_str);
+        pretty_assertions::assert_eq!(pem_from_bytes, pem_from_str);
     }
 
     #[test]
     fn to_pem() {
         let pem = PEM_STR.parse::<Pem>().unwrap();
         let reconverted_pem = pem.to_string();
-        assert_eq!(reconverted_pem.replace("\n", ""), PEM_STR.replace("\n", ""));
+        pretty_assertions::assert_eq!(reconverted_pem, PEM_STR);
     }
 
     #[test]

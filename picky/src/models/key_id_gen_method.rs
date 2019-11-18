@@ -4,7 +4,7 @@ use serde_asn1_der::asn1_wrapper::BitStringAsn1Container;
 use sha1::{Digest, Sha1};
 use sha2::{Sha224, Sha256, Sha384, Sha512};
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum KeyIdHashAlgo {
     Sha1,
     Sha224,
@@ -17,7 +17,7 @@ pub enum KeyIdHashAlgo {
 ///
 /// https://tools.ietf.org/html/rfc5280#section-4.2.1.2
 /// https://tools.ietf.org/html/rfc7093#section-2
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum KeyIdGenMethod {
     /// Hash the leftmost 160-bits of the
     /// SHA-256 hash of the value of the BIT STRING subjectPublicKey
@@ -52,11 +52,11 @@ impl KeyIdGenMethod {
                 match &public_key.as_inner().subject_public_key {
                     InnerPublicKey::RSA(BitStringAsn1Container(rsa_pk)) => {
                         let der = serde_asn1_der::to_vec(rsa_pk)?;
-                        Ok(hash!(hash_algo, der)[..160].to_vec())
+                        Ok(hash!(hash_algo, der)[..20].to_vec())
                     }
                     InnerPublicKey::EC(bitstring) => {
                         let der = bitstring.0.payload_view();
-                        Ok(hash!(hash_algo, der)[..160].to_vec())
+                        Ok(hash!(hash_algo, der)[..20].to_vec())
                     }
                 }
             }

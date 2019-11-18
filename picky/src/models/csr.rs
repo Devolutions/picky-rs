@@ -1,6 +1,10 @@
 use crate::{
     error::{Error, Result},
-    models::{key::PrivateKey, name::Name, signature::SignatureHashType},
+    models::{
+        key::{PrivateKey, PublicKey},
+        name::Name,
+        signature::SignatureHashType,
+    },
     pem::Pem,
     serde::{
         certification_request::CertificationRequestInfo, CertificationRequest, SubjectPublicKeyInfo,
@@ -10,6 +14,7 @@ use err_ctx::ResultExt;
 use serde_asn1_der::bit_string::BitString;
 
 /// Certificate Signing Request
+#[derive(Clone, Debug, PartialEq)]
 pub struct Csr {
     inner: CertificationRequest,
 }
@@ -64,12 +69,13 @@ impl Csr {
             .subject_public_key_info
     }
 
-    pub fn into_subject_infos(self) -> (Name, SubjectPublicKeyInfo) {
+    pub fn into_subject_infos(self) -> (Name, PublicKey) {
         (
             self.inner.certification_request_info.subject.into(),
             self.inner
                 .certification_request_info
-                .subject_public_key_info,
+                .subject_public_key_info
+                .into(),
         )
     }
 
@@ -86,7 +92,11 @@ impl Csr {
         let msg = serde_asn1_der::to_vec(&self.inner.certification_request_info)
             .ctx("couldn't serialize certification request info into der")?;
 
-        hash_type.verify(&public_key.clone().into(), &msg, self.inner.signature.0.payload_view())?;
+        hash_type.verify(
+            &public_key.clone().into(),
+            &msg,
+            self.inner.signature.0.payload_view(),
+        )?;
 
         Ok(())
     }

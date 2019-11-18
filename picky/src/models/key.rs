@@ -123,7 +123,7 @@ impl PublicKey {
 // Generating RSA keys in debug is very slow. Therefore, these tests only run in release mode.
 mod tests {
     use super::*;
-    use crate::models::{certificate::Cert, date::UTCDate, signature::SignatureHashType};
+    use crate::models::{certificate::CertificateBuilder, date::UTCDate, name::Name};
 
     #[test]
     fn generate_rsa_keys() {
@@ -133,14 +133,11 @@ mod tests {
         let valid_from = UTCDate::ymd(2019, 10, 10).unwrap();
         let valid_to = UTCDate::ymd(2019, 10, 11).unwrap();
 
-        // attempts to generate a full certificate using our newly generated private key
-        Cert::generate_root(
-            "test",
-            SignatureHashType::RsaSha256,
-            &private_key,
-            valid_from,
-            valid_to,
-        )
-        .expect("couldn't generate root ca");
+        CertificateBuilder::new()
+            .valididy(valid_from, valid_to)
+            .self_signed(Name::new_common_name("Test Root CA"), &private_key)
+            .ca(true)
+            .build()
+            .expect("couldn't build root ca");
     }
 }
