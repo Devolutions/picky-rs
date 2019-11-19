@@ -937,7 +937,7 @@ dependencies = [
 [[package]]
 name = "mongodb"
 version = "0.3.12"
-source = "git+https://github.com/Devolutions/mongo-rust-driver-prototype#509f3eb23924bb49fcce5edd727e5ebf3f240228"
+source = "git+https://github.com/Devolutions/mongo-rust-driver-prototype#8160d71abd9883192a95ad00b6449a63af396599"
 dependencies = [
  "bitflags 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "bson 0.13.0 (registry+https://github.com/rust-lang/crates.io-index)",
