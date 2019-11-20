@@ -3,7 +3,7 @@
 
 use picky::{
     pem::parse_pem,
-    serde::{Certificate, name::NamePrettyFormatter},
+    serde::{name::NamePrettyFormatter, Certificate},
 };
 use std::{cmp::min, fs};
 
