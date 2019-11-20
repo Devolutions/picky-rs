@@ -20,6 +20,8 @@ mod test_files {
         include_str!("../../test_assets/private_keys/rsa-2048-pk_3.key");
     pub const RSA_2048_PK_4: &str =
         include_str!("../../test_assets/private_keys/rsa-2048-pk_4.key");
+    pub const RSA_4096_PK_3_UNSUPPORTED: &str =
+        include_str!("../../test_assets/private_keys/rsa-4096-pk_3.key");
 
     pub const CSR: &str = include_str!("../../test_assets/certification_request.csr");
 

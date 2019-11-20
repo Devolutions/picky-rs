@@ -58,7 +58,7 @@ impl SignatureHashType {
     pub fn sign(self, msg: &[u8], private_key: &PrivateKey) -> Result<Vec<u8>> {
         let rsa_private_key = match &private_key.as_inner().private_key {
             serde::private_key_info::PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => {
-                RSAPrivateKey::from_components(
+                RSAPrivateKey::from_components2(
                     BigUint::from_bytes_be(&key.modulus().0.to_bytes_be().1),
                     BigUint::from_bytes_be(&key.public_exponent().0.to_bytes_be().1),
                     BigUint::from_bytes_be(&key.private_exponent().0.to_bytes_be().1),
@@ -67,6 +67,8 @@ impl SignatureHashType {
                         .map(|p| BigUint::from_bytes_be(&p.0.to_bytes_be().1))
                         .collect(),
                 )
+                .map_err(|_| Error::Rsa)
+                .ctx("couldn't build RSA private key from provided components")?
             }
         };
 
@@ -137,5 +139,31 @@ impl From<SignatureHashType> for AlgorithmIdentifier {
             SignatureHashType::RsaSha384 => AlgorithmIdentifier::new_sha384_with_rsa_encryption(),
             SignatureHashType::RsaSha512 => AlgorithmIdentifier::new_sha512_with_rsa_encryption(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::pem::Pem;
+
+    #[test]
+    fn unsupported_key_no_panic() {
+        // Once the key is supported by the RSA crate, this test should be deleted.
+        let unsupported_key = {
+            let pem = crate::test_files::RSA_4096_PK_3_UNSUPPORTED
+                .parse::<Pem>()
+                .unwrap();
+            PrivateKey::from_pkcs8(pem.data()).unwrap()
+        };
+        let msg = [0, 1, 2, 3, 4, 5];
+        let signature_hash_type = SignatureHashType::RsaSha512;
+        let err = signature_hash_type
+            .sign(&msg, &unsupported_key)
+            .unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "couldn\'t build RSA private key from provided components: RSA error"
+        );
     }
 }
