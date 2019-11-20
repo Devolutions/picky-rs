@@ -25,7 +25,7 @@ chrono = { version = "0.4", optional = true }
 
 sha-1 = "0.8"
 sha2 = "0.8"
-rsa = "0.1"
+rsa = { git = "https://github.com/Devolutions/RSA" }
 rand = "0.6" # TODO: update to 0.7. Requires rsa crate to support 0.7 too.
 
 [dev-dependencies]
@@ -36,3 +36,4 @@ hex = "0.3"
 default = []
 chrono_conversion = ["chrono", "serde_asn1_der/chrono_conversion"]
 controller = ["chrono_conversion"]
+expose_internals = []

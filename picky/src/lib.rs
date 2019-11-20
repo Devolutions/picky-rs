@@ -5,10 +5,14 @@ pub mod error;
 pub mod models;
 pub mod oids;
 pub mod pem;
-pub mod serde;
 
 #[cfg(feature = "controller")]
 pub mod controller;
+
+#[cfg(not(feature = "expose_internals"))]
+mod serde;
+#[cfg(feature = "expose_internals")]
+pub mod serde;
 
 #[cfg(test)]
 mod test_files {
@@ -20,6 +24,8 @@ mod test_files {
         include_str!("../../test_assets/private_keys/rsa-2048-pk_3.key");
     pub const RSA_2048_PK_4: &str =
         include_str!("../../test_assets/private_keys/rsa-2048-pk_4.key");
+    pub const RSA_4096_PK_3_UNSUPPORTED: &str =
+        include_str!("../../test_assets/private_keys/rsa-4096-pk_3.key");
 
     pub const CSR: &str = include_str!("../../test_assets/certification_request.csr");
 
