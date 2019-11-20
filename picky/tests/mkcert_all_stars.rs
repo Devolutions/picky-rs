@@ -1,21 +1,10 @@
 //! This test attempts to parse all root certificate provided by https://mkcert.org/
 //! Data fetched on the 2019/10 are in a file named `mkcert_all_root_ca_2019_10.txt`.
 
-use picky::{
-    pem::parse_pem,
-    serde::{name::NamePrettyFormatter, Certificate},
-};
+use picky::{models::certificate::Cert, pem::parse_pem};
 use std::{cmp::min, fs};
 
 const ALL_STARS_FILE_PATH: &str = "../test_assets/mkcert_all_root_ca_2019_10.txt";
-
-fn print_issuer(cert: &Certificate) {
-    println!(
-        "Decoded CA ({:?}): {}",
-        *cert.tbs_certificate.version,
-        NamePrettyFormatter(&cert.tbs_certificate.issuer)
-    );
-}
 
 fn substract_no_underflow(val: usize, sub: usize) -> usize {
     if sub > val {
@@ -61,9 +50,9 @@ fn all_stars_parsing() {
         };
         assert_eq!(pem.label(), "CERTIFICATE");
 
-        match Certificate::from_der(pem.data()) {
+        match Cert::from_der(pem.data()) {
             Ok(cert) => {
-                print_issuer(&cert);
+                println!("Decoded CA: {}", cert.issuer_name().to_string());
                 number_decoded += 1;
             }
             Err(e) => {

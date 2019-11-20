@@ -57,6 +57,10 @@ impl PrivateKey {
         &self.0
     }
 
+    pub fn into_inner(self) -> PrivateKeyInfo {
+        self.0
+    }
+
     /// **Beware**: this is insanely slow in debug builds.
     pub fn generate_rsa(bits: usize) -> Result<Self> {
         use rand::rngs::OsRng;
@@ -115,6 +119,10 @@ impl PublicKey {
 
     pub fn as_inner(&self) -> &SubjectPublicKeyInfo {
         &self.0
+    }
+
+    pub fn into_inner(self) -> SubjectPublicKeyInfo {
+        self.0
     }
 }
 

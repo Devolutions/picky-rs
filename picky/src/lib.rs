@@ -5,10 +5,14 @@ pub mod error;
 pub mod models;
 pub mod oids;
 pub mod pem;
-pub mod serde;
 
 #[cfg(feature = "controller")]
 pub mod controller;
+
+#[cfg(not(feature = "expose_internals"))]
+mod serde;
+#[cfg(feature = "expose_internals")]
+pub mod serde;
 
 #[cfg(test)]
 mod test_files {

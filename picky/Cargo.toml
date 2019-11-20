@@ -36,3 +36,4 @@ hex = "0.3"
 default = []
 chrono_conversion = ["chrono", "serde_asn1_der/chrono_conversion"]
 controller = ["chrono_conversion"]
+expose_internals = []

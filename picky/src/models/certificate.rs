@@ -33,12 +33,10 @@ pub enum CertType {
 pub struct Cert(Certificate);
 
 impl Cert {
-    pub fn new(certificate: Certificate) -> Self {
-        Self(certificate)
-    }
-
     pub fn from_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self> {
-        Ok(Self::new(serde_asn1_der::from_bytes(der.as_ref())?))
+        Ok(Self::from_certificate(serde_asn1_der::from_bytes(
+            der.as_ref(),
+        )?))
     }
 
     pub fn to_der(&self) -> serde_asn1_der::Result<Vec<u8>> {
@@ -49,12 +47,16 @@ impl Cert {
         Ok(Pem::new("CERTIFICATE", self.0.to_der()?))
     }
 
-    pub fn into_inner(self) -> Certificate {
-        self.0
+    pub fn from_certificate(certificate: Certificate) -> Self {
+        Self(certificate)
     }
 
-    pub fn view_inner(&self) -> &Certificate {
+    pub fn as_inner(&self) -> &Certificate {
         &self.0
+    }
+
+    pub fn into_inner(self) -> Certificate {
+        self.0
     }
 
     pub fn ty(&self) -> CertType {
