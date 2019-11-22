@@ -33,9 +33,7 @@ impl Repository for KeyIdentifierStoreRepository {
     type Model = KeyIdentifierStore;
 
     fn init(&mut self, db_instance: MongoConnection) -> Result<(), RepositoryError> {
-        let _ = db_instance.get()?.create_collection(COLLECTION_NAME, None);
         self.db_instance = Some(db_instance);
-
         Ok(())
     }
 
