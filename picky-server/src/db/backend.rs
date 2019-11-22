@@ -11,15 +11,9 @@ pub struct Backend {
 }
 
 impl Backend {
-    pub fn new(db: Box<dyn BackendStorage>) -> Result<Self, String> {
-        let mut backend = Backend{
-            db
-        };
-
-        if let Err(e) = backend.db.init(){
-            return Err(e);
-        }
-
+    pub fn new<T: BackendStorage + 'static>(db: T) -> Result<Self, String> {
+        let mut backend = Backend { db: Box::new(db) };
+        backend.db.init()?;
         Ok(backend)
     }
 }
@@ -45,12 +39,11 @@ impl From<&ServerConfig> for Backend{
     fn from(config: &ServerConfig) -> Self{
         match config.backend {
             BackendType::MongoDb => {
-                        let conn= MongoConnection::new(&config.database.url).expect("Invalid server url");
-                        let dbstorage = Box::new(RepositoryCollection::new(conn));
-                        Backend::new(dbstorage).expect("Wrong server configuration")
-                },
+                let conn= MongoConnection::new(&config.database.url).expect("Invalid server url");
+                Backend::new(RepositoryCollection::new(conn)).expect("Wrong server configuration")
+            },
             BackendType::Memory => {
-                Backend::new(Box::new(MemoryRepos::new())).expect("Bad configuration")
+                Backend::new(MemoryRepos::new()).expect("Bad configuration")
             },
             BackendType::File => {
                 let save_file_path = if config.save_file_path.eq("") {
@@ -59,7 +52,7 @@ impl From<&ServerConfig> for Backend{
                     format!("{}{}",&config.save_file_path, DEFAULT_FILEBASE_PATH)
                 };
 
-                Backend::new(Box::new(FileRepos::new(save_file_path.as_str()))).expect("Error creating backend for file base")
+                Backend::new(FileRepos::new(save_file_path.as_str())).expect("Error creating backend for file base")
             },
             _ => panic!("not yet implemented")
         }
