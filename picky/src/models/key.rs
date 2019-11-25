@@ -37,6 +37,17 @@ impl PrivateKey {
         Ok(Self(serde_asn1_der::from_bytes(pkcs8.as_ref())?))
     }
 
+    pub fn from_rsa_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> serde_asn1_der::Result<Self> {
+        use crate::serde::{private_key_info::RSAPrivateKey, AlgorithmIdentifier};
+
+        let private_key = serde_asn1_der::from_bytes::<RSAPrivateKey>(der.as_ref())?;
+        Ok(Self(PrivateKeyInfo {
+            version: 0,
+            private_key_algorithm: AlgorithmIdentifier::new_rsa_encryption(),
+            private_key: PrivateKeyValue::RSA(private_key.into()),
+        }))
+    }
+
     pub fn to_pkcs8(&self) -> serde_asn1_der::Result<Vec<u8>> {
         serde_asn1_der::to_vec(&self.0)
     }
