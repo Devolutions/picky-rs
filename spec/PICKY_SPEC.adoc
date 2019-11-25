@@ -8,23 +8,39 @@ This document covers the design principles and protocol specification of the Pic
 
 == Relevant specifications
 
-multihash: https://github.com/multiformats/multihash
+multihash format: https://github.com/multiformats/multihash
 
 HTTP signatures: https://tools.ietf.org/html/draft-cavage-http-signatures-12
 
+Cloudflare goes InterPlanetary - Introducing Cloudflare’s IPFS Gateway:
+https://blog.cloudflare.com/distributed-web-gateway/
+
 RFC4158: Internet X.509 Public Key Infrastructure: Certification Path Building
+https://tools.ietf.org/html/rfc4158
 
 RFC7468: Textual Encodings of PKIX, PKCS, and CMS Structures
+https://tools.ietf.org/html/rfc7468
 
 RFC2585: Internet X.509 Public Key Infrastructure Operational Protocols: FTP and HTTP
+https://tools.ietf.org/html/rfc2585
 
 RFC7093: Additional Methods for Generating Key Identifiers Values
+https://tools.ietf.org/html/rfc7093
 
 RFC4387: Internet X.509 Public Key Infrastructure Operational Protocols: Certificate Store Access via HTTP
+https://tools.ietf.org/html/rfc4387
 
 RFC4043: Internet X.509 Public Key Infrastructure Permanent Identifier
+https://tools.ietf.org/html/rfc4043
 
 RFC8649: Hash Of Root Key Certificate Extension
+https://tools.ietf.org/html/rfc8649
+
+== Design Principles
+
+Certificate storage and distribution of certificates should be done using content addressing, a principle borrowed from IPFS. A hash of the X.509 certificate binary data is used as the name of the file or key used to store and retrieve the same certificate. A primary hashing algorithm should be chosen (SHA-256 is recommended) for storage, creating the primary key for a given certificate. All other references to the same certificate should be constructed using the resulting string. For instance, if the primary hashing algorithm is SHA-256, a SHA1 table could be generated to map SHA1 hashes to their corresponding SHA-256 hashes for the same certificate.
+
+As for certificate distribution, one key aspect required to simplify using HTTP signatures along with X.509 certificates is the possibility of pushing and fetching leaf certificates from the certificate authority server. In the case of HTTP signatures, a client signs the HTTP request using the key pair identified in its X.509 certificate, and uses the X.509 certificate hash as the key id (kid) field. In order to validate the signature, the server fetches the corresponding X.509 certificate from the server using the certificate hash, and validates its against a trusted certificate chain. If all X.509 properties can be validated, then the server validates that the HTTP signature matches the public key from the X.509 certificate. This strategy avoid sending large X.509 certificates in each request. Since content addressing is used, client-side caching can be used, such that a server would only not need to fetch the certificate every time, without fear of caching an outdated certificate.
 
 == HTTP API
 
