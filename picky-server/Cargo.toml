@@ -10,7 +10,7 @@ edition = "2018"
 
 [dependencies]
 picky = { path = "../picky", features = ["controller"] }
-mongodb = { git = "https://github.com/Devolutions/mongo-rust-driver-prototype", branch = "master", features = ["ssl"] }
+mongodb = { package = "mongodb_cwal", version = "0.4", features = ["ssl"] }
 curl = { git = "https://github.com/Devolutions/curl-rust", branch = "wayk" }
 clap = { features = ["yaml"], version = "2.32" }
 multihash = "0.8"
