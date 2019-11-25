@@ -6,44 +6,35 @@
 
 This document covers the design principles and protocol specification of the Picky Certificate Authority.
 
-== Relevant specifications
+== Related Specifications
 
-multihash format: https://github.com/multiformats/multihash
+https://github.com/multiformats/multihash[Multihash format]
 
-multibase format: https://github.com/multiformats/multibase
+https://github.com/multiformats/multibase[Multibase format]
 
-HTTP signatures: https://tools.ietf.org/html/draft-cavage-http-signatures-12
+https://tools.ietf.org/html/draft-cavage-http-signatures-12[HTTP signatures]
 
-RFC4158: Internet X.509 Public Key Infrastructure: Certification Path Building
-https://tools.ietf.org/html/rfc4158
+https://tools.ietf.org/html/rfc4158[RFC4158: Internet X.509 Public Key Infrastructure: Certification Path Building]
 
-RFC7468: Textual Encodings of PKIX, PKCS, and CMS Structures
-https://tools.ietf.org/html/rfc7468
+https://tools.ietf.org/html/rfc7468[RFC7468: Textual Encodings of PKIX, PKCS, and CMS Structures]
 
-RFC7093: Additional Methods for Generating Key Identifiers Values
-https://tools.ietf.org/html/rfc7093
+=== Other Inspiration
 
-RFC2585: Internet X.509 Public Key Infrastructure Operational Protocols: FTP and HTTP
-https://tools.ietf.org/html/rfc2585
+The following specifications are not used in directly in picky, but are sources of inspiration for its design:
 
-RFC4387: Internet X.509 Public Key Infrastructure Operational Protocols: Certificate Store Access via HTTP
-https://tools.ietf.org/html/rfc4387
+https://tools.ietf.org/html/rfc7093[RFC7093: Additional Methods for Generating Key Identifiers Values]
 
-RFC4043: Internet X.509 Public Key Infrastructure Permanent Identifier
-https://tools.ietf.org/html/rfc4043
+https://tools.ietf.org/html/rfc2585[RFC2585: Internet X.509 Public Key Infrastructure Operational Protocols: FTP and HTTP]
 
-RFC8649: Hash Of Root Key Certificate Extension
-https://tools.ietf.org/html/rfc8649
+https://tools.ietf.org/html/rfc4387[RFC4387: Internet X.509 Public Key Infrastructure Operational Protocols: Certificate Store Access via HTTP]
 
-== Design Principles
+https://tools.ietf.org/html/rfc4043[RFC4043: Internet X.509 Public Key Infrastructure Permanent Identifier]
 
-Certificate storage and distribution of certificates should be done using content addressing, a principle borrowed from IPFS. A hash of the X.509 certificate binary data is used as the name of the file or key used to store and retrieve the same certificate. A primary hashing algorithm should be chosen (SHA-256 is recommended) for storage, creating the primary key for a given certificate. All other references to the same certificate should be constructed using the resulting string. For instance, if the primary hashing algorithm is SHA-256, a SHA1 table could be generated to map SHA1 hashes to their corresponding SHA-256 hashes for the same certificate.
+https://tools.ietf.org/html/rfc8649[RFC8649: Hash Of Root Key Certificate Extension]
 
-As for certificate distribution, one key aspect required to simplify using HTTP signatures along with X.509 certificates is the possibility of pushing and fetching leaf certificates from the certificate authority server. In the case of HTTP signatures, a client signs the HTTP request using the key pair identified in its X.509 certificate, and uses the X.509 certificate hash as the key id (kid) field. In order to validate the signature, the server fetches the corresponding X.509 certificate from the server using the certificate hash, and validates its against a trusted certificate chain. If all X.509 properties can be validated, then the server validates that the HTTP signature matches the public key from the X.509 certificate. This strategy avoid sending large X.509 certificates in each request. Since content addressing is used, client-side caching can be used, such that a server would only not need to fetch the certificate every time, without fear of caching an outdated certificate.
+== Certificate Addressing
 
-== Content Addressing
-
-Taking inspiration from IPFS, picky uses content addressing to refer to X.509 certificates. In this case, it means that we refer to an X.509 certificate by the hash of its binary representation (ASN.1 DER). The content address is a multibase-encoded multihash, where base64url encoding and SHA256 hashing are used by default. The result is a concise, self-descriptive string that is adaptable to multiple hash types and base encodings without ambiguity.
+Taking inspiration from https://ipfs.io/[IPFS], picky uses content addressing to refer to X.509 certificates. In this case, it means that we refer to an X.509 certificate by the hash of its binary representation (ASN.1 DER). The content address is a multibase-encoded multihash, where base64url encoding and SHA256 hashing are used by default. The result is a concise, self-descriptive string that is adaptable to multiple hash types and base encodings without ambiguity.
 
 For instance, let's take the SHA256 hash of the string "multihash" (without a newline character):
 
@@ -74,45 +65,20 @@ The string "uEiCcvAfD-ZFyWDajqipYHKICkZiqQgudmbwOEx2fPiy-Rw" becomes our content
 
 In the case of X.509 certificates, the same process is used on the binary representation of the certificate (ASN.1 DER) to obtain the corresponding content address. This means that even if the certificate is stored or transmitted in base64 or PEM format, the hash is always done on the corresponding binary data and not the textual representation.
 
-== HTTP API
+== Certificate Storage
 
-=== Requesting a certificate
+All X.509 certificates are stored in a flat key-value store where the key is the content address and the value is the X.509 certificate in binary representation. Textual representations such as base64 or PEM should be handled with on-the-fly conversions to and from the binary representation.
 
-Request:
-----
-POST /picky/sign HTTP/1.1
-Content-Type: application/pkcs10
-----
+The key-value store can be an in-memory hash map, local files, a database like MongoDB or a distributed cache like Redis. X.509 certificates should be stored only in one place to then use the content address as a reference in other tables without duplicating the content.
 
-Response:
-----
-HTTP/1.1 200 OK
-Content-Type: application/pkix-cert
-----
+Regardless of the storage backend, what matters is that it uses the content address as the key, and that it should be easy to check that the stored content matches the content address. Since the content address is computed over the binary representation of the certificate, storing certificates in ASN.1 DER binary format is recommended.
 
-=== Fetching a certificate
+== Certificate Caching
 
-Request:
-----
-GET /picky/cert HTTP/1.1
-Accept: application/pkix-cert
-----
+Because all X.509 certificates are content-addressed, they can be easily cached on both the client and server. Leaf certificates can be cached on the server for the purpose of making them available to other peers. Because of its immutable nature, content-addressed certificates do not need to be invalidated in potential HTTP caching proxies. The contents of a certificate fetched using the content address will never change.
 
-Response:
-----
-HTTP/1.1 200 OK
-Content-Type: application/pkix-cert
-----
+However, a configurable expiration time should be put on the server certificate cache to avoid caching old certificates that are no longer in use. This expiration time is only used to remove entries from the cache and has nothing to do with the certificate validity period.
 
-=== Pushing a certificate
+When leaf certificate caching is enabled, new certificates should automatically be cached after they've been signed by the certificate authority. Existing leaf certificates can be pushed back to the server to ensure they are still available in the cache for a period of time, resetting cache expiration time.
 
-Request:
-----
-POST /picky/cert HTTP/1.1
-Content-Type: application/pkix-cert
-----
-
-Response:
-----
-HTTP/1.1 200 OK
-----
+The trade-off of removing certificates after a certain period of time but allowing them to be pushed back in the cache ensures that we store only certificates that are in use while being able to function with certificates that were emitted some time ago.
