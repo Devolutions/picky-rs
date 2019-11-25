@@ -10,10 +10,9 @@ This document covers the design principles and protocol specification of the Pic
 
 multihash format: https://github.com/multiformats/multihash
 
-HTTP signatures: https://tools.ietf.org/html/draft-cavage-http-signatures-12
+multibase format: https://github.com/multiformats/multibase
 
-Cloudflare goes InterPlanetary - Introducing Cloudflare’s IPFS Gateway:
-https://blog.cloudflare.com/distributed-web-gateway/
+HTTP signatures: https://tools.ietf.org/html/draft-cavage-http-signatures-12
 
 RFC4158: Internet X.509 Public Key Infrastructure: Certification Path Building
 https://tools.ietf.org/html/rfc4158
@@ -21,11 +20,11 @@ https://tools.ietf.org/html/rfc4158
 RFC7468: Textual Encodings of PKIX, PKCS, and CMS Structures
 https://tools.ietf.org/html/rfc7468
 
-RFC2585: Internet X.509 Public Key Infrastructure Operational Protocols: FTP and HTTP
-https://tools.ietf.org/html/rfc2585
-
 RFC7093: Additional Methods for Generating Key Identifiers Values
 https://tools.ietf.org/html/rfc7093
+
+RFC2585: Internet X.509 Public Key Infrastructure Operational Protocols: FTP and HTTP
+https://tools.ietf.org/html/rfc2585
 
 RFC4387: Internet X.509 Public Key Infrastructure Operational Protocols: Certificate Store Access via HTTP
 https://tools.ietf.org/html/rfc4387
@@ -42,33 +41,78 @@ Certificate storage and distribution of certificates should be done using conten
 
 As for certificate distribution, one key aspect required to simplify using HTTP signatures along with X.509 certificates is the possibility of pushing and fetching leaf certificates from the certificate authority server. In the case of HTTP signatures, a client signs the HTTP request using the key pair identified in its X.509 certificate, and uses the X.509 certificate hash as the key id (kid) field. In order to validate the signature, the server fetches the corresponding X.509 certificate from the server using the certificate hash, and validates its against a trusted certificate chain. If all X.509 properties can be validated, then the server validates that the HTTP signature matches the public key from the X.509 certificate. This strategy avoid sending large X.509 certificates in each request. Since content addressing is used, client-side caching can be used, such that a server would only not need to fetch the certificate every time, without fear of caching an outdated certificate.
 
+== Content Addressing
+
+Taking inspiration from IPFS, picky uses content addressing to refer to X.509 certificates. In this case, it means that we refer to an X.509 certificate by the hash of its binary representation (ASN.1 DER). The content address is a multibase-encoded multihash, where base64url encoding and SHA256 hashing are used by default. The result is a concise, self-descriptive string that is adaptable to multiple hash types and base encodings without ambiguity.
+
+For instance, let's take the SHA256 hash of the string "multihash" (without a newline character):
+
+----
+echo -n "multihash" | sha256sum
+9cbc07c3f991725836a3aa2a581ca2029198aa420b9d99bc0e131d9f3e2cbe47
+----
+
+The resulting hexadecimal string contains the 32 bytes of the SHA256 hash. To convert it to a https://github.com/multiformats/multihash[multihash], we prefix it with the hash type (0x12) and length (0x20):
+
+----
+12209cbc07c3f991725836a3aa2a581ca2029198aa420b9d99bc0e131d9f3e2cbe47
+----
+
+This hexadecimal string can then be converted to base64url, which is much shorter while remaining URL safe:
+
+----
+EiCcvAfD-ZFyWDajqipYHKICkZiqQgudmbwOEx2fPiy-Rw
+----
+
+The last step is to prefix the base64url string with the character 'u', which is the https://github.com/multiformats/multibase[multibase] code for base64url:
+
+----
+uEiCcvAfD-ZFyWDajqipYHKICkZiqQgudmbwOEx2fPiy-Rw
+----
+
+The string "uEiCcvAfD-ZFyWDajqipYHKICkZiqQgudmbwOEx2fPiy-Rw" becomes our content address for the string content "multihash".
+
+In the case of X.509 certificates, the same process is used on the binary representation of the certificate (ASN.1 DER) to obtain the corresponding content address. This means that even if the certificate is stored or transmitted in base64 or PEM format, the hash is always done on the corresponding binary data and not the textual representation.
+
 == HTTP API
 
 === Requesting a certificate
 
 Request:
+----
 POST /picky/sign HTTP/1.1
 Content-Type: application/pkcs10
+----
 
 Response:
+----
 HTTP/1.1 200 OK
 Content-Type: application/pkix-cert
+----
 
 === Fetching a certificate
 
 Request:
+----
 GET /picky/cert HTTP/1.1
 Accept: application/pkix-cert
+----
 
 Response:
+----
 HTTP/1.1 200 OK
 Content-Type: application/pkix-cert
+----
 
 === Pushing a certificate
 
 Request:
+----
 POST /picky/cert HTTP/1.1
 Content-Type: application/pkix-cert
+----
 
 Response:
+----
 HTTP/1.1 200 OK
+----
