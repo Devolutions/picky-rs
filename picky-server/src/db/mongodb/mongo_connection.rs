@@ -1,6 +1,7 @@
 use mongodb::{connstring, db::ThreadedDatabase, r2d2_mongo, ClientOptions, CommandType};
 use r2d2::Pool;
 use std::time::Duration;
+use mongodb::common::{ReadPreference, ReadMode};
 
 const CONNECTION_IDLE_TIMEOUT_SECS: u64 = 600;
 const DB_CONNECTION_TIMEOUT_SECS: u64 = 15;
@@ -27,12 +28,8 @@ impl MongoConnection {
         client_options.idle_connection_timeout =
             Some(Duration::from_secs(CONNECTION_IDLE_TIMEOUT_SECS));
         client_options.pool_size = Some(1);
-
-        /* FIXME: driver explodes with this
-        if conn_str.hosts.len() > 1 {
-            client_options.read_preference =
-                Some(ReadPreference::new(ReadMode::SecondaryPreferred, None));
-        }*/
+        client_options.read_preference =
+            Some(ReadPreference::new(ReadMode::SecondaryPreferred, None));
 
         let manager =
             r2d2_mongo::MongoConnectionManager::new(conn_str, DATABASE_NAME, client_options);
