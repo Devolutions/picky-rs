@@ -5,6 +5,7 @@ use std::{borrow::Cow, fmt, str::FromStr};
 
 const PEM_HEADER_START: &str = "-----BEGIN";
 const PEM_HEADER_END: &str = "-----END";
+const PEM_DASHES_BOUNDARIES: &str = "-----";
 
 #[derive(Debug, Clone, Error)]
 pub enum PemError {
@@ -90,21 +91,23 @@ fn __parse_pem_impl(input: &[u8]) -> Result<Pem<'static>, PemError> {
     let header_start_idx =
         __find(input, PEM_HEADER_START.as_bytes()).ok_or(PemError::HeaderNotFound)?;
 
-    let label_start_idx = header_start_idx + PEM_HEADER_START.len();
+    let label_start_idx = header_start_idx + PEM_HEADER_START.as_bytes().len();
     let label_end_idx =
         __find(&input[label_start_idx..], b"-").ok_or(PemError::InvalidHeader)? + label_start_idx;
     let label = String::from_utf8_lossy(&input[label_start_idx..label_end_idx])
         .trim()
         .to_owned();
 
-    let header_end_idx =
-        __find(&input[label_end_idx..], b"\n").ok_or(PemError::FooterNotFound)? + label_end_idx;
+    let header_end_idx = __find(&input[label_end_idx..], PEM_DASHES_BOUNDARIES.as_bytes())
+        .ok_or(PemError::InvalidHeader)?
+        + label_end_idx
+        + PEM_DASHES_BOUNDARIES.as_bytes().len();
 
     let footer_start_idx = __find(&input[header_end_idx..], PEM_HEADER_END.as_bytes())
         .ok_or(PemError::FooterNotFound)?
         + header_end_idx;
 
-    let raw_data = &input[header_end_idx + 1..footer_start_idx - 1];
+    let raw_data = &input[header_end_idx..footer_start_idx];
 
     let data = if __find(raw_data, b"\n").is_some() {
         // Line ending characters should be striped... Sadly, this means we need to copy and allocate.
@@ -152,6 +155,7 @@ mod tests {
 
     const PEM_BYTES: &[u8] = crate::test_files::INTERMEDIATE_CA.as_bytes();
     const PEM_STR: &str = crate::test_files::INTERMEDIATE_CA;
+    const FLATTENED_PEM: &str = "-----BEGIN GARBAGE-----GARBAGE-----END GARBAGE-----";
 
     #[test]
     fn read_pem() {
@@ -167,6 +171,11 @@ mod tests {
         let pem = PEM_STR.parse::<Pem>().unwrap();
         let reconverted_pem = pem.to_string();
         pretty_assertions::assert_eq!(reconverted_pem, PEM_STR);
+    }
+
+    #[test]
+    fn flattened_pem() {
+        FLATTENED_PEM.parse::<Pem>().unwrap();
     }
 
     #[test]
