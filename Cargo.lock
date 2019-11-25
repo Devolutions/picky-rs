@@ -936,9 +936,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "mongodb"
-version = "0.3.12"
-source = "git+https://github.com/Devolutions/mongo-rust-driver-prototype#ddfaf3a6888654ccb754b457e4f3bbff864d6411"
+name = "mongodb_cwal"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "bitflags 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "bson 0.13.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1187,7 +1187,7 @@ dependencies = [
  "hex 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "log4rs 0.8.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "mongodb 0.3.12 (git+https://github.com/Devolutions/mongo-rust-driver-prototype)",
+ "mongodb_cwal 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "multihash 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "picky 4.0.0",
  "portpicker 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2405,7 +2405,7 @@ dependencies = [
 "checksum mio 0.6.20 (registry+https://github.com/rust-lang/crates.io-index)" = "72f4261ee7ab03cd36dc99eea4db8be6e83e4164da470e0c84f6726d6c605855"
 "checksum mio-uds 0.6.7 (registry+https://github.com/rust-lang/crates.io-index)" = "966257a94e196b11bb43aca423754d87429960a768de9414f3691d6957abf125"
 "checksum miow 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "8c1f2f3b1cf331de6896aabf6e9d55dca90356cc9960cca7eaaf408a355ae919"
-"checksum mongodb 0.3.12 (git+https://github.com/Devolutions/mongo-rust-driver-prototype)" = "<none>"
+"checksum mongodb_cwal 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "4cf024867d9babd3184da1dbfd69520009665ce584d38a825c37c66b800091e0"
 "checksum multihash 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c62469025f45dee2464ef9fc845f4683c543993792c1993e7d903c17a4546b74"
 "checksum net2 0.2.33 (registry+https://github.com/rust-lang/crates.io-index)" = "42550d9fb7b6684a6d404d9fa7250c2eb2646df731d1c06afc06dcee9e1bcf88"
 "checksum nom 4.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "2ad2a91a8e869eeb30b9cb3119ae87773a8f4ae617f41b1eb9c154b2905f7bd6"
