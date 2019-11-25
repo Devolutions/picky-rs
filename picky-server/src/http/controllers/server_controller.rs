@@ -349,8 +349,7 @@ fn sign_certificate(
     let ca_pk_der = repos
         .get_key(ca_hash)
         .map_err(|e| format!("couldn't fetch CA private key: {}", e))?;
-    let ca_pk = PrivateKey::from_pkcs8(&ca_pk_der)
-        .map_err(|e| format!("couldn't build private key from pkcs8: {}", e))?;
+    let ca_pk = parse_pk_from_magic_der(&ca_pk_der)?;
 
     let signed_cert = Picky::generate_leaf_from_csr(csr, &ca_cert, &ca_pk, config.key_config)
         .map_err(|e| format!("couldn't generate leaf certificate: {}", e))?;
@@ -519,7 +518,7 @@ pub fn generate_intermediate(
         }
     }
 
-    let (root_cert, root_key) = match repos.find(&root_name) {
+    let (root_cert_der, root_key_der) = match repos.find(&root_name) {
         Ok(roots) => {
             if roots.is_empty() {
                 return Err("no matching root CA".to_owned());
@@ -540,10 +539,9 @@ pub fn generate_intermediate(
     };
 
     let pk = generate_private_key(2048)?;
-    let root_cert = Cert::from_der(&root_cert)
+    let root_cert = Cert::from_der(&root_cert_der)
         .map_err(|e| format!("couldn't parse root cert from der: {}", e))?;
-    let root_key = PrivateKey::from_pkcs8(&root_key)
-        .map_err(|e| format!("couldn't parse private key from pkcs8: {}", e))?;
+    let root_key = parse_pk_from_magic_der(&root_key_der)?;
 
     let intermediate_cert = Picky::generate_intermediate(
         &intermediate_name,
@@ -682,8 +680,20 @@ fn generate_private_key(bits: usize) -> Result<PrivateKey, String> {
         .parse::<Pem>()
         .map_err(|e| format!("couldn't parse pk pem: {}", e))?;
 
-    PrivateKey::from_pkcs8(pem.data())
-        .map_err(|e| format!("couldn't parse private key from pkcs8: {}", e))
+    parse_pk_from_magic_der(pem.data())
+}
+
+fn parse_pk_from_magic_der(der: &[u8]) -> Result<PrivateKey, String> {
+    match PrivateKey::from_pkcs8(&der) {
+        Ok(pk) => Ok(pk),
+        Err(pkcs8_err) => PrivateKey::from_rsa_der(der).map_err(|rsa_der_err| {
+            format!(
+                "couldn't parse private key as pkcs8: {} ; \
+                 couldn't parse private key as raw der-encoded RSA key either: {}",
+                pkcs8_err, rsa_der_err
+            )
+        }),
+    }
 }
 
 #[cfg(test)]
@@ -738,5 +748,58 @@ mod tests {
         assert_eq!(chain[1].subject_name().to_string(), "CN=Picky Root CA");
 
         Picky::verify_chain(&signed_cert, chain.iter()).expect("couldn't validate ca chain");
+    }
+
+    const RAW_RSA_KEY_PEM: &str =
+        "-----BEGIN RSA PRIVATE KEY-----\n\
+         MIIEpAIBAAKCAQEA5Kz4i/+XZhiE+fyrgtx/4yI3i6C6HXbC4QJYpDuSUEKN2bO9\n\
+         RsE+Fnds/FizHtJVWbvya9ktvKdDPBdy58+CIM46HEKJhYLnBVlkEcg9N2RNgR3x\n\
+         HnpRbKfv+BmWjOpSmWrmJSDLY0dbw5X5YL8TU69ImoouCUfStyCgrpwkctR0GD3G\n\
+         fcGjbZRucV7VvVH9bS1jyaT/9yORyzPOSTwb+K9vOr6XlJX0CGvzQeIOcOimejHx\n\
+         ACFOCnhEKXiwMsmL8FMz0drkGeMuCODY/OHVmAdXDE5UhroL0oDhSmIrdZ8CxngO\n\
+         xHr1WD2yC0X0jAVP/mrxjSSfBwmmqhSMmONlvQIDAQABAoIBAQCJrBl3L8nWjayB\n\
+         VL1ta5MTC+alCX8DfhyVmvQC7FqKN4dvKecqUe0vWXcj9cLhK4B3JdAtXfNLQOgZ\n\
+         pYRoS2XsmjwiB20EFGtBrS+yBPvV/W0r7vrbfojHAdRXahBZhjl0ZAdrEvNgMfXt\n\
+         Kr2YoXDhUQZFBCvzKmqSFfKnLRpEhsCBOsp+Sx0ZbP3yVPASXnqiZmKblpY4qcE5\n\
+         KfYUO0nUWBSzY8I5c/29IY5oBbOUGS1DTMkx3R7V0BzbH/xmskVACn+cMzf467vp\n\
+         yupTKG9hIX8ff0QH4Ggx88uQTRTI9IvfrAMnICFtR6U7g70hLN6j9ujXkPNhmycw\n\
+         E5nQCmuBAoGBAPVbYtGBvnlySN73UrlyJ1NItUmOGhBt/ezpRjMIdMkJ6dihq7i2\n\
+         RpE76sRvwHY9Tmw8oxR/V1ITK3dM2jZP1SRcm1mn5Y1D3K38jwFS0C47AXzIN2N+\n\
+         LExekI1J4YOPV9o378vUKQuWpbQrQOOvylQBkRJ0Cd8DI3xhiBT/AVGbAoGBAO6Y\n\
+         WBP3GMloO2v6PHijhRqrNdaI0qht8tDhO5L1troFLst3sfpK9fUP/KTlhHOzNVBF\n\
+         fIJnNdcYAe9BISBbfSat+/R9F+GoUvpoC4j8ygHTQkT6ZMcMDfR8RQ4BlqGHIDKZ\n\
+         YaAJoPZVkg7hNRMcvIruYpzFrheDE/4xvnC51GeHAoGAHzCFyFIw72lKwCU6e956\n\
+         B0lH2ljZEVuaGuKwjM43YlMDSgmLNcjeAZpXRq9aDO3QKUwwAuwJIqLTNLAtURgm\n\
+         5R9slCIWuTV2ORvQ5f8r/aR8lOsyt1ATu4WN5JgOtdWj+laAAi4vJYz59YRGFGuF\n\
+         UdZ9JZZgptvUR/xx+xFLjp8CgYBMRzghaeXqvgABTUb36o8rL4FOzP9MCZqPXPKG\n\
+         0TdR0UZcli+4LS7k4e+LaDUoKCrrNsvPhN+ZnHtB2jiU96rTKtxaFYQFCKM+mvTV\n\
+         HrwWSUvucX62hAwSFYieKbPWgDSy+IZVe76SAllnmGg3bAB7CitMo4Y8zhMeORkB\n\
+         QOe/EQKBgQDgeNgRud7S9BvaT3iT7UtizOr0CnmMfoF05Ohd9+VE4ogvLdAoDTUF\n\
+         JFtdOT/0naQk0yqIwLDjzCjhe8+Ji5Y/21pjau8bvblTnASq26FRRjv5+hV8lmcR\n\
+         zzk3Y05KXvJL75ksJdomkzZZb0q+Omf3wyjMR8Xl5WueJH1fh4hpBw==\n\
+         -----END RSA PRIVATE KEY-----";
+
+    #[test]
+    fn parse_pk_from_raw_rsa_der_fallback() {
+        let pem = RAW_RSA_KEY_PEM
+            .parse::<Pem>()
+            .expect("couldn't parse pk pem");
+        parse_pk_from_magic_der(pem.data()).unwrap();
+    }
+
+    const GARBAGE_KEY_PEM: &str =
+        "-----BEGIN RSA PRIVATE KEY-----GARBAGE-----END RSA PRIVATE KEY-----";
+
+    #[test]
+    fn parse_pk_from_garbage_error() {
+        let pem = GARBAGE_KEY_PEM
+            .parse::<Pem>()
+            .expect("couldn't parse pk pem");
+        let err = parse_pk_from_magic_der(pem.data()).unwrap_err();
+        assert_eq!(
+            err,
+            "couldn\'t parse private key as pkcs8: InvalidData ; \
+             couldn\'t parse private key as raw der-encoded RSA key either: InvalidData"
+        );
     }
 }
