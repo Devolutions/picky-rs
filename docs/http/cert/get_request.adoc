@@ -1,0 +1,6 @@
+[source,http,options="nowrap"]
+----
+GET /cert/9c3e1ed7c2245dd96f93ae0e56b5d479a4b8802f11b80d69933685618e59e729 HTTP/1.1
+Host: ca.contoso.local
+----
+
