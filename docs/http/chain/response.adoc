@@ -1,7 +1,7 @@
 [source,http,options="nowrap"]
 ----
 HTTP/1.1 200 OK
-Content-Type: text/plain
+Content-Type: application/x-pem-file
 Content-Length: 3378
 
 -----BEGIN CERTIFICATE-----
