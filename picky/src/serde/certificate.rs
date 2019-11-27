@@ -220,7 +220,7 @@ mod tests {
         key_usage.set_key_encipherment(true);
 
         let extensions = Extensions(vec![
-            Extension::new_basic_constraints(false, None, None),
+            Extension::new_basic_constraints(None, None).into_non_critical(),
             Extension::new_key_usage(key_usage),
             Extension::new_subject_key_identifier(&encoded[469..489]),
             Extension::new_authority_key_identifier(

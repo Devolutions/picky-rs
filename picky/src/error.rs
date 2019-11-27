@@ -1,6 +1,6 @@
 use crate::{models::date::UTCDate, pem::PemError};
 use err_derive::Error;
-use serde_asn1_der::SerdeAsn1DerError;
+use serde_asn1_der::{restricted_string::CharSetError, SerdeAsn1DerError};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -49,6 +49,12 @@ pub enum Error {
         now
     )]
     CertificateExpired { not_after: UTCDate, now: UTCDate },
+    #[error(display = "input has invalid charset: {}", input)]
+    InvalidCharSet {
+        input: String,
+        #[error(source)]
+        source: CharSetError,
+    },
 }
 
 impl From<BoxedError> for Error {

@@ -8,10 +8,14 @@ use crate::{
         name::Name,
         signature::SignatureHashType,
     },
+    oids,
     pem::Pem,
     serde::{
         certificate::TBSCertificate,
-        extension::{Extension, Extensions, KeyIdentifier, KeyUsage},
+        extension::{
+            ExtendedKeyUsage, Extension, Extensions, IssuerAltName, KeyIdentifier, KeyUsage,
+            SubjectAltName,
+        },
         Certificate, Validity, Version,
     },
 };
@@ -215,6 +219,35 @@ enum IssuerInfos<'a> {
     },
 }
 
+#[derive(Clone, Debug)]
+enum MaybeA<T> {
+    Nothing,
+    Default,
+    Just(T),
+}
+
+impl<T> Default for MaybeA<T> {
+    fn default() -> Self {
+        Self::Nothing
+    }
+}
+
+impl<T> MaybeA<T> {
+    fn take(&mut self) -> Self {
+        let mut nothing = Self::Nothing;
+        std::mem::swap(self, &mut nothing);
+        nothing
+    }
+}
+
+// Statically checks the field actually exists and returns a &'static str of the field name
+macro_rules! field_str {
+    ($instance:ident.$field:ident) => {{
+        let _ = $instance.$field;
+        stringify!($field)
+    }};
+}
+
 #[derive(Default, Clone, Debug)]
 struct CertificateBuilderInner<'a> {
     valid_from: Option<UTCDate>,
@@ -225,6 +258,10 @@ struct CertificateBuilderInner<'a> {
     pathlen: Option<u8>,
     signature_hash_type: Option<SignatureHashType>,
     key_id_gen_method: Option<KeyIdGenMethod>,
+    key_usage: MaybeA<KeyUsage>,
+    extended_key_usage: Option<ExtendedKeyUsage>,
+    subject_alt_name: Option<SubjectAltName>,
+    issuer_alt_name: Option<IssuerAltName>,
 }
 
 #[derive(Default, Clone, Debug)]
@@ -316,17 +353,52 @@ impl<'a> CertificateBuilder<'a> {
         self
     }
 
+    /// Optional (alternative: `default_key_usage`)
+    #[inline]
+    pub fn key_usage(&self, key_usage: KeyUsage) -> &Self {
+        self.inner.borrow_mut().key_usage = MaybeA::Just(key_usage);
+        self
+    }
+
+    /// Optional (alternative: `key_usage`)
+    #[inline]
+    pub fn default_key_usage(&self) -> &Self {
+        self.inner.borrow_mut().key_usage = MaybeA::Default;
+        self
+    }
+
+    /// Optional (put anyExtendedKeyUsage if not provided)
+    #[inline]
+    pub fn extended_key_usage(&self, extended_key_usage: ExtendedKeyUsage) -> &Self {
+        self.inner.borrow_mut().extended_key_usage = Some(extended_key_usage);
+        self
+    }
+
+    /// Optional
+    #[inline]
+    pub fn subject_alt_name(&self, subject_alt_name: SubjectAltName) -> &Self {
+        self.inner.borrow_mut().subject_alt_name = Some(subject_alt_name);
+        self
+    }
+
+    /// Optional
+    #[inline]
+    pub fn issuer_alt_name(&self, issuer_alt_name: IssuerAltName) -> &Self {
+        self.inner.borrow_mut().issuer_alt_name = Some(issuer_alt_name);
+        self
+    }
+
     pub fn build(&self) -> Result<Cert> {
         let mut inner = self.inner.borrow_mut();
 
         let valid_from = inner
             .valid_from
             .take()
-            .ok_or(Error::MissingBuilderArgument("valid_from"))?;
+            .ok_or(Error::MissingBuilderArgument(field_str!(inner.valid_from)))?;
         let valid_to = inner
             .valid_to
             .take()
-            .ok_or(Error::MissingBuilderArgument("valid_to"))?;
+            .ok_or(Error::MissingBuilderArgument(field_str!(inner.valid_to)))?;
 
         let signature_hash_type = inner
             .signature_hash_type
@@ -341,7 +413,9 @@ impl<'a> CertificateBuilder<'a> {
         let issuer_infos = inner
             .issuer_infos
             .take()
-            .ok_or(Error::MissingBuilderArgument("issuer_infos"))?;
+            .ok_or(Error::MissingBuilderArgument(field_str!(
+                inner.issuer_infos
+            )))?;
         let (issuer_name, issuer_key, aki, subject_infos) = match issuer_infos {
             IssuerInfos::SelfSigned { name, key } => {
                 let aki = key_id_gen_method.generate_from(&key.to_public_key())?;
@@ -356,10 +430,13 @@ impl<'a> CertificateBuilder<'a> {
                 issuer_key,
                 aki,
             } => {
-                let subject_infos = inner
-                    .subject_infos
-                    .take()
-                    .ok_or(Error::MissingBuilderArgument("subject_infos"))?;
+                let subject_infos =
+                    inner
+                        .subject_infos
+                        .take()
+                        .ok_or(Error::MissingBuilderArgument(field_str!(
+                            inner.subject_infos
+                        )))?;
                 (issuer_name, issuer_key, aki, subject_infos)
             }
         };
@@ -374,6 +451,66 @@ impl<'a> CertificateBuilder<'a> {
         let ca = inner.ca.take().unwrap_or(false);
         let pathlen = inner.pathlen.take();
 
+        let key_usage = match inner.key_usage.take() {
+            MaybeA::Just(key_usage) => Some(key_usage),
+            MaybeA::Nothing => None,
+            MaybeA::Default => {
+                // https://tools.ietf.org/html/rfc4055#section-1.2
+                // If the keyUsage extension is present in an end-entity certificate
+                // that conveys an RSA public key with the id-RSASSA-PSS object
+                // identifier, then the keyUsage extension MUST contain one or both of
+                // the following values:
+                //
+                //      nonRepudiation; and
+                //      digitalSignature.
+                //
+                // If the keyUsage extension is present in a certification authority
+                // certificate that conveys an RSA public key with the id-RSASSA-PSS
+                // object identifier, then the keyUsage extension MUST contain one or
+                // more of the following values:
+                //
+                //      nonRepudiation;
+                //      digitalSignature;
+                //      keyCertSign; and
+                //      cRLSign.
+                //
+                // When a certificate conveys an RSA public key with the id-RSASSA-PSS
+                // object identifier, the certificate user MUST only use the certified
+                // RSA public key for RSASSA-PSS operations, and, if RSASSA-PSS-params
+                // is present, the certificate user MUST perform those operations using
+                // the one-way hash function, mask generation function, and trailer
+                // field identified in the subject public key algorithm identifier
+                // parameters within the certificate.
+                //
+                // If the keyUsage extension is present in a certificate conveys an RSA
+                // public key with the id-RSAES-OAEP object identifier, then the
+                // keyUsage extension MUST contain only the following values:
+                //
+                //      keyEncipherment; and
+                //      dataEncipherment.
+                //
+                // However, both keyEncipherment and dataEncipherment SHOULD NOT be
+                // present.
+                let mut key_usage = KeyUsage::new(7);
+                if ca {
+                    key_usage.set_digital_signature(true);
+                    key_usage.set_key_encipherment(true);
+                    key_usage.set_key_cert_sign(true);
+                    key_usage.set_crl_sign(true);
+                    key_usage.set_key_agreement(true);
+                } else {
+                    key_usage.set_digital_signature(true);
+                    key_usage.set_key_encipherment(true);
+                };
+
+                Some(key_usage)
+            }
+        };
+
+        let extended_key_usage = inner.extended_key_usage.take();
+        let subject_alt_name = inner.subject_alt_name.take();
+        let issuer_alt_name = inner.issuer_alt_name.take();
+
         drop(inner);
 
         let serial_number = BigInt::from_bytes_be(Sign::Plus, &generate_serial_number());
@@ -383,62 +520,52 @@ impl<'a> CertificateBuilder<'a> {
             not_after: valid_to.into(),
         };
 
-        // https://tools.ietf.org/html/rfc4055#section-1.2
-        // If the keyUsage extension is present in an end-entity certificate
-        // that conveys an RSA public key with the id-RSASSA-PSS object
-        // identifier, then the keyUsage extension MUST contain one or both of
-        // the following values:
-        //
-        //      nonRepudiation; and
-        //      digitalSignature.
-        //
-        // If the keyUsage extension is present in a certification authority
-        // certificate that conveys an RSA public key with the id-RSASSA-PSS
-        // object identifier, then the keyUsage extension MUST contain one or
-        // more of the following values:
-        //
-        //      nonRepudiation;
-        //      digitalSignature;
-        //      keyCertSign; and
-        //      cRLSign.
-        //
-        // When a certificate conveys an RSA public key with the id-RSASSA-PSS
-        // object identifier, the certificate user MUST only use the certified
-        // RSA public key for RSASSA-PSS operations, and, if RSASSA-PSS-params
-        // is present, the certificate user MUST perform those operations using
-        // the one-way hash function, mask generation function, and trailer
-        // field identified in the subject public key algorithm identifier
-        // parameters within the certificate.
-        //
-        // If the keyUsage extension is present in a certificate conveys an RSA
-        // public key with the id-RSAES-OAEP object identifier, then the
-        // keyUsage extension MUST contain only the following values:
-        //
-        //      keyEncipherment; and
-        //      dataEncipherment.
-        //
-        // However, both keyEncipherment and dataEncipherment SHOULD NOT be
-        // present.
-        let mut key_usage = KeyUsage::new(7);
-        if ca {
-            key_usage.set_digital_signature(true);
-            key_usage.set_key_encipherment(true);
-            key_usage.set_key_cert_sign(true);
-            key_usage.set_crl_sign(true);
-            key_usage.set_key_agreement(true);
-        } else {
-            key_usage.set_digital_signature(true);
-            key_usage.set_key_encipherment(true);
+        let extensions = {
+            let mut extensions = Vec::new();
+
+            // key usage + basic constraints
+            match key_usage {
+                Some(key_usage) if key_usage.digital_signature() => {
+                    extensions.push(Extension::new_basic_constraints(ca, pathlen).into_critical());
+                    extensions.push(Extension::new_key_usage(key_usage));
+                }
+                _ => {
+                    extensions
+                        .push(Extension::new_basic_constraints(ca, pathlen).into_non_critical());
+                }
+            }
+
+            // eku
+            let extended_key_usage = if let Some(extended_key_usage) = extended_key_usage {
+                extended_key_usage
+            } else {
+                ExtendedKeyUsage::new(vec![oids::kp_any_extended_key_usage()])
+            };
+            extensions.push(Extension::new_extended_key_usage(extended_key_usage));
+
+            // san
+            if let Some(san) = subject_alt_name {
+                extensions.push(Extension::new_subject_alt_name(san));
+            }
+
+            // ian
+            if let Some(ian) = issuer_alt_name {
+                extensions.push(Extension::new_issuer_alt_name(ian));
+            }
+
+            // ski
+            let ski = key_id_gen_method.generate_from(&subject_public_key)?;
+            extensions.push(Extension::new_subject_key_identifier(ski));
+
+            // aki
+            extensions.push(Extension::new_authority_key_identifier(
+                KeyIdentifier::from(aki),
+                None,
+                None,
+            ));
+
+            Extensions(extensions)
         };
-
-        let ski = key_id_gen_method.generate_from(&subject_public_key)?;
-
-        let extensions = Extensions(vec![
-            Extension::new_basic_constraints(false, ca, pathlen),
-            Extension::new_key_usage(key_usage),
-            Extension::new_subject_key_identifier(ski),
-            Extension::new_authority_key_identifier(KeyIdentifier::from(aki), None, None),
-        ]);
 
         let tbs_certificate = TBSCertificate {
             version: Version::V3.into(),
@@ -648,6 +775,7 @@ mod tests {
             .ca(true)
             .signature_hash_type(SignatureHashType::RsaSha1)
             .key_id_gen_method(KeyIdGenMethod::SPKFullDER(KeyIdHashAlgo::Sha224))
+            .default_key_usage()
             .build()
             .expect("couldn't build root ca");
 
@@ -694,7 +822,8 @@ mod tests {
                 intermediate.subject_key_identifier().unwrap().to_vec(),
             )
             .signature_hash_type(SignatureHashType::RsaSha224)
-            .key_id_gen_method(KeyIdGenMethod::SPKFullDER(KeyIdHashAlgo::Sha384));
+            .key_id_gen_method(KeyIdGenMethod::SPKFullDER(KeyIdHashAlgo::Sha384))
+            .default_key_usage();
 
         let signed_leaf = signed_leaf_builder
             .clone()
