@@ -238,6 +238,7 @@ impl<'a> CertificateBuilder<'a> {
     }
 
     /// Required
+    #[inline]
     pub fn valididy(&self, valid_from: UTCDate, valid_to: UTCDate) -> &Self {
         let mut inner_mut = self.inner.borrow_mut();
         inner_mut.valid_from = Some(valid_from);
@@ -247,6 +248,7 @@ impl<'a> CertificateBuilder<'a> {
     }
 
     /// Required (alternatives: `subject_from_csr`, `self_signed`)
+    #[inline]
     pub fn subject(&self, subject_name: Name, public_key: PublicKey) -> &Self {
         self.inner.borrow_mut().subject_infos = Some(SubjectInfos::NameAndPublicKey {
             name: subject_name,
@@ -256,12 +258,14 @@ impl<'a> CertificateBuilder<'a> {
     }
 
     /// Required (alternatives: `subject`, `self_signed`)
+    #[inline]
     pub fn subject_from_csr(&self, csr: Csr) -> &Self {
         self.inner.borrow_mut().subject_infos = Some(SubjectInfos::Csr(csr));
         self
     }
 
     /// Required (alternative: `self_signed`)
+    #[inline]
     pub fn issuer(
         &'a self,
         issuer_name: Name,
@@ -277,6 +281,7 @@ impl<'a> CertificateBuilder<'a> {
     }
 
     /// Required (alternative: `issuer`)
+    #[inline]
     pub fn self_signed(&'a self, name: Name, key: &'a PrivateKey) -> &'a Self {
         self.inner.borrow_mut().issuer_infos = Some(IssuerInfos::SelfSigned { name, key });
         self.inner.borrow_mut().pathlen = Some(0);
@@ -284,24 +289,28 @@ impl<'a> CertificateBuilder<'a> {
     }
 
     /// Optional
+    #[inline]
     pub fn ca(&self, ca: bool) -> &Self {
         self.inner.borrow_mut().ca = Some(ca);
         self
     }
 
     /// Optional (automatically set to 0 by `self_signed`)
+    #[inline]
     pub fn pathlen(&self, pathlen: u8) -> &Self {
         self.inner.borrow_mut().pathlen = Some(pathlen);
         self
     }
 
-    /// Optional.
+    /// Optional
+    #[inline]
     pub fn signature_hash_type(&self, signature_hash_type: SignatureHashType) -> &Self {
         self.inner.borrow_mut().signature_hash_type = Some(signature_hash_type);
         self
     }
 
-    /// Optional.
+    /// Optional
+    #[inline]
     pub fn key_id_gen_method(&self, key_id_gen_method: KeyIdGenMethod) -> &Self {
         self.inner.borrow_mut().key_id_gen_method = Some(key_id_gen_method);
         self

@@ -11,7 +11,6 @@
 /// I mean, I'm literally creating infinity out of emptiness.
 /// If you don't care about your mental sanity, you can read the
 /// [nomicon on unchecked uninitialized memory](https://doc.rust-lang.org/nomicon/unchecked-uninit.html).
-#[inline(always)]
 unsafe fn unreachable() -> ! {
     core::mem::MaybeUninit::uninit().assume_init()
 }
