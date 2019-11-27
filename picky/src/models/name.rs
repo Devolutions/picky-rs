@@ -2,6 +2,7 @@ use crate::serde::{
     attribute_type_and_value::DirectoryString,
     name::{new_common_name, NamePrettyFormatter},
     AttributeTypeAndValue, Name as SerdeName,
+    attribute_type_and_value::AttributeTypeAndValueParameters,
 };
 use serde_asn1_der::asn1_wrapper::{Asn1SequenceOf, Asn1SetOf};
 use std::fmt;
@@ -33,6 +34,18 @@ impl Name {
 
     pub fn new_common_name<S: Into<DirectoryString>>(name: S) -> Self {
         Self(new_common_name(name))
+    }
+
+    /// Find the first common name contained in this `Name`
+    pub fn find_common_name(&self) -> Option<&DirectoryString> {
+        for relative_distinguished_name in &((self.0).0) {
+            for attr_ty_val in &relative_distinguished_name.0 {
+                if let AttributeTypeAndValueParameters::CommonName(dir_string) = &attr_ty_val.value {
+                    return Some(dir_string);
+                }
+            }
+        }
+        None
     }
 
     pub fn add_attr<S: Into<DirectoryString>>(&mut self, attr: NameAttr, value: S) {
