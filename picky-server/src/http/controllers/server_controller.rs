@@ -161,14 +161,24 @@ fn post_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut Sync
         "couldn't fetch SKI"
     ));
 
-    let issuer_name = cert.issuer_name().to_string();
-    if issuer_name != format!("CN={} Authority", &controller_data.config.realm) {
+    let issuer_name = unwrap_opt!(
+        cert.issuer_name().find_common_name(),
+        "couldn't find issuer common name"
+    )
+    .to_string();
+
+    if issuer_name != format!("{} Authority", &controller_data.config.realm) {
         error!("this certificate was not signed by the CA of this server.");
         return;
     }
 
     let der = saphir_try!(cert.to_der(), "couldn't serialize certificate into der");
-    let subject_name = cert.subject_name().to_string();
+    let subject_name = unwrap_opt!(
+        cert.subject_name().find_common_name(),
+        "couldn't find subject issuer common name"
+    )
+    .to_string();
+
     if let Err(e) = controller_data.repos.store(&subject_name, &der, None, &ski) {
         error!("Insertion error for leaf {}: {}", subject_name, e);
     } else {
@@ -355,7 +365,11 @@ fn sign_certificate(
         .map_err(|e| format!("couldn't generate leaf certificate: {}", e))?;
 
     if config.save_certificate {
-        let name = signed_cert.subject_name().to_string();
+        let name = signed_cert
+            .subject_name()
+            .find_common_name()
+            .ok_or_else(|| "couldn't find signed cert subject common name")?
+            .to_string();
         let cert_der = signed_cert
             .to_der()
             .map_err(|e| format!("couldn't serialize certificate to der: {}", e))?;
@@ -465,7 +479,11 @@ fn request_name(_: &ControllerData, req: &SyncRequest, res: &mut SyncResponse) {
         "couldn't parse pem"
     );
     let csr = saphir_try!(Csr::from_der(csr_pem.data()), "couldn't deserialize CSR");
-    let subject_name = csr.subject_name().to_string().replace("CN=", "");
+    let subject_name = unwrap_opt!(
+        csr.subject_name().find_common_name(),
+        "couldn't find subject common name"
+    )
+    .to_string();
 
     res.body(subject_name);
     res.status(StatusCode::OK);
@@ -611,7 +629,11 @@ fn get_and_store_env_cert_info(
         cert.subject_key_identifier()
             .map_err(|e| format!("couldn't parse fetch subject key identifier: {}", e))?,
     );
-    let subject_name = cert.subject_name().to_string();
+    let subject_name = cert
+        .subject_name()
+        .find_common_name()
+        .ok_or_else(|| "couldn't find subject common name".to_owned())?
+        .to_string();
 
     let key_pem = key_pem
         .parse::<Pem>()
@@ -730,7 +752,11 @@ mod tests {
         let signed_cert = sign_certificate(&ca_name, csr, &config, backend.db.as_ref())
             .expect("couldn't sign certificate");
 
-        let issuer_name = signed_cert.issuer_name().to_string().replace("CN=", "");
+        let issuer_name = signed_cert
+            .issuer_name()
+            .find_common_name()
+            .unwrap()
+            .to_string();
         let chain_pem =
             find_ca_chain(backend.db.as_ref(), &issuer_name).expect("couldn't fetch CA chain");
 
