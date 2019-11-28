@@ -20,6 +20,8 @@ https://tools.ietf.org/html/rfc7468[RFC7468: Textual Encodings of PKIX, PKCS, an
 
 https://tools.ietf.org/html/rfc4158[RFC4158: Internet X.509 Public Key Infrastructure: Certification Path Building]
 
+https://tools.ietf.org/html/rfc6960[RFC6960: X.509 Internet Public Key Infrastructure: Online Certificate Status Protocol - OCSP]
+
 === Other Inspiration
 
 The following specifications are not used in directly in picky, but are sources of inspiration for its design:
@@ -33,6 +35,8 @@ https://tools.ietf.org/html/rfc4387[RFC4387: Internet X.509 Public Key Infrastru
 https://tools.ietf.org/html/rfc4043[RFC4043: Internet X.509 Public Key Infrastructure Permanent Identifier]
 
 https://tools.ietf.org/html/rfc8649[RFC8649: Hash Of Root Key Certificate Extension]
+
+https://tools.ietf.org/html/rfc8555[RFC8555: Automatic Certificate Management Environment (ACME)]
 
 == Certificate Addressing
 
@@ -108,9 +112,9 @@ include::file/cert/cert_pem.adoc[]
 
 When stored as a file, the .pem extension is normally used, but the .crt extension is also common. In practice, .crt files are often either binary or PEM-encoded certificates, leaving it up to the application to handle both formats with the same extension.
 
-=== application/pkcs10 (.csr)
+=== application/pkcs10 (.csr, .p10)
 
-The application/pkcs10 mime type is used to indicate a PKCS#10 certificate signing request in binary format. When stored as a file, the .csr extension is commonly used.
+The application/pkcs10 mime type is used to indicate a PKCS#10 certificate signing request in binary format. When stored as a file, both the .csr and .p10 extensions are commonly used.
 
 Example (binary):
 include::file/csr/csr_der.adoc[]
@@ -119,6 +123,16 @@ Just like certificates, certificate signing requests have a PEM-formatted varian
 
 Example (PEM):
 include::file/csr/csr_pem.adoc[]
+
+=== application/ocsp-request
+
+The application/ocsp-request is used to indicate an application OCSP request, as defined in https://tools.ietf.org/html/rfc6960#appendix-C.1[RFC 6960 Appendix C.1]
+
+When used over HTTP, an OCSP request can optionally be passed as part of the URL of a GET or request, using base64url encoding, as defined in https://tools.ietf.org/html/rfc6960#appendix-A[RFC 6960 Appendix A]
+
+=== application/ocsp-response
+
+The application/ocsp-response is used to indicate an application OCSP response, as defined in https://tools.ietf.org/html/rfc6960#appendix-C.2[RFC 6960 Appendix C.2]
 
 == Certificate Chain
 
@@ -152,3 +166,29 @@ include::http/cert/get_response.adoc[]
 Example:
 include::http/cert/post_request.adoc[]
 include::http/cert/post_response.adoc[]
+
+== Certificate Revocation
+
+A standard OCSP responder is available on "/ocsp", allowing certificate revocation status checks as defined in https://tools.ietf.org/html/rfc6960[RFC6960].
+
+== HTTP Signatures
+
+Picky can be used with https://tools.ietf.org/html/draft-cavage-http-signatures-12[HTTP signatures] to provide a method of authenticating HTTP requests with X.509 certificates. This approach has many advantages over JWTs because it can be more easily adaptable to peer-to-peer systems with X.509 certificate chain validation. While JWTs are simple enough with a single level of signatures, it falls short of providing good ways of chaining signatures. It is feasible, but not without creating a lot of tokens that would need to be included in each request.
+
+On the other side, signing HTTP requests using X.509 certificates has two potential drawbacks: ASN.1 DER encoding/decoding and the size of certificates. While JSON may be easier to work with in most languages, ASN.1 DER encoding has a major advantage: it provides a unique way of representing structures, making them easy to hash and sign.
+
+As for the size of certificates, the problem can be solved by referencing a certificate by its hash instead of including the certificate with each request. The hash can then be used to fetch the complete certificate from a central server that acts as a certificate cache.
+
+In order to benefit from this, the only problem that needs to be solved is ASN.1 encoding/decoding, which we have solved with Rust and our ASN.1 serde framework that works everywhere, including the browser with WebAssembly.
+
+=== keyId parameter
+
+The HTTP signatures https://tools.ietf.org/html/draft-cavage-http-signatures-12#section-2.1.1[keyId parameter] is defined as an opaque string used to identify which key was used to sign the HTTP request.
+
+When using HTTP signatures with Picky, the keyId parameter value is expected to be a valid certificate address of the form "EiCcvAfD-ZFyWDajqipYHKICkZiqQgudmbwOEx2fPiy-Rw"
+
+This certificate address is meant to be used by the recipient to fetch the X.509 leaf certificate used to sign the request. The signature of the HTTP request MUST match the public key of the certificate, and the certificate MUST be validated against the Picky certificate chain. Last but not least, the properties of the leaf certificate should be validated, including the validity period and common name.
+
+=== algorithm parameter
+
+The HTTP signatures https://tools.ietf.org/html/draft-cavage-http-signatures-12#section-2.1.3[algorithm parameter] is omitted because the signature algorithm is already encoded in the X.509 certificate used to sign the request.
