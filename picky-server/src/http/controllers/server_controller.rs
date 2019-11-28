@@ -743,7 +743,7 @@ mod tests {
 
         let pk = generate_private_key(2048).expect("couldn't generate private key");
         let csr = Csr::generate(
-            Name::new_common_name("Mister Bushidô"),
+            Name::new_common_name("Mister Bushido"),
             &pk,
             SignatureHashType::RsaSha384,
         )
