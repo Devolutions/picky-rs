@@ -20,11 +20,13 @@ pub enum Error {
     #[error(display = "RSA error")]
     Rsa,
     #[error(display = "invalid signature")]
-    BadSignature,
+    BadSignature, // TODO: which certificate?
     #[error(display = "CA chain depth does't satisfy basic constraints extension")]
-    CAChainTooDeep,
+    CAChainTooDeep, // TODO: which certificates disagree? what pathlen?
     #[error(display = "CA chain is missing a root certificate")]
     CAChainNoRoot,
+    #[error(display = "Issuer certificate is not a CA")]
+    IssuerIsNotCA, // TODO: context: issuer
     #[error(
         display = "authority key id doesn't match (expected: {:?}, got: {:?})",
         expected,
