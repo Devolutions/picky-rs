@@ -1,0 +1,210 @@
+
+:toc:
+:toclevels: 4
+
+= Picky Certificate Authority
+
+This document covers the design principles and protocol specification of the Picky Certificate Authority.
+
+== Related Specifications
+
+https://github.com/multiformats/multihash[Multihash format]
+
+https://github.com/multiformats/multibase[Multibase format]
+
+https://tools.ietf.org/html/draft-cavage-http-signatures-12[HTTP signatures]
+
+https://tools.ietf.org/html/rfc5958[RFC5958: Asymmetric Key Packages]
+
+https://tools.ietf.org/html/rfc7517[RFC7517: JSON Web Key (JWK)]
+
+https://tools.ietf.org/html/rfc5967[RFC5967: The application/pkcs10 Media Type]
+
+https://tools.ietf.org/html/rfc7468[RFC7468: Textual Encodings of PKIX, PKCS, and CMS Structures]
+
+https://tools.ietf.org/html/rfc4158[RFC4158: Internet X.509 Public Key Infrastructure: Certification Path Building]
+
+https://tools.ietf.org/html/rfc6960[RFC6960: X.509 Internet Public Key Infrastructure: Online Certificate Status Protocol - OCSP]
+
+=== Other Inspiration
+
+The following specifications are not used in directly in picky, but are sources of inspiration for its design:
+
+https://tools.ietf.org/html/rfc7093[RFC7093: Additional Methods for Generating Key Identifiers Values]
+
+https://tools.ietf.org/html/rfc2585[RFC2585: Internet X.509 Public Key Infrastructure Operational Protocols: FTP and HTTP]
+
+https://tools.ietf.org/html/rfc4387[RFC4387: Internet X.509 Public Key Infrastructure Operational Protocols: Certificate Store Access via HTTP]
+
+https://tools.ietf.org/html/rfc4043[RFC4043: Internet X.509 Public Key Infrastructure Permanent Identifier]
+
+https://tools.ietf.org/html/rfc8649[RFC8649: Hash Of Root Key Certificate Extension]
+
+https://tools.ietf.org/html/rfc8555[RFC8555: Automatic Certificate Management Environment (ACME)]
+
+== Certificate Addressing
+
+Taking inspiration from https://ipfs.io/[IPFS], picky uses content addressing to refer to X.509 certificates. In this case, it means that we refer to an X.509 certificate by the hash of its binary representation (ASN.1 DER). The content address is a multibase-encoded multihash, where base64url encoding and SHA256 hashing are used by default. The result is a concise, self-descriptive string that is adaptable to multiple hash types and base encodings without ambiguity.
+
+For instance, let's take the SHA256 hash of the string "multihash" (without a newline character):
+
+----
+echo -n "multihash" | sha256sum
+9cbc07c3f991725836a3aa2a581ca2029198aa420b9d99bc0e131d9f3e2cbe47
+----
+
+The resulting hexadecimal string contains the 32 bytes of the SHA256 hash. To convert it to a https://github.com/multiformats/multihash[multihash], we prefix it with the hash type (0x12) and length (0x20):
+
+----
+12209cbc07c3f991725836a3aa2a581ca2029198aa420b9d99bc0e131d9f3e2cbe47
+----
+
+This hexadecimal string can then be converted to base64url, which is much shorter while remaining URL safe:
+
+----
+EiCcvAfD-ZFyWDajqipYHKICkZiqQgudmbwOEx2fPiy-Rw
+----
+
+The last step is to prefix the base64url string with the character 'u', which is the https://github.com/multiformats/multibase[multibase] code for base64url. Alternatively, the original hexadecimal string can be prefixed with the character 'f' to produce a longer but still valid multibase-encoded multihash:
+
+----
+uEiCcvAfD-ZFyWDajqipYHKICkZiqQgudmbwOEx2fPiy-Rw (base64url)
+f12209cbc07c3f991725836a3aa2a581ca2029198aa420b9d99bc0e131d9f3e2cbe47 (base16)
+----
+
+The string "uEiCcvAfD-ZFyWDajqipYHKICkZiqQgudmbwOEx2fPiy-Rw" becomes our content address for the string content "multihash".
+
+In the case of X.509 certificates, the same process is used on the binary representation of the certificate (ASN.1 DER) to obtain the corresponding content address. This means that even if the certificate is stored or transmitted in base64 or PEM format, the hash is always done on the corresponding binary data and not the textual representation.
+
+== Certificate Storage
+
+All X.509 certificates are stored in a flat key-value store where the key is the content address and the value is the X.509 certificate in binary representation. Textual representations such as base64 or PEM should be handled with on-the-fly conversions to and from the binary representation.
+
+The key-value store can be an in-memory hash map, local files, a database like MongoDB or a distributed cache like Redis. X.509 certificates should be stored only in one place to then use the content address as a reference in other tables without duplicating the content.
+
+Regardless of the storage backend, what matters is that it uses the content address as the key, and that it should be easy to check that the stored content matches the content address. Since the content address is computed over the binary representation of the certificate, storing certificates in ASN.1 DER binary format is recommended.
+
+== Certificate Caching
+
+Because all X.509 certificates are content-addressed, they can be easily cached on both the client and server. Leaf certificates can be cached on the server for the purpose of making them available to other peers. Because of its immutable nature, content-addressed certificates do not need to be invalidated in potential HTTP caching proxies. The contents of a certificate fetched using the content address will never change.
+
+However, a configurable expiration time should be put on the server certificate cache to avoid caching old certificates that are no longer in use. This expiration time is only used to remove entries from the cache and has nothing to do with the certificate validity period.
+
+When leaf certificate caching is enabled, new certificates should automatically be cached after they've been signed by the certificate authority. Existing leaf certificates can be pushed back to the server to ensure they are still available in the cache for a period of time, resetting cache expiration time.
+
+The trade-off of removing certificates after a certain period of time but allowing them to be pushed back in the cache ensures that we store only certificates that are in use while being able to function with certificates that were emitted some time ago.
+
+== File Formats
+
+Multiple file formats exist for single certificates, certificate chains, public keys, private keys and certificate signing requests. The common denominator to all of these formats is that they all have an ASN.1 DER binary representation, but they are often transmitted in text-based formats for simplicity.
+
+=== Public Keys
+
+Public keys are encoded using the X.509 SubjectPublicKeyInfo ASN.1 structure as defined in https://tools.ietf.org/html/rfc5280#section-4.1[RFC5280 Section 4.1]. RSA public keys should be supported, but other public key types can be used. When encoded as PEM, the "application/x-pem-file" mime type should be used along with the "PUBLIC KEY" label.
+
+RSA public keys can also be encoded using the RSAPublicKey structure as defined in https://tools.ietf.org/html/rfc8017#appendix-A.1.1[RFC8017 Appendix A.1.1]. When encoded as PEM, the "application-x-pem-file" mime type should be used along with the "RSA PUBLIC KEY" label. However, the SubjectPublicKeyInfo structure should be preferred over the RSAPublicKey structure because it supports multiple public key formats.
+
+When encoded as JSON, public keys should follow the https://tools.ietf.org/html/rfc7517[JSON Web Key (JWK)] specification with the https://tools.ietf.org/html/rfc7517#section-8.5["application/jwk+json" mime type].
+
+=== X.509 Certificates
+
+The "application/pkix-cert" mime type is defined in https://tools.ietf.org/html/rfc2585.html#section-4.1[RFC 2585 section 4.1]. It is meant to contain a single binary X.509 certificate. While the standard file extension is defined as .cer, other file extensions such as .der or .crt are commonly used for the same file format.
+
+Example (binary):
+include::file/cert/cert_cer.adoc[]
+
+The application/x-pem-file mime type is used to indicate a PEM-formatted file (.pem). While PEM stands for "Privacy Enhanced Mail", the format has been adapted over the years to handle multiple content types, including X.509 certificates. Because it encodes X.509 certificates as base64 blocks of text separated by labels, PEM is suitable for storing multiple certificates or certificate chains, unlike its binary counterpart.
+
+While the application/x-pem-file mime type is not standardized, it is has been in use by different applications for a long time. As for PEM-formatted certificates, they are specified in https://tools.ietf.org/html/rfc7468#section-5[RFC 7468 section 5].
+
+Example (PEM):
+include::file/cert/cert_pem.adoc[]
+
+When stored as a file, the .pem extension is normally used, but the .crt extension is also common. In practice, .crt files are often either binary or PEM-encoded certificates, leaving it up to the application to handle both formats with the same extension.
+
+=== Certificate Signing Request
+
+The application/pkcs10 mime type is used to indicate a PKCS#10 certificate signing request in binary format. When stored as a file, both the .csr and .p10 extensions are commonly used.
+
+Example (binary):
+include::file/csr/csr_der.adoc[]
+
+Just like certificates, certificate signing requests have a PEM-formatted variant using the "CERTIFICATE REQUEST" label. When using the PEM format, the "application/x-pem-file" mime type should be used.
+
+Example (PEM):
+include::file/csr/csr_pem.adoc[]
+
+=== Online Certificate Status Protocol (OCSP)
+
+The "application/ocsp-request" mime type is used to indicate an application OCSP request, as defined in https://tools.ietf.org/html/rfc6960#appendix-C.1[RFC 6960 Appendix C.1]
+
+When used over HTTP, an OCSP request can optionally be passed as part of the URL of a GET or request, using base64url encoding, as defined in https://tools.ietf.org/html/rfc6960#appendix-A[RFC 6960 Appendix A]
+
+The "application/ocsp-response" mime type is used to indicate an application OCSP response, as defined in https://tools.ietf.org/html/rfc6960#appendix-C.2[RFC 6960 Appendix C.2]
+
+== Certificate Chain
+
+Picky currently only supports a single certificate chain at a time. The chain is composed of a root and an intermediate certificate, with names derived from the picky realm configuration option. This chain is automatically generated by the picky server if none is provided. Using "contoso" as the realm, the default chain looks like this:
+
+* Root CA: "contoso Root CA" issuer name, valid for 10 years
+* Intermediate CA: "contoso Authority" issuer name, valid for 5 years
+
+The certificate chain can be fetched with a GET request on /chain:
+
+Example:
+include::http/chain/request.adoc[]
+include::http/chain/response.adoc[]
+
+== Certificate Signing
+
+Picky accepts certificate signing requests authorized using an API key, restricting it to backend service usage at this point. Better authorization mechanisms will be added in the future.
+
+Example:
+include::http/sign/request.adoc[]
+include::http/sign/response.adoc[]
+
+== Certificate Fetching
+
+Example:
+include::http/cert/get_request.adoc[]
+include::http/cert/get_response.adoc[]
+
+== Certificate Pushing
+
+Example:
+include::http/cert/post_request.adoc[]
+include::http/cert/post_response.adoc[]
+
+== Certificate Revocation
+
+A standard OCSP responder is available on "/ocsp", allowing certificate revocation status checks as defined in https://tools.ietf.org/html/rfc6960[RFC6960].
+
+== HTTP Signatures
+
+Picky can be used with https://tools.ietf.org/html/draft-cavage-http-signatures-12[HTTP signatures] to provide a method of authenticating HTTP requests with X.509 certificates. This approach has many advantages over JWTs because it can be more easily adaptable to peer-to-peer systems with X.509 certificate chain validation. While JWTs are simple enough with a single level of signatures, it falls short of providing good ways of chaining signatures. It is feasible, but not without creating a lot of tokens that would need to be included in each request.
+
+On the other side, signing HTTP requests using X.509 certificates has two potential drawbacks: ASN.1 DER encoding/decoding and the size of certificates. While JSON may be easier to work with in most languages, ASN.1 DER encoding has a major advantage: it provides a unique way of representing structures, making them easy to hash and sign.
+
+As for the size of certificates, the problem can be solved by referencing a certificate by its hash instead of including the certificate with each request. The hash can then be used to fetch the complete certificate from a central server that acts as a certificate cache.
+
+In order to benefit from this, the only problem that needs to be solved is ASN.1 encoding/decoding, which we have solved with Rust and our ASN.1 serde framework that works everywhere, including the browser with WebAssembly.
+
+=== keyId parameter
+
+The HTTP signatures https://tools.ietf.org/html/draft-cavage-http-signatures-12#section-2.1.1[keyId parameter] is defined as an opaque string used to identify which key was used to sign the HTTP request.
+
+When using HTTP signatures with Picky, the keyId parameter value is expected to be a valid certificate address of the form "EiCcvAfD-ZFyWDajqipYHKICkZiqQgudmbwOEx2fPiy-Rw"
+
+This certificate address is meant to be used by the recipient to fetch the X.509 leaf certificate used to sign the request. The signature of the HTTP request MUST match the public key of the certificate, and the certificate MUST be validated against the Picky certificate chain. Last but not least, the properties of the leaf certificate should be validated, including the validity period and common name.
+
+=== algorithm parameter
+
+The HTTP signatures https://tools.ietf.org/html/draft-cavage-http-signatures-12#section-2.1.3[algorithm parameter] is omitted because the signature algorithm is already encoded in the X.509 certificate used to sign the request.
+
+=== created parameter
+
+The HTTP signatures https://tools.ietf.org/html/draft-cavage-http-signatures-12#section-2.1.4[created parameter] is omitted because the https://tools.ietf.org/html/rfc7231#section-7.1.1.2[HTTP "Date" header] is used instead.
+
+=== expires parameter
+
+The HTTP signatures https://tools.ietf.org/html/draft-cavage-http-signatures-12#section-2.1.4[expires parameter] is not used, but recipients should not accept requests with signatures older than a few minutes.

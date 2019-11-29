@@ -1,0 +1,6 @@
+[source,http,options="nowrap"]
+----
+GET /chain HTTP/1.1
+Host: ca.contoso.local
+----
+
