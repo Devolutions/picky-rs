@@ -4,7 +4,8 @@ param(
 	[switch] $UseFile,
 	[switch] $SavePickyCertificates,
 	[switch] $Silent,
-	[switch] $Debug
+	[switch] $Debug,
+	[switch] $NoClean
 )
 
 . "$PSScriptRoot/Private/Base64Url.ps1"
@@ -64,6 +65,10 @@ Describe 'Picky tests' {
                 $location = Get-Location
                 $location = "$location/../picky-server/Cargo.toml"
                 $location = Resolve-Path $location
+
+                Context 'debug pre-build' {
+                    & 'cargo' 'build' '--manifest-path' $location
+                }
 
                 if ($Silent) {
                     Start-Process pwsh -Args "-File ./Private/RunPicky.ps1 $picky_realm $picky_api_key $picky_backend $SavePickyCertificatesString $location -Silent"
@@ -666,8 +671,12 @@ Od8i323fM5dQS1qQpBjBc/5fPw==
                 -Body $cert_binary } | Should -Throw
 		}
 	}
-	AfterAll{
-		if($Silent)
+	AfterAll {
+	    if ($NoClean) {
+	        return
+	    }
+
+		if ($Silent)
 		{
             if ($UseMongo) {
                 [void](& 'docker' 'stop' 'picky-mongo')
@@ -676,13 +685,13 @@ Od8i323fM5dQS1qQpBjBc/5fPw==
                 [void](Remove-Item 'database' -Recurse)
             }
 
-			if($Debug){
+			if ($Debug) {
 				[void](Stop-Process -Name 'picky-server')
-			}else{
+			} else {
 				[void](& 'docker' 'stop' 'picky-server')
 				[void](& 'docker' 'rm' 'picky-server')
 			}
-		}else{
+		} else {
             if ($UseMongo) {
                 & 'docker' 'stop' 'picky-mongo'
                 & 'docker' 'rm' 'picky-mongo'
@@ -690,9 +699,9 @@ Od8i323fM5dQS1qQpBjBc/5fPw==
                 Remove-Item 'database' -Recurse
             }
 
-			if($Debug){
+			if ($Debug){
 				Stop-Process -Name 'picky-server'
-			}else{
+			} else {
 				& 'docker' 'stop' 'picky-server'
 				& 'docker' 'rm' 'picky-server'
 			}

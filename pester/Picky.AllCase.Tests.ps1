@@ -3,9 +3,6 @@ param(
 )
 if ($Debug) {
     Describe 'Rust Tests' {
-        Context 'debug build' {
-            & 'cargo' 'build' '--manifest-path' '../Cargo.toml'
-        }
         Context 'debug mode' {
             & 'cargo' 'test' '--manifest-path' '../Cargo.toml'
         }
