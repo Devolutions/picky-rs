@@ -1,6 +1,6 @@
 use crate::{models::date::UTCDate, pem::PemError};
 use err_derive::Error;
-use serde_asn1_der::SerdeAsn1DerError;
+use serde_asn1_der::{restricted_string::CharSetError, SerdeAsn1DerError};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -20,11 +20,13 @@ pub enum Error {
     #[error(display = "RSA error")]
     Rsa,
     #[error(display = "invalid signature")]
-    BadSignature,
+    BadSignature, // TODO: which certificate?
     #[error(display = "CA chain depth does't satisfy basic constraints extension")]
-    CAChainTooDeep,
+    CAChainTooDeep, // TODO: which certificates disagree? what pathlen?
     #[error(display = "CA chain is missing a root certificate")]
     CAChainNoRoot,
+    #[error(display = "Issuer certificate is not a CA")]
+    IssuerIsNotCA, // TODO: context: issuer
     #[error(
         display = "authority key id doesn't match (expected: {:?}, got: {:?})",
         expected,
@@ -49,6 +51,12 @@ pub enum Error {
         now
     )]
     CertificateExpired { not_after: UTCDate, now: UTCDate },
+    #[error(display = "input has invalid charset: {}", input)]
+    InvalidCharSet {
+        input: String,
+        #[error(source)]
+        source: CharSetError,
+    },
 }
 
 impl From<BoxedError> for Error {

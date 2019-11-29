@@ -8,50 +8,50 @@ use std::fmt;
 pub struct UTCDate(GeneralizedTime);
 
 impl UTCDate {
-    #[inline(always)]
+    #[inline]
     pub fn new(year: u16, month: u8, day: u8, hour: u8, minute: u8, second: u8) -> Option<Self> {
         Some(Self(GeneralizedTime::new(
             year, month, day, hour, minute, second,
         )?))
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn ymd(year: u16, month: u8, day: u8) -> Option<Self> {
         Some(Self(GeneralizedTime::new(year, month, day, 0, 0, 0)?))
     }
 
     #[cfg(feature = "chrono_conversion")]
-    #[inline(always)]
+    #[inline]
     pub fn now() -> Self {
         Self(chrono::offset::Utc::now().into())
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn year(&self) -> u16 {
         self.0.year()
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn month(&self) -> u8 {
         self.0.month()
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn day(&self) -> u8 {
         self.0.day()
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn hour(&self) -> u8 {
         self.0.hour()
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn minute(&self) -> u8 {
         self.0.minute()
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn second(&self) -> u8 {
         self.0.second()
     }

@@ -11,10 +11,12 @@ use std::{borrow::Cow, fmt};
 #[derive(Debug, PartialEq, Clone)]
 pub enum AttributeTypeAndValueParameters {
     CommonName(DirectoryString),
+    Surname(DirectoryString),
     SerialNumber(DirectoryString),
     CountryName(DirectoryString),
     LocalityName(DirectoryString),
     StateOrProvinceName(DirectoryString),
+    StreetName(DirectoryString),
     OrganisationName(DirectoryString),
     OrganisationalUnitName(DirectoryString),
 }
@@ -28,49 +30,63 @@ pub struct AttributeTypeAndValue {
 impl AttributeTypeAndValue {
     pub fn new_common_name<S: Into<DirectoryString>>(name: S) -> Self {
         Self {
-            ty: oids::common_name().into(),
+            ty: oids::at_common_name().into(),
             value: AttributeTypeAndValueParameters::CommonName(name.into()),
+        }
+    }
+
+    pub fn new_surname<S: Into<DirectoryString>>(name: S) -> Self {
+        Self {
+            ty: oids::at_surname().into(),
+            value: AttributeTypeAndValueParameters::Surname(name.into()),
         }
     }
 
     pub fn new_serial_number<S: Into<DirectoryString>>(name: S) -> Self {
         Self {
-            ty: oids::serial_number().into(),
+            ty: oids::at_serial_number().into(),
             value: AttributeTypeAndValueParameters::SerialNumber(name.into()),
         }
     }
 
     pub fn new_country_name<S: Into<DirectoryString>>(name: S) -> Self {
         Self {
-            ty: oids::country_name().into(),
+            ty: oids::at_country_name().into(),
             value: AttributeTypeAndValueParameters::CountryName(name.into()),
         }
     }
 
     pub fn new_locality_name<S: Into<DirectoryString>>(name: S) -> Self {
         Self {
-            ty: oids::locality_name().into(),
+            ty: oids::at_locality_name().into(),
             value: AttributeTypeAndValueParameters::LocalityName(name.into()),
         }
     }
 
     pub fn new_state_or_province_name<S: Into<DirectoryString>>(name: S) -> Self {
         Self {
-            ty: oids::state_or_province_name().into(),
+            ty: oids::at_state_or_province_name().into(),
             value: AttributeTypeAndValueParameters::StateOrProvinceName(name.into()),
+        }
+    }
+
+    pub fn new_street_name<S: Into<DirectoryString>>(name: S) -> Self {
+        Self {
+            ty: oids::at_street_name().into(),
+            value: AttributeTypeAndValueParameters::StreetName(name.into()),
         }
     }
 
     pub fn new_organisation_name<S: Into<DirectoryString>>(name: S) -> Self {
         Self {
-            ty: oids::organisation_name().into(),
+            ty: oids::at_organisation_name().into(),
             value: AttributeTypeAndValueParameters::OrganisationName(name.into()),
         }
     }
 
     pub fn new_organisational_unit_name<S: Into<DirectoryString>>(name: S) -> Self {
         Self {
-            ty: oids::organisational_unit_name().into(),
+            ty: oids::at_organisational_unit_name().into(),
             value: AttributeTypeAndValueParameters::OrganisationalUnitName(name.into()),
         }
     }
@@ -91,6 +107,9 @@ impl ser::Serialize for AttributeTypeAndValue {
             AttributeTypeAndValueParameters::CommonName(name) => {
                 seq.serialize_element(name)?;
             }
+            AttributeTypeAndValueParameters::Surname(name) => {
+                seq.serialize_element(name)?;
+            }
             AttributeTypeAndValueParameters::SerialNumber(name) => {
                 seq.serialize_element(name)?;
             }
@@ -101,6 +120,9 @@ impl ser::Serialize for AttributeTypeAndValue {
                 seq.serialize_element(name)?;
             }
             AttributeTypeAndValueParameters::StateOrProvinceName(name) => {
+                seq.serialize_element(name)?;
+            }
+            AttributeTypeAndValueParameters::StreetName(name) => {
                 seq.serialize_element(name)?;
             }
             AttributeTypeAndValueParameters::OrganisationName(name) => {
@@ -135,35 +157,43 @@ impl<'de> de::Deserialize<'de> for AttributeTypeAndValue {
                 let ty: ObjectIdentifierAsn1 = seq.next_element()?.unwrap(); // cannot panic with DER deserializer
 
                 let value = match Into::<String>::into(&ty.0).as_str() {
-                    oids::COMMON_NAME => {
+                    oids::AT_COMMON_NAME => {
                         // cannot panic with DER deserializer
                         AttributeTypeAndValueParameters::CommonName(seq.next_element()?.unwrap())
                     }
-                    oids::SERIAL_NUMBER => {
+                    oids::AT_SURNAME => {
+                        // cannot panic with DER deserializer
+                        AttributeTypeAndValueParameters::Surname(seq.next_element()?.unwrap())
+                    }
+                    oids::AT_SERIAL_NUMBER => {
                         // cannot panic with DER deserializer
                         AttributeTypeAndValueParameters::SerialNumber(seq.next_element()?.unwrap())
                     }
-                    oids::COUNTRY_NAME => {
+                    oids::AT_COUNTRY_NAME => {
                         // cannot panic with DER deserializer
                         AttributeTypeAndValueParameters::CountryName(seq.next_element()?.unwrap())
                     }
-                    oids::LOCALITY_NAME => {
+                    oids::AT_LOCALITY_NAME => {
                         // cannot panic with DER deserializer
                         AttributeTypeAndValueParameters::LocalityName(seq.next_element()?.unwrap())
                     }
-                    oids::STATE_OR_PROVINCE_NAME => {
+                    oids::AT_STATE_OR_PROVINCE_NAME => {
                         // cannot panic with DER deserializer
                         AttributeTypeAndValueParameters::StateOrProvinceName(
                             seq.next_element()?.unwrap(),
                         )
                     }
-                    oids::ORGANISATION_NAME => {
+                    oids::AT_STREET_NAME => {
+                        // cannot panic with DER deserializer
+                        AttributeTypeAndValueParameters::StreetName(seq.next_element()?.unwrap())
+                    }
+                    oids::AT_ORGANISATION_NAME => {
                         // cannot panic with DER deserializer
                         AttributeTypeAndValueParameters::OrganisationName(
                             seq.next_element()?.unwrap(),
                         )
                     }
-                    oids::ORGANISATIONAL_UNIT_NAME => {
+                    oids::AT_ORGANISATIONAL_UNIT_NAME => {
                         // cannot panic with DER deserializer
                         AttributeTypeAndValueParameters::OrganisationalUnitName(
                             seq.next_element()?.unwrap(),
@@ -195,6 +225,15 @@ impl<'de> de::Deserialize<'de> for AttributeTypeAndValue {
         deserializer.deserialize_seq(Visitor)
     }
 }
+
+// TODO: make model wrapper
+
+// DirectoryString ::= CHOICE {
+//      teletexString       TeletexString   (SIZE (1..MAX)),
+//      printableString     PrintableString (SIZE (1..MAX)),
+//      universalString     UniversalString (SIZE (1..MAX)),
+//      utf8String          UTF8String      (SIZE (1..MAX)),
+//      bmpString           BMPString       (SIZE (1..MAX)) }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum DirectoryString {

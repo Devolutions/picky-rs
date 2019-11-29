@@ -361,15 +361,17 @@ fn sign_certificate(
         .map_err(|e| format!("couldn't fetch CA private key: {}", e))?;
     let ca_pk = parse_pk_from_magic_der(&ca_pk_der)?;
 
-    let signed_cert = Picky::generate_leaf_from_csr(csr, &ca_cert, &ca_pk, config.key_config)
-        .map_err(|e| format!("couldn't generate leaf certificate: {}", e))?;
+    let dns_name = csr
+        .subject_name()
+        .find_common_name()
+        .ok_or_else(|| "couldn't find signed cert subject common name")?
+        .to_string();
+
+    let signed_cert =
+        Picky::generate_leaf_from_csr(csr, &ca_cert, &ca_pk, config.key_config, Some(&dns_name))
+            .map_err(|e| format!("couldn't generate leaf certificate: {}", e))?;
 
     if config.save_certificate {
-        let name = signed_cert
-            .subject_name()
-            .find_common_name()
-            .ok_or_else(|| "couldn't find signed cert subject common name")?
-            .to_string();
         let cert_der = signed_cert
             .to_der()
             .map_err(|e| format!("couldn't serialize certificate to der: {}", e))?;
@@ -380,8 +382,8 @@ fn sign_certificate(
         );
 
         repos
-            .store(&name, &cert_der, None, &ski)
-            .map_err(|e| format!("Insertion error for leaf {}: {}", name, e))?;
+            .store(&dns_name, &cert_der, None, &ski)
+            .map_err(|e| format!("Insertion error for leaf {}: {}", dns_name, e))?;
     }
 
     Ok(signed_cert)
@@ -743,7 +745,7 @@ mod tests {
 
         let pk = generate_private_key(2048).expect("couldn't generate private key");
         let csr = Csr::generate(
-            Name::new_common_name("Mister Bushidô"),
+            Name::new_common_name("Mister Bushido"),
             &pk,
             SignatureHashType::RsaSha384,
         )

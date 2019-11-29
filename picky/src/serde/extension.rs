@@ -1,13 +1,19 @@
-use crate::{oids, serde::name::GeneralNames};
+use crate::{
+    oids,
+    serde::name::{GeneralName, GeneralNames},
+};
 use serde::{de, ser};
 use serde_asn1_der::{
     asn1_wrapper::{
-        ApplicationTag1, ApplicationTag4, BitStringAsn1, ContextTag0, ContextTag2, Implicit,
+        ApplicationTag1, Asn1SequenceOf, BitStringAsn1, ContextTag0, ContextTag2, Implicit,
         IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1, OctetStringAsn1Container,
     },
     bit_string::BitString,
 };
-use std::fmt;
+use std::{
+    fmt,
+    slice::{Iter, IterMut},
+};
 
 /// https://tools.ietf.org/html/rfc5280#section-4.1.2.9
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -21,24 +27,45 @@ pub struct Extension {
 }
 
 impl Extension {
+    pub fn into_critical(mut self) -> Self {
+        self.critical = true.into();
+        self
+    }
+
+    pub fn into_non_critical(mut self) -> Self {
+        self.critical = false.into();
+        self
+    }
+
+    pub fn set_critical(&mut self, critical: bool) {
+        self.critical = critical.into();
+    }
+
+    /// When present, conforming CAs SHOULD mark this extension as critical
+    ///
+    /// Default is critical.
     pub fn new_key_usage(key_usage: KeyUsage) -> Self {
         Self {
             extn_id: oids::key_usage().into(),
-            // When present, conforming CAs SHOULD mark this extension as critical
             critical: true.into(),
             extn_value: ExtensionValue::KeyUsage(key_usage.into()),
         }
     }
 
+    /// Conforming CAs MUST mark this extension as non-critical
+    ///
+    /// Default is non-critical.
     pub fn new_subject_key_identifier<V: Into<Vec<u8>>>(ski: V) -> Self {
         Self {
             extn_id: oids::subject_key_identifier().into(),
-            // Conforming CAs MUST mark this extension as non-critical
             critical: false.into(),
             extn_value: ExtensionValue::SubjectKeyIdentifier(OctetStringAsn1(ski.into()).into()),
         }
     }
 
+    /// Conforming CAs MUST mark this extension as non-critical
+    ///
+    /// Default is critical.
     pub fn new_authority_key_identifier<KI, I, SN>(
         key_identifier: KI,
         authority_cert_issuer: I,
@@ -46,20 +73,16 @@ impl Extension {
     ) -> Self
     where
         KI: Into<Option<KeyIdentifier>>,
-        I: Into<Option<GeneralNames>>,
+        I: Into<Option<GeneralName>>,
         SN: Into<Option<IntegerAsn1>>,
     {
         Self {
             extn_id: oids::authority_key_identifier().into(),
-            // Conforming CAs MUST mark this extension as non-critical
             critical: false.into(),
             extn_value: ExtensionValue::AuthorityKeyIdentifier(
                 AuthorityKeyIdentifier {
                     key_identifier: key_identifier.into().map(ContextTag0),
-                    authority_cert_issuer: authority_cert_issuer
-                        .into()
-                        .map(ApplicationTag4)
-                        .map(ApplicationTag1),
+                    authority_cert_issuer: authority_cert_issuer.into().map(ApplicationTag1),
                     authority_cert_serial_number: authority_cert_serial_number
                         .into()
                         .map(ContextTag2),
@@ -69,15 +92,18 @@ impl Extension {
         }
     }
 
+    /// Marking this extension as critical is always acceptable.
+    /// Check details here: https://tools.ietf.org/html/rfc5280#section-4.2.1.9
+    /// You may change this value using `into_non_critical` or `set_critical` methods.
+    ///
+    /// Default is critical.
     pub fn new_basic_constraints<CA: Into<Option<bool>>, PLC: Into<Option<u8>>>(
-        is_critical: bool,
         ca: CA,
         path_len_constraints: PLC,
     ) -> Self {
         Self {
             extn_id: oids::basic_constraints().into(),
-            // FIXME: check details here: https://tools.ietf.org/html/rfc5280#section-4.2.1.9
-            critical: Implicit(is_critical),
+            critical: true.into(),
             extn_value: ExtensionValue::BasicConstraints(
                 BasicConstraints {
                     ca: Implicit(ca.into()),
@@ -85,6 +111,49 @@ impl Extension {
                 }
                 .into(),
             ),
+        }
+    }
+
+    /// This extension MAY, at the option of the certificate issuer, be either critical or non-critical.
+    /// Conforming CAs SHOULD NOT mark this extension as critical if the anyExtendedKeyUsage
+    /// KeyPurposeId is present.
+    ///
+    /// Default is non-critical if anyExtendedKeyUsage is present, critical otherwise.
+    pub fn new_extended_key_usage<EKU>(extended_key_usage: EKU) -> Self
+    where
+        EKU: Into<ExtendedKeyUsage>,
+    {
+        let eku = extended_key_usage.into();
+        Self {
+            extn_id: oids::extended_key_usage().into(),
+            critical: Implicit(!eku.contains(oids::kp_any_extended_key_usage())),
+            extn_value: ExtensionValue::ExtendedKeyUsage(eku.into()),
+        }
+    }
+
+    /// If the subject field contains an empty sequence, then the issuing CA MUST include a
+    /// subjectAltName extension that is marked as critical. When including
+    /// the subjectAltName extension in a certificate that has a non-empty
+    /// subject distinguished name, conforming CAs SHOULD mark the
+    /// subjectAltName extension as non-critical.
+    ///
+    /// Default is critical.
+    pub fn new_subject_alt_name(name: SubjectAltName) -> Self {
+        Self {
+            extn_id: oids::subject_alternative_name().into(),
+            critical: true.into(),
+            extn_value: ExtensionValue::SubjectAltName(name.into()),
+        }
+    }
+
+    /// Where present, conforming CAs SHOULD mark this extension as non-critical.
+    ///
+    /// Default is non-critical.
+    pub fn new_issuer_alt_name(name: IssuerAltName) -> Self {
+        Self {
+            extn_id: oids::issuer_alternative_name().into(),
+            critical: false.into(),
+            extn_value: ExtensionValue::IssuerAltName(name.into()),
         }
     }
 }
@@ -132,15 +201,24 @@ impl<'de> de::Deserialize<'de> for Extension {
                 let id: ObjectIdentifierAsn1 = seq.next_element()?.unwrap();
                 let critical: Implicit<bool> = seq.next_element()?.unwrap();
                 let value = match Into::<String>::into(&id.0).as_str() {
-                    oids::KEY_USAGE => ExtensionValue::KeyUsage(seq.next_element()?.unwrap()),
-                    oids::SUBJECT_KEY_IDENTIFIER => {
-                        ExtensionValue::SubjectKeyIdentifier(seq.next_element()?.unwrap())
-                    }
                     oids::AUTHORITY_KEY_IDENTIFIER => {
                         ExtensionValue::AuthorityKeyIdentifier(seq.next_element()?.unwrap())
                     }
+                    oids::SUBJECT_KEY_IDENTIFIER => {
+                        ExtensionValue::SubjectKeyIdentifier(seq.next_element()?.unwrap())
+                    }
+                    oids::KEY_USAGE => ExtensionValue::KeyUsage(seq.next_element()?.unwrap()),
+                    oids::SUBJECT_ALTERNATIVE_NAME => {
+                        ExtensionValue::SubjectAltName(seq.next_element()?.unwrap())
+                    }
+                    oids::ISSUER_ALTERNATIVE_NAME => {
+                        ExtensionValue::IssuerAltName(seq.next_element()?.unwrap())
+                    }
                     oids::BASIC_CONSTRAINTS => {
                         ExtensionValue::BasicConstraints(seq.next_element()?.unwrap())
+                    }
+                    oids::EXTENDED_KEY_USAGE => {
+                        ExtensionValue::ExtendedKeyUsage(seq.next_element()?.unwrap())
                     }
                     _ => ExtensionValue::Generic(seq.next_element()?.unwrap()),
                 };
@@ -164,13 +242,13 @@ pub enum ExtensionValue {
     KeyUsage(OctetStringAsn1Container<KeyUsage>),
     //CertificatePolicies(OctetStringAsn1Container<Asn1SequenceOf<PolicyInformation>>),
     //PolicyMappings(OctetStringAsn1Container<Asn1SequenceOfPolicyMapping>>),
-    //SubjectAlternativeName(OctetStringAsn1Container<SubjectAltName>), TODO: prefer this extension
-    //IssuerAlternativeName(OctetStringAsn1Container<IssuerAltName>),
+    SubjectAltName(OctetStringAsn1Container<SubjectAltName>),
+    IssuerAltName(OctetStringAsn1Container<IssuerAltName>),
     //SubjectDirectoryAttributes(OctetStringAsn1Container<Asn1SequenceOf<Attribute>>),
     BasicConstraints(OctetStringAsn1Container<BasicConstraints>),
     //NameConstraints(…),
     //PolicyConstraints(…),
-    //ExtendedKeyUsage(…),
+    ExtendedKeyUsage(OctetStringAsn1Container<ExtendedKeyUsage>),
     //CRLDistributionPoints(…),
     //InhibitAnyPolicy(…),
     //FreshestCRL(…),
@@ -189,9 +267,12 @@ impl ser::Serialize for ExtensionValue {
             ExtensionValue::AuthorityKeyIdentifier(aki) => aki.serialize(serializer),
             ExtensionValue::SubjectKeyIdentifier(ski) => ski.serialize(serializer),
             ExtensionValue::KeyUsage(key_usage) => key_usage.serialize(serializer),
+            ExtensionValue::SubjectAltName(san) => san.serialize(serializer),
+            ExtensionValue::IssuerAltName(ian) => ian.serialize(serializer),
             ExtensionValue::BasicConstraints(basic_constraints) => {
                 basic_constraints.serialize(serializer)
             }
+            ExtensionValue::ExtendedKeyUsage(eku) => eku.serialize(serializer),
             ExtensionValue::Generic(octet_string) => octet_string.serialize(serializer),
         }
     }
@@ -201,7 +282,7 @@ impl ser::Serialize for ExtensionValue {
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct AuthorityKeyIdentifier {
     pub key_identifier: Option<ContextTag0<KeyIdentifier>>,
-    pub authority_cert_issuer: Option<ApplicationTag1<ApplicationTag4<GeneralNames>>>,
+    pub authority_cert_issuer: Option<ApplicationTag1<GeneralName>>,
     pub authority_cert_serial_number: Option<ContextTag2<IntegerAsn1>>,
 }
 
@@ -243,6 +324,7 @@ impl<'de> de::Deserialize<'de> for AuthorityKeyIdentifier {
 /// https://tools.ietf.org/html/rfc5280#section-4.2.1.2
 pub type SubjectKeyIdentifier = OctetStringAsn1;
 
+// TODO: move
 /// https://tools.ietf.org/html/rfc5280#section-4.2.1.3
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct KeyUsage(BitStringAsn1);
@@ -293,7 +375,13 @@ impl KeyUsage {
     }
 }
 
-// https://tools.ietf.org/html/rfc5280#section-4.2.1.9
+/// https://tools.ietf.org/html/rfc5280#section-4.2.1.6
+pub type SubjectAltName = GeneralNames;
+
+/// https://tools.ietf.org/html/rfc5280#section-4.2.1.7
+pub type IssuerAltName = GeneralNames;
+
+/// https://tools.ietf.org/html/rfc5280#section-4.2.1.9
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct BasicConstraints {
     pub ca: Implicit<Option<bool>>, // default is false
@@ -331,9 +419,45 @@ impl<'de> de::Deserialize<'de> for BasicConstraints {
     }
 }
 
+// TODO: move
+/// https://tools.ietf.org/html/rfc5280#section-4.2.1.12
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct ExtendedKeyUsage(Asn1SequenceOf<ObjectIdentifierAsn1>);
+
+impl<OID: Into<ObjectIdentifierAsn1>> From<Vec<OID>> for ExtendedKeyUsage {
+    fn from(purpose_oids: Vec<OID>) -> Self {
+        ExtendedKeyUsage::new(purpose_oids)
+    }
+}
+
+impl ExtendedKeyUsage {
+    pub fn new<OID: Into<ObjectIdentifierAsn1>>(purpose_oids: Vec<OID>) -> Self {
+        Self(
+            purpose_oids
+                .into_iter()
+                .map(|oid| oid.into())
+                .collect::<Vec<_>>()
+                .into(),
+        )
+    }
+
+    pub fn iter(&self) -> Iter<ObjectIdentifierAsn1> {
+        (self.0).0.iter()
+    }
+
+    pub fn iter_mut(&mut self) -> IterMut<ObjectIdentifierAsn1> {
+        (self.0).0.iter_mut()
+    }
+
+    pub fn contains<C: PartialEq<oid::ObjectIdentifier>>(&self, item: C) -> bool {
+        (self.0).0.iter().any(|id| item.eq(&id.0))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{pem::Pem, serde::name::GeneralName};
 
     #[test]
     fn key_usage() {
@@ -343,5 +467,60 @@ mod tests {
         key_usage.set_key_encipherment(true);
         assert_eq!(key_usage.as_bytes(), &[0xA0]);
         check_serde!(key_usage: KeyUsage in encoded);
+    }
+
+    const CSR_PEM: &str = "-----BEGIN CERTIFICATE REQUEST-----\n\
+                           MIIDIjCCAgoCAQAwIDELMAkGA1UEBhMCRlIxETAPBgNVBAMMCERyYXBlYXUhMIIB\n\
+                           IjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA5GqDEM7AfctJizsFEqtAvXd5\n\
+                           Fl1GtyXDAnx68MUTuSL22t8aBZoCCi3/9AlS75uUqKggHnRuY2MRYPQaUzpE1F1a\n\
+                           aZJNr6tXQy39FtdXrDq2zfwZdDmLW6sPmhvJrBO4yWjuG3wh1paPHy+rBHOjYt+9\n\
+                           Pbl/FmDDjIzF8B2LZDuLdnS94Fs/JhogJL/XF4b6RLW60gEnYFjL+ebYdV/f3JYi\n\
+                           ccQxY4imvbB2URlIO3t+aG9WMmhHZbbOi/HBdFG1fB7Hsa9Ek2FXshULzEDCJcMz\n\
+                           n8HD96XbVBmlaz9nYIcZ83eCOhra67FfFy4pIE1M9saxYJg/OJrMHG12r89yUQID\n\
+                           AQABoIG8MIG5BgkqhkiG9w0BCQ4xgaswgagwCQYDVR0TBAIwADALBgNVHQ8EBAMC\n\
+                           BeAwJwYDVR0lBCAwHgYIKwYBBQUHAwIGCCsGAQUFBwMBBggrBgEFBQcDAzBlBgNV\n\
+                           HREEXjBcghFkZXZlbC5leGFtcGxlLmNvbYIQaXB2Ni5leGFtcGxlLmNvbYIQaXB2\n\
+                           NC5leGFtcGxlLmNvbYIQdGVzdC5leGFtcGxlLmNvbYIRcGFydHkuZXhhbXBsZS5j\n\
+                           b20wDQYJKoZIhvcNAQELBQADggEBANaSDnpQUGcGypAaafJKAGME2Od8F4pvKjKF\n\
+                           lREoWC7JFGIGE/pUrnvrE7qIFmCM3mnFWXEHvResFsdPmEWar+1jMdFinxBg0+J+\n\
+                           Op0fxOwfHpxs++8hPsQgnDdL9pIjYFwmIAm64jnyq6wsYIl5CpkvBjGVRVddXkTb\n\
+                           VDWhWaGncSdDur6++dp2OAGYTAv4XIHc0nhtcBoxeL4VhjcuksOdGg3JF02gW6Rc\n\
+                           B1gipqD0jun8kPgWcQY22zhmP2HuPp0y58t9cu9FsnUcAFa//5pQA1LuaSFp65D4\n\
+                           92uaByS3lH18xzrkygzn1BeHRpo0fk4I9Rk8uy2QygCk43Pv6SU=\n\
+                           -----END CERTIFICATE REQUEST-----";
+
+    #[test]
+    fn eku_ku_bc_san_extensions() {
+        let pem = CSR_PEM.parse::<Pem>().expect("couldn't parse PEM");
+        let encoded = &pem.data()[359..359 + 3 + 168];
+
+        let mut key_usage = KeyUsage::new(3);
+        key_usage.set_digital_signature(true);
+        key_usage.set_content_commitment(true);
+        key_usage.set_key_encipherment(true);
+
+        let extensions = Extensions(vec![
+            Extension::new_basic_constraints(None, None).into_non_critical(),
+            Extension::new_key_usage(key_usage).into_non_critical(),
+            Extension::new_extended_key_usage(vec![
+                oids::kp_client_auth(),
+                oids::kp_server_auth(),
+                oids::kp_code_signing(),
+            ])
+            .into_non_critical(),
+            Extension::new_subject_alt_name(
+                vec![
+                    GeneralName::new_dns_name("devel.example.com").unwrap(),
+                    GeneralName::new_dns_name("ipv6.example.com").unwrap(),
+                    GeneralName::new_dns_name("ipv4.example.com").unwrap(),
+                    GeneralName::new_dns_name("test.example.com").unwrap(),
+                    GeneralName::new_dns_name("party.example.com").unwrap(),
+                ]
+                .into(),
+            )
+            .into_non_critical(),
+        ]);
+
+        check_serde!(extensions: Extensions in encoded);
     }
 }

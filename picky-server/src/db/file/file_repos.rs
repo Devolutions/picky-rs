@@ -44,7 +44,6 @@ impl FileRepos {
         }
     }
 
-    #[inline]
     fn __helper_get(&self, hash: &str, collection: &FileRepo<Vec<u8>>, type_err: &'static str) -> Result<Vec<u8>, String> {
         let hash = format!("{}{}", hash, DER_EXT);
         let repo_collection = if let Ok(repo_collection) = collection.get_collection() {

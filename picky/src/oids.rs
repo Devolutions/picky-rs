@@ -11,7 +11,6 @@
 /// I mean, I'm literally creating infinity out of emptiness.
 /// If you don't care about your mental sanity, you can read the
 /// [nomicon on unchecked uninitialized memory](https://doc.rust-lang.org/nomicon/unchecked-uninit.html).
-#[inline(always)]
 unsafe fn unreachable() -> ! {
     core::mem::MaybeUninit::uninit().assume_init()
 }
@@ -57,18 +56,35 @@ define_oid! {
     // Certicom Object Identifiers
     SECP384R1 => secp384r1 => "1.3.132.0.34",
 
+    // Extended key purpose OIDS
+    KP_SERVER_AUTH => kp_server_auth => "1.3.6.1.5.5.7.3.1",
+    KP_CLIENT_AUTH => kp_client_auth => "1.3.6.1.5.5.7.3.2",
+    KP_CODE_SIGNING => kp_code_signing => "1.3.6.1.5.5.7.3.3",
+    KP_EMAIL_PROTECTION => kp_email_protection => "1.3.6.1.5.5.7.3.4",
+    KP_IPSEC_END_SYSTEM => kp_ipsec_end_system => "1.3.6.1.5.5.7.3.5",
+    KP_IPSPEC_TUNNEL => kp_ipsec_tunnel => "1.3.6.1.5.5.7.3.6",
+    KP_IPSEC_USER => kp_ipsec_user => "1.3.6.1.5.5.7.3.7",
+    KP_TIME_STAMPING => kp_time_stamping => "1.3.6.1.5.5.7.3.8",
+    KP_OCSP_SIGNING => kp_ocsp_signing => "1.3.6.1.5.5.7.3.9",
+    KP_ANY_EXTENDED_KEY_USAGE => kp_any_extended_key_usage => "2.5.29.37.0",
+
     // attribute types
-    COMMON_NAME => common_name => "2.5.4.3",
-    SERIAL_NUMBER => serial_number => "2.5.4.5",
-    COUNTRY_NAME => country_name => "2.5.4.6",
-    LOCALITY_NAME => locality_name => "2.5.4.7",
-    STATE_OR_PROVINCE_NAME => state_or_province_name => "2.5.4.8",
-    ORGANISATION_NAME => organisation_name => "2.5.4.10",
-    ORGANISATIONAL_UNIT_NAME => organisational_unit_name => "2.5.4.11",
+    AT_COMMON_NAME => at_common_name => "2.5.4.3",
+    AT_SURNAME => at_surname => "2.5.4.4",
+    AT_SERIAL_NUMBER => at_serial_number => "2.5.4.5",
+    AT_COUNTRY_NAME => at_country_name => "2.5.4.6",
+    AT_LOCALITY_NAME => at_locality_name => "2.5.4.7",
+    AT_STATE_OR_PROVINCE_NAME => at_state_or_province_name => "2.5.4.8",
+    AT_STREET_NAME => at_street_name => "2.5.4.9",
+    AT_ORGANISATION_NAME => at_organisation_name => "2.5.4.10",
+    AT_ORGANISATIONAL_UNIT_NAME => at_organisational_unit_name => "2.5.4.11",
 
     // certificate extensions
     SUBJECT_KEY_IDENTIFIER => subject_key_identifier => "2.5.29.14",
     KEY_USAGE => key_usage => "2.5.29.15",
+    SUBJECT_ALTERNATIVE_NAME => subject_alternative_name => "2.5.29.17",
+    ISSUER_ALTERNATIVE_NAME => issuer_alternative_name => "2.5.29.18",
     BASIC_CONSTRAINTS => basic_constraints => "2.5.29.19",
     AUTHORITY_KEY_IDENTIFIER => authority_key_identifier => "2.5.29.35",
+    EXTENDED_KEY_USAGE => extended_key_usage => "2.5.29.37",
 }
