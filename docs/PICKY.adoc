@@ -14,6 +14,10 @@ https://github.com/multiformats/multibase[Multibase format]
 
 https://tools.ietf.org/html/draft-cavage-http-signatures-12[HTTP signatures]
 
+https://tools.ietf.org/html/rfc5958[RFC5958: Asymmetric Key Packages]
+
+https://tools.ietf.org/html/rfc7517[RFC7517: JSON Web Key (JWK)]
+
 https://tools.ietf.org/html/rfc5967[RFC5967: The application/pkcs10 Media Type]
 
 https://tools.ietf.org/html/rfc7468[RFC7468: Textual Encodings of PKIX, PKCS, and CMS Structures]
@@ -90,18 +94,24 @@ When leaf certificate caching is enabled, new certificates should automatically 
 
 The trade-off of removing certificates after a certain period of time but allowing them to be pushed back in the cache ensures that we store only certificates that are in use while being able to function with certificates that were emitted some time ago.
 
-== Certificate Formats
+== File Formats
 
 Multiple file formats exist for single certificates, certificate chains, public keys, private keys and certificate signing requests. The common denominator to all of these formats is that they all have an ASN.1 DER binary representation, but they are often transmitted in text-based formats for simplicity.
 
-=== application/pkix-cert (.cer)
+=== Public Keys
 
-The application/pkix-cert mime type is defined in https://tools.ietf.org/html/rfc2585.html#section-4.1[RFC 2585 section 4.1]. It is meant to contain a single binary X.509 certificate. While the standard file extension is defined as .cer, other file extensions such as .der or .crt are commonly used for the same file format.
+Public keys are encoded using the X.509 SubjectPublicKeyInfo ASN.1 structure as defined in https://tools.ietf.org/html/rfc5280#section-4.1[RFC5280 Section 4.1]. RSA public keys should be supported, but other public key types can be used. When encoded as PEM, the "application/x-pem-file" mime type should be used along with the "PUBLIC KEY" label.
+
+RSA public keys can also be encoded using the RSAPublicKey structure as defined in https://tools.ietf.org/html/rfc8017#appendix-A.1.1[RFC8017 Appendix A.1.1]. When encoded as PEM, the "application-x-pem-file" mime type should be used along with the "RSA PUBLIC KEY" label. However, the SubjectPublicKeyInfo structure should be preferred over the RSAPublicKey structure because it supports multiple public key formats.
+
+When encoded as JSON, public keys should follow the https://tools.ietf.org/html/rfc7517[JSON Web Key (JWK)] specification with the https://tools.ietf.org/html/rfc7517#section-8.5["application/jwk+json" mime type].
+
+=== X.509 Certificates
+
+The "application/pkix-cert" mime type is defined in https://tools.ietf.org/html/rfc2585.html#section-4.1[RFC 2585 section 4.1]. It is meant to contain a single binary X.509 certificate. While the standard file extension is defined as .cer, other file extensions such as .der or .crt are commonly used for the same file format.
 
 Example (binary):
 include::file/cert/cert_cer.adoc[]
-
-=== application/x-pem-file (.pem)
 
 The application/x-pem-file mime type is used to indicate a PEM-formatted file (.pem). While PEM stands for "Privacy Enhanced Mail", the format has been adapted over the years to handle multiple content types, including X.509 certificates. Because it encodes X.509 certificates as base64 blocks of text separated by labels, PEM is suitable for storing multiple certificates or certificate chains, unlike its binary counterpart.
 
@@ -112,7 +122,7 @@ include::file/cert/cert_pem.adoc[]
 
 When stored as a file, the .pem extension is normally used, but the .crt extension is also common. In practice, .crt files are often either binary or PEM-encoded certificates, leaving it up to the application to handle both formats with the same extension.
 
-=== application/pkcs10 (.csr, .p10)
+=== Certificate Signing Request
 
 The application/pkcs10 mime type is used to indicate a PKCS#10 certificate signing request in binary format. When stored as a file, both the .csr and .p10 extensions are commonly used.
 
@@ -124,15 +134,13 @@ Just like certificates, certificate signing requests have a PEM-formatted varian
 Example (PEM):
 include::file/csr/csr_pem.adoc[]
 
-=== application/ocsp-request
+=== Online Certificate Status Protocol (OCSP)
 
-The application/ocsp-request is used to indicate an application OCSP request, as defined in https://tools.ietf.org/html/rfc6960#appendix-C.1[RFC 6960 Appendix C.1]
+The "application/ocsp-request" mime type is used to indicate an application OCSP request, as defined in https://tools.ietf.org/html/rfc6960#appendix-C.1[RFC 6960 Appendix C.1]
 
 When used over HTTP, an OCSP request can optionally be passed as part of the URL of a GET or request, using base64url encoding, as defined in https://tools.ietf.org/html/rfc6960#appendix-A[RFC 6960 Appendix A]
 
-=== application/ocsp-response
-
-The application/ocsp-response is used to indicate an application OCSP response, as defined in https://tools.ietf.org/html/rfc6960#appendix-C.2[RFC 6960 Appendix C.2]
+The "application/ocsp-response" mime type is used to indicate an application OCSP response, as defined in https://tools.ietf.org/html/rfc6960#appendix-C.2[RFC 6960 Appendix C.2]
 
 == Certificate Chain
 
@@ -192,3 +200,11 @@ This certificate address is meant to be used by the recipient to fetch the X.509
 === algorithm parameter
 
 The HTTP signatures https://tools.ietf.org/html/draft-cavage-http-signatures-12#section-2.1.3[algorithm parameter] is omitted because the signature algorithm is already encoded in the X.509 certificate used to sign the request.
+
+=== created parameter
+
+The HTTP signatures https://tools.ietf.org/html/draft-cavage-http-signatures-12#section-2.1.4[created parameter] is omitted because the https://tools.ietf.org/html/rfc7231#section-7.1.1.2[HTTP "Date" header] is used instead.
+
+=== expires parameter
+
+The HTTP signatures https://tools.ietf.org/html/draft-cavage-http-signatures-12#section-2.1.4[expires parameter] is not used, but recipients should not accept requests with signatures older than a few minutes.
