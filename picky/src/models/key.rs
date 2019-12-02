@@ -1,8 +1,7 @@
 use crate::{
-    error::Result,
+    error::{Error, Result},
     serde::{private_key_info::PrivateKeyValue, PrivateKeyInfo, SubjectPublicKeyInfo},
 };
-use err_ctx::ResultExt;
 use num_bigint_dig::{BigInt, Sign};
 use serde_asn1_der::asn1_wrapper::OctetStringAsn1Container;
 
@@ -77,10 +76,8 @@ impl PrivateKey {
         use rand::rngs::OsRng;
         use rsa::{PublicKey, RSAPrivateKey};
 
-        let mut rng = OsRng::new().ctx("no secure randomness available")?;
-        let key = RSAPrivateKey::new(&mut rng, bits)
-            .map_err(|_| crate::error::Error::Rsa)
-            .ctx("failed to generate rsa key")?;
+        let mut rng = OsRng::new().map_err(|_| Error::NoSecureRandomness)?;
+        let key = RSAPrivateKey::new(&mut rng, bits)?;
 
         let modulus = BigInt::from_bytes_be(Sign::Plus, &key.n().to_bytes_be());
         let public_exponent = BigInt::from_bytes_be(Sign::Plus, &key.e().to_bytes_be());

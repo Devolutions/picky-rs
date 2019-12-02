@@ -1,22 +1,26 @@
 use base64::DecodeError;
-use err_derive::Error;
 use serde::export::Formatter;
+use snafu::{ResultExt, Snafu};
 use std::{borrow::Cow, fmt, str::FromStr};
 
 const PEM_HEADER_START: &str = "-----BEGIN";
 const PEM_HEADER_END: &str = "-----END";
 const PEM_DASHES_BOUNDARIES: &str = "-----";
 
-#[derive(Debug, Clone, Error)]
+#[derive(Debug, Clone, Snafu)]
 pub enum PemError {
-    #[error(display = "pem header not found")]
+    /// pem header not found
     HeaderNotFound,
-    #[error(display = "invalid pem header")]
+
+    /// invalid pem header
     InvalidHeader,
-    #[error(display = "pem footer not found")]
+
+    /// pem footer not found
     FooterNotFound,
-    #[error(display = "couldn't decode base64: {}", _0)]
-    Base64Decoding(DecodeError),
+
+    /// couldn't decode base64
+    #[snafu(display("couldn't decode base64: {}", source))]
+    Base64Decoding { source: DecodeError },
 }
 
 // https://tools.ietf.org/html/rfc7468
@@ -116,10 +120,10 @@ fn __parse_pem_impl(input: &[u8]) -> Result<Pem<'static>, PemError> {
             .copied()
             .filter(|byte| *byte != b'\r' && *byte != b'\n')
             .collect();
-        base64::decode(&striped_raw_data).map_err(PemError::Base64Decoding)?
+        base64::decode(&striped_raw_data).context(Base64Decoding)?
     } else {
         // Can be decoded as is!
-        base64::decode(raw_data).map_err(PemError::Base64Decoding)?
+        base64::decode(raw_data).context(Base64Decoding)?
     };
 
     Ok(Pem {

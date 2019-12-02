@@ -13,9 +13,8 @@ oid = { version = "^0.1.1", features = ["serde_support"] }
 serde = "1.0"
 serde_derive = "1.0"
 base64 = "0.10"
+snafu = "0.6"
 num-bigint-dig = "0.5" # TODO: remove this dependency
-err-derive = "0.2"
-err-ctx = "0.2"
 
 chrono = { version = "0.4", optional = true }
 

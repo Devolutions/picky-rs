@@ -20,13 +20,13 @@ pub struct Certificate {
 }
 
 macro_rules! find_ext {
-    ($oid:expr, $self:ident, $error_ctx:literal) => {{
+    ($oid:expr, $self:ident, $ext_name:literal) => {{
         let key_identifier_oid = $oid;
         ($self.tbs_certificate.extensions.0)
             .0
             .iter()
             .find(|ext| ext.extn_id == key_identifier_oid)
-            .ok_or(crate::error::Error::ExtensionNotFound($error_ctx))
+            .ok_or(crate::error::Error::ExtensionNotFound { name: $ext_name })
     }};
 }
 

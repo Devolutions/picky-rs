@@ -4,7 +4,6 @@ use crate::{
     oids, serde,
     serde::AlgorithmIdentifier,
 };
-use err_ctx::ResultExt;
 use rand::rngs::OsRng;
 use rsa::{
     hash::Hashes, BigUint, PaddingScheme, PublicKey as RsaPublicKeyInterface, RSAPrivateKey,
@@ -66,13 +65,11 @@ impl SignatureHashType {
                         .iter()
                         .map(|p| BigUint::from_bytes_be(&p.0.to_bytes_be().1))
                         .collect(),
-                )
-                .map_err(|_| Error::Rsa)
-                .ctx("couldn't build RSA private key from provided components")?
+                )?
             }
         };
 
-        let mut rng = OsRng::new().ctx("no secure randomness available")?;
+        let mut rng = OsRng::new().map_err(|_| Error::NoSecureRandomness)?;
 
         let digest = self.hash(msg);
 
@@ -84,10 +81,12 @@ impl SignatureHashType {
             Self::RsaSha512 => &Hashes::SHA2_512,
         };
 
-        let signature = rsa_private_key
-            .sign_blinded(&mut rng, PaddingScheme::PKCS1v15, Some(hash_algo), &digest)
-            .map_err(|_| Error::Rsa)
-            .ctx("couldn't sign")?;
+        let signature = rsa_private_key.sign_blinded(
+            &mut rng,
+            PaddingScheme::PKCS1v15,
+            Some(hash_algo),
+            &digest,
+        )?;
 
         Ok(signature)
     }
@@ -98,11 +97,11 @@ impl SignatureHashType {
             InnerPublicKey::RSA(BitStringAsn1Container(key)) => RSAPublicKey::new(
                 BigUint::from_bytes_be(&key.modulus.0.to_bytes_be().1),
                 BigUint::from_bytes_be(&key.public_exponent.0.to_bytes_be().1),
-            )
-            .map_err(|_| Error::Rsa)
-            .ctx("couldn't build RSA public key from subject public key info")?,
+            )?,
             InnerPublicKey::EC(_) => {
-                return Err(Error::UnsupportedAlgorithm("elliptic curves"));
+                return Err(Error::UnsupportedAlgorithm {
+                    algorithm: "elliptic curves".into(),
+                });
             }
         };
 
@@ -123,8 +122,7 @@ impl SignatureHashType {
                 &digest,
                 signature,
             )
-            .map_err(|_| Error::BadSignature)
-            .ctx("couldn't verify signature")?;
+            .map_err(|_| Error::BadSignature)?;
 
         Ok(())
     }
@@ -161,9 +159,6 @@ mod tests {
         let err = signature_hash_type
             .sign(&msg, &unsupported_key)
             .unwrap_err();
-        assert_eq!(
-            err.to_string(),
-            "couldn\'t build RSA private key from provided components: RSA error"
-        );
+        assert_eq!(err.to_string(), "RSA error: invalid coefficient");
     }
 }

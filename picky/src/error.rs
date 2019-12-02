@@ -1,74 +1,111 @@
-use crate::{models::date::UTCDate, pem::PemError};
-use err_derive::Error;
+use crate::models::date::UTCDate;
+use rsa::errors::Error as RSAError;
 use serde_asn1_der::{restricted_string::CharSetError, SerdeAsn1DerError};
+use snafu::Snafu;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-type BoxedError = Box<dyn std::error::Error + Send + Sync>;
-type ContextError<T> = err_ctx::Context<T>;
-
-#[derive(Debug, Error)]
+#[derive(Debug, Snafu)]
 pub enum Error {
-    #[error(display = "{}", _0)]
-    Boxed(BoxedError),
-    #[error(display = "invalid pem: {}", _0)]
-    Pem(#[error(source)] PemError),
-    #[error(display = "asn1 (de)serialization error: {}", _0)]
-    Asn1(#[error(source)] SerdeAsn1DerError),
-    #[error(display = "couldn't generate certificate")]
-    CertGeneration,
-    #[error(display = "RSA error")]
-    Rsa,
-    #[error(display = "invalid signature")]
-    BadSignature, // TODO: which certificate?
-    #[error(display = "CA chain depth does't satisfy basic constraints extension")]
-    CAChainTooDeep, // TODO: which certificates disagree? what pathlen?
-    #[error(display = "CA chain is missing a root certificate")]
+    /// couldn't generate certificate
+    #[snafu(display("couldn't generate certificate: {}", source))]
+    #[snafu(visibility = "pub(crate)")]
+    CertGeneration {
+        #[snafu(source(from(Error, Box::new)))]
+        source: Box<Error>,
+    },
+
+    /// invalid certificate
+    #[snafu(display("invalid certificate '{}': {}", id, source))]
+    #[snafu(visibility = "pub(crate)")]
+    InvalidCertificate {
+        id: String,
+        #[snafu(source(from(Error, Box::new)))]
+        source: Box<Error>,
+    },
+
+    /// asn1 serialization error
+    #[snafu(display("(asn1) couldn't serialize {}: {}", element, source))]
+    #[snafu(visibility = "pub(crate)")]
+    Asn1Serialization {
+        element: &'static str,
+        source: SerdeAsn1DerError,
+    },
+
+    /// asn1 deserialization error
+    #[snafu(display("(asn1) couldn't deserialize {}: {}", element, source))]
+    #[snafu(visibility = "pub(crate)")]
+    Asn1Deserialization {
+        element: &'static str,
+        source: SerdeAsn1DerError,
+    },
+
+    /// RSA error
+    #[snafu(display("RSA error: {}", context))]
+    Rsa { context: String },
+
+    /// no secure randomness available
+    NoSecureRandomness,
+
+    /// invalid signature
+    BadSignature,
+
+    /// CA chain depth does't satisfy basic constraints extension
+    #[snafu(display(
+        "CA chain depth doesn't satisfy basic constraints extension: certificate '{}' has pathlen of {}",
+        cert_id,
+        pathlen
+    ))]
+    CAChainTooDeep { cert_id: String, pathlen: u8 },
+
+    /// CA chain is missing a root certificate
     CAChainNoRoot,
-    #[error(display = "Issuer certificate is not a CA")]
-    IssuerIsNotCA, // TODO: context: issuer
-    #[error(
-        display = "authority key id doesn't match (expected: {:?}, got: {:?})",
+
+    /// issuer certificate is not a CA
+    #[snafu(display("issuer certificate '{}' is not a CA", issuer_id))]
+    IssuerIsNotCA { issuer_id: String },
+
+    /// authority key id doesn't match
+    #[snafu(display(
+        "authority key id doesn't match (expected: {:?}, got: {:?})",
         expected,
         actual
-    )]
+    ))]
     AuthorityKeyIdMismatch { expected: Vec<u8>, actual: Vec<u8> },
-    #[error(display = "extension not found: {}", _0)]
-    ExtensionNotFound(&'static str),
-    #[error(display = "missing required builder argument `{}`", _0)]
-    MissingBuilderArgument(&'static str),
-    #[error(display = "unsupported algorithm: {}", _0)]
-    UnsupportedAlgorithm(&'static str),
-    #[error(
-        display = "certificate is not yet valid (not before: {}, now: {})",
+
+    /// extension not found
+    #[snafu(display("extension not found: {}", name))]
+    ExtensionNotFound { name: &'static str },
+
+    /// missing required builder argument
+    #[snafu(display("missing required builder argument `{}`", arg))]
+    MissingBuilderArgument { arg: &'static str },
+
+    /// unsupported algorithm
+    #[snafu(display("unsupported algorithm: {}", algorithm))]
+    UnsupportedAlgorithm { algorithm: String },
+
+    /// certificate is not yet valid
+    #[snafu(display(
+        "certificate is not yet valid (not before: {}, now: {})",
         not_before,
         now
-    )]
+    ))]
     CertificateNotYetValid { not_before: UTCDate, now: UTCDate },
-    #[error(
-        display = "certificate expired (not after: {}, now: {})",
-        not_after,
-        now
-    )]
+
+    /// certificate expired
+    #[snafu(display("certificate expired (not after: {}, now: {})", not_after, now))]
     CertificateExpired { not_after: UTCDate, now: UTCDate },
-    #[error(display = "input has invalid charset: {}", input)]
-    InvalidCharSet {
-        input: String,
-        #[error(source)]
-        source: CharSetError,
-    },
+
+    /// input has invalid charset
+    #[snafu(display("input has invalid charset: {}", input))]
+    InvalidCharSet { input: String, source: CharSetError },
 }
 
-impl From<BoxedError> for Error {
-    fn from(e: BoxedError) -> Self {
-        Self::Boxed(e)
-    }
-}
-
-impl<T: 'static + Send + Sync + std::fmt::Debug + std::fmt::Display> From<ContextError<T>>
-    for Error
-{
-    fn from(e: ContextError<T>) -> Self {
-        Self::Boxed(Box::new(e))
+impl From<RSAError> for Error {
+    fn from(e: RSAError) -> Self {
+        Error::Rsa {
+            context: e.to_string(),
+        }
     }
 }

@@ -1,5 +1,7 @@
 use crate::{
-    error::{Error, Result},
+    error::{
+        Asn1Deserialization, Asn1Serialization, CertGeneration, Error, InvalidCertificate, Result,
+    },
     models::{
         csr::Csr,
         date::UTCDate,
@@ -18,10 +20,10 @@ use crate::{
         Certificate, Validity, Version,
     },
 };
-use err_ctx::ResultExt;
 use num_bigint_dig::{BigInt, Sign};
 use rand::{rngs::OsRng, RngCore};
 use serde_asn1_der::bit_string::BitString;
+use snafu::ResultExt;
 use std::cell::RefCell;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -37,9 +39,11 @@ pub struct Cert(Certificate);
 
 impl Cert {
     pub fn from_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self> {
-        Ok(Self::from_certificate(serde_asn1_der::from_bytes(
-            der.as_ref(),
-        )?))
+        Ok(Self::from_certificate(
+            serde_asn1_der::from_bytes(der.as_ref()).context(Asn1Deserialization {
+                element: "certificate",
+            })?,
+        ))
     }
 
     pub fn to_der(&self) -> serde_asn1_der::Result<Vec<u8>> {
@@ -125,28 +129,45 @@ impl Cert {
         chain: Chain,
         now: &UTCDate,
     ) -> Result<()> {
-        self.verify(now).ctx("invalid certificate")?;
+        self.verify(now).context(InvalidCertificate {
+            id: self.subject_name().to_string(),
+        })?;
 
         let mut current_cert = self;
-        let mut number_certs = 0;
         let mut root_ca_not_found = true;
 
-        for parent_cert in chain {
+        for (number_certs, parent_cert) in chain.enumerate() {
             match parent_cert.basic_constraints().unwrap_or((None, None)) {
-                (Some(false), _) => return Err(Error::IssuerIsNotCA),
-                (_, Some(pathlen)) if pathlen < number_certs => return Err(Error::CAChainTooDeep),
+                (Some(false), _) => {
+                    return Err(Error::IssuerIsNotCA {
+                        issuer_id: parent_cert.subject_name().to_string(),
+                    })
+                }
+                (_, Some(pathlen)) if usize::from(pathlen) < number_certs => {
+                    return Err(Error::CAChainTooDeep {
+                        cert_id: parent_cert.subject_name().to_string(),
+                        pathlen,
+                    })
+                }
                 _ => {}
             }
 
-            parent_cert.verify(now).ctx("invalid parent certificate")?;
+            parent_cert.verify(now).context(InvalidCertificate {
+                id: parent_cert.subject_name().to_string(),
+            })?;
 
             // check current cert aki match parent ski
             let parent_ski = parent_cert
                 .subject_key_identifier()
-                .ctx("couldn't fetch parent ski")?;
-            let current_aki = current_cert
-                .authority_key_identifier()
-                .ctx("couldn't fetch child aki")?;
+                .context(InvalidCertificate {
+                    id: parent_cert.subject_name().to_string(),
+                })?;
+            let current_aki =
+                current_cert
+                    .authority_key_identifier()
+                    .context(InvalidCertificate {
+                        id: current_cert.subject_name().to_string(),
+                    })?;
             if parent_ski != current_aki {
                 return Err(Error::AuthorityKeyIdMismatch {
                     expected: current_aki.to_vec(),
@@ -157,27 +178,40 @@ impl Cert {
             // validate current cert signature using parent public key
             let hash_type =
                 SignatureHashType::from_algorithm_identifier(&current_cert.0.signature_algorithm)
-                    .ok_or(Error::UnsupportedAlgorithm("unknown identifier"))?;
+                    .ok_or(Error::UnsupportedAlgorithm {
+                    algorithm: (&current_cert.0.signature_algorithm.algorithm.0).into(),
+                })?;
             let public_key = &parent_cert.0.tbs_certificate.subject_public_key_info;
             let msg = serde_asn1_der::to_vec(&current_cert.0.tbs_certificate)
-                .ctx("couldn't serialize child certificate to der")?;
-            hash_type.verify(
-                &public_key.clone().into(),
-                &msg,
-                current_cert.0.signature_value.0.payload_view(),
-            )?;
+                .context(Asn1Serialization {
+                    element: "tbs certificate",
+                })
+                .context(InvalidCertificate {
+                    id: current_cert.subject_name().to_string(),
+                })?;
+            hash_type
+                .verify(
+                    &public_key.clone().into(),
+                    &msg,
+                    current_cert.0.signature_value.0.payload_view(),
+                )
+                .context(InvalidCertificate {
+                    id: current_cert.subject_name().to_string(),
+                })?;
 
             // check if this is a root CA
-            let parent_aki = parent_cert
-                .authority_key_identifier()
-                .ctx("couldn't fetch parent aki")?;
+            let parent_aki =
+                parent_cert
+                    .authority_key_identifier()
+                    .context(InvalidCertificate {
+                        id: parent_cert.subject_name().to_string(),
+                    })?;
             if parent_ski == parent_aki {
                 root_ca_not_found = false;
                 break;
             }
 
             current_cert = parent_cert;
-            number_certs += 1
         }
 
         if root_ca_not_found {
@@ -354,11 +388,12 @@ impl<'a> CertificateBuilder<'a> {
         let valid_from = inner
             .valid_from
             .take()
-            .ok_or(Error::MissingBuilderArgument(field_str!(inner.valid_from)))?;
-        let valid_to = inner
-            .valid_to
-            .take()
-            .ok_or(Error::MissingBuilderArgument(field_str!(inner.valid_to)))?;
+            .ok_or(Error::MissingBuilderArgument {
+                arg: field_str!(inner.valid_from),
+            })?;
+        let valid_to = inner.valid_to.take().ok_or(Error::MissingBuilderArgument {
+            arg: field_str!(inner.valid_to),
+        })?;
 
         let signature_hash_type = inner
             .signature_hash_type
@@ -373,9 +408,9 @@ impl<'a> CertificateBuilder<'a> {
         let issuer_infos = inner
             .issuer_infos
             .take()
-            .ok_or(Error::MissingBuilderArgument(field_str!(
-                inner.issuer_infos
-            )))?;
+            .ok_or(Error::MissingBuilderArgument {
+                arg: field_str!(inner.issuer_infos),
+            })?;
         let (issuer_name, issuer_key, aki, subject_infos) = match issuer_infos {
             IssuerInfos::SelfSigned { name, key } => {
                 let aki = key_id_gen_method.generate_from(&key.to_public_key())?;
@@ -394,9 +429,9 @@ impl<'a> CertificateBuilder<'a> {
                     inner
                         .subject_infos
                         .take()
-                        .ok_or(Error::MissingBuilderArgument(field_str!(
-                            inner.subject_infos
-                        )))?;
+                        .ok_or(Error::MissingBuilderArgument {
+                            arg: field_str!(inner.subject_infos),
+                        })?;
                 (issuer_name, issuer_key, aki, subject_infos)
             }
         };
@@ -456,7 +491,9 @@ impl<'a> CertificateBuilder<'a> {
             }
 
             // ski
-            let ski = key_id_gen_method.generate_from(&subject_public_key)?;
+            let ski = key_id_gen_method
+                .generate_from(&subject_public_key)
+                .context(CertGeneration)?;
             extensions.push(Extension::new_subject_key_identifier(ski));
 
             // aki
@@ -481,9 +518,15 @@ impl<'a> CertificateBuilder<'a> {
         };
 
         let tbs_der = serde_asn1_der::to_vec(&tbs_certificate)
-            .ctx("couldn't serialize tbs certificate into der")?;
-        let signature_value =
-            BitString::with_bytes(signature_hash_type.sign(&tbs_der, issuer_key)?);
+            .context(Asn1Serialization {
+                element: "tbs certificate",
+            })
+            .context(CertGeneration)?;
+        let signature_value = BitString::with_bytes(
+            signature_hash_type
+                .sign(&tbs_der, issuer_key)
+                .context(CertGeneration)?,
+        );
 
         Ok(Cert(Certificate {
             tbs_certificate,
@@ -638,7 +681,8 @@ mod tests {
             .unwrap_err();
         assert_eq!(
             expired_err.to_string(),
-            "invalid certificate: certificate expired (not after: 2072-01-01 00:00:00, now: 2080-10-01 00:00:00)"
+            "invalid certificate \'CN=ChillingInTheFuture.usobakkari\': \
+             certificate expired (not after: 2072-01-01 00:00:00, now: 2080-10-01 00:00:00)"
         );
 
         let intermediate_expired_err = signed_leaf
@@ -646,7 +690,8 @@ mod tests {
             .unwrap_err();
         assert_eq!(
             intermediate_expired_err.to_string(),
-            "invalid parent certificate: certificate expired (not after: 2071-01-01 00:00:00, now: 2071-06-01 00:00:00)"
+            "invalid certificate \'CN=TheFuture.usodakedo Authority\': \
+             certificate expired (not after: 2071-01-01 00:00:00, now: 2071-06-01 00:00:00)"
         );
 
         let root_expired_err = signed_leaf
@@ -654,7 +699,8 @@ mod tests {
             .unwrap_err();
         assert_eq!(
             root_expired_err.to_string(),
-            "invalid parent certificate: certificate expired (not after: 2070-06-15 00:00:00, now: 2070-06-16 00:00:00)"
+            "invalid certificate \'CN=TheFuture.usodakedo Root CA\': \
+             certificate expired (not after: 2070-06-15 00:00:00, now: 2070-06-16 00:00:00)"
         );
 
         let still_in_2019_err = signed_leaf
@@ -662,7 +708,8 @@ mod tests {
             .unwrap_err();
         assert_eq!(
             still_in_2019_err.to_string(),
-            "invalid certificate: certificate is not yet valid (not before: 2069-01-01 00:00:00, now: 2019-11-14 00:00:00)"
+            "invalid certificate \'CN=ChillingInTheFuture.usobakkari\': \
+            certificate is not yet valid (not before: 2069-01-01 00:00:00, now: 2019-11-14 00:00:00)"
         );
     }
 
@@ -747,7 +794,7 @@ mod tests {
             .unwrap_err();
         assert_eq!(
             invalid_sig_err.to_string(),
-            "couldn\'t verify signature: invalid signature"
+            "invalid certificate \'CN=V.E.R.Y Legitimate VerySafe Authority\': invalid signature"
         );
     }
 
@@ -816,7 +863,8 @@ mod tests {
             .unwrap_err();
         assert_eq!(
             invalid_pathlen_err.to_string(),
-            "CA chain depth does\'t satisfy basic constraints extension"
+            "CA chain depth doesn\'t satisfy basic constraints extension: \
+             certificate \'CN=VerySafe Root CA\' has pathlen of 0"
         );
 
         let invalid_issuer_signed_leaf = CertificateBuilder::new()
@@ -840,7 +888,7 @@ mod tests {
             .unwrap_err();
         assert_eq!(
             invalid_issuer_err.to_string(),
-            "Issuer certificate is not a CA"
+            "issuer certificate \'CN=I Trust This V.E.R.Y Legitimate Intermediate Certificate\' is not a CA"
         );
     }
 }
