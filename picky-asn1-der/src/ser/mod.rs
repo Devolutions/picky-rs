@@ -10,7 +10,7 @@ use crate::{
         boolean::Boolean, integer::UnsignedInteger, null::Null, sequence::Sequence,
         utf8_string::Utf8String,
     },
-    Result, Asn1DerError,
+    Asn1DerError, Result,
 };
 use picky_asn1::{tag::Tag, wrapper::*, Asn1Type};
 use serde::Serialize;

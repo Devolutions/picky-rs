@@ -10,7 +10,7 @@ use crate::{
         utf8_string::Utf8String,
     },
     misc::{Length, PeekableReader, ReadExt},
-    Result, Asn1DerError,
+    Asn1DerError, Result,
 };
 use picky_asn1::{tag::Tag, wrapper::*, Asn1Type};
 use serde::{de::Visitor, Deserialize};
@@ -370,10 +370,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
         self.__next_object()?;
         let s = Utf8String::deserialize(&self.buf)?;
 
-        let c = s
-            .chars()
-            .next()
-            .ok_or(Asn1DerError::UnsupportedValue)?;
+        let c = s.chars().next().ok_or(Asn1DerError::UnsupportedValue)?;
         visitor.visit_char(c)
     }
 

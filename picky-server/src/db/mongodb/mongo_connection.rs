@@ -1,7 +1,7 @@
+use mongodb::common::{ReadMode, ReadPreference};
 use mongodb::{connstring, db::ThreadedDatabase, r2d2_mongo, ClientOptions, CommandType};
 use r2d2::Pool;
 use std::time::Duration;
-use mongodb::common::{ReadPreference, ReadMode};
 
 const CONNECTION_IDLE_TIMEOUT_SECS: u64 = 600;
 const DB_CONNECTION_TIMEOUT_SECS: u64 = 15;

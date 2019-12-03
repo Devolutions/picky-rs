@@ -1,4 +1,4 @@
-use crate::{Result, Asn1DerError};
+use crate::{Asn1DerError, Result};
 
 /// A trait that allows you to convert all unsigned integers from a `u128` (if possible)
 pub trait UInt: Sized + Copy {

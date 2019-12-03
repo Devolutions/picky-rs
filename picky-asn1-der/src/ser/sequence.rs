@@ -1,7 +1,7 @@
 use crate::{
     misc::WriteExt,
     ser::{to_writer, Serializer},
-    Result, Asn1DerError,
+    Asn1DerError, Result,
 };
 use picky_asn1::tag::Tag;
 use serde::Serialize;

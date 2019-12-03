@@ -1,13 +1,13 @@
 use crate::configuration::{BackendType, ServerConfig};
-use crate::db::memory::memory_repos::MemoryRepos;
 use crate::db::file::file_repos::FileRepos;
-use crate::db::mongodb::mongo_connection::MongoConnection;
+use crate::db::memory::memory_repos::MemoryRepos;
 use crate::db::mongodb::model::RepositoryCollection;
+use crate::db::mongodb::mongo_connection::MongoConnection;
 
 pub const DEFAULT_FILEBASE_PATH: &str = "database/";
 
 pub struct Backend {
-    pub db: Box<dyn BackendStorage>
+    pub db: Box<dyn BackendStorage>,
 }
 
 impl Backend {
@@ -21,12 +21,18 @@ impl Backend {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Model<T> {
     pub key: String,
-    pub value: T
+    pub value: T,
 }
 
-pub trait BackendStorage: Send + Sync{
+pub trait BackendStorage: Send + Sync {
     fn init(&mut self) -> Result<(), String>;
-    fn store(&self, name: &str, cert: &[u8], key: Option<&[u8]>, key_identifier: &str) -> Result<bool, String>;
+    fn store(
+        &self,
+        name: &str,
+        cert: &[u8],
+        key: Option<&[u8]>,
+        key_identifier: &str,
+    ) -> Result<bool, String>;
     fn find(&self, name: &str) -> Result<Vec<Model<String>>, String>;
     fn get_cert(&self, hash: &str) -> Result<Vec<u8>, String>;
     fn get_key(&self, hash: &str) -> Result<Vec<u8>, String>;
@@ -35,31 +41,30 @@ pub trait BackendStorage: Send + Sync{
     fn health(&self) -> Result<(), String>;
 }
 
-impl From<&ServerConfig> for Backend{
-    fn from(config: &ServerConfig) -> Self{
+impl From<&ServerConfig> for Backend {
+    fn from(config: &ServerConfig) -> Self {
         match config.backend {
             BackendType::MongoDb => {
-                let conn= MongoConnection::new(&config.database.url).expect("Invalid server url");
+                let conn = MongoConnection::new(&config.database.url).expect("Invalid server url");
                 Backend::new(RepositoryCollection::new(conn)).expect("Wrong server configuration")
-            },
-            BackendType::Memory => {
-                Backend::new(MemoryRepos::new()).expect("Bad configuration")
-            },
+            }
+            BackendType::Memory => Backend::new(MemoryRepos::new()).expect("Bad configuration"),
             BackendType::File => {
                 let save_file_path = if config.save_file_path.eq("") {
                     DEFAULT_FILEBASE_PATH.to_owned()
                 } else {
-                    format!("{}{}",&config.save_file_path, DEFAULT_FILEBASE_PATH)
+                    format!("{}{}", &config.save_file_path, DEFAULT_FILEBASE_PATH)
                 };
 
-                Backend::new(FileRepos::new(save_file_path.as_str())).expect("Error creating backend for file base")
-            },
-            _ => panic!("not yet implemented")
+                Backend::new(FileRepos::new(save_file_path.as_str()))
+                    .expect("Error creating backend for file base")
+            }
+            _ => panic!("not yet implemented"),
         }
     }
 }
 
-pub trait Repo<T>{
+pub trait Repo<T> {
     type Instance;
     type RepoError;
     type RepoCollection;

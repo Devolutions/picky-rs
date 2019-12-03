@@ -3,14 +3,16 @@ extern crate num_bigint_dig as num_bigint;
 mod pki_tests;
 
 use num_bigint::{BigInt, Sign, ToBigInt};
-use picky_asn1::{date::Date, wrapper::*};
+use oid::prelude::*;
+use picky_asn1::{
+    bit_string::BitString,
+    date::{Date, GeneralizedTime, UTCTime},
+    restricted_string::{IA5String, PrintableString, Utf8String},
+    wrapper::*,
+};
 use pretty_assertions::assert_eq;
 use serde::{Deserialize, Serialize};
 use std::{borrow::Cow, convert::TryFrom, fmt::Debug, str::FromStr};
-use oid::prelude::*;
-use picky_asn1::bit_string::BitString;
-use picky_asn1::date::{GeneralizedTime, UTCTime};
-use picky_asn1::restricted_string::{PrintableString, Utf8String, IA5String};
 
 fn check<'de, T>(buffer: &'de [u8], expected: T)
 where

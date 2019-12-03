@@ -62,12 +62,12 @@ use crate::pki_tests::{
 use num_bigint_dig::{BigInt, Sign};
 use oid::prelude::*;
 use picky_asn1::{
+    bit_string::BitString,
+    date::Date,
     wrapper::{
         ApplicationTag0, ApplicationTag3, Asn1SequenceOf, Asn1SetOf, BitStringAsn1, Implicit,
         ObjectIdentifierAsn1, OctetStringAsn1, UTCTimeAsn1,
     },
-    bit_string::BitString,
-    date::Date,
 };
 use serde::{Deserialize, Serialize};
 

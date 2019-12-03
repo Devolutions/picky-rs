@@ -1,7 +1,7 @@
-use log::LevelFilter;
-use std::env;
 use clap::App;
+use log::LevelFilter;
 use picky::models::signature::SignatureHashType;
+use std::env;
 
 const DEFAULT_PICKY_REALM: &str = "Picky";
 
@@ -17,35 +17,35 @@ const PICKY_SAVE_CERTIFICATE_ENV: &str = "PICKY_SAVE_CERTIFICATE";
 const PICKY_BACKEND_FILE_PATH_ENV: &str = "PICKY_BACKEND_FILE_PATH";
 
 #[derive(PartialEq, Clone)]
-pub enum BackendType{
+pub enum BackendType {
     MySQL,
     SQLite,
     MongoDb,
     Memory,
-    File
+    File,
 }
 
-impl From<&str> for BackendType{
-    fn from(backend: &str) -> Self{
-        match backend{
+impl From<&str> for BackendType {
+    fn from(backend: &str) -> Self {
+        match backend {
             "mysql" => BackendType::MySQL,
             "sqlite" => BackendType::SQLite,
             "mongodb" => BackendType::MongoDb,
             "memory" => BackendType::Memory,
             "file" => BackendType::File,
-            _ => BackendType::default()
+            _ => BackendType::default(),
         }
     }
 }
 
-impl Default for BackendType{
-    fn default() -> Self{
+impl Default for BackendType {
+    fn default() -> Self {
         BackendType::MongoDb
     }
 }
 
 #[derive(Clone)]
-pub struct ServerConfig{
+pub struct ServerConfig {
     pub log_level: String,
     pub api_key: String,
     pub database: Database,
@@ -61,8 +61,8 @@ pub struct ServerConfig{
     pub save_certificate: bool,
 }
 
-impl ServerConfig{
-    pub fn new() -> Self{
+impl ServerConfig {
+    pub fn new() -> Self {
         let mut config = ServerConfig::default();
         config.load_cli();
         config.load_env();
@@ -112,39 +112,39 @@ impl ServerConfig{
     }
 
     fn load_env(&mut self) {
-        if let Ok(val) = env::var(PICKY_REALM_ENV){
+        if let Ok(val) = env::var(PICKY_REALM_ENV) {
             self.realm = val;
         }
 
-        if let Ok(val) = env::var(PICKY_API_KEY_ENV){
+        if let Ok(val) = env::var(PICKY_API_KEY_ENV) {
             self.api_key = val;
         }
 
-        if let Ok(val) = env::var(PICKY_DATABASE_URL_ENV){
+        if let Ok(val) = env::var(PICKY_DATABASE_URL_ENV) {
             self.database.url = val;
         }
 
-        if let Ok(val) = env::var(PICKY_BACKEND_ENV){
+        if let Ok(val) = env::var(PICKY_BACKEND_ENV) {
             self.backend = BackendType::from(val.as_str());
         }
 
-        if let Ok(val) = env::var(PICKY_ROOT_CERT_ENV){
+        if let Ok(val) = env::var(PICKY_ROOT_CERT_ENV) {
             self.root_cert = val;
         }
 
-        if let Ok(val) = env::var(PICKY_ROOT_KEY_ENV){
+        if let Ok(val) = env::var(PICKY_ROOT_KEY_ENV) {
             self.root_key = val;
         }
 
-        if let Ok(val) = env::var(PICKY_INTERMEDIATE_CERT_ENV){
+        if let Ok(val) = env::var(PICKY_INTERMEDIATE_CERT_ENV) {
             self.intermediate_cert = val;
         }
 
-        if let Ok(val) = env::var(PICKY_INTERMEDIATE_KEY_ENV){
+        if let Ok(val) = env::var(PICKY_INTERMEDIATE_KEY_ENV) {
             self.intermediate_key = val;
         }
 
-        if let Ok(val) = env::var(PICKY_BACKEND_FILE_PATH_ENV){
+        if let Ok(val) = env::var(PICKY_BACKEND_FILE_PATH_ENV) {
             self.save_file_path = val;
         }
 
@@ -156,9 +156,9 @@ impl ServerConfig{
     }
 }
 
-impl Default for ServerConfig{
+impl Default for ServerConfig {
     fn default() -> Self {
-        ServerConfig{
+        ServerConfig {
             log_level: "info".to_string(),
             api_key: String::default(),
             database: Database::default(),
@@ -183,7 +183,7 @@ pub struct Database {
 impl Default for Database {
     fn default() -> Self {
         Database {
-            url: "mongodb://127.0.0.1:27017".to_string()
+            url: "mongodb://127.0.0.1:27017".to_string(),
         }
     }
 }

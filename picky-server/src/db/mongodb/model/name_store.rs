@@ -1,9 +1,9 @@
-use mongodb::db::ThreadedDatabase;
-use mongodb::coll::Collection;
-use bson::oid::ObjectId;
+use crate::db::backend::Model;
 use crate::db::mongodb::model::{Repository, RepositoryError};
 use crate::db::mongodb::mongo_connection::MongoConnection;
-use crate::db::backend::Model;
+use bson::oid::ObjectId;
+use mongodb::coll::Collection;
+use mongodb::db::ThreadedDatabase;
 
 const COLLECTION_NAME: &str = "name_store";
 

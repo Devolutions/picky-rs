@@ -1,4 +1,4 @@
-use crate::{Result, Asn1DerError};
+use crate::{Asn1DerError, Result};
 use std::str;
 
 /// A deserializer for UTF-8 strings

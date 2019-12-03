@@ -1,7 +1,7 @@
 mod read_test_vectors;
 
-use read_test_vectors::*;
 use picky_asn1_der::{from_bytes, to_vec};
+use read_test_vectors::*;
 use serde::{Deserialize, Serialize};
 use serde_bytes::ByteBuf;
 use std::fmt::Debug;

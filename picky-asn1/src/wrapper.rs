@@ -288,9 +288,7 @@ where
 
 /// A Vec<u8> wrapper for Asn1 encoding as OctetString.
 #[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd, Hash, Clone)]
-pub struct OctetStringAsn1(
-    #[serde(with = "serde_bytes")] pub Vec<u8>,
-);
+pub struct OctetStringAsn1(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 type VecU8 = Vec<u8>;
 impls! { OctetStringAsn1(VecU8), Tag::OCTET_STRING }

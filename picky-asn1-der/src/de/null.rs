@@ -1,4 +1,4 @@
-use crate::{Result, Asn1DerError};
+use crate::{Asn1DerError, Result};
 
 /// A deserializer for the `Null` type
 pub struct Null;
