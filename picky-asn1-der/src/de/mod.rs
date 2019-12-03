@@ -434,6 +434,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
         match self.__peek_object()? {
             Tag::OCTET_STRING => {}
             Tag::BIT_STRING => {}
+            Tag::INTEGER => {}
             Tag::UTF8_STRING => {}
             Tag::PRINTABLE_STRING => {}
             Tag::NUMERIC_STRING => {}

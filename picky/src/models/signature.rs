@@ -58,12 +58,12 @@ impl SignatureHashType {
         let rsa_private_key = match &private_key.as_inner().private_key {
             serde::private_key_info::PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => {
                 RSAPrivateKey::from_components2(
-                    BigUint::from_bytes_be(&key.modulus().0.to_bytes_be().1),
-                    BigUint::from_bytes_be(&key.public_exponent().0.to_bytes_be().1),
-                    BigUint::from_bytes_be(&key.private_exponent().0.to_bytes_be().1),
+                    BigUint::from_bytes_be(key.modulus().as_bytes_be()),
+                    BigUint::from_bytes_be(key.public_exponent().as_bytes_be()),
+                    BigUint::from_bytes_be(key.private_exponent().as_bytes_be()),
                     key.primes()
                         .iter()
-                        .map(|p| BigUint::from_bytes_be(&p.0.to_bytes_be().1))
+                        .map(|p| BigUint::from_bytes_be(p.as_bytes_be()))
                         .collect(),
                 )?
             }
@@ -95,8 +95,8 @@ impl SignatureHashType {
         use crate::serde::subject_public_key_info::PublicKey as InnerPublicKey;
         let public_key = match &public_key.as_inner().subject_public_key {
             InnerPublicKey::RSA(BitStringAsn1Container(key)) => RSAPublicKey::new(
-                BigUint::from_bytes_be(&key.modulus.0.to_bytes_be().1),
-                BigUint::from_bytes_be(&key.public_exponent.0.to_bytes_be().1),
+                BigUint::from_bytes_be(key.modulus.as_bytes_be()),
+                BigUint::from_bytes_be(key.public_exponent.as_bytes_be()),
             )?,
             InnerPublicKey::EC(_) => {
                 return Err(Error::UnsupportedAlgorithm {

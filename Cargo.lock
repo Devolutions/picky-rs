@@ -1237,7 +1237,6 @@ name = "picky-asn1"
 version = "0.1.0"
 dependencies = [
  "chrono 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "num-bigint-dig 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "oid 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "picky-asn1-der 0.1.0",
  "serde 1.0.103 (registry+https://github.com/rust-lang/crates.io-index)",

@@ -1,5 +1,3 @@
-extern crate num_bigint_dig as num_bigint;
-
 pub mod bit_string;
 pub mod date;
 pub mod restricted_string;

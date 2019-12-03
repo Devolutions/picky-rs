@@ -2,8 +2,7 @@ use crate::{
     error::{Error, Result},
     serde::{private_key_info::PrivateKeyValue, PrivateKeyInfo, SubjectPublicKeyInfo},
 };
-use num_bigint_dig::{BigInt, Sign};
-use picky_asn1::wrapper::OctetStringAsn1Container;
+use picky_asn1::wrapper::{IntegerAsn1, OctetStringAsn1Container};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PrivateKey(PrivateKeyInfo);
@@ -79,9 +78,9 @@ impl PrivateKey {
         let mut rng = OsRng::new().map_err(|_| Error::NoSecureRandomness)?;
         let key = RSAPrivateKey::new(&mut rng, bits)?;
 
-        let modulus = BigInt::from_bytes_be(Sign::Plus, &key.n().to_bytes_be());
-        let public_exponent = BigInt::from_bytes_be(Sign::Plus, &key.e().to_bytes_be());
-        let private_exponent = BigInt::from_bytes_be(Sign::Plus, &key.d().to_bytes_be());
+        let modulus = IntegerAsn1::from(key.n().to_bytes_be());
+        let public_exponent = IntegerAsn1::from(key.e().to_bytes_be());
+        let private_exponent = IntegerAsn1::from(key.d().to_bytes_be());
 
         Ok(Self(PrivateKeyInfo::new_rsa_encryption(
             modulus,
@@ -89,7 +88,7 @@ impl PrivateKey {
             private_exponent,
             key.primes()
                 .iter()
-                .map(|p| BigInt::from_bytes_be(Sign::Plus, &p.to_bytes_be()))
+                .map(|p| IntegerAsn1::from(p.to_bytes_be()))
                 .collect(),
         )))
     }

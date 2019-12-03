@@ -20,7 +20,6 @@ use crate::{
         Certificate, Validity, Version,
     },
 };
-use num_bigint_dig::{BigInt, Sign};
 use picky_asn1::bit_string::BitString;
 use rand::{rngs::OsRng, RngCore};
 use snafu::ResultExt;
@@ -452,7 +451,7 @@ impl<'a> CertificateBuilder<'a> {
 
         drop(inner);
 
-        let serial_number = BigInt::from_bytes_be(Sign::Plus, &generate_serial_number());
+        let serial_number = generate_serial_number();
 
         let validity = Validity {
             not_before: valid_from.into(),

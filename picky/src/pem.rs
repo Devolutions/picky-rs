@@ -154,7 +154,6 @@ mod tests {
         oids,
         serde::{name::NamePrettyFormatter, Certificate, Version},
     };
-    use num_bigint_dig::BigInt;
     use picky_asn1::date::UTCTime;
 
     const PEM_BYTES: &[u8] = crate::test_files::INTERMEDIATE_CA.as_bytes();
@@ -188,7 +187,7 @@ mod tests {
         let cert = Certificate::from_der(&pem.data).unwrap();
 
         assert_eq!(cert.tbs_certificate.version.0, Version::V3);
-        assert_eq!(cert.tbs_certificate.serial_number, BigInt::from(1));
+        assert_eq!(cert.tbs_certificate.serial_number, vec![1]);
         assert_eq!(
             Into::<String>::into(cert.tbs_certificate.signature.algorithm.0).as_str(),
             oids::SHA1_WITH_RSA_ENCRYPTION

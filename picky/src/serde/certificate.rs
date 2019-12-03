@@ -156,7 +156,7 @@ mod tests {
             Extension,
         },
     };
-    use num_bigint_dig::{BigInt, Sign};
+    use num_bigint_dig::BigInt;
     use picky_asn1::{bit_string::BitString, date::UTCTime};
 
     #[test]
@@ -208,8 +208,8 @@ mod tests {
         // SubjectPublicKeyInfo
 
         let subject_public_key_info = SubjectPublicKeyInfo::new_rsa_key(
-            BigInt::from_bytes_be(Sign::Plus, &encoded[165..422]).into(),
-            BigInt::from(65537).into(),
+            IntegerAsn1::from(encoded[165..422].to_vec()),
+            BigInt::from(65537).to_signed_bytes_be().into(),
         );
         check_serde!(subject_public_key_info: SubjectPublicKeyInfo in encoded[133..427]);
 
@@ -240,7 +240,7 @@ mod tests {
 
         let tbs_certificate = TBSCertificate {
             version: ApplicationTag0(Version::V3).into(),
-            serial_number: BigInt::from(935548868).into(),
+            serial_number: BigInt::from(935548868).to_signed_bytes_be().into(),
             signature: signature_algorithm.clone(),
             issuer,
             validity,

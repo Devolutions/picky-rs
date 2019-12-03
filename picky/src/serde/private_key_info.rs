@@ -1,5 +1,4 @@
 use crate::{oids, serde::AlgorithmIdentifier};
-use num_bigint_dig::BigInt;
 use picky_asn1::wrapper::{Asn1SequenceOf, IntegerAsn1, OctetStringAsn1Container};
 use serde::{de, ser};
 use std::fmt;
@@ -54,18 +53,18 @@ pub struct PrivateKeyInfo {
 
 impl PrivateKeyInfo {
     pub fn new_rsa_encryption(
-        modulus: BigInt,
-        public_exponent: BigInt,
-        private_exponent: BigInt,
-        primes: Vec<BigInt>,
+        modulus: IntegerAsn1,
+        public_exponent: IntegerAsn1,
+        private_exponent: IntegerAsn1,
+        primes: Vec<IntegerAsn1>,
     ) -> Self {
         let mut seq = Asn1SequenceOf(vec![
-            BigInt::from(0).into(),
-            modulus.into(),
-            public_exponent.into(),
-            private_exponent.into(),
+            vec![0].into(),
+            modulus,
+            public_exponent,
+            private_exponent,
         ]);
-        seq.0.extend(primes.into_iter().map(|p| p.into()));
+        seq.0.extend(primes);
         let private_key = PrivateKeyValue::RSA(RSAPrivateKey(seq).into());
 
         Self {
@@ -176,7 +175,6 @@ impl RSAPrivateKey {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use num_bigint_dig::Sign;
 
     #[test]
     fn pkcs_8_private_key() {
@@ -192,15 +190,15 @@ mod tests {
         )
         .expect("invalid base64");
 
-        let modulus = BigInt::from_bytes_be(Sign::Plus, &encoded[35..100]);
-        let public_exponent = BigInt::from_bytes_be(Sign::Plus, &encoded[102..105]);
-        let private_exponent = BigInt::from_bytes_be(Sign::Plus, &encoded[107..171]);
+        let modulus = IntegerAsn1::from(encoded[35..100].to_vec());
+        let public_exponent = IntegerAsn1::from(encoded[102..105].to_vec());
+        let private_exponent = IntegerAsn1::from(encoded[107..171].to_vec());
         let primes = vec![
-            BigInt::from_bytes_be(Sign::Plus, &encoded[173..206]),
-            BigInt::from_bytes_be(Sign::Plus, &encoded[208..241]),
-            BigInt::from_bytes_be(Sign::Plus, &encoded[243..276]),
-            BigInt::from_bytes_be(Sign::Plus, &encoded[278..311]),
-            BigInt::from_bytes_be(Sign::Plus, &encoded[313..346]),
+            IntegerAsn1::from(encoded[173..206].to_vec()),
+            IntegerAsn1::from(encoded[208..241].to_vec()),
+            IntegerAsn1::from(encoded[243..276].to_vec()),
+            IntegerAsn1::from(encoded[278..311].to_vec()),
+            IntegerAsn1::from(encoded[313..346].to_vec()),
         ];
         let private_key =
             PrivateKeyInfo::new_rsa_encryption(modulus, public_exponent, private_exponent, primes);

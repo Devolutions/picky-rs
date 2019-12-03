@@ -5,7 +5,6 @@ use crate::{
     tag::Tag,
     Asn1Type,
 };
-use num_bigint::{BigInt, Sign};
 use oid::ObjectIdentifier;
 use serde::{de, ser, Deserialize, Serialize};
 use std::{
@@ -293,6 +292,60 @@ pub struct OctetStringAsn1(#[serde(with = "serde_bytes")] pub Vec<u8>);
 type VecU8 = Vec<u8>;
 impls! { OctetStringAsn1(VecU8), Tag::OCTET_STRING }
 
+/// A BigInt wrapper for Asn1 encoding.
+///
+/// Simply use primitive integer types if you don't need big integer.
+#[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd, Hash, Clone)]
+pub struct IntegerAsn1(#[serde(with = "serde_bytes")] pub Vec<u8>);
+
+impls! { IntegerAsn1(VecU8), Tag::INTEGER }
+
+impl IntegerAsn1 {
+    pub fn is_positive(&self) -> bool {
+        if self.0.len() > 1 && self.0[0] == 0x00 || self.0.is_empty() {
+            true
+        } else {
+            self.0[0] & 0x80 == 0
+        }
+    }
+
+    pub fn is_negative(&self) -> bool {
+        if self.0.len() > 1 && self.0[0] == 0x00 {
+            false
+        } else if self.0.is_empty() {
+            true
+        } else {
+            self.0[0] & 0x80 != 0
+        }
+    }
+
+    pub fn as_bytes_be(&self) -> &[u8] {
+        if self.0.len() > 1 {
+            if self.0[0] == 0x00 {
+                &self.0[1..]
+            } else {
+                &self.0
+            }
+        } else if self.0.is_empty() {
+            &[0]
+        } else {
+            &self.0
+        }
+    }
+
+    pub fn as_signed_bytes_be(&self) -> &[u8] {
+        if self.0.is_empty() {
+            &[0]
+        } else {
+            &self.0
+        }
+    }
+
+    pub fn from_signed_bytes_be(bytes: Vec<u8>) -> Self {
+        Self::from(bytes)
+    }
+}
+
 /// A wrapper encoding/decoding only the header of the provided Asn1Wrapper with a length of 0.
 ///
 /// Examples:
@@ -391,66 +444,6 @@ where
     }
 
     deserializer.deserialize_bytes(Visitor(std::marker::PhantomData))
-}
-
-/// A BigInt wrapper for Asn1 encoding.
-///
-/// Simply use primitive integer types if you don't need big integer.
-#[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd, Hash, Clone)]
-pub struct IntegerAsn1(
-    #[serde(
-        serialize_with = "serialize_big_int",
-        deserialize_with = "deserialize_big_int"
-    )]
-    pub BigInt,
-);
-
-impls! { IntegerAsn1(BigInt), Tag::INTEGER }
-
-fn serialize_big_int<S>(
-    big_int: &BigInt,
-    serializer: S,
-) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
-where
-    S: ser::Serializer,
-{
-    serializer.serialize_bytes(&big_int.to_signed_bytes_be())
-}
-
-fn deserialize_big_int<'de, D>(deserializer: D) -> Result<BigInt, D::Error>
-where
-    D: de::Deserializer<'de>,
-{
-    struct Visitor;
-
-    impl<'de> de::Visitor<'de> for Visitor {
-        type Value = BigInt;
-
-        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-            formatter.write_str("a valid buffer representing a bit string")
-        }
-
-        fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
-        where
-            E: de::Error,
-        {
-            if v.len() > 1 {
-                if v[0] == 0x00 {
-                    Ok(BigInt::from_bytes_be(Sign::Plus, &v[1..]))
-                } else if v[0] & 0x80 != 0 {
-                    Ok(BigInt::from_bytes_be(Sign::Minus, v))
-                } else {
-                    Ok(BigInt::from_bytes_be(Sign::Plus, v))
-                }
-            } else if v.is_empty() {
-                Ok(BigInt::from(0))
-            } else {
-                Ok(BigInt::from(v[0] as i8))
-            }
-        }
-    }
-
-    deserializer.deserialize_bytes(Visitor)
 }
 
 /// A BitString encapsulating things.

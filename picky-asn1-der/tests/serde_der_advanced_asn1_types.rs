@@ -2,7 +2,7 @@ extern crate num_bigint_dig as num_bigint;
 
 mod pki_tests;
 
-use num_bigint::{BigInt, Sign, ToBigInt};
+use num_bigint::ToBigInt;
 use oid::prelude::*;
 use picky_asn1::{
     bit_string::BitString,
@@ -73,7 +73,7 @@ fn encapsulated_types() {
 #[test]
 fn big_integer() {
     #[rustfmt::skip]
-        let big_integer_buffer = [
+    let big_integer_buffer = [
         0x02, // tag
         0x81, 0x81, // length
         0x00, // + sign
@@ -86,22 +86,36 @@ fn big_integer() {
         0x9d, 0x7c, 0x92, 0x71, 0xe1, 0xb2, 0x2f, 0x5c, 0x8d, 0xee, 0xf0, 0xf1, 0x17, 0x1e, 0xd2, 0x5f,
         0x31, 0x5b, 0xb1, 0x9c, 0xbc, 0x20, 0x55, 0xbf, 0x3a, 0x37, 0x42, 0x45, 0x75, 0xdc, 0x90, 0x65,
     ];
-    let big_integer =
-        IntegerAsn1::from(BigInt::from_bytes_be(Sign::Plus, &big_integer_buffer[4..]));
+    let big_integer = IntegerAsn1::from_signed_bytes_be(big_integer_buffer[3..].to_vec());
+
+    assert!(big_integer.is_positive());
+    assert!(!big_integer.is_negative());
+    assert_eq!(big_integer.as_bytes_be(), &big_integer_buffer[4..]);
+
     check(&big_integer_buffer, big_integer);
 }
 
 #[test]
 fn small_integer() {
     let buffer = [0x02, 0x01, 0x03];
-    let big_integer = IntegerAsn1::from(3.to_bigint().unwrap());
+    let big_integer = IntegerAsn1::from(3.to_bigint().unwrap().to_signed_bytes_be());
+
+    assert!(big_integer.is_positive());
+    assert!(!big_integer.is_negative());
+    assert_eq!(big_integer.as_bytes_be(), &[0x03]);
+
     check(&buffer, big_integer);
 }
 
 #[test]
 fn small_integer_negative() {
     let buffer = [0x02, 0x01, 0xF9];
-    let big_integer = IntegerAsn1::from(-7.to_bigint().unwrap());
+    let big_integer = IntegerAsn1::from((-7).to_bigint().unwrap().to_signed_bytes_be());
+
+    assert!(!big_integer.is_positive());
+    assert!(big_integer.is_negative());
+    assert_eq!(big_integer.as_bytes_be(), &[0xF9]);
+
     check(&buffer, big_integer);
 }
 
@@ -208,7 +222,9 @@ fn sequence_of() {
 #[test]
 fn application_tag0() {
     let buffer = [0xA0, 0x03, 0x02, 0x01, 0xF9];
-    let application_tag = ApplicationTag0(IntegerAsn1::from(-7.to_bigint().unwrap()));
+    let application_tag = ApplicationTag0(IntegerAsn1::from(
+        (-7).to_bigint().unwrap().to_signed_bytes_be(),
+    ));
     check(&buffer, application_tag);
 }
 

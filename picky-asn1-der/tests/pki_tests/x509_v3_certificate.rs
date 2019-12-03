@@ -59,14 +59,14 @@ use crate::pki_tests::{
     rsa_public_key::{RSAPublicKey, SubjectPublicKeyInfoRsa},
     version::{implicit_app0_version_is_default, Version},
 };
-use num_bigint_dig::{BigInt, Sign};
+use num_bigint_dig::BigInt;
 use oid::prelude::*;
 use picky_asn1::{
     bit_string::BitString,
     date::Date,
     wrapper::{
         ApplicationTag0, ApplicationTag3, Asn1SequenceOf, Asn1SetOf, BitStringAsn1, Implicit,
-        ObjectIdentifierAsn1, OctetStringAsn1, UTCTimeAsn1,
+        IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1, UTCTimeAsn1,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -176,8 +176,8 @@ fn x509_v3_certificate() {
             parameters: (),
         },
         subject_public_key: RSAPublicKey {
-            modulus: BigInt::from_bytes_be(Sign::Plus, &encoded[165..422]).into(),
-            public_exponent: BigInt::from(65537).into(),
+            modulus: IntegerAsn1::from_signed_bytes_be(encoded[165..422].to_vec()),
+            public_exponent: BigInt::from(65537).to_signed_bytes_be().into(),
         }
         .into(),
     };

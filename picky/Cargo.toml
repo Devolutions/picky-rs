@@ -17,7 +17,6 @@ serde = "1.0"
 serde_derive = "1.0"
 base64 = "0.10"
 snafu = "0.6"
-num-bigint-dig = "0.5" # TODO: remove this dependency
 
 chrono = { version = "0.4", optional = true }
 
@@ -31,6 +30,7 @@ rsa = { git = "https://github.com/Devolutions/RSA" }
 rand = "0.6" # TODO: update to 0.7. Requires rsa crate to support 0.7 too.
 
 [dev-dependencies]
+num-bigint-dig = "0.5"
 pretty_assertions = "*"
 hex = "0.3"
 
