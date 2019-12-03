@@ -1,18 +1,17 @@
 use crate::serde::attribute_type_and_value::{
     AttributeTypeAndValue, AttributeTypeAndValueParameters, DirectoryString,
 };
-use serde::{de, ser};
-use serde_asn1_der::{
-    asn1_wrapper::{
+use picky_asn1::{
+    restricted_string::{CharSetError, IA5String},
+    tag::{Tag, TagPeeker},
+    wrapper::{
         ApplicationTag1, ApplicationTag2, ApplicationTag4, ApplicationTag5, ApplicationTag6,
         ApplicationTag7, ApplicationTag8, Asn1SequenceOf, Asn1SetOf, ContextTag0, ContextTag1,
         ContextTag2, ContextTag4, ContextTag5, ContextTag6, ContextTag7, ContextTag8,
         IA5StringAsn1, Implicit, ObjectIdentifierAsn1, OctetStringAsn1,
     },
-    restricted_string::{CharSetError, IA5String},
-    tag::Tag,
-    tag_peeker::TagPeeker,
 };
+use serde::{de, ser};
 use std::fmt;
 
 // Name ::= CHOICE { -- only one possibility for now --

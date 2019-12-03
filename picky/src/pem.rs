@@ -155,7 +155,7 @@ mod tests {
         serde::{name::NamePrettyFormatter, Certificate, Version},
     };
     use num_bigint_dig::BigInt;
-    use serde_asn1_der::date::UTCTime;
+    use picky_asn1::date::UTCTime;
 
     const PEM_BYTES: &[u8] = crate::test_files::INTERMEDIATE_CA.as_bytes();
     const PEM_STR: &str = crate::test_files::INTERMEDIATE_CA;

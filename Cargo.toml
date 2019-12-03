@@ -1,5 +1,12 @@
 [workspace]
 members = [
     "picky",
-    "picky-server"
+    "picky-server",
+    "picky-asn1",
+    "picky-asn1-der",
+]
+exclude = [
+    ".dockerignore",
+    "Dockerfile",
+    "Dockerfile-win2k19",
 ]

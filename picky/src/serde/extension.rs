@@ -2,14 +2,14 @@ use crate::{
     oids,
     serde::name::{GeneralName, GeneralNames},
 };
-use serde::{de, ser};
-use serde_asn1_der::{
-    asn1_wrapper::{
+use picky_asn1::{
+    bit_string::BitString,
+    wrapper::{
         ApplicationTag1, Asn1SequenceOf, BitStringAsn1, ContextTag0, ContextTag2, Implicit,
         IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1, OctetStringAsn1Container,
     },
-    bit_string::BitString,
 };
+use serde::{de, ser};
 use std::{
     fmt,
     slice::{Iter, IterMut},

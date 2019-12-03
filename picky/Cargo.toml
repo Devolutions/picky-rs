@@ -6,9 +6,12 @@ authors = [
     "Benoît CORTIER <benoit.cortier@fried-world.eu>",
 ]
 edition = "2018"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Devolutions/picky-rs"
 
 [dependencies]
-serde_asn1_der = { git = "https://github.com/Devolutions/serde_asn1_der", features = ["extra_types"] }
+picky-asn1 = { path = "../picky-asn1" }
+picky-asn1-der = { path = "../picky-asn1-der" }
 oid = { version = "^0.1.1", features = ["serde_support"] }
 serde = "1.0"
 serde_derive = "1.0"
@@ -33,6 +36,6 @@ hex = "0.3"
 
 [features]
 default = []
-chrono_conversion = ["chrono", "serde_asn1_der/chrono_conversion"]
+chrono_conversion = ["chrono", "picky-asn1/chrono_conversion"]
 controller = ["chrono_conversion"]
 expose_internals = []

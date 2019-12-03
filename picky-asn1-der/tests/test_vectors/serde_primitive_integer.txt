@@ -1,0 +1,29 @@
+# Test zero
+value: 0
+der__: 020100
+
+# Test normal integer
+value: 7
+der__: 020107
+
+
+# Test leading-one integer
+value: 128
+der__: 02020080
+
+# Test all-one integer
+value: 255
+der__: 020200FF
+
+
+# Test u128 integer
+value: 169853733957366961371495358725388383073
+der__: 02107FC8A3A53249CCF273B3E94DE1B63361
+
+# Test u128 integer
+value: 171182961953151877244399165785668727649
+der__: 02110080C8A3A53249CCF273B3E94DE1B63361
+
+# Test u128 integer
+value: 340282366920938463463374607431768211455
+der__: 021100FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF

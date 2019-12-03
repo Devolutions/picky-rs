@@ -1,11 +1,10 @@
 use crate::oids;
-use serde::{de, export::Formatter, ser};
-use serde_asn1_der::{
-    asn1_wrapper::{ObjectIdentifierAsn1, PrintableStringAsn1},
+use picky_asn1::{
     restricted_string::PrintableString,
-    tag::Tag,
-    tag_peeker::TagPeeker,
+    tag::{Tag, TagPeeker},
+    wrapper::{ObjectIdentifierAsn1, PrintableStringAsn1},
 };
+use serde::{de, export::Formatter, ser};
 use std::{borrow::Cow, fmt};
 
 #[derive(Debug, PartialEq, Clone)]

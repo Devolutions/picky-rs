@@ -1,0 +1,26 @@
+[package]
+name = "picky-asn1"
+version = "0.1.0"
+edition = "2018"
+authors = [
+    "Benoît CORTIER <benoit.cortier@fried-world.eu>",
+]
+keywords = ["serde", "asn1", "serialize", "deserialize"]
+categories = ["encoding"]
+description = "Provide ASN.1 simple types"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Devolutions/picky-rs"
+readme = "README.md"
+
+[dependencies]
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+oid = { version = "^0.1.1", default-features = false, features = ["serde_support"] }
+num-bigint-dig = "0.5"
+chrono = { version = "0.4", optional = true }
+serde_bytes = "0.11"
+
+[dev-dependencies]
+picky-asn1-der = { path = "../picky-asn1-der" }
+
+[features]
+chrono_conversion = ["chrono"]

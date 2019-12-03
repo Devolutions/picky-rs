@@ -8,7 +8,7 @@ use crate::{
     pem::Pem,
     serde::{certification_request::CertificationRequestInfo, CertificationRequest},
 };
-use serde_asn1_der::bit_string::BitString;
+use picky_asn1::bit_string::BitString;
 use snafu::ResultExt;
 
 /// Certificate Signing Request
@@ -16,15 +16,15 @@ use snafu::ResultExt;
 pub struct Csr(CertificationRequest);
 
 impl Csr {
-    pub fn from_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> serde_asn1_der::Result<Self> {
-        Ok(Self(serde_asn1_der::from_bytes(der.as_ref())?))
+    pub fn from_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> picky_asn1_der::Result<Self> {
+        Ok(Self(picky_asn1_der::from_bytes(der.as_ref())?))
     }
 
-    pub fn to_der(&self) -> serde_asn1_der::Result<Vec<u8>> {
-        serde_asn1_der::to_vec(&self.0)
+    pub fn to_der(&self) -> picky_asn1_der::Result<Vec<u8>> {
+        picky_asn1_der::to_vec(&self.0)
     }
 
-    pub fn to_pem(&self) -> serde_asn1_der::Result<Pem<'static>> {
+    pub fn to_pem(&self) -> picky_asn1_der::Result<Pem<'static>> {
         Ok(Pem::new("CERTIFICATE REQUEST", self.to_der()?))
     }
 
@@ -47,7 +47,7 @@ impl Csr {
     ) -> Result<Self> {
         let info =
             CertificationRequestInfo::new(subject.into(), private_key.to_public_key().into());
-        let info_der = serde_asn1_der::to_vec(&info).context(Asn1Serialization {
+        let info_der = picky_asn1_der::to_vec(&info).context(Asn1Serialization {
             element: "certification request info",
         })?;
         let signature = BitString::with_bytes(signature_hash_type.sign(&info_der, private_key)?);
@@ -89,7 +89,7 @@ impl Csr {
 
         let public_key = &self.0.certification_request_info.subject_public_key_info;
 
-        let msg = serde_asn1_der::to_vec(&self.0.certification_request_info).context(
+        let msg = picky_asn1_der::to_vec(&self.0.certification_request_info).context(
             Asn1Serialization {
                 element: "certification request info",
             },

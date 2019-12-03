@@ -1,7 +1,10 @@
 use crate::oids;
 use oid::ObjectIdentifier;
+use picky_asn1::{
+    tag::{Tag, TagPeeker},
+    wrapper::ObjectIdentifierAsn1,
+};
 use serde::{de, ser};
-use serde_asn1_der::{asn1_wrapper::ObjectIdentifierAsn1, tag::Tag, tag_peeker::TagPeeker};
 use std::fmt;
 
 #[derive(Debug, PartialEq, Clone)]

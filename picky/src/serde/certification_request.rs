@@ -1,5 +1,5 @@
 use crate::serde::{AlgorithmIdentifier, Name, SubjectPublicKeyInfo};
-use serde_asn1_der::asn1_wrapper::{ApplicationTag0, BitStringAsn1, HeaderOnly, Implicit};
+use picky_asn1::wrapper::{ApplicationTag0, BitStringAsn1, HeaderOnly, Implicit};
 
 // https://tools.ietf.org/html/rfc2986#section-4
 
@@ -35,7 +35,7 @@ mod tests {
     use super::*;
     use crate::{pem::Pem, serde::name::new_common_name};
     use num_bigint_dig::{BigInt, Sign};
-    use serde_asn1_der::{bit_string::BitString, restricted_string::PrintableString};
+    use picky_asn1::{bit_string::BitString, restricted_string::PrintableString};
     use std::str::FromStr;
 
     #[test]

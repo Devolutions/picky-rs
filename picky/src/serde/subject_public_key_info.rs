@@ -2,8 +2,8 @@ use crate::{
     oids,
     serde::{algorithm_identifier::ECParameters, AlgorithmIdentifier},
 };
+use picky_asn1::wrapper::{BitStringAsn1, BitStringAsn1Container, IntegerAsn1};
 use serde::{de, ser};
-use serde_asn1_der::asn1_wrapper::{BitStringAsn1, BitStringAsn1Container, IntegerAsn1};
 use std::fmt;
 
 #[derive(Debug, PartialEq, Clone)]

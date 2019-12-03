@@ -4,12 +4,12 @@ use crate::{
     oids, serde,
     serde::AlgorithmIdentifier,
 };
+use picky_asn1::wrapper::{BitStringAsn1Container, OctetStringAsn1Container};
 use rand::rngs::OsRng;
 use rsa::{
     hash::Hashes, BigUint, PaddingScheme, PublicKey as RsaPublicKeyInterface, RSAPrivateKey,
     RSAPublicKey,
 };
-use serde_asn1_der::asn1_wrapper::{BitStringAsn1Container, OctetStringAsn1Container};
 use sha1::{Digest, Sha1};
 use sha2::{Sha224, Sha256, Sha384, Sha512};
 

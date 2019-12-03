@@ -3,7 +3,7 @@ use crate::serde::{
     name::{new_common_name, NamePrettyFormatter},
     AttributeTypeAndValue, Name as SerdeName,
 };
-use serde_asn1_der::asn1_wrapper::{Asn1SequenceOf, Asn1SetOf};
+use picky_asn1::wrapper::{Asn1SequenceOf, Asn1SetOf};
 use std::fmt;
 
 #[derive(Clone, Debug, PartialEq)]

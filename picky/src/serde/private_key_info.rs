@@ -1,7 +1,7 @@
 use crate::{oids, serde::AlgorithmIdentifier};
 use num_bigint_dig::BigInt;
+use picky_asn1::wrapper::{Asn1SequenceOf, IntegerAsn1, OctetStringAsn1Container};
 use serde::{de, ser};
-use serde_asn1_der::asn1_wrapper::{Asn1SequenceOf, IntegerAsn1, OctetStringAsn1Container};
 use std::fmt;
 
 // Public-Key Cryptography Standards (PKCS) #8:

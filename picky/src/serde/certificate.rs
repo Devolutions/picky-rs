@@ -5,11 +5,11 @@ use crate::{
         AlgorithmIdentifier, Extensions, Name, SubjectPublicKeyInfo, Validity, Version,
     },
 };
-use serde::de;
-use serde_asn1_der::asn1_wrapper::{
+use picky_asn1::wrapper::{
     ApplicationTag0, ApplicationTag3, BitStringAsn1, Implicit, IntegerAsn1,
     OctetStringAsn1Container,
 };
+use serde::de;
 use std::{convert::TryFrom, fmt};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -31,12 +31,12 @@ macro_rules! find_ext {
 }
 
 impl Certificate {
-    pub fn from_der(der: &[u8]) -> serde_asn1_der::Result<Self> {
-        serde_asn1_der::from_bytes(der)
+    pub fn from_der(der: &[u8]) -> picky_asn1_der::Result<Self> {
+        picky_asn1_der::from_bytes(der)
     }
 
-    pub fn to_der(&self) -> serde_asn1_der::Result<Vec<u8>> {
-        serde_asn1_der::to_vec(self)
+    pub fn to_der(&self) -> picky_asn1_der::Result<Vec<u8>> {
+        picky_asn1_der::to_vec(self)
     }
 
     pub fn subject_key_identifier(&self) -> crate::error::Result<&[u8]> {
@@ -81,7 +81,7 @@ impl Certificate {
 }
 
 impl TryFrom<&[u8]> for Certificate {
-    type Error = serde_asn1_der::SerdeAsn1DerError;
+    type Error = picky_asn1_der::Asn1DerError;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         Self::from_der(value)
@@ -157,7 +157,7 @@ mod tests {
         },
     };
     use num_bigint_dig::{BigInt, Sign};
-    use serde_asn1_der::{bit_string::BitString, date::UTCTime};
+    use picky_asn1::{bit_string::BitString, date::UTCTime};
 
     #[test]
     fn x509_v3_certificate() {
