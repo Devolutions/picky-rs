@@ -81,7 +81,7 @@ impl BackendStorage for FileRepos {
 
     fn store(&self, name: &str, cert: &[u8], key: Option<&[u8]>, key_identifier: &str) -> Result<bool, String> {
         if let Ok(cert_hash) = utils::multihash_encode(cert){
-            self.name.write().unwrap().insert(&format!("{}{}", name.replace(" ", "_").to_string(), TXT_EXT), &cert_hash)?;
+            self.name.write().unwrap().insert(&format!("{}{}", name.replace(" ", "_"), TXT_EXT), &cert_hash)?;
             self.cert.write().unwrap().insert(&format!("{}{}",cert_hash, DER_EXT), &cert.to_vec())?;
 
             if let Some(key) = key {

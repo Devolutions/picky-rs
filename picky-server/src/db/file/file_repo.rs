@@ -29,7 +29,7 @@ impl<T> Repo<T> for FileRepo<T> where T: Eq + Clone + AsRef<[u8]>{
                     return Err(e.to_string());
                 }
 
-                self.repo = path.clone();
+                self.repo = path;
                 Ok(())
             },
             None => {
@@ -38,7 +38,7 @@ impl<T> Repo<T> for FileRepo<T> where T: Eq + Clone + AsRef<[u8]>{
                     return Err(e.to_string());
                 }
 
-                self.repo = path.clone();
+                self.repo = path;
                 Ok(())
             }
         }

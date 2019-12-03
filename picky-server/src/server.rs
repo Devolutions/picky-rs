@@ -35,7 +35,7 @@ impl Server{
                 }
             }).expect("Unable to configure picky");
 
-            let controller = ServerController::new(repos, config.clone());
+            let controller = ServerController::new(repos, config);
             router.add(controller)
         };
 
