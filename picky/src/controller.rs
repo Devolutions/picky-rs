@@ -11,7 +11,7 @@ use crate::{
     oids,
     serde::{extension::KeyUsage, name::GeneralName},
 };
-use serde_asn1_der::asn1_wrapper::Asn1SequenceOf;
+use picky_asn1::wrapper::Asn1SequenceOf;
 
 const ROOT_DURATION_DAYS: i64 = 3650;
 const INTERMEDIATE_DURATION_DAYS: i64 = 1825;

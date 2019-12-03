@@ -7,6 +7,8 @@ authors = [
     "Johann Dufaud <jdufaud@devolutions.net>",
 ]
 edition = "2018"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Devolutions/picky-rs"
 
 [dependencies]
 picky = { path = "../picky", features = ["controller"] }

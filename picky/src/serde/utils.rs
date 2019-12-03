@@ -11,7 +11,7 @@ mod tests {
 
             println!(concat!(stringify!($item), " check..."));
 
-            let serialized = serde_asn1_der::to_vec(&$item).expect(concat!(
+            let serialized = picky_asn1_der::to_vec(&$item).expect(concat!(
                 "failed ",
                 stringify!($item),
                 " serialization"
@@ -21,7 +21,7 @@ mod tests {
                 concat!("serialized ", stringify!($item), " doesn't match")
             );
 
-            let deserialized: $type = serde_asn1_der::from_bytes(encoded).expect(concat!(
+            let deserialized: $type = picky_asn1_der::from_bytes(encoded).expect(concat!(
                 "failed ",
                 stringify!($item),
                 " deserialization"

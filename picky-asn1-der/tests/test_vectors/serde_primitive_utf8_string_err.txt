@@ -1,0 +1,7 @@
+# Invalid tag
+der__: 0D09546573746F6C6F7065
+error: InvalidData
+
+# Truncated data
+der__: 0C09546573746F6C6F70
+error: TruncatedData

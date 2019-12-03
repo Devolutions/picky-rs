@@ -1,0 +1,7 @@
+# Test normal string
+value: Testolope
+der__: 0C09546573746F6C6F7065
+
+# Test emoji string
+value: Some UTF-8 Emoji 🖖🏽
+der__: 0C19536F6D65205554462D3820456D6F6A6920F09F9696F09F8FBD

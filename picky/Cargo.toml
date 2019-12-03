@@ -6,15 +6,17 @@ authors = [
     "Benoît CORTIER <benoit.cortier@fried-world.eu>",
 ]
 edition = "2018"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Devolutions/picky-rs"
 
 [dependencies]
-serde_asn1_der = { git = "https://github.com/Devolutions/serde_asn1_der", features = ["extra_types"] }
+picky-asn1 = { path = "../picky-asn1" }
+picky-asn1-der = { path = "../picky-asn1-der" }
 oid = { version = "^0.1.1", features = ["serde_support"] }
 serde = "1.0"
 serde_derive = "1.0"
 base64 = "0.10"
 snafu = "0.6"
-num-bigint-dig = "0.5" # TODO: remove this dependency
 
 chrono = { version = "0.4", optional = true }
 
@@ -28,11 +30,12 @@ rsa = { git = "https://github.com/Devolutions/RSA" }
 rand = "0.6" # TODO: update to 0.7. Requires rsa crate to support 0.7 too.
 
 [dev-dependencies]
+num-bigint-dig = "0.5"
 pretty_assertions = "*"
 hex = "0.3"
 
 [features]
 default = []
-chrono_conversion = ["chrono", "serde_asn1_der/chrono_conversion"]
+chrono_conversion = ["chrono", "picky-asn1/chrono_conversion"]
 controller = ["chrono_conversion"]
 expose_internals = []

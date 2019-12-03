@@ -20,9 +20,8 @@ use crate::{
         Certificate, Validity, Version,
     },
 };
-use num_bigint_dig::{BigInt, Sign};
+use picky_asn1::bit_string::BitString;
 use rand::{rngs::OsRng, RngCore};
-use serde_asn1_der::bit_string::BitString;
 use snafu::ResultExt;
 use std::cell::RefCell;
 
@@ -40,17 +39,17 @@ pub struct Cert(Certificate);
 impl Cert {
     pub fn from_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self> {
         Ok(Self::from_certificate(
-            serde_asn1_der::from_bytes(der.as_ref()).context(Asn1Deserialization {
+            picky_asn1_der::from_bytes(der.as_ref()).context(Asn1Deserialization {
                 element: "certificate",
             })?,
         ))
     }
 
-    pub fn to_der(&self) -> serde_asn1_der::Result<Vec<u8>> {
+    pub fn to_der(&self) -> picky_asn1_der::Result<Vec<u8>> {
         self.0.to_der()
     }
 
-    pub fn to_pem(&self) -> serde_asn1_der::Result<Pem<'static>> {
+    pub fn to_pem(&self) -> picky_asn1_der::Result<Pem<'static>> {
         Ok(Pem::new("CERTIFICATE", self.0.to_der()?))
     }
 
@@ -182,7 +181,7 @@ impl Cert {
                     algorithm: (&current_cert.0.signature_algorithm.algorithm.0).into(),
                 })?;
             let public_key = &parent_cert.0.tbs_certificate.subject_public_key_info;
-            let msg = serde_asn1_der::to_vec(&current_cert.0.tbs_certificate)
+            let msg = picky_asn1_der::to_vec(&current_cert.0.tbs_certificate)
                 .context(Asn1Serialization {
                     element: "tbs certificate",
                 })
@@ -452,7 +451,7 @@ impl<'a> CertificateBuilder<'a> {
 
         drop(inner);
 
-        let serial_number = BigInt::from_bytes_be(Sign::Plus, &generate_serial_number());
+        let serial_number = generate_serial_number();
 
         let validity = Validity {
             not_before: valid_from.into(),
@@ -517,7 +516,7 @@ impl<'a> CertificateBuilder<'a> {
             extensions: extensions.into(),
         };
 
-        let tbs_der = serde_asn1_der::to_vec(&tbs_certificate)
+        let tbs_der = picky_asn1_der::to_vec(&tbs_certificate)
             .context(Asn1Serialization {
                 element: "tbs certificate",
             })

@@ -1,5 +1,5 @@
 use crate::serde::{AlgorithmIdentifier, Name, SubjectPublicKeyInfo};
-use serde_asn1_der::asn1_wrapper::{ApplicationTag0, BitStringAsn1, HeaderOnly, Implicit};
+use picky_asn1::wrapper::{ApplicationTag0, BitStringAsn1, HeaderOnly, Implicit};
 
 // https://tools.ietf.org/html/rfc2986#section-4
 
@@ -34,8 +34,9 @@ pub struct CertificationRequest {
 mod tests {
     use super::*;
     use crate::{pem::Pem, serde::name::new_common_name};
-    use num_bigint_dig::{BigInt, Sign};
-    use serde_asn1_der::{bit_string::BitString, restricted_string::PrintableString};
+    use picky_asn1::{
+        bit_string::BitString, restricted_string::PrintableString, wrapper::IntegerAsn1,
+    };
     use std::str::FromStr;
 
     #[test]
@@ -49,8 +50,8 @@ mod tests {
         let certification_request_info = CertificationRequestInfo::new(
             new_common_name(PrintableString::from_str("test.contoso.local").unwrap()),
             SubjectPublicKeyInfo::new_rsa_key(
-                BigInt::from_bytes_be(Sign::Plus, &encoded[74..331]).into(),
-                BigInt::from_bytes_be(Sign::Plus, &encoded[333..336]).into(),
+                IntegerAsn1::from(encoded[74..331].to_vec()),
+                IntegerAsn1::from(encoded[333..336].to_vec()),
             ),
         );
 

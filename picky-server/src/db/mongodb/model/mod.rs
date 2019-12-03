@@ -3,24 +3,26 @@ pub mod key_identifier_store;
 pub mod key_store;
 pub mod name_store;
 
+use crate::db::backend::{BackendStorage, Model};
+use crate::db::mongodb::model::certificate_store::CertificateStore;
+use crate::db::mongodb::model::key_identifier_store::KeyIdentifierStore;
+use crate::db::mongodb::model::key_store::KeyStore;
+use crate::db::mongodb::model::name_store::NameStore;
+use crate::db::mongodb::mongo_connection::MongoConnection;
+use crate::utils;
+use bson::oid::ObjectId;
+use bson::spec::BinarySubtype;
 use bson::Bson;
 use bson::Document;
-use bson::{to_bson, from_bson};
-use mongodb::coll::options::{AggregateOptions, FindOptions, UpdateOptions, FindOneAndUpdateOptions};
-use mongodb::coll::results::{InsertManyResult, UpdateResult, DeleteResult};
-use bson::oid::ObjectId;
+use bson::{from_bson, to_bson};
 use mongodb::coll::options::ReplaceOptions;
+use mongodb::coll::options::{
+    AggregateOptions, FindOneAndUpdateOptions, FindOptions, UpdateOptions,
+};
+use mongodb::coll::results::{DeleteResult, InsertManyResult, UpdateResult};
 use std::error::Error;
-use std::fmt::{Display, Formatter};
 use std::fmt;
-use crate::db::mongodb::mongo_connection::MongoConnection;
-use crate::db::backend::{BackendStorage, Model};
-use crate::utils;
-use crate::db::mongodb::model::name_store::NameStore;
-use bson::spec::BinarySubtype;
-use crate::db::mongodb::model::certificate_store::CertificateStore;
-use crate::db::mongodb::model::key_store::KeyStore;
-use crate::db::mongodb::model::key_identifier_store::KeyIdentifierStore;
+use std::fmt::{Display, Formatter};
 
 #[allow(dead_code)]
 #[derive(Debug)]
@@ -34,9 +36,9 @@ pub enum RepositoryError {
     Other(String),
 }
 
-impl Error for RepositoryError{}
+impl Error for RepositoryError {}
 
-impl Display for RepositoryError{
+impl Display for RepositoryError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             RepositoryError::BsonEncodeError(e) => write!(f, "Bson encode error: {}", e),
@@ -45,7 +47,7 @@ impl Display for RepositoryError{
             RepositoryError::UninitializedRepoError => write!(f, "Repository not initialized."),
             RepositoryError::InsertError => write!(f, "Insert error"),
             RepositoryError::UpdateError => write!(f, "Update error"),
-            RepositoryError::Other(s) => write!(f, "Other error: {}", s)
+            RepositoryError::Other(s) => write!(f, "Other error: {}", s),
         }
     }
 }
@@ -100,7 +102,7 @@ impl RepositoryCollection {
         }
     }
 
-    pub fn load_repositories(&mut self) -> Result<(), RepositoryError>{
+    pub fn load_repositories(&mut self) -> Result<(), RepositoryError> {
         self.certificate_store.init(self.db_instance.clone())?;
         self.key_identifier_store.init(self.db_instance.clone())?;
         self.key_store.init(self.db_instance.clone())?;
@@ -114,31 +116,54 @@ impl BackendStorage for RepositoryCollection {
         self.load_repositories().map_err(|e| e.to_string())
     }
 
-    fn store(&self, name: &str, cert: &[u8], key: Option<&[u8]>, key_identifier: &str) -> Result<bool, String> {
-        if let Ok(cert_hash) = utils::multihash_encode(cert){
+    fn store(
+        &self,
+        name: &str,
+        cert: &[u8],
+        key: Option<&[u8]>,
+        key_identifier: &str,
+    ) -> Result<bool, String> {
+        if let Ok(cert_hash) = utils::multihash_encode(cert) {
             let name_item = NameStore::new(name, &cert_hash);
-            self.name_store.update_with_options(doc!("key": name), name_item, true)?;
+            self.name_store
+                .update_with_options(doc!("key": name), name_item, true)?;
 
-            let certificate_item = CertificateStore::new(&cert_hash, Bson::Binary(BinarySubtype::Generic, cert.to_vec()));
-            self.certificate_store.update_with_options(doc!("key": cert_hash.clone()), certificate_item, true)?;
+            let certificate_item = CertificateStore::new(
+                &cert_hash,
+                Bson::Binary(BinarySubtype::Generic, cert.to_vec()),
+            );
+            self.certificate_store.update_with_options(
+                doc!("key": cert_hash.clone()),
+                certificate_item,
+                true,
+            )?;
 
             if let Some(key) = key {
-                let key_item = KeyStore::new(&cert_hash, Bson::Binary(BinarySubtype::Generic, key.to_vec()));
-                self.key_store.update_with_options(doc!("key": cert_hash.clone()), key_item, true)?;
+                let key_item = KeyStore::new(
+                    &cert_hash,
+                    Bson::Binary(BinarySubtype::Generic, key.to_vec()),
+                );
+                self.key_store.update_with_options(
+                    doc!("key": cert_hash.clone()),
+                    key_item,
+                    true,
+                )?;
             }
 
             let key_identifier_item = KeyIdentifierStore::new(key_identifier, &cert_hash);
-            self.key_identifier_store.update_with_options(doc!("key": key_identifier), key_identifier_item, true)?;
+            self.key_identifier_store.update_with_options(
+                doc!("key": key_identifier),
+                key_identifier_item,
+                true,
+            )?;
 
             return Ok(true);
         }
 
         Err("Can\'t encode certificate".to_string())
-
     }
 
     fn find(&self, name: &str) -> Result<Vec<Model<String>>, String> {
-
         let mut model_vec = Vec::new();
 
         if let Some(name_item) = self.name_store.get(doc!("key": name))? {
@@ -151,12 +176,8 @@ impl BackendStorage for RepositoryCollection {
     fn get_cert(&self, hash: &str) -> Result<Vec<u8>, String> {
         if let Some(cert) = self.certificate_store.get(doc!("key": hash))? {
             match cert.value {
-                Bson::Binary(BinarySubtype::Generic, bin) => {
-                    Ok(bin)
-                }
-                _ => {
-                    Err("DB content is not binary".to_string())
-                }
+                Bson::Binary(BinarySubtype::Generic, bin) => Ok(bin),
+                _ => Err("DB content is not binary".to_string()),
             }
         } else {
             Err("Cert not found".to_string())
@@ -166,12 +187,8 @@ impl BackendStorage for RepositoryCollection {
     fn get_key(&self, hash: &str) -> Result<Vec<u8>, String> {
         if let Some(key) = self.key_store.get(doc!("key": hash))? {
             match key.value {
-                Bson::Binary(BinarySubtype::Generic, bin) => {
-                    Ok(bin)
-                }
-                _ => {
-                    Err("DB content is not binary".to_string())
-                }
+                Bson::Binary(BinarySubtype::Generic, bin) => Ok(bin),
+                _ => Err("DB content is not binary".to_string()),
             }
         } else {
             Err("Key not found".to_string())
@@ -205,7 +222,10 @@ pub trait Repository {
     fn init(&mut self, db_instance: MongoConnection) -> Result<(), RepositoryError>;
     fn get_collection(&self) -> Result<mongodb::coll::Collection, RepositoryError>;
 
-    fn insert(&self, model: <Self as Repository>::Model) -> Result<Option<Bson>, RepositoryError> where <Self as Repository>::Model: ::serde::Serialize {
+    fn insert(&self, model: <Self as Repository>::Model) -> Result<Option<Bson>, RepositoryError>
+    where
+        <Self as Repository>::Model: ::serde::Serialize,
+    {
         let serialized_model = to_bson(&model)?;
 
         if let Bson::Document(document) = serialized_model {
@@ -215,16 +235,17 @@ pub trait Repository {
                     error!("Document can't be inserted: {}", write_exception.message);
                     Err(RepositoryError::InsertError)
                 }
-                None => {
-                    Ok(inserted.inserted_id)
-                }
+                None => Ok(inserted.inserted_id),
             }
         } else {
             Err(RepositoryError::InsertError)
         }
     }
 
-    fn insert_many(&self, models: Vec<<Self as Repository>::Model>) -> InsertManyResult<> where <Self as Repository>::Model: ::serde::Serialize {
+    fn insert_many(&self, models: Vec<<Self as Repository>::Model>) -> InsertManyResult
+    where
+        <Self as Repository>::Model: ::serde::Serialize,
+    {
         let mut documents = Vec::new();
         for model in models {
             match to_bson(&model) {
@@ -239,8 +260,8 @@ pub trait Repository {
             }
         }
 
-        if let Ok(collection) = self.get_collection(){
-            if let Ok(res) = collection.insert_many(documents, None){
+        if let Ok(collection) = self.get_collection() {
+            if let Ok(res) = collection.insert_many(documents, None) {
                 return res;
             }
         }
@@ -248,7 +269,14 @@ pub trait Repository {
         InsertManyResult::new(None, None)
     }
 
-    fn update(&self, doc: Document, model: <Self as Repository>::Model) -> Result<(), RepositoryError> where <Self as Repository>::Model: ::serde::Serialize {
+    fn update(
+        &self,
+        doc: Document,
+        model: <Self as Repository>::Model,
+    ) -> Result<(), RepositoryError>
+    where
+        <Self as Repository>::Model: ::serde::Serialize,
+    {
         let serialized_model = to_bson(&model)?;
 
         if let Bson::Document(mut document) = serialized_model {
@@ -260,35 +288,80 @@ pub trait Repository {
         }
     }
 
-    fn update_with_options(&self, doc: Document, model: <Self as Repository>::Model, upsert: bool) -> Result<(), RepositoryError> where <Self as Repository>::Model: ::serde::Serialize {
+    fn update_with_options(
+        &self,
+        doc: Document,
+        model: <Self as Repository>::Model,
+        upsert: bool,
+    ) -> Result<(), RepositoryError>
+    where
+        <Self as Repository>::Model: ::serde::Serialize,
+    {
         let serialized_model = to_bson(&model)?;
 
         if let Bson::Document(mut document) = serialized_model {
             let _res = document.remove("_id"); // if there is an id field removes it. Replace one does not work on data targeting the id field index
-            let _result = self.get_collection()?.replace_one(doc, document, Some(ReplaceOptions {
-                upsert: Some(upsert),
-                ..ReplaceOptions::new()
-            }))?;
+            let _result = self.get_collection()?.replace_one(
+                doc,
+                document,
+                Some(ReplaceOptions {
+                    upsert: Some(upsert),
+                    ..ReplaceOptions::new()
+                }),
+            )?;
             Ok(())
         } else {
             Err(RepositoryError::UpdateError)
         }
     }
 
-    fn update_by_id(&self, bson_id: ObjectId, model: <Self as Repository>::Model) -> Result<(), RepositoryError> where <Self as Repository>::Model: ::serde::Serialize {
+    fn update_by_id(
+        &self,
+        bson_id: ObjectId,
+        model: <Self as Repository>::Model,
+    ) -> Result<(), RepositoryError>
+    where
+        <Self as Repository>::Model: ::serde::Serialize,
+    {
         self.update(doc! { "_id": bson_id }, model)
     }
 
-    fn update_one(&self, filter: Document, update: Document) -> Result<UpdateResult, RepositoryError> {
-        self.get_collection()?.update_one(filter, update, None).map_err(|e| e.into())
+    fn update_one(
+        &self,
+        filter: Document,
+        update: Document,
+    ) -> Result<UpdateResult, RepositoryError> {
+        self.get_collection()?
+            .update_one(filter, update, None)
+            .map_err(|e| e.into())
     }
 
-    fn update_one_with_options(&self, filter: Document, update: Document, upsert: bool) -> Result<UpdateResult, RepositoryError> {
-        self.get_collection()?.update_one(filter, update, Some(UpdateOptions { upsert: Some(upsert),..Default::default()})).map_err(|e| e.into())
+    fn update_one_with_options(
+        &self,
+        filter: Document,
+        update: Document,
+        upsert: bool,
+    ) -> Result<UpdateResult, RepositoryError> {
+        self.get_collection()?
+            .update_one(
+                filter,
+                update,
+                Some(UpdateOptions {
+                    upsert: Some(upsert),
+                    ..Default::default()
+                }),
+            )
+            .map_err(|e| e.into())
     }
 
-    fn update_many(&self, filter: Document, update: Document) -> Result<UpdateResult, RepositoryError> {
-        self.get_collection()?.update_many(filter, update, None).map_err(|e| e.into())
+    fn update_many(
+        &self,
+        filter: Document,
+        update: Document,
+    ) -> Result<UpdateResult, RepositoryError> {
+        self.get_collection()?
+            .update_many(filter, update, None)
+            .map_err(|e| e.into())
     }
 
     fn delete(&self, doc: Document) -> Result<DeleteResult, RepositoryError> {
@@ -305,7 +378,10 @@ pub trait Repository {
         self.delete(doc! { "_id": bson_id })
     }
 
-    fn get(&self, doc: Document) -> Result<Option<<Self as Repository>::Model>, RepositoryError> where <Self as Repository>::Model: ::serde::Deserialize<'static> {
+    fn get(&self, doc: Document) -> Result<Option<<Self as Repository>::Model>, RepositoryError>
+    where
+        <Self as Repository>::Model: ::serde::Deserialize<'static>,
+    {
         let document_opt = self.get_collection()?.find_one(Some(doc), None)?;
 
         if let Some(doc) = document_opt {
@@ -316,11 +392,23 @@ pub trait Repository {
         }
     }
 
-    fn get_by_id(&self, bson_id: ObjectId) -> Result<Option<<Self as Repository>::Model>, RepositoryError> where <Self as Repository>::Model: ::serde::Deserialize<'static> {
+    fn get_by_id(
+        &self,
+        bson_id: ObjectId,
+    ) -> Result<Option<<Self as Repository>::Model>, RepositoryError>
+    where
+        <Self as Repository>::Model: ::serde::Deserialize<'static>,
+    {
         self.get(doc! { "_id": bson_id })
     }
 
-    fn get_all(&self, options: Option<FindOptions>) -> Result<Vec<<Self as Repository>::Model>, RepositoryError> where <Self as Repository>::Model: ::serde::Deserialize<'static> {
+    fn get_all(
+        &self,
+        options: Option<FindOptions>,
+    ) -> Result<Vec<<Self as Repository>::Model>, RepositoryError>
+    where
+        <Self as Repository>::Model: ::serde::Deserialize<'static>,
+    {
         let mut model_vec = Vec::new();
         let documents_cursor = self.get_collection()?.find(None, options)?;
 
@@ -335,7 +423,14 @@ pub trait Repository {
         Ok(model_vec)
     }
 
-    fn find(&self, doc: Document, options: Option<FindOptions>) -> Result<Vec<<Self as Repository>::Model>, RepositoryError> where <Self as Repository>::Model: ::serde::Deserialize<'static> {
+    fn find(
+        &self,
+        doc: Document,
+        options: Option<FindOptions>,
+    ) -> Result<Vec<<Self as Repository>::Model>, RepositoryError>
+    where
+        <Self as Repository>::Model: ::serde::Deserialize<'static>,
+    {
         let mut model_vec = Vec::new();
         let documents_cursor = self.get_collection()?.find(Some(doc), options)?;
 
@@ -350,13 +445,20 @@ pub trait Repository {
         Ok(model_vec)
     }
 
-    fn find_with_pipeline(&self, docs: Vec<Document>, options: Option<AggregateOptions>) -> Result<Vec<Document>, RepositoryError> where Document: ::serde::Deserialize<'static> {
+    fn find_with_pipeline(
+        &self,
+        docs: Vec<Document>,
+        options: Option<AggregateOptions>,
+    ) -> Result<Vec<Document>, RepositoryError>
+    where
+        Document: ::serde::Deserialize<'static>,
+    {
         let mut model_vec = Vec::new();
         let documents_cursor = self.get_collection()?.aggregate(docs, options);
 
         if let Ok(mut cursor) = documents_cursor {
-            if let Ok(documents) = cursor.drain_current_batch(){
-                for document in documents{
+            if let Ok(documents) = cursor.drain_current_batch() {
+                for document in documents {
                     model_vec.push(document);
                 }
             }
@@ -365,13 +467,20 @@ pub trait Repository {
         Ok(model_vec)
     }
 
-    fn find_models_with_pipeline(&self, docs: Vec<Document>, options: Option<AggregateOptions>) -> Result<Vec<<Self as Repository>::Model>, RepositoryError> where <Self as Repository>::Model: ::serde::Deserialize<'static> {
+    fn find_models_with_pipeline(
+        &self,
+        docs: Vec<Document>,
+        options: Option<AggregateOptions>,
+    ) -> Result<Vec<<Self as Repository>::Model>, RepositoryError>
+    where
+        <Self as Repository>::Model: ::serde::Deserialize<'static>,
+    {
         let mut model_vec = Vec::new();
         let documents_cursor = self.get_collection()?.aggregate(docs, options);
 
         if let Ok(mut cursor) = documents_cursor {
-            if let Ok(documents) = cursor.drain_current_batch(){
-                for document in documents{
+            if let Ok(documents) = cursor.drain_current_batch() {
+                for document in documents {
                     if let Ok(model) = from_bson(Bson::Document(document)) {
                         model_vec.push(model);
                     }
@@ -382,8 +491,15 @@ pub trait Repository {
         Ok(model_vec)
     }
 
-    fn find_one_and_update(&self, filter: Document,update: Document, options: Option<FindOneAndUpdateOptions>) -> Result<Option<Document>, RepositoryError> {
-        let result = self.get_collection()?.find_one_and_update(filter, update, options)?;
+    fn find_one_and_update(
+        &self,
+        filter: Document,
+        update: Document,
+        options: Option<FindOneAndUpdateOptions>,
+    ) -> Result<Option<Document>, RepositoryError> {
+        let result = self
+            .get_collection()?
+            .find_one_and_update(filter, update, options)?;
         Ok(result)
     }
 }

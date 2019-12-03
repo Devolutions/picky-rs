@@ -1,6 +1,7 @@
 use crate::models::date::UTCDate;
+use picky_asn1::restricted_string::CharSetError;
+use picky_asn1_der::Asn1DerError;
 use rsa::errors::Error as RSAError;
-use serde_asn1_der::{restricted_string::CharSetError, SerdeAsn1DerError};
 use snafu::Snafu;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -29,7 +30,7 @@ pub enum Error {
     #[snafu(visibility = "pub(crate)")]
     Asn1Serialization {
         element: &'static str,
-        source: SerdeAsn1DerError,
+        source: Asn1DerError,
     },
 
     /// asn1 deserialization error
@@ -37,7 +38,7 @@ pub enum Error {
     #[snafu(visibility = "pub(crate)")]
     Asn1Deserialization {
         element: &'static str,
-        source: SerdeAsn1DerError,
+        source: Asn1DerError,
     },
 
     /// RSA error

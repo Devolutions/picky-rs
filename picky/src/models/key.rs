@@ -2,8 +2,7 @@ use crate::{
     error::{Error, Result},
     serde::{private_key_info::PrivateKeyValue, PrivateKeyInfo, SubjectPublicKeyInfo},
 };
-use num_bigint_dig::{BigInt, Sign};
-use serde_asn1_der::asn1_wrapper::OctetStringAsn1Container;
+use picky_asn1::wrapper::{IntegerAsn1, OctetStringAsn1Container};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PrivateKey(PrivateKeyInfo);
@@ -32,14 +31,14 @@ impl From<PrivateKey> for SubjectPublicKeyInfo {
 }
 
 impl PrivateKey {
-    pub fn from_pkcs8<T: ?Sized + AsRef<[u8]>>(pkcs8: &T) -> serde_asn1_der::Result<Self> {
-        Ok(Self(serde_asn1_der::from_bytes(pkcs8.as_ref())?))
+    pub fn from_pkcs8<T: ?Sized + AsRef<[u8]>>(pkcs8: &T) -> picky_asn1_der::Result<Self> {
+        Ok(Self(picky_asn1_der::from_bytes(pkcs8.as_ref())?))
     }
 
-    pub fn from_rsa_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> serde_asn1_der::Result<Self> {
+    pub fn from_rsa_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> picky_asn1_der::Result<Self> {
         use crate::serde::{private_key_info::RSAPrivateKey, AlgorithmIdentifier};
 
-        let private_key = serde_asn1_der::from_bytes::<RSAPrivateKey>(der.as_ref())?;
+        let private_key = picky_asn1_der::from_bytes::<RSAPrivateKey>(der.as_ref())?;
         Ok(Self(PrivateKeyInfo {
             version: 0,
             private_key_algorithm: AlgorithmIdentifier::new_rsa_encryption(),
@@ -47,8 +46,8 @@ impl PrivateKey {
         }))
     }
 
-    pub fn to_pkcs8(&self) -> serde_asn1_der::Result<Vec<u8>> {
-        serde_asn1_der::to_vec(&self.0)
+    pub fn to_pkcs8(&self) -> picky_asn1_der::Result<Vec<u8>> {
+        picky_asn1_der::to_vec(&self.0)
     }
 
     pub fn to_public_key(&self) -> PublicKey {
@@ -79,9 +78,9 @@ impl PrivateKey {
         let mut rng = OsRng::new().map_err(|_| Error::NoSecureRandomness)?;
         let key = RSAPrivateKey::new(&mut rng, bits)?;
 
-        let modulus = BigInt::from_bytes_be(Sign::Plus, &key.n().to_bytes_be());
-        let public_exponent = BigInt::from_bytes_be(Sign::Plus, &key.e().to_bytes_be());
-        let private_exponent = BigInt::from_bytes_be(Sign::Plus, &key.d().to_bytes_be());
+        let modulus = IntegerAsn1::from(key.n().to_bytes_be());
+        let public_exponent = IntegerAsn1::from(key.e().to_bytes_be());
+        let private_exponent = IntegerAsn1::from(key.d().to_bytes_be());
 
         Ok(Self(PrivateKeyInfo::new_rsa_encryption(
             modulus,
@@ -89,7 +88,7 @@ impl PrivateKey {
             private_exponent,
             key.primes()
                 .iter()
-                .map(|p| BigInt::from_bytes_be(Sign::Plus, &p.to_bytes_be()))
+                .map(|p| IntegerAsn1::from(p.to_bytes_be()))
                 .collect(),
         )))
     }
@@ -117,12 +116,12 @@ impl From<PrivateKey> for PublicKey {
 }
 
 impl PublicKey {
-    pub fn from_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> serde_asn1_der::Result<Self> {
-        Ok(Self(serde_asn1_der::from_bytes(der.as_ref())?))
+    pub fn from_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> picky_asn1_der::Result<Self> {
+        Ok(Self(picky_asn1_der::from_bytes(der.as_ref())?))
     }
 
-    pub fn to_der(&self) -> serde_asn1_der::Result<Vec<u8>> {
-        serde_asn1_der::to_vec(&self.0)
+    pub fn to_der(&self) -> picky_asn1_der::Result<Vec<u8>> {
+        picky_asn1_der::to_vec(&self.0)
     }
 
     pub fn as_inner(&self) -> &SubjectPublicKeyInfo {

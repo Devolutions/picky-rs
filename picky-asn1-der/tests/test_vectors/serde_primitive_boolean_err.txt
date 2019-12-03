@@ -1,0 +1,19 @@
+# Invalid tag
+der__: 020100
+error: InvalidData
+
+# Truncated data
+der__: 0101
+error: TruncatedData
+
+# Invalid value
+der__: 010101
+error: InvalidData
+
+# Invalid extended data (`true`)
+der__: 01020000
+error: InvalidData
+
+# Invalid extended data (`false`)
+der__: 0102FFFF
+error: InvalidData

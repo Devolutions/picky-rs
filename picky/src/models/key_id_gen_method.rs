@@ -2,7 +2,7 @@ use crate::{
     error::{Asn1Serialization, Result},
     models::key::PublicKey,
 };
-use serde_asn1_der::asn1_wrapper::BitStringAsn1Container;
+use picky_asn1::wrapper::BitStringAsn1Container;
 use sha1::{Digest, Sha1};
 use sha2::{Sha224, Sha256, Sha384, Sha512};
 use snafu::ResultExt;
@@ -54,7 +54,7 @@ impl KeyIdGenMethod {
             KeyIdGenMethod::SPKValueHashedLeftmost160(hash_algo) => {
                 match &public_key.as_inner().subject_public_key {
                     InnerPublicKey::RSA(BitStringAsn1Container(rsa_pk)) => {
-                        let der = serde_asn1_der::to_vec(rsa_pk).context(Asn1Serialization {
+                        let der = picky_asn1_der::to_vec(rsa_pk).context(Asn1Serialization {
                             element: "RSA private key",
                         })?;
                         Ok(hash!(hash_algo, der)[..20].to_vec())

@@ -1,9 +1,10 @@
-use serde::{de, ser};
-use serde_asn1_der::{
-    asn1_wrapper::{Asn1Wrapper, GeneralizedTimeAsn1, UTCTimeAsn1},
+use picky_asn1::{
     date::{GeneralizedTime, UTCTime},
-    tag_peeker::TagPeeker,
+    tag::TagPeeker,
+    wrapper::{GeneralizedTimeAsn1, UTCTimeAsn1},
+    Asn1Type,
 };
+use serde::{de, ser};
 use std::fmt;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]

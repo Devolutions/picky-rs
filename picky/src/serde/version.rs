@@ -82,10 +82,8 @@ impl<'de> Deserialize<'de> for Version {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_asn1_der::{
-        asn1_wrapper::{ApplicationTag9, Implicit},
-        SerdeAsn1DerError,
-    };
+    use picky_asn1::wrapper::{ApplicationTag9, Implicit};
+    use picky_asn1_der::Asn1DerError;
 
     #[derive(Serialize, Deserialize, Debug, PartialEq)]
     struct OptionalVersionTestStruct {
@@ -124,9 +122,9 @@ mod tests {
     fn unsupported_version() {
         let buffer: [u8; 3] = [0x02, 0x01, 0x0F];
 
-        let version: serde_asn1_der::Result<Version> = serde_asn1_der::from_bytes(&buffer);
+        let version: picky_asn1_der::Result<Version> = picky_asn1_der::from_bytes(&buffer);
         match version {
-            Err(SerdeAsn1DerError::Message(msg)) => assert_eq!(
+            Err(Asn1DerError::Message(msg)) => assert_eq!(
                 msg,
                 "invalid value: invalid version number, expected a valid integer \
                  representing a supported version number (0, 1 or 2)"
