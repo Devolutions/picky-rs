@@ -1,19 +1,19 @@
-use crate::{
-    oids,
-    serde::name::{GeneralName, GeneralNames},
-};
+use core::slice::{Iter, IterMut};
 use picky_asn1::{
     bit_string::BitString,
-    wrapper::{
-        ApplicationTag1, Asn1SequenceOf, BitStringAsn1, ContextTag0, ContextTag2, Implicit,
-        IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1, OctetStringAsn1Container,
-    },
+    wrapper::{Asn1SequenceOf, BitStringAsn1},
 };
-use serde::{de, ser};
-use std::{
-    fmt,
-    slice::{Iter, IterMut},
+
+use crate::{
+    oids,
+    x509::private::name::{GeneralName, GeneralNames},
 };
+use picky_asn1::wrapper::{
+    ApplicationTag1, ContextTag0, ContextTag2, Implicit, IntegerAsn1, ObjectIdentifierAsn1,
+    OctetStringAsn1, OctetStringAsn1Container,
+};
+use serde::{de, ser, Deserialize, Serialize};
+use std::fmt;
 
 /// https://tools.ietf.org/html/rfc5280#section-4.1.2.9
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -21,12 +21,24 @@ pub struct Extensions(pub Vec<Extension>);
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Extension {
-    pub extn_id: ObjectIdentifierAsn1,
-    pub critical: Implicit<bool>,
-    pub extn_value: ExtensionValue,
+    extn_id: ObjectIdentifierAsn1,
+    critical: Implicit<bool>,
+    extn_value: ExtensionValue,
 }
 
 impl Extension {
+    pub fn extn_id(&self) -> &ObjectIdentifierAsn1 {
+        &self.extn_id
+    }
+
+    pub fn critical(&self) -> bool {
+        self.critical.0
+    }
+
+    pub fn extn_value(&self) -> ExtensionView<'_> {
+        ExtensionView::from(&self.extn_value)
+    }
+
     pub fn into_critical(mut self) -> Self {
         self.critical = true.into();
         self
@@ -44,7 +56,7 @@ impl Extension {
     /// When present, conforming CAs SHOULD mark this extension as critical
     ///
     /// Default is critical.
-    pub fn new_key_usage(key_usage: KeyUsage) -> Self {
+    pub(crate) fn new_key_usage(key_usage: KeyUsage) -> Self {
         Self {
             extn_id: oids::key_usage().into(),
             critical: true.into(),
@@ -55,7 +67,7 @@ impl Extension {
     /// Conforming CAs MUST mark this extension as non-critical
     ///
     /// Default is non-critical.
-    pub fn new_subject_key_identifier<V: Into<Vec<u8>>>(ski: V) -> Self {
+    pub(crate) fn new_subject_key_identifier<V: Into<Vec<u8>>>(ski: V) -> Self {
         Self {
             extn_id: oids::subject_key_identifier().into(),
             critical: false.into(),
@@ -66,7 +78,7 @@ impl Extension {
     /// Conforming CAs MUST mark this extension as non-critical
     ///
     /// Default is critical.
-    pub fn new_authority_key_identifier<KI, I, SN>(
+    pub(crate) fn new_authority_key_identifier<KI, I, SN>(
         key_identifier: KI,
         authority_cert_issuer: I,
         authority_cert_serial_number: SN,
@@ -97,7 +109,7 @@ impl Extension {
     /// You may change this value using `into_non_critical` or `set_critical` methods.
     ///
     /// Default is critical.
-    pub fn new_basic_constraints<CA: Into<Option<bool>>, PLC: Into<Option<u8>>>(
+    pub(crate) fn new_basic_constraints<CA: Into<Option<bool>>, PLC: Into<Option<u8>>>(
         ca: CA,
         path_len_constraints: PLC,
     ) -> Self {
@@ -119,7 +131,7 @@ impl Extension {
     /// KeyPurposeId is present.
     ///
     /// Default is non-critical if anyExtendedKeyUsage is present, critical otherwise.
-    pub fn new_extended_key_usage<EKU>(extended_key_usage: EKU) -> Self
+    pub(crate) fn new_extended_key_usage<EKU>(extended_key_usage: EKU) -> Self
     where
         EKU: Into<ExtendedKeyUsage>,
     {
@@ -138,7 +150,8 @@ impl Extension {
     /// subjectAltName extension as non-critical.
     ///
     /// Default is critical.
-    pub fn new_subject_alt_name(name: SubjectAltName) -> Self {
+    pub(crate) fn new_subject_alt_name<N: Into<SubjectAltName>>(name: N) -> Self {
+        let name = name.into();
         Self {
             extn_id: oids::subject_alternative_name().into(),
             critical: true.into(),
@@ -149,7 +162,8 @@ impl Extension {
     /// Where present, conforming CAs SHOULD mark this extension as non-critical.
     ///
     /// Default is non-critical.
-    pub fn new_issuer_alt_name(name: IssuerAltName) -> Self {
+    pub(crate) fn new_issuer_alt_name<N: Into<IssuerAltName>>(name: N) -> Self {
+        let name = name.into();
         Self {
             extn_id: oids::issuer_alternative_name().into(),
             critical: false.into(),
@@ -235,8 +249,48 @@ impl<'de> de::Deserialize<'de> for Extension {
     }
 }
 
+/// A view on an Extension's value designed to be easier to use match and use.
 #[derive(Debug, PartialEq, Clone)]
-pub enum ExtensionValue {
+pub enum ExtensionView<'a> {
+    AuthorityKeyIdentifier(&'a AuthorityKeyIdentifier),
+    SubjectKeyIdentifier(&'a SubjectKeyIdentifier),
+    KeyUsage(&'a KeyUsage),
+    SubjectAltName(super::name::GeneralNames),
+    IssuerAltName(super::name::GeneralNames),
+    BasicConstraints(&'a BasicConstraints),
+    ExtendedKeyUsage(&'a ExtendedKeyUsage),
+    Generic(&'a OctetStringAsn1),
+}
+
+impl<'a> From<&'a ExtensionValue> for ExtensionView<'a> {
+    fn from(value: &'a ExtensionValue) -> Self {
+        match value {
+            ExtensionValue::AuthorityKeyIdentifier(OctetStringAsn1Container(val)) => {
+                Self::AuthorityKeyIdentifier(val)
+            }
+            ExtensionValue::SubjectKeyIdentifier(OctetStringAsn1Container(val)) => {
+                Self::SubjectKeyIdentifier(val)
+            }
+            ExtensionValue::KeyUsage(OctetStringAsn1Container(val)) => Self::KeyUsage(val),
+            ExtensionValue::SubjectAltName(OctetStringAsn1Container(val)) => {
+                Self::SubjectAltName(val.clone().into())
+            }
+            ExtensionValue::IssuerAltName(OctetStringAsn1Container(val)) => {
+                Self::IssuerAltName(val.clone().into())
+            }
+            ExtensionValue::BasicConstraints(OctetStringAsn1Container(val)) => {
+                Self::BasicConstraints(val)
+            }
+            ExtensionValue::ExtendedKeyUsage(OctetStringAsn1Container(val)) => {
+                Self::ExtendedKeyUsage(val)
+            }
+            ExtensionValue::Generic(val) => Self::Generic(val),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+enum ExtensionValue {
     AuthorityKeyIdentifier(OctetStringAsn1Container<AuthorityKeyIdentifier>),
     SubjectKeyIdentifier(OctetStringAsn1Container<SubjectKeyIdentifier>),
     KeyUsage(OctetStringAsn1Container<KeyUsage>),
@@ -281,9 +335,27 @@ impl ser::Serialize for ExtensionValue {
 /// https://tools.ietf.org/html/rfc5280#section-4.2.1.1
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct AuthorityKeyIdentifier {
-    pub key_identifier: Option<ContextTag0<KeyIdentifier>>,
-    pub authority_cert_issuer: Option<ApplicationTag1<GeneralName>>,
-    pub authority_cert_serial_number: Option<ContextTag2<IntegerAsn1>>,
+    key_identifier: Option<ContextTag0<KeyIdentifier>>,
+    authority_cert_issuer: Option<ApplicationTag1<GeneralName>>,
+    authority_cert_serial_number: Option<ContextTag2<IntegerAsn1>>,
+}
+
+impl AuthorityKeyIdentifier {
+    pub fn key_identifier(&self) -> Option<&[u8]> {
+        self.key_identifier.as_ref().map(|ki| (ki.0).0.as_slice())
+    }
+
+    pub fn authority_cert_issuer(&self) -> Option<super::name::GeneralName> {
+        self.authority_cert_issuer
+            .as_ref()
+            .map(|aci| aci.clone().0.into())
+    }
+
+    pub fn authority_cert_serial_number(&self) -> Option<&IntegerAsn1> {
+        self.authority_cert_serial_number
+            .as_ref()
+            .map(|acsn| &acsn.0)
+    }
 }
 
 pub type KeyIdentifier = OctetStringAsn1;
@@ -324,7 +396,6 @@ impl<'de> de::Deserialize<'de> for AuthorityKeyIdentifier {
 /// https://tools.ietf.org/html/rfc5280#section-4.2.1.2
 pub type SubjectKeyIdentifier = OctetStringAsn1;
 
-// TODO: move
 /// https://tools.ietf.org/html/rfc5280#section-4.2.1.3
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct KeyUsage(BitStringAsn1);
@@ -376,16 +447,26 @@ impl KeyUsage {
 }
 
 /// https://tools.ietf.org/html/rfc5280#section-4.2.1.6
-pub type SubjectAltName = GeneralNames;
+type SubjectAltName = GeneralNames;
 
 /// https://tools.ietf.org/html/rfc5280#section-4.2.1.7
-pub type IssuerAltName = GeneralNames;
+type IssuerAltName = GeneralNames;
 
 /// https://tools.ietf.org/html/rfc5280#section-4.2.1.9
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct BasicConstraints {
-    pub ca: Implicit<Option<bool>>, // default is false
-    pub path_len_constraint: Implicit<Option<u8>>,
+    ca: Implicit<Option<bool>>, // default is false
+    path_len_constraint: Implicit<Option<u8>>,
+}
+
+impl BasicConstraints {
+    pub fn ca(&self) -> Option<bool> {
+        self.ca.0
+    }
+
+    pub fn pathlen(&self) -> Option<u8> {
+        self.path_len_constraint.0
+    }
 }
 
 impl<'de> de::Deserialize<'de> for BasicConstraints {
@@ -419,7 +500,6 @@ impl<'de> de::Deserialize<'de> for BasicConstraints {
     }
 }
 
-// TODO: move
 /// https://tools.ietf.org/html/rfc5280#section-4.2.1.12
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct ExtendedKeyUsage(Asn1SequenceOf<ObjectIdentifierAsn1>);
@@ -457,7 +537,8 @@ impl ExtendedKeyUsage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{pem::Pem, serde::name::GeneralName};
+    use crate::{pem::Pem, x509::private::name::GeneralName};
+    use picky_asn1::restricted_string::IA5String;
 
     #[test]
     fn key_usage() {
@@ -508,16 +589,33 @@ mod tests {
                 oids::kp_code_signing(),
             ])
             .into_non_critical(),
-            Extension::new_subject_alt_name(
-                vec![
-                    GeneralName::new_dns_name("devel.example.com").unwrap(),
-                    GeneralName::new_dns_name("ipv6.example.com").unwrap(),
-                    GeneralName::new_dns_name("ipv4.example.com").unwrap(),
-                    GeneralName::new_dns_name("test.example.com").unwrap(),
-                    GeneralName::new_dns_name("party.example.com").unwrap(),
-                ]
-                .into(),
-            )
+            Extension::new_subject_alt_name(vec![
+                GeneralName::DNSName(
+                    IA5String::from_string("devel.example.com".into())
+                        .unwrap()
+                        .into(),
+                ),
+                GeneralName::DNSName(
+                    IA5String::from_string("ipv6.example.com".into())
+                        .unwrap()
+                        .into(),
+                ),
+                GeneralName::DNSName(
+                    IA5String::from_string("ipv4.example.com".into())
+                        .unwrap()
+                        .into(),
+                ),
+                GeneralName::DNSName(
+                    IA5String::from_string("test.example.com".into())
+                        .unwrap()
+                        .into(),
+                ),
+                GeneralName::DNSName(
+                    IA5String::from_string("party.example.com".into())
+                        .unwrap()
+                        .into(),
+                ),
+            ])
             .into_non_critical(),
         ]);
 

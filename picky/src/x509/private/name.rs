@@ -1,8 +1,8 @@
-use crate::serde::attribute_type_and_value::{
-    AttributeTypeAndValue, AttributeTypeAndValueParameters, DirectoryString,
+use crate::x509::{
+    private::attribute_type_and_value::{AttributeTypeAndValue, AttributeTypeAndValueParameters},
+    DirectoryString,
 };
 use picky_asn1::{
-    restricted_string::{CharSetError, IA5String},
     tag::{Tag, TagPeeker},
     wrapper::{
         ApplicationTag1, ApplicationTag2, ApplicationTag4, ApplicationTag5, ApplicationTag6,
@@ -11,24 +11,18 @@ use picky_asn1::{
         IA5StringAsn1, Implicit, ObjectIdentifierAsn1, OctetStringAsn1,
     },
 };
-use serde::{de, ser};
+use serde::{de, ser, Deserialize, Serialize};
 use std::fmt;
 
 // Name ::= CHOICE { -- only one possibility for now --
 //       rdnSequence  RDNSequence }
-pub type Name = RDNSequence;
+pub(crate) type Name = RDNSequence;
 // RDNSequence ::= SEQUENCE OF RelativeDistinguishedName
-pub type RDNSequence = Asn1SequenceOf<RelativeDistinguishedName>;
+pub(crate) type RDNSequence = Asn1SequenceOf<RelativeDistinguishedName>;
 // RelativeDistinguishedName ::= SET SIZE (1..MAX) OF AttributeTypeAndValue
-pub type RelativeDistinguishedName = Asn1SetOf<AttributeTypeAndValue>;
+pub(crate) type RelativeDistinguishedName = Asn1SetOf<AttributeTypeAndValue>;
 
-pub fn new_common_name<S: Into<DirectoryString>>(name: S) -> Name {
-    Asn1SequenceOf(vec![Asn1SetOf(vec![
-        AttributeTypeAndValue::new_common_name(name),
-    ])])
-}
-
-pub struct NamePrettyFormatter<'a>(pub &'a Name);
+pub(crate) struct NamePrettyFormatter<'a>(pub &'a Name);
 impl fmt::Display for NamePrettyFormatter<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut first = true;
@@ -77,7 +71,7 @@ impl fmt::Display for NamePrettyFormatter<'_> {
 
 // https://tools.ietf.org/html/rfc5280#section-4.2.1.6
 // GeneralNames ::= SEQUENCE SIZE (1..MAX) OF GeneralName
-pub type GeneralNames = Asn1SequenceOf<GeneralName>;
+pub(crate) type GeneralNames = Asn1SequenceOf<GeneralName>;
 
 // GeneralName ::= CHOICE {
 //      otherName                       [0]     OtherName,
@@ -90,7 +84,7 @@ pub type GeneralNames = Asn1SequenceOf<GeneralName>;
 //      iPAddress                       [7]     OCTET STRING,
 //      registeredID                    [8]     OBJECT IDENTIFIER }
 #[derive(Debug, PartialEq, Clone)]
-pub enum GeneralName {
+pub(crate) enum GeneralName {
     //OtherName(OtherName),
     RFC822Name(IA5StringAsn1),
     DNSName(IA5StringAsn1),
@@ -103,20 +97,6 @@ pub enum GeneralName {
 }
 
 impl GeneralName {
-    pub fn new_rfc822_name<S: Into<String>>(name: S) -> Result<Self, CharSetError> {
-        Ok(Self::RFC822Name(
-            IA5String::from_string(name.into())?.into(),
-        ))
-    }
-
-    pub fn new_dns_name<S: Into<String>>(name: S) -> Result<Self, CharSetError> {
-        Ok(Self::DNSName(IA5String::from_string(name.into())?.into()))
-    }
-
-    pub fn new_directory_name(name: Name) -> Self {
-        Self::DirectoryName(name)
-    }
-
     pub fn new_edi_party_name<PN, NA>(party_name: PN, name_assigner: Option<NA>) -> Self
     where
         PN: Into<DirectoryString>,
@@ -126,18 +106,6 @@ impl GeneralName {
             name_assigner: Implicit(name_assigner.map(Into::into).map(ContextTag0)),
             party_name: ContextTag1(party_name.into()),
         })
-    }
-
-    pub fn new_uri<S: Into<String>>(uri: S) -> Result<Self, CharSetError> {
-        Ok(Self::URI(IA5String::from_string(uri.into())?.into()))
-    }
-
-    pub fn new_ip_address<ADDR: Into<Vec<u8>>>(ip_address: ADDR) -> Self {
-        Self::IpAddress(OctetStringAsn1(ip_address.into()))
-    }
-
-    pub fn new_registered_id<OID: Into<ObjectIdentifierAsn1>>(oid: OID) -> Self {
-        Self::RegisteredId(oid.into())
     }
 }
 
@@ -280,13 +248,13 @@ impl<'de> de::Deserialize<'de> for GeneralName {
 // OtherName ::= SEQUENCE {
 //      type-id    OBJECT IDENTIFIER,
 //      value      [0] EXPLICIT ANY DEFINED BY type-id }
-//pub struct OtherName { ... }
+//pub(crate) struct OtherName { ... }
 
 // EDIPartyName ::= SEQUENCE {
 //      nameAssigner            [0]     DirectoryString OPTIONAL,
 //      partyName               [1]     DirectoryString }
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct EDIPartyName {
+pub(crate) struct EDIPartyName {
     pub name_assigner: Implicit<Option<ContextTag0<DirectoryString>>>,
     pub party_name: ContextTag1<DirectoryString>,
 }
@@ -294,6 +262,7 @@ pub struct EDIPartyName {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use picky_asn1::restricted_string::IA5String;
 
     #[test]
     fn common_name() {
@@ -306,7 +275,9 @@ mod tests {
                         0x0c, 0x12, 0x74, 0x65, 0x73, 0x74, 0x2E, 0x63, 0x6F, 0x6E, 0x74, 0x6F,
                             0x73, 0x6F, 0x2E, 0x6C, 0x6F, 0x63, 0x61, 0x6C, // utf8 string
         ];
-        let expected = new_common_name("test.contoso.local");
+        let expected = Asn1SequenceOf(vec![Asn1SetOf(vec![
+            AttributeTypeAndValue::new_common_name("test.contoso.local"),
+        ])]);
         check_serde!(expected: Name in encoded);
     }
 
@@ -317,8 +288,11 @@ mod tests {
             0x82, 0x11,
                 0x64, 0x65, 0x76, 0x65, 0x6C, 0x2E, 0x65, 0x78, 0x61, 0x6D, 0x70, 0x6C, 0x65, 0x2E, 0x63, 0x6F, 0x6D,
         ];
-        let expected =
-            GeneralName::new_dns_name("devel.example.com").expect("couldn't construct GeneralName");
+        let expected = GeneralName::DNSName(
+            IA5String::from_string("devel.example.com".into())
+                .unwrap()
+                .into(),
+        );
         check_serde!(expected: GeneralName in encoded);
     }
 }

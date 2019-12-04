@@ -1,6 +1,6 @@
 use clap::App;
 use log::LevelFilter;
-use picky::models::signature::SignatureHashType;
+use picky::signature::SignatureHashType;
 use std::env;
 
 const DEFAULT_PICKY_REALM: &str = "Picky";

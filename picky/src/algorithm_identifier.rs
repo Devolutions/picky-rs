@@ -9,11 +9,19 @@ use std::fmt;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct AlgorithmIdentifier {
-    pub algorithm: ObjectIdentifierAsn1,
-    pub parameters: AlgorithmIdentifierParameters,
+    algorithm: ObjectIdentifierAsn1,
+    parameters: AlgorithmIdentifierParameters,
 }
 
 impl AlgorithmIdentifier {
+    pub fn oid(&self) -> &ObjectIdentifier {
+        &self.algorithm.0
+    }
+
+    pub fn parameters(&self) -> &AlgorithmIdentifierParameters {
+        &self.parameters
+    }
+
     pub fn is_a(&self, algorithm: ObjectIdentifier) -> bool {
         algorithm.eq(&self.algorithm.0)
     }

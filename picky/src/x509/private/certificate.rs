@@ -1,95 +1,24 @@
 use crate::{
-    oids,
-    serde::{
-        extension::{AuthorityKeyIdentifier, BasicConstraints, ExtensionValue},
-        AlgorithmIdentifier, Extensions, Name, SubjectPublicKeyInfo, Validity, Version,
+    private::SubjectPublicKeyInfo,
+    x509::{
+        private::{Name, Validity, Version},
+        Extensions,
     },
+    AlgorithmIdentifier,
 };
-use picky_asn1::wrapper::{
-    ApplicationTag0, ApplicationTag3, BitStringAsn1, Implicit, IntegerAsn1,
-    OctetStringAsn1Container,
-};
-use serde::de;
-use std::{convert::TryFrom, fmt};
+use picky_asn1::wrapper::{ApplicationTag0, ApplicationTag3, BitStringAsn1, IntegerAsn1};
+use serde::{de, Deserialize, Serialize};
+use std::fmt;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct Certificate {
+pub(crate) struct Certificate {
     pub tbs_certificate: TBSCertificate,
     pub signature_algorithm: AlgorithmIdentifier,
     pub signature_value: BitStringAsn1,
 }
 
-macro_rules! find_ext {
-    ($oid:expr, $self:ident, $ext_name:literal) => {{
-        let key_identifier_oid = $oid;
-        ($self.tbs_certificate.extensions.0)
-            .0
-            .iter()
-            .find(|ext| ext.extn_id == key_identifier_oid)
-            .ok_or(crate::error::Error::ExtensionNotFound { name: $ext_name })
-    }};
-}
-
-impl Certificate {
-    pub fn from_der(der: &[u8]) -> picky_asn1_der::Result<Self> {
-        picky_asn1_der::from_bytes(der)
-    }
-
-    pub fn to_der(&self) -> picky_asn1_der::Result<Vec<u8>> {
-        picky_asn1_der::to_vec(self)
-    }
-
-    pub fn subject_key_identifier(&self) -> crate::error::Result<&[u8]> {
-        let ext = find_ext!(
-            oids::subject_key_identifier(),
-            self,
-            "subject key identifier"
-        )?;
-        match &ext.extn_value {
-            ExtensionValue::SubjectKeyIdentifier(ski) => Ok(&(ski.0).0),
-            _ => unreachable!("invalid extension (expected subject key identifier)"),
-        }
-    }
-
-    pub fn authority_key_identifier(&self) -> crate::error::Result<&[u8]> {
-        let ext = find_ext!(
-            oids::authority_key_identifier(),
-            self,
-            "authority key identifier"
-        )?;
-        match &ext.extn_value {
-            ExtensionValue::AuthorityKeyIdentifier(OctetStringAsn1Container(
-                AuthorityKeyIdentifier {
-                    key_identifier: Some(key_identifier),
-                    ..
-                },
-            )) => Ok(&(key_identifier.0).0),
-            _ => unreachable!("invalid extension (expected authority key identifier)"),
-        }
-    }
-
-    pub fn basic_constraints(&self) -> crate::error::Result<(Option<bool>, Option<u8>)> {
-        let ext = find_ext!(oids::basic_constraints(), self, "basic constraints")?;
-        match &ext.extn_value {
-            ExtensionValue::BasicConstraints(OctetStringAsn1Container(BasicConstraints {
-                ca: Implicit(ca),
-                path_len_constraint: Implicit(len),
-            })) => Ok((*ca, *len)),
-            _ => unreachable!("invalid extension (expected basic constraints)"),
-        }
-    }
-}
-
-impl TryFrom<&[u8]> for Certificate {
-    type Error = picky_asn1_der::Asn1DerError;
-
-    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        Self::from_der(value)
-    }
-}
-
 #[derive(Serialize, Clone, Debug, PartialEq)]
-pub struct TBSCertificate {
+pub(crate) struct TBSCertificate {
     pub version: ApplicationTag0<Version>,
     pub serial_number: IntegerAsn1,
     pub signature: AlgorithmIdentifier,
@@ -150,10 +79,10 @@ mod tests {
     use super::*;
     use crate::{
         pem::parse_pem,
-        serde::{
+        x509::{
             extension::{KeyIdentifier, KeyUsage},
-            name::new_common_name,
-            Extension,
+            name::DirectoryName,
+            Cert, Extension,
         },
     };
     use num_bigint_dig::BigInt;
@@ -189,7 +118,7 @@ mod tests {
 
         // Issuer
 
-        let issuer: Name = new_common_name("contoso.local Authority");
+        let issuer: Name = DirectoryName::new_common_name("contoso.local Authority").into();
         check_serde!(issuer: Name in encoded[34..70]);
 
         // Validity
@@ -202,7 +131,7 @@ mod tests {
 
         // Subject
 
-        let subject: Name = new_common_name("test.contoso.local");
+        let subject: Name = DirectoryName::new_common_name("test.contoso.local").into();
         check_serde!(subject: Name in encoded[102..133]);
 
         // SubjectPublicKeyInfo
@@ -263,13 +192,19 @@ mod tests {
     #[test]
     fn key_id() {
         let intermediate_cert_pem = parse_pem(crate::test_files::INTERMEDIATE_CA).unwrap();
-        let cert = Certificate::from_der(intermediate_cert_pem.data()).unwrap();
+        let cert = Cert::from_der(intermediate_cert_pem.data()).unwrap();
         pretty_assertions::assert_eq!(
             hex::encode(&cert.subject_key_identifier().unwrap()),
             "1f74d63f29c17474453b05122c3da8bd435902a6"
         );
         pretty_assertions::assert_eq!(
-            hex::encode(&cert.authority_key_identifier().unwrap()),
+            hex::encode(
+                &cert
+                    .authority_key_identifier()
+                    .unwrap()
+                    .key_identifier()
+                    .unwrap()
+            ),
             "b45ae4a5b3ded252f6b9d5a6950feb3ebcc7fdff"
         );
     }

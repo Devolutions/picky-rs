@@ -5,8 +5,9 @@ use crate::{
 use base64::{STANDARD, URL_SAFE_NO_PAD};
 use picky::{
     controller::Picky,
-    models::{certificate::Cert, csr::Csr, key::PrivateKey},
+    key::PrivateKey,
     pem::{parse_pem, to_pem, Pem},
+    x509::{Cert, Csr},
 };
 use saphir::*;
 use serde_json::{self, Value};
@@ -410,7 +411,9 @@ fn find_ca_chain(repos: &dyn BackendStorage, ca_name: &str) -> Result<Vec<String
 
         let parent_key_id = hex::encode(
             cert.authority_key_identifier()
-                .map_err(|e| format!("couldn't fetch authority key identifier: {}", e))?,
+                .map_err(|e| format!("couldn't fetch authority key identifier: {}", e))?
+                .key_identifier()
+                .ok_or_else(|| "parent key identifier not found".to_owned())?,
         );
 
         if current_key_id == parent_key_id {
@@ -724,7 +727,8 @@ fn parse_pk_from_magic_der(der: &[u8]) -> Result<PrivateKey, String> {
 mod tests {
     use super::*;
     use crate::{configuration::BackendType, db::backend::Backend};
-    use picky::models::{name::Name, signature::SignatureHashType};
+    use picky::signature::SignatureHashType;
+    use picky::x509::name::DirectoryName;
 
     fn config() -> ServerConfig {
         let mut config = ServerConfig::default();
@@ -745,7 +749,7 @@ mod tests {
 
         let pk = generate_private_key(2048).expect("couldn't generate private key");
         let csr = Csr::generate(
-            Name::new_common_name("Mister Bushido"),
+            DirectoryName::new_common_name("Mister Bushido"),
             &pk,
             SignatureHashType::RsaSha384,
         )
@@ -826,8 +830,8 @@ mod tests {
         let err = parse_pk_from_magic_der(pem.data()).unwrap_err();
         assert_eq!(
             err,
-            "couldn\'t parse private key as pkcs8: InvalidData ; \
-             couldn\'t parse private key as raw der-encoded RSA key either: InvalidData"
+            "couldn't parse private key as pkcs8: (asn1) couldn't deserialize private key info (pkcs8): InvalidData ; \
+             couldn't parse private key as raw der-encoded RSA key either: (asn1) couldn't deserialize rsa private key: InvalidData"
         );
     }
 }

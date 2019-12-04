@@ -1,7 +1,8 @@
+#![cfg(feature = "x509")]
 //! This test attempts to parse all root certificate provided by https://mkcert.org/
 //! Data fetched on the 2019/10 are in a file named `mkcert_all_root_ca_2019_10.txt`.
 
-use picky::{models::certificate::Cert, pem::parse_pem};
+use picky::{pem::parse_pem, x509::Cert};
 use std::{cmp::min, fs};
 
 const ALL_STARS_FILE_PATH: &str = "../test_assets/mkcert_all_root_ca_2019_10.txt";

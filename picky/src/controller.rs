@@ -1,21 +1,38 @@
 use crate::{
-    error::{Error, Result},
-    models::{
-        certificate::{Cert, CertificateBuilder},
+    key::{PrivateKey, PublicKey},
+    oids,
+    signature::SignatureHashType,
+    x509::{
+        certificate::{Cert, CertError, CertificateBuilder},
         csr::Csr,
         date::UTCDate,
-        key::{PrivateKey, PublicKey},
-        name::Name,
-        signature::SignatureHashType,
+        extension::KeyUsage,
+        name::{DirectoryName, GeneralNames},
     },
-    oids,
-    serde::{extension::KeyUsage, name::GeneralName},
 };
-use picky_asn1::wrapper::Asn1SequenceOf;
+use picky_asn1::restricted_string::{CharSetError, IA5String};
+use snafu::{ResultExt, Snafu};
 
 const ROOT_DURATION_DAYS: i64 = 3650;
 const INTERMEDIATE_DURATION_DAYS: i64 = 1825;
 const LEAF_DURATION_DAYS: i64 = 365;
+
+#[derive(Debug, Snafu)]
+pub enum PickyError {
+    /// certificate error
+    #[snafu(display("certificate error: {}", source))]
+    Certificate { source: CertError },
+
+    /// input has invalid charset
+    #[snafu(display("input has invalid charset: {}", input))]
+    InvalidCharSet { input: String, source: CharSetError },
+}
+
+impl From<CertError> for PickyError {
+    fn from(source: CertError) -> Self {
+        Self::Certificate { source }
+    }
+}
 
 pub struct Picky;
 
@@ -24,7 +41,7 @@ impl Picky {
         name: &str,
         key: &PrivateKey,
         signature_hash_type: SignatureHashType,
-    ) -> Result<Cert> {
+    ) -> Result<Cert, PickyError> {
         // validity
         let now = chrono::offset::Utc::now();
         let valid_from = UTCDate::from(now);
@@ -36,11 +53,12 @@ impl Picky {
 
         CertificateBuilder::new()
             .valididy(valid_from, valid_to)
-            .self_signed(Name::new_common_name(name), &key)
+            .self_signed(DirectoryName::new_common_name(name), &key)
             .signature_hash_type(signature_hash_type)
             .ca(true)
             .key_usage(key_usage)
             .build()
+            .context(Certificate)
     }
 
     pub fn generate_intermediate(
@@ -49,15 +67,13 @@ impl Picky {
         issuer_cert: &Cert,
         issuer_key: &PrivateKey,
         signature_hash_type: SignatureHashType,
-    ) -> Result<Cert> {
+    ) -> Result<Cert, PickyError> {
         // validity
         let now = chrono::offset::Utc::now();
         let valid_from = UTCDate::from(now);
         let valid_to = UTCDate::from(now + chrono::Duration::days(INTERMEDIATE_DURATION_DAYS));
 
-        let subject_name = Name::new_common_name(intermediate_name);
-        let issuer_name = issuer_cert.subject_name();
-        let aki = issuer_cert.subject_key_identifier()?;
+        let subject_name = DirectoryName::new_common_name(intermediate_name);
 
         let mut key_usage = KeyUsage::default();
         key_usage.set_digital_signature(true);
@@ -67,12 +83,13 @@ impl Picky {
         CertificateBuilder::new()
             .valididy(valid_from, valid_to)
             .subject(subject_name, intermediate_key)
-            .issuer(issuer_name, issuer_key, aki.to_vec())
+            .issuer_cert(issuer_cert, issuer_key)
             .signature_hash_type(signature_hash_type)
             .key_usage(key_usage)
             .pathlen(0)
             .ca(true)
             .build()
+            .context(Certificate)
     }
 
     pub fn generate_leaf_from_csr(
@@ -81,14 +98,11 @@ impl Picky {
         issuer_key: &PrivateKey,
         signature_hash_type: SignatureHashType,
         dns_name: Option<&str>,
-    ) -> Result<Cert> {
+    ) -> Result<Cert, PickyError> {
         // validity
         let now = chrono::offset::Utc::now();
         let valid_from = UTCDate::from(now);
         let valid_to = UTCDate::from(now + chrono::Duration::days(LEAF_DURATION_DAYS));
-
-        let issuer_name = issuer_cert.subject_name();
-        let aki = issuer_cert.subject_key_identifier()?;
 
         let mut key_usage = KeyUsage::default();
         key_usage.set_digital_signature(true);
@@ -101,29 +115,27 @@ impl Picky {
         builder
             .valididy(valid_from, valid_to)
             .subject_from_csr(csr)
-            .issuer(issuer_name, issuer_key, aki.to_vec())
+            .issuer_cert(issuer_cert, issuer_key)
             .signature_hash_type(signature_hash_type)
             .key_usage(key_usage)
             .extended_key_usage(eku.into());
 
         if let Some(dns_name) = dns_name {
-            // TODO: simplify this
-            let san = Asn1SequenceOf(vec![GeneralName::new_dns_name(dns_name).map_err(|e| {
-                Error::InvalidCharSet {
+            let san = GeneralNames::new_dns_name(IA5String::from_string(dns_name.into()).context(
+                InvalidCharSet {
                     input: dns_name.to_owned(),
-                    source: e,
-                }
-            })?]);
+                },
+            )?);
             builder.subject_alt_name(san);
         }
 
-        builder.build()
+        builder.build().context(Certificate)
     }
 
     pub fn verify_chain<'a, Chain: Iterator<Item = &'a Cert>>(
         leaf: &Cert,
         chain: Chain,
-    ) -> Result<()> {
+    ) -> Result<(), CertError> {
         leaf.verify_chain(chain, &UTCDate::now())
     }
 }

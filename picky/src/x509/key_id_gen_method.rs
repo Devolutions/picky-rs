@@ -1,11 +1,23 @@
-use crate::{
-    error::{Asn1Serialization, Result},
-    models::key::PublicKey,
-};
+use crate::key::{KeyError, PublicKey};
 use picky_asn1::wrapper::BitStringAsn1Container;
+use picky_asn1_der::Asn1DerError;
 use sha1::{Digest, Sha1};
 use sha2::{Sha224, Sha256, Sha384, Sha512};
-use snafu::ResultExt;
+use snafu::{ResultExt, Snafu};
+
+#[derive(Debug, Snafu)]
+pub enum KeyIdGenError {
+    /// asn1 serialization error
+    #[snafu(display("(asn1) couldn't serialize {}: {}", element, source))]
+    Asn1Serialization {
+        element: &'static str,
+        source: Asn1DerError,
+    },
+
+    /// invalid key
+    #[snafu(display("invalid key: {}", source))]
+    InvalidKey { source: KeyError },
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum KeyIdHashAlgo {
@@ -48,8 +60,8 @@ macro_rules! hash {
 }
 
 impl KeyIdGenMethod {
-    pub fn generate_from(&self, public_key: &PublicKey) -> Result<Vec<u8>> {
-        use crate::serde::subject_public_key_info::PublicKey as InnerPublicKey;
+    pub fn generate_from(&self, public_key: &PublicKey) -> Result<Vec<u8>, KeyIdGenError> {
+        use crate::private::subject_public_key_info::PublicKey as InnerPublicKey;
         match self {
             KeyIdGenMethod::SPKValueHashedLeftmost160(hash_algo) => {
                 match &public_key.as_inner().subject_public_key {
@@ -66,9 +78,7 @@ impl KeyIdGenMethod {
                 }
             }
             KeyIdGenMethod::SPKFullDER(hash_algo) => {
-                let der = public_key.to_der().context(Asn1Serialization {
-                    element: "subject public key",
-                })?;
+                let der = public_key.to_der().context(InvalidKey)?;
                 Ok(hash!(hash_algo, der))
             }
         }

@@ -1,10 +1,10 @@
-use crate::serde::{AlgorithmIdentifier, Name, SubjectPublicKeyInfo};
+use crate::{private::SubjectPublicKeyInfo, x509::private::Name, AlgorithmIdentifier};
 use picky_asn1::wrapper::{ApplicationTag0, BitStringAsn1, HeaderOnly, Implicit};
+use serde::{Deserialize, Serialize};
 
-// https://tools.ietf.org/html/rfc2986#section-4
-
+/// https://tools.ietf.org/html/rfc2986#section-4
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct CertificationRequestInfo {
+pub(crate) struct CertificationRequestInfo {
     pub version: u8,
     pub subject: Name,
     pub subject_public_key_info: SubjectPublicKeyInfo,
@@ -24,7 +24,7 @@ impl CertificationRequestInfo {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct CertificationRequest {
+pub(crate) struct CertificationRequest {
     pub certification_request_info: CertificationRequestInfo,
     pub signature_algorithm: AlgorithmIdentifier,
     pub signature: BitStringAsn1,
@@ -33,7 +33,7 @@ pub struct CertificationRequest {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{pem::Pem, serde::name::new_common_name};
+    use crate::{pem::Pem, x509::name::DirectoryName};
     use picky_asn1::{
         bit_string::BitString, restricted_string::PrintableString, wrapper::IntegerAsn1,
     };
@@ -48,7 +48,10 @@ mod tests {
         assert_eq!(pem.label(), "CERTIFICATE REQUEST");
 
         let certification_request_info = CertificationRequestInfo::new(
-            new_common_name(PrintableString::from_str("test.contoso.local").unwrap()),
+            DirectoryName::new_common_name(
+                PrintableString::from_str("test.contoso.local").unwrap(),
+            )
+            .into(),
             SubjectPublicKeyInfo::new_rsa_key(
                 IntegerAsn1::from(encoded[74..331].to_vec()),
                 IntegerAsn1::from(encoded[333..336].to_vec()),

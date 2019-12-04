@@ -12,18 +12,15 @@ repository = "https://github.com/Devolutions/picky-rs"
 [dependencies]
 picky-asn1 = { path = "../picky-asn1" }
 picky-asn1-der = { path = "../picky-asn1-der" }
+serde = { version = "1.0", features = ["derive"] }
 oid = { version = "^0.1.1", features = ["serde_support"] }
-serde = "1.0"
-serde_derive = "1.0"
 base64 = "0.10"
 snafu = "0.6"
-
 chrono = { version = "0.4", optional = true }
 
 # /!\ ===== cryptography dependencies ===== /!\
 # These should be updated as soon as possible.
 # /!\ ===================================== /!\
-
 sha-1 = "0.8"
 sha2 = "0.8"
 rsa = { git = "https://github.com/Devolutions/RSA" }
@@ -33,9 +30,10 @@ rand = "0.6" # TODO: update to 0.7. Requires rsa crate to support 0.7 too.
 num-bigint-dig = "0.5"
 pretty_assertions = "*"
 hex = "0.3"
+cfg-if = "0.1"
 
 [features]
-default = []
+x509 = []
+jwt = []
 chrono_conversion = ["chrono", "picky-asn1/chrono_conversion"]
-controller = ["chrono_conversion"]
-expose_internals = []
+controller = ["x509", "chrono_conversion"]

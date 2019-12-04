@@ -1,6 +1,6 @@
-use crate::{oids, serde::AlgorithmIdentifier};
+use crate::{oids, AlgorithmIdentifier};
 use picky_asn1::wrapper::{Asn1SequenceOf, IntegerAsn1, OctetStringAsn1Container};
-use serde::{de, ser};
+use serde::{de, ser, Deserialize, Serialize};
 use std::fmt;
 
 // Public-Key Cryptography Standards (PKCS) #8:
@@ -44,7 +44,7 @@ use std::fmt;
 // information that is encrypted along with the private-key
 // information.
 #[derive(Serialize, Debug, Clone, PartialEq)]
-pub struct PrivateKeyInfo {
+pub(crate) struct PrivateKeyInfo {
     pub version: u8,
     pub private_key_algorithm: AlgorithmIdentifier,
     pub private_key: PrivateKeyValue,
@@ -127,7 +127,7 @@ impl<'de> de::Deserialize<'de> for PrivateKeyInfo {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum PrivateKeyValue {
+pub(crate) enum PrivateKeyValue {
     RSA(OctetStringAsn1Container<RSAPrivateKey>),
 }
 
@@ -146,7 +146,7 @@ impl ser::Serialize for PrivateKeyValue {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct RSAPrivateKey(Asn1SequenceOf<IntegerAsn1>);
+pub(crate) struct RSAPrivateKey(Asn1SequenceOf<IntegerAsn1>);
 
 impl RSAPrivateKey {
     pub fn modulus(&self) -> &IntegerAsn1 {
