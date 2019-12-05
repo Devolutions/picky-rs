@@ -1,9 +1,9 @@
-use crate::db::mongodb::model::{Repository, RepositoryError};
-use crate::db::mongodb::mongo_connection::MongoConnection;
-use bson::oid::ObjectId;
-use bson::Bson;
-use mongodb::coll::Collection;
-use mongodb::db::ThreadedDatabase;
+use crate::db::mongodb::{
+    model::{Repository, RepositoryError},
+    mongo_connection::MongoConnection,
+};
+use bson::{oid::ObjectId, Bson};
+use mongodb::{coll::Collection, db::ThreadedDatabase};
 
 const COLLECTION_NAME: &str = "certificate_store";
 

@@ -1,7 +1,5 @@
-use crate::configuration::ServerConfig;
-use crate::http::middlewares::auth::AuthMiddleware;
-use saphir::router::Builder;
-use saphir::Server as SaphirServer;
+use crate::{configuration::ServerConfig, http::middlewares::auth::AuthMiddleware};
+use saphir::{router::Builder, Server as SaphirServer};
 
 pub struct HttpServer {
     pub server: SaphirServer,

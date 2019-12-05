@@ -1,7 +1,5 @@
 use crate::db::backend::Repo;
-use std::collections::HashMap;
-use std::fmt::Error;
-use std::hash::Hash;
+use std::{collections::HashMap, fmt::Error, hash::Hash};
 
 #[derive(Clone, Debug)]
 pub struct MemoryRepo<T> {

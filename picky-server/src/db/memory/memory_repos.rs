@@ -1,8 +1,11 @@
-use crate::db::backend::{BackendStorage, Model, Repo};
-use crate::db::memory::memory_repo::MemoryRepo;
-use crate::utils;
-use std::collections::HashMap;
-use std::sync::RwLock;
+use crate::{
+    db::{
+        backend::{BackendStorage, Model, Repo},
+        memory::memory_repo::MemoryRepo,
+    },
+    utils,
+};
+use std::{collections::HashMap, sync::RwLock};
 
 pub struct MemoryRepos {
     pub name: RwLock<MemoryRepo<String>>,
