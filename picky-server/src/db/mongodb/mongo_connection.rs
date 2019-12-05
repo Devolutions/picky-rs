@@ -1,5 +1,9 @@
-use mongodb::common::{ReadMode, ReadPreference};
-use mongodb::{connstring, db::ThreadedDatabase, r2d2_mongo, ClientOptions, CommandType};
+use mongodb::{
+    common::{ReadMode, ReadPreference},
+    connstring,
+    db::ThreadedDatabase,
+    r2d2_mongo, ClientOptions, CommandType,
+};
 use r2d2::Pool;
 use std::time::Duration;
 

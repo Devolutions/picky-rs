@@ -1,8 +1,5 @@
 use crate::db::backend::Repo;
-use std::fmt::Error;
-use std::fs::File;
-use std::io::Write;
-use std::marker::PhantomData;
+use std::{fmt::Error, fs::File, io::Write, marker::PhantomData};
 
 const DEFAULT_PATH: &str = "../filebase/";
 const PATH_DELIMITER: char = '/';

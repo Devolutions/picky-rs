@@ -1,10 +1,11 @@
-use crate::db::backend::{BackendStorage, Model, Repo};
-use crate::db::file::file_repo::FileRepo;
-use crate::utils;
-use std::fs::File;
-use std::io::Read;
-use std::marker::PhantomData;
-use std::sync::RwLock;
+use crate::{
+    db::{
+        backend::{BackendStorage, Model, Repo},
+        file::file_repo::FileRepo,
+    },
+    utils,
+};
+use std::{fs::File, io::Read, marker::PhantomData, sync::RwLock};
 
 const REPO_CERTIFICATE: &str = "CertificateStore/";
 const REPO_KEY: &str = "KeyStore/";

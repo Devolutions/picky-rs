@@ -1,8 +1,11 @@
-use crate::configuration::{BackendType, ServerConfig};
-use crate::db::file::file_repos::FileRepos;
-use crate::db::memory::memory_repos::MemoryRepos;
-use crate::db::mongodb::model::RepositoryCollection;
-use crate::db::mongodb::mongo_connection::MongoConnection;
+use crate::{
+    configuration::{BackendType, ServerConfig},
+    db::{
+        file::file_repos::FileRepos,
+        memory::memory_repos::MemoryRepos,
+        mongodb::{model::RepositoryCollection, mongo_connection::MongoConnection},
+    },
+};
 
 pub const DEFAULT_FILEBASE_PATH: &str = "database/";
 

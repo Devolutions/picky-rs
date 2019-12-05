@@ -1,4 +1,4 @@
-use crate::serde::validity::Time;
+use crate::x509::private::validity::Time;
 #[cfg(feature = "chrono_conversion")]
 use chrono::{DateTime, Utc};
 use picky_asn1::date::{Date, GeneralizedTime, UTCTime, UTCTimeRepr};

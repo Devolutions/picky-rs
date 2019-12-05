@@ -150,14 +150,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        oids,
-        serde::{name::NamePrettyFormatter, Certificate, Version},
-    };
-    use picky_asn1::date::UTCTime;
 
-    const PEM_BYTES: &[u8] = crate::test_files::INTERMEDIATE_CA.as_bytes();
-    const PEM_STR: &str = crate::test_files::INTERMEDIATE_CA;
+    const PEM_BYTES: &[u8] = include_bytes!("../../test_assets/intermediate_ca.crt");
+    const PEM_STR: &str = include_str!("../../test_assets/intermediate_ca.crt");
     const FLATTENED_PEM: &str = "-----BEGIN GARBAGE-----GARBAGE-----END GARBAGE-----";
 
     #[test]
@@ -179,31 +174,5 @@ mod tests {
     #[test]
     fn flattened_pem() {
         FLATTENED_PEM.parse::<Pem>().unwrap();
-    }
-
-    #[test]
-    fn read_pem_and_parse_certificate() {
-        let pem = parse_pem(PEM_BYTES).unwrap();
-        let cert = Certificate::from_der(&pem.data).unwrap();
-
-        assert_eq!(cert.tbs_certificate.version.0, Version::V3);
-        assert_eq!(cert.tbs_certificate.serial_number, vec![1]);
-        assert_eq!(
-            Into::<String>::into(cert.tbs_certificate.signature.algorithm.0).as_str(),
-            oids::SHA1_WITH_RSA_ENCRYPTION
-        );
-        assert_eq!(
-            cert.tbs_certificate.validity.not_before,
-            UTCTime::new(2011, 2, 12, 14, 44, 6).unwrap().into()
-        );
-        assert_eq!(
-            cert.tbs_certificate.validity.not_after,
-            UTCTime::new(2021, 2, 12, 14, 44, 6).unwrap().into()
-        );
-
-        assert_eq!(
-            NamePrettyFormatter(&cert.tbs_certificate.issuer).to_string(),
-            "C=NL,O=PolarSSL,CN=PolarSSL Test CA"
-        );
     }
 }

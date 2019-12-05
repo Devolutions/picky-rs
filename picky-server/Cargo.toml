@@ -11,7 +11,8 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/Devolutions/picky-rs"
 
 [dependencies]
-picky = { path = "../picky", features = ["controller"] }
+picky = { path = "../picky", default-features = false, features = ["x509", "chrono_conversion"] }
+picky-asn1 = { path = "../picky-asn1" }
 mongodb = { package = "mongodb_cwal", version = "0.6", features = ["ssl"] }
 curl = { git = "https://github.com/Devolutions/curl-rust", branch = "wayk" }
 clap = { features = ["yaml"], version = "2.32" }
@@ -29,7 +30,7 @@ portpicker = "0.1"
 chrono = "0.4"
 base64 = "0.10"
 hex = "0.3"
-
+snafu = "0.6"
 rand = { version = "0.7", optional = true }
 
 [dev-dependencies]

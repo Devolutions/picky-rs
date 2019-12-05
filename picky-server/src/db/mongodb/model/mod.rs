@@ -3,26 +3,31 @@ pub mod key_identifier_store;
 pub mod key_store;
 pub mod name_store;
 
-use crate::db::backend::{BackendStorage, Model};
-use crate::db::mongodb::model::certificate_store::CertificateStore;
-use crate::db::mongodb::model::key_identifier_store::KeyIdentifierStore;
-use crate::db::mongodb::model::key_store::KeyStore;
-use crate::db::mongodb::model::name_store::NameStore;
-use crate::db::mongodb::mongo_connection::MongoConnection;
-use crate::utils;
-use bson::oid::ObjectId;
-use bson::spec::BinarySubtype;
-use bson::Bson;
-use bson::Document;
-use bson::{from_bson, to_bson};
-use mongodb::coll::options::ReplaceOptions;
-use mongodb::coll::options::{
-    AggregateOptions, FindOneAndUpdateOptions, FindOptions, UpdateOptions,
+use crate::{
+    db::{
+        backend::{BackendStorage, Model},
+        mongodb::{
+            model::{
+                certificate_store::CertificateStore, key_identifier_store::KeyIdentifierStore,
+                key_store::KeyStore, name_store::NameStore,
+            },
+            mongo_connection::MongoConnection,
+        },
+    },
+    utils,
 };
-use mongodb::coll::results::{DeleteResult, InsertManyResult, UpdateResult};
-use std::error::Error;
-use std::fmt;
-use std::fmt::{Display, Formatter};
+use bson::{from_bson, oid::ObjectId, spec::BinarySubtype, to_bson, Bson, Document};
+use mongodb::coll::{
+    options::{
+        AggregateOptions, FindOneAndUpdateOptions, FindOptions, ReplaceOptions, UpdateOptions,
+    },
+    results::{DeleteResult, InsertManyResult, UpdateResult},
+};
+use std::{
+    error::Error,
+    fmt,
+    fmt::{Display, Formatter},
+};
 
 #[allow(dead_code)]
 #[derive(Debug)]

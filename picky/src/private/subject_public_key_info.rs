@@ -1,29 +1,26 @@
-use crate::{
-    oids,
-    serde::{algorithm_identifier::ECParameters, AlgorithmIdentifier},
-};
+use crate::{oids, AlgorithmIdentifier};
 use picky_asn1::wrapper::{BitStringAsn1, BitStringAsn1Container, IntegerAsn1};
-use serde::{de, ser};
+use serde::{de, ser, Deserialize, Serialize};
 use std::fmt;
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum PublicKey {
+pub(crate) enum PublicKey {
     RSA(EncapsulatedRSAPublicKey),
     EC(EncapsulatedECPoint),
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct RSAPublicKey {
+pub(crate) struct RSAPublicKey {
     pub modulus: IntegerAsn1,         // n
     pub public_exponent: IntegerAsn1, // e
 }
-pub type EncapsulatedRSAPublicKey = BitStringAsn1Container<RSAPublicKey>;
+pub(crate) type EncapsulatedRSAPublicKey = BitStringAsn1Container<RSAPublicKey>;
 
-//pub type ECPoint = OctetStringAsn1;
-pub type EncapsulatedECPoint = BitStringAsn1;
+//pub(crate) type ECPoint = OctetStringAsn1;
+pub(crate) type EncapsulatedECPoint = BitStringAsn1;
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct SubjectPublicKeyInfo {
+pub(crate) struct SubjectPublicKeyInfo {
     pub algorithm: AlgorithmIdentifier,
     pub subject_public_key: PublicKey,
 }
@@ -39,16 +36,6 @@ impl SubjectPublicKeyInfo {
                 }
                 .into(),
             ),
-        }
-    }
-
-    pub fn new_elliptic_curve<P: Into<ECParameters>>(
-        ec_params: P,
-        point: EncapsulatedECPoint,
-    ) -> Self {
-        Self {
-            algorithm: AlgorithmIdentifier::new_elliptic_curve(ec_params),
-            subject_public_key: PublicKey::EC(point),
         }
     }
 }
@@ -92,8 +79,7 @@ impl<'de> de::Deserialize<'de> for SubjectPublicKeyInfo {
             {
                 let algorithm: AlgorithmIdentifier = seq.next_element()?.unwrap();
 
-                let subject_public_key = match Into::<String>::into(&algorithm.algorithm.0).as_str()
-                {
+                let subject_public_key = match Into::<String>::into(algorithm.oid()).as_str() {
                     oids::RSA_ENCRYPTION => PublicKey::RSA(seq.next_element()?.unwrap()),
                     oids::EC_PUBLIC_KEY => PublicKey::EC(seq.next_element()?.unwrap()),
                     _ => {
@@ -142,7 +128,7 @@ mod tests {
 
         // RSA modulus and public exponent
 
-        let modulus = IntegerAsn1::from(vec![
+        let modulus = IntegerAsn1::from_signed_bytes_be(vec![
             0x00, 0xb2, 0x22, 0xe8, 0x23, 0x19, 0x97, 0x69, 0x90, 0x5, 0x44, 0x12, 0xad, 0x1d,
             0x86, 0x61, 0x88, 0x5f, 0x26, 0xfa, 0x96, 0x11, 0xfb, 0x11, 0x88, 0xa6, 0xea, 0x6f,
             0xb1, 0xd0, 0xc4, 0xbc, 0xa3, 0xbd, 0xd8, 0x3e, 0x9f, 0x21, 0xc7, 0x20, 0x54, 0xb2,

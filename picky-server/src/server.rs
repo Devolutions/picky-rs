@@ -1,9 +1,13 @@
-use crate::configuration::ServerConfig;
-use crate::db::backend::Backend;
-use crate::http::controllers::server_controller::{
-    check_certs_in_env, generate_intermediate, generate_root_ca, ServerController,
+use crate::{
+    configuration::ServerConfig,
+    db::backend::Backend,
+    http::{
+        controllers::server_controller::{
+            check_certs_in_env, generate_intermediate, generate_root_ca, ServerController,
+        },
+        http_server::HttpServer,
+    },
 };
-use crate::http::http_server::HttpServer;
 use saphir::router::Builder;
 
 pub struct Server {}

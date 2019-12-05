@@ -10,11 +10,11 @@ extern crate serde_derive;
 mod configuration;
 mod db;
 mod http;
+mod picky_controller;
 mod server;
 mod utils;
 
-use crate::configuration::ServerConfig;
-use crate::server::Server;
+use crate::{configuration::ServerConfig, server::Server};
 use log::LevelFilter;
 
 #[cfg(any(feature = "pre-gen-pk", all(debug_assertions, test)))]
@@ -47,8 +47,10 @@ fn main() {
 }
 
 fn init_logs(config: &ServerConfig) {
-    use log4rs::append::console::ConsoleAppender;
-    use log4rs::config::{Appender, Config as ConfigLog4rs, Logger, Root};
+    use log4rs::{
+        append::console::ConsoleAppender,
+        config::{Appender, Config as ConfigLog4rs, Logger, Root},
+    };
     let console_appender = ConsoleAppender::builder().build();
 
     let config = ConfigLog4rs::builder()

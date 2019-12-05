@@ -3,7 +3,7 @@ use std::fmt;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 #[repr(u8)]
-pub enum Version {
+pub(crate) enum Version {
     V1 = 0x00,
     V2 = 0x01,
     V3 = 0x02,
@@ -23,10 +23,6 @@ impl Version {
             0x02 => Some(Self::V3),
             _ => None,
         }
-    }
-
-    pub fn is_default(self) -> bool {
-        self == Self::V1
     }
 }
 
@@ -93,7 +89,7 @@ mod tests {
     }
 
     fn version_is_default(version: &Implicit<ApplicationTag9<Version>>) -> bool {
-        version.is_default()
+        (version.0).0 == Version::V1
     }
 
     #[test]
