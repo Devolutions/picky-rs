@@ -1,4 +1,4 @@
-use crate::{
+use picky::{
     key::{PrivateKey, PublicKey},
     oids,
     signature::SignatureHashType,
@@ -7,10 +7,10 @@ use crate::{
         csr::Csr,
         date::UTCDate,
         extension::KeyUsage,
-        name::{DirectoryName, GeneralNames},
+        name::{DirectoryName, GeneralName, GeneralNames},
     },
 };
-use picky_asn1::restricted_string::{CharSetError, IA5String};
+use picky_asn1::restricted_string::CharSetError;
 use snafu::{ResultExt, Snafu};
 
 const ROOT_DURATION_DAYS: i64 = 3650;
@@ -97,7 +97,7 @@ impl Picky {
         issuer_cert: &Cert,
         issuer_key: &PrivateKey,
         signature_hash_type: SignatureHashType,
-        dns_name: Option<&str>,
+        dns_name: &str,
     ) -> Result<Cert, PickyError> {
         // validity
         let now = chrono::offset::Utc::now();
@@ -110,32 +110,20 @@ impl Picky {
 
         let eku = vec![oids::kp_server_auth(), oids::kp_client_auth()];
 
-        let builder = CertificateBuilder::new();
+        let dns_gn = GeneralName::new_dns_name(dns_name).context(InvalidCharSet {
+            input: dns_name.to_owned(),
+        })?;
+        let san = GeneralNames::new(dns_gn);
 
-        builder
+        CertificateBuilder::new()
             .valididy(valid_from, valid_to)
             .subject_from_csr(csr)
             .issuer_cert(issuer_cert, issuer_key)
             .signature_hash_type(signature_hash_type)
             .key_usage(key_usage)
-            .extended_key_usage(eku.into());
-
-        if let Some(dns_name) = dns_name {
-            let san = GeneralNames::new_dns_name(IA5String::from_string(dns_name.into()).context(
-                InvalidCharSet {
-                    input: dns_name.to_owned(),
-                },
-            )?);
-            builder.subject_alt_name(san);
-        }
-
-        builder.build().context(Certificate)
-    }
-
-    pub fn verify_chain<'a, Chain: Iterator<Item = &'a Cert>>(
-        leaf: &Cert,
-        chain: Chain,
-    ) -> Result<(), CertError> {
-        leaf.verify_chain(chain, &UTCDate::now())
+            .extended_key_usage(eku.into())
+            .subject_alt_name(san)
+            .build()
+            .context(Certificate)
     }
 }

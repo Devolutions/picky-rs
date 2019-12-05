@@ -8,9 +8,6 @@ pub mod jwt;
 #[cfg(feature = "x509")]
 pub mod x509;
 
-#[cfg(feature = "controller")]
-pub mod controller;
-
 pub mod algorithm_identifier;
 pub mod key;
 pub mod oids;

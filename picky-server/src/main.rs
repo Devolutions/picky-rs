@@ -10,6 +10,7 @@ extern crate serde_derive;
 mod configuration;
 mod db;
 mod http;
+mod picky_controller;
 mod server;
 mod utils;
 

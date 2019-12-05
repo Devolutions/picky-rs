@@ -1,10 +1,9 @@
 use crate::{
     configuration::ServerConfig, db::backend::BackendStorage,
-    http::controllers::utils::SyncRequestUtil, utils::*,
+    http::controllers::utils::SyncRequestUtil, picky_controller::Picky, utils::*,
 };
 use base64::{STANDARD, URL_SAFE_NO_PAD};
 use picky::{
-    controller::Picky,
     key::PrivateKey,
     pem::{parse_pem, to_pem, Pem},
     x509::{Cert, Csr},
@@ -369,7 +368,7 @@ fn sign_certificate(
         .to_string();
 
     let signed_cert =
-        Picky::generate_leaf_from_csr(csr, &ca_cert, &ca_pk, config.key_config, Some(&dns_name))
+        Picky::generate_leaf_from_csr(csr, &ca_cert, &ca_pk, config.key_config, &dns_name)
             .map_err(|e| format!("couldn't generate leaf certificate: {}", e))?;
 
     if config.save_certificate {
@@ -727,8 +726,10 @@ fn parse_pk_from_magic_der(der: &[u8]) -> Result<PrivateKey, String> {
 mod tests {
     use super::*;
     use crate::{configuration::BackendType, db::backend::Backend};
-    use picky::signature::SignatureHashType;
-    use picky::x509::name::DirectoryName;
+    use picky::{
+        signature::SignatureHashType,
+        x509::{date::UTCDate, name::DirectoryName},
+    };
 
     fn config() -> ServerConfig {
         let mut config = ServerConfig::default();
@@ -779,7 +780,9 @@ mod tests {
         assert_eq!(chain[0].subject_name().to_string(), "CN=Picky Authority");
         assert_eq!(chain[1].subject_name().to_string(), "CN=Picky Root CA");
 
-        Picky::verify_chain(&signed_cert, chain.iter()).expect("couldn't validate ca chain");
+        signed_cert
+            .verify_chain(chain.iter(), &UTCDate::now())
+            .expect("couldn't validate ca chain");
     }
 
     const RAW_RSA_KEY_PEM: &str =

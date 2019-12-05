@@ -33,7 +33,7 @@ hex = "0.3"
 cfg-if = "0.1"
 
 [features]
+default = ["x509", "jwt"]
 x509 = []
 jwt = []
 chrono_conversion = ["chrono", "picky-asn1/chrono_conversion"]
-controller = ["x509", "chrono_conversion"]
