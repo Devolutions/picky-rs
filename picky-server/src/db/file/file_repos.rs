@@ -3,7 +3,7 @@ use crate::{
         backend::{BackendStorage, Model, Repo},
         file::file_repo::FileRepo,
     },
-    utils,
+    multihash,
 };
 use std::{fs::File, io::Read, marker::PhantomData, sync::RwLock};
 
@@ -105,7 +105,7 @@ impl BackendStorage for FileRepos {
         key: Option<&[u8]>,
         key_identifier: &str,
     ) -> Result<bool, String> {
-        if let Ok(cert_hash) = utils::multihash_encode(cert) {
+        if let Ok(cert_hash) = multihash::multihash_encode(cert) {
             self.name.write().unwrap().insert(
                 &format!("{}{}", name.replace(" ", "_"), TXT_EXT),
                 &cert_hash,

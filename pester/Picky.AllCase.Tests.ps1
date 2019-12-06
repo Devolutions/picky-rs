@@ -1,8 +1,9 @@
 param(
+    [switch] $Verbose,
     [switch] $Debug
 )
 if ($Debug) {
-    Describe 'Rust Tests' {
+    Describe 'rust tests' {
         Context 'debug mode' {
             & 'cargo' 'test' '--manifest-path' '../Cargo.toml'
         }
@@ -11,45 +12,45 @@ if ($Debug) {
         }
     }
 
-    Describe 'Start All cases test for picky'{
+    Describe 'all tests for picky (debug)' {
         Context 'Mongodb without save certificates on backend'{
-            & ./Picky.Tests.ps1 -UseMongo -Silent -Debug
+            & ./Picky.Tests.ps1 -UseMongo -Debug -Verbose:$Verbose
         }
         Context 'Mongodb with save certificates on backend'{
-            & ./Picky.Tests.ps1 -UseMongo -SavePickyCertificates -Silent -Debug
+            & ./Picky.Tests.ps1 -UseMongo -SavePickyCertificates -Debug -Verbose:$Verbose
         }
         Context 'Memory without save certificates on backend'{
-            & ./Picky.Tests.ps1 -UseMemory -Silent -Debug
+            & ./Picky.Tests.ps1 -UseMemory -Debug -Verbose:$Verbose
         }
         Context 'Memory with save certificates on backend'{
-            & ./Picky.Tests.ps1 -UseMemory -SavePickyCertificates -Silent -Debug
+            & ./Picky.Tests.ps1 -UseMemory -SavePickyCertificates -Debug -Verbose:$Verbose
         }
         Context 'File without save certificates on backend'{
-            & ./Picky.Tests.ps1 -UseFile -Silent -Debug
+            & ./Picky.Tests.ps1 -UseFile -Debug -Verbose:$Verbose
         }
         Context 'File with save certificates on backend'{
-            & ./Picky.Tests.ps1 -UseFile -SavePickyCertificates -Silent -Debug
+            & ./Picky.Tests.ps1 -UseFile -SavePickyCertificates -Debug -Verbose:$Verbose
         }
     }
 } else {
-    Describe 'Start All cases test for picky'{
+    Describe 'all tests for picky' {
         Context 'Mongodb without save certificates on backend'{
-            & ./Picky.Tests.ps1 -UseMongo -Silent
+            & ./Picky.Tests.ps1 -UseMongo -Verbose:$Verbose
         }
         Context 'Mongodb with save certificates on backend'{
-            & ./Picky.Tests.ps1 -UseMongo -SavePickyCertificates -Silent
+            & ./Picky.Tests.ps1 -UseMongo -SavePickyCertificates -Verbose:$Verbose
         }
         Context 'Memory without save certificates on backend'{
-            & ./Picky.Tests.ps1 -UseMemory -Silent
+            & ./Picky.Tests.ps1 -UseMemory -Verbose:$Verbose
         }
         Context 'Memory with save certificates on backend'{
-            & ./Picky.Tests.ps1 -UseMemory -SavePickyCertificates -Silent
+            & ./Picky.Tests.ps1 -UseMemory -SavePickyCertificates -Verbose:$Verbose
         }
         Context 'File without save certificates on backend'{
-            & ./Picky.Tests.ps1 -UseFile -Silent
+            & ./Picky.Tests.ps1 -UseFile -Verbose:$Verbose
         }
         Context 'File with save certificates on backend'{
-            & ./Picky.Tests.ps1 -UseFile -SavePickyCertificates -Silent
+            & ./Picky.Tests.ps1 -UseFile -SavePickyCertificates -Verbose:$Verbose
         }
     }
 }

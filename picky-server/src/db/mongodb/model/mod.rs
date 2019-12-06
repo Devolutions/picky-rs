@@ -14,7 +14,7 @@ use crate::{
             mongo_connection::MongoConnection,
         },
     },
-    utils,
+    multihash,
 };
 use bson::{from_bson, oid::ObjectId, spec::BinarySubtype, to_bson, Bson, Document};
 use mongodb::coll::{
@@ -128,7 +128,7 @@ impl BackendStorage for RepositoryCollection {
         key: Option<&[u8]>,
         key_identifier: &str,
     ) -> Result<bool, String> {
-        if let Ok(cert_hash) = utils::multihash_encode(cert) {
+        if let Ok(cert_hash) = multihash::multihash_encode(cert) {
             let name_item = NameStore::new(name, &cert_hash);
             self.name_store
                 .update_with_options(doc!("key": name), name_item, true)?;

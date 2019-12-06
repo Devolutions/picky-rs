@@ -57,7 +57,6 @@ pub struct ServerConfig {
     pub intermediate_cert: String,
     pub intermediate_key: String,
     pub save_file_path: String,
-
     pub save_certificate: bool,
 }
 

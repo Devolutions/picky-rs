@@ -7,6 +7,7 @@ use crate::db::{
 };
 use bson::oid::ObjectId;
 use mongodb::{coll::Collection, db::ThreadedDatabase};
+use serde::{Deserialize, Serialize};
 
 const COLLECTION_NAME: &str = "name_store";
 
