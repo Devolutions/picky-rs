@@ -6,6 +6,7 @@ use crate::{
         mongodb::{model::RepositoryCollection, mongo_connection::MongoConnection},
     },
 };
+use serde::{Deserialize, Serialize};
 
 pub const DEFAULT_FILEBASE_PATH: &str = "database/";
 

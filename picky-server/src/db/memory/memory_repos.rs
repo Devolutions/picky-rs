@@ -3,7 +3,7 @@ use crate::{
         backend::{BackendStorage, Model, Repo},
         memory::memory_repo::MemoryRepo,
     },
-    utils,
+    multihash,
 };
 use std::{collections::HashMap, sync::RwLock};
 
@@ -56,7 +56,7 @@ impl BackendStorage for MemoryRepos {
         key: Option<&[u8]>,
         key_identifier: &str,
     ) -> Result<bool, String> {
-        if let Ok(cert_hash) = utils::multihash_encode(cert) {
+        if let Ok(cert_hash) = multihash::multihash_encode(cert) {
             self.name
                 .write()
                 .unwrap()

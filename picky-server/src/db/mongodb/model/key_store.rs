@@ -4,6 +4,7 @@ use crate::db::mongodb::{
 };
 use bson::{oid::ObjectId, Bson};
 use mongodb::{coll::Collection, db::ThreadedDatabase};
+use serde::{Deserialize, Serialize};
 
 const COLLECTION_NAME: &str = "key_store";
 
