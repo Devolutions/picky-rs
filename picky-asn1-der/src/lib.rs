@@ -36,18 +36,18 @@
 //!
 //! #[derive(Serialize, Deserialize)] // Now our struct supports all DER-conversion-traits
 //! struct Address {
-//! 	street: String,
-//! 	house_number: u128,
-//! 	postal_code: u128,
-//! 	state: String,
-//! 	country: String
+//!     street: String,
+//!     house_number: u128,
+//!     postal_code: u128,
+//!     state: String,
+//!     country: String
 //! }
 //!
 //! #[derive(Serialize, Deserialize)] // Now our struct supports all DER-conversion-traits too
 //! struct Customer {
-//! 	name: String,
-//! 	e_mail_address: String,
-//! 	postal_address: Address
+//!     name: String,
+//!     e_mail_address: String,
+//!     postal_address: Address
 //! }
 //! ```
 //!
@@ -58,10 +58,10 @@
 //!
 //! #[derive(Serialize, Deserialize)]
 //! struct TestStruct {
-//! 	number: u8,
-//! 	#[serde(with = "serde_bytes")]
-//! 	vec: Vec<u8>,
-//! 	tuple: (usize, ())
+//!     number: u8,
+//!     #[serde(with = "serde_bytes")]
+//!     vec: Vec<u8>,
+//!     tuple: (usize, ())
 //! }
 //!
 //! let plain = TestStruct{ number: 7, vec: b"Testolope".to_vec(), tuple: (4, ()) };

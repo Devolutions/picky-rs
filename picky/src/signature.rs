@@ -10,6 +10,7 @@ use rsa::{
     hash::Hashes, BigUint, PaddingScheme, PublicKey as RsaPublicKeyInterface, RSAPrivateKey,
     RSAPublicKey,
 };
+use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
 use sha2::{Sha224, Sha256, Sha384, Sha512};
 use snafu::Snafu;
@@ -39,12 +40,17 @@ impl From<rsa::errors::Error> for SignatureError {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum SignatureHashType {
+    #[serde(rename = "RS1")]
     RsaSha1,
+    #[serde(rename = "RS224")]
     RsaSha224,
+    #[serde(rename = "RS256")]
     RsaSha256,
+    #[serde(rename = "RS384")]
     RsaSha384,
+    #[serde(rename = "RS512")]
     RsaSha512,
 }
 
