@@ -7,6 +7,8 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use snafu::Snafu;
 use std::borrow::Cow;
 
+// === error type === //
+
 #[derive(Debug, Snafu)]
 pub enum JwtError {
     /// RSA error
@@ -43,7 +45,7 @@ pub enum JwtError {
 
 impl From<rsa::errors::Error> for JwtError {
     fn from(e: rsa::errors::Error) -> Self {
-        JwtError::Rsa {
+        Self::Rsa {
             context: e.to_string(),
         }
     }
@@ -51,21 +53,23 @@ impl From<rsa::errors::Error> for JwtError {
 
 impl From<serde_json::Error> for JwtError {
     fn from(e: serde_json::Error) -> Self {
-        JwtError::Json { source: e }
+        Self::Json { source: e }
     }
 }
 
 impl From<SignatureError> for JwtError {
     fn from(e: SignatureError) -> Self {
-        JwtError::Signature { source: e }
+        Self::Signature { source: e }
     }
 }
 
 impl From<DecodeError> for JwtError {
     fn from(e: DecodeError) -> Self {
-        JwtError::Base64Decoding { source: e }
+        Self::Base64Decoding { source: e }
     }
 }
+
+// === json web token === //
 
 const JWT_TYPE: &str = "JWT";
 
@@ -98,6 +102,36 @@ impl<'a, C> Jwt<'a, C> {
     pub fn into_claims(self) -> C {
         self.claims
     }
+
+    pub fn check_signature(
+        &self,
+        encoded_token: &str,
+        public_key: &PublicKey,
+    ) -> Result<(), JwtError> {
+        let last_dot_idx = encoded_token
+            .rfind('.')
+            .ok_or_else(|| JwtError::InvalidEncoding {
+                input: encoded_token.to_owned(),
+            })?;
+
+        snafu::ensure!(
+            last_dot_idx + 1 < encoded_token.len(),
+            InvalidEncoding {
+                input: encoded_token.to_owned(),
+            }
+        );
+
+        let signature =
+            base64::decode_config(&encoded_token[last_dot_idx + 1..], base64::URL_SAFE_NO_PAD)?;
+
+        self.header.alg.verify(
+            public_key,
+            &encoded_token[..last_dot_idx].as_bytes(),
+            &signature,
+        )?;
+
+        Ok(())
+    }
 }
 
 impl<'a, C: Serialize> Jwt<'a, C> {
@@ -118,36 +152,49 @@ impl<'a, C: Serialize> Jwt<'a, C> {
 
 impl<'a, C: DeserializeOwned> Jwt<'a, C> {
     pub fn decode(encoded_token: &str, public_key: &PublicKey) -> Result<Self, JwtError> {
-        let first_dot_idx = encoded_token
-            .find('.')
-            .ok_or_else(|| JwtError::InvalidEncoding {
-                input: encoded_token.to_owned(),
-            })?;
+        __decode_helper(encoded_token, Some(public_key))
+    }
 
-        let last_dot_idx = encoded_token
-            .rfind('.')
-            .ok_or_else(|| JwtError::InvalidEncoding {
-                input: encoded_token.to_owned(),
-            })?;
+    pub fn decode_without_signature_check(encoded_token: &str) -> Result<Self, JwtError> {
+        __decode_helper(encoded_token, None)
+    }
+}
 
-        snafu::ensure!(
-            first_dot_idx != last_dot_idx && last_dot_idx + 1 < encoded_token.len(),
-            InvalidEncoding {
-                input: encoded_token.to_owned(),
-            }
-        );
+fn __decode_helper<'a, C: DeserializeOwned>(
+    encoded_token: &str,
+    public_key: Option<&PublicKey>,
+) -> Result<Jwt<'a, C>, JwtError> {
+    let first_dot_idx = encoded_token
+        .find('.')
+        .ok_or_else(|| JwtError::InvalidEncoding {
+            input: encoded_token.to_owned(),
+        })?;
 
-        let header_json =
-            base64::decode_config(&encoded_token[..first_dot_idx], base64::URL_SAFE_NO_PAD)?;
-        let header = serde_json::from_slice::<Header>(&header_json)?;
+    let last_dot_idx = encoded_token
+        .rfind('.')
+        .ok_or_else(|| JwtError::InvalidEncoding {
+            input: encoded_token.to_owned(),
+        })?;
 
-        snafu::ensure!(
-            header.typ == JWT_TYPE,
-            UnexpectedType {
-                typ: header.typ.to_owned(),
-            }
-        );
+    snafu::ensure!(
+        first_dot_idx != last_dot_idx && last_dot_idx + 1 < encoded_token.len(),
+        InvalidEncoding {
+            input: encoded_token.to_owned(),
+        }
+    );
 
+    let header_json =
+        base64::decode_config(&encoded_token[..first_dot_idx], base64::URL_SAFE_NO_PAD)?;
+    let header = serde_json::from_slice::<Header>(&header_json)?;
+
+    snafu::ensure!(
+        header.typ == JWT_TYPE,
+        UnexpectedType {
+            typ: header.typ.to_owned(),
+        }
+    );
+
+    if let Some(public_key) = public_key {
         let signature =
             base64::decode_config(&encoded_token[last_dot_idx + 1..], base64::URL_SAFE_NO_PAD)?;
 
@@ -156,15 +203,15 @@ impl<'a, C: DeserializeOwned> Jwt<'a, C> {
             &encoded_token[..last_dot_idx].as_bytes(),
             &signature,
         )?;
-
-        let claims_json = base64::decode_config(
-            &encoded_token[first_dot_idx + 1..last_dot_idx],
-            base64::URL_SAFE_NO_PAD,
-        )?;
-        let claims = serde_json::from_slice(&claims_json)?;
-
-        Ok(Jwt { header, claims })
     }
+
+    let claims_json = base64::decode_config(
+        &encoded_token[first_dot_idx + 1..last_dot_idx],
+        base64::URL_SAFE_NO_PAD,
+    )?;
+    let claims = serde_json::from_slice(&claims_json)?;
+
+    Ok(Jwt { header, claims })
 }
 
 #[cfg(test)]
@@ -172,18 +219,8 @@ mod tests {
     use super::*;
     use crate::pem::Pem;
 
-    const ENCODED_JWT: &str = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3\
-                               ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MT\
-                               UxNjIzOTAyMn0.ekfvYsHi-JLCVSDY3QzveVYCnZzeotJ0WS_GO3dxQODW\
-                               iX5hR2WRkePOm2WKl-5ChXjE4_T4kcukgcKHQtXZ5m68kM6RyRrkRqrk3L\
-                               6EftR2DAslATNXDLM3JPEzvcLgFI1U1BFeELw9GGo8HHx9j7nAMJmBCIvS\
-                               HPDWsQxq9Xkoa2jOTwmtn5JX9WMFwbtKSN-POdNaa8gBIn9NJhtjSDPtCq\
-                               ATFai7N6EcBcOhd7p8RWFbgiA_92FAgZW1P6XMxVRT1BHlw3YL9HS80QBr\
-                               OyyD-daWq5FQZWY-kljVhCALLLvSr43pq4XwO1h66iegyWIVLSFyVfOAWl\
-                               lw7BoYPQ";
-
     #[derive(Serialize, Deserialize, Debug, PartialEq)]
-    struct Claims {
+    struct MyClaims {
         sub: Cow<'static, str>,
         name: Cow<'static, str>,
         admin: bool,
@@ -200,40 +237,65 @@ mod tests {
         PrivateKey::from_pkcs8(pk_pem.data()).unwrap()
     }
 
-    #[test]
-    fn encode_rsa_sha256() {
-        let claims = Claims {
+    fn get_strongly_typed_claims() -> MyClaims {
+        MyClaims {
             sub: Cow::Borrowed("1234567890"),
             name: Cow::Borrowed("John Doe"),
             admin: true,
             iat: 1516239022,
-        };
+        }
+    }
 
+    #[test]
+    fn encode_rsa_sha256() {
+        let claims = get_strongly_typed_claims();
         let jwt = Jwt::new(SignatureHashType::RsaSha256, claims);
         let encoded = jwt.encode(&get_private_key_1()).unwrap();
-        assert_eq!(encoded, ENCODED_JWT);
+        assert_eq!(encoded, crate::test_files::JOSE_JWT_EXAMPLE);
     }
 
     #[test]
     fn decode_rsa_sha256() {
         let public_key = get_private_key_1().to_public_key();
-        let jwt = Jwt::<Claims>::decode(ENCODED_JWT, &public_key).unwrap();
+        let jwt =
+            Jwt::<MyClaims>::decode(crate::test_files::JOSE_JWT_EXAMPLE, &public_key).unwrap();
         let claims = jwt.into_claims();
-        assert_eq!(
-            claims,
-            Claims {
-                sub: Cow::Borrowed("1234567890"),
-                name: Cow::Borrowed("John Doe"),
-                admin: true,
-                iat: 1516239022,
-            },
-        )
+        assert_eq!(claims, get_strongly_typed_claims());
+    }
+
+    #[test]
+    fn decode_rsa_sha256_using_json_value_claims() {
+        let public_key = get_private_key_1().to_public_key();
+        let jwt =
+            Jwt::<serde_json::Value>::decode(crate::test_files::JOSE_JWT_EXAMPLE, &public_key)
+                .unwrap();
+        let claims = jwt.into_claims();
+        assert_eq!(claims["sub"].as_str().expect("sub"), "1234567890");
+        assert_eq!(claims["name"].as_str().expect("name"), "John Doe");
+        assert_eq!(claims["admin"].as_bool().expect("sub"), true);
+        assert_eq!(claims["iat"].as_i64().expect("iat"), 1516239022);
+    }
+
+    #[test]
+    fn decode_rsa_sha256_delayed_signature_check() {
+        let jwt =
+            Jwt::<MyClaims>::decode_without_signature_check(crate::test_files::JOSE_JWT_EXAMPLE)
+                .unwrap();
+        let claims = jwt.view_claims();
+        assert_eq!(claims, &get_strongly_typed_claims());
+
+        let public_key = get_private_key_2().to_public_key();
+        let err = jwt
+            .check_signature(crate::test_files::JOSE_JWT_EXAMPLE, &public_key)
+            .err()
+            .unwrap();
+        assert_eq!(err.to_string(), "signature error: invalid signature");
     }
 
     #[test]
     fn decode_rsa_sha256_invalid_signature_err() {
         let public_key = get_private_key_2().to_public_key();
-        let err = Jwt::<Claims>::decode(ENCODED_JWT, &public_key)
+        let err = Jwt::<MyClaims>::decode(crate::test_files::JOSE_JWT_EXAMPLE, &public_key)
             .err()
             .unwrap();
         assert_eq!(err.to_string(), "signature error: invalid signature");
@@ -242,7 +304,7 @@ mod tests {
     #[test]
     fn decode_invalid_base64_err() {
         let public_key = get_private_key_1().to_public_key();
-        let err = Jwt::<Claims>::decode("aieoè~†.tésp.à", &public_key)
+        let err = Jwt::<MyClaims>::decode("aieoè~†.tésp.à", &public_key)
             .err()
             .unwrap();
         assert_eq!(
@@ -255,7 +317,7 @@ mod tests {
     fn decode_invalid_json_err() {
         let public_key = get_private_key_1().to_public_key();
 
-        let err = Jwt::<Claims>::decode("abc.abc.abc", &public_key)
+        let err = Jwt::<MyClaims>::decode("abc.abc.abc", &public_key)
             .err()
             .unwrap();
         assert_eq!(
@@ -263,7 +325,7 @@ mod tests {
             "JSON error: expected value at line 1 column 1"
         );
 
-        let err = Jwt::<Claims>::decode("eyAiYWxnIjogIkhTMjU2IH0K.abc.abc", &public_key)
+        let err = Jwt::<MyClaims>::decode("eyAiYWxnIjogIkhTMjU2IH0K.abc.abc", &public_key)
             .err()
             .unwrap();
         assert_eq!(
@@ -277,7 +339,7 @@ mod tests {
     fn decode_invalid_encoding_err() {
         let public_key = get_private_key_1().to_public_key();
 
-        let err = Jwt::<Claims>::decode("abc.abc.", &public_key)
+        let err = Jwt::<MyClaims>::decode("abc.abc.", &public_key)
             .err()
             .unwrap();
         assert_eq!(
@@ -285,13 +347,15 @@ mod tests {
             "input isn\'t a valid token string: abc.abc."
         );
 
-        let err = Jwt::<Claims>::decode("abc.abc", &public_key).err().unwrap();
+        let err = Jwt::<MyClaims>::decode("abc.abc", &public_key)
+            .err()
+            .unwrap();
         assert_eq!(
             err.to_string(),
             "input isn\'t a valid token string: abc.abc"
         );
 
-        let err = Jwt::<Claims>::decode("abc", &public_key).err().unwrap();
+        let err = Jwt::<MyClaims>::decode("abc", &public_key).err().unwrap();
         assert_eq!(err.to_string(), "input isn\'t a valid token string: abc");
     }
 }

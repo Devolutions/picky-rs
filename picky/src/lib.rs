@@ -2,8 +2,8 @@
 mod macros;
 mod private;
 
-#[cfg(feature = "jwt")]
-pub mod jwt;
+#[cfg(feature = "jose")]
+pub mod jose;
 
 #[cfg(feature = "x509")]
 pub mod x509;
@@ -35,5 +35,12 @@ mod test_files {
 
         pub const INTERMEDIATE_CA: &str = include_str!("../../test_assets/intermediate_ca.crt");
         pub const ROOT_CA: &str = include_str!("../../test_assets/root_ca.crt");
+    }}
+
+    cfg_if::cfg_if! { if #[cfg(feature = "jose")] {
+        pub const JOSE_JWT_EXAMPLE: &str =
+            include_str!("../../test_assets/jose/jwt_example.txt");
+        pub const JOSE_JWK_SET: &str =
+            include_str!("../../test_assets/jose/jwk_set.json");
     }}
 }
