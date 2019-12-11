@@ -2,13 +2,37 @@ param(
     [switch] $Verbose,
     [switch] $Debug
 )
+
 if ($Debug) {
-    Describe 'rust tests' {
-        Context 'debug mode' {
-            & 'cargo' 'test' '--manifest-path' '../Cargo.toml'
+    Describe 'rust' {
+        It 'picky code formatting' {
+            Invoke-Expression "rustfmt +stable --check ../picky/src/lib.rs"
+            $LASTEXITCODE | Should -be 0 # please, run `cargo +stable fmt`
         }
-        Context 'release mode' {
-            & 'cargo' 'test' '--manifest-path' '../Cargo.toml' '--release'
+
+        It 'picky-asn1 code formatting' {
+            Invoke-Expression "rustfmt +stable --check ../picky-asn1/src/lib.rs"
+            $LASTEXITCODE | Should -be 0 # please, run `cargo +stable fmt`
+        }
+
+        It 'picky-asn1-der code formatting' {
+            Invoke-Expression "rustfmt +stable --check ../picky-asn1-der/src/lib.rs"
+            $LASTEXITCODE | Should -be 0 # please, run `cargo +stable fmt`
+        }
+
+        It 'picky-server code formatting' {
+            Invoke-Expression "rustfmt +stable --check ../picky-server/src/main.rs"
+            $LASTEXITCODE | Should -be 0 # please, run `cargo +stable fmt`
+        }
+
+        It 'tests in debug profile' {
+            Invoke-Expression "cargo +stable test --manifest-path ../Cargo.toml --quiet"
+            $LASTEXITCODE | Should -be 0
+        }
+
+        It 'tests in release profile' {
+            Invoke-Expression "cargo +stable test --manifest-path ../Cargo.toml --release --quiet"
+            $LASTEXITCODE | Should -be 0
         }
     }
 

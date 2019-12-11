@@ -1,11 +1,11 @@
 param(
-	[switch] $UseMongo,
-	[switch] $UseMemory,
-	[switch] $UseFile,
-	[switch] $SavePickyCertificates,
-	[switch] $Verbose,
-	[switch] $Debug,
-	[switch] $NoClean
+    [switch] $UseMongo,
+    [switch] $UseMemory,
+    [switch] $UseFile,
+    [switch] $SavePickyCertificates,
+    [switch] $Verbose,
+    [switch] $Debug,
+    [switch] $NoClean
 )
 
 . "$PSScriptRoot/Private/Base64Url.ps1"
@@ -21,14 +21,14 @@ $picky_authority = "${picky_realm} Authority"
 $picky_api_key = "secret"
 
 if ($UseMemory) {
-	$picky_backend = "memory"
-	$picky_database_url = "memory"
+    $picky_backend = "memory"
+    $picky_database_url = "memory"
 } elseif($UseFile) {
-	$picky_backend = "file"
-	$picky_database_url = "file"
+    $picky_backend = "file"
+    $picky_database_url = "file"
 } else {
-	$picky_backend = "mongodb"
-	$picky_database_url = "mongodb://picky-mongo:27017"
+    $picky_backend = "mongodb"
+    $picky_database_url = "mongodb://picky-mongo:27017"
 }
 
 if ($Verbose) {
@@ -36,47 +36,41 @@ if ($Verbose) {
 }
 
 Describe 'picky-server REST API tests' {
-	BeforeAll {
-		$network = $(docker network ls -qf "name=picky")
-		if (!($network)) {
-			docker network create picky
-		}
+    BeforeAll {
+        $network = $(docker network ls -qf "name=picky")
+        if (!($network)) {
+            docker network create picky
+        }
 
-		if ($picky_backend -Eq 'mongodb') {
+        if ($picky_backend -Eq 'mongodb') {
             if ($Verbose) {
                 & 'docker' 'stop' 'picky-mongo' 2>&1 | Out-Null
                 & 'docker' 'rm' 'picky-mongo' 2>&1 | Out-Null
-                & 'docker' 'run' '-d' '-p' '27017:27017' '--network=picky' '--name' 'picky-mongo' `
-		            'library/mongo:4.1-bionic' > $null
+                & 'docker' 'run' '-d' '-p' '27017:27017' '--network=picky' '--name' 'picky-mongo' 'library/mongo:4.1-bionic'
             } else {
-                & 'docker' 'stop' 'picky-mongo'
-                & 'docker' 'rm' 'picky-mongo'
-                & 'docker' 'run' '-d' '-p' '27017:27017' '--network=picky' '--name' 'picky-mongo' `
-		            'library/mongo:4.1-bionic'
+                & 'docker' 'stop' 'picky-mongo' 2>&1 | Out-Null
+                & 'docker' 'rm' 'picky-mongo' 2>&1 | Out-Null
+                & 'docker' 'run' '-d' '-p' '27017:27017' '--network=picky' '--name' 'picky-mongo' 'library/mongo:4.1-bionic' > $null
             }
 
-			Start-Sleep -s 2 # wait for picky-mongo to be ready
-		}
+            Start-Sleep -s 2 # wait for picky-mongo to be ready
+        }
 
-		if ($SavePickyCertificates) {
-			$SavePickyCertificatesString = 'true'
-		} else {
-			$SavePickyCertificatesString = 'false'
-		}
+        if ($SavePickyCertificates) {
+            $SavePickyCertificatesString = 'true'
+        } else {
+            $SavePickyCertificatesString = 'false'
+        }
 
         if ($Debug) {
-            Context "build and run picky-server ..." {
-                $location = Get-Location
-                $location = "$location/../picky-server/Cargo.toml"
-                $location = Resolve-Path $location
+            $location = Get-Location
+            $location = "$location/../picky-server/Cargo.toml"
+            $location = Resolve-Path $location
 
-                Context 'debug pre-build' {
-                    & 'cargo' 'build' '--manifest-path' $location
-                }
+            & 'cargo' 'build' '--manifest-path' $location '--quiet'
 
-                Start-Process pwsh `
-					-Args "-File ./Private/RunPicky.ps1 $picky_realm $picky_api_key $picky_backend $SavePickyCertificatesString $location -Verbose:$Verbose"
-            }
+            Start-Process pwsh `
+                -Args "-File ./Private/RunPicky.ps1 $picky_realm $picky_api_key $picky_backend $SavePickyCertificatesString $location -Verbose:$Verbose"
         } else {
             & 'docker' 'stop' 'picky-server'
             & 'docker' 'rm' 'picky-server'
@@ -92,286 +86,286 @@ Describe 'picky-server REST API tests' {
         }
     }
 
-	It 'check health' {
-		$s = 0
-		while($s -lt 30){
-			Start-Sleep -Seconds 2
-			try {
-				$s = $s + 2
-				$result = Invoke-WebRequest -Uri "$picky_url/health" -Method GET
-				if($result.StatusCode -eq 200){
-					break;
-				}
-			} catch {}
-		}
+    It 'check health' {
+        $s = 0
+        while($s -lt 30){
+            Start-Sleep -Seconds 2
+            try {
+                $s = $s + 2
+                $result = Invoke-WebRequest -Uri "$picky_url/health" -Method GET
+                if($result.StatusCode -eq 200){
+                    break;
+                }
+            } catch {}
+        }
 
-		$s | Should -Not -Be 30
-	}
+        $s | Should -Not -Be 30
+    }
 
-	It 'fetch CA chain' {
-		$ca_chain = @()
+    It 'fetch CA chain' {
+        $ca_chain = @()
 
-		$contents = Invoke-RestMethod -Uri $picky_url/chain -Method 'GET' -ContentType 'text/plain'
-		# https://stackoverflow.com/questions/45884754/powershell-extract-multiple-occurrences-in-multi-lines
-		$contents | Select-String  -Pattern '(?smi)^-{2,}BEGIN CERTIFICATE-{2,}.*?-{2,}END CERTIFICATE-{2,}' `
-			-Allmatches | ForEach-Object {$_.Matches} | ForEach-Object { $ca_chain += $_.Value }
+        $contents = Invoke-RestMethod -Uri $picky_url/chain -Method 'GET' -ContentType 'text/plain'
+        # https://stackoverflow.com/questions/45884754/powershell-extract-multiple-occurrences-in-multi-lines
+        $contents | Select-String  -Pattern '(?smi)^-{2,}BEGIN CERTIFICATE-{2,}.*?-{2,}END CERTIFICATE-{2,}' `
+            -Allmatches | ForEach-Object {$_.Matches} | ForEach-Object { $ca_chain += $_.Value }
 
-		Write-Verbose "Fetched chain: $ca_chain"
+        Write-Verbose "Fetched chain: $ca_chain"
 
-		$ca_chain.Count | Should -Be 2
+        $ca_chain.Count | Should -Be 2
 
-		Set-Content -Value $ca_chain[0] -Path "$TestDrive/intermediate_ca.pem"
-		$intermediate_ca = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2("$TestDrive/intermediate_ca.pem")
-		$intermediate_ca.Subject | Should -Be "CN=${picky_realm} Authority"
-		$intermediate_ca.Issuer | Should -Be "CN=${picky_realm} Root CA"
+        Set-Content -Value $ca_chain[0] -Path "$TestDrive/intermediate_ca.pem"
+        $intermediate_ca = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2("$TestDrive/intermediate_ca.pem")
+        $intermediate_ca.Subject | Should -Be "CN=${picky_realm} Authority"
+        $intermediate_ca.Issuer | Should -Be "CN=${picky_realm} Root CA"
 
-		Set-Content -Value $ca_chain[1] -Path "$TestDrive/root_ca.pem"
-		$root_ca = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2("$TestDrive/root_ca.pem")
-		$root_ca.Subject | Should -Be "CN=${picky_realm} Root CA"
-		$root_ca.Issuer | Should -Be "CN=${picky_realm} Root CA"
-	}
+        Set-Content -Value $ca_chain[1] -Path "$TestDrive/root_ca.pem"
+        $root_ca = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2("$TestDrive/root_ca.pem")
+        $root_ca.Subject | Should -Be "CN=${picky_realm} Root CA"
+        $root_ca.Issuer | Should -Be "CN=${picky_realm} Root CA"
+    }
 
-	function CheckSignResponse($response) {
-		$response.StatusCode | Should -Be 200
+    function CheckSignResponse($response) {
+        $response.StatusCode | Should -Be 200
 
-		$signed_cert_pem = [System.Text.Encoding]::ASCII.GetString($response.Content)
-		Write-Verbose "Signed Cert: $signed_cert_pem"
+        $signed_cert_pem = [System.Text.Encoding]::ASCII.GetString($response.Content)
+        Write-Verbose "Signed Cert: $signed_cert_pem"
 
-		$signed_cert = PemToCert($signed_cert_pem)
-		$signed_cert.Subject | Should -Be "CN=test.${picky_realm}"
-		$signed_cert.Issuer | Should -Be "CN=${picky_realm} Authority"
+        $signed_cert = PemToCert($signed_cert_pem)
+        $signed_cert.Subject | Should -Be "CN=test.${picky_realm}"
+        $signed_cert.Issuer | Should -Be "CN=${picky_realm} Authority"
 
-		return PemToDer $signed_cert_pem
-	}
+        return PemToDer $signed_cert_pem
+    }
 
-	It 'sign certificate using JSON with CA and CSR' {
-		$csr_der = GenerateCsrDer "CN=test.${picky_realm}"
-		$csr_pem = CsrDerToPem $csr_der
+    It 'sign certificate using JSON with CA and CSR' {
+        $csr_der = GenerateCsrDer "CN=test.${picky_realm}"
+        $csr_pem = CsrDerToPem $csr_der
 
-		$headers = @{
-			"Authorization" = "Bearer $picky_api_key"
-			"Accept" = 'application/x-pem-file'
-		}
+        $headers = @{
+            "Authorization" = "Bearer $picky_api_key"
+            "Accept" = 'application/x-pem-file'
+        }
 
-		$payload = [PSCustomObject]@{
-			ca="$picky_authority"
-			csr="$csr_pem"
-		} | ConvertTo-Json
+        $payload = [PSCustomObject]@{
+            ca="$picky_authority"
+            csr="$csr_pem"
+        } | ConvertTo-Json
 
-		$response = Invoke-WebRequest `
-			-Uri $picky_url/sign/ -Method POST `
-			-Headers $headers `
-			-ContentType 'application/json' `
-			-Body $payload
+        $response = Invoke-WebRequest `
+            -Uri $picky_url/sign/ -Method POST `
+            -Headers $headers `
+            -ContentType 'application/json' `
+            -Body $payload
 
-		CheckSignResponse $response
-	}
+        CheckSignResponse $response
+    }
 
-	It 'sign certificate with CSR wrapped in PEM' {
-		$csr_der = GenerateCsrDer "CN=test.${picky_realm}"
-		$csr_pem = CsrDerToPem $csr_der
+    It 'sign certificate with CSR wrapped in PEM' {
+        $csr_der = GenerateCsrDer "CN=test.${picky_realm}"
+        $csr_pem = CsrDerToPem $csr_der
 
-		$headers = @{
-			"Authorization" = "Bearer $picky_api_key"
-		}
+        $headers = @{
+            "Authorization" = "Bearer $picky_api_key"
+        }
 
-		$response = Invoke-WebRequest `
-			-Uri $picky_url/sign/ -Method POST `
-			-ContentType 'application/x-pem-file' `
-			-Headers $headers `
-			-Body $csr_pem
+        $response = Invoke-WebRequest `
+            -Uri $picky_url/sign/ -Method POST `
+            -ContentType 'application/x-pem-file' `
+            -Headers $headers `
+            -Body $csr_pem
 
-		CheckSignResponse $response
-	}
+        CheckSignResponse $response
+    }
 
-	It 'sign certificate with CSR in base64' {
-		$csr_der = GenerateCsrDer "CN=test.${picky_realm}"
-		$csr_base64 = [Convert]::ToBase64String($csr_der)
+    It 'sign certificate with CSR in base64' {
+        $csr_der = GenerateCsrDer "CN=test.${picky_realm}"
+        $csr_base64 = [Convert]::ToBase64String($csr_der)
 
-		$headers = @{
-			"Authorization" = "Bearer $picky_api_key"
-			"Content-Transfer-Encoding" = "base64"
-		}
+        $headers = @{
+            "Authorization" = "Bearer $picky_api_key"
+            "Content-Transfer-Encoding" = "base64"
+        }
 
-		$response = Invoke-WebRequest `
-			-Uri $picky_url/sign/ -Method POST `
-			-ContentType 'application/pkcs10' `
-			-Headers $headers `
-			-Body $csr_base64
+        $response = Invoke-WebRequest `
+            -Uri $picky_url/sign/ -Method POST `
+            -ContentType 'application/pkcs10' `
+            -Headers $headers `
+            -Body $csr_base64
 
-		CheckSignResponse $response
-	}
+        CheckSignResponse $response
+    }
 
-	It 'sign certificate request without Content-Transfert-Encoding returns bad request' {
-		$csr_der = GenerateCsrDer "CN=test.${picky_realm}"
-		$csr_base64 = [Convert]::ToBase64String($csr_der)
+    It 'sign certificate request without Content-Transfert-Encoding returns bad request' {
+        $csr_der = GenerateCsrDer "CN=test.${picky_realm}"
+        $csr_base64 = [Convert]::ToBase64String($csr_der)
 
-		$headers = @{
-			"Authorization" = "Bearer $picky_api_key"
-		}
+        $headers = @{
+            "Authorization" = "Bearer $picky_api_key"
+        }
 
-		$response = try {
-			Invoke-WebRequest `
-				-Uri $picky_url/sign/ -Method POST `
-				-ContentType 'application/pkcs10' `
-				-Headers $headers `
-				-Body $csr_base64
-		} catch {
-			$_.Exception.Response
-		}
+        $response = try {
+            Invoke-WebRequest `
+                -Uri $picky_url/sign/ -Method POST `
+                -ContentType 'application/pkcs10' `
+                -Headers $headers `
+                -Body $csr_base64
+        } catch {
+            $_.Exception.Response
+        }
 
-		$response.StatusCode | Should -Be 400
-	}
+        $response.StatusCode | Should -Be 400
+    }
 
-	function SignCertAndGetHash {
-		$csr_der = GenerateCsrDer "CN=test.${picky_realm}"
-		$csr_base64 = [Convert]::ToBase64String($csr_der)
+    function SignCertAndGetHash {
+        $csr_der = GenerateCsrDer "CN=test.${picky_realm}"
+        $csr_base64 = [Convert]::ToBase64String($csr_der)
 
-		$headers = @{
-			"Authorization" = "Bearer $picky_api_key"
-			"Content-Transfer-Encoding" = "base64"
-		}
-		$response = Invoke-WebRequest `
-			-Uri $picky_url/sign/ -Method POST `
-			-ContentType 'application/pkcs10' `
-			-Headers $headers `
-			-Body $csr_base64
-		$cert_der = CheckSignResponse $response
+        $headers = @{
+            "Authorization" = "Bearer $picky_api_key"
+            "Content-Transfer-Encoding" = "base64"
+        }
+        $response = Invoke-WebRequest `
+            -Uri $picky_url/sign/ -Method POST `
+            -ContentType 'application/pkcs10' `
+            -Headers $headers `
+            -Body $csr_base64
+        $cert_der = CheckSignResponse $response
 
-		$hash = Get-HashFromByte($cert_der)
+        $hash = Get-HashFromByte($cert_der)
 
-		return $hash
-	}
+        return $hash
+    }
 
-	It 'get cert in binary with sha256' {
-		$hash = SignCertAndGetHash
+    It 'get cert in binary with sha256' {
+        $hash = SignCertAndGetHash
 
-		$headers = @{
-			"Accept-Encoding" = "binary"
-			"Accept" = "application/pkix-cert"
-		}
+        $headers = @{
+            "Accept-Encoding" = "binary"
+            "Accept" = "application/pkix-cert"
+        }
 
-		if ($SavePickyCertificates) {
-			$response = Invoke-WebRequest `
-				-Uri "$picky_url/cert/$hash" `
-				-Method GET `
+        if ($SavePickyCertificates) {
+            $response = Invoke-WebRequest `
+                -Uri "$picky_url/cert/$hash" `
+                -Method GET `
                 -Headers $headers
-			$response.StatusCode | Should -Be 200
-			DerToCert $response.Content
-		} else {
-			{
-				Invoke-RestMethod `
-					-Uri "$picky_url/cert/$hash" `
-					-Method GET `
-                	-Headers $headers
-			} | Should -Throw
-		}
-	}
+            $response.StatusCode | Should -Be 200
+            DerToCert $response.Content
+        } else {
+            {
+                Invoke-RestMethod `
+                    -Uri "$picky_url/cert/$hash" `
+                    -Method GET `
+                    -Headers $headers
+            } | Should -Throw
+        }
+    }
 
-	It 'get cert in base64 with sha256' {
-		$hash = SignCertAndGetHash
+    It 'get cert in base64 with sha256' {
+        $hash = SignCertAndGetHash
 
-		$headers = @{
-			"Accept-Encoding" = "base64"
-			"Accept" = "application/pkix-cert"
-		}
+        $headers = @{
+            "Accept-Encoding" = "base64"
+            "Accept" = "application/pkix-cert"
+        }
 
-		if ($SavePickyCertificates) {
-			$response = Invoke-WebRequest `
-				-Uri "$picky_url/cert/$hash" `
-				-Method GET `
+        if ($SavePickyCertificates) {
+            $response = Invoke-WebRequest `
+                -Uri "$picky_url/cert/$hash" `
+                -Method GET `
                 -Headers $headers
-			$response.StatusCode | Should -Be 200
-			$base64 = [System.Text.Encoding]::ASCII.GetString($response.Content)
-			Base64StringToCert $base64
-		} else {
-			{
-				Invoke-RestMethod `
-					-Uri "$picky_url/cert/$hash" `
-					-Method GET `
-                	-Headers $headers
-			} | Should -Throw
-		}
-	}
+            $response.StatusCode | Should -Be 200
+            $base64 = [System.Text.Encoding]::ASCII.GetString($response.Content)
+            Base64StringToCert $base64
+        } else {
+            {
+                Invoke-RestMethod `
+                    -Uri "$picky_url/cert/$hash" `
+                    -Method GET `
+                    -Headers $headers
+            } | Should -Throw
+        }
+    }
 
-	It 'get cert in PEM with sha256' {
-		$hash = SignCertAndGetHash
+    It 'get cert in PEM with sha256' {
+        $hash = SignCertAndGetHash
 
-		$headers = @{
-			"Accept" = "application/x-pem-file"
-		}
+        $headers = @{
+            "Accept" = "application/x-pem-file"
+        }
 
-		if ($SavePickyCertificates) {
-			$response = Invoke-WebRequest `
-				-Uri "$picky_url/cert/$hash" `
-				-Method GET `
+        if ($SavePickyCertificates) {
+            $response = Invoke-WebRequest `
+                -Uri "$picky_url/cert/$hash" `
+                -Method GET `
                 -Headers $headers
-			$response.StatusCode | Should -Be 200
-			$pem = [System.Text.Encoding]::ASCII.GetString($response.Content)
-			PemToCert $pem
-		} else {
-			{
-				Invoke-RestMethod `
-					-Uri "$picky_url/cert/$hash" `
-					-Method GET `
-                	-Headers $headers
-			} | Should -Throw
-		}
-	}
+            $response.StatusCode | Should -Be 200
+            $pem = [System.Text.Encoding]::ASCII.GetString($response.Content)
+            PemToCert $pem
+        } else {
+            {
+                Invoke-RestMethod `
+                    -Uri "$picky_url/cert/$hash" `
+                    -Method GET `
+                    -Headers $headers
+            } | Should -Throw
+        }
+    }
 
-	It 'register certificate in base64' {
-		$csr_der = GenerateCsrDer "CN=test.${picky_realm}"
-		$csr_base64 = [Convert]::ToBase64String($csr_der)
-		$headers = @{
-			"Authorization" = "Bearer $picky_api_key"
-			"Content-Transfer-Encoding" = "base64"
-			"Accept" = "application/x-pem-file"
-		}
-		$response = Invoke-WebRequest `
-			-Uri $picky_url/sign/ -Method POST `
-			-ContentType 'application/pkcs10' `
-			-Headers $headers `
-			-Body $csr_base64
-		$signed_cert_der = CheckSignResponse $response
-		$signed_cert_base64 = [Convert]::ToBase64String($signed_cert_der)
+    It 'register certificate in base64' {
+        $csr_der = GenerateCsrDer "CN=test.${picky_realm}"
+        $csr_base64 = [Convert]::ToBase64String($csr_der)
+        $headers = @{
+            "Authorization" = "Bearer $picky_api_key"
+            "Content-Transfer-Encoding" = "base64"
+            "Accept" = "application/x-pem-file"
+        }
+        $response = Invoke-WebRequest `
+            -Uri $picky_url/sign/ -Method POST `
+            -ContentType 'application/pkcs10' `
+            -Headers $headers `
+            -Body $csr_base64
+        $signed_cert_der = CheckSignResponse $response
+        $signed_cert_base64 = [Convert]::ToBase64String($signed_cert_der)
 
-		$headers = @{
-			"Content-Transfer-Encoding" = "base64"
-		}
-		$postCert = Invoke-RestMethod -Uri $picky_url/cert/ -Method POST `
-			-ContentType 'application/pkix-cert' `
-			-Headers $headers `
-			-Body $signed_cert_base64
-		$postCert | Should -Not -Be $null
-	}
+        $headers = @{
+            "Content-Transfer-Encoding" = "base64"
+        }
+        $postCert = Invoke-RestMethod -Uri $picky_url/cert/ -Method POST `
+            -ContentType 'application/pkix-cert' `
+            -Headers $headers `
+            -Body $signed_cert_base64
+        $postCert | Should -Not -Be $null
+    }
 
-	It 'register certificate in json' {
-		$csr_der = GenerateCsrDer "CN=test.${picky_realm}"
-		$csr_base64 = [Convert]::ToBase64String($csr_der)
-		$headers = @{
-			"Authorization" = "Bearer $picky_api_key"
-			"Content-Transfer-Encoding" = "base64"
-			"Accept" = "application/pkix-cert"
-			"Accept-Encoding" = "base64"
-		}
-		$signed_cert_base64 = Invoke-RestMethod -Uri $picky_url/sign/ -Method POST `
-			-ContentType 'application/pkcs10' `
-			-Headers $headers `
-			-Body $csr_base64
-		$signed_cert_der = [Convert]::FromBase64String($signed_cert_base64)
-		$signed_cert_pem = CertDerToPem $signed_cert_der
+    It 'register certificate in json' {
+        $csr_der = GenerateCsrDer "CN=test.${picky_realm}"
+        $csr_base64 = [Convert]::ToBase64String($csr_der)
+        $headers = @{
+            "Authorization" = "Bearer $picky_api_key"
+            "Content-Transfer-Encoding" = "base64"
+            "Accept" = "application/pkix-cert"
+            "Accept-Encoding" = "base64"
+        }
+        $signed_cert_base64 = Invoke-RestMethod -Uri $picky_url/sign/ -Method POST `
+            -ContentType 'application/pkcs10' `
+            -Headers $headers `
+            -Body $csr_base64
+        $signed_cert_der = [Convert]::FromBase64String($signed_cert_base64)
+        $signed_cert_pem = CertDerToPem $signed_cert_der
 
-		$json = @{
-			certificate = $signed_cert_pem
-		} | ConvertTo-Json
-		$postCert = Invoke-RestMethod -Uri $picky_url/cert/ -Method POST `
-			-ContentType 'application/json' `
-			-Body $json
-		$postCert | Should -Not -Be $null
-	}
+        $json = @{
+            certificate = $signed_cert_pem
+        } | ConvertTo-Json
+        $postCert = Invoke-RestMethod -Uri $picky_url/cert/ -Method POST `
+            -ContentType 'application/json' `
+            -Body $json
+        $postCert | Should -Not -Be $null
+    }
 
-	It 'register certificate not signed by a picky server CA' {
-		$cert_pem = "-----BEGIN CERTIFICATE-----
+    It 'register certificate not signed by a picky server CA' {
+        $cert_pem = "-----BEGIN CERTIFICATE-----
 MIIDPzCCAiegAwIBAgIBATANBgkqhkiG9w0BAQUFADA7MQswCQYDVQQGEwJOTDER
 MA8GA1UECgwIUG9sYXJTU0wxGTAXBgNVBAMMEFBvbGFyU1NMIFRlc3QgQ0EwHhcN
 MTEwMjEyMTQ0NDA2WhcNMjEwMjEyMTQ0NDA2WjA8MQswCQYDVQQGEwJOTDERMA8G
@@ -392,15 +386,15 @@ Ln/az3v5DdgrNoAO60zK1zYAmekLil7pgba/jBLPeAQ2fZVgFxttKv33nUnUBzKA
 Od8i323fM5dQS1qQpBjBc/5fPw==
 -----END CERTIFICATE-----"
 
-		{
-			Invoke-RestMethod -Uri $picky_url/cert/ -Method POST `
-				-ContentType 'application/x-pem-file' `
-				-Body $cert_pem
-		} | Should -Throw
-	}
+        {
+            Invoke-RestMethod -Uri $picky_url/cert/ -Method POST `
+                -ContentType 'application/x-pem-file' `
+                -Body $cert_pem
+        } | Should -Throw
+    }
 
-	AfterAll {
-		if ($Verbose) {
+    AfterAll {
+        if ($Verbose) {
             if ($UseMongo) {
                 & 'docker' 'stop' 'picky-mongo'
                 & 'docker' 'rm' 'picky-mongo'
@@ -412,7 +406,7 @@ Od8i323fM5dQS1qQpBjBc/5fPw==
                 & 'docker' 'stop' 'picky-server'
                 & 'docker' 'rm' 'picky-server'
             }
-		} else {
+        } else {
             if ($UseMongo) {
                 & 'docker' 'stop' 'picky-mongo' > $null
                 & 'docker' 'rm' 'picky-mongo' > $null
@@ -424,18 +418,18 @@ Od8i323fM5dQS1qQpBjBc/5fPw==
                 & 'docker' 'stop' 'picky-server' > $null
                 & 'docker' 'rm' 'picky-server' > $null
             }
-		}
+        }
 
-	    if ($NoClean) {
-	        return
-	    }
+        if ($NoClean) {
+            return
+        }
 
-		if ($UseFile) {
-			if ($Verbose) {
-				Remove-Item 'database' -Recurse
-			} else {
-				Remove-Item 'database' -Recurse > $null
-			}
-		}
-	}
+        if ($UseFile) {
+            if ($Verbose) {
+                Remove-Item 'database' -Recurse
+            } else {
+                Remove-Item 'database' -Recurse > $null
+            }
+        }
+    }
 }

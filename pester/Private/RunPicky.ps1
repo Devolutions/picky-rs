@@ -14,7 +14,7 @@ $Env:PICKY_SAVE_CERTIFICATE = $SavePickyCertificatesString
 $Env:RUST_BACKTRACE = 1
 
 if ($Verbose) {
-    & 'cargo' 'run' '--features' 'pre-gen-pk' '--manifest-path' "$location"
+    & 'cargo' 'run' '--features' 'pre-gen-pk' '--manifest-path' "$location" '--quiet'
 } else {
-    & 'cargo' 'run' '--features' 'pre-gen-pk' '--manifest-path' "$location" > $null
+    & 'cargo' 'run' '--features' 'pre-gen-pk' '--manifest-path' "$location" '--quiet' > $null
 }
