@@ -34,7 +34,7 @@ hex = "0.3"
 cfg-if = "0.1"
 
 [features]
-default = ["x509", "jwt"]
+default = ["x509", "jose"]
 x509 = []
-jwt = ["serde_json"]
+jose = ["serde_json"]
 chrono_conversion = ["chrono", "picky-asn1/chrono_conversion"]
