@@ -30,7 +30,13 @@ pub enum CsrError {
     /// signature error
     #[snafu(display("signature error: {}", source))]
     Signature { source: SignatureError },
+
+    /// invalid PEM label error
+    #[snafu(display("invalid PEM label: {}", label))]
+    InvalidPemLabel { label: String },
 }
+
+const CSR_PEM_LABEL: &str = "CERTIFICATE REQUEST";
 
 /// Certificate Signing Request
 #[derive(Clone, Debug, PartialEq)]
@@ -51,6 +57,15 @@ impl Csr {
         )?))
     }
 
+    pub fn from_pem(pem: &Pem) -> Result<Self, CsrError> {
+        match pem.label() {
+            CSR_PEM_LABEL => Self::from_der(pem.data()),
+            _ => Err(CsrError::InvalidPemLabel {
+                label: pem.label().to_owned(),
+            }),
+        }
+    }
+
     pub fn to_der(&self) -> Result<Vec<u8>, CsrError> {
         picky_asn1_der::to_vec(&self.0).context(Asn1Serialization {
             element: "certification request",
@@ -58,7 +73,7 @@ impl Csr {
     }
 
     pub fn to_pem(&self) -> Result<Pem<'static>, CsrError> {
-        Ok(Pem::new("CERTIFICATE REQUEST", self.to_der()?))
+        Ok(Pem::new(CSR_PEM_LABEL, self.to_der()?))
     }
 
     pub fn generate(

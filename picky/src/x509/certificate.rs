@@ -89,6 +89,10 @@ pub enum CertError {
     /// certificate expired
     #[snafu(display("certificate expired (not after: {}, now: {})", not_after, now))]
     CertificateExpired { not_after: UTCDate, now: UTCDate },
+
+    /// invalid PEM label error
+    #[snafu(display("invalid PEM label: {}", label))]
+    InvalidPemLabel { label: String },
 }
 
 #[derive(Debug, Snafu)]
@@ -129,6 +133,8 @@ pub enum CertType {
     Unknown,
 }
 
+const CERT_PEM_LABEL: &str = "CERTIFICATE";
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Cert(Certificate);
 
@@ -158,6 +164,15 @@ impl Cert {
         )?))
     }
 
+    pub fn from_pem(pem: &Pem) -> Result<Self, CertError> {
+        match pem.label() {
+            CERT_PEM_LABEL => Self::from_der(pem.data()),
+            _ => Err(CertError::InvalidPemLabel {
+                label: pem.label().to_owned(),
+            }),
+        }
+    }
+
     pub fn to_der(&self) -> Result<Vec<u8>, CertError> {
         picky_asn1_der::to_vec(&self.0).context(Asn1Serialization {
             element: "certificate",
@@ -165,7 +180,7 @@ impl Cert {
     }
 
     pub fn to_pem(&self) -> Result<Pem<'static>, CertError> {
-        Ok(Pem::new("CERTIFICATE", self.to_der()?))
+        Ok(Pem::new(CERT_PEM_LABEL, self.to_der()?))
     }
 
     pub fn ty(&self) -> CertType {

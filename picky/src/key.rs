@@ -1,5 +1,5 @@
 use crate::{
-    pem::Pem,
+    pem::{to_pem, Pem},
     private::{private_key_info::PrivateKeyValue, PrivateKeyInfo, SubjectPublicKeyInfo},
 };
 use picky_asn1::wrapper::{IntegerAsn1, OctetStringAsn1Container};
@@ -44,8 +44,8 @@ impl From<rsa::errors::Error> for KeyError {
 
 // === private key === //
 
-const PRIVATE_KEY_LABEL: &str = "PRIVATE KEY";
-const RSA_PRIVATE_KEY_LABEL: &str = "RSA PRIVATE KEY";
+const PRIVATE_KEY_PEM_LABEL: &str = "PRIVATE KEY";
+const RSA_PRIVATE_KEY_PEM_LABEL: &str = "RSA PRIVATE KEY";
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PrivateKey(PrivateKeyInfo);
@@ -76,8 +76,8 @@ impl From<PrivateKey> for SubjectPublicKeyInfo {
 impl PrivateKey {
     pub fn from_pem(pem: &Pem) -> Result<Self, KeyError> {
         match pem.label() {
-            PRIVATE_KEY_LABEL => Self::from_pkcs8(pem.data()),
-            RSA_PRIVATE_KEY_LABEL => Self::from_rsa_der(pem.data()),
+            PRIVATE_KEY_PEM_LABEL => Self::from_pkcs8(pem.data()),
+            RSA_PRIVATE_KEY_PEM_LABEL => Self::from_rsa_der(pem.data()),
             _ => Err(KeyError::InvalidPemLabel {
                 label: pem.label().to_owned(),
             }),
@@ -112,6 +112,10 @@ impl PrivateKey {
         picky_asn1_der::to_vec(&self.0).context(Asn1Serialization {
             element: "private key info (pkcs8)",
         })
+    }
+
+    pub fn to_pem(&self) -> Result<String, KeyError> {
+        Ok(to_pem(PRIVATE_KEY_PEM_LABEL, &self.to_pkcs8()?))
     }
 
     pub fn to_public_key(&self) -> OwnedPublicKey {
@@ -156,8 +160,8 @@ impl PrivateKey {
 
 // === public key === //
 
-const PUBLIC_KEY_LABEL: &str = "PUBLIC KEY";
-const RSA_PUBLIC_KEY_LABEL: &str = "RSA PUBLIC KEY";
+const PUBLIC_KEY_PEM_LABEL: &str = "PUBLIC KEY";
+const RSA_PUBLIC_KEY_PEM_LABEL: &str = "RSA PUBLIC KEY";
 
 #[derive(Debug, Clone, PartialEq)]
 enum PublicKeyInner<'a> {
@@ -232,8 +236,8 @@ impl From<PrivateKey> for OwnedPublicKey {
 impl OwnedPublicKey {
     pub fn from_pem(pem: &Pem) -> Result<Self, KeyError> {
         match pem.label() {
-            PUBLIC_KEY_LABEL => Self::from_der(pem.data()),
-            RSA_PUBLIC_KEY_LABEL => Self::from_rsa_der(pem.data()),
+            PUBLIC_KEY_PEM_LABEL => Self::from_der(pem.data()),
+            RSA_PUBLIC_KEY_PEM_LABEL => Self::from_rsa_der(pem.data()),
             _ => Err(KeyError::InvalidPemLabel {
                 label: pem.label().to_owned(),
             }),
@@ -277,6 +281,10 @@ impl<'a> PublicKey<'a> {
         picky_asn1_der::to_vec(self.0.as_ref()).context(Asn1Serialization {
             element: "subject public key info",
         })
+    }
+
+    pub fn to_pem(&self) -> Result<String, KeyError> {
+        Ok(to_pem(PUBLIC_KEY_PEM_LABEL, &self.to_der()?))
     }
 
     pub fn into_owned(self) -> OwnedPublicKey {
