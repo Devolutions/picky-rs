@@ -1,4 +1,8 @@
-use crate::{key::PublicKey, private::SubjectPublicKeyInfo, signature::SignatureHashType};
+use crate::{
+    key::{OwnedPublicKey, PublicKey},
+    private::SubjectPublicKeyInfo,
+    signature::SignatureHashType,
+};
 use base64::DecodeError;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -175,7 +179,7 @@ impl Jwk {
         Ok(serde_json::to_string_pretty(self)?)
     }
 
-    pub fn to_public_key(&self) -> Result<PublicKey, JwkError> {
+    pub fn to_public_key(&self) -> Result<OwnedPublicKey, JwkError> {
         match &self.key {
             JwkKeyType::Rsa(rsa) => {
                 let spki = SubjectPublicKeyInfo::new_rsa_key(

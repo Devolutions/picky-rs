@@ -1,5 +1,5 @@
 use crate::{
-    key::{PrivateKey, PublicKey},
+    key::{OwnedPublicKey, PrivateKey, PublicKey},
     oids,
     pem::Pem,
     signature::{SignatureError, SignatureHashType},
@@ -249,6 +249,10 @@ impl Cert {
         (self.0.tbs_certificate.extensions.0).0.as_slice()
     }
 
+    pub fn public_key(&self) -> PublicKey {
+        (&self.0.tbs_certificate.subject_public_key_info).into()
+    }
+
     pub fn verify(&self, now: &UTCDate) -> Result<(), CertError> {
         let validity = &self.0.tbs_certificate.validity;
         let not_before: UTCDate = validity.not_before.clone().into();
@@ -393,7 +397,7 @@ enum SubjectInfos {
     Csr(Csr),
     NameAndPublicKey {
         name: DirectoryName,
-        public_key: PublicKey,
+        public_key: OwnedPublicKey,
     },
 }
 
@@ -406,8 +410,8 @@ struct IssuerInfos<'a> {
 
 // Statically checks the field actually exists and returns a &'static str of the field name
 macro_rules! field_str {
-    ($instance:ident.$field:ident) => {{
-        let _ = $instance.$field;
+    ($field:ident) => {{
+        ::static_assertions::assert_fields!(CertificateBuilderInner: $field);
         stringify!($field)
     }};
 }
@@ -451,7 +455,7 @@ impl<'a> CertificateBuilder<'a> {
 
     /// Required (alternatives: `subject_from_csr`, `self_signed`)
     #[inline]
-    pub fn subject(&self, subject_name: DirectoryName, public_key: PublicKey) -> &Self {
+    pub fn subject(&self, subject_name: DirectoryName, public_key: OwnedPublicKey) -> &Self {
         self.inner.borrow_mut().subject_infos = Some(SubjectInfos::NameAndPublicKey {
             name: subject_name,
             public_key,
@@ -468,7 +472,7 @@ impl<'a> CertificateBuilder<'a> {
 
     /// Required (alternative: `self_signed`, `issuer_cert`)
     #[inline]
-    pub fn issuer(&'a self, issuer_name: DirectoryName, issuer_key: &'a PrivateKey) -> &'a Self {
+    pub fn issuer(&self, issuer_name: DirectoryName, issuer_key: &'a PrivateKey) -> &Self {
         self.inner.borrow_mut().issuer_infos = Some(IssuerInfos {
             name: issuer_name,
             key: issuer_key,
@@ -479,7 +483,7 @@ impl<'a> CertificateBuilder<'a> {
 
     /// Required (alternative: `issuer`, `issuer_cert`)
     #[inline]
-    pub fn self_signed(&'a self, name: DirectoryName, key: &'a PrivateKey) -> &'a Self {
+    pub fn self_signed(&self, name: DirectoryName, key: &'a PrivateKey) -> &Self {
         self.inner.borrow_mut().issuer_infos = Some(IssuerInfos {
             name,
             key,
@@ -490,7 +494,7 @@ impl<'a> CertificateBuilder<'a> {
 
     /// Required (alternative: `issuer`, `self_signed`)
     #[inline]
-    pub fn issuer_cert(&'a self, issuer_cert: &Cert, issuer_key: &'a PrivateKey) -> &'a Self {
+    pub fn issuer_cert(&self, issuer_cert: &Cert, issuer_key: &'a PrivateKey) -> &Self {
         let builder = self.issuer(issuer_cert.subject_name(), &issuer_key);
 
         if let Ok(issuer_ski) = issuer_cert.subject_key_identifier() {
@@ -570,13 +574,13 @@ impl<'a> CertificateBuilder<'a> {
             .valid_from
             .take()
             .ok_or(CertError::MissingBuilderArgument {
-                arg: field_str!(inner.valid_from),
+                arg: field_str!(valid_from),
             })?;
         let valid_to = inner
             .valid_to
             .take()
             .ok_or(CertError::MissingBuilderArgument {
-                arg: field_str!(inner.valid_to),
+                arg: field_str!(valid_to),
             })?;
 
         let signature_hash_type = inner
@@ -593,7 +597,7 @@ impl<'a> CertificateBuilder<'a> {
             .issuer_infos
             .take()
             .ok_or(CertError::MissingBuilderArgument {
-                arg: field_str!(inner.issuer_infos),
+                arg: field_str!(issuer_infos),
             })?;
         let (issuer_name, issuer_key, aki, subject_infos) = {
             let (aki, subject_infos) = if issuer_infos.self_signed {
@@ -610,7 +614,7 @@ impl<'a> CertificateBuilder<'a> {
             } else {
                 let aki = inner.authority_key_identifier.take().ok_or(
                     CertError::MissingBuilderArgument {
-                        arg: field_str!(inner.authority_key_identifier),
+                        arg: field_str!(authority_key_identifier),
                     },
                 )?;
                 let subject_infos =
@@ -618,7 +622,7 @@ impl<'a> CertificateBuilder<'a> {
                         .subject_infos
                         .take()
                         .ok_or(CertError::MissingBuilderArgument {
-                            arg: field_str!(inner.subject_infos),
+                            arg: field_str!(subject_infos),
                         })?;
                 (aki, subject_infos)
             };

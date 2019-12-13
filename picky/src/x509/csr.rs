@@ -1,5 +1,5 @@
 use crate::{
-    key::{PrivateKey, PublicKey},
+    key::{OwnedPublicKey, PrivateKey, PublicKey},
     pem::Pem,
     signature::{SignatureError, SignatureHashType},
     x509::{
@@ -88,15 +88,11 @@ impl Csr {
         self.0.certification_request_info.subject.clone().into()
     }
 
-    pub fn to_public_key(&self) -> PublicKey {
-        self.0
-            .certification_request_info
-            .subject_public_key_info
-            .clone()
-            .into()
+    pub fn public_key(&self) -> PublicKey {
+        (&self.0.certification_request_info.subject_public_key_info).into()
     }
 
-    pub fn into_subject_infos(self) -> (DirectoryName, PublicKey) {
+    pub fn into_subject_infos(self) -> (DirectoryName, OwnedPublicKey) {
         (
             self.0.certification_request_info.subject.into(),
             self.0

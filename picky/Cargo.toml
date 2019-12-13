@@ -18,6 +18,7 @@ base64 = "0.10"
 snafu = "0.6"
 chrono = { version = "0.4", optional = true }
 serde_json = { version = "1.0", optional = true }
+static_assertions = "1.1"
 
 # /!\ ===== cryptography dependencies ===== /!\
 # These should be updated as soon as possible.

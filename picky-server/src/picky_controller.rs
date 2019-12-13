@@ -1,5 +1,5 @@
 use picky::{
-    key::{KeyError, PrivateKey, PublicKey},
+    key::{KeyError, OwnedPublicKey, PrivateKey},
     oids,
     pem::PemError,
     signature::SignatureHashType,
@@ -85,7 +85,7 @@ impl Picky {
 
     pub fn generate_intermediate(
         intermediate_name: &str,
-        intermediate_key: PublicKey,
+        intermediate_key: OwnedPublicKey,
         issuer_cert: &Cert,
         issuer_key: &PrivateKey,
         signature_hash_type: SignatureHashType,
