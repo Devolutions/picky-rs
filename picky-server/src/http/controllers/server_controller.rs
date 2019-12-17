@@ -1,6 +1,9 @@
 use crate::{
-    configuration::ServerConfig, db::backend::BackendStorage,
-    http::controllers::utils::SyncRequestUtil, multihash::*, picky_controller::Picky,
+    configuration::ServerConfig,
+    db::{get_storage, BoxedPickyStorage, CertificateEntry, PickyStorage},
+    http::controllers::utils::SyncRequestUtil,
+    multihash::*,
+    picky_controller::Picky,
 };
 use base64::URL_SAFE_NO_PAD;
 use picky::{
@@ -13,7 +16,7 @@ use serde_json::{self, Value};
 use std::fmt::Display;
 
 struct ControllerData {
-    pub repos: Box<dyn BackendStorage>,
+    pub storage: BoxedPickyStorage,
     pub config: ServerConfig,
 }
 
@@ -22,13 +25,16 @@ pub struct ServerController {
 }
 
 impl ServerController {
-    pub fn new(repos: Box<dyn BackendStorage>, config: ServerConfig) -> Self {
-        if let Err(e) = check_certs_in_env(&config, repos.as_ref()) {
+    pub fn new(config: ServerConfig) -> Self {
+        let storage = get_storage(&config);
+
+        if let Err(e) = check_certs_in_env(&config, storage.as_ref()) {
             error!("Error loading certificates in environment: {}", e);
         }
 
         info!("Creating root CA...");
-        let created = generate_root_ca(&config, repos.as_ref()).expect("couldn't generate root CA");
+        let created =
+            generate_root_ca(&config, storage.as_ref()).expect("couldn't generate root CA");
         if created {
             info!("Root CA Created");
         } else {
@@ -36,7 +42,7 @@ impl ServerController {
         }
 
         info!("Creating intermediate CA...");
-        let created = generate_intermediate_ca(&config, repos.as_ref())
+        let created = generate_intermediate_ca(&config, storage.as_ref())
             .expect("couldn't generate intermediate CA");
         if created {
             info!("Intermediate Created");
@@ -44,7 +50,7 @@ impl ServerController {
             info!("Intermediate already exists");
         }
 
-        let controller_data = ControllerData { repos, config };
+        let controller_data = ControllerData { storage, config };
 
         let dispatch = ControllerDispatch::new(controller_data);
 
@@ -202,7 +208,7 @@ impl Format {
 // === health === //
 
 fn health(controller_data: &ControllerData, _req: &SyncRequest, res: &mut SyncResponse) {
-    if controller_data.repos.health().is_ok() {
+    if controller_data.storage.health().is_ok() {
         res.status(StatusCode::OK)
             .body("Everything should be alright!");
     } else {
@@ -282,7 +288,12 @@ fn post_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut Sync
     )
     .to_string();
 
-    if let Err(e) = controller_data.repos.store(&subject_name, &der, None, &ski) {
+    if let Err(e) = controller_data.storage.store(CertificateEntry {
+        name: subject_name.clone(),
+        cert: der,
+        key_identifier: ski,
+        key: None,
+    }) {
         error!("Insertion error for leaf {}: {}", subject_name, e);
     } else {
         res.status(StatusCode::OK);
@@ -344,7 +355,7 @@ fn cert_signature_request(
         &ca_name,
         csr,
         &controller_data.config,
-        controller_data.repos.as_ref()
+        controller_data.storage.as_ref()
     ));
 
     let response_format = Format::response_format(req).unwrap_or(Format::PemFile);
@@ -373,25 +384,20 @@ fn sign_certificate(
     ca_name: &str,
     csr: Csr,
     config: &ServerConfig,
-    repos: &dyn BackendStorage,
+    storage: &dyn PickyStorage,
 ) -> Result<Cert, String> {
-    let ca_hashes = repos
-        .find(ca_name)
+    let ca_hash = storage
+        .get_hash_by_name(ca_name)
         .map_err(|e| format!("couldn't fetch CA: {}", e))?;
-    let ca_hash = if ca_hashes.is_empty() {
-        return Err("ca hash empty".to_owned());
-    } else {
-        &ca_hashes[0].value
-    };
 
-    let ca_cert_der = repos
-        .get_cert(ca_hash)
+    let ca_cert_der = storage
+        .get_cert_by_hash(&ca_hash)
         .map_err(|e| format!("couldn't get CA cert der: {}", e))?;
     let ca_cert =
         Cert::from_der(&ca_cert_der).map_err(|e| format!("couldn't deserialize CA cert: {}", e))?;
 
-    let ca_pk_der = repos
-        .get_key(ca_hash)
+    let ca_pk_der = storage
+        .get_key_by_hash(&ca_hash)
         .map_err(|e| format!("couldn't fetch CA private key: {}", e))?;
     let ca_pk = Picky::parse_pk_from_magic_der(&ca_pk_der).map_err(|e| e.to_string())?;
 
@@ -415,8 +421,13 @@ fn sign_certificate(
                 .map_err(|e| format!("couldn't get SKI: {}", e))?,
         );
 
-        repos
-            .store(&dns_name, &cert_der, None, &ski)
+        storage
+            .store(CertificateEntry {
+                name: dns_name.clone(),
+                cert: cert_der,
+                key_identifier: ski,
+                key: None,
+            })
             .map_err(|e| format!("insertion error for leaf {}: {}", dns_name, e))?;
     }
 
@@ -430,7 +441,7 @@ fn get_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncR
 
     let hash = unwrap_opt!(req.captures().get("multihash"), "multihash is missing");
 
-    let cert_der = match controller_data.repos.get_cert(hash) {
+    let cert_der = match controller_data.storage.get_cert_by_hash(hash) {
         Ok(cert_der) => cert_der,
         Err(e) => {
             info!(
@@ -438,7 +449,7 @@ fn get_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncR
                 hash, e
             );
             let multihash = saphir_try!(sha256_to_multihash(hash));
-            saphir_try!(controller_data.repos.get_cert(&multihash))
+            saphir_try!(controller_data.storage.get_cert_by_hash(&multihash))
         }
     };
 
@@ -475,7 +486,7 @@ fn get_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncR
 fn get_default_chain(controller_data: &ControllerData, _: &SyncRequest, res: &mut SyncResponse) {
     res.status(StatusCode::BAD_REQUEST);
     let ca = format!("{} Authority", &controller_data.config.realm);
-    let chain = saphir_try!(find_ca_chain(controller_data.repos.as_ref(), &ca));
+    let chain = saphir_try!(find_ca_chain(controller_data.storage.as_ref(), &ca));
     res.body(chain.join("\n"));
     res.status(StatusCode::OK);
 }
@@ -489,7 +500,7 @@ fn get_chain(controller_data: &ControllerData, req: &SyncRequest, res: &mut Sync
         .and_then(|c| base64::decode_config(c, URL_SAFE_NO_PAD).ok())
     {
         let decoded = String::from_utf8_lossy(&common_name);
-        let chain = saphir_try!(find_ca_chain(controller_data.repos.as_ref(), &decoded));
+        let chain = saphir_try!(find_ca_chain(controller_data.storage.as_ref(), &decoded));
         res.body(chain.join("\n"));
         res.status(StatusCode::OK);
     } else {
@@ -502,18 +513,13 @@ fn get_chain(controller_data: &ControllerData, req: &SyncRequest, res: &mut Sync
     }
 }
 
-fn find_ca_chain(repos: &dyn BackendStorage, ca_name: &str) -> Result<Vec<String>, String> {
-    let ca_hash = repos
-        .find(ca_name)
+fn find_ca_chain(storage: &dyn PickyStorage, ca_name: &str) -> Result<Vec<String>, String> {
+    let ca_hash = storage
+        .get_hash_by_name(ca_name)
         .map_err(|e| format!("couldn't fetch CA hash id for {}: {}", ca_name, e))?;
-    let ca_hash = if ca_hash.is_empty() {
-        return Err("No intermediate certificate found!".to_owned());
-    } else {
-        &ca_hash[0].value
-    };
 
-    let mut cert_der = repos
-        .get_cert(ca_hash)
+    let mut cert_der = storage
+        .get_cert_by_hash(&ca_hash)
         .map_err(|e| format!("couldn't fetch CA certificate der: {}", e))?;
     let mut chain = vec![to_pem("CERTIFICATE", &cert_der)];
     let mut current_key_id = String::default();
@@ -533,12 +539,12 @@ fn find_ca_chain(repos: &dyn BackendStorage, ca_name: &str) -> Result<Vec<String
             break;
         }
 
-        let hash = repos
-            .get_hash_from_key_identifier(&parent_key_id)
+        let hash = storage
+            .get_hash_by_key_identifier(&parent_key_id)
             .map_err(|e| format!("couldn't fetch hash: {}", e))?;
 
-        cert_der = repos
-            .get_cert(&hash)
+        cert_der = storage
+            .get_cert_by_hash(&hash)
             .map_err(|e| format!("couldn't fetch certificate der: {}", e))?;
 
         chain.push(to_pem("CERTIFICATE", &cert_der));
@@ -580,10 +586,10 @@ fn get_name(_: &ControllerData, req: &SyncRequest, res: &mut SyncResponse) {
 
 // === generate root CA === //
 
-fn generate_root_ca(config: &ServerConfig, repos: &dyn BackendStorage) -> Result<bool, String> {
+fn generate_root_ca(config: &ServerConfig, storage: &dyn PickyStorage) -> Result<bool, String> {
     let name = format!("{} Root CA", config.realm);
 
-    if let Ok(certs) = repos.find(&name) {
+    if let Ok(certs) = storage.get_hash_by_name(&name) {
         if !certs.is_empty() {
             // already exists
             return Ok(false);
@@ -606,8 +612,13 @@ fn generate_root_ca(config: &ServerConfig, repos: &dyn BackendStorage) -> Result
         .to_pkcs8()
         .map_err(|e| format!("couldn't get private key pkcs8: {}", e))?;
 
-    repos
-        .store(&name, &cert_der, Some(&pk_pkcs8), &hex::encode(ski))
+    storage
+        .store(CertificateEntry {
+            name,
+            cert: cert_der,
+            key_identifier: hex::encode(ski),
+            key: Some(pk_pkcs8),
+        })
         .map_err(|e| format!("couldn't store generated root certificate: {}", e))?;
 
     Ok(true)
@@ -617,33 +628,27 @@ fn generate_root_ca(config: &ServerConfig, repos: &dyn BackendStorage) -> Result
 
 fn generate_intermediate_ca(
     config: &ServerConfig,
-    repos: &dyn BackendStorage,
+    storage: &dyn PickyStorage,
 ) -> Result<bool, String> {
     let root_name = format!("{} Root CA", config.realm);
     let intermediate_name = format!("{} Authority", config.realm);
 
-    if let Ok(certs) = repos.find(&intermediate_name) {
+    if let Ok(certs) = storage.get_hash_by_name(&intermediate_name) {
         if !certs.is_empty() {
             // already exists
             return Ok(false);
         }
     }
 
-    let (root_cert_der, root_key_der) = match repos.find(&root_name) {
-        Ok(roots) => {
-            if roots.is_empty() {
-                return Err("no matching root CA".to_owned());
-            } else {
-                (
-                    repos
-                        .get_cert(&roots[0].value)
-                        .map_err(|e| format!("couldn't fetch root CA: {}", e))?,
-                    repos
-                        .get_key(&roots[0].value)
-                        .map_err(|e| format!("couldn't fetch root CA private key: {}", e))?,
-                )
-            }
-        }
+    let (root_cert_der, root_key_der) = match storage.get_hash_by_name(&root_name) {
+        Ok(root_hash) => (
+            storage
+                .get_cert_by_hash(&root_hash)
+                .map_err(|e| format!("couldn't fetch root CA: {}", e))?,
+            storage
+                .get_key_by_hash(&root_hash)
+                .map_err(|e| format!("couldn't fetch root CA private key: {}", e))?,
+        ),
         Err(e) => {
             return Err(format!("error while fetching root: {}", e));
         }
@@ -678,13 +683,13 @@ fn generate_intermediate_ca(
         .to_pkcs8()
         .map_err(|e| format!("couldn't get private key pkcs8: {}", e))?;
 
-    repos
-        .store(
-            &intermediate_name,
-            &cert_der,
-            Some(&pk_pkcs8),
-            &hex::encode(ski),
-        )
+    storage
+        .store(CertificateEntry {
+            name: intermediate_name,
+            cert: cert_der,
+            key_identifier: hex::encode(ski),
+            key: Some(pk_pkcs8),
+        })
         .map_err(|e| format!("couldn't store generated intermediate certificate: {}", e))?;
 
     Ok(true)
@@ -692,17 +697,19 @@ fn generate_intermediate_ca(
 
 // === check certificates in env === //
 
-fn check_certs_in_env(config: &ServerConfig, repos: &dyn BackendStorage) -> Result<(), String> {
+fn check_certs_in_env(config: &ServerConfig, storage: &dyn PickyStorage) -> Result<(), String> {
     if !config.root_cert.is_empty() && !config.root_key.is_empty() {
-        if let Err(e) = get_and_store_env_cert_info(&config.root_cert, &config.root_key, repos) {
+        if let Err(e) = get_and_store_env_cert_info(&config.root_cert, &config.root_key, storage) {
             return Err(e);
         }
     }
 
     if !config.intermediate_cert.is_empty() && !config.intermediate_key.is_empty() {
-        if let Err(e) =
-            get_and_store_env_cert_info(&config.intermediate_cert, &config.intermediate_key, repos)
-        {
+        if let Err(e) = get_and_store_env_cert_info(
+            &config.intermediate_cert,
+            &config.intermediate_key,
+            storage,
+        ) {
             return Err(e);
         }
     }
@@ -713,7 +720,7 @@ fn check_certs_in_env(config: &ServerConfig, repos: &dyn BackendStorage) -> Resu
 fn get_and_store_env_cert_info(
     cert_pem: &str,
     key_pem: &str,
-    repos: &dyn BackendStorage,
+    storage: &dyn PickyStorage,
 ) -> Result<(), String> {
     let cert_pem = cert_pem
         .parse::<Pem>()
@@ -734,7 +741,14 @@ fn get_and_store_env_cert_info(
         .parse::<Pem>()
         .map_err(|e| format!("couldn't parse key pem: {}", e))?;
 
-    repos.store(&subject_name, &cert_pem.data(), Some(key_pem.data()), &ski)?;
+    storage
+        .store(CertificateEntry {
+            name: subject_name,
+            cert: cert_pem.into_data().into_owned(),
+            key_identifier: ski,
+            key: Some(key_pem.into_data().into_owned()),
+        })
+        .map_err(|e| format!("couldn't store certificate: {}", e))?;
 
     Ok(())
 }
@@ -742,7 +756,7 @@ fn get_and_store_env_cert_info(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{configuration::BackendType, db::backend::Backend};
+    use crate::configuration::BackendType;
     use picky::{
         signature::SignatureHashType,
         x509::{date::UTCDate, name::DirectoryName},
@@ -757,12 +771,12 @@ mod tests {
     #[test]
     fn generate_chain_and_verify() {
         let config = config();
-        let backend = Backend::from(&config);
+        let storage = get_storage(&config);
 
         let ca_name = format!("{} Authority", config.realm);
 
-        generate_root_ca(&config, backend.db.as_ref()).expect("couldn't generate root ca");
-        generate_intermediate_ca(&config, backend.db.as_ref())
+        generate_root_ca(&config, storage.as_ref()).expect("couldn't generate root ca");
+        generate_intermediate_ca(&config, storage.as_ref())
             .expect("couldn't generate intermediate ca");
 
         let pk = Picky::generate_private_key(2048).expect("couldn't generate private key");
@@ -773,7 +787,7 @@ mod tests {
         )
         .expect("couldn't generate csr");
 
-        let signed_cert = sign_certificate(&ca_name, csr, &config, backend.db.as_ref())
+        let signed_cert = sign_certificate(&ca_name, csr, &config, storage.as_ref())
             .expect("couldn't sign certificate");
 
         let issuer_name = signed_cert
@@ -782,7 +796,7 @@ mod tests {
             .unwrap()
             .to_string();
         let chain_pem =
-            find_ca_chain(backend.db.as_ref(), &issuer_name).expect("couldn't fetch CA chain");
+            find_ca_chain(storage.as_ref(), &issuer_name).expect("couldn't fetch CA chain");
 
         assert_eq!(chain_pem.len(), 2);
 
