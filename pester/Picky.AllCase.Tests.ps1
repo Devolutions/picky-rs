@@ -5,23 +5,8 @@ param(
 
 if ($Debug) {
     Describe 'rust' {
-        It 'picky code formatting' {
-            Invoke-Expression "rustfmt +stable --check ../picky/src/lib.rs"
-            $LASTEXITCODE | Should -be 0 # please, run `cargo +stable fmt`
-        }
-
-        It 'picky-asn1 code formatting' {
-            Invoke-Expression "rustfmt +stable --check ../picky-asn1/src/lib.rs"
-            $LASTEXITCODE | Should -be 0 # please, run `cargo +stable fmt`
-        }
-
-        It 'picky-asn1-der code formatting' {
-            Invoke-Expression "rustfmt +stable --check ../picky-asn1-der/src/lib.rs"
-            $LASTEXITCODE | Should -be 0 # please, run `cargo +stable fmt`
-        }
-
-        It 'picky-server code formatting' {
-            Invoke-Expression "rustfmt +stable --check ../picky-server/src/main.rs"
+        It 'code formatting' {
+            Invoke-Expression "cargo +stable fmt --all -- --check 2>&1 | Out-Null"
             $LASTEXITCODE | Should -be 0 # please, run `cargo +stable fmt`
         }
 
