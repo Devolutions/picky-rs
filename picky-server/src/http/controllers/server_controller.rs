@@ -33,8 +33,7 @@ impl ServerController {
         }
 
         info!("Creating root CA...");
-        let created =
-            generate_root_ca(&config, storage.as_ref()).expect("couldn't generate root CA");
+        let created = generate_root_ca(&config, storage.as_ref()).expect("couldn't generate root CA");
         if created {
             info!("Root CA Created");
         } else {
@@ -42,8 +41,7 @@ impl ServerController {
         }
 
         info!("Creating intermediate CA...");
-        let created = generate_intermediate_ca(&config, storage.as_ref())
-            .expect("couldn't generate intermediate CA");
+        let created = generate_intermediate_ca(&config, storage.as_ref()).expect("couldn't generate intermediate CA");
         if created {
             info!("Intermediate Created");
         } else {
@@ -135,8 +133,7 @@ impl Display for Format {
 impl Format {
     fn request_format(req: &SyncRequest) -> Result<Self, String> {
         let content_type_opt = req.get_header_string_value("Content-Type");
-        let content_transfert_encoding_opt =
-            req.get_header_string_value("Content-Transfer-Encoding");
+        let content_transfert_encoding_opt = req.get_header_string_value("Content-Transfer-Encoding");
 
         if let Some(content_type) = content_type_opt {
             Self::new(
@@ -151,30 +148,15 @@ impl Format {
     fn response_format(req: &SyncRequest) -> Result<Self, String> {
         let accept_opt = req.get_header_string_value("Accept").map(|s| {
             // cannot panic
-            s.split(',')
-                .next()
-                .unwrap()
-                .split(';')
-                .next()
-                .unwrap()
-                .to_owned()
+            s.split(',').next().unwrap().split(';').next().unwrap().to_owned()
         });
         let accept_encoding_opt = req.get_header_string_value("Accept-Encoding").map(|s| {
             // cannot panic
-            s.split(',')
-                .next()
-                .unwrap()
-                .split(';')
-                .next()
-                .unwrap()
-                .to_owned()
+            s.split(',').next().unwrap().split(';').next().unwrap().to_owned()
         });
 
         if let Some(accept) = accept_opt {
-            Self::new(
-                accept.as_str(),
-                accept_encoding_opt.as_ref().map(|s| s.as_str()),
-            )
+            Self::new(accept.as_str(), accept_encoding_opt.as_ref().map(|s| s.as_str()))
         } else {
             Err("Accept header is missing".to_string())
         }
@@ -186,19 +168,15 @@ impl Format {
             ("application/json", _) => Ok(Self::Json),
             ("application/pkix-cert", Some("binary")) => Ok(Self::PkixCertBinary),
             ("application/pkix-cert", Some("base64")) => Ok(Self::PkixCertBase64),
-            ("application/pkix-cert", Some(unsupported)) => Err(format!(
-                "unsupported encoding format for pkix-cert: {}",
-                unsupported
-            )),
-            ("application/pkix-cert", None) => {
-                Err("format encoding for pkix-cert is missing".to_owned())
+            ("application/pkix-cert", Some(unsupported)) => {
+                Err(format!("unsupported encoding format for pkix-cert: {}", unsupported))
             }
+            ("application/pkix-cert", None) => Err("format encoding for pkix-cert is missing".to_owned()),
             ("application/pkcs10", Some("binary")) => Ok(Self::Pkcs10Binary),
             ("application/pkcs10", Some("base64")) => Ok(Self::Pkcs10Base64),
-            ("application/pkcs10", Some(unsupported)) => Err(format!(
-                "unsupported encoding format for pkcs10: {}",
-                unsupported
-            )),
+            ("application/pkcs10", Some(unsupported)) => {
+                Err(format!("unsupported encoding format for pkcs10: {}", unsupported))
+            }
             ("application/pkcs10", None) => Err("format encoding for pkcs10 is missing".to_owned()),
             (unsupported, _) => Err(format!("unsupported format: {}", unsupported)),
         }
@@ -209,8 +187,7 @@ impl Format {
 
 fn health(controller_data: &ControllerData, _req: &SyncRequest, res: &mut SyncResponse) {
     if controller_data.storage.health().is_ok() {
-        res.status(StatusCode::OK)
-            .body("Everything should be alright!");
+        res.status(StatusCode::OK).body("Everything should be alright!");
     } else {
         res.status(StatusCode::SERVICE_UNAVAILABLE);
     }
@@ -225,10 +202,7 @@ fn post_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut Sync
     let cert = match request_format {
         Format::PemFile => {
             let pem = saphir_try!(parse_pem(req.body()), "couldn't parse pem");
-            saphir_try!(
-                Cert::from_der(pem.data()),
-                "(pem) couldn't deserialize certificate"
-            )
+            saphir_try!(Cert::from_der(pem.data()), "(pem) couldn't deserialize certificate")
         }
         Format::Json => {
             let json = saphir_try!(
@@ -243,21 +217,12 @@ fn post_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut Sync
                     .parse::<Pem>(),
                 "(json) couldn't parse pem",
             );
-            saphir_try!(
-                Cert::from_der(pem.data()),
-                "(json) couldn't deserialize certificate"
-            )
+            saphir_try!(Cert::from_der(pem.data()), "(json) couldn't deserialize certificate")
         }
-        Format::PkixCertBinary => saphir_try!(
-            Cert::from_der(req.body()),
-            "(binary) couldn't deserialize certificate"
-        ),
+        Format::PkixCertBinary => saphir_try!(Cert::from_der(req.body()), "(binary) couldn't deserialize certificate"),
         Format::PkixCertBase64 => {
             let der = saphir_try!(base64::decode(&req.body()), "couldn't decode base64 body");
-            saphir_try!(
-                Cert::from_der(&der),
-                "(base64) couldn't deserialize certificate"
-            )
+            saphir_try!(Cert::from_der(&der), "(base64) couldn't deserialize certificate")
         }
         unexpected => {
             error!("unexpected request format: {}", unexpected);
@@ -265,10 +230,7 @@ fn post_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut Sync
         }
     };
 
-    let ski = hex::encode(saphir_try!(
-        cert.subject_key_identifier(),
-        "couldn't fetch SKI"
-    ));
+    let ski = hex::encode(saphir_try!(cert.subject_key_identifier(), "couldn't fetch SKI"));
 
     let issuer_name = unwrap_opt!(
         cert.issuer_name().find_common_name(),
@@ -302,11 +264,7 @@ fn post_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut Sync
 
 // === cert_signature_request ===
 
-fn cert_signature_request(
-    controller_data: &ControllerData,
-    req: &SyncRequest,
-    res: &mut SyncResponse,
-) {
+fn cert_signature_request(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse) {
     res.status(StatusCode::BAD_REQUEST);
 
     let request_format = saphir_try!(Format::request_format(req));
@@ -336,10 +294,7 @@ fn cert_signature_request(
             );
             saphir_try!(Csr::from_der(pem.data()), "(json) couldn't deserialize csr")
         }
-        Format::Pkcs10Binary => saphir_try!(
-            Csr::from_der(req.body()),
-            "(binary) couldn't deserialize csr"
-        ),
+        Format::Pkcs10Binary => saphir_try!(Csr::from_der(req.body()), "(binary) couldn't deserialize csr"),
         Format::Pkcs10Base64 => {
             let der = saphir_try!(base64::decode(&req.body()), "couldn't decode base64 body");
             saphir_try!(Csr::from_der(&der), "(base64) couldn't deserialize csr")
@@ -393,8 +348,7 @@ fn sign_certificate(
     let ca_cert_der = storage
         .get_cert_by_hash(&ca_hash)
         .map_err(|e| format!("couldn't get CA cert der: {}", e))?;
-    let ca_cert =
-        Cert::from_der(&ca_cert_der).map_err(|e| format!("couldn't deserialize CA cert: {}", e))?;
+    let ca_cert = Cert::from_der(&ca_cert_der).map_err(|e| format!("couldn't deserialize CA cert: {}", e))?;
 
     let ca_pk_der = storage
         .get_key_by_hash(&ca_hash)
@@ -407,9 +361,8 @@ fn sign_certificate(
         .ok_or_else(|| "couldn't find signed cert subject common name")?
         .to_string();
 
-    let signed_cert =
-        Picky::generate_leaf_from_csr(csr, &ca_cert, &ca_pk, config.key_config, &dns_name)
-            .map_err(|e| format!("couldn't generate leaf certificate: {}", e))?;
+    let signed_cert = Picky::generate_leaf_from_csr(csr, &ca_cert, &ca_pk, config.key_config, &dns_name)
+        .map_err(|e| format!("couldn't generate leaf certificate: {}", e))?;
 
     if config.save_certificate {
         let cert_der = signed_cert
@@ -454,13 +407,12 @@ fn get_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncR
     };
 
     // FIXME: deprecated
-    let response_format = Format::response_format(req).unwrap_or_else(|_| {
-        match req.captures().get("format").map(|s| s.as_str()) {
+    let response_format =
+        Format::response_format(req).unwrap_or_else(|_| match req.captures().get("format").map(|s| s.as_str()) {
             Some("der") => Format::PkixCertBinary,
             Some("base64") => Format::PkixCertBase64,
             _ => Format::PemFile,
-        }
-    });
+        });
 
     match response_format {
         Format::PemFile => {
@@ -506,9 +458,7 @@ fn get_chain(controller_data: &ControllerData, req: &SyncRequest, res: &mut Sync
     } else {
         error!(
             "Wrong path or can't decode base64: {}",
-            req.captures()
-                .get("ca")
-                .unwrap_or(&"No capture ca".to_string())
+            req.captures().get("ca").unwrap_or(&"No capture ca".to_string())
         );
     }
 }
@@ -524,8 +474,7 @@ fn find_ca_chain(storage: &dyn PickyStorage, ca_name: &str) -> Result<Vec<String
     let mut chain = vec![to_pem("CERTIFICATE", &cert_der)];
     let mut current_key_id = String::default();
     loop {
-        let cert = Cert::from_der(&cert_der)
-            .map_err(|e| format!("couldn't deserialize certificate: {}", e))?;
+        let cert = Cert::from_der(&cert_der).map_err(|e| format!("couldn't deserialize certificate: {}", e))?;
 
         let parent_key_id = hex::encode(
             cert.authority_key_identifier()
@@ -560,10 +509,7 @@ fn find_ca_chain(storage: &dyn PickyStorage, ca_name: &str) -> Result<Vec<String
 fn get_name(_: &ControllerData, req: &SyncRequest, res: &mut SyncResponse) {
     res.status(StatusCode::BAD_REQUEST);
 
-    let body = saphir_try!(
-        std::str::from_utf8(req.body()),
-        "couldn't parse body as utf8"
-    );
+    let body = saphir_try!(std::str::from_utf8(req.body()), "couldn't parse body as utf8");
     let json = saphir_try!(serde_json::from_str::<Value>(body), "couldn't parse json");
     let csr_pem = saphir_try!(
         json["csr"]
@@ -596,8 +542,7 @@ fn generate_root_ca(config: &ServerConfig, storage: &dyn PickyStorage) -> Result
         }
     }
 
-    let pk = Picky::generate_private_key(4096)
-        .map_err(|e| format!("couldn't generate private key: {}", e))?;
+    let pk = Picky::generate_private_key(4096).map_err(|e| format!("couldn't generate private key: {}", e))?;
     let root = Picky::generate_root(&name, &pk, config.key_config)
         .map_err(|e| format!("couldn't generate root certificate: {}", e))?;
     let ski = root
@@ -626,10 +571,7 @@ fn generate_root_ca(config: &ServerConfig, storage: &dyn PickyStorage) -> Result
 
 // === generate intermediate CA === //
 
-fn generate_intermediate_ca(
-    config: &ServerConfig,
-    storage: &dyn PickyStorage,
-) -> Result<bool, String> {
+fn generate_intermediate_ca(config: &ServerConfig, storage: &dyn PickyStorage) -> Result<bool, String> {
     let root_name = format!("{} Root CA", config.realm);
     let intermediate_name = format!("{} Authority", config.realm);
 
@@ -655,8 +597,7 @@ fn generate_intermediate_ca(
     };
 
     let pk = Picky::generate_private_key(2048).map_err(|e| e.to_string())?;
-    let root_cert = Cert::from_der(&root_cert_der)
-        .map_err(|e| format!("couldn't parse root cert from der: {}", e))?;
+    let root_cert = Cert::from_der(&root_cert_der).map_err(|e| format!("couldn't parse root cert from der: {}", e))?;
     let root_key = Picky::parse_pk_from_magic_der(&root_key_der).map_err(|e| e.to_string())?;
 
     let intermediate_cert = Picky::generate_intermediate(
@@ -672,12 +613,9 @@ fn generate_intermediate_ca(
         .subject_key_identifier()
         .map_err(|e| format!("couldn't fetch key id: {}", e))?;
 
-    let cert_der = intermediate_cert.to_der().map_err(|e| {
-        format!(
-            "couldn't serialize intermediate certificate into der: {}",
-            e
-        )
-    })?;
+    let cert_der = intermediate_cert
+        .to_der()
+        .map_err(|e| format!("couldn't serialize intermediate certificate into der: {}", e))?;
 
     let pk_pkcs8 = pk
         .to_pkcs8()
@@ -705,11 +643,7 @@ fn check_certs_in_env(config: &ServerConfig, storage: &dyn PickyStorage) -> Resu
     }
 
     if !config.intermediate_cert.is_empty() && !config.intermediate_key.is_empty() {
-        if let Err(e) = get_and_store_env_cert_info(
-            &config.intermediate_cert,
-            &config.intermediate_key,
-            storage,
-        ) {
+        if let Err(e) = get_and_store_env_cert_info(&config.intermediate_cert, &config.intermediate_key, storage) {
             return Err(e);
         }
     }
@@ -717,16 +651,11 @@ fn check_certs_in_env(config: &ServerConfig, storage: &dyn PickyStorage) -> Resu
     Ok(())
 }
 
-fn get_and_store_env_cert_info(
-    cert_pem: &str,
-    key_pem: &str,
-    storage: &dyn PickyStorage,
-) -> Result<(), String> {
+fn get_and_store_env_cert_info(cert_pem: &str, key_pem: &str, storage: &dyn PickyStorage) -> Result<(), String> {
     let cert_pem = cert_pem
         .parse::<Pem>()
         .map_err(|e| format!("couldn't parse cert pem: {}", e))?;
-    let cert = Cert::from_der(cert_pem.data())
-        .map_err(|e| format!("couldn't parse cert from der: {}", e))?;
+    let cert = Cert::from_der(cert_pem.data()).map_err(|e| format!("couldn't parse cert from der: {}", e))?;
     let ski = hex::encode(
         cert.subject_key_identifier()
             .map_err(|e| format!("couldn't parse fetch subject key identifier: {}", e))?,
@@ -776,8 +705,7 @@ mod tests {
         let ca_name = format!("{} Authority", config.realm);
 
         generate_root_ca(&config, storage.as_ref()).expect("couldn't generate root ca");
-        generate_intermediate_ca(&config, storage.as_ref())
-            .expect("couldn't generate intermediate ca");
+        generate_intermediate_ca(&config, storage.as_ref()).expect("couldn't generate intermediate ca");
 
         let pk = Picky::generate_private_key(2048).expect("couldn't generate private key");
         let csr = Csr::generate(
@@ -787,16 +715,11 @@ mod tests {
         )
         .expect("couldn't generate csr");
 
-        let signed_cert = sign_certificate(&ca_name, csr, &config, storage.as_ref())
-            .expect("couldn't sign certificate");
+        let signed_cert =
+            sign_certificate(&ca_name, csr, &config, storage.as_ref()).expect("couldn't sign certificate");
 
-        let issuer_name = signed_cert
-            .issuer_name()
-            .find_common_name()
-            .unwrap()
-            .to_string();
-        let chain_pem =
-            find_ca_chain(storage.as_ref(), &issuer_name).expect("couldn't fetch CA chain");
+        let issuer_name = signed_cert.issuer_name().find_common_name().unwrap().to_string();
+        let chain_pem = find_ca_chain(storage.as_ref(), &issuer_name).expect("couldn't fetch CA chain");
 
         assert_eq!(chain_pem.len(), 2);
 
@@ -830,18 +753,11 @@ mod tests {
 
     #[test]
     fn request_format() {
-        let format = Format::request_format(&new_saphir_request(vec![(
-            "Content-Type",
-            "application/x-pem-file",
-        )]))
-        .unwrap();
+        let format =
+            Format::request_format(&new_saphir_request(vec![("Content-Type", "application/x-pem-file")])).unwrap();
         assert_eq!(format, Format::PemFile);
 
-        let format = Format::request_format(&new_saphir_request(vec![(
-            "Content-Type",
-            "application/json",
-        )]))
-        .unwrap();
+        let format = Format::request_format(&new_saphir_request(vec![("Content-Type", "application/json")])).unwrap();
         assert_eq!(format, Format::Json);
 
         let format = Format::request_format(&new_saphir_request(vec![
@@ -861,17 +777,12 @@ mod tests {
 
     #[test]
     fn request_format_err() {
-        let err = Format::request_format(&new_saphir_request(vec![]))
-            .err()
-            .unwrap();
+        let err = Format::request_format(&new_saphir_request(vec![])).err().unwrap();
         assert_eq!(err, "Content-Type header is missing");
 
-        let err = Format::request_format(&new_saphir_request(vec![(
-            "Content-Type",
-            "application/pkcs10",
-        )]))
-        .err()
-        .unwrap();
+        let err = Format::request_format(&new_saphir_request(vec![("Content-Type", "application/pkcs10")]))
+            .err()
+            .unwrap();
         assert_eq!(err, "format encoding for pkcs10 is missing");
 
         let err = Format::request_format(&new_saphir_request(vec![
@@ -893,11 +804,7 @@ mod tests {
 
     #[test]
     fn response_format() {
-        let format = Format::response_format(&new_saphir_request(vec![(
-            "Accept",
-            "application/x-pem-file",
-        )]))
-        .unwrap();
+        let format = Format::response_format(&new_saphir_request(vec![("Accept", "application/x-pem-file")])).unwrap();
         assert_eq!(format, Format::PemFile);
 
         let format = Format::response_format(&new_saphir_request(vec![(
@@ -927,9 +834,7 @@ mod tests {
 
     #[test]
     fn response_format_err() {
-        let err = Format::response_format(&new_saphir_request(vec![]))
-            .err()
-            .unwrap();
+        let err = Format::response_format(&new_saphir_request(vec![])).err().unwrap();
         assert_eq!(err, "Accept header is missing");
     }
 }

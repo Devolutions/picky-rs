@@ -12,11 +12,7 @@ impl HttpServer {
     pub fn new(config: ServerConfig) -> Self {
         let server = SaphirServer::builder()
             .configure_middlewares(|middle_stack| {
-                middle_stack.apply(
-                    AuthMiddleware::new(config.clone()),
-                    vec!["/sign", "/signcert"],
-                    None,
-                )
+                middle_stack.apply(AuthMiddleware::new(config.clone()), vec!["/sign", "/signcert"], None)
             })
             .configure_router(|router: Builder| {
                 let controller = ServerController::new(config);

@@ -18,8 +18,7 @@ pub use algorithm_identifier::AlgorithmIdentifier;
 
 #[cfg(test)]
 mod test_files {
-    pub const RSA_4096_PK_3_UNSUPPORTED: &str =
-        include_str!("../../test_assets/private_keys/rsa-4096-pk_3.key");
+    pub const RSA_4096_PK_3_UNSUPPORTED: &str = include_str!("../../test_assets/private_keys/rsa-4096-pk_3.key");
 
     cfg_if::cfg_if! { if #[cfg(feature = "x509")] {
         pub const RSA_2048_PK_1: &str =

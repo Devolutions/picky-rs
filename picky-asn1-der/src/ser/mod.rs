@@ -6,10 +6,7 @@ mod utf8_string;
 
 use crate::{
     misc::{Length, WriteExt},
-    ser::{
-        boolean::Boolean, integer::UnsignedInteger, null::Null, sequence::Sequence,
-        utf8_string::Utf8String,
-    },
+    ser::{boolean::Boolean, integer::UnsignedInteger, null::Null, sequence::Sequence, utf8_string::Utf8String},
     Asn1DerError, Result,
 };
 use picky_asn1::{tag::Tag, wrapper::*, Asn1Type};
@@ -266,11 +263,7 @@ impl<'a, 'se> serde::ser::Serializer for &'a mut Serializer<'se> {
         Err(Asn1DerError::UnsupportedType)
     }
 
-    fn serialize_newtype_struct<T: ?Sized + Serialize>(
-        mut self,
-        name: &'static str,
-        value: &T,
-    ) -> Result<Self::Ok> {
+    fn serialize_newtype_struct<T: ?Sized + Serialize>(mut self, name: &'static str, value: &T) -> Result<Self::Ok> {
         debug_log!("serialize_newtype_struct: {}", name);
 
         match name {
@@ -349,11 +342,7 @@ impl<'a, 'se> serde::ser::Serializer for &'a mut Serializer<'se> {
         self.serialize_seq(Some(len))
     }
 
-    fn serialize_tuple_struct(
-        self,
-        _name: &'static str,
-        len: usize,
-    ) -> Result<Self::SerializeTupleStruct> {
+    fn serialize_tuple_struct(self, _name: &'static str, len: usize) -> Result<Self::SerializeTupleStruct> {
         debug_log!("serialize_tuple_struct: {}({})", _name, len);
         self.serialize_seq(Some(len))
     }
@@ -425,11 +414,7 @@ impl<'a, 'se> serde::ser::SerializeStructVariant for &'a mut Serializer<'se> {
     type Ok = usize;
     type Error = Asn1DerError;
 
-    fn serialize_field<T: ?Sized + Serialize>(
-        &mut self,
-        _key: &'static str,
-        _value: &T,
-    ) -> Result<()> {
+    fn serialize_field<T: ?Sized + Serialize>(&mut self, _key: &'static str, _value: &T) -> Result<()> {
         unimplemented!("The implementation does not support struct variants")
     }
 

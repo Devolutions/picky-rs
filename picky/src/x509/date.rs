@@ -10,9 +10,7 @@ pub struct UTCDate(GeneralizedTime);
 impl UTCDate {
     #[inline]
     pub fn new(year: u16, month: u8, day: u8, hour: u8, minute: u8, second: u8) -> Option<Self> {
-        Some(Self(GeneralizedTime::new(
-            year, month, day, hour, minute, second,
-        )?))
+        Some(Self(GeneralizedTime::new(year, month, day, hour, minute, second)?))
     }
 
     #[inline]

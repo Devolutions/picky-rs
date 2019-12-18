@@ -12,9 +12,7 @@ where
     where
         S: ser::Serializer;
 
-    fn deserialize<'de, D>(
-        deserializer: D,
-    ) -> Result<Date<Self>, <D as de::Deserializer<'de>>::Error>
+    fn deserialize<'de, D>(deserializer: D) -> Result<Date<Self>, <D as de::Deserializer<'de>>::Error>
     where
         D: de::Deserializer<'de>;
 }
@@ -37,14 +35,7 @@ impl<TR: TimeRepr> Date<TR> {
     /// # Safety
     ///
     /// You have to make sure you're not building an invalid date.
-    pub unsafe fn new_unchecked(
-        year: u16,
-        month: u8,
-        day: u8,
-        hour: u8,
-        minute: u8,
-        second: u8,
-    ) -> Date<TR> {
+    pub unsafe fn new_unchecked(year: u16, month: u8, day: u8, hour: u8, minute: u8, second: u8) -> Date<TR> {
         Self {
             year,
             month,
@@ -56,22 +47,8 @@ impl<TR: TimeRepr> Date<TR> {
         }
     }
 
-    pub fn new(
-        year: u16,
-        month: u8,
-        day: u8,
-        hour: u8,
-        minute: u8,
-        second: u8,
-    ) -> Option<Date<TR>> {
-        if month >= 1
-            && month <= 12
-            && day >= 1
-            && day <= 31
-            && hour < 24
-            && minute < 60
-            && second < 60
-        {
+    pub fn new(year: u16, month: u8, day: u8, hour: u8, minute: u8, second: u8) -> Option<Date<TR>> {
+        if month >= 1 && month <= 12 && day >= 1 && day <= 31 && hour < 24 && minute < 60 && second < 60 {
             Some(Self {
                 year,
                 month,
@@ -112,10 +89,7 @@ impl<TR: TimeRepr> Date<TR> {
 }
 
 impl<TR: TimeRepr> ser::Serialize for Date<TR> {
-    fn serialize<S>(
-        &self,
-        serializer: S,
-    ) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
     where
         S: ser::Serializer,
     {
@@ -153,10 +127,7 @@ pub struct UTCTimeRepr;
 pub type UTCTime = Date<UTCTimeRepr>;
 
 impl TimeRepr for UTCTimeRepr {
-    fn serialize<S>(
-        date: &Date<UTCTimeRepr>,
-        serializer: S,
-    ) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+    fn serialize<S>(date: &Date<UTCTimeRepr>, serializer: S) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
     where
         S: ser::Serializer,
     {
@@ -186,9 +157,7 @@ impl TimeRepr for UTCTimeRepr {
         serializer.serialize_bytes(&encoded)
     }
 
-    fn deserialize<'de, D>(
-        deserializer: D,
-    ) -> Result<Date<UTCTimeRepr>, <D as Deserializer<'de>>::Error>
+    fn deserialize<'de, D>(deserializer: D) -> Result<Date<UTCTimeRepr>, <D as Deserializer<'de>>::Error>
     where
         D: de::Deserializer<'de>,
     {
@@ -253,8 +222,7 @@ impl TimeRepr for GeneralizedTimeRepr {
         S: ser::Serializer,
     {
         let mut encoded = [
-            0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30,
-            0x5A,
+            0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x5A,
         ];
 
         encoded[0] |= (date.year() / 1000) as u8;
@@ -275,9 +243,7 @@ impl TimeRepr for GeneralizedTimeRepr {
         serializer.serialize_bytes(&encoded)
     }
 
-    fn deserialize<'de, D>(
-        deserializer: D,
-    ) -> Result<Date<GeneralizedTimeRepr>, <D as Deserializer<'de>>::Error>
+    fn deserialize<'de, D>(deserializer: D) -> Result<Date<GeneralizedTimeRepr>, <D as Deserializer<'de>>::Error>
     where
         D: de::Deserializer<'de>,
     {
@@ -301,8 +267,7 @@ impl TimeRepr for GeneralizedTimeRepr {
                     ));
                 }
 
-                let yyyy = v.read_and_merge_with_next(0) as u16 * 100
-                    + v.read_and_merge_with_next(2) as u16;
+                let yyyy = v.read_and_merge_with_next(0) as u16 * 100 + v.read_and_merge_with_next(2) as u16;
                 let month = v.read_and_merge_with_next(4);
                 let day = v.read_and_merge_with_next(6);
                 let hour = v.read_and_merge_with_next(8);
@@ -354,12 +319,7 @@ mod chrono_conversion {
 
     impl<TR: TimeRepr> Into<NaiveDateTime> for Date<TR> {
         fn into(self) -> NaiveDateTime {
-            NaiveDate::from_ymd(
-                i32::from(self.year),
-                u32::from(self.month),
-                u32::from(self.day),
-            )
-            .and_hms(
+            NaiveDate::from_ymd(i32::from(self.year), u32::from(self.month), u32::from(self.day)).and_hms(
                 u32::from(self.hour),
                 u32::from(self.minute),
                 u32::from(self.second),

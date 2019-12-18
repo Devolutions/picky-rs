@@ -17,8 +17,7 @@ impl<T> Primitive<T> {
     where
         T: Serialize + Debug,
     {
-        let ser = to_vec(&self.value)
-            .unwrap_or_else(|_| panic!("Failed to serialize value @{}", self.line));
+        let ser = to_vec(&self.value).unwrap_or_else(|_| panic!("Failed to serialize value @{}", self.line));
         assert_eq!(ser, self.der__, "Invalid serialized value @{}", self.line);
         self
     }
@@ -27,8 +26,7 @@ impl<T> Primitive<T> {
     where
         T: Deserialize<'a> + Debug + PartialEq + 'a,
     {
-        let de: T = from_bytes(&self.der__)
-            .unwrap_or_else(|_| panic!("Failed to deserialize value @{}", self.line));
+        let de: T = from_bytes(&self.der__).unwrap_or_else(|_| panic!("Failed to deserialize value @{}", self.line));
         assert_eq!(de, self.value, "Invalid serialized value @{}", self.line);
     }
 }
@@ -77,12 +75,7 @@ impl PrimitiveErr {
         let err = from_bytes::<T>(&self.der__)
             .err()
             .unwrap_or_else(|| panic!("Illegal successful deserialization @{}", self.line));
-        assert_eq!(
-            format!("{:?}", err),
-            self.error,
-            "Invalid error @{}",
-            self.line
-        );
+        assert_eq!(format!("{:?}", err), self.error, "Invalid error @{}", self.line);
     }
 }
 

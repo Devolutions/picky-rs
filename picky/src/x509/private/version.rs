@@ -94,8 +94,7 @@ mod tests {
 
     #[test]
     fn optional_version() {
-        let buffer_with_version: [u8; 10] =
-            [0x30, 0x08, 0xA9, 0x03, 0x02, 0x01, 0x02, 0x02, 0x01, 0x6E];
+        let buffer_with_version: [u8; 10] = [0x30, 0x08, 0xA9, 0x03, 0x02, 0x01, 0x02, 0x02, 0x01, 0x6E];
 
         let non_default = OptionalVersionTestStruct {
             version: ApplicationTag9(Version::V3).into(),

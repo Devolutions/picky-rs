@@ -58,12 +58,7 @@ impl<Model: serde::ser::Serialize> MongoRepository<Model> {
         Ok(self.mongo_conn.get()?.collection(self.collection_name))
     }
 
-    pub fn update_with_options(
-        &self,
-        doc: Document,
-        model: Model,
-        upsert: bool,
-    ) -> Result<(), MongoStorageError> {
+    pub fn update_with_options(&self, doc: Document, model: Model, upsert: bool) -> Result<(), MongoStorageError> {
         let serialized_model = to_bson(&model)?;
 
         if let Bson::Document(mut document) = serialized_model {

@@ -65,11 +65,7 @@ impl<'a, 'se> serde::ser::SerializeStruct for Sequence<'a, 'se> {
     type Ok = usize;
     type Error = Asn1DerError;
 
-    fn serialize_field<T: ?Sized + Serialize>(
-        &mut self,
-        _key: &'static str,
-        value: &T,
-    ) -> Result<()> {
+    fn serialize_field<T: ?Sized + Serialize>(&mut self, _key: &'static str, value: &T) -> Result<()> {
         self.write_object(value)
     }
     fn end(self) -> Result<Self::Ok> {

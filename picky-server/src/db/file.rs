@@ -50,16 +50,14 @@ where
         // This isn't an efficient way to proceed.
         // Implementing a lazy wrapper would be a better approach should this be used in production.
         let mut coll = Vec::new();
-        let d = std::fs::read_dir(&self.folder_path)
-            .map_err(|e| format!("repository folder not found: {}", e))?;
+        let d = std::fs::read_dir(&self.folder_path).map_err(|e| format!("repository folder not found: {}", e))?;
         for f in d {
             let f = f.map_err(|e| format!("error looking for directory: {}", e))?;
-            coll.push(f.file_name().into_string().map_err(|e| {
-                format!(
-                    "error writing filename from OsString: {}",
-                    e.to_string_lossy()
-                )
-            })?);
+            coll.push(
+                f.file_name()
+                    .into_string()
+                    .map_err(|e| format!("error writing filename from OsString: {}", e.to_string_lossy()))?,
+            );
         }
         Ok(coll)
     }
@@ -97,22 +95,14 @@ impl FileStorage {
         };
 
         FileStorage {
-            name: FileRepo::new(path.clone(), REPO_CERTNAME)
-                .expect("couldn't initialize name repo"),
-            cert: FileRepo::new(path.clone(), REPO_CERTIFICATE)
-                .expect("couldn't initialize cert repo"),
+            name: FileRepo::new(path.clone(), REPO_CERTNAME).expect("couldn't initialize name repo"),
+            cert: FileRepo::new(path.clone(), REPO_CERTIFICATE).expect("couldn't initialize cert repo"),
             keys: FileRepo::new(path.clone(), REPO_KEY).expect("couldn't initialize keys repo"),
-            key_identifiers: FileRepo::new(path, REPO_KEYIDENTIFIER)
-                .expect("couldn't initialize key identifiers repo"),
+            key_identifiers: FileRepo::new(path, REPO_KEYIDENTIFIER).expect("couldn't initialize key identifiers repo"),
         }
     }
 
-    fn h_get(
-        &self,
-        hash: &str,
-        repo: &FileRepo<Vec<u8>>,
-        type_err: &'static str,
-    ) -> Result<Vec<u8>, FileStorageError> {
+    fn h_get(&self, hash: &str, repo: &FileRepo<Vec<u8>>, type_err: &'static str) -> Result<Vec<u8>, FileStorageError> {
         let hash = format!("{}{}", hash, DER_EXT);
         let repo_collection = if let Ok(repo_collection) = repo.get_collection() {
             repo_collection
@@ -158,17 +148,13 @@ impl PickyStorage for FileStorage {
             description: format!("couldn't hash certificate der: {}", e),
         })?;
 
-        self.name.insert(
-            &format!("{}{}", name.replace(" ", "_"), TXT_EXT),
-            &cert_hash,
-        )?;
+        self.name
+            .insert(&format!("{}{}", name.replace(" ", "_"), TXT_EXT), &cert_hash)?;
 
-        self.cert
-            .insert(&format!("{}{}", cert_hash, DER_EXT), &cert.to_vec())?;
+        self.cert.insert(&format!("{}{}", cert_hash, DER_EXT), &cert.to_vec())?;
 
         if let Some(key) = key {
-            self.keys
-                .insert(&format!("{}{}", cert_hash, DER_EXT), &key.to_vec())?;
+            self.keys.insert(&format!("{}{}", cert_hash, DER_EXT), &key.to_vec())?;
         }
 
         self.key_identifiers

@@ -12,22 +12,19 @@ impl ParseStr for &'static str {
 impl ParseStr for usize {
     fn parse_str(line: usize, to_parse: &'static str) -> Self {
         use std::str::FromStr;
-        usize::from_str(to_parse)
-            .unwrap_or_else(|_| panic!("Test vector contains invalid usize @{}", line))
+        usize::from_str(to_parse).unwrap_or_else(|_| panic!("Test vector contains invalid usize @{}", line))
     }
 }
 impl ParseStr for bool {
     fn parse_str(line: usize, to_parse: &'static str) -> Self {
         use std::str::FromStr;
-        bool::from_str(to_parse)
-            .unwrap_or_else(|_| panic!("Test vector contains invalid usize @{}", line))
+        bool::from_str(to_parse).unwrap_or_else(|_| panic!("Test vector contains invalid usize @{}", line))
     }
 }
 impl ParseStr for u128 {
     fn parse_str(line: usize, to_parse: &'static str) -> Self {
         use std::str::FromStr;
-        u128::from_str(to_parse)
-            .unwrap_or_else(|_| panic!("Test vector contains invalid usize @{}", line))
+        u128::from_str(to_parse).unwrap_or_else(|_| panic!("Test vector contains invalid usize @{}", line))
     }
 }
 impl ParseStr for () {
@@ -46,10 +43,7 @@ impl ParseStr for Vec<u8> {
                 n @ b'0'..=b'9' => n - b'0',
                 n @ b'a'..=b'f' => (n - b'a') + 10,
                 n @ b'A'..=b'F' => (n - b'A') + 10,
-                n => panic!(
-                    "Test vector contains invalid hex char \"{:02x}\" @{}",
-                    n, line
-                ),
+                n => panic!("Test vector contains invalid hex char \"{:02x}\" @{}", n, line),
             }
         };
 
@@ -60,13 +54,10 @@ impl ParseStr for Vec<u8> {
             "Test vector contains invalid hex string @{}",
             line
         );
-        to_parse
-            .as_bytes()
-            .chunks(2)
-            .fold(Self::new(), |mut vec, pair| {
-                vec.push(decode(pair[0]) << 4 | decode(pair[1]));
-                vec
-            })
+        to_parse.as_bytes().chunks(2).fold(Self::new(), |mut vec, pair| {
+            vec.push(decode(pair[0]) << 4 | decode(pair[1]));
+            vec
+        })
     }
 }
 impl ParseStr for serde_bytes::ByteBuf {

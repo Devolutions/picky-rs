@@ -71,19 +71,14 @@ impl From<PrintableStringAsn1> for DirectoryString {
 impl Into<String> for DirectoryString {
     fn into(self) -> String {
         match self {
-            DirectoryString::PrintableString(string) => {
-                String::from_utf8_lossy(string.as_bytes()).into()
-            }
+            DirectoryString::PrintableString(string) => String::from_utf8_lossy(string.as_bytes()).into(),
             DirectoryString::Utf8String(string) => string,
         }
     }
 }
 
 impl ser::Serialize for DirectoryString {
-    fn serialize<S>(
-        &self,
-        serializer: S,
-    ) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
     where
         S: ser::Serializer,
     {
@@ -114,12 +109,8 @@ impl<'de> de::Deserialize<'de> for DirectoryString {
             {
                 // cannot panic with DER deserializer
                 match seq.next_element::<TagPeeker>()?.unwrap().next_tag {
-                    Tag::UTF8_STRING => {
-                        Ok(DirectoryString::Utf8String(seq.next_element()?.unwrap()))
-                    }
-                    Tag::PRINTABLE_STRING => Ok(DirectoryString::PrintableString(
-                        seq.next_element()?.unwrap(),
-                    )),
+                    Tag::UTF8_STRING => Ok(DirectoryString::Utf8String(seq.next_element()?.unwrap())),
+                    Tag::PRINTABLE_STRING => Ok(DirectoryString::PrintableString(seq.next_element()?.unwrap())),
                     Tag::TELETEX_STRING => Err(de::Error::invalid_value(
                         de::Unexpected::Other("[DirectoryString] TeletexString not supported"),
                         &"a supported string type",
@@ -140,10 +131,6 @@ impl<'de> de::Deserialize<'de> for DirectoryString {
             }
         }
 
-        deserializer.deserialize_enum(
-            "DirectoryString",
-            &["PrintableString", "Utf8String"],
-            Visitor,
-        )
+        deserializer.deserialize_enum("DirectoryString", &["PrintableString", "Utf8String"], Visitor)
     }
 }

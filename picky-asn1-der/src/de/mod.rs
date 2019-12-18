@@ -5,10 +5,7 @@ mod sequence;
 mod utf8_string;
 
 use crate::{
-    de::{
-        boolean::Boolean, integer::UnsignedInteger, null::Null, sequence::Sequence,
-        utf8_string::Utf8String,
-    },
+    de::{boolean::Boolean, integer::UnsignedInteger, null::Null, sequence::Sequence, utf8_string::Utf8String},
     misc::{Length, PeekableReader, ReadExt},
     Asn1DerError, Result,
 };
@@ -98,9 +95,7 @@ impl<'de> Deserializer<'de> {
                 let encapsulator_tag = *encapsulator_tag;
 
                 if peeked.len() < cursor + 2 {
-                    debug_log!(
-                        "peek_object: TRUNCATED DATA (couldn't read encapsulator tag or length)"
-                    );
+                    debug_log!("peek_object: TRUNCATED DATA (couldn't read encapsulator tag or length)");
                     return Err(Asn1DerError::TruncatedData);
                 }
 
@@ -116,8 +111,7 @@ impl<'de> Deserializer<'de> {
                 }
 
                 let length = {
-                    let len =
-                        Length::deserialized(&mut Cursor::new(&peeked.buffer()[cursor + 1..]))?;
+                    let len = Length::deserialized(&mut Cursor::new(&peeked.buffer()[cursor + 1..]))?;
                     Length::encoded_len(len)
                 };
 
@@ -469,20 +463,12 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
         visitor.visit_unit()
     }
 
-    fn deserialize_unit_struct<V: Visitor<'de>>(
-        self,
-        _name: &'static str,
-        visitor: V,
-    ) -> Result<V::Value> {
+    fn deserialize_unit_struct<V: Visitor<'de>>(self, _name: &'static str, visitor: V) -> Result<V::Value> {
         debug_log!("deserialize_unit_struct");
         self.deserialize_unit(visitor)
     }
 
-    fn deserialize_newtype_struct<V: Visitor<'de>>(
-        self,
-        name: &'static str,
-        visitor: V,
-    ) -> Result<V::Value> {
+    fn deserialize_newtype_struct<V: Visitor<'de>>(self, name: &'static str, visitor: V) -> Result<V::Value> {
         debug_log!("deserialize_newtype_struct: {}", name);
         match name {
             BitStringAsn1Container::<()>::NAME => self.h_encapsulate(Tag::BIT_STRING),

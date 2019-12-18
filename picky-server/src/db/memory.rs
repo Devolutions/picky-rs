@@ -31,9 +31,7 @@ where
     T: Eq + Clone + Hash,
 {
     fn get_collection(&'a self) -> RwLockReadGuard<'a, HashMap<String, T>> {
-        self.repo
-            .read()
-            .expect("couldn't get read lock on repo (poisoned)")
+        self.repo.read().expect("couldn't get read lock on repo (poisoned)")
     }
 
     fn insert(&self, key: String, value: T) {

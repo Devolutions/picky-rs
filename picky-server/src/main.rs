@@ -43,11 +43,7 @@ fn init_logs(config: &ServerConfig) {
         .logger(Logger::builder().build("tokio_reactor", LevelFilter::Off))
         .logger(Logger::builder().build("tokio_threadpool", LevelFilter::Off))
         .logger(Logger::builder().build("tokio_core", LevelFilter::Off))
-        .build(
-            Root::builder()
-                .appender("stdout")
-                .build(config.level_filter()),
-        )
+        .build(Root::builder().appender("stdout").build(config.level_filter()))
         .expect("Unable to configure logger");
 
     if let Err(e) = log4rs::init_config(config) {
@@ -57,21 +53,13 @@ fn init_logs(config: &ServerConfig) {
 
 #[cfg(any(feature = "pre-gen-pk", all(debug_assertions, test)))]
 pub mod test_files {
-    pub const RSA_2048_PK_1: &str =
-        include_str!("../../test_assets/private_keys/rsa-2048-pk_1.key");
-    pub const RSA_2048_PK_2: &str =
-        include_str!("../../test_assets/private_keys/rsa-2048-pk_2.key");
-    pub const RSA_2048_PK_3: &str =
-        include_str!("../../test_assets/private_keys/rsa-2048-pk_3.key");
-    pub const RSA_2048_PK_4: &str =
-        include_str!("../../test_assets/private_keys/rsa-2048-pk_4.key");
-    pub const RSA_2048_PK_5: &str =
-        include_str!("../../test_assets/private_keys/rsa-2048-pk_5.key");
-    pub const RSA_2048_PK_6: &str =
-        include_str!("../../test_assets/private_keys/rsa-2048-pk_6.key");
-    pub const RSA_4096_PK_1: &str =
-        include_str!("../../test_assets/private_keys/rsa-4096-pk_1.key");
-    pub const RSA_4096_PK_2: &str =
-        include_str!("../../test_assets/private_keys/rsa-4096-pk_2.key");
+    pub const RSA_2048_PK_1: &str = include_str!("../../test_assets/private_keys/rsa-2048-pk_1.key");
+    pub const RSA_2048_PK_2: &str = include_str!("../../test_assets/private_keys/rsa-2048-pk_2.key");
+    pub const RSA_2048_PK_3: &str = include_str!("../../test_assets/private_keys/rsa-2048-pk_3.key");
+    pub const RSA_2048_PK_4: &str = include_str!("../../test_assets/private_keys/rsa-2048-pk_4.key");
+    pub const RSA_2048_PK_5: &str = include_str!("../../test_assets/private_keys/rsa-2048-pk_5.key");
+    pub const RSA_2048_PK_6: &str = include_str!("../../test_assets/private_keys/rsa-2048-pk_6.key");
+    pub const RSA_4096_PK_1: &str = include_str!("../../test_assets/private_keys/rsa-4096-pk_1.key");
+    pub const RSA_4096_PK_2: &str = include_str!("../../test_assets/private_keys/rsa-4096-pk_2.key");
     //pub const RSA_4096_PK_3: &str = include_str!("../../test_assets/private_keys/rsa-4096-pk_3.key");
 }

@@ -7,10 +7,9 @@ use crate::{
         mongodb::{
             mongo_connection::MongoConnection,
             mongo_repository::{
-                CertificateModel, CertificateStoreRepository, KeyIdentifierModel,
-                KeyIdentifierStoreRepository, KeyModel, KeyStoreRepository, NameModel,
-                NameStoreRepository, CERTIFICATE_COLLECTION_NAME, KEY_IDENTIFIER_COLLECTION_NAME,
-                KEY_STORE_COLLECTION_NAME, NAME_STORE_COLLECTION_NAME,
+                CertificateModel, CertificateStoreRepository, KeyIdentifierModel, KeyIdentifierStoreRepository,
+                KeyModel, KeyStoreRepository, NameModel, NameStoreRepository, CERTIFICATE_COLLECTION_NAME,
+                KEY_IDENTIFIER_COLLECTION_NAME, KEY_STORE_COLLECTION_NAME, NAME_STORE_COLLECTION_NAME,
             },
         },
         CertificateEntry, PickyStorage, StorageError,
@@ -107,19 +106,12 @@ pub struct MongoStorage {
 
 impl MongoStorage {
     pub fn new(config: &ServerConfig) -> Self {
-        let db =
-            MongoConnection::new(&config.database.url).expect("couldn't build mongo connection");
+        let db = MongoConnection::new(&config.database.url).expect("couldn't build mongo connection");
 
         MongoStorage {
             mongo_conn: db.clone(),
-            certificate_store: CertificateStoreRepository::new(
-                db.clone(),
-                CERTIFICATE_COLLECTION_NAME,
-            ),
-            key_identifier_store: KeyIdentifierStoreRepository::new(
-                db.clone(),
-                KEY_IDENTIFIER_COLLECTION_NAME,
-            ),
+            certificate_store: CertificateStoreRepository::new(db.clone(), CERTIFICATE_COLLECTION_NAME),
+            key_identifier_store: KeyIdentifierStoreRepository::new(db.clone(), KEY_IDENTIFIER_COLLECTION_NAME),
             key_store: KeyStoreRepository::new(db.clone(), KEY_STORE_COLLECTION_NAME),
             name_store: NameStoreRepository::new(db, NAME_STORE_COLLECTION_NAME),
         }
@@ -128,11 +120,9 @@ impl MongoStorage {
 
 impl PickyStorage for MongoStorage {
     fn health(&self) -> Result<(), StorageError> {
-        self.mongo_conn
-            .ping()
-            .map_err(|e| MongoStorageError::Other {
-                description: format!("ping to mongo connexion failed: {}", e),
-            })?;
+        self.mongo_conn.ping().map_err(|e| MongoStorageError::Other {
+            description: format!("ping to mongo connexion failed: {}", e),
+        })?;
         Ok(())
     }
 
@@ -148,32 +138,23 @@ impl PickyStorage for MongoStorage {
 
         let name_doc = doc!("key": name.clone());
         let name_item = NameModel::new(name, cert_hash.clone());
-        self.name_store
-            .update_with_options(name_doc, name_item, true)?;
+        self.name_store.update_with_options(name_doc, name_item, true)?;
 
         let certificate_doc = doc!("key": cert_hash.clone());
-        let certificate_item = CertificateModel::new(
-            cert_hash.clone(),
-            Bson::Binary(BinarySubtype::Generic, cert),
-        );
+        let certificate_item = CertificateModel::new(cert_hash.clone(), Bson::Binary(BinarySubtype::Generic, cert));
         self.certificate_store
             .update_with_options(certificate_doc, certificate_item, true)?;
 
         if let Some(key) = key {
             let key_doc = doc!("key": cert_hash.clone());
-            let key_item =
-                KeyModel::new(cert_hash.clone(), Bson::Binary(BinarySubtype::Generic, key));
-            self.key_store
-                .update_with_options(key_doc, key_item, true)?;
+            let key_item = KeyModel::new(cert_hash.clone(), Bson::Binary(BinarySubtype::Generic, key));
+            self.key_store.update_with_options(key_doc, key_item, true)?;
         }
 
         let key_identifier_doc = doc!("key": key_identifier.clone());
         let key_identifier_item = KeyIdentifierModel::new(key_identifier, cert_hash);
-        self.key_identifier_store.update_with_options(
-            key_identifier_doc,
-            key_identifier_item,
-            true,
-        )?;
+        self.key_identifier_store
+            .update_with_options(key_identifier_doc, key_identifier_item, true)?;
 
         Ok(())
     }
@@ -207,12 +188,12 @@ impl PickyStorage for MongoStorage {
     }
 
     fn get_key_by_hash(&self, hash: &str) -> Result<Vec<u8>, StorageError> {
-        let key =
-            self.key_store
-                .get(doc!("key": hash))?
-                .ok_or_else(|| MongoStorageError::Other {
-                    description: "key not found".to_owned(),
-                })?;
+        let key = self
+            .key_store
+            .get(doc!("key": hash))?
+            .ok_or_else(|| MongoStorageError::Other {
+                description: "key not found".to_owned(),
+            })?;
         match key.value {
             Bson::Binary(BinarySubtype::Generic, bin) => Ok(bin),
             unexpected => Err(MongoStorageError::Other {

@@ -236,10 +236,7 @@ define_special_tag! {
     ContextTag15     => Tag::CTX_15,
 }
 
-fn serialize_vec<S, T>(
-    elems: &[T],
-    serializer: S,
-) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
+fn serialize_vec<S, T>(elems: &[T], serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
 where
     S: ser::Serializer,
     T: Serialize,
@@ -395,9 +392,7 @@ where
     serializer.serialize_bytes(&[Phantom::TAG.number(), 0x00][..])
 }
 
-fn deserialize_header_only<'de, D, Phantom>(
-    deserializer: D,
-) -> Result<std::marker::PhantomData<Phantom>, D::Error>
+fn deserialize_header_only<'de, D, Phantom>(deserializer: D) -> Result<std::marker::PhantomData<Phantom>, D::Error>
 where
     D: de::Deserializer<'de>,
     Phantom: Asn1Type,
@@ -677,8 +672,7 @@ where
             }
         }
 
-        match deserializer.deserialize_newtype_struct("Implicit", Visitor(std::marker::PhantomData))
-        {
+        match deserializer.deserialize_newtype_struct("Implicit", Visitor(std::marker::PhantomData)) {
             Err(_) => Ok(Self(T::default())),
             result => result,
         }

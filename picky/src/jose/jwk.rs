@@ -159,12 +159,10 @@ impl Jwk {
         use picky_asn1::wrapper::BitStringAsn1Container;
 
         match &public_key.as_inner().subject_public_key {
-            SerdePublicKey::RSA(BitStringAsn1Container(rsa)) => {
-                Ok(Self::new(JwkKeyType::new_rsa_key(
-                    rsa.modulus.as_signed_bytes_be(),
-                    rsa.public_exponent.as_signed_bytes_be(),
-                )))
-            }
+            SerdePublicKey::RSA(BitStringAsn1Container(rsa)) => Ok(Self::new(JwkKeyType::new_rsa_key(
+                rsa.modulus.as_signed_bytes_be(),
+                rsa.public_exponent.as_signed_bytes_be(),
+            ))),
             SerdePublicKey::EC(_) => Err(JwkError::UnsupportedAlgorithm {
                 algorithm: "elliptic curves",
             }),
@@ -182,10 +180,7 @@ impl Jwk {
     pub fn to_public_key(&self) -> Result<OwnedPublicKey, JwkError> {
         match &self.key {
             JwkKeyType::Rsa(rsa) => {
-                let spki = SubjectPublicKeyInfo::new_rsa_key(
-                    rsa.modulus()?.into(),
-                    rsa.public_exponent()?.into(),
-                );
+                let spki = SubjectPublicKeyInfo::new_rsa_key(rsa.modulus()?.into(), rsa.public_exponent()?.into());
                 Ok(spki.into())
             }
         }
@@ -235,12 +230,11 @@ impl JwkPublicRsaKey {
 mod tests {
     use super::*;
 
-    const RSA_MODULUS: &str =
-        "rpJjxW0nNZiq1mPC3ZAxqf9qNjmKurP7XuKrpWrfv3IOUldqChQVPNg8zCvDOMZIO-ZDuRmVH\
-         EZ5E1vz5auHNACnpl6AvDGJ-4qyX42vfUDMNZx8i86d7bQpwJkO_MVMLj8qMGmTVbQ8zqVw2z\
-         MyKUFfa2V83nvx2wz4FJh2Thw2uZX2P7h8nlDVSuXO0wJ_OY_2qtqRIAnNXMzL5BF5pEFh4hi\
-         JIFiMTNkhVtUjT1QSB9E8DtDme8g4u769Oc0My45fgqSNE7kKKyaDhTfqSovyhj-qWiD-X_Gw\
-         pWkW4ungpHzz_97-ZDB3yQ7AMwKAsw5EW2cMqseAp3f-kf159w";
+    const RSA_MODULUS: &str = "rpJjxW0nNZiq1mPC3ZAxqf9qNjmKurP7XuKrpWrfv3IOUldqChQVPNg8zCvDOMZIO-ZDuRmVH\
+                               EZ5E1vz5auHNACnpl6AvDGJ-4qyX42vfUDMNZx8i86d7bQpwJkO_MVMLj8qMGmTVbQ8zqVw2z\
+                               MyKUFfa2V83nvx2wz4FJh2Thw2uZX2P7h8nlDVSuXO0wJ_OY_2qtqRIAnNXMzL5BF5pEFh4hi\
+                               JIFiMTNkhVtUjT1QSB9E8DtDme8g4u769Oc0My45fgqSNE7kKKyaDhTfqSovyhj-qWiD-X_Gw\
+                               pWkW4ungpHzz_97-ZDB3yQ7AMwKAsw5EW2cMqseAp3f-kf159w";
 
     const RSA_PUBLIC_EXPONENT: &str = "AQAB";
 
@@ -313,10 +307,7 @@ mod tests {
             keys: vec![Jwk {
                 algorithm: Some(SignatureHashType::RsaSha256),
                 key_operations: Some(vec![JwkKeyOps::Verify]),
-                key_id: Some(
-                    "bG9naW4uZGV2b2x1dGlvbnMuY29tIFRva2VuLk1hciAxMyAxMzoxNTozNSAyMDE5IEdNVA"
-                        .to_owned(),
-                ),
+                key_id: Some("bG9naW4uZGV2b2x1dGlvbnMuY29tIFRva2VuLk1hciAxMyAxMzoxNTozNSAyMDE5IEdNVA".to_owned()),
                 x509_sha1_thumbprint: Some(X509_SHA1_THUMBPRINT.to_owned()),
                 x509_chain: Some(vec![
                     X509_CERT_0.to_owned(),

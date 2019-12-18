@@ -81,16 +81,11 @@ impl Csr {
         private_key: &PrivateKey,
         signature_hash_type: SignatureHashType,
     ) -> Result<Self, CsrError> {
-        let info =
-            CertificationRequestInfo::new(subject.into(), private_key.to_public_key().into());
+        let info = CertificationRequestInfo::new(subject.into(), private_key.to_public_key().into());
         let info_der = picky_asn1_der::to_vec(&info).context(Asn1Serialization {
             element: "certification request info",
         })?;
-        let signature = BitString::with_bytes(
-            signature_hash_type
-                .sign(&info_der, private_key)
-                .context(Signature)?,
-        );
+        let signature = BitString::with_bytes(signature_hash_type.sign(&info_der, private_key).context(Signature)?);
 
         Ok(Self(CertificationRequest {
             certification_request_info: info,
@@ -110,31 +105,21 @@ impl Csr {
     pub fn into_subject_infos(self) -> (DirectoryName, OwnedPublicKey) {
         (
             self.0.certification_request_info.subject.into(),
-            self.0
-                .certification_request_info
-                .subject_public_key_info
-                .into(),
+            self.0.certification_request_info.subject_public_key_info.into(),
         )
     }
 
     pub fn verify(&self) -> Result<(), CsrError> {
-        let hash_type = SignatureHashType::from_algorithm_identifier(&self.0.signature_algorithm)
-            .context(Signature)?;
+        let hash_type = SignatureHashType::from_algorithm_identifier(&self.0.signature_algorithm).context(Signature)?;
 
         let public_key = &self.0.certification_request_info.subject_public_key_info;
 
-        let msg = picky_asn1_der::to_vec(&self.0.certification_request_info).context(
-            Asn1Serialization {
-                element: "certification request info",
-            },
-        )?;
+        let msg = picky_asn1_der::to_vec(&self.0.certification_request_info).context(Asn1Serialization {
+            element: "certification request info",
+        })?;
 
         hash_type
-            .verify(
-                &public_key.clone().into(),
-                &msg,
-                self.0.signature.0.payload_view(),
-            )
+            .verify(&public_key.clone().into(), &msg, self.0.signature.0.payload_view())
             .context(Signature)?;
 
         Ok(())

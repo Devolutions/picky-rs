@@ -65,8 +65,8 @@ use picky_asn1::{
     bit_string::BitString,
     date::Date,
     wrapper::{
-        ApplicationTag0, ApplicationTag3, Asn1SequenceOf, Asn1SetOf, BitStringAsn1, Implicit,
-        IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1, UTCTimeAsn1,
+        ApplicationTag0, ApplicationTag3, Asn1SequenceOf, Asn1SetOf, BitStringAsn1, Implicit, IntegerAsn1,
+        ObjectIdentifierAsn1, OctetStringAsn1, UTCTimeAsn1,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -219,9 +219,7 @@ fn x509_v3_certificate() {
         version: ApplicationTag0(Version::V3).into(),
         serial_number: 935548868,
         signature: AlgorithmIdentifier {
-            algorithm: ObjectIdentifier::try_from("1.2.840.113549.1.1.11")
-                .unwrap()
-                .into(), // sha256
+            algorithm: ObjectIdentifier::try_from("1.2.840.113549.1.1.11").unwrap().into(), // sha256
             parameters: (),
         },
         issuer,

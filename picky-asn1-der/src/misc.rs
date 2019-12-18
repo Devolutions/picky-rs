@@ -102,9 +102,7 @@ impl<R: Read> PeekableReader<R> {
     pub fn peek_buffer(&mut self) -> io::Result<&PeekedContent> {
         // Check if we already have peeked data
         if self.peeked.len < PEEKED_BUFFER_SIZE {
-            let n = self
-                .reader
-                .read(&mut self.peeked.buffer[self.peeked.len..])?;
+            let n = self.reader.read(&mut self.peeked.buffer[self.peeked.len..])?;
             self.peeked.len += n;
         }
 
@@ -127,8 +125,7 @@ impl<R: Read> Read for PeekableReader<R> {
             // keep remaining peeked bytes
             let remaining_bytes = peeked.len - buf.len();
             if remaining_bytes > 0 {
-                self.peeked.buffer[..remaining_bytes]
-                    .copy_from_slice(&peeked.buffer[buf.len()..peeked.len]);
+                self.peeked.buffer[..remaining_bytes].copy_from_slice(&peeked.buffer[buf.len()..peeked.len]);
                 self.peeked.len = remaining_bytes;
             }
 
