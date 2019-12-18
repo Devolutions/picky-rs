@@ -29,9 +29,6 @@ pub enum KeyError {
     /// invalid PEM label error
     #[snafu(display("invalid PEM label: {}", label))]
     InvalidPemLabel { label: String },
-
-    /// no secure randomness available
-    NoSecureRandomness,
 }
 
 impl From<rsa::errors::Error> for KeyError {
@@ -127,9 +124,7 @@ impl PrivateKey {
         use rand::rngs::OsRng;
         use rsa::{PublicKey, RSAPrivateKey};
 
-        let mut rng = OsRng::new().map_err(|_| KeyError::NoSecureRandomness)?;
-        let key = RSAPrivateKey::new(&mut rng, bits)?;
-
+        let key = RSAPrivateKey::new(&mut OsRng, bits)?;
         let modulus = IntegerAsn1::from_signed_bytes_be(key.n().to_bytes_be());
         let public_exponent = IntegerAsn1::from_signed_bytes_be(key.e().to_bytes_be());
         let private_exponent = IntegerAsn1::from_signed_bytes_be(key.d().to_bytes_be());

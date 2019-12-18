@@ -18,7 +18,6 @@ use crate::{
 };
 use picky_asn1::{bit_string::BitString, wrapper::IntegerAsn1};
 use picky_asn1_der::Asn1DerError;
-use rand::{rngs::OsRng, RngCore};
 use snafu::{ResultExt, Snafu};
 use std::cell::RefCell;
 
@@ -710,8 +709,7 @@ impl<'a> CertificateBuilder<'a> {
 }
 
 fn generate_serial_number() -> Vec<u8> {
-    let mut rng = OsRng::new().expect("couldn't fetch OsRng");
-    let x = rng.next_u32();
+    let x = rand::random::<u32>();
     let b1 = ((x >> 24) & 0xff) as u8;
     let b2 = ((x >> 16) & 0xff) as u8;
     let b3 = ((x >> 8) & 0xff) as u8;

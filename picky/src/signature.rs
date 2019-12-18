@@ -5,7 +5,6 @@ use crate::{
     AlgorithmIdentifier,
 };
 use picky_asn1::wrapper::{BitStringAsn1Container, OctetStringAsn1Container};
-use rand::rngs::OsRng;
 use rsa::{hash::Hashes, BigUint, PaddingScheme, PublicKey as RsaPublicKeyInterface, RSAPrivateKey, RSAPublicKey};
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
@@ -17,9 +16,6 @@ pub enum SignatureError {
     /// RSA error
     #[snafu(display("RSA error: {}", context))]
     Rsa { context: String },
-
-    /// no secure randomness available
-    NoSecureRandomness,
 
     /// invalid signature
     BadSignature,
@@ -82,7 +78,7 @@ impl SignatureHashType {
 
     pub fn sign(self, msg: &[u8], private_key: &PrivateKey) -> Result<Vec<u8>, SignatureError> {
         let rsa_private_key = match &private_key.as_inner().private_key {
-            private_key_info::PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => RSAPrivateKey::from_components2(
+            private_key_info::PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => RSAPrivateKey::from_components(
                 BigUint::from_bytes_be(key.modulus().as_bytes_be()),
                 BigUint::from_bytes_be(key.public_exponent().as_bytes_be()),
                 BigUint::from_bytes_be(key.private_exponent().as_bytes_be()),
@@ -90,10 +86,8 @@ impl SignatureHashType {
                     .iter()
                     .map(|p| BigUint::from_bytes_be(p.as_bytes_be()))
                     .collect(),
-            )?,
+            ),
         };
-
-        let mut rng = OsRng::new().map_err(|_| SignatureError::NoSecureRandomness)?;
 
         let digest = self.hash(msg);
 
@@ -105,7 +99,12 @@ impl SignatureHashType {
             Self::RsaSha512 => &Hashes::SHA2_512,
         };
 
-        let signature = rsa_private_key.sign_blinded(&mut rng, PaddingScheme::PKCS1v15, Some(hash_algo), &digest)?;
+        let signature = rsa_private_key.sign_blinded(
+            &mut rand::rngs::OsRng,
+            PaddingScheme::PKCS1v15,
+            Some(hash_algo),
+            &digest,
+        )?;
 
         Ok(signature)
     }
@@ -152,24 +151,5 @@ impl From<SignatureHashType> for AlgorithmIdentifier {
             SignatureHashType::RsaSha384 => AlgorithmIdentifier::new_sha384_with_rsa_encryption(),
             SignatureHashType::RsaSha512 => AlgorithmIdentifier::new_sha512_with_rsa_encryption(),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::pem::Pem;
-
-    #[test]
-    fn unsupported_key_no_panic() {
-        // Once the key is supported by the RSA crate, this test should be deleted.
-        let unsupported_key = {
-            let pem = crate::test_files::RSA_4096_PK_3_UNSUPPORTED.parse::<Pem>().unwrap();
-            PrivateKey::from_pkcs8(pem.data()).unwrap()
-        };
-        let msg = [0, 1, 2, 3, 4, 5];
-        let signature_hash_type = SignatureHashType::RsaSha512;
-        let err = signature_hash_type.sign(&msg, &unsupported_key).unwrap_err();
-        assert_eq!(err.to_string(), "RSA error: invalid coefficient");
     }
 }
