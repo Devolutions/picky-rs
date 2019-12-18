@@ -88,10 +88,7 @@ impl AttributeTypeAndValue {
 }
 
 impl ser::Serialize for AttributeTypeAndValue {
-    fn serialize<S>(
-        &self,
-        serializer: S,
-    ) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
     where
         S: ser::Serializer,
     {
@@ -174,9 +171,7 @@ impl<'de> de::Deserialize<'de> for AttributeTypeAndValue {
                     }
                     oids::AT_STATE_OR_PROVINCE_NAME => {
                         // cannot panic with DER deserializer
-                        AttributeTypeAndValueParameters::StateOrProvinceName(
-                            seq.next_element()?.unwrap(),
-                        )
+                        AttributeTypeAndValueParameters::StateOrProvinceName(seq.next_element()?.unwrap())
                     }
                     oids::AT_STREET_NAME => {
                         // cannot panic with DER deserializer
@@ -184,15 +179,11 @@ impl<'de> de::Deserialize<'de> for AttributeTypeAndValue {
                     }
                     oids::AT_ORGANISATION_NAME => {
                         // cannot panic with DER deserializer
-                        AttributeTypeAndValueParameters::OrganisationName(
-                            seq.next_element()?.unwrap(),
-                        )
+                        AttributeTypeAndValueParameters::OrganisationName(seq.next_element()?.unwrap())
                     }
                     oids::AT_ORGANISATIONAL_UNIT_NAME => {
                         // cannot panic with DER deserializer
-                        AttributeTypeAndValueParameters::OrganisationalUnitName(
-                            seq.next_element()?.unwrap(),
-                        )
+                        AttributeTypeAndValueParameters::OrganisationalUnitName(seq.next_element()?.unwrap())
                     }
                     oids::EMAIL_ADDRESS => {
                         return Err(de::Error::invalid_value(
@@ -205,9 +196,7 @@ impl<'de> de::Deserialize<'de> for AttributeTypeAndValue {
                     }
                     _ => {
                         return Err(de::Error::invalid_value(
-                            de::Unexpected::Other(
-                                "[AttributeTypeAndValue] unsupported type (unknown oid)",
-                            ),
+                            de::Unexpected::Other("[AttributeTypeAndValue] unsupported type (unknown oid)"),
                             &"a supported type",
                         ));
                     }

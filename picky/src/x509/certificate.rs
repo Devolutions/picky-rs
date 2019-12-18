@@ -1,5 +1,5 @@
 use crate::{
-    key::{PrivateKey, PublicKey},
+    key::{OwnedPublicKey, PrivateKey, PublicKey},
     oids,
     pem::Pem,
     signature::{SignatureError, SignatureHashType},
@@ -7,8 +7,7 @@ use crate::{
         csr::{Csr, CsrError},
         date::UTCDate,
         extension::{
-            AuthorityKeyIdentifier, BasicConstraints, ExtendedKeyUsage, ExtensionView,
-            KeyIdentifier, KeyUsage,
+            AuthorityKeyIdentifier, BasicConstraints, ExtendedKeyUsage, ExtensionView, KeyIdentifier, KeyUsage,
         },
         key_id_gen_method::{KeyIdGenError, KeyIdGenMethod, KeyIdHashAlgo},
         name::{DirectoryName, GeneralNames},
@@ -19,7 +18,6 @@ use crate::{
 };
 use picky_asn1::{bit_string::BitString, wrapper::IntegerAsn1};
 use picky_asn1_der::Asn1DerError;
-use rand::{rngs::OsRng, RngCore};
 use snafu::{ResultExt, Snafu};
 use std::cell::RefCell;
 
@@ -79,16 +77,16 @@ pub enum CertError {
     MissingBuilderArgument { arg: &'static str },
 
     /// certificate is not yet valid
-    #[snafu(display(
-        "certificate is not yet valid (not before: {}, now: {})",
-        not_before,
-        now
-    ))]
+    #[snafu(display("certificate is not yet valid (not before: {}, now: {})", not_before, now))]
     CertificateNotYetValid { not_before: UTCDate, now: UTCDate },
 
     /// certificate expired
     #[snafu(display("certificate expired (not after: {}, now: {})", not_after, now))]
     CertificateExpired { not_after: UTCDate, now: UTCDate },
+
+    /// invalid PEM label error
+    #[snafu(display("invalid PEM label: {}", label))]
+    InvalidPemLabel { label: String },
 }
 
 #[derive(Debug, Snafu)]
@@ -109,11 +107,7 @@ pub enum CaChainError {
     IssuerIsNotCA { issuer_id: String },
 
     /// authority key id doesn't match
-    #[snafu(display(
-        "authority key id doesn't match (expected: {:?}, got: {:?})",
-        expected,
-        actual
-    ))]
+    #[snafu(display("authority key id doesn't match (expected: {:?}, got: {:?})", expected, actual))]
     AuthorityKeyIdMismatch { expected: Vec<u8>, actual: Vec<u8> },
 
     /// issuer name doesn't match
@@ -128,6 +122,8 @@ pub enum CertType {
     Leaf,
     Unknown,
 }
+
+const CERT_PEM_LABEL: &str = "CERTIFICATE";
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Cert(Certificate);
@@ -151,21 +147,26 @@ macro_rules! find_ext {
 
 impl Cert {
     pub fn from_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, CertError> {
-        Ok(Self(picky_asn1_der::from_bytes(der.as_ref()).context(
-            Asn1Deserialization {
-                element: "certificate",
-            },
-        )?))
+        Ok(Self(
+            picky_asn1_der::from_bytes(der.as_ref()).context(Asn1Deserialization { element: "certificate" })?,
+        ))
+    }
+
+    pub fn from_pem(pem: &Pem) -> Result<Self, CertError> {
+        match pem.label() {
+            CERT_PEM_LABEL => Self::from_der(pem.data()),
+            _ => Err(CertError::InvalidPemLabel {
+                label: pem.label().to_owned(),
+            }),
+        }
     }
 
     pub fn to_der(&self) -> Result<Vec<u8>, CertError> {
-        picky_asn1_der::to_vec(&self.0).context(Asn1Serialization {
-            element: "certificate",
-        })
+        picky_asn1_der::to_vec(&self.0).context(Asn1Serialization { element: "certificate" })
     }
 
     pub fn to_pem(&self) -> Result<Pem<'static>, CertError> {
-        Ok(Pem::new("CERTIFICATE", self.to_der()?))
+        Ok(Pem::new(CERT_PEM_LABEL, self.to_der()?))
     }
 
     pub fn ty(&self) -> CertType {
@@ -203,11 +204,7 @@ impl Cert {
     pub fn subject_key_identifier(&self) -> Result<&[u8], CertError> {
         let certificate = &self.0;
 
-        let ext = find_ext!(
-            oids::subject_key_identifier(),
-            certificate,
-            "subject key identifier"
-        )?;
+        let ext = find_ext!(oids::subject_key_identifier(), certificate, "subject key identifier")?;
         match ext.extn_value() {
             ExtensionView::SubjectKeyIdentifier(ski) => Ok(&ski.0),
             _ => unreachable!("invalid extension (expected subject key identifier)"),
@@ -249,6 +246,10 @@ impl Cert {
         (self.0.tbs_certificate.extensions.0).0.as_slice()
     }
 
+    pub fn public_key(&self) -> PublicKey {
+        (&self.0.tbs_certificate.subject_public_key_info).into()
+    }
+
     pub fn verify(&self, now: &UTCDate) -> Result<(), CertError> {
         let validity = &self.0.tbs_certificate.validity;
         let not_before: UTCDate = validity.not_before.clone().into();
@@ -274,11 +275,9 @@ impl Cert {
     pub fn is_parent_of(&self, other: &Cert) -> Result<(), CertError> {
         if let Ok(other_aki) = other.authority_key_identifier() {
             if let Some(other_aki) = other_aki.key_identifier() {
-                let parent_ski =
-                    self.subject_key_identifier()
-                        .with_context(|| InvalidCertificate {
-                            id: self.subject_name().to_string(),
-                        })?;
+                let parent_ski = self.subject_key_identifier().with_context(|| InvalidCertificate {
+                    id: self.subject_name().to_string(),
+                })?;
 
                 if parent_ski != other_aki {
                     return Err(CaChainError::AuthorityKeyIdMismatch {
@@ -344,19 +343,16 @@ impl Cert {
             }
 
             // verify parent
-            parent_cert
-                .verify(now)
-                .with_context(|| InvalidCertificate {
-                    id: parent_cert.subject_name().to_string(),
-                })?;
+            parent_cert.verify(now).with_context(|| InvalidCertificate {
+                id: parent_cert.subject_name().to_string(),
+            })?;
 
             // check parent_cert is the parent of current_cert
             parent_cert.is_parent_of(current_cert)?;
 
             // validate current cert signature using parent public key
             let hash_type =
-                SignatureHashType::from_algorithm_identifier(&current_cert.0.signature_algorithm)
-                    .context(Signature)?;
+                SignatureHashType::from_algorithm_identifier(&current_cert.0.signature_algorithm).context(Signature)?;
             let public_key = &parent_cert.0.tbs_certificate.subject_public_key_info;
             let msg = picky_asn1_der::to_vec(&current_cert.0.tbs_certificate)
                 .context(Asn1Serialization {
@@ -393,7 +389,7 @@ enum SubjectInfos {
     Csr(Csr),
     NameAndPublicKey {
         name: DirectoryName,
-        public_key: PublicKey,
+        public_key: OwnedPublicKey,
     },
 }
 
@@ -406,8 +402,8 @@ struct IssuerInfos<'a> {
 
 // Statically checks the field actually exists and returns a &'static str of the field name
 macro_rules! field_str {
-    ($instance:ident.$field:ident) => {{
-        let _ = $instance.$field;
+    ($field:ident) => {{
+        ::static_assertions::assert_fields!(CertificateBuilderInner: $field);
         stringify!($field)
     }};
 }
@@ -451,7 +447,7 @@ impl<'a> CertificateBuilder<'a> {
 
     /// Required (alternatives: `subject_from_csr`, `self_signed`)
     #[inline]
-    pub fn subject(&self, subject_name: DirectoryName, public_key: PublicKey) -> &Self {
+    pub fn subject(&self, subject_name: DirectoryName, public_key: OwnedPublicKey) -> &Self {
         self.inner.borrow_mut().subject_infos = Some(SubjectInfos::NameAndPublicKey {
             name: subject_name,
             public_key,
@@ -468,7 +464,7 @@ impl<'a> CertificateBuilder<'a> {
 
     /// Required (alternative: `self_signed`, `issuer_cert`)
     #[inline]
-    pub fn issuer(&'a self, issuer_name: DirectoryName, issuer_key: &'a PrivateKey) -> &'a Self {
+    pub fn issuer(&self, issuer_name: DirectoryName, issuer_key: &'a PrivateKey) -> &Self {
         self.inner.borrow_mut().issuer_infos = Some(IssuerInfos {
             name: issuer_name,
             key: issuer_key,
@@ -479,7 +475,7 @@ impl<'a> CertificateBuilder<'a> {
 
     /// Required (alternative: `issuer`, `issuer_cert`)
     #[inline]
-    pub fn self_signed(&'a self, name: DirectoryName, key: &'a PrivateKey) -> &'a Self {
+    pub fn self_signed(&self, name: DirectoryName, key: &'a PrivateKey) -> &Self {
         self.inner.borrow_mut().issuer_infos = Some(IssuerInfos {
             name,
             key,
@@ -490,7 +486,7 @@ impl<'a> CertificateBuilder<'a> {
 
     /// Required (alternative: `issuer`, `self_signed`)
     #[inline]
-    pub fn issuer_cert(&'a self, issuer_cert: &Cert, issuer_key: &'a PrivateKey) -> &'a Self {
+    pub fn issuer_cert(&self, issuer_cert: &Cert, issuer_key: &'a PrivateKey) -> &Self {
         let builder = self.issuer(issuer_cert.subject_name(), &issuer_key);
 
         if let Ok(issuer_ski) = issuer_cert.subject_key_identifier() {
@@ -566,35 +562,23 @@ impl<'a> CertificateBuilder<'a> {
     pub fn build(&self) -> Result<Cert, CertError> {
         let mut inner = self.inner.borrow_mut();
 
-        let valid_from = inner
-            .valid_from
-            .take()
-            .ok_or(CertError::MissingBuilderArgument {
-                arg: field_str!(inner.valid_from),
-            })?;
-        let valid_to = inner
-            .valid_to
-            .take()
-            .ok_or(CertError::MissingBuilderArgument {
-                arg: field_str!(inner.valid_to),
-            })?;
+        let valid_from = inner.valid_from.take().ok_or(CertError::MissingBuilderArgument {
+            arg: field_str!(valid_from),
+        })?;
+        let valid_to = inner.valid_to.take().ok_or(CertError::MissingBuilderArgument {
+            arg: field_str!(valid_to),
+        })?;
 
-        let signature_hash_type = inner
-            .signature_hash_type
-            .take()
-            .unwrap_or(SignatureHashType::RsaSha256);
+        let signature_hash_type = inner.signature_hash_type.take().unwrap_or(SignatureHashType::RsaSha256);
 
         let key_id_gen_method = inner
             .key_id_gen_method
             .take()
             .unwrap_or(KeyIdGenMethod::SPKFullDER(KeyIdHashAlgo::Sha256));
 
-        let issuer_infos = inner
-            .issuer_infos
-            .take()
-            .ok_or(CertError::MissingBuilderArgument {
-                arg: field_str!(inner.issuer_infos),
-            })?;
+        let issuer_infos = inner.issuer_infos.take().ok_or(CertError::MissingBuilderArgument {
+            arg: field_str!(issuer_infos),
+        })?;
         let (issuer_name, issuer_key, aki, subject_infos) = {
             let (aki, subject_infos) = if issuer_infos.self_signed {
                 let public_key = issuer_infos.key.to_public_key();
@@ -608,18 +592,15 @@ impl<'a> CertificateBuilder<'a> {
                 };
                 (aki, subject_infos)
             } else {
-                let aki = inner.authority_key_identifier.take().ok_or(
-                    CertError::MissingBuilderArgument {
-                        arg: field_str!(inner.authority_key_identifier),
-                    },
-                )?;
-                let subject_infos =
-                    inner
-                        .subject_infos
-                        .take()
-                        .ok_or(CertError::MissingBuilderArgument {
-                            arg: field_str!(inner.subject_infos),
-                        })?;
+                let aki = inner
+                    .authority_key_identifier
+                    .take()
+                    .ok_or(CertError::MissingBuilderArgument {
+                        arg: field_str!(authority_key_identifier),
+                    })?;
+                let subject_infos = inner.subject_infos.take().ok_or(CertError::MissingBuilderArgument {
+                    arg: field_str!(subject_infos),
+                })?;
                 (aki, subject_infos)
             };
 
@@ -657,8 +638,7 @@ impl<'a> CertificateBuilder<'a> {
                 if key_usage.digital_signature() {
                     extensions.push(Extension::new_basic_constraints(ca, pathlen).into_critical());
                 } else {
-                    extensions
-                        .push(Extension::new_basic_constraints(ca, pathlen).into_non_critical());
+                    extensions.push(Extension::new_basic_constraints(ca, pathlen).into_non_critical());
                 }
                 extensions.push(Extension::new_key_usage(key_usage));
             } else {
@@ -729,8 +709,7 @@ impl<'a> CertificateBuilder<'a> {
 }
 
 fn generate_serial_number() -> Vec<u8> {
-    let mut rng = OsRng::new().expect("couldn't fetch OsRng");
-    let x = rng.next_u32();
+    let x = rand::random::<u32>();
     let b1 = ((x >> 24) & 0xff) as u8;
     let b2 = ((x >> 16) & 0xff) as u8;
     let b3 = ((x >> 8) & 0xff) as u8;
@@ -753,19 +732,10 @@ mod tests {
             Into::<String>::into(cert.signature_algorithm().oid()).as_str(),
             oids::SHA1_WITH_RSA_ENCRYPTION
         );
-        assert_eq!(
-            cert.valid_not_before(),
-            UTCDate::new(2011, 2, 12, 14, 44, 6).unwrap()
-        );
-        assert_eq!(
-            cert.valid_not_after(),
-            UTCDate::new(2021, 2, 12, 14, 44, 6).unwrap()
-        );
+        assert_eq!(cert.valid_not_before(), UTCDate::new(2011, 2, 12, 14, 44, 6).unwrap());
+        assert_eq!(cert.valid_not_after(), UTCDate::new(2021, 2, 12, 14, 44, 6).unwrap());
 
-        assert_eq!(
-            cert.issuer_name().to_string(),
-            "C=NL,O=PolarSSL,CN=PolarSSL Test CA"
-        );
+        assert_eq!(cert.issuer_name().to_string(), "C=NL,O=PolarSSL,CN=PolarSSL Test CA");
     }
 
     #[test]
@@ -773,8 +743,7 @@ mod tests {
         let pem = crate::test_files::RSA_2048_PK_1
             .parse::<Pem>()
             .expect("couldn't parse pem");
-        let private_key =
-            PrivateKey::from_pkcs8(pem.data()).expect("couldn't extract private key from pkcs8");
+        let private_key = PrivateKey::from_pkcs8(pem.data()).expect("couldn't extract private key from pkcs8");
 
         // validity
         let valid_from = UTCDate::ymd(2019, 10, 10).unwrap();
@@ -798,9 +767,7 @@ mod tests {
     #[test]
     fn key_id_and_cert() {
         let kid = "c4a7b1a47b2c71fadbe14b9075ffc41560858910";
-        let pem = crate::test_files::ROOT_CA
-            .parse::<Pem>()
-            .expect("couldn't parse PEM");
+        let pem = crate::test_files::ROOT_CA.parse::<Pem>().expect("couldn't parse PEM");
         let cert = Cert::from_der(pem.data()).expect("couldn't deserialize certificate");
         assert_eq!(cert.ty(), CertType::Root);
         let key_id = cert
@@ -821,14 +788,8 @@ mod tests {
         let leaf_key = parse_key(crate::test_files::RSA_2048_PK_3);
 
         let root = CertificateBuilder::new()
-            .valididy(
-                UTCDate::ymd(2065, 6, 15).unwrap(),
-                UTCDate::ymd(2070, 6, 15).unwrap(),
-            )
-            .self_signed(
-                DirectoryName::new_common_name("TheFuture.usodakedo Root CA"),
-                &root_key,
-            )
+            .valididy(UTCDate::ymd(2065, 6, 15).unwrap(), UTCDate::ymd(2070, 6, 15).unwrap())
+            .self_signed(DirectoryName::new_common_name("TheFuture.usodakedo Root CA"), &root_key)
             .ca(true)
             .signature_hash_type(SignatureHashType::RsaSha512)
             .key_id_gen_method(KeyIdGenMethod::SPKFullDER(KeyIdHashAlgo::Sha384))
@@ -837,19 +798,14 @@ mod tests {
         assert_eq!(root.ty(), CertType::Root);
 
         let intermediate = CertificateBuilder::new()
-            .valididy(
-                UTCDate::ymd(2068, 1, 1).unwrap(),
-                UTCDate::ymd(2071, 1, 1).unwrap(),
-            )
+            .valididy(UTCDate::ymd(2068, 1, 1).unwrap(), UTCDate::ymd(2071, 1, 1).unwrap())
             .subject(
                 DirectoryName::new_common_name("TheFuture.usodakedo Authority"),
                 intermediate_key.to_public_key(),
             )
             .issuer_cert(&root, &root_key)
             .signature_hash_type(SignatureHashType::RsaSha224)
-            .key_id_gen_method(KeyIdGenMethod::SPKValueHashedLeftmost160(
-                KeyIdHashAlgo::Sha1,
-            ))
+            .key_id_gen_method(KeyIdGenMethod::SPKValueHashedLeftmost160(KeyIdHashAlgo::Sha1))
             .ca(true)
             .pathlen(0)
             .build()
@@ -864,10 +820,7 @@ mod tests {
         .unwrap();
 
         let signed_leaf = CertificateBuilder::new()
-            .valididy(
-                UTCDate::ymd(2069, 1, 1).unwrap(),
-                UTCDate::ymd(2072, 1, 1).unwrap(),
-            )
+            .valididy(UTCDate::ymd(2069, 1, 1).unwrap(), UTCDate::ymd(2072, 1, 1).unwrap())
             .subject_from_csr(csr)
             .issuer_cert(&intermediate, &intermediate_key)
             .signature_hash_type(SignatureHashType::RsaSha384)
@@ -916,7 +869,7 @@ mod tests {
         assert_eq!(
             still_in_2019_err.to_string(),
             "invalid certificate \'CN=ChillingInTheFuture.usobakkari\': \
-            certificate is not yet valid (not before: 2069-01-01 00:00:00, now: 2019-11-14 00:00:00)"
+             certificate is not yet valid (not before: 2069-01-01 00:00:00, now: 2019-11-14 00:00:00)"
         );
     }
 
@@ -928,14 +881,8 @@ mod tests {
         let malicious_root_key = parse_key(crate::test_files::RSA_2048_PK_4);
 
         let root = CertificateBuilder::new()
-            .valididy(
-                UTCDate::ymd(2065, 6, 15).unwrap(),
-                UTCDate::ymd(2070, 6, 15).unwrap(),
-            )
-            .self_signed(
-                DirectoryName::new_common_name("VerySafe Root CA"),
-                &root_key,
-            )
+            .valididy(UTCDate::ymd(2065, 6, 15).unwrap(), UTCDate::ymd(2070, 6, 15).unwrap())
+            .self_signed(DirectoryName::new_common_name("VerySafe Root CA"), &root_key)
             .ca(true)
             .pathlen(1)
             .signature_hash_type(SignatureHashType::RsaSha1)
@@ -944,38 +891,28 @@ mod tests {
             .expect("couldn't build root ca");
 
         let intermediate = CertificateBuilder::new()
-            .valididy(
-                UTCDate::ymd(2068, 1, 1).unwrap(),
-                UTCDate::ymd(2071, 1, 1).unwrap(),
-            )
+            .valididy(UTCDate::ymd(2068, 1, 1).unwrap(), UTCDate::ymd(2071, 1, 1).unwrap())
             .subject(
                 DirectoryName::new_common_name("V.E.R.Y Legitimate VerySafe Authority"),
                 intermediate_key.to_public_key(),
             )
             .issuer_cert(&root, &malicious_root_key)
             .signature_hash_type(SignatureHashType::RsaSha512)
-            .key_id_gen_method(KeyIdGenMethod::SPKValueHashedLeftmost160(
-                KeyIdHashAlgo::Sha384,
-            ))
+            .key_id_gen_method(KeyIdGenMethod::SPKValueHashedLeftmost160(KeyIdHashAlgo::Sha384))
             .ca(true)
             .pathlen(0)
             .build()
             .expect("couldn't build intermediate ca");
 
         let csr = Csr::generate(
-            DirectoryName::new_common_name(
-                "I Trust This V.E.R.Y Legitimate Intermediate Certificate",
-            ),
+            DirectoryName::new_common_name("I Trust This V.E.R.Y Legitimate Intermediate Certificate"),
             &leaf_key,
             SignatureHashType::RsaSha1,
         )
         .unwrap();
 
         let signed_leaf = CertificateBuilder::new()
-            .valididy(
-                UTCDate::ymd(2069, 1, 1).unwrap(),
-                UTCDate::ymd(2072, 1, 1).unwrap(),
-            )
+            .valididy(UTCDate::ymd(2069, 1, 1).unwrap(), UTCDate::ymd(2072, 1, 1).unwrap())
             .subject_from_csr(csr)
             .issuer_cert(&intermediate, &intermediate_key)
             .signature_hash_type(SignatureHashType::RsaSha224)
@@ -1009,24 +946,15 @@ mod tests {
         let leaf_key = parse_key(crate::test_files::RSA_2048_PK_3);
 
         let root = CertificateBuilder::new()
-            .valididy(
-                UTCDate::ymd(2065, 6, 15).unwrap(),
-                UTCDate::ymd(2070, 6, 15).unwrap(),
-            )
-            .self_signed(
-                DirectoryName::new_common_name("VerySafe Root CA"),
-                &root_key,
-            )
+            .valididy(UTCDate::ymd(2065, 6, 15).unwrap(), UTCDate::ymd(2070, 6, 15).unwrap())
+            .self_signed(DirectoryName::new_common_name("VerySafe Root CA"), &root_key)
             .ca(true)
             .pathlen(0)
             .build()
             .expect("couldn't build root ca");
 
         let intermediate = CertificateBuilder::new()
-            .valididy(
-                UTCDate::ymd(2068, 1, 1).unwrap(),
-                UTCDate::ymd(2071, 1, 1).unwrap(),
-            )
+            .valididy(UTCDate::ymd(2068, 1, 1).unwrap(), UTCDate::ymd(2071, 1, 1).unwrap())
             .subject(
                 DirectoryName::new_common_name("V.E.R.Y Legitimate VerySafe Authority"),
                 intermediate_key.to_public_key(),
@@ -1038,19 +966,14 @@ mod tests {
             .expect("couldn't build intermediate ca");
 
         let csr = Csr::generate(
-            DirectoryName::new_common_name(
-                "I Trust This V.E.R.Y Legitimate Intermediate Certificate",
-            ),
+            DirectoryName::new_common_name("I Trust This V.E.R.Y Legitimate Intermediate Certificate"),
             &leaf_key,
             SignatureHashType::RsaSha1,
         )
         .unwrap();
 
         let signed_leaf = CertificateBuilder::new()
-            .valididy(
-                UTCDate::ymd(2069, 1, 1).unwrap(),
-                UTCDate::ymd(2072, 1, 1).unwrap(),
-            )
+            .valididy(UTCDate::ymd(2069, 1, 1).unwrap(), UTCDate::ymd(2072, 1, 1).unwrap())
             .subject_from_csr(csr.clone())
             .issuer_cert(&intermediate, &intermediate_key)
             .build()
@@ -1068,10 +991,7 @@ mod tests {
         );
 
         let invalid_issuer_signed_leaf = CertificateBuilder::new()
-            .valididy(
-                UTCDate::ymd(2069, 1, 1).unwrap(),
-                UTCDate::ymd(2072, 1, 1).unwrap(),
-            )
+            .valididy(UTCDate::ymd(2069, 1, 1).unwrap(), UTCDate::ymd(2072, 1, 1).unwrap())
             .subject_from_csr(csr)
             .issuer_cert(&signed_leaf, &leaf_key)
             .build()

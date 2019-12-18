@@ -5,10 +5,7 @@ mod sequence;
 mod utf8_string;
 
 use crate::{
-    de::{
-        boolean::Boolean, integer::UnsignedInteger, null::Null, sequence::Sequence,
-        utf8_string::Utf8String,
-    },
+    de::{boolean::Boolean, integer::UnsignedInteger, null::Null, sequence::Sequence, utf8_string::Utf8String},
     misc::{Length, PeekableReader, ReadExt},
     Asn1DerError, Result,
 };
@@ -54,7 +51,7 @@ impl<'de> Deserializer<'de> {
     }
 
     /// Reads tag and length of the next DER object
-    fn __next_tag_len(&mut self) -> Result<(Tag, usize)> {
+    fn h_next_tag_len(&mut self) -> Result<(Tag, usize)> {
         // Read type and length
         let tag = Tag::from(self.reader.read_one()?);
         let len = Length::deserialized(&mut self.reader)?;
@@ -62,8 +59,8 @@ impl<'de> Deserializer<'de> {
     }
 
     /// Reads the next DER object into `self.buf` and returns the tag
-    fn __next_object(&mut self) -> Result<Tag> {
-        let (tag, len) = if let Some((tag, len)) = self.__decapsulate()? {
+    fn h_next_object(&mut self) -> Result<Tag> {
+        let (tag, len) = if let Some((tag, len)) = self.h_decapsulate()? {
             if tag.is_context_specific() {
                 (tag, len)
             } else {
@@ -84,7 +81,7 @@ impl<'de> Deserializer<'de> {
     }
 
     /// Peek next DER object tag (ignoring encapsulator)
-    fn __peek_object(&mut self) -> Result<Tag> {
+    fn h_peek_object(&mut self) -> Result<Tag> {
         if self.encapsulator_tag_stack.is_empty() {
             Ok(Tag::from(self.reader.peek_one()?))
         } else {
@@ -98,9 +95,7 @@ impl<'de> Deserializer<'de> {
                 let encapsulator_tag = *encapsulator_tag;
 
                 if peeked.len() < cursor + 2 {
-                    debug_log!(
-                        "peek_object: TRUNCATED DATA (couldn't read encapsulator tag or length)"
-                    );
+                    debug_log!("peek_object: TRUNCATED DATA (couldn't read encapsulator tag or length)");
                     return Err(Asn1DerError::TruncatedData);
                 }
 
@@ -116,8 +111,7 @@ impl<'de> Deserializer<'de> {
                 }
 
                 let length = {
-                    let len =
-                        Length::deserialized(&mut Cursor::new(&peeked.buffer()[cursor + 1..]))?;
+                    let len = Length::deserialized(&mut Cursor::new(&peeked.buffer()[cursor + 1..]))?;
                     Length::encoded_len(len)
                 };
 
@@ -137,12 +131,12 @@ impl<'de> Deserializer<'de> {
         }
     }
 
-    fn __encapsulate(&mut self, tag: Tag) {
+    fn h_encapsulate(&mut self, tag: Tag) {
         debug_log!("> encapsulator ({})", tag);
         self.encapsulator_tag_stack.push(tag);
     }
 
-    fn __decapsulate(&mut self) -> Result<Option<(Tag, usize)>> {
+    fn h_decapsulate(&mut self) -> Result<Option<(Tag, usize)>> {
         if self.encapsulator_tag_stack.is_empty() {
             Ok(None)
         } else {
@@ -181,7 +175,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
 
     fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         debug_log!("deserialize_any");
-        match self.__peek_object()? {
+        match self.h_peek_object()? {
             Tag::BOOLEAN => self.deserialize_bool(visitor),
             Tag::INTEGER => {
                 debug_log!("deserialize_any: can't be used on INTEGER");
@@ -239,7 +233,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
 
     fn deserialize_bool<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         debug_log!("deserialize_bool");
-        match self.__peek_object()? {
+        match self.h_peek_object()? {
             Tag::BOOLEAN => {}
             tag if tag.is_context_specific() => {}
             _tag => {
@@ -247,7 +241,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 return Err(Asn1DerError::InvalidData);
             }
         }
-        self.__next_object()?;
+        self.h_next_object()?;
         visitor.visit_bool(Boolean::deserialize(&self.buf)?)
     }
 
@@ -278,7 +272,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
 
     fn deserialize_u8<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         debug_log!("deserialize_u8");
-        match self.__peek_object()? {
+        match self.h_peek_object()? {
             Tag::INTEGER => {}
             tag if tag.is_context_specific() => {}
             _tag => {
@@ -286,13 +280,13 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 return Err(Asn1DerError::InvalidData);
             }
         }
-        self.__next_object()?;
+        self.h_next_object()?;
         visitor.visit_u8(UnsignedInteger::deserialize(&self.buf)?)
     }
 
     fn deserialize_u16<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         debug_log!("deserialize_u16");
-        match self.__peek_object()? {
+        match self.h_peek_object()? {
             Tag::INTEGER => {}
             tag if tag.is_context_specific() => {}
             _tag => {
@@ -300,13 +294,13 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 return Err(Asn1DerError::InvalidData);
             }
         }
-        self.__next_object()?;
+        self.h_next_object()?;
         visitor.visit_u16(UnsignedInteger::deserialize(&self.buf)?)
     }
 
     fn deserialize_u32<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         debug_log!("deserialize_u32");
-        match self.__peek_object()? {
+        match self.h_peek_object()? {
             Tag::INTEGER => {}
             tag if tag.is_context_specific() => {}
             _tag => {
@@ -314,13 +308,13 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 return Err(Asn1DerError::InvalidData);
             }
         }
-        self.__next_object()?;
+        self.h_next_object()?;
         visitor.visit_u32(UnsignedInteger::deserialize(&self.buf)?)
     }
 
     fn deserialize_u64<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         debug_log!("deserialize_u64");
-        match self.__peek_object()? {
+        match self.h_peek_object()? {
             Tag::INTEGER => {}
             tag if tag.is_context_specific() => {}
             _tag => {
@@ -328,13 +322,13 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 return Err(Asn1DerError::InvalidData);
             }
         }
-        self.__next_object()?;
+        self.h_next_object()?;
         visitor.visit_u64(UnsignedInteger::deserialize(&self.buf)?)
     }
 
     fn deserialize_u128<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         debug_log!("deserialize_u128");
-        match self.__peek_object()? {
+        match self.h_peek_object()? {
             Tag::INTEGER => {}
             tag if tag.is_context_specific() => {}
             _tag => {
@@ -342,7 +336,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 return Err(Asn1DerError::InvalidData);
             }
         }
-        self.__next_object()?;
+        self.h_next_object()?;
         visitor.visit_u128(UnsignedInteger::deserialize(&self.buf)?)
     }
 
@@ -358,7 +352,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
 
     fn deserialize_char<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         debug_log!("deserialize_char");
-        match self.__peek_object()? {
+        match self.h_peek_object()? {
             Tag::UTF8_STRING => {}
             tag if tag.is_context_specific() => {}
             _tag => {
@@ -367,7 +361,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
             }
         }
 
-        self.__next_object()?;
+        self.h_next_object()?;
         let s = Utf8String::deserialize(&self.buf)?;
 
         let c = s.chars().next().ok_or(Asn1DerError::UnsupportedValue)?;
@@ -376,7 +370,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
 
     fn deserialize_str<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         debug_log!("deserialize_str");
-        match self.__peek_object()? {
+        match self.h_peek_object()? {
             Tag::UTF8_STRING => {}
             tag if tag.is_context_specific() => {}
             _tag => {
@@ -384,13 +378,13 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 return Err(Asn1DerError::InvalidData);
             }
         }
-        self.__next_object()?;
+        self.h_next_object()?;
         visitor.visit_str(Utf8String::deserialize(&self.buf)?)
     }
 
     fn deserialize_string<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         debug_log!("deserialize_string");
-        match self.__peek_object()? {
+        match self.h_peek_object()? {
             Tag::UTF8_STRING => {}
             tag if tag.is_context_specific() => {}
             _tag => {
@@ -398,13 +392,13 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 return Err(Asn1DerError::InvalidData);
             }
         }
-        self.__next_object()?;
+        self.h_next_object()?;
         visitor.visit_string(Utf8String::deserialize(&self.buf)?.to_string())
     }
 
     fn deserialize_bytes<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         debug_log!("deserialize_bytes");
-        match self.__peek_object()? {
+        match self.h_peek_object()? {
             Tag::OCTET_STRING => {}
             Tag::OID => {}
             Tag::BIT_STRING => {}
@@ -425,13 +419,13 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
             }
         }
 
-        self.__next_object()?;
+        self.h_next_object()?;
         visitor.visit_bytes(&self.buf)
     }
 
     fn deserialize_byte_buf<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         debug_log!("deserialize_byte_buf");
-        match self.__peek_object()? {
+        match self.h_peek_object()? {
             Tag::OCTET_STRING => {}
             Tag::BIT_STRING => {}
             Tag::INTEGER => {}
@@ -445,7 +439,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 return Err(Asn1DerError::InvalidData);
             }
         }
-        self.__next_object()?;
+        self.h_next_object()?;
         visitor.visit_byte_buf(self.buf.to_vec())
     }
 
@@ -456,7 +450,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
 
     fn deserialize_unit<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         debug_log!("deserialize_unit");
-        match self.__peek_object()? {
+        match self.h_peek_object()? {
             Tag::NULL => {}
             tag if tag.is_context_specific() => {}
             _tag => {
@@ -464,61 +458,53 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 return Err(Asn1DerError::InvalidData);
             }
         }
-        self.__next_object()?;
+        self.h_next_object()?;
         Null::deserialize(&self.buf)?;
         visitor.visit_unit()
     }
 
-    fn deserialize_unit_struct<V: Visitor<'de>>(
-        self,
-        _name: &'static str,
-        visitor: V,
-    ) -> Result<V::Value> {
+    fn deserialize_unit_struct<V: Visitor<'de>>(self, _name: &'static str, visitor: V) -> Result<V::Value> {
         debug_log!("deserialize_unit_struct");
         self.deserialize_unit(visitor)
     }
 
-    fn deserialize_newtype_struct<V: Visitor<'de>>(
-        self,
-        name: &'static str,
-        visitor: V,
-    ) -> Result<V::Value> {
+    fn deserialize_newtype_struct<V: Visitor<'de>>(self, name: &'static str, visitor: V) -> Result<V::Value> {
         debug_log!("deserialize_newtype_struct: {}", name);
         match name {
-            BitStringAsn1Container::<()>::NAME => self.__encapsulate(Tag::BIT_STRING),
-            OctetStringAsn1Container::<()>::NAME => self.__encapsulate(Tag::OCTET_STRING),
-            ApplicationTag0::<()>::NAME => self.__encapsulate(Tag::APP_0),
-            ApplicationTag1::<()>::NAME => self.__encapsulate(Tag::APP_1),
-            ApplicationTag2::<()>::NAME => self.__encapsulate(Tag::APP_2),
-            ApplicationTag3::<()>::NAME => self.__encapsulate(Tag::APP_3),
-            ApplicationTag4::<()>::NAME => self.__encapsulate(Tag::APP_4),
-            ApplicationTag5::<()>::NAME => self.__encapsulate(Tag::APP_5),
-            ApplicationTag6::<()>::NAME => self.__encapsulate(Tag::APP_6),
-            ApplicationTag7::<()>::NAME => self.__encapsulate(Tag::APP_7),
-            ApplicationTag8::<()>::NAME => self.__encapsulate(Tag::APP_8),
-            ApplicationTag9::<()>::NAME => self.__encapsulate(Tag::APP_9),
-            ApplicationTag10::<()>::NAME => self.__encapsulate(Tag::APP_10),
-            ApplicationTag11::<()>::NAME => self.__encapsulate(Tag::APP_11),
-            ApplicationTag12::<()>::NAME => self.__encapsulate(Tag::APP_12),
-            ApplicationTag13::<()>::NAME => self.__encapsulate(Tag::APP_13),
-            ApplicationTag14::<()>::NAME => self.__encapsulate(Tag::APP_14),
-            ApplicationTag15::<()>::NAME => self.__encapsulate(Tag::APP_15),
-            ContextTag0::<()>::NAME => self.__encapsulate(Tag::CTX_0),
-            ContextTag1::<()>::NAME => self.__encapsulate(Tag::CTX_1),
-            ContextTag2::<()>::NAME => self.__encapsulate(Tag::CTX_2),
-            ContextTag3::<()>::NAME => self.__encapsulate(Tag::CTX_3),
-            ContextTag4::<()>::NAME => self.__encapsulate(Tag::CTX_4),
-            ContextTag5::<()>::NAME => self.__encapsulate(Tag::CTX_5),
-            ContextTag6::<()>::NAME => self.__encapsulate(Tag::CTX_6),
-            ContextTag7::<()>::NAME => self.__encapsulate(Tag::CTX_7),
-            ContextTag8::<()>::NAME => self.__encapsulate(Tag::CTX_8),
-            ContextTag9::<()>::NAME => self.__encapsulate(Tag::CTX_9),
-            ContextTag10::<()>::NAME => self.__encapsulate(Tag::CTX_10),
-            ContextTag11::<()>::NAME => self.__encapsulate(Tag::CTX_11),
-            ContextTag12::<()>::NAME => self.__encapsulate(Tag::CTX_12),
-            ContextTag13::<()>::NAME => self.__encapsulate(Tag::CTX_13),
-            ContextTag14::<()>::NAME => self.__encapsulate(Tag::CTX_14),
-            ContextTag15::<()>::NAME => self.__encapsulate(Tag::CTX_15),
+            BitStringAsn1Container::<()>::NAME => self.h_encapsulate(Tag::BIT_STRING),
+            OctetStringAsn1Container::<()>::NAME => self.h_encapsulate(Tag::OCTET_STRING),
+            ApplicationTag0::<()>::NAME => self.h_encapsulate(Tag::APP_0),
+            ApplicationTag1::<()>::NAME => self.h_encapsulate(Tag::APP_1),
+            ApplicationTag2::<()>::NAME => self.h_encapsulate(Tag::APP_2),
+            ApplicationTag3::<()>::NAME => self.h_encapsulate(Tag::APP_3),
+            ApplicationTag4::<()>::NAME => self.h_encapsulate(Tag::APP_4),
+            ApplicationTag5::<()>::NAME => self.h_encapsulate(Tag::APP_5),
+            ApplicationTag6::<()>::NAME => self.h_encapsulate(Tag::APP_6),
+            ApplicationTag7::<()>::NAME => self.h_encapsulate(Tag::APP_7),
+            ApplicationTag8::<()>::NAME => self.h_encapsulate(Tag::APP_8),
+            ApplicationTag9::<()>::NAME => self.h_encapsulate(Tag::APP_9),
+            ApplicationTag10::<()>::NAME => self.h_encapsulate(Tag::APP_10),
+            ApplicationTag11::<()>::NAME => self.h_encapsulate(Tag::APP_11),
+            ApplicationTag12::<()>::NAME => self.h_encapsulate(Tag::APP_12),
+            ApplicationTag13::<()>::NAME => self.h_encapsulate(Tag::APP_13),
+            ApplicationTag14::<()>::NAME => self.h_encapsulate(Tag::APP_14),
+            ApplicationTag15::<()>::NAME => self.h_encapsulate(Tag::APP_15),
+            ContextTag0::<()>::NAME => self.h_encapsulate(Tag::CTX_0),
+            ContextTag1::<()>::NAME => self.h_encapsulate(Tag::CTX_1),
+            ContextTag2::<()>::NAME => self.h_encapsulate(Tag::CTX_2),
+            ContextTag3::<()>::NAME => self.h_encapsulate(Tag::CTX_3),
+            ContextTag4::<()>::NAME => self.h_encapsulate(Tag::CTX_4),
+            ContextTag5::<()>::NAME => self.h_encapsulate(Tag::CTX_5),
+            ContextTag6::<()>::NAME => self.h_encapsulate(Tag::CTX_6),
+            ContextTag7::<()>::NAME => self.h_encapsulate(Tag::CTX_7),
+            ContextTag8::<()>::NAME => self.h_encapsulate(Tag::CTX_8),
+            ContextTag9::<()>::NAME => self.h_encapsulate(Tag::CTX_9),
+            ContextTag10::<()>::NAME => self.h_encapsulate(Tag::CTX_10),
+            ContextTag11::<()>::NAME => self.h_encapsulate(Tag::CTX_11),
+            ContextTag12::<()>::NAME => self.h_encapsulate(Tag::CTX_12),
+            ContextTag13::<()>::NAME => self.h_encapsulate(Tag::CTX_13),
+            ContextTag14::<()>::NAME => self.h_encapsulate(Tag::CTX_14),
+            ContextTag15::<()>::NAME => self.h_encapsulate(Tag::CTX_15),
             HeaderOnly::<()>::NAME => self.header_only = true,
             _ => {}
         }
@@ -529,10 +515,10 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
     fn deserialize_seq<V: Visitor<'de>>(mut self, visitor: V) -> Result<V::Value> {
         debug_log!("deserialize_seq");
 
-        self.__decapsulate()?;
+        self.h_decapsulate()?;
 
         // Read tag and length
-        let (tag, len) = self.__next_tag_len()?;
+        let (tag, len) = self.h_next_tag_len()?;
         debug_log!("tag: {}, len: {}", tag, len);
         match tag {
             Tag::SEQUENCE => {}
@@ -596,7 +582,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
 
     fn deserialize_identifier<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         debug_log!("deserialize_identifier: peek next tag id");
-        let tag = self.__peek_object()?;
+        let tag = self.h_peek_object()?;
         debug_log!("next tag id: {}", tag);
         visitor.visit_u8(tag.number())
     }

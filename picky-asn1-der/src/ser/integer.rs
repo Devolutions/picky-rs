@@ -31,7 +31,7 @@ impl UnsignedInteger {
         };
         let length = 17 - skip;
 
-        let mut written = ser.__write_header(Tag::INTEGER, length)?;
+        let mut written = ser.h_write_header(Tag::INTEGER, length)?;
 
         // Serialize the value and write the bytes
         let mut bytes = [0; 17];

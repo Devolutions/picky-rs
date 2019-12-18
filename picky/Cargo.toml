@@ -5,31 +5,33 @@ authors = [
     "jtrepanier-devolutions <jtrepanier@devolutions.net>",
     "Benoît CORTIER <benoit.cortier@fried-world.eu>",
 ]
+description = "Portable X.509, Jose and PKI implementation."
 edition = "2018"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Devolutions/picky-rs"
 
 [dependencies]
-picky-asn1 = { path = "../picky-asn1" }
-picky-asn1-der = { path = "../picky-asn1-der" }
+picky-asn1 = "0.1"
+picky-asn1-der = "0.1"
 serde = { version = "1.0", features = ["derive"] }
 oid = { version = "^0.1.1", features = ["serde_support"] }
 base64 = "0.10"
 snafu = "0.6"
 chrono = { version = "0.4", optional = true }
 serde_json = { version = "1.0", optional = true }
+static_assertions = "1.1"
 
 # /!\ ===== cryptography dependencies ===== /!\
 # These should be updated as soon as possible.
 # /!\ ===================================== /!\
 sha-1 = "0.8"
 sha2 = "0.8"
-rsa = { git = "https://github.com/Devolutions/RSA" }
-rand = "0.6" # TODO: update to 0.7. Requires rsa crate to support 0.7 too.
+rsa = "0.2"
+rand = "0.7"
 
 [dev-dependencies]
 num-bigint-dig = "0.5"
-pretty_assertions = "*"
+pretty_assertions = "^0.6"
 hex = "0.3"
 cfg-if = "0.1"
 

@@ -37,11 +37,7 @@ impl Middleware for AuthMiddleware {
     }
 }
 
-fn validate_api_key(
-    config: &ServerConfig,
-    auth_str: &str,
-    res: &mut SyncResponse,
-) -> RequestContinuation {
+fn validate_api_key(config: &ServerConfig, auth_str: &str, res: &mut SyncResponse) -> RequestContinuation {
     let auth_vec = auth_str.split(' ').collect::<Vec<&str>>();
 
     if auth_vec.len() != 2 {

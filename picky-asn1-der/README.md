@@ -7,7 +7,7 @@
 Portions of project [serde_asn1_der](https://github.com/KizzyCode/serde_asn1_der) are held by
 Keziah Biermann, 2019 as part of this project.
 
-This crate implements an ASN.1-DER subset for serde. 
+This crate implements an ASN.1-DER subset for serde.
 
 The following types have built-in support:
  - `bool`: The ASN.1-BOOLEAN-type

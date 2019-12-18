@@ -88,32 +88,29 @@ impl Into<String> for Pem<'_> {
 /// is allocated striping these. If you can strip these with minimal data copy
 /// you should do it beforehand.
 pub fn parse_pem<T: ?Sized + AsRef<[u8]>>(input: &T) -> Result<Pem<'static>, PemError> {
-    __parse_pem_impl(input.as_ref())
+    parse_pem_impl(input.as_ref())
 }
 
-fn __parse_pem_impl(input: &[u8]) -> Result<Pem<'static>, PemError> {
-    let header_start_idx =
-        __find(input, PEM_HEADER_START.as_bytes()).ok_or(PemError::HeaderNotFound)?;
+fn parse_pem_impl(input: &[u8]) -> Result<Pem<'static>, PemError> {
+    let header_start_idx = h_find(input, PEM_HEADER_START.as_bytes()).ok_or(PemError::HeaderNotFound)?;
 
     let label_start_idx = header_start_idx + PEM_HEADER_START.as_bytes().len();
-    let label_end_idx =
-        __find(&input[label_start_idx..], b"-").ok_or(PemError::InvalidHeader)? + label_start_idx;
+    let label_end_idx = h_find(&input[label_start_idx..], b"-").ok_or(PemError::InvalidHeader)? + label_start_idx;
     let label = String::from_utf8_lossy(&input[label_start_idx..label_end_idx])
         .trim()
         .to_owned();
 
-    let header_end_idx = __find(&input[label_end_idx..], PEM_DASHES_BOUNDARIES.as_bytes())
+    let header_end_idx = h_find(&input[label_end_idx..], PEM_DASHES_BOUNDARIES.as_bytes())
         .ok_or(PemError::InvalidHeader)?
         + label_end_idx
         + PEM_DASHES_BOUNDARIES.as_bytes().len();
 
-    let footer_start_idx = __find(&input[header_end_idx..], PEM_HEADER_END.as_bytes())
-        .ok_or(PemError::FooterNotFound)?
-        + header_end_idx;
+    let footer_start_idx =
+        h_find(&input[header_end_idx..], PEM_HEADER_END.as_bytes()).ok_or(PemError::FooterNotFound)? + header_end_idx;
 
     let raw_data = &input[header_end_idx..footer_start_idx];
 
-    let data = if __find(raw_data, b"\n").is_some() {
+    let data = if h_find(raw_data, b"\n").is_some() {
         // Line ending characters should be striped... Sadly, this means we need to copy and allocate.
         let striped_raw_data: Vec<u8> = raw_data
             .iter()
@@ -132,10 +129,8 @@ fn __parse_pem_impl(input: &[u8]) -> Result<Pem<'static>, PemError> {
     })
 }
 
-fn __find(buffer: &[u8], value: &[u8]) -> Option<usize> {
-    buffer
-        .windows(value.len())
-        .position(|window| window == value)
+fn h_find(buffer: &[u8], value: &[u8]) -> Option<usize> {
+    buffer.windows(value.len()).position(|window| window == value)
 }
 
 /// Build a PEM-encoded structure into a String.

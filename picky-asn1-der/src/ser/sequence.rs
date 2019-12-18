@@ -33,7 +33,7 @@ impl<'a, 'se> Sequence<'a, 'se> {
         // Reclaim buffer
         let buf = self.buf.into_inner();
 
-        let mut written = self.ser.__write_header(self.tag, buf.len())?;
+        let mut written = self.ser.h_write_header(self.tag, buf.len())?;
         written += self.ser.writer.write_exact(&buf)?;
 
         Ok(written)
@@ -65,11 +65,7 @@ impl<'a, 'se> serde::ser::SerializeStruct for Sequence<'a, 'se> {
     type Ok = usize;
     type Error = Asn1DerError;
 
-    fn serialize_field<T: ?Sized + Serialize>(
-        &mut self,
-        _key: &'static str,
-        value: &T,
-    ) -> Result<()> {
+    fn serialize_field<T: ?Sized + Serialize>(&mut self, _key: &'static str, value: &T) -> Result<()> {
         self.write_object(value)
     }
     fn end(self) -> Result<Self::Ok> {

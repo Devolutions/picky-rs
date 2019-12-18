@@ -34,24 +34,17 @@ pub(crate) struct CertificationRequest {
 mod tests {
     use super::*;
     use crate::{pem::Pem, x509::name::DirectoryName};
-    use picky_asn1::{
-        bit_string::BitString, restricted_string::PrintableString, wrapper::IntegerAsn1,
-    };
+    use picky_asn1::{bit_string::BitString, restricted_string::PrintableString, wrapper::IntegerAsn1};
     use std::str::FromStr;
 
     #[test]
     fn deserialize_csr() {
-        let pem = crate::test_files::CSR
-            .parse::<Pem>()
-            .expect("couldn't parse csr pem");
+        let pem = crate::test_files::CSR.parse::<Pem>().expect("couldn't parse csr pem");
         let encoded = pem.data();
         assert_eq!(pem.label(), "CERTIFICATE REQUEST");
 
         let certification_request_info = CertificationRequestInfo::new(
-            DirectoryName::new_common_name(
-                PrintableString::from_str("test.contoso.local").unwrap(),
-            )
-            .into(),
+            DirectoryName::new_common_name(PrintableString::from_str("test.contoso.local").unwrap()).into(),
             SubjectPublicKeyInfo::new_rsa_key(
                 IntegerAsn1::from(encoded[74..331].to_vec()),
                 IntegerAsn1::from(encoded[333..336].to_vec()),

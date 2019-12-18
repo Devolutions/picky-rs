@@ -58,12 +58,7 @@ impl PrivateKeyInfo {
         private_exponent: IntegerAsn1,
         primes: Vec<IntegerAsn1>,
     ) -> Self {
-        let mut seq = Asn1SequenceOf(vec![
-            vec![0].into(),
-            modulus,
-            public_exponent,
-            private_exponent,
-        ]);
+        let mut seq = Asn1SequenceOf(vec![vec![0].into(), modulus, public_exponent, private_exponent]);
         seq.0.extend(primes);
         let private_key = PrivateKeyValue::RSA(RSAPrivateKey(seq).into());
 
@@ -96,9 +91,7 @@ impl<'de> de::Deserialize<'de> for PrivateKeyInfo {
                 let version = seq.next_element()?.unwrap();
                 if version != 0 {
                     return Err(de::Error::invalid_value(
-                        de::Unexpected::Other(
-                            "[PrivateKeyInfo] unsupported version (valid version number: 0)",
-                        ),
+                        de::Unexpected::Other("[PrivateKeyInfo] unsupported version (valid version number: 0)"),
                         &"a supported PrivateKeyInfo",
                     ));
                 }
@@ -132,10 +125,7 @@ pub(crate) enum PrivateKeyValue {
 }
 
 impl ser::Serialize for PrivateKeyValue {
-    fn serialize<S>(
-        &self,
-        serializer: S,
-    ) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
     where
         S: ser::Serializer,
     {
@@ -200,8 +190,7 @@ mod tests {
             IntegerAsn1::from(encoded[278..311].to_vec()),
             IntegerAsn1::from(encoded[313..346].to_vec()),
         ];
-        let private_key =
-            PrivateKeyInfo::new_rsa_encryption(modulus, public_exponent, private_exponent, primes);
+        let private_key = PrivateKeyInfo::new_rsa_encryption(modulus, public_exponent, private_exponent, primes);
         check_serde!(private_key: PrivateKeyInfo in encoded);
     }
 }

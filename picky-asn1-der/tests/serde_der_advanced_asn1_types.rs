@@ -62,8 +62,8 @@ fn encapsulated_types() {
 
     {
         let buffer = [
-            0x03, 0x11, 0x00, 0x0c, 0x0e, 0x55, 0x54, 0x46, 0x2d, 0x38, 0xe6, 0x96, 0x87, 0xe5,
-            0xad, 0x97, 0xe5, 0x88, 0x97,
+            0x03, 0x11, 0x00, 0x0c, 0x0e, 0x55, 0x54, 0x46, 0x2d, 0x38, 0xe6, 0x96, 0x87, 0xe5, 0xad, 0x97, 0xe5, 0x88,
+            0x97,
         ];
         let encapsulated: BitStringAsn1Container<String> = String::from("UTF-8文字列").into();
         check(&buffer, encapsulated);
@@ -140,12 +140,9 @@ fn utc_time() {
 #[test]
 fn generalized_time() {
     let buffer = [
-        0x18, 0x0F, 0x32, 0x30, 0x31, 0x31, 0x31, 0x30, 0x30, 0x36, 0x30, 0x38, 0x33, 0x39, 0x35,
-        0x36, 0x5A,
+        0x18, 0x0F, 0x32, 0x30, 0x31, 0x31, 0x31, 0x30, 0x30, 0x36, 0x30, 0x38, 0x33, 0x39, 0x35, 0x36, 0x5A,
     ];
-    let time: GeneralizedTimeAsn1 = GeneralizedTime::new(2011, 10, 06, 08, 39, 56)
-        .unwrap()
-        .into();
+    let time: GeneralizedTimeAsn1 = GeneralizedTime::new(2011, 10, 06, 08, 39, 56).unwrap().into();
     check(&buffer, time);
 }
 
@@ -222,9 +219,7 @@ fn sequence_of() {
 #[test]
 fn application_tag0() {
     let buffer = [0xA0, 0x03, 0x02, 0x01, 0xF9];
-    let application_tag = ApplicationTag0(IntegerAsn1::from(
-        (-7).to_bigint().unwrap().to_signed_bytes_be(),
-    ));
+    let application_tag = ApplicationTag0(IntegerAsn1::from((-7).to_bigint().unwrap().to_signed_bytes_be()));
     check(&buffer, application_tag);
 }
 
@@ -234,13 +229,11 @@ fn restricted_strings() {
     let printable_string = PrintableString::from_str("NL").unwrap();
     check::<PrintableStringAsn1>(printable_string_buffer, printable_string.into());
 
-    let utf8_string_buffer =
-        b"\x0C\x10\x50\x6F\x6C\x61\x72\x53\x53\x4C\x20\x54\x65\x73\x74\x20\x43\x41";
+    let utf8_string_buffer = b"\x0C\x10\x50\x6F\x6C\x61\x72\x53\x53\x4C\x20\x54\x65\x73\x74\x20\x43\x41";
     let utf8_string = Utf8String::from_str("PolarSSL Test CA").unwrap();
     check::<Utf8StringAsn1>(utf8_string_buffer, utf8_string.into());
 
-    let ia5_string_buffer =
-        b"\x16\x10\x50\x6F\x6C\x61\x72\x53\x53\x4C\x20\x54\x65\x73\x74\x20\x43\x41";
+    let ia5_string_buffer = b"\x16\x10\x50\x6F\x6C\x61\x72\x53\x53\x4C\x20\x54\x65\x73\x74\x20\x43\x41";
     let ia5_string = IA5String::from_str("PolarSSL Test CA").unwrap();
     check::<IA5StringAsn1>(ia5_string_buffer, ia5_string.into());
 }

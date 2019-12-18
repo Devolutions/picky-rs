@@ -9,8 +9,8 @@ use crate::{
     x509::private::name::{GeneralName, GeneralNames},
 };
 use picky_asn1::wrapper::{
-    ApplicationTag1, ContextTag0, ContextTag2, Implicit, IntegerAsn1, ObjectIdentifierAsn1,
-    OctetStringAsn1, OctetStringAsn1Container,
+    ApplicationTag1, ContextTag0, ContextTag2, Implicit, IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1,
+    OctetStringAsn1Container,
 };
 use serde::{de, ser, Deserialize, Serialize};
 use std::fmt;
@@ -95,9 +95,7 @@ impl Extension {
                 AuthorityKeyIdentifier {
                     key_identifier: key_identifier.into().map(ContextTag0),
                     authority_cert_issuer: authority_cert_issuer.into().map(ApplicationTag1),
-                    authority_cert_serial_number: authority_cert_serial_number
-                        .into()
-                        .map(ContextTag2),
+                    authority_cert_serial_number: authority_cert_serial_number.into().map(ContextTag2),
                 }
                 .into(),
             ),
@@ -173,10 +171,7 @@ impl Extension {
 }
 
 impl ser::Serialize for Extension {
-    fn serialize<S>(
-        &self,
-        serializer: S,
-    ) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
     where
         S: ser::Serializer,
     {
@@ -218,22 +213,12 @@ impl<'de> de::Deserialize<'de> for Extension {
                     oids::AUTHORITY_KEY_IDENTIFIER => {
                         ExtensionValue::AuthorityKeyIdentifier(seq.next_element()?.unwrap())
                     }
-                    oids::SUBJECT_KEY_IDENTIFIER => {
-                        ExtensionValue::SubjectKeyIdentifier(seq.next_element()?.unwrap())
-                    }
+                    oids::SUBJECT_KEY_IDENTIFIER => ExtensionValue::SubjectKeyIdentifier(seq.next_element()?.unwrap()),
                     oids::KEY_USAGE => ExtensionValue::KeyUsage(seq.next_element()?.unwrap()),
-                    oids::SUBJECT_ALTERNATIVE_NAME => {
-                        ExtensionValue::SubjectAltName(seq.next_element()?.unwrap())
-                    }
-                    oids::ISSUER_ALTERNATIVE_NAME => {
-                        ExtensionValue::IssuerAltName(seq.next_element()?.unwrap())
-                    }
-                    oids::BASIC_CONSTRAINTS => {
-                        ExtensionValue::BasicConstraints(seq.next_element()?.unwrap())
-                    }
-                    oids::EXTENDED_KEY_USAGE => {
-                        ExtensionValue::ExtendedKeyUsage(seq.next_element()?.unwrap())
-                    }
+                    oids::SUBJECT_ALTERNATIVE_NAME => ExtensionValue::SubjectAltName(seq.next_element()?.unwrap()),
+                    oids::ISSUER_ALTERNATIVE_NAME => ExtensionValue::IssuerAltName(seq.next_element()?.unwrap()),
+                    oids::BASIC_CONSTRAINTS => ExtensionValue::BasicConstraints(seq.next_element()?.unwrap()),
+                    oids::EXTENDED_KEY_USAGE => ExtensionValue::ExtendedKeyUsage(seq.next_element()?.unwrap()),
                     _ => ExtensionValue::Generic(seq.next_element()?.unwrap()),
                 };
 
@@ -265,25 +250,13 @@ pub enum ExtensionView<'a> {
 impl<'a> From<&'a ExtensionValue> for ExtensionView<'a> {
     fn from(value: &'a ExtensionValue) -> Self {
         match value {
-            ExtensionValue::AuthorityKeyIdentifier(OctetStringAsn1Container(val)) => {
-                Self::AuthorityKeyIdentifier(val)
-            }
-            ExtensionValue::SubjectKeyIdentifier(OctetStringAsn1Container(val)) => {
-                Self::SubjectKeyIdentifier(val)
-            }
+            ExtensionValue::AuthorityKeyIdentifier(OctetStringAsn1Container(val)) => Self::AuthorityKeyIdentifier(val),
+            ExtensionValue::SubjectKeyIdentifier(OctetStringAsn1Container(val)) => Self::SubjectKeyIdentifier(val),
             ExtensionValue::KeyUsage(OctetStringAsn1Container(val)) => Self::KeyUsage(val),
-            ExtensionValue::SubjectAltName(OctetStringAsn1Container(val)) => {
-                Self::SubjectAltName(val.clone().into())
-            }
-            ExtensionValue::IssuerAltName(OctetStringAsn1Container(val)) => {
-                Self::IssuerAltName(val.clone().into())
-            }
-            ExtensionValue::BasicConstraints(OctetStringAsn1Container(val)) => {
-                Self::BasicConstraints(val)
-            }
-            ExtensionValue::ExtendedKeyUsage(OctetStringAsn1Container(val)) => {
-                Self::ExtendedKeyUsage(val)
-            }
+            ExtensionValue::SubjectAltName(OctetStringAsn1Container(val)) => Self::SubjectAltName(val.clone().into()),
+            ExtensionValue::IssuerAltName(OctetStringAsn1Container(val)) => Self::IssuerAltName(val.clone().into()),
+            ExtensionValue::BasicConstraints(OctetStringAsn1Container(val)) => Self::BasicConstraints(val),
+            ExtensionValue::ExtendedKeyUsage(OctetStringAsn1Container(val)) => Self::ExtendedKeyUsage(val),
             ExtensionValue::Generic(val) => Self::Generic(val),
         }
     }
@@ -310,10 +283,7 @@ enum ExtensionValue {
 }
 
 impl ser::Serialize for ExtensionValue {
-    fn serialize<S>(
-        &self,
-        serializer: S,
-    ) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
     where
         S: ser::Serializer,
     {
@@ -323,9 +293,7 @@ impl ser::Serialize for ExtensionValue {
             ExtensionValue::KeyUsage(key_usage) => key_usage.serialize(serializer),
             ExtensionValue::SubjectAltName(san) => san.serialize(serializer),
             ExtensionValue::IssuerAltName(ian) => ian.serialize(serializer),
-            ExtensionValue::BasicConstraints(basic_constraints) => {
-                basic_constraints.serialize(serializer)
-            }
+            ExtensionValue::BasicConstraints(basic_constraints) => basic_constraints.serialize(serializer),
             ExtensionValue::ExtendedKeyUsage(eku) => eku.serialize(serializer),
             ExtensionValue::Generic(octet_string) => octet_string.serialize(serializer),
         }
@@ -346,15 +314,11 @@ impl AuthorityKeyIdentifier {
     }
 
     pub fn authority_cert_issuer(&self) -> Option<super::name::GeneralName> {
-        self.authority_cert_issuer
-            .as_ref()
-            .map(|aci| aci.clone().0.into())
+        self.authority_cert_issuer.as_ref().map(|aci| aci.clone().0.into())
     }
 
     pub fn authority_cert_serial_number(&self) -> Option<&IntegerAsn1> {
-        self.authority_cert_serial_number
-            .as_ref()
-            .map(|acsn| &acsn.0)
+        self.authority_cert_serial_number.as_ref().map(|acsn| &acsn.0)
     }
 }
 
@@ -381,10 +345,7 @@ impl<'de> de::Deserialize<'de> for AuthorityKeyIdentifier {
                 Ok(AuthorityKeyIdentifier {
                     key_identifier: seq.next_element().unwrap_or(Some(None)).unwrap_or(None),
                     authority_cert_issuer: seq.next_element().unwrap_or(Some(None)).unwrap_or(None),
-                    authority_cert_serial_number: seq
-                        .next_element()
-                        .unwrap_or(Some(None))
-                        .unwrap_or(None),
+                    authority_cert_serial_number: seq.next_element().unwrap_or(Some(None)).unwrap_or(None),
                 })
             }
         }
@@ -489,9 +450,7 @@ impl<'de> de::Deserialize<'de> for BasicConstraints {
             {
                 Ok(BasicConstraints {
                     ca: Implicit(seq.next_element().unwrap_or(Some(None)).unwrap_or(None)),
-                    path_len_constraint: Implicit(
-                        seq.next_element().unwrap_or(Some(None)).unwrap_or(None),
-                    ),
+                    path_len_constraint: Implicit(seq.next_element().unwrap_or(Some(None)).unwrap_or(None)),
                 })
             }
         }
@@ -590,31 +549,11 @@ mod tests {
             ])
             .into_non_critical(),
             Extension::new_subject_alt_name(vec![
-                GeneralName::DNSName(
-                    IA5String::from_string("devel.example.com".into())
-                        .unwrap()
-                        .into(),
-                ),
-                GeneralName::DNSName(
-                    IA5String::from_string("ipv6.example.com".into())
-                        .unwrap()
-                        .into(),
-                ),
-                GeneralName::DNSName(
-                    IA5String::from_string("ipv4.example.com".into())
-                        .unwrap()
-                        .into(),
-                ),
-                GeneralName::DNSName(
-                    IA5String::from_string("test.example.com".into())
-                        .unwrap()
-                        .into(),
-                ),
-                GeneralName::DNSName(
-                    IA5String::from_string("party.example.com".into())
-                        .unwrap()
-                        .into(),
-                ),
+                GeneralName::DNSName(IA5String::from_string("devel.example.com".into()).unwrap().into()),
+                GeneralName::DNSName(IA5String::from_string("ipv6.example.com".into()).unwrap().into()),
+                GeneralName::DNSName(IA5String::from_string("ipv4.example.com".into()).unwrap().into()),
+                GeneralName::DNSName(IA5String::from_string("test.example.com".into()).unwrap().into()),
+                GeneralName::DNSName(IA5String::from_string("party.example.com".into()).unwrap().into()),
             ])
             .into_non_critical(),
         ]);

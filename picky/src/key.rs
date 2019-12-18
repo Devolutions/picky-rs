@@ -1,4 +1,7 @@
-use crate::private::{private_key_info::PrivateKeyValue, PrivateKeyInfo, SubjectPublicKeyInfo};
+use crate::{
+    pem::{to_pem, Pem},
+    private::{private_key_info::PrivateKeyValue, PrivateKeyInfo, SubjectPublicKeyInfo},
+};
 use picky_asn1::wrapper::{IntegerAsn1, OctetStringAsn1Container};
 use picky_asn1_der::Asn1DerError;
 use snafu::{ResultExt, Snafu};
@@ -23,17 +26,21 @@ pub enum KeyError {
     #[snafu(display("RSA error: {}", context))]
     Rsa { context: String },
 
-    /// no secure randomness available
-    NoSecureRandomness,
+    /// invalid PEM label error
+    #[snafu(display("invalid PEM label: {}", label))]
+    InvalidPemLabel { label: String },
 }
 
 impl From<rsa::errors::Error> for KeyError {
     fn from(e: rsa::errors::Error) -> Self {
-        KeyError::Rsa {
-            context: e.to_string(),
-        }
+        KeyError::Rsa { context: e.to_string() }
     }
 }
+
+// === private key === //
+
+const PRIVATE_KEY_PEM_LABEL: &str = "PRIVATE KEY";
+const RSA_PRIVATE_KEY_PEM_LABEL: &str = "RSA PRIVATE KEY";
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PrivateKey(PrivateKeyInfo);
@@ -62,6 +69,16 @@ impl From<PrivateKey> for SubjectPublicKeyInfo {
 }
 
 impl PrivateKey {
+    pub fn from_pem(pem: &Pem) -> Result<Self, KeyError> {
+        match pem.label() {
+            PRIVATE_KEY_PEM_LABEL => Self::from_pkcs8(pem.data()),
+            RSA_PRIVATE_KEY_PEM_LABEL => Self::from_rsa_der(pem.data()),
+            _ => Err(KeyError::InvalidPemLabel {
+                label: pem.label().to_owned(),
+            }),
+        }
+    }
+
     pub fn from_pkcs8<T: ?Sized + AsRef<[u8]>>(pkcs8: &T) -> Result<Self, KeyError> {
         Ok(Self(picky_asn1_der::from_bytes(pkcs8.as_ref()).context(
             Asn1Deserialization {
@@ -73,11 +90,9 @@ impl PrivateKey {
     pub fn from_rsa_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, KeyError> {
         use crate::{private::private_key_info::RSAPrivateKey, AlgorithmIdentifier};
 
-        let private_key = picky_asn1_der::from_bytes::<RSAPrivateKey>(der.as_ref()).context(
-            Asn1Deserialization {
-                element: "rsa private key",
-            },
-        )?;
+        let private_key = picky_asn1_der::from_bytes::<RSAPrivateKey>(der.as_ref()).context(Asn1Deserialization {
+            element: "rsa private key",
+        })?;
 
         Ok(Self(PrivateKeyInfo {
             version: 0,
@@ -92,14 +107,14 @@ impl PrivateKey {
         })
     }
 
-    pub fn to_public_key(&self) -> PublicKey {
+    pub fn to_pem(&self) -> Result<String, KeyError> {
+        Ok(to_pem(PRIVATE_KEY_PEM_LABEL, &self.to_pkcs8()?))
+    }
+
+    pub fn to_public_key(&self) -> OwnedPublicKey {
         match &self.0.private_key {
             PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => {
-                SubjectPublicKeyInfo::new_rsa_key(
-                    key.modulus().clone(),
-                    key.public_exponent().clone(),
-                )
-                .into()
+                SubjectPublicKeyInfo::new_rsa_key(key.modulus().clone(), key.public_exponent().clone()).into()
             }
         }
     }
@@ -109,9 +124,7 @@ impl PrivateKey {
         use rand::rngs::OsRng;
         use rsa::{PublicKey, RSAPrivateKey};
 
-        let mut rng = OsRng::new().map_err(|_| KeyError::NoSecureRandomness)?;
-        let key = RSAPrivateKey::new(&mut rng, bits)?;
-
+        let key = RSAPrivateKey::new(&mut OsRng, bits)?;
         let modulus = IntegerAsn1::from_signed_bytes_be(key.n().to_bytes_be());
         let public_exponent = IntegerAsn1::from_signed_bytes_be(key.e().to_bytes_be());
         let private_exponent = IntegerAsn1::from_signed_bytes_be(key.d().to_bytes_be());
@@ -132,75 +145,243 @@ impl PrivateKey {
     }
 }
 
+// === public key === //
+
+const PUBLIC_KEY_PEM_LABEL: &str = "PUBLIC KEY";
+const RSA_PUBLIC_KEY_PEM_LABEL: &str = "RSA PUBLIC KEY";
+
 #[derive(Debug, Clone, PartialEq)]
-pub struct PublicKey(SubjectPublicKeyInfo);
+enum PublicKeyInner<'a> {
+    Owned(SubjectPublicKeyInfo),
+    Ref(&'a SubjectPublicKeyInfo),
+}
 
-impl From<SubjectPublicKeyInfo> for PublicKey {
+impl<'a> From<SubjectPublicKeyInfo> for PublicKeyInner<'a> {
+    fn from(spki: SubjectPublicKeyInfo) -> Self {
+        Self::Owned(spki)
+    }
+}
+
+impl<'a> From<&'a SubjectPublicKeyInfo> for PublicKeyInner<'a> {
+    fn from(spki: &'a SubjectPublicKeyInfo) -> Self {
+        Self::Ref(spki)
+    }
+}
+
+impl<'a> PublicKeyInner<'a> {
+    pub fn into_owned(self) -> SubjectPublicKeyInfo {
+        match self {
+            PublicKeyInner::Owned(spki) => spki,
+            PublicKeyInner::Ref(spki) => (*spki).clone(),
+        }
+    }
+}
+
+impl<'a> AsRef<SubjectPublicKeyInfo> for PublicKeyInner<'a> {
+    fn as_ref(&self) -> &SubjectPublicKeyInfo {
+        match self {
+            PublicKeyInner::Owned(spki) => spki,
+            PublicKeyInner::Ref(spki) => spki,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PublicKey<'a>(PublicKeyInner<'a>);
+pub type OwnedPublicKey = PublicKey<'static>;
+
+impl From<SubjectPublicKeyInfo> for OwnedPublicKey {
     fn from(key: SubjectPublicKeyInfo) -> Self {
-        Self(key)
+        Self(PublicKeyInner::Owned(key))
     }
 }
 
-impl From<PublicKey> for SubjectPublicKeyInfo {
-    fn from(key: PublicKey) -> Self {
-        key.0
+impl<'a> From<&'a SubjectPublicKeyInfo> for PublicKey<'a> {
+    fn from(key: &'a SubjectPublicKeyInfo) -> Self {
+        Self(PublicKeyInner::Ref(key))
     }
 }
 
-impl From<PrivateKey> for PublicKey {
+impl From<OwnedPublicKey> for SubjectPublicKeyInfo {
+    fn from(key: OwnedPublicKey) -> Self {
+        key.0.into_owned()
+    }
+}
+
+impl<'a> From<&'a PublicKey<'a>> for &'a SubjectPublicKeyInfo {
+    fn from(key: &'a PublicKey<'a>) -> Self {
+        key.0.as_ref()
+    }
+}
+
+impl From<PrivateKey> for OwnedPublicKey {
     fn from(key: PrivateKey) -> Self {
-        Self(key.into())
+        Self(PublicKeyInner::Owned(key.into()))
     }
 }
 
-impl PublicKey {
-    pub fn from_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, KeyError> {
-        Ok(Self(picky_asn1_der::from_bytes(der.as_ref()).context(
-            Asn1Deserialization {
-                element: "subject public key info",
-            },
-        )?))
+impl OwnedPublicKey {
+    pub fn from_pem(pem: &Pem) -> Result<Self, KeyError> {
+        match pem.label() {
+            PUBLIC_KEY_PEM_LABEL => Self::from_der(pem.data()),
+            RSA_PUBLIC_KEY_PEM_LABEL => Self::from_rsa_der(pem.data()),
+            _ => Err(KeyError::InvalidPemLabel {
+                label: pem.label().to_owned(),
+            }),
+        }
     }
 
+    pub fn from_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, KeyError> {
+        Ok(Self(
+            picky_asn1_der::from_bytes::<SubjectPublicKeyInfo>(der.as_ref())
+                .context(Asn1Deserialization {
+                    element: "subject public key info",
+                })?
+                .into(),
+        ))
+    }
+
+    pub fn from_rsa_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, KeyError> {
+        use crate::{
+            private::subject_public_key_info::{PublicKey, RSAPublicKey},
+            AlgorithmIdentifier,
+        };
+
+        let public_key = picky_asn1_der::from_bytes::<RSAPublicKey>(der.as_ref()).context(Asn1Deserialization {
+            element: "rsa public key",
+        })?;
+
+        Ok(Self(
+            SubjectPublicKeyInfo {
+                algorithm: AlgorithmIdentifier::new_rsa_encryption(),
+                subject_public_key: PublicKey::RSA(public_key.into()),
+            }
+            .into(),
+        ))
+    }
+}
+
+impl<'a> PublicKey<'a> {
     pub fn to_der(&self) -> Result<Vec<u8>, KeyError> {
-        picky_asn1_der::to_vec(&self.0).context(Asn1Serialization {
+        picky_asn1_der::to_vec(self.0.as_ref()).context(Asn1Serialization {
             element: "subject public key info",
         })
     }
 
+    pub fn to_pem(&self) -> Result<String, KeyError> {
+        Ok(to_pem(PUBLIC_KEY_PEM_LABEL, &self.to_der()?))
+    }
+
+    pub fn into_owned(self) -> OwnedPublicKey {
+        Self(PublicKeyInner::Owned(self.0.into_owned()))
+    }
+
     pub(crate) fn as_inner(&self) -> &SubjectPublicKeyInfo {
-        &self.0
+        self.0.as_ref()
     }
 }
 
 #[cfg(test)]
-#[cfg(not(debug_assertions))]
-/// Generating RSA keys in debug is very slow. Therefore, these tests only run in release mode.
 mod tests {
     use super::*;
 
-    cfg_if::cfg_if! { if #[cfg(feature = "x509")] {
-        use crate::x509::{certificate::CertificateBuilder, date::UTCDate, name::DirectoryName};
+    // Generating RSA keys in debug is very slow. Therefore, this test only run in release mode.
+    cfg_if::cfg_if! { if #[cfg(not(debug_assertions))] {
+        cfg_if::cfg_if! { if #[cfg(feature = "x509")] {
+            use crate::x509::{certificate::CertificateBuilder, date::UTCDate, name::DirectoryName};
 
-        fn generate_certificate_from_pk(private_key: PrivateKey) {
-            // validity
-            let valid_from = UTCDate::ymd(2019, 10, 10).unwrap();
-            let valid_to = UTCDate::ymd(2019, 10, 11).unwrap();
+            fn generate_certificate_from_pk(private_key: PrivateKey) {
+                // validity
+                let valid_from = UTCDate::ymd(2019, 10, 10).unwrap();
+                let valid_to = UTCDate::ymd(2019, 10, 11).unwrap();
 
-            CertificateBuilder::new()
-                .valididy(valid_from, valid_to)
-                .self_signed(DirectoryName::new_common_name("Test Root CA"), &private_key)
-                .ca(true)
-                .build()
-                .expect("couldn't build root ca");
+                CertificateBuilder::new()
+                    .valididy(valid_from, valid_to)
+                    .self_signed(DirectoryName::new_common_name("Test Root CA"), &private_key)
+                    .ca(true)
+                    .build()
+                    .expect("couldn't build root ca");
+            }
+        } else {
+            fn generate_certificate_from_pk(_: PrivateKey) {}
+        }}
+
+        #[test]
+        fn generate_rsa_keys() {
+            let private_key = PrivateKey::generate_rsa(4096).expect("couldn't generate rsa key");
+            generate_certificate_from_pk(private_key);
         }
-    } else {
-        fn generate_certificate_from_pk(_: PrivateKey) {}
     }}
 
+    const RSA_PRIVATE_KEY_PEM: &str = "-----BEGIN RSA PRIVATE KEY-----\n\
+                                       MIIEpAIBAAKCAQEA5Kz4i/+XZhiE+fyrgtx/4yI3i6C6HXbC4QJYpDuSUEKN2bO9\n\
+                                       RsE+Fnds/FizHtJVWbvya9ktvKdDPBdy58+CIM46HEKJhYLnBVlkEcg9N2RNgR3x\n\
+                                       HnpRbKfv+BmWjOpSmWrmJSDLY0dbw5X5YL8TU69ImoouCUfStyCgrpwkctR0GD3G\n\
+                                       fcGjbZRucV7VvVH9bS1jyaT/9yORyzPOSTwb+K9vOr6XlJX0CGvzQeIOcOimejHx\n\
+                                       ACFOCnhEKXiwMsmL8FMz0drkGeMuCODY/OHVmAdXDE5UhroL0oDhSmIrdZ8CxngO\n\
+                                       xHr1WD2yC0X0jAVP/mrxjSSfBwmmqhSMmONlvQIDAQABAoIBAQCJrBl3L8nWjayB\n\
+                                       VL1ta5MTC+alCX8DfhyVmvQC7FqKN4dvKecqUe0vWXcj9cLhK4B3JdAtXfNLQOgZ\n\
+                                       pYRoS2XsmjwiB20EFGtBrS+yBPvV/W0r7vrbfojHAdRXahBZhjl0ZAdrEvNgMfXt\n\
+                                       Kr2YoXDhUQZFBCvzKmqSFfKnLRpEhsCBOsp+Sx0ZbP3yVPASXnqiZmKblpY4qcE5\n\
+                                       KfYUO0nUWBSzY8I5c/29IY5oBbOUGS1DTMkx3R7V0BzbH/xmskVACn+cMzf467vp\n\
+                                       yupTKG9hIX8ff0QH4Ggx88uQTRTI9IvfrAMnICFtR6U7g70hLN6j9ujXkPNhmycw\n\
+                                       E5nQCmuBAoGBAPVbYtGBvnlySN73UrlyJ1NItUmOGhBt/ezpRjMIdMkJ6dihq7i2\n\
+                                       RpE76sRvwHY9Tmw8oxR/V1ITK3dM2jZP1SRcm1mn5Y1D3K38jwFS0C47AXzIN2N+\n\
+                                       LExekI1J4YOPV9o378vUKQuWpbQrQOOvylQBkRJ0Cd8DI3xhiBT/AVGbAoGBAO6Y\n\
+                                       WBP3GMloO2v6PHijhRqrNdaI0qht8tDhO5L1troFLst3sfpK9fUP/KTlhHOzNVBF\n\
+                                       fIJnNdcYAe9BISBbfSat+/R9F+GoUvpoC4j8ygHTQkT6ZMcMDfR8RQ4BlqGHIDKZ\n\
+                                       YaAJoPZVkg7hNRMcvIruYpzFrheDE/4xvnC51GeHAoGAHzCFyFIw72lKwCU6e956\n\
+                                       B0lH2ljZEVuaGuKwjM43YlMDSgmLNcjeAZpXRq9aDO3QKUwwAuwJIqLTNLAtURgm\n\
+                                       5R9slCIWuTV2ORvQ5f8r/aR8lOsyt1ATu4WN5JgOtdWj+laAAi4vJYz59YRGFGuF\n\
+                                       UdZ9JZZgptvUR/xx+xFLjp8CgYBMRzghaeXqvgABTUb36o8rL4FOzP9MCZqPXPKG\n\
+                                       0TdR0UZcli+4LS7k4e+LaDUoKCrrNsvPhN+ZnHtB2jiU96rTKtxaFYQFCKM+mvTV\n\
+                                       HrwWSUvucX62hAwSFYieKbPWgDSy+IZVe76SAllnmGg3bAB7CitMo4Y8zhMeORkB\n\
+                                       QOe/EQKBgQDgeNgRud7S9BvaT3iT7UtizOr0CnmMfoF05Ohd9+VE4ogvLdAoDTUF\n\
+                                       JFtdOT/0naQk0yqIwLDjzCjhe8+Ji5Y/21pjau8bvblTnASq26FRRjv5+hV8lmcR\n\
+                                       zzk3Y05KXvJL75ksJdomkzZZb0q+Omf3wyjMR8Xl5WueJH1fh4hpBw==\n\
+                                       -----END RSA PRIVATE KEY-----";
+
     #[test]
-    fn generate_rsa_keys() {
-        let private_key = PrivateKey::generate_rsa(4096).expect("couldn't generate rsa key");
-        generate_certificate_from_pk(private_key);
+    fn private_key_from_rsa_pem() {
+        PrivateKey::from_pem(&RSA_PRIVATE_KEY_PEM.parse::<Pem>().expect("pem")).expect("private key");
+    }
+
+    const PUBLIC_KEY_PEM: &str = "-----BEGIN PUBLIC KEY-----\n\
+                                  MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA61BjmfXGEvWmegnBGSuS\n\
+                                  +rU9soUg2FnODva32D1AqhwdziwHINFaD1MVlcrYG6XRKfkcxnaXGfFDWHLEvNBS\n\
+                                  EVCgJjtHAGZIm5GL/KA86KDp/CwDFMSwluowcXwDwoyinmeOY9eKyh6aY72xJh7n\n\
+                                  oLBBq1N0bWi1e2i+83txOCg4yV2oVXhBo8pYEJ8LT3el6Smxol3C1oFMVdwPgc0v\n\
+                                  Tl25XucMcG/ALE/KNY6pqC2AQ6R2ERlVgPiUWOPatVkt7+Bs3h5Ramxh7XjBOXeu\n\
+                                  lmCpGSynXNcpZ/06+vofGi/2MlpQZNhHAo8eayMp6FcvNucIpUndo1X8dKMv3Y26\n\
+                                  ZQIDAQAB\n\
+                                  -----END PUBLIC KEY-----";
+
+    #[test]
+    fn public_key_from_pem() {
+        PublicKey::from_pem(&PUBLIC_KEY_PEM.parse::<Pem>().expect("pem")).expect("public key");
+    }
+
+    const RSA_PUBLIC_KEY_PEM: &str = "-----BEGIN RSA PUBLIC KEY-----\n\
+                                      MIIBCgKCAQEA61BjmfXGEvWmegnBGSuS+rU9soUg2FnODva32D1AqhwdziwHINFa\n\
+                                      D1MVlcrYG6XRKfkcxnaXGfFDWHLEvNBSEVCgJjtHAGZIm5GL/KA86KDp/CwDFMSw\n\
+                                      luowcXwDwoyinmeOY9eKyh6aY72xJh7noLBBq1N0bWi1e2i+83txOCg4yV2oVXhB\n\
+                                      o8pYEJ8LT3el6Smxol3C1oFMVdwPgc0vTl25XucMcG/ALE/KNY6pqC2AQ6R2ERlV\n\
+                                      gPiUWOPatVkt7+Bs3h5Ramxh7XjBOXeulmCpGSynXNcpZ/06+vofGi/2MlpQZNhH\n\
+                                      Ao8eayMp6FcvNucIpUndo1X8dKMv3Y26ZQIDAQAB\n\
+                                      -----END RSA PUBLIC KEY-----";
+
+    #[test]
+    fn public_key_from_rsa_pem() {
+        PublicKey::from_pem(&RSA_PUBLIC_KEY_PEM.parse::<Pem>().expect("pem")).expect("public key");
+    }
+
+    const GARBAGE_PEM: &str = "-----BEGIN GARBAGE-----GARBAGE-----END GARBAGE-----";
+
+    #[test]
+    fn public_key_from_garbage_pem_err() {
+        let err = PublicKey::from_pem(&GARBAGE_PEM.parse::<Pem>().expect("pem"))
+            .err()
+            .expect("key error");
+        assert_eq!(err.to_string(), "invalid PEM label: GARBAGE");
     }
 }

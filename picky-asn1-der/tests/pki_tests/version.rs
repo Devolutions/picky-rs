@@ -84,8 +84,7 @@ pub fn implicit_app0_version_is_default(version: &Implicit<ApplicationTag0<Versi
 
 #[test]
 fn optional_version() {
-    let buffer_with_version: [u8; 10] =
-        [0x30, 0x08, 0xA0, 0x03, 0x02, 0x01, 0x02, 0x02, 0x01, 0x6E];
+    let buffer_with_version: [u8; 10] = [0x30, 0x08, 0xA0, 0x03, 0x02, 0x01, 0x02, 0x02, 0x01, 0x6E];
 
     let non_default = OptionalVersionTestStruct {
         version: ApplicationTag0(Version::V3).into(),

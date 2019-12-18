@@ -52,13 +52,18 @@ impl<'de> de::Deserialize<'de> for TBSCertificate {
                 V: de::SeqAccess<'de>,
             {
                 Ok(TBSCertificate {
-                    version: seq.next_element().map_err(|_| de::Error::invalid_value(
-                            de::Unexpected::Other(
-                                "[TBSCertificate] V1 certificates unsupported. Only V3 certificates \
-                                are supported",
-                            ),
-                            &"a supported certificate",
-                        ))?.ok_or_else(|| de::Error::invalid_length(0, &self))?,
+                    version: seq
+                        .next_element()
+                        .map_err(|_| {
+                            de::Error::invalid_value(
+                                de::Unexpected::Other(
+                                    "[TBSCertificate] V1 certificates unsupported. Only V3 certificates \
+                                     are supported",
+                                ),
+                                &"a supported certificate",
+                            )
+                        })?
+                        .ok_or_else(|| de::Error::invalid_length(0, &self))?,
                     serial_number: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(1, &self))?,
                     signature: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(2, &self))?,
                     issuer: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(3, &self))?,
@@ -152,11 +157,7 @@ mod tests {
             Extension::new_basic_constraints(None, None).into_non_critical(),
             Extension::new_key_usage(key_usage),
             Extension::new_subject_key_identifier(&encoded[469..489]),
-            Extension::new_authority_key_identifier(
-                KeyIdentifier::from(encoded[502..522].to_vec()),
-                None,
-                None,
-            ),
+            Extension::new_authority_key_identifier(KeyIdentifier::from(encoded[502..522].to_vec()), None, None),
         ]);
         check_serde!(extensions: Extensions in encoded[429..522]);
 
@@ -198,13 +199,7 @@ mod tests {
             "1f74d63f29c17474453b05122c3da8bd435902a6"
         );
         pretty_assertions::assert_eq!(
-            hex::encode(
-                &cert
-                    .authority_key_identifier()
-                    .unwrap()
-                    .key_identifier()
-                    .unwrap()
-            ),
+            hex::encode(&cert.authority_key_identifier().unwrap().key_identifier().unwrap()),
             "b45ae4a5b3ded252f6b9d5a6950feb3ebcc7fdff"
         );
     }

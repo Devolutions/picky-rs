@@ -18,29 +18,25 @@ const PICKY_BACKEND_FILE_PATH_ENV: &str = "PICKY_BACKEND_FILE_PATH";
 
 #[derive(PartialEq, Clone)]
 pub enum BackendType {
-    MySQL,
-    SQLite,
     MongoDb,
     Memory,
     File,
 }
 
+impl Default for BackendType {
+    fn default() -> Self {
+        BackendType::MongoDb
+    }
+}
+
 impl From<&str> for BackendType {
     fn from(backend: &str) -> Self {
         match backend {
-            "mysql" => BackendType::MySQL,
-            "sqlite" => BackendType::SQLite,
             "mongodb" => BackendType::MongoDb,
             "memory" => BackendType::Memory,
             "file" => BackendType::File,
             _ => BackendType::default(),
         }
-    }
-}
-
-impl Default for BackendType {
-    fn default() -> Self {
-        BackendType::MongoDb
     }
 }
 

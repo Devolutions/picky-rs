@@ -63,20 +63,18 @@ impl KeyIdGenMethod {
     pub fn generate_from(&self, public_key: &PublicKey) -> Result<Vec<u8>, KeyIdGenError> {
         use crate::private::subject_public_key_info::PublicKey as InnerPublicKey;
         match self {
-            KeyIdGenMethod::SPKValueHashedLeftmost160(hash_algo) => {
-                match &public_key.as_inner().subject_public_key {
-                    InnerPublicKey::RSA(BitStringAsn1Container(rsa_pk)) => {
-                        let der = picky_asn1_der::to_vec(rsa_pk).context(Asn1Serialization {
-                            element: "RSA private key",
-                        })?;
-                        Ok(hash!(hash_algo, der)[..20].to_vec())
-                    }
-                    InnerPublicKey::EC(bitstring) => {
-                        let der = bitstring.0.payload_view();
-                        Ok(hash!(hash_algo, der)[..20].to_vec())
-                    }
+            KeyIdGenMethod::SPKValueHashedLeftmost160(hash_algo) => match &public_key.as_inner().subject_public_key {
+                InnerPublicKey::RSA(BitStringAsn1Container(rsa_pk)) => {
+                    let der = picky_asn1_der::to_vec(rsa_pk).context(Asn1Serialization {
+                        element: "RSA private key",
+                    })?;
+                    Ok(hash!(hash_algo, der)[..20].to_vec())
                 }
-            }
+                InnerPublicKey::EC(bitstring) => {
+                    let der = bitstring.0.payload_view();
+                    Ok(hash!(hash_algo, der)[..20].to_vec())
+                }
+            },
             KeyIdGenMethod::SPKFullDER(hash_algo) => {
                 let der = public_key.to_der().context(InvalidKey)?;
                 Ok(hash!(hash_algo, der))

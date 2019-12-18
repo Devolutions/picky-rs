@@ -91,10 +91,7 @@ impl AlgorithmIdentifier {
 }
 
 impl ser::Serialize for AlgorithmIdentifier {
-    fn serialize<S>(
-        &self,
-        serializer: S,
-    ) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
     where
         S: ser::Serializer,
     {
@@ -144,17 +141,13 @@ impl<'de> de::Deserialize<'de> for AlgorithmIdentifier {
                         seq.next_element::<()>()?.unwrap();
                         AlgorithmIdentifierParameters::Null
                     }
-                    oids::ECDSA_WITH_SHA384 | oids::ECDSA_WITH_SHA256 => {
-                        AlgorithmIdentifierParameters::None
+                    oids::ECDSA_WITH_SHA384 | oids::ECDSA_WITH_SHA256 => AlgorithmIdentifierParameters::None,
+                    oids::EC_PUBLIC_KEY => {
+                        AlgorithmIdentifierParameters::EC(seq.next_element::<ECParameters>()?.unwrap())
                     }
-                    oids::EC_PUBLIC_KEY => AlgorithmIdentifierParameters::EC(
-                        seq.next_element::<ECParameters>()?.unwrap(),
-                    ),
                     _ => {
                         return Err(de::Error::invalid_value(
-                            de::Unexpected::Other(
-                                "[AlgorithmIdentifier] unsupported algorithm (unknown oid)",
-                            ),
+                            de::Unexpected::Other("[AlgorithmIdentifier] unsupported algorithm (unknown oid)"),
                             &"a supported algorithm",
                         ));
                     }
@@ -204,10 +197,7 @@ impl From<()> for ECParameters {
 }
 
 impl ser::Serialize for ECParameters {
-    fn serialize<S>(
-        &self,
-        serializer: S,
-    ) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
     where
         S: ser::Serializer,
     {
@@ -244,9 +234,7 @@ impl<'de> de::Deserialize<'de> for ECParameters {
                         Ok(ECParameters::ImplicitCurve)
                     }
                     _ => Err(de::Error::invalid_value(
-                        de::Unexpected::Other(
-                            "[ECParameters] unsupported or unknown elliptic curve parameter",
-                        ),
+                        de::Unexpected::Other("[ECParameters] unsupported or unknown elliptic curve parameter"),
                         &"a supported elliptic curve parameter",
                     )),
                 }

@@ -6,7 +6,7 @@ pub struct Boolean;
 impl Boolean {
     /// Serializes `value` into `writer`
     pub fn serialize(value: bool, ser: &mut Serializer) -> Result<usize> {
-        let mut written = ser.__write_header(Tag::BOOLEAN, 1)?;
+        let mut written = ser.h_write_header(Tag::BOOLEAN, 1)?;
 
         // Serialize the value
         written += if value {

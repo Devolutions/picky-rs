@@ -5,11 +5,7 @@ use crate::{
     AlgorithmIdentifier,
 };
 use picky_asn1::wrapper::{BitStringAsn1Container, OctetStringAsn1Container};
-use rand::rngs::OsRng;
-use rsa::{
-    hash::Hashes, BigUint, PaddingScheme, PublicKey as RsaPublicKeyInterface, RSAPrivateKey,
-    RSAPublicKey,
-};
+use rsa::{hash::Hashes, BigUint, PaddingScheme, PublicKey as RsaPublicKeyInterface, RSAPrivateKey, RSAPublicKey};
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
 use sha2::{Sha224, Sha256, Sha384, Sha512};
@@ -21,9 +17,6 @@ pub enum SignatureError {
     #[snafu(display("RSA error: {}", context))]
     Rsa { context: String },
 
-    /// no secure randomness available
-    NoSecureRandomness,
-
     /// invalid signature
     BadSignature,
 
@@ -34,9 +27,7 @@ pub enum SignatureError {
 
 impl From<rsa::errors::Error> for SignatureError {
     fn from(e: rsa::errors::Error) -> Self {
-        SignatureError::Rsa {
-            context: e.to_string(),
-        }
+        SignatureError::Rsa { context: e.to_string() }
     }
 }
 
@@ -63,9 +54,7 @@ macro_rules! hash {
 }
 
 impl SignatureHashType {
-    pub fn from_algorithm_identifier(
-        algorithm_identifier: &AlgorithmIdentifier,
-    ) -> Result<Self, SignatureError> {
+    pub fn from_algorithm_identifier(algorithm_identifier: &AlgorithmIdentifier) -> Result<Self, SignatureError> {
         let oid_string: String = algorithm_identifier.oid().into();
         match oid_string.as_str() {
             oids::SHA1_WITH_RSA_ENCRYPTION => Ok(Self::RsaSha1),
@@ -73,9 +62,7 @@ impl SignatureHashType {
             oids::SHA256_WITH_RSA_ENCRYPTION => Ok(Self::RsaSha256),
             oids::SHA384_WITH_RSA_ENCRYPTION => Ok(Self::RsaSha384),
             oids::SHA512_WITH_RSA_ENCRYPTION => Ok(Self::RsaSha512),
-            _ => Err(SignatureError::UnsupportedAlgorithm {
-                algorithm: oid_string,
-            }),
+            _ => Err(SignatureError::UnsupportedAlgorithm { algorithm: oid_string }),
         }
     }
 
@@ -91,20 +78,16 @@ impl SignatureHashType {
 
     pub fn sign(self, msg: &[u8], private_key: &PrivateKey) -> Result<Vec<u8>, SignatureError> {
         let rsa_private_key = match &private_key.as_inner().private_key {
-            private_key_info::PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => {
-                RSAPrivateKey::from_components2(
-                    BigUint::from_bytes_be(key.modulus().as_bytes_be()),
-                    BigUint::from_bytes_be(key.public_exponent().as_bytes_be()),
-                    BigUint::from_bytes_be(key.private_exponent().as_bytes_be()),
-                    key.primes()
-                        .iter()
-                        .map(|p| BigUint::from_bytes_be(p.as_bytes_be()))
-                        .collect(),
-                )?
-            }
+            private_key_info::PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => RSAPrivateKey::from_components(
+                BigUint::from_bytes_be(key.modulus().as_bytes_be()),
+                BigUint::from_bytes_be(key.public_exponent().as_bytes_be()),
+                BigUint::from_bytes_be(key.private_exponent().as_bytes_be()),
+                key.primes()
+                    .iter()
+                    .map(|p| BigUint::from_bytes_be(p.as_bytes_be()))
+                    .collect(),
+            ),
         };
-
-        let mut rng = OsRng::new().map_err(|_| SignatureError::NoSecureRandomness)?;
 
         let digest = self.hash(msg);
 
@@ -117,7 +100,7 @@ impl SignatureHashType {
         };
 
         let signature = rsa_private_key.sign_blinded(
-            &mut rng,
+            &mut rand::rngs::OsRng,
             PaddingScheme::PKCS1v15,
             Some(hash_algo),
             &digest,
@@ -126,12 +109,7 @@ impl SignatureHashType {
         Ok(signature)
     }
 
-    pub fn verify(
-        self,
-        public_key: &PublicKey,
-        msg: &[u8],
-        signature: &[u8],
-    ) -> Result<(), SignatureError> {
+    pub fn verify(self, public_key: &PublicKey, msg: &[u8], signature: &[u8]) -> Result<(), SignatureError> {
         use crate::private::subject_public_key_info::PublicKey as InnerPublicKey;
 
         let public_key = match &public_key.as_inner().subject_public_key {
@@ -157,12 +135,7 @@ impl SignatureHashType {
         let digest = self.hash(msg);
 
         public_key
-            .verify(
-                PaddingScheme::PKCS1v15,
-                Some(hash_algorithm),
-                &digest,
-                signature,
-            )
+            .verify(PaddingScheme::PKCS1v15, Some(hash_algorithm), &digest, signature)
             .map_err(|_| SignatureError::BadSignature)?;
 
         Ok(())
@@ -178,28 +151,5 @@ impl From<SignatureHashType> for AlgorithmIdentifier {
             SignatureHashType::RsaSha384 => AlgorithmIdentifier::new_sha384_with_rsa_encryption(),
             SignatureHashType::RsaSha512 => AlgorithmIdentifier::new_sha512_with_rsa_encryption(),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::pem::Pem;
-
-    #[test]
-    fn unsupported_key_no_panic() {
-        // Once the key is supported by the RSA crate, this test should be deleted.
-        let unsupported_key = {
-            let pem = crate::test_files::RSA_4096_PK_3_UNSUPPORTED
-                .parse::<Pem>()
-                .unwrap();
-            PrivateKey::from_pkcs8(pem.data()).unwrap()
-        };
-        let msg = [0, 1, 2, 3, 4, 5];
-        let signature_hash_type = SignatureHashType::RsaSha512;
-        let err = signature_hash_type
-            .sign(&msg, &unsupported_key)
-            .unwrap_err();
-        assert_eq!(err.to_string(), "RSA error: invalid coefficient");
     }
 }

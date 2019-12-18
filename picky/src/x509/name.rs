@@ -1,9 +1,7 @@
 use crate::x509::{
     private::{
         attribute_type_and_value::AttributeTypeAndValueParameters,
-        name::{
-            GeneralName as SerdeGeneralName, GeneralNames as SerdeGeneralNames, NamePrettyFormatter,
-        },
+        name::{GeneralName as SerdeGeneralName, GeneralNames as SerdeGeneralNames, NamePrettyFormatter},
         AttributeTypeAndValue, Name,
     },
     DirectoryString,
@@ -54,8 +52,7 @@ impl DirectoryName {
     pub fn find_common_name(&self) -> Option<&DirectoryString> {
         for relative_distinguished_name in &((self.0).0) {
             for attr_ty_val in &relative_distinguished_name.0 {
-                if let AttributeTypeAndValueParameters::CommonName(dir_string) = &attr_ty_val.value
-                {
+                if let AttributeTypeAndValueParameters::CommonName(dir_string) = &attr_ty_val.value {
                     return Some(dir_string);
                 }
             }
@@ -70,14 +67,10 @@ impl DirectoryName {
             NameAttr::SerialNumber => AttributeTypeAndValue::new_serial_number(value),
             NameAttr::CountryName => AttributeTypeAndValue::new_country_name(value),
             NameAttr::LocalityName => AttributeTypeAndValue::new_locality_name(value),
-            NameAttr::StateOrProvinceName => {
-                AttributeTypeAndValue::new_state_or_province_name(value)
-            }
+            NameAttr::StateOrProvinceName => AttributeTypeAndValue::new_state_or_province_name(value),
             NameAttr::StreetName => AttributeTypeAndValue::new_street_name(value),
             NameAttr::OrganisationName => AttributeTypeAndValue::new_organisation_name(value),
-            NameAttr::OrganisationalUnitName => {
-                AttributeTypeAndValue::new_organisational_unit_name(value)
-            }
+            NameAttr::OrganisationalUnitName => AttributeTypeAndValue::new_organisational_unit_name(value),
         };
         ((self.0).0)[0].0.push(ty_val);
     }
@@ -260,10 +253,7 @@ mod tests {
         let mut my_name = DirectoryName::new_common_name("CommonName");
         my_name.add_attr(NameAttr::StateOrProvinceName, "SomeState");
         my_name.add_attr(NameAttr::CountryName, "SomeCountry");
-        assert_eq!(
-            my_name.to_string(),
-            "CN=CommonName,ST=SomeState,C=SomeCountry"
-        );
+        assert_eq!(my_name.to_string(), "CN=CommonName,ST=SomeState,C=SomeCountry");
     }
 
     #[test]

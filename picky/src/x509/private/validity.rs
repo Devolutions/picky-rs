@@ -44,10 +44,7 @@ impl From<GeneralizedTime> for Time {
 }
 
 impl ser::Serialize for Time {
-    fn serialize<S>(
-        &self,
-        serializer: S,
-    ) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
     where
         S: ser::Serializer,
     {

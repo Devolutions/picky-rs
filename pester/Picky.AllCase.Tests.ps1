@@ -2,13 +2,22 @@ param(
     [switch] $Verbose,
     [switch] $Debug
 )
+
 if ($Debug) {
-    Describe 'rust tests' {
-        Context 'debug mode' {
-            & 'cargo' 'test' '--manifest-path' '../Cargo.toml'
+    Describe 'rust' {
+        It 'code formatting' {
+            Invoke-Expression "cargo +stable fmt --all -- --check 2>&1 | Out-Null"
+            $LASTEXITCODE | Should -be 0 # please, run `cargo +stable fmt`
         }
-        Context 'release mode' {
-            & 'cargo' 'test' '--manifest-path' '../Cargo.toml' '--release'
+
+        It 'tests in debug profile' {
+            Invoke-Expression "cargo +stable test --manifest-path ../Cargo.toml --quiet"
+            $LASTEXITCODE | Should -be 0
+        }
+
+        It 'tests in release profile' {
+            Invoke-Expression "cargo +stable test --manifest-path ../Cargo.toml --release --quiet"
+            $LASTEXITCODE | Should -be 0
         }
     }
 
