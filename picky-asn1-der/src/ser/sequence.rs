@@ -33,7 +33,7 @@ impl<'a, 'se> Sequence<'a, 'se> {
         // Reclaim buffer
         let buf = self.buf.into_inner();
 
-        let mut written = self.ser.__write_header(self.tag, buf.len())?;
+        let mut written = self.ser.h_write_header(self.tag, buf.len())?;
         written += self.ser.writer.write_exact(&buf)?;
 
         Ok(written)

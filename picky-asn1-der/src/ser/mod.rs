@@ -75,11 +75,11 @@ impl<'se> Serializer<'se> {
         }
     }
 
-    fn __encapsulate(&mut self, tag: Tag) {
+    fn h_encapsulate(&mut self, tag: Tag) {
         self.encapsulators.push(tag);
     }
 
-    fn __write_encapsulator(&mut self, payload_len: usize) -> Result<usize> {
+    fn h_write_encapsulator(&mut self, payload_len: usize) -> Result<usize> {
         let mut written = 0;
 
         for (i, encapsulator_tag) in self.encapsulators.iter().copied().enumerate() {
@@ -110,7 +110,7 @@ impl<'se> Serializer<'se> {
         Ok(written)
     }
 
-    fn __write_header(&mut self, tag: Tag, len: usize) -> Result<usize> {
+    fn h_write_header(&mut self, tag: Tag, len: usize) -> Result<usize> {
         if self.no_header {
             self.no_header = false; // reset state
             return Ok(0);
@@ -119,22 +119,22 @@ impl<'se> Serializer<'se> {
         let mut written;
         if let Some(last_encapsulator_tag) = self.encapsulators.last() {
             if last_encapsulator_tag.is_context_specific() {
-                written = self.__write_encapsulator(len)?;
+                written = self.h_write_encapsulator(len)?;
             } else {
-                written = self.__write_encapsulator(Length::encoded_len(len) + len + 1)?;
+                written = self.h_write_encapsulator(Length::encoded_len(len) + len + 1)?;
                 written += self.writer.write_one(tag.number())?;
                 written += Length::serialize(len, &mut self.writer)?;
             }
         } else {
-            written = self.__write_encapsulator(Length::encoded_len(len) + len + 1)?;
+            written = self.h_write_encapsulator(Length::encoded_len(len) + len + 1)?;
             written += self.writer.write_one(tag.number())?;
             written += Length::serialize(len, &mut self.writer)?;
         }
         Ok(written)
     }
 
-    fn __serialize_bytes_with_tag(&mut self, bytes: &[u8]) -> Result<usize> {
-        let mut written = self.__write_header(self.tag_for_next_bytes, bytes.len())?;
+    fn h_serialize_bytes_with_tag(&mut self, bytes: &[u8]) -> Result<usize> {
+        let mut written = self.h_write_header(self.tag_for_next_bytes, bytes.len())?;
         written += self.writer.write_exact(bytes)?;
 
         self.tag_for_next_bytes = Tag::OCTET_STRING; // reset to octet string
@@ -233,7 +233,7 @@ impl<'a, 'se> serde::ser::Serializer for &'a mut Serializer<'se> {
 
     fn serialize_bytes(self, v: &[u8]) -> Result<Self::Ok> {
         debug_log!("serialize_bytes");
-        self.__serialize_bytes_with_tag(v)
+        self.h_serialize_bytes_with_tag(v)
     }
 
     fn serialize_none(self) -> Result<Self::Ok> {
@@ -285,40 +285,40 @@ impl<'a, 'se> serde::ser::Serializer for &'a mut Serializer<'se> {
             IA5StringAsn1::NAME => self.tag_for_next_bytes = Tag::IA5_STRING,
             Asn1SetOf::<()>::NAME => self.tag_for_next_seq = Tag::SET,
             Asn1SequenceOf::<()>::NAME => self.tag_for_next_seq = Tag::SEQUENCE,
-            BitStringAsn1Container::<()>::NAME => self.__encapsulate(Tag::BIT_STRING),
-            OctetStringAsn1Container::<()>::NAME => self.__encapsulate(Tag::OCTET_STRING),
-            ApplicationTag0::<()>::NAME => self.__encapsulate(Tag::APP_0),
-            ApplicationTag1::<()>::NAME => self.__encapsulate(Tag::APP_1),
-            ApplicationTag2::<()>::NAME => self.__encapsulate(Tag::APP_2),
-            ApplicationTag3::<()>::NAME => self.__encapsulate(Tag::APP_3),
-            ApplicationTag4::<()>::NAME => self.__encapsulate(Tag::APP_4),
-            ApplicationTag5::<()>::NAME => self.__encapsulate(Tag::APP_5),
-            ApplicationTag6::<()>::NAME => self.__encapsulate(Tag::APP_6),
-            ApplicationTag7::<()>::NAME => self.__encapsulate(Tag::APP_7),
-            ApplicationTag8::<()>::NAME => self.__encapsulate(Tag::APP_8),
-            ApplicationTag9::<()>::NAME => self.__encapsulate(Tag::APP_9),
-            ApplicationTag10::<()>::NAME => self.__encapsulate(Tag::APP_10),
-            ApplicationTag11::<()>::NAME => self.__encapsulate(Tag::APP_11),
-            ApplicationTag12::<()>::NAME => self.__encapsulate(Tag::APP_12),
-            ApplicationTag13::<()>::NAME => self.__encapsulate(Tag::APP_13),
-            ApplicationTag14::<()>::NAME => self.__encapsulate(Tag::APP_14),
-            ApplicationTag15::<()>::NAME => self.__encapsulate(Tag::APP_15),
-            ContextTag0::<()>::NAME => self.__encapsulate(Tag::CTX_0),
-            ContextTag1::<()>::NAME => self.__encapsulate(Tag::CTX_1),
-            ContextTag2::<()>::NAME => self.__encapsulate(Tag::CTX_2),
-            ContextTag3::<()>::NAME => self.__encapsulate(Tag::CTX_3),
-            ContextTag4::<()>::NAME => self.__encapsulate(Tag::CTX_4),
-            ContextTag5::<()>::NAME => self.__encapsulate(Tag::CTX_5),
-            ContextTag6::<()>::NAME => self.__encapsulate(Tag::CTX_6),
-            ContextTag7::<()>::NAME => self.__encapsulate(Tag::CTX_7),
-            ContextTag8::<()>::NAME => self.__encapsulate(Tag::CTX_8),
-            ContextTag9::<()>::NAME => self.__encapsulate(Tag::CTX_9),
-            ContextTag10::<()>::NAME => self.__encapsulate(Tag::CTX_10),
-            ContextTag11::<()>::NAME => self.__encapsulate(Tag::CTX_11),
-            ContextTag12::<()>::NAME => self.__encapsulate(Tag::CTX_12),
-            ContextTag13::<()>::NAME => self.__encapsulate(Tag::CTX_13),
-            ContextTag14::<()>::NAME => self.__encapsulate(Tag::CTX_14),
-            ContextTag15::<()>::NAME => self.__encapsulate(Tag::CTX_15),
+            BitStringAsn1Container::<()>::NAME => self.h_encapsulate(Tag::BIT_STRING),
+            OctetStringAsn1Container::<()>::NAME => self.h_encapsulate(Tag::OCTET_STRING),
+            ApplicationTag0::<()>::NAME => self.h_encapsulate(Tag::APP_0),
+            ApplicationTag1::<()>::NAME => self.h_encapsulate(Tag::APP_1),
+            ApplicationTag2::<()>::NAME => self.h_encapsulate(Tag::APP_2),
+            ApplicationTag3::<()>::NAME => self.h_encapsulate(Tag::APP_3),
+            ApplicationTag4::<()>::NAME => self.h_encapsulate(Tag::APP_4),
+            ApplicationTag5::<()>::NAME => self.h_encapsulate(Tag::APP_5),
+            ApplicationTag6::<()>::NAME => self.h_encapsulate(Tag::APP_6),
+            ApplicationTag7::<()>::NAME => self.h_encapsulate(Tag::APP_7),
+            ApplicationTag8::<()>::NAME => self.h_encapsulate(Tag::APP_8),
+            ApplicationTag9::<()>::NAME => self.h_encapsulate(Tag::APP_9),
+            ApplicationTag10::<()>::NAME => self.h_encapsulate(Tag::APP_10),
+            ApplicationTag11::<()>::NAME => self.h_encapsulate(Tag::APP_11),
+            ApplicationTag12::<()>::NAME => self.h_encapsulate(Tag::APP_12),
+            ApplicationTag13::<()>::NAME => self.h_encapsulate(Tag::APP_13),
+            ApplicationTag14::<()>::NAME => self.h_encapsulate(Tag::APP_14),
+            ApplicationTag15::<()>::NAME => self.h_encapsulate(Tag::APP_15),
+            ContextTag0::<()>::NAME => self.h_encapsulate(Tag::CTX_0),
+            ContextTag1::<()>::NAME => self.h_encapsulate(Tag::CTX_1),
+            ContextTag2::<()>::NAME => self.h_encapsulate(Tag::CTX_2),
+            ContextTag3::<()>::NAME => self.h_encapsulate(Tag::CTX_3),
+            ContextTag4::<()>::NAME => self.h_encapsulate(Tag::CTX_4),
+            ContextTag5::<()>::NAME => self.h_encapsulate(Tag::CTX_5),
+            ContextTag6::<()>::NAME => self.h_encapsulate(Tag::CTX_6),
+            ContextTag7::<()>::NAME => self.h_encapsulate(Tag::CTX_7),
+            ContextTag8::<()>::NAME => self.h_encapsulate(Tag::CTX_8),
+            ContextTag9::<()>::NAME => self.h_encapsulate(Tag::CTX_9),
+            ContextTag10::<()>::NAME => self.h_encapsulate(Tag::CTX_10),
+            ContextTag11::<()>::NAME => self.h_encapsulate(Tag::CTX_11),
+            ContextTag12::<()>::NAME => self.h_encapsulate(Tag::CTX_12),
+            ContextTag13::<()>::NAME => self.h_encapsulate(Tag::CTX_13),
+            ContextTag14::<()>::NAME => self.h_encapsulate(Tag::CTX_14),
+            ContextTag15::<()>::NAME => self.h_encapsulate(Tag::CTX_15),
             HeaderOnly::<()>::NAME => self.no_header = true,
             _ => {}
         }

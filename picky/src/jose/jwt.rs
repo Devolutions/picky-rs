@@ -152,15 +152,15 @@ impl<'a, C: Serialize> Jwt<'a, C> {
 
 impl<'a, C: DeserializeOwned> Jwt<'a, C> {
     pub fn decode(encoded_token: &str, public_key: &PublicKey) -> Result<Self, JwtError> {
-        __decode_helper(encoded_token, Some(public_key))
+        decode_impl(encoded_token, Some(public_key))
     }
 
     pub fn decode_without_signature_check(encoded_token: &str) -> Result<Self, JwtError> {
-        __decode_helper(encoded_token, None)
+        decode_impl(encoded_token, None)
     }
 }
 
-fn __decode_helper<'a, C: DeserializeOwned>(
+fn decode_impl<'a, C: DeserializeOwned>(
     encoded_token: &str,
     public_key: Option<&PublicKey>,
 ) -> Result<Jwt<'a, C>, JwtError> {

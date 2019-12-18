@@ -6,6 +6,6 @@ pub struct Null;
 impl Null {
     /// Serializes a `Null` into `_writer`
     pub fn serialize(ser: &mut Serializer) -> Result<usize> {
-        ser.__write_header(Tag::NULL, 0)
+        ser.h_write_header(Tag::NULL, 0)
     }
 }

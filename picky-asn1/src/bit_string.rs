@@ -39,8 +39,7 @@ pub struct BitString {
 }
 
 impl BitString {
-    #[inline]
-    fn __number_of_unused_bits(data_size: usize, num_bits: usize) -> u8 {
+    fn h_number_of_unused_bits(data_size: usize, num_bits: usize) -> u8 {
         (data_size * 8 - num_bits) as u8
     }
 
@@ -48,7 +47,7 @@ impl BitString {
     pub fn with_len(num_bits: usize) -> BitString {
         let data_size = num_bits / 8 + if num_bits % 8 == 0 { 0 } else { 1 };
         let mut data = vec![0x00u8; data_size + 1];
-        data[0] = Self::__number_of_unused_bits(data_size, num_bits);
+        data[0] = Self::h_number_of_unused_bits(data_size, num_bits);
         BitString { data }
     }
 
@@ -73,7 +72,7 @@ impl BitString {
         V: Into<Vec<u8>>,
     {
         let mut data = data.into();
-        let number_of_unused = Self::__number_of_unused_bits(data.len(), num_bits);
+        let number_of_unused = Self::h_number_of_unused_bits(data.len(), num_bits);
         data.insert(0, number_of_unused);
         BitString { data }
     }
@@ -130,7 +129,7 @@ impl BitString {
     /// ```
     pub fn set_num_bits(&mut self, num_bits: usize) {
         let new_size = num_bits / 8 + if num_bits % 8 == 0 { 0 } else { 1 };
-        self.data[0] = Self::__number_of_unused_bits(new_size, num_bits);
+        self.data[0] = Self::h_number_of_unused_bits(new_size, num_bits);
         self.data.resize(new_size + 1, 0);
     }
 
