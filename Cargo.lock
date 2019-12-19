@@ -1245,7 +1245,7 @@ dependencies = [
 
 [[package]]
 name = "picky"
-version = "4.2.1"
+version = "4.4.2"
 dependencies = [
  "base64 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "cfg-if 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
