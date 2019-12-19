@@ -41,6 +41,14 @@ pub enum JwtError {
     /// expected JWT but got an unexpected type
     #[snafu(display("header says input is not a JWT: expected JWT, found {}", typ))]
     UnexpectedType { typ: String },
+
+    /// a required claim is missing
+    #[snafu(display("{} claim is required but is missing", claim))]
+    MissingClaim { claim: &'static str },
+
+    /// token expired
+    #[snafu(display("token expired (not after: {}, now: {} [leeway: {}])", not_after, now.numeric_date, now.leeway))]
+    Expired { not_after: i64, now: JwtDate },
 }
 
 impl From<rsa::errors::Error> for JwtError {
@@ -64,6 +72,39 @@ impl From<SignatureError> for JwtError {
 impl From<DecodeError> for JwtError {
     fn from(e: DecodeError) -> Self {
         Self::Base64Decoding { source: e }
+    }
+}
+
+// === JWT date === //
+
+/// Represent date as defined by [RFC7519](https://tools.ietf.org/html/rfc7519#section-2).
+///
+/// A leeway can be configured to account clock skew when comparing with another date.
+/// Should be small (less than 120).
+#[derive(Clone, Debug)]
+pub struct JwtDate {
+    pub numeric_date: i64,
+    pub leeway: u8,
+}
+
+impl JwtDate {
+    pub fn new(numeric_date: i64) -> Self {
+        Self {
+            numeric_date,
+            leeway: 0,
+        }
+    }
+
+    pub fn new_with_leeway(numeric_date: i64, leeway: u8) -> Self {
+        Self { numeric_date, leeway }
+    }
+
+    pub fn is_before(&self, other_numeric_date: i64) -> bool {
+        self.numeric_date < other_numeric_date + self.leeway as i64
+    }
+
+    pub fn is_after(&self, other_numeric_date: i64) -> bool {
+        self.numeric_date > other_numeric_date - self.leeway as i64
     }
 }
 
@@ -135,18 +176,32 @@ impl<'a, C: Serialize> Jwt<'a, C> {
 }
 
 impl<'a, C: DeserializeOwned> Jwt<'a, C> {
-    pub fn decode(encoded_token: &str, public_key: &PublicKey) -> Result<Self, JwtError> {
-        decode_impl(encoded_token, Some(public_key))
+    /// Decode JWT and check the registered exp claim.
+    pub fn decode_with_exp_check(
+        encoded_token: &str,
+        public_key: &PublicKey,
+        current_date: &JwtDate,
+    ) -> Result<Self, JwtError> {
+        decode_impl(encoded_token, Some(public_key), Some(current_date))
     }
 
+    /// Basic JWT decoding method.
+    ///
+    /// This doesn't check expiration time.
+    pub fn decode(encoded_token: &str, public_key: &PublicKey) -> Result<Self, JwtError> {
+        decode_impl(encoded_token, Some(public_key), None)
+    }
+
+    /// Unsafe JWT decoding method. Signature isn't checked at all.
     pub fn decode_without_signature_check(encoded_token: &str) -> Result<Self, JwtError> {
-        decode_impl(encoded_token, None)
+        decode_impl(encoded_token, None, None)
     }
 }
 
 fn decode_impl<'a, C: DeserializeOwned>(
     encoded_token: &str,
     public_key: Option<&PublicKey>,
+    current_date: Option<&JwtDate>,
 ) -> Result<Jwt<'a, C>, JwtError> {
     let first_dot_idx = encoded_token.find('.').ok_or_else(|| JwtError::InvalidEncoding {
         input: encoded_token.to_owned(),
@@ -182,7 +237,22 @@ fn decode_impl<'a, C: DeserializeOwned>(
     }
 
     let claims_json = base64::decode_config(&encoded_token[first_dot_idx + 1..last_dot_idx], base64::URL_SAFE_NO_PAD)?;
-    let claims = serde_json::from_slice(&claims_json)?;
+    let claims = if let Some(current_date) = current_date {
+        let claims = serde_json::from_slice::<serde_json::Value>(&claims_json)?;
+        let exp = claims["exp"]
+            .as_i64()
+            .ok_or_else(|| JwtError::MissingClaim { claim: "exp" })?;
+        snafu::ensure!(
+            current_date.is_before(exp),
+            Expired {
+                not_after: exp,
+                now: current_date.clone(),
+            }
+        );
+        serde_json::value::from_value(claims)?
+    } else {
+        serde_json::from_slice(&claims_json)?
+    };
 
     Ok(Jwt { header, claims })
 }
@@ -305,5 +375,44 @@ mod tests {
 
         let err = Jwt::<MyClaims>::decode("abc", &public_key).err().unwrap();
         assert_eq!(err.to_string(), "input isn\'t a valid token string: abc");
+    }
+
+    #[derive(Serialize, Deserialize)]
+    struct MyExpirableClaims {
+        exp: i64,
+        msg: String,
+    }
+
+    #[test]
+    fn decode_jwt_not_expired() {
+        let public_key = get_private_key_1().to_public_key();
+
+        let jwt = Jwt::<MyExpirableClaims>::decode_with_exp_check(
+            crate::test_files::JOSE_JWT_WITH_EXP,
+            &public_key,
+            &JwtDate::new(1545263999),
+        ).expect("couldn't decode jwt without leeway");
+        let claims = jwt.into_claims();
+        assert_eq!(claims.exp, 1545264000);
+        assert_eq!(claims.msg, "THIS IS TIME SENSITIVE DATA");
+
+        // alternatively, a leeway can account for small clock skew
+        Jwt::<MyExpirableClaims>::decode_with_exp_check(
+            crate::test_files::JOSE_JWT_WITH_EXP,
+            &public_key,
+            &JwtDate::new_with_leeway(1545264001, 10),
+        ).expect("couldn't decode jwt with leeway");
+    }
+
+    #[test]
+    fn decode_jwt_expired_err() {
+        let public_key = get_private_key_1().to_public_key();
+
+        let err = Jwt::<MyExpirableClaims>::decode_with_exp_check(
+            crate::test_files::JOSE_JWT_WITH_EXP,
+            &public_key,
+            &JwtDate::new(1545264001),
+        ).err().unwrap();
+        assert_eq!(err.to_string(), "token expired (not after: 1545264000, now: 1545264001 [leeway: 0])");
     }
 }

@@ -18,8 +18,6 @@ pub use algorithm_identifier::AlgorithmIdentifier;
 
 #[cfg(test)]
 mod test_files {
-    pub const RSA_4096_PK_3_UNSUPPORTED: &str = include_str!("../../test_assets/private_keys/rsa-4096-pk_3.key");
-
     cfg_if::cfg_if! { if #[cfg(feature = "x509")] {
         pub const RSA_2048_PK_1: &str =
             include_str!("../../test_assets/private_keys/rsa-2048-pk_1.key");
@@ -39,6 +37,8 @@ mod test_files {
     cfg_if::cfg_if! { if #[cfg(feature = "jose")] {
         pub const JOSE_JWT_EXAMPLE: &str =
             include_str!("../../test_assets/jose/jwt_example.txt");
+        pub const JOSE_JWT_WITH_EXP: &str =
+            include_str!("../../test_assets/jose/jwt_with_exp.txt");
         pub const JOSE_JWK_SET: &str =
             include_str!("../../test_assets/jose/jwk_set.json");
     }}
