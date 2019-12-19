@@ -221,6 +221,10 @@ impl From<PrivateKey> for OwnedPublicKey {
 }
 
 impl OwnedPublicKey {
+    pub fn as_borrowed(&self) -> PublicKey<'_> {
+        PublicKey(PublicKeyInner::Ref(self.0.as_ref()))
+    }
+
     pub fn from_pem(pem: &Pem) -> Result<Self, KeyError> {
         match pem.label() {
             PUBLIC_KEY_PEM_LABEL => Self::from_der(pem.data()),
