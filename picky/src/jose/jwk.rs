@@ -1,5 +1,5 @@
 use crate::{
-    key::{OwnedPublicKey, PublicKey},
+    key::PublicKey,
     private::SubjectPublicKeyInfo,
     signature::SignatureHashType,
 };
@@ -177,7 +177,7 @@ impl Jwk {
         Ok(serde_json::to_string_pretty(self)?)
     }
 
-    pub fn to_public_key(&self) -> Result<OwnedPublicKey, JwkError> {
+    pub fn to_public_key(&self) -> Result<PublicKey, JwkError> {
         match &self.key {
             JwkKeyType::Rsa(rsa) => {
                 let spki = SubjectPublicKeyInfo::new_rsa_key(rsa.modulus()?.into(), rsa.public_exponent()?.into());

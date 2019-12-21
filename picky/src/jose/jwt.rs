@@ -140,7 +140,7 @@ enum CheckStrictness {
 
 #[derive(Debug, Clone)]
 pub struct JwtValidator<'a> {
-    public_key: Option<&'a PublicKey<'a>>,
+    public_key: Option<&'a PublicKey>,
     current_date: Option<&'a JwtDate>,
     expiration_claim: CheckStrictness,
     not_before_claim: CheckStrictness,
@@ -150,7 +150,7 @@ pub const DANGEROUS_VALIDATOR: JwtValidator<'static> = JwtValidator::dangerous()
 
 impl<'a> JwtValidator<'a> {
     /// Check signature and the registered exp and nbf claims. If a claim is missing token is rejected.
-    pub const fn strict(public_key: &'a PublicKey<'a>, current_date: &'a JwtDate) -> Self {
+    pub const fn strict(public_key: &'a PublicKey, current_date: &'a JwtDate) -> Self {
         Self {
             public_key: Some(public_key),
             current_date: Some(current_date),
@@ -160,7 +160,7 @@ impl<'a> JwtValidator<'a> {
     }
 
     /// Check signature and the registered exp and nbf claims. Token isn't rejected if a claim is missing.
-    pub const fn lenient(public_key: &'a PublicKey<'a>, current_date: &'a JwtDate) -> Self {
+    pub const fn lenient(public_key: &'a PublicKey, current_date: &'a JwtDate) -> Self {
         Self {
             public_key: Some(public_key),
             current_date: Some(current_date),
@@ -170,7 +170,7 @@ impl<'a> JwtValidator<'a> {
     }
 
     /// Check signature only. No registered claim is checked.
-    pub const fn signature_only(public_key: &'a PublicKey<'a>) -> Self {
+    pub const fn signature_only(public_key: &'a PublicKey) -> Self {
         Self {
             public_key: Some(public_key),
             current_date: None,
@@ -189,7 +189,7 @@ impl<'a> JwtValidator<'a> {
         }
     }
 
-    pub fn public_key(self, public_key: &'a PublicKey<'a>) -> Self {
+    pub fn public_key(self, public_key: &'a PublicKey) -> Self {
         Self {
             public_key: Some(public_key),
             ..self
