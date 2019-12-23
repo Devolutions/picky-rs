@@ -5,3 +5,7 @@ members = [
     "picky-asn1",
     "picky-asn1-der",
 ]
+
+[patch.crates-io]
+backtrace = { git = "https://github.com/Devolutions/backtrace-rs", branch = "wayk" }
+libz-sys = { git = "https://github.com/Devolutions/libz-sys", branch = "wayk" }

@@ -1,5 +1,5 @@
 use crate::{
-    key::{OwnedPublicKey, PrivateKey, PublicKey},
+    key::{PrivateKey, PublicKey},
     oids,
     pem::Pem,
     signature::{SignatureError, SignatureHashType},
@@ -246,7 +246,7 @@ impl Cert {
         (self.0.tbs_certificate.extensions.0).0.as_slice()
     }
 
-    pub fn public_key(&self) -> PublicKey {
+    pub fn public_key(&self) -> &PublicKey {
         (&self.0.tbs_certificate.subject_public_key_info).into()
     }
 
@@ -389,7 +389,7 @@ enum SubjectInfos {
     Csr(Csr),
     NameAndPublicKey {
         name: DirectoryName,
-        public_key: OwnedPublicKey,
+        public_key: PublicKey,
     },
 }
 
@@ -447,7 +447,7 @@ impl<'a> CertificateBuilder<'a> {
 
     /// Required (alternatives: `subject_from_csr`, `self_signed`)
     #[inline]
-    pub fn subject(&self, subject_name: DirectoryName, public_key: OwnedPublicKey) -> &Self {
+    pub fn subject(&self, subject_name: DirectoryName, public_key: PublicKey) -> &Self {
         self.inner.borrow_mut().subject_infos = Some(SubjectInfos::NameAndPublicKey {
             name: subject_name,
             public_key,
