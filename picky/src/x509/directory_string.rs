@@ -107,25 +107,37 @@ impl<'de> de::Deserialize<'de> for DirectoryString {
             where
                 A: de::SeqAccess<'de>,
             {
-                // cannot panic with DER deserializer
-                match seq.next_element::<TagPeeker>()?.unwrap().next_tag {
-                    Tag::UTF8_STRING => Ok(DirectoryString::Utf8String(seq.next_element()?.unwrap())),
-                    Tag::PRINTABLE_STRING => Ok(DirectoryString::PrintableString(seq.next_element()?.unwrap())),
-                    Tag::TELETEX_STRING => Err(de::Error::invalid_value(
-                        de::Unexpected::Other("[DirectoryString] TeletexString not supported"),
-                        &"a supported string type",
+                let tag_peeker: TagPeeker = seq_next_element!(seq, DirectoryString, "choice tag");
+                match tag_peeker.next_tag {
+                    Tag::UTF8_STRING => Ok(DirectoryString::Utf8String(seq_next_element!(
+                        seq,
+                        DirectoryString,
+                        "Utf8String"
+                    ))),
+                    Tag::PRINTABLE_STRING => Ok(DirectoryString::PrintableString(seq_next_element!(
+                        seq,
+                        DirectoryString,
+                        "PrintableString"
+                    ))),
+                    Tag::TELETEX_STRING => Err(serde_invalid_value!(
+                        DirectoryString,
+                        "TeletexString not supported",
+                        "a supported string type"
                     )),
-                    Tag::VIDEOTEX_STRING => Err(de::Error::invalid_value(
-                        de::Unexpected::Other("[DirectoryString] VideotexString not supported"),
-                        &"a supported string type",
+                    Tag::VIDEOTEX_STRING => Err(serde_invalid_value!(
+                        DirectoryString,
+                        "VideotexString not supported",
+                        "a supported string type"
                     )),
-                    Tag::IA5_STRING => Err(de::Error::invalid_value(
-                        de::Unexpected::Other("[DirectoryString] IA5String not supported"),
-                        &"a supported string type",
+                    Tag::IA5_STRING => Err(serde_invalid_value!(
+                        DirectoryString,
+                        "IA5String not supported",
+                        "a supported string type"
                     )),
-                    _ => Err(de::Error::invalid_value(
-                        de::Unexpected::Other("[DirectoryString] unknown string type"),
-                        &"a known supported string type",
+                    _ => Err(serde_invalid_value!(
+                        DirectoryString,
+                        "unknown string type",
+                        "a known supported string type"
                     )),
                 }
             }

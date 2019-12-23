@@ -387,10 +387,7 @@ impl Cert {
 #[derive(Clone, Debug)]
 enum SubjectInfos {
     Csr(Csr),
-    NameAndPublicKey {
-        name: DirectoryName,
-        public_key: PublicKey,
-    },
+    NameAndPublicKey { name: DirectoryName, public_key: PublicKey },
 }
 
 #[derive(Clone, Debug)]

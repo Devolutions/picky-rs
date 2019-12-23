@@ -1,6 +1,6 @@
 [package]
 name = "picky-server"
-version = "4.2.0"
+version = "4.2.1"
 authors = [
     "jtrepanier-devolutions <jtrepanier@devolutions.net>",
     "Benoît CORTIER <benoit.cortier@fried-world.eu>",
@@ -11,7 +11,7 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/Devolutions/picky-rs"
 
 [dependencies]
-picky = { version = "4.2", default-features = false, features = ["x509", "chrono_conversion"] }
+picky = { version = "4.5", default-features = false, features = ["x509", "chrono_conversion"] }
 picky-asn1 = "0.1"
 mongodb = { package = "mongodb_cwal", version = "0.6", features = ["ssl"] }
 curl = { git = "https://github.com/Devolutions/curl-rust", branch = "wayk" }

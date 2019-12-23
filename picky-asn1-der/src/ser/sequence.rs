@@ -13,6 +13,7 @@ pub struct Sequence<'a, 'se> {
     buf: Cursor<Vec<u8>>,
     tag: Tag,
 }
+
 impl<'a, 'se> Sequence<'a, 'se> {
     /// Creates a lazy serializer that will serialize the sequence's sub-elements to `writer`
     pub fn serialize_lazy(ser: &'a mut Serializer<'se>, tag: Tag) -> Self {
@@ -28,6 +29,7 @@ impl<'a, 'se> Sequence<'a, 'se> {
         to_writer(value, &mut self.buf)?;
         Ok(())
     }
+
     /// Finalizes the sequence
     fn finalize(self) -> Result<usize> {
         // Reclaim buffer
@@ -39,6 +41,7 @@ impl<'a, 'se> Sequence<'a, 'se> {
         Ok(written)
     }
 }
+
 impl<'a, 'se> serde::ser::SerializeSeq for Sequence<'a, 'se> {
     type Ok = usize;
     type Error = Asn1DerError;
@@ -50,6 +53,7 @@ impl<'a, 'se> serde::ser::SerializeSeq for Sequence<'a, 'se> {
         self.finalize()
     }
 }
+
 impl<'a, 'se> serde::ser::SerializeTuple for Sequence<'a, 'se> {
     type Ok = usize;
     type Error = Asn1DerError;
@@ -61,6 +65,7 @@ impl<'a, 'se> serde::ser::SerializeTuple for Sequence<'a, 'se> {
         self.finalize()
     }
 }
+
 impl<'a, 'se> serde::ser::SerializeStruct for Sequence<'a, 'se> {
     type Ok = usize;
     type Error = Asn1DerError;
@@ -72,6 +77,7 @@ impl<'a, 'se> serde::ser::SerializeStruct for Sequence<'a, 'se> {
         self.finalize()
     }
 }
+
 impl<'a, 'se> serde::ser::SerializeTupleStruct for Sequence<'a, 'se> {
     type Ok = usize;
     type Error = Asn1DerError;

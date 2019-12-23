@@ -129,7 +129,7 @@ impl<'de> de::Deserialize<'de> for AlgorithmIdentifier {
             where
                 A: de::SeqAccess<'de>,
             {
-                let oid: ObjectIdentifierAsn1 = seq.next_element()?.unwrap();
+                let oid: ObjectIdentifierAsn1 = seq_next_element!(seq, AlgorithmIdentifier, "algorithm oid");
 
                 let args = match Into::<String>::into(&oid.0).as_str() {
                     oids::RSA_ENCRYPTION
@@ -138,17 +138,20 @@ impl<'de> de::Deserialize<'de> for AlgorithmIdentifier {
                     | oids::SHA256_WITH_RSA_ENCRYPTION
                     | oids::SHA384_WITH_RSA_ENCRYPTION
                     | oids::SHA512_WITH_RSA_ENCRYPTION => {
-                        seq.next_element::<()>()?.unwrap();
+                        seq_next_element!(seq, AlgorithmIdentifier, "algorithm identifier parameters (null)");
                         AlgorithmIdentifierParameters::Null
                     }
                     oids::ECDSA_WITH_SHA384 | oids::ECDSA_WITH_SHA256 => AlgorithmIdentifierParameters::None,
-                    oids::EC_PUBLIC_KEY => {
-                        AlgorithmIdentifierParameters::EC(seq.next_element::<ECParameters>()?.unwrap())
-                    }
+                    oids::EC_PUBLIC_KEY => AlgorithmIdentifierParameters::EC(seq_next_element!(
+                        seq,
+                        AlgorithmIdentifier,
+                        "elliptic curves parameters"
+                    )),
                     _ => {
-                        return Err(de::Error::invalid_value(
-                            de::Unexpected::Other("[AlgorithmIdentifier] unsupported algorithm (unknown oid)"),
-                            &"a supported algorithm",
+                        return Err(serde_invalid_value!(
+                            AlgorithmIdentifier,
+                            "unsupported algorithm (unknown oid)",
+                            "a supported algorithm"
                         ));
                     }
                 };
@@ -226,16 +229,21 @@ impl<'de> de::Deserialize<'de> for ECParameters {
             where
                 A: de::SeqAccess<'de>,
             {
-                // cannot panic with DER deserializer
-                match seq.next_element::<TagPeeker>()?.unwrap().next_tag {
-                    Tag::OID => Ok(ECParameters::NamedCurve(seq.next_element()?.unwrap())),
+                let tag_peeker: TagPeeker = seq_next_element!(seq, ECParameters, "choice tag");
+                match tag_peeker.next_tag {
+                    Tag::OID => Ok(ECParameters::NamedCurve(seq_next_element!(
+                        seq,
+                        ECParameters,
+                        "Object Identifier"
+                    ))),
                     Tag::NULL => {
-                        seq.next_element::<()>()?.unwrap();
+                        seq.next_element::<()>()?.expect("should not panic");
                         Ok(ECParameters::ImplicitCurve)
                     }
-                    _ => Err(de::Error::invalid_value(
-                        de::Unexpected::Other("[ECParameters] unsupported or unknown elliptic curve parameter"),
-                        &"a supported elliptic curve parameter",
+                    _ => Err(serde_invalid_value!(
+                        ECParameters,
+                        "unsupported or unknown elliptic curve parameter",
+                        "a supported elliptic curve parameter"
                     )),
                 }
             }

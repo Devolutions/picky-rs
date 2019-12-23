@@ -77,7 +77,7 @@ mod misc;
 mod ser;
 
 pub use crate::{
-    de::{from_bytes, from_reader, Deserializer},
+    de::{from_bytes, from_reader, from_reader_with_max_len, Deserializer},
     ser::{to_byte_buf, to_bytes, to_vec, to_writer, Serializer},
 };
 

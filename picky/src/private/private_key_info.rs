@@ -88,22 +88,24 @@ impl<'de> de::Deserialize<'de> for PrivateKeyInfo {
             where
                 A: de::SeqAccess<'de>,
             {
-                let version = seq.next_element()?.unwrap();
+                let version = seq_next_element!(seq, PrivateKeyInfo, "version");
                 if version != 0 {
-                    return Err(de::Error::invalid_value(
-                        de::Unexpected::Other("[PrivateKeyInfo] unsupported version (valid version number: 0)"),
-                        &"a supported PrivateKeyInfo",
+                    return Err(serde_invalid_value!(
+                        PrivateKeyInfo,
+                        "unsupported version (valid version number: 0)",
+                        "a supported PrivateKeyInfo"
                     ));
                 }
 
-                let private_key_algorithm: AlgorithmIdentifier = seq.next_element()?.unwrap();
-
+                let private_key_algorithm: AlgorithmIdentifier =
+                    seq_next_element!(seq, PrivateKeyInfo, "private key algorithm");
                 let private_key = if private_key_algorithm.is_a(oids::rsa_encryption()) {
-                    PrivateKeyValue::RSA(seq.next_element()?.unwrap())
+                    PrivateKeyValue::RSA(seq_next_element!(seq, PrivateKeyInfo, "rsa oid"))
                 } else {
-                    return Err(de::Error::invalid_value(
-                        de::Unexpected::Other("[PrivateKeyInfo] unsupported algorithm"),
-                        &"a PrivateKeyInfo using a supported algorithm",
+                    return Err(serde_invalid_value!(
+                        PrivateKeyInfo,
+                        "unsupported algorithm",
+                        "a supported algorithm"
                     ));
                 };
 
@@ -157,8 +159,11 @@ impl RSAPrivateKey {
 
     pub fn into_public_components(self) -> (IntegerAsn1, IntegerAsn1) {
         let mut iter = (self.0).0.into_iter();
-        iter.next().unwrap();
-        (iter.next().unwrap(), iter.next().unwrap())
+        iter.next().expect("should not panic");
+        (
+            iter.next().expect("should not panic"),
+            iter.next().expect("should not panic"),
+        )
     }
 }
 
