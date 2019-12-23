@@ -1217,7 +1217,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "picky"
-version = "4.4.2"
+version = "4.5.0"
 dependencies = [
  "base64 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "cfg-if 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1226,7 +1226,7 @@ dependencies = [
  "num-bigint-dig 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "oid 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "picky-asn1 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "picky-asn1-der 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "picky-asn1-der 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "pretty_assertions 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "rsa 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1263,7 +1263,7 @@ version = "0.1.0"
 dependencies = [
  "chrono 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "oid 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "picky-asn1-der 0.1.0",
+ "picky-asn1-der 0.2.0",
  "serde 1.0.104 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_bytes 0.11.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -1281,7 +1281,7 @@ dependencies = [
 
 [[package]]
 name = "picky-asn1-der"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "base64 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1291,15 +1291,6 @@ dependencies = [
  "pretty_assertions 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.104 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_bytes 0.11.3 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "picky-asn1-der"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "picky-asn1 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde 1.0.104 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -2705,7 +2696,6 @@ dependencies = [
 "checksum percent-encoding 2.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d4fd5641d01c8f18a23da7b6fe29298ff4b55afcccdf78973b24cf3175fee32e"
 "checksum picky 4.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c9d7aa6ad4f8b4b667514e2af5f8d9583e1f346416c8fcb0395548a564c05f87"
 "checksum picky-asn1 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c7e3797d15d9e7b6e6c46b6f971f13f5fd120578643a4e4416309606ebcfc048"
-"checksum picky-asn1-der 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "651cd390619d725d5bee51b716b47a6c7086a1cdbfe0aedb4c6808bc1736af35"
 "checksum picky-asn1-der 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "affcd14dea3ac5a55852b4247a341c092a79de129a8816b2d5f697b63fd6d486"
 "checksum pkg-config 0.3.17 (registry+https://github.com/rust-lang/crates.io-index)" = "05da548ad6865900e60eaba7f589cc0783590a92e940c26953ff81ddbab2d677"
 "checksum portpicker 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "5b497d05c16fe00939445c00a4fe2fa4f3d3dfc9c0401a3ab5c577afda2debb9"
