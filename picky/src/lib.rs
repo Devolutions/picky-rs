@@ -2,6 +2,9 @@
 mod macros;
 mod private;
 
+#[cfg(feature = "http_signature")]
+pub mod http;
+
 #[cfg(feature = "jose")]
 pub mod jose;
 

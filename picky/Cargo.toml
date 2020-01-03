@@ -19,6 +19,7 @@ base64 = "0.10"
 snafu = "0.6"
 chrono = { version = "0.4", optional = true }
 serde_json = { version = "1.0", optional = true }
+http = { version = "0.2", optional = true }
 static_assertions = "1.1"
 
 # /!\ ===== cryptography dependencies ===== /!\
@@ -36,7 +37,8 @@ hex = "0.3"
 cfg-if = "0.1"
 
 [features]
-default = ["x509", "jose"]
+default = ["x509", "jose", "http_signature"]
 x509 = []
 jose = ["serde_json"]
+http_signature = ["http"]
 chrono_conversion = ["chrono", "picky-asn1/chrono_conversion"]
