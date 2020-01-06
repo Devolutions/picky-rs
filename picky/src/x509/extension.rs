@@ -207,19 +207,31 @@ impl<'de> de::Deserialize<'de> for Extension {
             where
                 A: de::SeqAccess<'de>,
             {
-                let id: ObjectIdentifierAsn1 = seq.next_element()?.unwrap();
-                let critical: Implicit<bool> = seq.next_element()?.unwrap();
+                let id: ObjectIdentifierAsn1 = seq_next_element!(seq, Extension, "id");
+                let critical: Implicit<bool> = seq_next_element!(seq, Extension, "critical");
                 let value = match Into::<String>::into(&id.0).as_str() {
-                    oids::AUTHORITY_KEY_IDENTIFIER => {
-                        ExtensionValue::AuthorityKeyIdentifier(seq.next_element()?.unwrap())
+                    oids::AUTHORITY_KEY_IDENTIFIER => ExtensionValue::AuthorityKeyIdentifier(seq_next_element!(
+                        seq,
+                        Extension,
+                        "AuthorityKeyIdentifier"
+                    )),
+                    oids::SUBJECT_KEY_IDENTIFIER => {
+                        ExtensionValue::SubjectKeyIdentifier(seq_next_element!(seq, Extension, "SubjectKeyIdentifier"))
                     }
-                    oids::SUBJECT_KEY_IDENTIFIER => ExtensionValue::SubjectKeyIdentifier(seq.next_element()?.unwrap()),
-                    oids::KEY_USAGE => ExtensionValue::KeyUsage(seq.next_element()?.unwrap()),
-                    oids::SUBJECT_ALTERNATIVE_NAME => ExtensionValue::SubjectAltName(seq.next_element()?.unwrap()),
-                    oids::ISSUER_ALTERNATIVE_NAME => ExtensionValue::IssuerAltName(seq.next_element()?.unwrap()),
-                    oids::BASIC_CONSTRAINTS => ExtensionValue::BasicConstraints(seq.next_element()?.unwrap()),
-                    oids::EXTENDED_KEY_USAGE => ExtensionValue::ExtendedKeyUsage(seq.next_element()?.unwrap()),
-                    _ => ExtensionValue::Generic(seq.next_element()?.unwrap()),
+                    oids::KEY_USAGE => ExtensionValue::KeyUsage(seq_next_element!(seq, Extension, "KeyUsage")),
+                    oids::SUBJECT_ALTERNATIVE_NAME => {
+                        ExtensionValue::SubjectAltName(seq_next_element!(seq, Extension, "SubjectAltName"))
+                    }
+                    oids::ISSUER_ALTERNATIVE_NAME => {
+                        ExtensionValue::IssuerAltName(seq_next_element!(seq, Extension, "IssuerAltName"))
+                    }
+                    oids::BASIC_CONSTRAINTS => {
+                        ExtensionValue::BasicConstraints(seq_next_element!(seq, Extension, "BasicConstraints"))
+                    }
+                    oids::EXTENDED_KEY_USAGE => {
+                        ExtensionValue::ExtendedKeyUsage(seq_next_element!(seq, Extension, "ExtendedKeyUsage"))
+                    }
+                    _ => ExtensionValue::Generic(seq_next_element!(seq, Extension, "Generic")),
                 };
 
                 Ok(Extension {

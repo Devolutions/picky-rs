@@ -73,13 +73,14 @@ impl<'de> de::Deserialize<'de> for Time {
             where
                 A: de::SeqAccess<'de>,
             {
-                // cannot panic with DER deserializer
-                match seq.next_element::<TagPeeker>()?.unwrap().next_tag {
-                    UTCTimeAsn1::TAG => Ok(Time::UTC(seq.next_element()?.unwrap())),
-                    GeneralizedTimeAsn1::TAG => Ok(Time::Generalized(seq.next_element()?.unwrap())),
-                    _ => Err(de::Error::invalid_value(
-                        de::Unexpected::Other("[Time] invalid variant"),
-                        &"either UTCTime or GeneralizedTime",
+                let tag_peeker: TagPeeker = seq_next_element!(seq, Time, "choice tag");
+                match tag_peeker.next_tag {
+                    UTCTimeAsn1::TAG => Ok(Time::UTC(seq_next_element!(seq, Time, "UTCTime"))),
+                    GeneralizedTimeAsn1::TAG => Ok(Time::Generalized(seq_next_element!(seq, Time, "GeneralizedTime"))),
+                    _ => Err(serde_invalid_value!(
+                        Time,
+                        "invalid variant",
+                        "either UTCTime or GeneralizedTime"
                     )),
                 }
             }

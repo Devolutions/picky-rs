@@ -146,61 +146,65 @@ impl<'de> de::Deserialize<'de> for AttributeTypeAndValue {
             where
                 A: de::SeqAccess<'de>,
             {
-                let ty: ObjectIdentifierAsn1 = seq.next_element()?.unwrap(); // cannot panic with DER deserializer
+                let ty: ObjectIdentifierAsn1 = seq_next_element!(seq, AttributeTypeAndValue, "type oid");
 
-                let value = match Into::<String>::into(&ty.0).as_str() {
-                    oids::AT_COMMON_NAME => {
-                        // cannot panic with DER deserializer
-                        AttributeTypeAndValueParameters::CommonName(seq.next_element()?.unwrap())
-                    }
-                    oids::AT_SURNAME => {
-                        // cannot panic with DER deserializer
-                        AttributeTypeAndValueParameters::Surname(seq.next_element()?.unwrap())
-                    }
-                    oids::AT_SERIAL_NUMBER => {
-                        // cannot panic with DER deserializer
-                        AttributeTypeAndValueParameters::SerialNumber(seq.next_element()?.unwrap())
-                    }
-                    oids::AT_COUNTRY_NAME => {
-                        // cannot panic with DER deserializer
-                        AttributeTypeAndValueParameters::CountryName(seq.next_element()?.unwrap())
-                    }
-                    oids::AT_LOCALITY_NAME => {
-                        // cannot panic with DER deserializer
-                        AttributeTypeAndValueParameters::LocalityName(seq.next_element()?.unwrap())
-                    }
-                    oids::AT_STATE_OR_PROVINCE_NAME => {
-                        // cannot panic with DER deserializer
-                        AttributeTypeAndValueParameters::StateOrProvinceName(seq.next_element()?.unwrap())
-                    }
-                    oids::AT_STREET_NAME => {
-                        // cannot panic with DER deserializer
-                        AttributeTypeAndValueParameters::StreetName(seq.next_element()?.unwrap())
-                    }
-                    oids::AT_ORGANISATION_NAME => {
-                        // cannot panic with DER deserializer
-                        AttributeTypeAndValueParameters::OrganisationName(seq.next_element()?.unwrap())
-                    }
-                    oids::AT_ORGANISATIONAL_UNIT_NAME => {
-                        // cannot panic with DER deserializer
-                        AttributeTypeAndValueParameters::OrganisationalUnitName(seq.next_element()?.unwrap())
-                    }
-                    oids::EMAIL_ADDRESS => {
-                        return Err(de::Error::invalid_value(
-                            de::Unexpected::Other(
-                                "[AttributeTypeAndValue] 1.2.840.113549.1.9.1 (e-mailAddress) \
+                let value =
+                    match Into::<String>::into(&ty.0).as_str() {
+                        oids::AT_COMMON_NAME => AttributeTypeAndValueParameters::CommonName(seq_next_element!(
+                            seq,
+                            AttributeTypeAndValue,
+                            "at common name"
+                        )),
+                        oids::AT_SURNAME => AttributeTypeAndValueParameters::Surname(seq_next_element!(
+                            seq,
+                            AttributeTypeAndValue,
+                            "at surname"
+                        )),
+                        oids::AT_SERIAL_NUMBER => AttributeTypeAndValueParameters::SerialNumber(seq_next_element!(
+                            seq,
+                            AttributeTypeAndValue,
+                            "at serial number"
+                        )),
+                        oids::AT_COUNTRY_NAME => AttributeTypeAndValueParameters::CountryName(seq_next_element!(
+                            seq,
+                            AttributeTypeAndValue,
+                            "at country name"
+                        )),
+                        oids::AT_LOCALITY_NAME => AttributeTypeAndValueParameters::LocalityName(seq_next_element!(
+                            seq,
+                            AttributeTypeAndValue,
+                            "at locality name"
+                        )),
+                        oids::AT_STATE_OR_PROVINCE_NAME => AttributeTypeAndValueParameters::StateOrProvinceName(
+                            seq_next_element!(seq, AttributeTypeAndValue, "at state or province name"),
+                        ),
+                        oids::AT_STREET_NAME => AttributeTypeAndValueParameters::StreetName(seq_next_element!(
+                            seq,
+                            AttributeTypeAndValue,
+                            "at street name"
+                        )),
+                        oids::AT_ORGANISATION_NAME => AttributeTypeAndValueParameters::OrganisationName(
+                            seq_next_element!(seq, AttributeTypeAndValue, "at organisation name"),
+                        ),
+                        oids::AT_ORGANISATIONAL_UNIT_NAME => AttributeTypeAndValueParameters::OrganisationalUnitName(
+                            seq_next_element!(seq, AttributeTypeAndValue, "at organisational unit name"),
+                        ),
+                        oids::EMAIL_ADDRESS => {
+                            return Err(serde_invalid_value!(
+                                AttributeTypeAndValue,
+                                "1.2.840.113549.1.9.1 (e-mailAddress) \
                                  attribute is deprecated and won't be supported",
-                            ),
-                            &"a supported type",
-                        ));
-                    }
-                    _ => {
-                        return Err(de::Error::invalid_value(
-                            de::Unexpected::Other("[AttributeTypeAndValue] unsupported type (unknown oid)"),
-                            &"a supported type",
-                        ));
-                    }
-                };
+                                "a supported type"
+                            ));
+                        }
+                        _ => {
+                            return Err(serde_invalid_value!(
+                                AttributeTypeAndValue,
+                                "unsupported type (unknown oid)",
+                                "a supported type"
+                            ));
+                        }
+                    };
 
                 Ok(AttributeTypeAndValue { ty, value })
             }

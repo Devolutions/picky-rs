@@ -1,8 +1,4 @@
-use crate::{
-    key::PublicKey,
-    private::SubjectPublicKeyInfo,
-    signature::SignatureHashType,
-};
+use crate::{key::PublicKey, private::SubjectPublicKeyInfo, signature::SignatureHashType};
 use base64::DecodeError;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;

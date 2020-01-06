@@ -13,6 +13,8 @@ use picky_asn1::{tag::Tag, wrapper::*, Asn1Type};
 use serde::{de::Visitor, Deserialize};
 use std::io::{Cursor, Read};
 
+const DEFAULT_MAX_LEN: usize = 10240;
+
 /// Deserializes `T` from `bytes`
 pub fn from_bytes<'a, T: Deserialize<'a>>(bytes: &'a [u8]) -> Result<T> {
     debug_log!("deserialization using `from_bytes`");
@@ -22,8 +24,16 @@ pub fn from_bytes<'a, T: Deserialize<'a>>(bytes: &'a [u8]) -> Result<T> {
 
 /// Deserializes `T` from `reader`
 pub fn from_reader<'a, T: Deserialize<'a>>(reader: impl Read + 'a) -> Result<T> {
-    debug_log!("deserialization using `from_reader`");
-    let mut deserializer = Deserializer::new_from_reader(reader);
+    from_reader_with_max_len(reader, DEFAULT_MAX_LEN)
+}
+
+/// Deserializes `T` from `reader` reading at most n bytes.
+pub fn from_reader_with_max_len<'a, T: Deserialize<'a>>(reader: impl Read + 'a, max_len: usize) -> Result<T> {
+    debug_log!(
+        "deserialization using `from_reader_with_max_len`, max_len = {}",
+        max_len
+    );
+    let mut deserializer = Deserializer::new_from_reader(reader, max_len);
     T::deserialize(&mut deserializer)
 }
 
@@ -33,20 +43,22 @@ pub struct Deserializer<'de> {
     buf: Vec<u8>,
     encapsulator_tag_stack: Vec<Tag>,
     header_only: bool,
+    max_len: usize,
 }
 
 impl<'de> Deserializer<'de> {
     /// Creates a new deserializer over `bytes`
     pub fn new_from_bytes(bytes: &'de [u8]) -> Self {
-        Self::new_from_reader(Cursor::new(bytes))
+        Self::new_from_reader(Cursor::new(bytes), bytes.len())
     }
     /// Creates a new deserializer for `reader`
-    pub fn new_from_reader(reader: impl Read + 'de) -> Self {
+    pub fn new_from_reader(reader: impl Read + 'de, max_len: usize) -> Self {
         Self {
             reader: PeekableReader::new(Box::new(reader)),
             buf: Vec::new(),
             encapsulator_tag_stack: Vec::with_capacity(3),
             header_only: false,
+            max_len,
         }
     }
 
@@ -74,8 +86,13 @@ impl<'de> Deserializer<'de> {
             (tag, len)
         };
 
+        if len > self.max_len {
+            debug_log!("TRUNCATED DATA (invalid len: found {}, max is {})", len, self.max_len);
+            return Err(Asn1DerError::TruncatedData);
+        }
+
         self.buf.resize(len, 0);
-        self.reader.read_exact(&mut self.buf)?;
+        self.reader.read_exact(self.buf.as_mut_slice())?;
 
         Ok(tag)
     }
@@ -122,7 +139,7 @@ impl<'de> Deserializer<'de> {
                 };
             }
 
-            if peeked.len() < cursor {
+            if peeked.len() <= cursor {
                 debug_log!("peek_object: TRUNCATED DATA (couldn't read object tag)");
                 return Err(Asn1DerError::TruncatedData);
             }

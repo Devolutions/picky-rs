@@ -149,61 +149,64 @@ impl<'de> de::Deserialize<'de> for GeneralName {
             where
                 A: de::SeqAccess<'de>,
             {
-                // cannot panic with DER deserializer
-                match seq.next_element::<TagPeeker>()?.unwrap().next_tag {
-                    Tag::CTX_0 | Tag::APP_0 => Err(de::Error::invalid_value(
-                        de::Unexpected::Other("[GeneralName] OtherName not supported"),
-                        &"a supported GeneraleName choice",
+                let tag_peeker: TagPeeker = seq_next_element!(seq, DirectoryString, "choice tag");
+                match tag_peeker.next_tag {
+                    Tag::CTX_0 | Tag::APP_0 => Err(serde_invalid_value!(
+                        GeneralName,
+                        "OtherName not supported",
+                        "a supported choice"
                     )),
                     Tag::CTX_1 => Ok(GeneralName::RFC822Name(
-                        seq.next_element::<ContextTag1<IA5StringAsn1>>()?.unwrap().0,
+                        seq_next_element!(seq, ContextTag1<IA5StringAsn1>, GeneralName, "RFC822Name").0,
                     )),
                     Tag::APP_1 => Ok(GeneralName::RFC822Name(
-                        seq.next_element::<ApplicationTag1<IA5StringAsn1>>()?.unwrap().0,
+                        seq_next_element!(seq, ApplicationTag1<IA5StringAsn1>, GeneralName, "RFC822Name").0,
                     )),
                     Tag::CTX_2 => Ok(GeneralName::DNSName(
-                        seq.next_element::<ContextTag2<IA5StringAsn1>>()?.unwrap().0,
+                        seq_next_element!(seq, ContextTag2<IA5StringAsn1>, GeneralName, "DNSName").0,
                     )),
                     Tag::APP_2 => Ok(GeneralName::DNSName(
-                        seq.next_element::<ApplicationTag2<IA5StringAsn1>>()?.unwrap().0,
+                        seq_next_element!(seq, ApplicationTag2<IA5StringAsn1>, GeneralName, "DNSName").0,
                     )),
-                    Tag::CTX_3 | Tag::APP_3 => Err(de::Error::invalid_value(
-                        de::Unexpected::Other("[GeneralName] X400Address not supported"),
-                        &"a supported GeneraleName choice",
+                    Tag::CTX_3 | Tag::APP_3 => Err(serde_invalid_value!(
+                        GeneralName,
+                        "X400Address not supported",
+                        "a supported choice"
                     )),
                     Tag::CTX_4 => Ok(GeneralName::DirectoryName(
-                        seq.next_element::<ContextTag4<Name>>()?.unwrap().0,
+                        seq_next_element!(seq, ContextTag4<Name>, GeneralName, "DirectoryName").0,
                     )),
                     Tag::APP_4 => Ok(GeneralName::DirectoryName(
-                        seq.next_element::<ApplicationTag4<Name>>()?.unwrap().0,
+                        seq_next_element!(seq, ApplicationTag4<Name>, GeneralName, "DirectoryName").0,
                     )),
                     Tag::CTX_5 => Ok(GeneralName::EDIPartyName(
-                        seq.next_element::<ContextTag5<EDIPartyName>>()?.unwrap().0,
+                        seq_next_element!(seq, ContextTag5<EDIPartyName>, GeneralName, "EDIPartyName").0,
                     )),
                     Tag::APP_5 => Ok(GeneralName::EDIPartyName(
-                        seq.next_element::<ApplicationTag5<EDIPartyName>>()?.unwrap().0,
+                        seq_next_element!(seq, ApplicationTag5<EDIPartyName>, GeneralName, "EDIPartyName").0,
                     )),
                     Tag::CTX_6 => Ok(GeneralName::URI(
-                        seq.next_element::<ContextTag6<IA5StringAsn1>>()?.unwrap().0,
+                        seq_next_element!(seq, ContextTag6<IA5StringAsn1>, GeneralName, "URI").0,
                     )),
                     Tag::APP_6 => Ok(GeneralName::URI(
-                        seq.next_element::<ApplicationTag6<IA5StringAsn1>>()?.unwrap().0,
+                        seq_next_element!(seq, ApplicationTag6<IA5StringAsn1>, GeneralName, "URI").0,
                     )),
                     Tag::CTX_7 => Ok(GeneralName::IpAddress(
-                        seq.next_element::<ContextTag7<OctetStringAsn1>>()?.unwrap().0,
+                        seq_next_element!(seq, ContextTag7<OctetStringAsn1>, GeneralName, "IpAddress").0,
                     )),
                     Tag::APP_7 => Ok(GeneralName::IpAddress(
-                        seq.next_element::<ApplicationTag7<OctetStringAsn1>>()?.unwrap().0,
+                        seq_next_element!(seq, ApplicationTag7<OctetStringAsn1>, GeneralName, "IpAddress").0,
                     )),
                     Tag::CTX_8 => Ok(GeneralName::RegisteredId(
-                        seq.next_element::<ContextTag8<ObjectIdentifierAsn1>>()?.unwrap().0,
+                        seq_next_element!(seq, ContextTag8<ObjectIdentifierAsn1>, GeneralName, "RegisteredId").0,
                     )),
                     Tag::APP_8 => Ok(GeneralName::RegisteredId(
-                        seq.next_element::<ApplicationTag8<ObjectIdentifierAsn1>>()?.unwrap().0,
+                        seq_next_element!(seq, ApplicationTag8<ObjectIdentifierAsn1>, GeneralName, "RegisteredId").0,
                     )),
-                    _ => Err(de::Error::invalid_value(
-                        de::Unexpected::Other("[GeneralName] unknown choice value"),
-                        &"a supported GeneralName choice",
+                    _ => Err(serde_invalid_value!(
+                        GeneralName,
+                        "unknown choice value",
+                        "a supported GeneralName choice"
                     )),
                 }
             }

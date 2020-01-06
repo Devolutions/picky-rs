@@ -74,15 +74,18 @@ impl<'de> de::Deserialize<'de> for SubjectPublicKeyInfo {
             where
                 A: de::SeqAccess<'de>,
             {
-                let algorithm: AlgorithmIdentifier = seq.next_element()?.unwrap();
+                let algorithm: AlgorithmIdentifier = seq_next_element!(seq, AlgorithmIdentifier, "algorithm oid");
 
                 let subject_public_key = match Into::<String>::into(algorithm.oid()).as_str() {
-                    oids::RSA_ENCRYPTION => PublicKey::RSA(seq.next_element()?.unwrap()),
-                    oids::EC_PUBLIC_KEY => PublicKey::EC(seq.next_element()?.unwrap()),
+                    oids::RSA_ENCRYPTION => PublicKey::RSA(seq_next_element!(seq, SubjectPublicKeyInfo, "rsa key")),
+                    oids::EC_PUBLIC_KEY => {
+                        PublicKey::EC(seq_next_element!(seq, SubjectPublicKeyInfo, "elliptic curves key"))
+                    }
                     _ => {
-                        return Err(de::Error::invalid_value(
-                            de::Unexpected::Other("[SubjectPublicKeyInfo] unsupported algorithm (unknown oid)"),
-                            &"a supported algorithm",
+                        return Err(serde_invalid_value!(
+                            SubjectPublicKeyInfo,
+                            "unsupported algorithm (unknown oid)",
+                            "a supported algorithm"
                         ));
                     }
                 };
