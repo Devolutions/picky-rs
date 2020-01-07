@@ -9,7 +9,12 @@ use crate::{
 use base64::DecodeError;
 use http::header::HeaderName;
 use snafu::Snafu;
-use std::{cell::RefCell, collections::HashMap, str::FromStr};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    fmt::{self, Debug},
+    str::FromStr,
+};
 
 // === error type === //
 
@@ -34,7 +39,11 @@ pub enum HttpSignatureError {
 
     /// couldn't generate signing string
     #[snafu(display("couldn't generate signing string: {}", source))]
-    SigningString { source: HttpRequestError },
+    SigningStringGeneration { source: HttpRequestError },
+
+    /// invalid signing string
+    #[snafu(display("signing string invalid for line `{}`", line))]
+    InvalidSigningString { line: String },
 
     /// missing required builder argument
     #[snafu(display("missing required builder argument `{}`", arg))]
@@ -42,6 +51,9 @@ pub enum HttpSignatureError {
 
     /// builder requires a non empty `headers` parameter
     BuilderEmptyHeaders,
+
+    /// `headers` parameter shouldn't be provided when using builder with a pre-generated signing string
+    BuilderHeadersProvidedWithPreGenerated,
 
     /// required parameter is missing from http signature string
     #[snafu(display("required parameter is missing from http signature string: {}", parameter))]
@@ -66,7 +78,7 @@ impl From<SignatureError> for HttpSignatureError {
 
 impl From<HttpRequestError> for HttpSignatureError {
     fn from(e: HttpRequestError) -> Self {
-        Self::SigningString { source: e }
+        Self::SigningStringGeneration { source: e }
     }
 }
 
@@ -257,12 +269,29 @@ impl FromStr for HttpSignature {
 
 // === http signature builder === //
 
-// Statically checks the field actually exists and returns a &'static str of the field name
-macro_rules! field_str {
+macro_rules! builder_argument_missing_err {
     ($field:ident) => {{
         ::static_assertions::assert_fields!(HttpSignatureBuilderInner: $field);
-        stringify!($field)
+        HttpSignatureError::MissingBuilderArgument {
+            arg: stringify!($field),
+        }
     }};
+}
+
+#[derive(Clone)]
+enum SigningStringGenMethod<'a> {
+    PreGenerated(&'a str),
+    FromHttpRequest(&'a dyn HttpRequest),
+}
+
+impl<'a> Debug for SigningStringGenMethod<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SigningStringGenMethod::")?;
+        match self {
+            SigningStringGenMethod::PreGenerated(signing_string) => write!(f, "PreGenerated({})", signing_string),
+            SigningStringGenMethod::FromHttpRequest(_) => write!(f, "FromHttpRequest(...)"),
+        }
+    }
 }
 
 #[derive(Default, Clone, Debug)]
@@ -272,6 +301,7 @@ struct HttpSignatureBuilderInner<'a> {
     created: Option<u64>,
     expires: Option<u64>,
     headers: Vec<Header>,
+    signing_string_generation: Option<SigningStringGenMethod<'a>>,
 }
 
 #[derive(Default, Clone, Debug)]
@@ -300,7 +330,8 @@ impl<'a> HttpSignatureBuilder<'a> {
     }
 
     #[inline]
-    /// At least one of `created`, `expires`, `request_target` or `http_header` is required.
+    /// If generating signing string, at least one of `created`, `expires`, `request_target`
+    /// or `http_header` is required otherwise DO NOT provide.
     pub fn created(&self, unix_timestamp: u64) -> &Self {
         let mut inner_mut = self.inner.borrow_mut();
         inner_mut.created = Some(unix_timestamp);
@@ -310,7 +341,8 @@ impl<'a> HttpSignatureBuilder<'a> {
     }
 
     #[inline]
-    /// At least one of `created`, `expires`, `request_target` or `http_header` is required.
+    /// If generating signing string, at least one of `created`, `expires`, `request_target`
+    /// or `http_header` is required otherwise DO NOT provide.
     pub fn expires(&self, unix_timestamp: u64) -> &Self {
         let mut inner_mut = self.inner.borrow_mut();
         inner_mut.expires = Some(unix_timestamp);
@@ -320,83 +352,146 @@ impl<'a> HttpSignatureBuilder<'a> {
     }
 
     #[inline]
-    /// At least one of `created`, `expires`, `request_target` or `http_header` is required.
+    /// If generating signing string, at least one of `created`, `expires`, `request_target`
+    /// or `http_header` is required otherwise DO NOT provide.
     pub fn request_target(&self) -> &Self {
         self.inner.borrow_mut().headers.push(Header::RequestTarget);
         self
     }
 
     #[inline]
-    /// At least one of `created`, `expires`, `request_target` or `http_header` is required.
+    /// If generating signing string, at least one of `created`, `expires`, `request_target`
+    /// or `http_header` is required otherwise DO NOT provide.
     pub fn http_header(&self, header: HeaderName) -> &Self {
         self.inner.borrow_mut().headers.push(Header::Name(header));
         self
     }
 
-    pub fn build(&self, http_request: &impl HttpRequest) -> Result<HttpSignature, HttpSignatureError> {
+    #[inline]
+    /// Required (alternative: `pre_generated_signing_string`).
+    pub fn generate_signing_string_using_http_request(&self, http_request: &'a dyn HttpRequest) -> &Self {
+        self.inner.borrow_mut().signing_string_generation = Some(SigningStringGenMethod::FromHttpRequest(http_request));
+        self
+    }
+
+    #[inline]
+    /// Required (alternative: `generate_signing_string_using_http_request`).
+    pub fn pre_generated_signing_string(&self, signing_string: &'a str) -> &Self {
+        self.inner.borrow_mut().signing_string_generation = Some(SigningStringGenMethod::PreGenerated(signing_string));
+        self
+    }
+
+    pub fn build(&self) -> Result<HttpSignature, HttpSignatureError> {
         let mut inner = self.inner.borrow_mut();
 
         let (private_key, signature_type) = {
             inner
                 .signature_method
                 .take()
-                .ok_or(HttpSignatureError::MissingBuilderArgument {
-                    arg: field_str!(signature_method),
-                })?
+                .ok_or(builder_argument_missing_err!(signature_method))?
         };
-        let key_id = inner.key_id.take().ok_or(HttpSignatureError::MissingBuilderArgument {
-            arg: field_str!(key_id),
-        })?;
+        let key_id = inner.key_id.take().ok_or(builder_argument_missing_err!(key_id))?;
 
-        let created = inner.created.take();
-        let expires = inner.expires.take();
-        let headers: Vec<Header> = inner.headers.drain(..).collect();
+        let signing_string_generation = inner
+            .signing_string_generation
+            .take()
+            .ok_or(builder_argument_missing_err!(signing_string_generation))?;
 
-        if headers.is_empty() {
-            return Err(HttpSignatureError::BuilderEmptyHeaders);
-        }
+        let mut created = inner.created.take();
+        let mut expires = inner.expires.take();
+        let mut headers: Vec<Header> = inner.headers.drain(..).collect();
 
         drop(inner);
 
-        let signing_string = {
-            // Generate signing string.
-            // See https://tools.ietf.org/html/draft-cavage-http-signatures-12#section-2.3
-
-            let mut acc = Vec::with_capacity(headers.len());
-            for header in &headers {
-                match header {
-                    Header::Name(header_name) => {
-                        let concatenated_values = http_request.get_header_concatenated_values(header_name)?;
-                        if concatenated_values.is_empty() {
-                            acc.push(format!("{}:", header_name.as_str()));
-                        } else {
-                            acc.push(format!("{}: {}", header_name.as_str(), concatenated_values));
-                        }
-                    }
-                    Header::RequestTarget => {
-                        acc.push(format!(
-                            "{} {}",
-                            http_request.get_lowercased_method()?,
-                            http_request.get_target()?
-                        ));
-                    }
-                    Header::Created => acc.push(format!(
-                        "{}: {}",
-                        header.as_str(),
-                        created.expect("Some by builder construction")
-                    )),
-                    Header::Expires => acc.push(format!(
-                        "{}: {}",
-                        header.as_str(),
-                        expires.expect("Some by builder construction")
-                    )),
+        let signature_binary = match signing_string_generation {
+            SigningStringGenMethod::PreGenerated(signing_string) => {
+                if !headers.is_empty() {
+                    return Err(HttpSignatureError::BuilderHeadersProvidedWithPreGenerated);
                 }
+
+                // parse pre-generated signing string to fill our HttpSignature struct properly.
+
+                for line in signing_string.lines() {
+                    let mut split = line.split(":");
+                    let key = split.next().expect("there is always at least one element in the split");
+                    if let Some(value) = split.next() {
+                        match key {
+                            Header::CREATED_STR => {
+                                headers.push(Header::Created);
+                                created =
+                                    Some(value.trim().parse().map_err(|_| {
+                                        HttpSignatureError::InvalidSigningString { line: line.to_owned() }
+                                    })?);
+                            }
+                            Header::EXPIRES_STR => {
+                                headers.push(Header::Expires);
+                                expires =
+                                    Some(value.trim().parse().map_err(|_| {
+                                        HttpSignatureError::InvalidSigningString { line: line.to_owned() }
+                                    })?);
+                            }
+                            header_name => headers
+                                .push(Header::Name(HeaderName::from_str(header_name).map_err(|_| {
+                                    HttpSignatureError::InvalidSigningString { line: line.to_owned() }
+                                })?)),
+                        }
+                    } else if key.starts_with("get")
+                        || key.starts_with("post")
+                        || key.starts_with("put")
+                        || key.starts_with("delete")
+                    {
+                        headers.push(Header::RequestTarget);
+                    } else {
+                        return Err(HttpSignatureError::InvalidSigningString { line: line.to_owned() });
+                    }
+                }
+
+                signature_type.sign(signing_string.as_bytes(), private_key)?
             }
+            SigningStringGenMethod::FromHttpRequest(http_request) => {
+                // Generate signing string.
+                // See https://tools.ietf.org/html/draft-cavage-http-signatures-12#section-2.3
 
-            acc.join("\n")
+                if headers.is_empty() {
+                    return Err(HttpSignatureError::BuilderEmptyHeaders);
+                }
+
+                let mut acc = Vec::with_capacity(headers.len());
+                for header in &headers {
+                    match header {
+                        Header::Name(header_name) => {
+                            let concatenated_values = http_request.get_header_concatenated_values(header_name)?;
+                            if concatenated_values.is_empty() {
+                                acc.push(format!("{}:", header_name.as_str()));
+                            } else {
+                                acc.push(format!("{}: {}", header_name.as_str(), concatenated_values));
+                            }
+                        }
+                        Header::RequestTarget => {
+                            acc.push(format!(
+                                "{} {}",
+                                http_request.get_lowercased_method()?,
+                                http_request.get_target()?
+                            ));
+                        }
+                        Header::Created => acc.push(format!(
+                            "{}: {}",
+                            header.as_str(),
+                            created.expect("Some by builder construction")
+                        )),
+                        Header::Expires => acc.push(format!(
+                            "{}: {}",
+                            header.as_str(),
+                            expires.expect("Some by builder construction")
+                        )),
+                    }
+                }
+
+                let signing_string = acc.join("\n");
+
+                signature_type.sign(signing_string.as_bytes(), private_key)?
+            }
         };
-
-        let signature_binary = signature_type.sign(signing_string.as_bytes(), private_key)?;
 
         Ok(HttpSignature {
             key_id,

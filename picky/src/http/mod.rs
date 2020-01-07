@@ -15,6 +15,8 @@
 //!     key::PrivateKey,
 //! };
 //!
+//! // all you need to generate a http signature
+//!
 //! let private_rsa_key: &str = "-----BEGIN RSA PRIVATE KEY-----\n\
 //!     MIIEpgIBAAKCAQEApDx0MjvRzmxYXKfqHy0gN1znX6rSU2EnsDTbZaU1UcsMmRNx\n\
 //!     L+FqDNzwNutCSQlkujzR37+bHGTxOnRvvSG3lwRvDBZepYWPum9WDqa9T5gTS/Cj\n\
@@ -59,9 +61,12 @@
 //!
 //! let (parts, _) = req.into_parts();
 //!
+//! // generate http signature
+//!
 //! let http_signature = HttpSignatureBuilder::new()
 //!     .key_id("my-rsa-key")
 //!     .signature_method(&private_key, SignatureHashType::RsaSha224)
+//!     .generate_signing_string_using_http_request(&parts)
 //!     .request_target()
 //!     .created(1402170695)
 //!     .http_header(header::HOST)
@@ -69,7 +74,7 @@
 //!     .http_header(header::CACHE_CONTROL)
 //!     .http_header(HeaderName::from_static("x-emptyheader"))
 //!     .http_header(HeaderName::from_static("x-example"))
-//!     .build(&parts)
+//!     .build()
 //!     .expect("couldn't generate http signature");
 //!
 //! let http_signature_str = http_signature.to_string();
@@ -84,6 +89,8 @@
 //!                  X59HkNVCkT4TPOovNZHyJQwu8IDhba0evPTCIvrzULpN4qY+ZAua2i3wGwWqFUgbm4eBJS2pwjWr\
 //!                  XyRusoELK0BjJ8a0KdOegmbEViIxy/Uqu0L2yQ==\""
 //! );
+//!
+//! // parse a http signature and verify it
 //!
 //! let parsed_http_signature = http_signature_str.parse::<HttpSignature>()
 //!     .expect("couldn't parse http signature");
@@ -105,6 +112,20 @@
 //!     signing_string,
 //!     1402170695
 //! ).expect("couldn't verify signature");
+//!
+//! // alternatively you can provide a pre-generated signing string to build http signature with
+//!
+//! let http_signature_pre_generated = HttpSignatureBuilder::new()
+//!     .key_id("my-rsa-key")
+//!     .signature_method(&private_key, SignatureHashType::RsaSha224)
+//!     .pre_generated_signing_string(signing_string)
+//!     .build()
+//!     .expect("couldn't generate http signature using pre-generated signing string");
+//!
+//! let http_signature_pre_generated_str = http_signature_pre_generated.to_string();
+//!
+//! assert_eq!(http_signature_pre_generated, http_signature);
+//! assert_eq!(http_signature_pre_generated_str, http_signature_str);
 //! ```
 
 pub mod header;

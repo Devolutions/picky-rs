@@ -14,9 +14,9 @@ pub enum Header {
 }
 
 impl Header {
-    const REQUEST_TARGET_STR: &'static str = "(request-target)";
-    const CREATED_STR: &'static str = "(created)";
-    const EXPIRES_STR: &'static str = "(expires)";
+    pub const REQUEST_TARGET_STR: &'static str = "(request-target)";
+    pub const CREATED_STR: &'static str = "(created)";
+    pub const EXPIRES_STR: &'static str = "(expires)";
 
     pub fn as_str(&self) -> &str {
         match self {
