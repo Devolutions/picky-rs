@@ -10,6 +10,7 @@ use base64::DecodeError;
 use http::header::HeaderName;
 use snafu::Snafu;
 use std::{
+    borrow::Cow,
     cell::RefCell,
     collections::HashMap,
     fmt::{self, Debug},
@@ -121,32 +122,11 @@ pub struct HttpSignature {
 }
 
 impl HttpSignature {
-    pub fn verify(
-        &self,
-        signature_type: SignatureHashType,
-        public_key: &PublicKey,
-        signing_string: &str,
-        now: u64,
-    ) -> Result<(), HttpSignatureError> {
-        if let Some(expires) = self.expires {
-            if expires < now {
-                return Err(HttpSignatureError::Expired {
-                    not_after: expires,
-                    now,
-                });
-            }
+    pub fn verifier<'a>(&'a self) -> HttpSignatureVerifier<'a> {
+        HttpSignatureVerifier {
+            http_signature: self,
+            inner: Default::default(),
         }
-
-        if let Some(created) = self.created {
-            if now < created {
-                return Err(HttpSignatureError::NotYetValid { created, now });
-            }
-        }
-
-        let decoded_signature = base64::decode(&self.signature)?;
-        signature_type.verify(public_key, signing_string.as_bytes(), &decoded_signature)?;
-
-        Ok(())
     }
 }
 
@@ -221,7 +201,7 @@ impl FromStr for HttpSignature {
                 }
                 headers
             } else {
-                vec![Header::Created]
+                vec![]
             }
         };
 
@@ -500,5 +480,152 @@ impl<'a> HttpSignatureBuilder<'a> {
             expires,
             signature: base64::encode(&signature_binary),
         })
+    }
+}
+
+// === http signature verifier === /
+
+macro_rules! verifier_argument_missing_err {
+    ($field:ident) => {{
+        ::static_assertions::assert_fields!(HttpSignatureVerifierInner: $field);
+        HttpSignatureError::MissingBuilderArgument {
+            arg: stringify!($field),
+        }
+    }};
+}
+
+#[derive(Default, Clone, Debug)]
+struct HttpSignatureVerifierInner<'a> {
+    now: Option<u64>,
+    signature_method: Option<(&'a PublicKey, SignatureHashType)>,
+    signing_string_generation: Option<SigningStringGenMethod<'a>>,
+}
+
+#[derive(Clone, Debug)]
+/// Utility to verify `HttpSignature`s
+pub struct HttpSignatureVerifier<'a> {
+    http_signature: &'a HttpSignature,
+    inner: RefCell<HttpSignatureVerifierInner<'a>>,
+}
+
+impl<'a> HttpSignatureVerifier<'a> {
+    #[inline]
+    /// Optional. Required only if http signature contains (expires) or (created) parameters.
+    pub fn now(&self, unix_timestamp: u64) -> &Self {
+        self.inner.borrow_mut().now = Some(unix_timestamp);
+        self
+    }
+
+    #[inline]
+    /// Required
+    pub fn signature_method(&self, public_key: &'a PublicKey, signature_type: SignatureHashType) -> &Self {
+        self.inner.borrow_mut().signature_method = Some((public_key, signature_type));
+        self
+    }
+
+    #[inline]
+    /// Required (alternative: `pre_generated_signing_string`).
+    pub fn generate_signing_string_using_http_request(&self, http_request: &'a dyn HttpRequest) -> &Self {
+        self.inner.borrow_mut().signing_string_generation = Some(SigningStringGenMethod::FromHttpRequest(http_request));
+        self
+    }
+
+    #[inline]
+    /// Required (alternative: `generate_signing_string_using_http_request`).
+    pub fn pre_generated_signing_string(&self, signing_string: &'a str) -> &Self {
+        self.inner.borrow_mut().signing_string_generation = Some(SigningStringGenMethod::PreGenerated(signing_string));
+        self
+    }
+
+    pub fn verify(&self) -> Result<(), HttpSignatureError> {
+        let mut inner = self.inner.borrow_mut();
+
+        let (public_key, signature_type) = {
+            inner
+                .signature_method
+                .take()
+                .ok_or(verifier_argument_missing_err!(signature_method))?
+        };
+
+        let signing_string_generation = inner
+            .signing_string_generation
+            .take()
+            .ok_or(verifier_argument_missing_err!(signing_string_generation))?;
+
+        if let Some(expires) = self.http_signature.expires {
+            let now = inner.now.take().ok_or(verifier_argument_missing_err!(now))?;
+            if expires < now {
+                return Err(HttpSignatureError::Expired {
+                    not_after: expires,
+                    now,
+                });
+            }
+        }
+
+        if let Some(created) = self.http_signature.created {
+            let now = inner.now.take().ok_or(verifier_argument_missing_err!(now))?;
+            if now < created {
+                return Err(HttpSignatureError::NotYetValid { created, now });
+            }
+        }
+
+        drop(inner);
+
+        let signing_string = match signing_string_generation {
+            SigningStringGenMethod::PreGenerated(signing_string) => Cow::Borrowed(signing_string),
+            SigningStringGenMethod::FromHttpRequest(http_request) => {
+                let headers = if self.http_signature.headers.is_empty() {
+                    &[Header::Created][..]
+                } else {
+                    self.http_signature.headers.as_slice()
+                };
+
+                let mut acc = Vec::with_capacity(headers.len());
+                for header in headers {
+                    match header {
+                        Header::Name(header_name) => {
+                            let concatenated_values = http_request.get_header_concatenated_values(header_name)?;
+                            if concatenated_values.is_empty() {
+                                acc.push(format!("{}:", header_name.as_str()));
+                            } else {
+                                acc.push(format!("{}: {}", header_name.as_str(), concatenated_values));
+                            }
+                        }
+                        Header::RequestTarget => {
+                            acc.push(format!(
+                                "{} {}",
+                                http_request.get_lowercased_method()?,
+                                http_request.get_target()?
+                            ));
+                        }
+                        Header::Created => acc.push(format!(
+                            "{}: {}",
+                            header.as_str(),
+                            self.http_signature.created.ok_or_else(|| {
+                                HttpSignatureError::MissingRequiredParameter {
+                                    parameter: HTTP_SIGNATURE_CREATED,
+                                }
+                            })?
+                        )),
+                        Header::Expires => acc.push(format!(
+                            "{}: {}",
+                            header.as_str(),
+                            self.http_signature.expires.ok_or_else(|| {
+                                HttpSignatureError::MissingRequiredParameter {
+                                    parameter: HTTP_SIGNATURE_EXPIRES,
+                                }
+                            })?
+                        )),
+                    }
+                }
+
+                Cow::Owned(acc.join("\n"))
+            }
+        };
+
+        let decoded_signature = base64::decode(&self.http_signature.signature)?;
+        signature_type.verify(public_key, signing_string.as_bytes(), &decoded_signature)?;
+
+        Ok(())
     }
 }

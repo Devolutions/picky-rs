@@ -97,6 +97,15 @@
 //!
 //! assert_eq!(parsed_http_signature, http_signature);
 //!
+//! parsed_http_signature.verifier()
+//!     .signature_method(&private_key.to_public_key(), SignatureHashType::RsaSha224)
+//!     .generate_signing_string_using_http_request(&parts)
+//!     .now(1402170695)
+//!     .verify()
+//!     .expect("couldn't verify signature");
+//!
+//! // alternatively you can provide a pre-generated signing string
+//!
 //! let signing_string =
 //!     "get /foo\n\
 //!      (created): 1402170695\n\
@@ -105,15 +114,6 @@
 //!      cache-control: max-age=60, must-revalidate\n\
 //!      x-emptyheader:\n\
 //!      x-example: Example header       with some whitespace.";
-//!
-//! parsed_http_signature.verify(
-//!     SignatureHashType::RsaSha224,
-//!     &private_key.to_public_key(),
-//!     signing_string,
-//!     1402170695
-//! ).expect("couldn't verify signature");
-//!
-//! // alternatively you can provide a pre-generated signing string to build http signature with
 //!
 //! let http_signature_pre_generated = HttpSignatureBuilder::new()
 //!     .key_id("my-rsa-key")
@@ -126,6 +126,13 @@
 //!
 //! assert_eq!(http_signature_pre_generated, http_signature);
 //! assert_eq!(http_signature_pre_generated_str, http_signature_str);
+//!
+//! parsed_http_signature.verifier()
+//!     .signature_method(&private_key.to_public_key(), SignatureHashType::RsaSha224)
+//!     .pre_generated_signing_string(signing_string)
+//!     .now(1402170695)
+//!     .verify()
+//!     .expect("couldn't verify signature using pre-generated signing string");
 //! ```
 
 pub mod header;
