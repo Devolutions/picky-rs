@@ -168,15 +168,16 @@ impl Picky {
              THIS BUILD IS FOR DEBUG PURPOSE ONLY, DON'T USE THIS BUILD IN PRODUCTION."
         );
 
-        const RSA_2048_POOL: [&str; 6] = [
+        const RSA_2048_POOL: [&str; 7] = [
             RSA_2048_PK_1,
             RSA_2048_PK_2,
             RSA_2048_PK_3,
             RSA_2048_PK_4,
             RSA_2048_PK_5,
             RSA_2048_PK_6,
+            RSA_2048_PK_7,
         ];
-        const RSA_4096_POOL: [&str; 2] = [RSA_4096_PK_1, RSA_4096_PK_2]; //, RSA_4096_PK_3]; The third key isn't supported by current RSA implementation.
+        const RSA_4096_POOL: [&str; 3] = [RSA_4096_PK_1, RSA_4096_PK_2, RSA_4096_PK_3];
 
         let choice: usize = random();
         let pk_pem_str = match bits {
@@ -194,7 +195,7 @@ impl Picky {
         };
 
         let pem = pk_pem_str.parse::<Pem>().context(PrivateKeyPem)?;
-        PrivateKey::from_pkcs8(pem.data()).context(PrivateKeyGeneration)
+        PrivateKey::from_pem(&pem).context(PrivateKeyGeneration)
     }
 
     pub fn parse_pk_from_magic_der(der: &[u8]) -> Result<PrivateKey, PickyError> {
