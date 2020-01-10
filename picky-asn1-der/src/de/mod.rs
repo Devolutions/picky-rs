@@ -7,7 +7,7 @@ mod utf8_string;
 use crate::{
     de::{boolean::Boolean, integer::UnsignedInteger, null::Null, sequence::Sequence, utf8_string::Utf8String},
     misc::{Length, PeekableReader, ReadExt},
-    Asn1DerError, Result,
+    Asn1DerError, Asn1RawDer, Result,
 };
 use picky_asn1::{tag::Tag, wrapper::*, Asn1Type};
 use serde::{de::Visitor, Deserialize};
@@ -43,6 +43,7 @@ pub struct Deserializer<'de> {
     buf: Vec<u8>,
     encapsulator_tag_stack: Vec<Tag>,
     header_only: bool,
+    raw_der: bool,
     max_len: usize,
 }
 
@@ -58,6 +59,7 @@ impl<'de> Deserializer<'de> {
             buf: Vec::new(),
             encapsulator_tag_stack: Vec::with_capacity(3),
             header_only: false,
+            raw_der: false,
             max_len,
         }
     }
@@ -452,6 +454,16 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Tag::IA5_STRING => {}
             tag if tag.is_context_specific() => {}
             _tag => {
+                if self.raw_der {
+                    self.raw_der = false;
+                    let peeked = self.reader.peek_buffer()?;
+                    let msg_len = Length::deserialized(&mut Cursor::new(&peeked.buffer()[1..]))?;
+                    let header_len = Length::encoded_len(msg_len) + 1;
+                    self.buf.resize(header_len + msg_len, 0);
+                    self.reader.read_exact(&mut self.buf)?;
+                    return visitor.visit_bytes(&self.buf);
+                }
+
                 debug_log!("deserialize_byte_buf: INVALID (found {})", _tag);
                 return Err(Asn1DerError::InvalidData);
             }
@@ -523,6 +535,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
             ContextTag14::<()>::NAME => self.h_encapsulate(Tag::CTX_14),
             ContextTag15::<()>::NAME => self.h_encapsulate(Tag::CTX_15),
             HeaderOnly::<()>::NAME => self.header_only = true,
+            Asn1RawDer::NAME => self.raw_der = true,
             _ => {}
         }
 

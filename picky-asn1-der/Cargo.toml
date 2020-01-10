@@ -16,6 +16,7 @@ readme = "README.md"
 [dependencies]
 picky-asn1 = { version = "0.2", path = "../picky-asn1" }
 serde = { version = "1.0", default-features = false, features = ["derive"] }
+serde_bytes = "0.11"
 lazy_static = { version = "1.4", optional = true }
 
 [dev-dependencies]
