@@ -675,13 +675,14 @@ mod tests {
     use crate::pem::Pem;
     use http_0_2::{header, method::Method, request};
 
-    const HTTP_SIGNATURE_EXAMPLE: &str = "Signature keyId=\"my-rsa-key\", created=\"1402170695\", \
-             headers=\"(request-target) (created) date\", \
-             signature=\"CM3Ui6l4Z6+yYdWaX5Cz10OAqUceS53Zy/qA+e4xG5Nabe215iTlnj/sfVJ3nBaMIOj/4e\
-             gxTKNDXAJbLm6nOF8zUOdJBuKQZNO1mfzrMKLsz7gc2PQI1eVxGNJoBZ40L7CouertpowQFpKyizNXqH/y\
-             YBgqPEnLk+p5ISkXeHd7P/YbAAQGnSe3hnJ/gkkJ5rS6mGuu2C8+Qm68tcSGz9qwVdNTFPpji5VPxprs2J\
-             2Z1vjsMVW97rsKOs8lo+qxPGfni27udledH2ZQABGZHOgZsChj59Xb3oVAA8/V3rjt5Un7gsz2AHQ6aY6o\
-             ky59Rsg/CpB8gP7szjK/wrCclA==\"";
+    const HTTP_SIGNATURE_EXAMPLE: &str =
+        "Signature keyId=\"my-rsa-key\", created=\"1402170695\", \
+         headers=\"(request-target) (created) date\", \
+         signature=\"CM3Ui6l4Z6+yYdWaX5Cz10OAqUceS53Zy/qA+e4xG5Nabe215iTlnj/sfVJ3nBaMIOj/4e\
+         gxTKNDXAJbLm6nOF8zUOdJBuKQZNO1mfzrMKLsz7gc2PQI1eVxGNJoBZ40L7CouertpowQFpKyizNXqH/y\
+         YBgqPEnLk+p5ISkXeHd7P/YbAAQGnSe3hnJ/gkkJ5rS6mGuu2C8+Qm68tcSGz9qwVdNTFPpji5VPxprs2J\
+         2Z1vjsMVW97rsKOs8lo+qxPGfni27udledH2ZQABGZHOgZsChj59Xb3oVAA8/V3rjt5Un7gsz2AHQ6aY6o\
+         ky59Rsg/CpB8gP7szjK/wrCclA==\"";
 
     fn private_key_1() -> PrivateKey {
         let pem = crate::test_files::RSA_2048_PK_7.parse::<Pem>().expect("pem 1");
