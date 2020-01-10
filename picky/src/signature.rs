@@ -79,12 +79,12 @@ impl SignatureHashType {
     pub fn sign(self, msg: &[u8], private_key: &PrivateKey) -> Result<Vec<u8>, SignatureError> {
         let rsa_private_key = match &private_key.as_inner().private_key {
             private_key_info::PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => RSAPrivateKey::from_components(
-                BigUint::from_bytes_be(key.modulus().as_bytes_be()),
-                BigUint::from_bytes_be(key.public_exponent().as_bytes_be()),
-                BigUint::from_bytes_be(key.private_exponent().as_bytes_be()),
+                BigUint::from_bytes_be(key.modulus().as_unsigned_bytes_be()),
+                BigUint::from_bytes_be(key.public_exponent().as_unsigned_bytes_be()),
+                BigUint::from_bytes_be(key.private_exponent().as_unsigned_bytes_be()),
                 key.primes()
                     .iter()
-                    .map(|p| BigUint::from_bytes_be(p.as_bytes_be()))
+                    .map(|p| BigUint::from_bytes_be(p.as_unsigned_bytes_be()))
                     .collect(),
             ),
         };
@@ -114,8 +114,8 @@ impl SignatureHashType {
 
         let public_key = match &public_key.as_inner().subject_public_key {
             InnerPublicKey::RSA(BitStringAsn1Container(key)) => RSAPublicKey::new(
-                BigUint::from_bytes_be(key.modulus.as_bytes_be()),
-                BigUint::from_bytes_be(key.public_exponent.as_bytes_be()),
+                BigUint::from_bytes_be(key.modulus.as_unsigned_bytes_be()),
+                BigUint::from_bytes_be(key.public_exponent.as_unsigned_bytes_be()),
             )?,
             InnerPublicKey::EC(_) => {
                 return Err(SignatureError::UnsupportedAlgorithm {

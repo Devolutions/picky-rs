@@ -7,7 +7,7 @@ mod utf8_string;
 use crate::{
     misc::{Length, WriteExt},
     ser::{boolean::Boolean, integer::UnsignedInteger, null::Null, sequence::Sequence, utf8_string::Utf8String},
-    Asn1DerError, Result,
+    Asn1DerError, Asn1RawDer, Result,
 };
 use picky_asn1::{tag::Tag, wrapper::*, Asn1Type};
 use serde::Serialize;
@@ -313,6 +313,7 @@ impl<'a, 'se> serde::ser::Serializer for &'a mut Serializer<'se> {
             ContextTag14::<()>::NAME => self.h_encapsulate(Tag::CTX_14),
             ContextTag15::<()>::NAME => self.h_encapsulate(Tag::CTX_15),
             HeaderOnly::<()>::NAME => self.no_header = true,
+            Asn1RawDer::NAME => self.no_header = true,
             _ => {}
         }
 

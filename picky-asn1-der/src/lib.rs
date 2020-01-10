@@ -74,10 +74,12 @@ mod debug_log;
 
 mod de;
 mod misc;
+mod raw_der;
 mod ser;
 
 pub use crate::{
     de::{from_bytes, from_reader, from_reader_with_max_len, Deserializer},
+    raw_der::Asn1RawDer,
     ser::{to_byte_buf, to_bytes, to_vec, to_writer, Serializer},
 };
 

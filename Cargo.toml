@@ -9,3 +9,4 @@ members = [
 [patch.crates-io]
 backtrace = { git = "https://github.com/Devolutions/backtrace-rs", branch = "wayk" }
 libz-sys = { git = "https://github.com/Devolutions/libz-sys", branch = "wayk" }
+rsa = { git = "https://github.com/RustCrypto/RSA" }

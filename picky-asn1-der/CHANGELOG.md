@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.1] 2020-01-10
+
+### Added
+
+- `Asn1RawDer` wrapper for user-provided raw DER.
+
 ## [0.2.0] 2019-12-23
 
 ### Added

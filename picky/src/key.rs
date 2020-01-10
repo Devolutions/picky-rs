@@ -256,6 +256,7 @@ impl PublicKey {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::signature::SignatureHashType;
 
     // Generating RSA keys in debug is very slow. Therefore, this test only run in release mode.
     cfg_if::cfg_if! { if #[cfg(not(debug_assertions))] {
@@ -355,5 +356,26 @@ mod tests {
             .err()
             .expect("key error");
         assert_eq!(err.to_string(), "invalid PEM label: GARBAGE");
+    }
+
+    fn check_pk(pem_str: &str) {
+        const MSG: &'static [u8] = b"abcde";
+
+        let pem = pem_str.parse::<Pem>().expect("pem");
+        let pk = PrivateKey::from_pem(&pem).expect("private key");
+        let signed_rsa = SignatureHashType::RsaSha256.sign(MSG, &pk).expect("rsa sign");
+        SignatureHashType::RsaSha256
+            .verify(&pk.to_public_key(), MSG, &signed_rsa)
+            .expect("rsa verify rsa");
+
+        println!("Success!");
+    }
+
+    #[test]
+    fn invalid_coeff_private_key_regression() {
+        println!("2048 PK 7");
+        check_pk(crate::test_files::RSA_2048_PK_7);
+        println!("4096 PK 3");
+        check_pk(crate::test_files::RSA_4096_PK_3);
     }
 }

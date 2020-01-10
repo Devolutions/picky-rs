@@ -292,6 +292,9 @@ impls! { OctetStringAsn1(VecU8), Tag::OCTET_STRING }
 /// A BigInt wrapper for Asn1 encoding.
 ///
 /// Simply use primitive integer types if you don't need big integer.
+///
+/// For underlying implementation,
+/// see this [Microsoft's documentation](https://docs.microsoft.com/en-us/windows/win32/seccertenroll/about-integer).
 #[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd, Hash, Clone)]
 pub struct IntegerAsn1(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
@@ -316,7 +319,7 @@ impl IntegerAsn1 {
         }
     }
 
-    pub fn as_bytes_be(&self) -> &[u8] {
+    pub fn as_unsigned_bytes_be(&self) -> &[u8] {
         if self.0.len() > 1 {
             if self.0[0] == 0x00 {
                 &self.0[1..]
@@ -339,7 +342,20 @@ impl IntegerAsn1 {
     }
 
     pub fn from_signed_bytes_be(bytes: Vec<u8>) -> Self {
-        Self::from(bytes)
+        Self(bytes)
+    }
+
+    /// Build an ASN.1 Integer from unsigned big endian bytes.
+    ///
+    /// If high order bit is set to 1, this shift all elements to the right
+    /// and add a leading 0x00 byte indicating the number is positive.
+    /// Prefer `from_signed_bytes_be` if you can build a signed bytes string without
+    /// overhead on you side.
+    pub fn from_unsigned_bytes_be(mut bytes: Vec<u8>) -> Self {
+        if bytes[0] & 0x80 == 0x80 {
+            bytes.insert(0, 0x00);
+        }
+        Self(bytes)
     }
 }
 
