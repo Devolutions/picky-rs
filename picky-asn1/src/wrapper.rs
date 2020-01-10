@@ -319,7 +319,7 @@ impl IntegerAsn1 {
         }
     }
 
-    pub fn as_bytes_be(&self) -> &[u8] {
+    pub fn as_unsigned_bytes_be(&self) -> &[u8] {
         if self.0.len() > 1 {
             if self.0[0] == 0x00 {
                 &self.0[1..]
