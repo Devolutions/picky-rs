@@ -11,8 +11,8 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/Devolutions/picky-rs"
 
 [dependencies]
-picky-asn1 = "0.1"
-picky-asn1-der = "0.2"
+picky-asn1 = { version = "0.2", path = "../picky-asn1" }
+picky-asn1-der = { version = "0.2", path = "../picky-asn1-der" }
 serde = { version = "1.0", features = ["derive"] }
 oid = { version = "^0.1.1", features = ["serde_support"] }
 base64 = "0.10"
