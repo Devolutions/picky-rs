@@ -86,12 +86,21 @@ fn big_integer() {
         0x9d, 0x7c, 0x92, 0x71, 0xe1, 0xb2, 0x2f, 0x5c, 0x8d, 0xee, 0xf0, 0xf1, 0x17, 0x1e, 0xd2, 0x5f,
         0x31, 0x5b, 0xb1, 0x9c, 0xbc, 0x20, 0x55, 0xbf, 0x3a, 0x37, 0x42, 0x45, 0x75, 0xdc, 0x90, 0x65,
     ];
-    let big_integer = IntegerAsn1::from_signed_bytes_be(big_integer_buffer[3..].to_vec());
 
+    // from signed bytes
+
+    let big_integer = IntegerAsn1::from_signed_bytes_be(big_integer_buffer[3..].to_vec());
     assert!(big_integer.is_positive());
     assert!(!big_integer.is_negative());
-    assert_eq!(big_integer.as_bytes_be(), &big_integer_buffer[4..]);
+    assert_eq!(big_integer.as_unsigned_bytes_be(), &big_integer_buffer[4..]);
+    check(&big_integer_buffer, big_integer);
 
+    // check we have same result using unsigned bytes
+
+    let big_integer = IntegerAsn1::from_unsigned_bytes_be(big_integer_buffer[4..].to_vec());
+    assert!(big_integer.is_positive());
+    assert!(!big_integer.is_negative());
+    assert_eq!(big_integer.as_signed_bytes_be(), &big_integer_buffer[3..]);
     check(&big_integer_buffer, big_integer);
 }
 
@@ -102,7 +111,7 @@ fn small_integer() {
 
     assert!(big_integer.is_positive());
     assert!(!big_integer.is_negative());
-    assert_eq!(big_integer.as_bytes_be(), &[0x03]);
+    assert_eq!(big_integer.as_unsigned_bytes_be(), &[0x03]);
 
     check(&buffer, big_integer);
 }
@@ -114,7 +123,7 @@ fn small_integer_negative() {
 
     assert!(!big_integer.is_positive());
     assert!(big_integer.is_negative());
-    assert_eq!(big_integer.as_bytes_be(), &[0xF9]);
+    assert_eq!(big_integer.as_unsigned_bytes_be(), &[0xF9]);
 
     check(&buffer, big_integer);
 }
