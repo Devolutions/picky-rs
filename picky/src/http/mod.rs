@@ -13,7 +13,7 @@
 //!     key::PrivateKey,
 //!     pem::parse_pem,
 //! };
-//! use http::{request, header::{self, HeaderName}, method::Method};
+//! use http_0_2::{request, header::{self, HeaderName}, method::Method};
 //!
 //! // all you need to generate a http signature
 //!
@@ -67,6 +67,7 @@
 //!     .key_id("my-rsa-key")
 //!     .signature_method(&private_key, SignatureHashType::RsaSha224)
 //!     // `picky::http::http_request::HttpRequest` trait is implemented for `http::request::Parts`
+//!     // for `http` crate 0.1 and 0.2 with `http_trait_impl` feature gate
 //!     .generate_signing_string_using_http_request(&parts)
 //!     .request_target()
 //!     .created(1402170695)
