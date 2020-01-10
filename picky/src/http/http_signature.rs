@@ -592,7 +592,7 @@ impl<'a> HttpSignatureVerifier<'a> {
             .ok_or(verifier_argument_missing_err!(signing_string_generation))?;
 
         if let Some(expires) = self.http_signature.expires {
-            let now = inner.now.take().ok_or(verifier_argument_missing_err!(now))?;
+            let now = inner.now.ok_or(verifier_argument_missing_err!(now))?;
             if expires < now {
                 return Err(HttpSignatureError::Expired {
                     not_after: expires,
@@ -602,7 +602,7 @@ impl<'a> HttpSignatureVerifier<'a> {
         }
 
         if let Some(created) = self.http_signature.created {
-            let now = inner.now.take().ok_or(verifier_argument_missing_err!(now))?;
+            let now = inner.now.ok_or(verifier_argument_missing_err!(now))?;
             if now < created {
                 return Err(HttpSignatureError::NotYetValid { created, now });
             }
@@ -666,5 +666,237 @@ impl<'a> HttpSignatureVerifier<'a> {
         signature_type.verify(public_key, signing_string.as_bytes(), &decoded_signature)?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::pem::Pem;
+    use http_0_2::{header, method::Method, request};
+
+    const HTTP_SIGNATURE_EXAMPLE: &str = "Signature keyId=\"my-rsa-key\", created=\"1402170695\", \
+             headers=\"(request-target) (created) date\", \
+             signature=\"CM3Ui6l4Z6+yYdWaX5Cz10OAqUceS53Zy/qA+e4xG5Nabe215iTlnj/sfVJ3nBaMIOj/4e\
+             gxTKNDXAJbLm6nOF8zUOdJBuKQZNO1mfzrMKLsz7gc2PQI1eVxGNJoBZ40L7CouertpowQFpKyizNXqH/y\
+             YBgqPEnLk+p5ISkXeHd7P/YbAAQGnSe3hnJ/gkkJ5rS6mGuu2C8+Qm68tcSGz9qwVdNTFPpji5VPxprs2J\
+             2Z1vjsMVW97rsKOs8lo+qxPGfni27udledH2ZQABGZHOgZsChj59Xb3oVAA8/V3rjt5Un7gsz2AHQ6aY6o\
+             ky59Rsg/CpB8gP7szjK/wrCclA==\"";
+
+    fn private_key_1() -> PrivateKey {
+        let pem = crate::test_files::RSA_2048_PK_7.parse::<Pem>().expect("pem 1");
+        PrivateKey::from_pem(&pem).expect("private key 1")
+    }
+
+    fn private_key_2() -> PrivateKey {
+        let pem = crate::test_files::RSA_2048_PK_1.parse::<Pem>().expect("pem 2");
+        PrivateKey::from_pem(&pem).expect("private key 2")
+    }
+
+    #[test]
+    fn sign() {
+        let private_key = private_key_1();
+        let http_signature_builder = HttpSignatureBuilder::new();
+        http_signature_builder
+            .key_id("my-rsa-key")
+            .signature_method(&private_key, SignatureHashType::RsaSha256)
+            .request_target()
+            .created(1402170695)
+            .http_header("Date");
+
+        let req = request::Builder::new()
+            .method(Method::GET)
+            .uri("/foo")
+            .header(header::DATE, "Tue, 07 Jun 2014 20:51:35 GMT")
+            .header(header::CACHE_CONTROL, "max-age=60") // unused for signature
+            .header(header::CACHE_CONTROL, "must-revalidate") // unused for signature
+            .body(())
+            .expect("couldn't build request");
+        let (parts, _) = req.into_parts();
+
+        let http_signature = http_signature_builder
+            .clone()
+            .generate_signing_string_using_http_request(&parts)
+            .build()
+            .expect("couldn't generate http signature");
+        let http_signature_str = http_signature.to_string();
+
+        pretty_assertions::assert_eq!(http_signature_str, HTTP_SIGNATURE_EXAMPLE,);
+
+        // changing unused headers should not change signature
+
+        let req_2 = request::Builder::new()
+            .method(Method::GET)
+            .uri("/foo")
+            .header(header::DATE, "Tue, 07 Jun 2014 20:51:35 GMT")
+            .header(header::CACHE_CONTROL, "max-age=222") // unused for signature
+            .body(())
+            .expect("couldn't build request");
+        let (parts_2, _) = req_2.into_parts();
+
+        let http_signature_2 = http_signature_builder
+            .generate_signing_string_using_http_request(&parts_2)
+            .build()
+            .expect("couldn't generate http signature 2");
+        let http_signature_str_2 = http_signature_2.to_string();
+
+        pretty_assertions::assert_eq!(http_signature_str_2, http_signature_str);
+    }
+
+    #[test]
+    fn verify() {
+        let req = request::Builder::new()
+            .method(Method::GET)
+            .uri("/foo")
+            .header(header::DATE, "Tue, 07 Jun 2014 20:51:35 GMT")
+            .header("something-else", "owowo") // unused for signature
+            .body(())
+            .expect("couldn't build request");
+        let (parts, _) = req.into_parts();
+
+        let http_signature = HttpSignature::from_str(HTTP_SIGNATURE_EXAMPLE).expect("http signature");
+        http_signature
+            .verifier()
+            .now(1402170700)
+            .signature_method(&private_key_1().to_public_key(), SignatureHashType::RsaSha256)
+            .generate_signing_string_using_http_request(&parts)
+            .verify()
+            .expect("couldn't verify");
+    }
+
+    #[test]
+    fn invalid_signature_err() {
+        let req = request::Builder::new()
+            .method(Method::GET)
+            .uri("/foo")
+            .header(header::DATE, "Tue, 07 Jun 2014 20:51:35 GMT")
+            .body(())
+            .expect("couldn't build request");
+        let (parts, _) = req.into_parts();
+
+        let http_signature = HttpSignatureBuilder::new()
+            .key_id("my-rsa-key")
+            .signature_method(&private_key_1(), SignatureHashType::RsaSha256)
+            .request_target()
+            .created(1402170695)
+            .expires(1402170705)
+            .http_header("Date")
+            .generate_signing_string_using_http_request(&parts)
+            .build()
+            .expect("couldn't generate http signature");
+
+        let err = http_signature
+            .verifier()
+            .now(1402170700)
+            .signature_method(&private_key_2().to_public_key(), SignatureHashType::RsaSha256)
+            .generate_signing_string_using_http_request(&parts)
+            .verify()
+            .err()
+            .expect("verify");
+        assert_eq!(err.to_string(), "signature error: invalid signature");
+
+        let err = http_signature
+            .verifier()
+            .now(1402170700)
+            .signature_method(&private_key_1().to_public_key(), SignatureHashType::RsaSha1)
+            .generate_signing_string_using_http_request(&parts)
+            .verify()
+            .err()
+            .expect("verify");
+        assert_eq!(err.to_string(), "signature error: invalid signature");
+
+        let err = http_signature
+            .verifier()
+            .now(1402170710)
+            .signature_method(&private_key_1().to_public_key(), SignatureHashType::RsaSha256)
+            .generate_signing_string_using_http_request(&parts)
+            .verify()
+            .err()
+            .expect("verify");
+        assert_eq!(
+            err.to_string(),
+            "certificate expired (not after: 1402170705, now: 1402170710)"
+        );
+
+        let err = http_signature
+            .verifier()
+            .now(1402170600)
+            .signature_method(&private_key_1().to_public_key(), SignatureHashType::RsaSha256)
+            .generate_signing_string_using_http_request(&parts)
+            .verify()
+            .err()
+            .expect("verify");
+        assert_eq!(
+            err.to_string(),
+            "signature is not yet valid (created: 1402170695, now: 1402170600)"
+        );
+
+        let req_2 = request::Builder::new()
+            .method(Method::GET)
+            .uri("/foo")
+            .header(header::DATE, "Tue, 08 Jun 2014 20:51:35 GMT")
+            .body(())
+            .expect("couldn't build request");
+        let (parts_2, _) = req_2.into_parts();
+
+        let err = http_signature
+            .verifier()
+            .now(1402170700)
+            .signature_method(&private_key_1().to_public_key(), SignatureHashType::RsaSha256)
+            .generate_signing_string_using_http_request(&parts_2)
+            .verify()
+            .err()
+            .expect("verify");
+        assert_eq!(err.to_string(), "signature error: invalid signature");
+    }
+
+    #[test]
+    fn sign_with_pre_generated_signing_string() {
+        let signing_string = "get /foo\n(created): 1402170695\ndate: Tue, 07 Jun 2014 20:51:35 GMT";
+        let http_signature = HttpSignatureBuilder::new()
+            .key_id("my-rsa-key")
+            .signature_method(&private_key_1(), SignatureHashType::RsaSha256)
+            .pre_generated_signing_string(signing_string)
+            .build()
+            .expect("couldn't generate http signature using pre-generated signing string");
+        let http_signature_str = http_signature.to_string();
+        assert_eq!(http_signature_str, HTTP_SIGNATURE_EXAMPLE);
+    }
+
+    #[test]
+    fn verify_with_pre_generated_signing_string() {
+        let signing_string = "get /foo\n(created): 1402170695\ndate: Tue, 07 Jun 2014 20:51:35 GMT";
+        let http_signature = HttpSignature::from_str(HTTP_SIGNATURE_EXAMPLE).expect("http signature");
+        http_signature
+            .verifier()
+            .now(1402170700)
+            .signature_method(&private_key_1().to_public_key(), SignatureHashType::RsaSha256)
+            .pre_generated_signing_string(signing_string)
+            .verify()
+            .expect("couldn't verify");
+    }
+
+    fn parse_err(http_signature: &str) -> String {
+        http_signature
+            .parse::<HttpSignature>()
+            .err()
+            .expect("no parse error")
+            .to_string()
+    }
+
+    #[test]
+    fn http_signature_parse_err() {
+        pretty_assertions::assert_eq!(
+            parse_err("Signature signature=\"some sig\""),
+            "required parameter is missing from http signature string: keyId"
+        );
+
+        pretty_assertions::assert_eq!(
+            parse_err(
+                "Signature keyId=\"my-rsa-key\", created=\"HQHQHQ\", \
+                 signature=\"some sig\""
+            ),
+            "invalid parameter: created"
+        );
     }
 }
