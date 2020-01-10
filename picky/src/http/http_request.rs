@@ -1,4 +1,3 @@
-use http::header::HeaderName;
 use snafu::Snafu;
 use std::borrow::Cow;
 
@@ -15,22 +14,18 @@ pub enum HttpRequestError {
 }
 
 pub trait HttpRequest {
-    fn get_header_concatenated_values<'a>(&'a self, header_name: &HeaderName)
-        -> Result<Cow<'a, str>, HttpRequestError>;
+    fn get_header_concatenated_values<'a>(&'a self, header_name: &str) -> Result<Cow<'a, str>, HttpRequestError>;
     fn get_lowercased_method(&self) -> Result<Cow<'_, str>, HttpRequestError>;
     fn get_target(&self) -> Result<Cow<'_, str>, HttpRequestError>;
 }
 
 impl HttpRequest for http::request::Parts {
-    fn get_header_concatenated_values<'a>(
-        &'a self,
-        header_name: &HeaderName,
-    ) -> Result<Cow<'a, str>, HttpRequestError> {
+    fn get_header_concatenated_values<'a>(&'a self, header_name: &str) -> Result<Cow<'a, str>, HttpRequestError> {
         let mut values = Vec::new();
         let all_values = self.headers.get_all(header_name);
         for value in all_values {
             let value_str = value.to_str().map_err(|_| HttpRequestError::HeaderValueToStr {
-                key: header_name.as_str().to_owned(),
+                key: header_name.to_owned(),
             })?;
             values.push(value_str.trim());
         }
@@ -70,28 +65,24 @@ mod tests {
         assert_eq!(parts.get_target().expect("target"), "/foo");
         assert_eq!(parts.get_lowercased_method().expect("method"), "get");
         assert_eq!(
-            parts.get_header_concatenated_values(&header::HOST).expect("host"),
+            parts.get_header_concatenated_values("host").expect("host"),
             "example.org"
         );
         assert_eq!(
-            parts.get_header_concatenated_values(&header::DATE).expect("date"),
+            parts.get_header_concatenated_values("date").expect("date"),
             "Tue, 07 Jun 2014 20:51:35 GMT"
         );
         assert_eq!(
-            parts
-                .get_header_concatenated_values(&HeaderName::from_static("x-example"))
-                .expect("example"),
+            parts.get_header_concatenated_values("x-example").expect("example"),
             "Example header       with some whitespace."
         );
         assert_eq!(
-            parts
-                .get_header_concatenated_values(&HeaderName::from_static("x-emptyheader"))
-                .expect("empty"),
+            parts.get_header_concatenated_values("X-EmptyHeader").expect("empty"),
             ""
         );
         assert_eq!(
             parts
-                .get_header_concatenated_values(&header::CACHE_CONTROL)
+                .get_header_concatenated_values(header::CACHE_CONTROL.as_str())
                 .expect("cache control"),
             "max-age=60, must-revalidate"
         );

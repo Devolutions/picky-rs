@@ -1,13 +1,9 @@
 use crate::{
-    http::{
-        http_request::{HttpRequest, HttpRequestError},
-        Header,
-    },
+    http::http_request::{HttpRequest, HttpRequestError},
     key::{PrivateKey, PublicKey},
     signature::{SignatureError, SignatureHashType},
 };
 use base64::DecodeError;
-use http::header::HeaderName;
 use snafu::Snafu;
 use std::{
     borrow::Cow,
@@ -80,6 +76,57 @@ impl From<SignatureError> for HttpSignatureError {
 impl From<HttpRequestError> for HttpSignatureError {
     fn from(e: HttpRequestError) -> Self {
         Self::SigningStringGeneration { source: e }
+    }
+}
+
+// === header parameter ===
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub enum Header {
+    /// Lowercased HTTP header field name
+    Name(String),
+    /// Special `(request-target)` header field
+    RequestTarget,
+    /// Special `(created)` header field
+    Created,
+    /// Special `(expires)` header field
+    Expires,
+}
+
+impl Header {
+    pub const REQUEST_TARGET_STR: &'static str = "(request-target)";
+    pub const CREATED_STR: &'static str = "(created)";
+    pub const EXPIRES_STR: &'static str = "(expires)";
+
+    pub fn new_name(mut name: String) -> Self {
+        name.make_ascii_lowercase();
+        Self::Name(name)
+    }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            Header::Name(header_name) => header_name.as_str(),
+            Header::RequestTarget => Self::REQUEST_TARGET_STR,
+            Header::Created => Self::CREATED_STR,
+            Header::Expires => Self::EXPIRES_STR,
+        }
+    }
+}
+
+impl ToString for Header {
+    fn to_string(&self) -> String {
+        self.as_str().to_owned()
+    }
+}
+
+impl From<&str> for Header {
+    fn from(s: &str) -> Self {
+        match s {
+            Self::REQUEST_TARGET_STR => Self::RequestTarget,
+            Self::CREATED_STR => Self::Created,
+            Self::EXPIRES_STR => Self::Expires,
+            _ => Self::new_name(s.to_owned()),
+        }
     }
 }
 
@@ -193,11 +240,7 @@ impl FromStr for HttpSignature {
                 let headers_str_vec = headers_str.split(' ').collect::<Vec<&str>>();
                 let mut headers = Vec::with_capacity(headers_str_vec.len());
                 for header_str in headers_str_vec {
-                    headers.push(
-                        Header::from_str(header_str).map_err(|_| HttpSignatureError::InvalidParameter {
-                            parameter: HTTP_SIGNATURE_HEADERS,
-                        })?,
-                    );
+                    headers.push(Header::from(header_str));
                 }
                 headers
             } else {
@@ -342,8 +385,8 @@ impl<'a> HttpSignatureBuilder<'a> {
     #[inline]
     /// If generating signing string, at least one of `created`, `expires`, `request_target`
     /// or `http_header` is required otherwise DO NOT provide.
-    pub fn http_header(&self, header: HeaderName) -> &Self {
-        self.inner.borrow_mut().headers.push(Header::Name(header));
+    pub fn http_header<S: Into<String>>(&self, header: S) -> &Self {
+        self.inner.borrow_mut().headers.push(Header::new_name(header.into()));
         self
     }
 
@@ -383,95 +426,91 @@ impl<'a> HttpSignatureBuilder<'a> {
 
         drop(inner);
 
-        let signature_binary = match signing_string_generation {
-            SigningStringGenMethod::PreGenerated(signing_string) => {
-                if !headers.is_empty() {
-                    return Err(HttpSignatureError::BuilderHeadersProvidedWithPreGenerated);
-                }
+        let signature_binary =
+            match signing_string_generation {
+                SigningStringGenMethod::PreGenerated(signing_string) => {
+                    if !headers.is_empty() {
+                        return Err(HttpSignatureError::BuilderHeadersProvidedWithPreGenerated);
+                    }
 
-                // parse pre-generated signing string to fill our HttpSignature struct properly.
+                    // parse pre-generated signing string to fill our HttpSignature struct properly.
 
-                for line in signing_string.lines() {
-                    let mut split = line.split(":");
-                    let key = split.next().expect("there is always at least one element in the split");
-                    if let Some(value) = split.next() {
-                        match key {
-                            Header::CREATED_STR => {
-                                headers.push(Header::Created);
-                                created =
-                                    Some(value.trim().parse().map_err(|_| {
+                    for line in signing_string.lines() {
+                        let mut split = line.split(":");
+                        let key = split.next().expect("there is always at least one element in the split");
+                        if let Some(value) = split.next() {
+                            match key {
+                                Header::CREATED_STR => {
+                                    headers.push(Header::Created);
+                                    created = Some(value.trim().parse().map_err(|_| {
                                         HttpSignatureError::InvalidSigningString { line: line.to_owned() }
                                     })?);
-                            }
-                            Header::EXPIRES_STR => {
-                                headers.push(Header::Expires);
-                                expires =
-                                    Some(value.trim().parse().map_err(|_| {
+                                }
+                                Header::EXPIRES_STR => {
+                                    headers.push(Header::Expires);
+                                    expires = Some(value.trim().parse().map_err(|_| {
                                         HttpSignatureError::InvalidSigningString { line: line.to_owned() }
                                     })?);
+                                }
+                                header_name => headers.push(Header::new_name(header_name.to_owned())),
                             }
-                            header_name => headers
-                                .push(Header::Name(HeaderName::from_str(header_name).map_err(|_| {
-                                    HttpSignatureError::InvalidSigningString { line: line.to_owned() }
-                                })?)),
+                        } else if key.starts_with("get")
+                            || key.starts_with("post")
+                            || key.starts_with("put")
+                            || key.starts_with("delete")
+                        {
+                            headers.push(Header::RequestTarget);
+                        } else {
+                            return Err(HttpSignatureError::InvalidSigningString { line: line.to_owned() });
                         }
-                    } else if key.starts_with("get")
-                        || key.starts_with("post")
-                        || key.starts_with("put")
-                        || key.starts_with("delete")
-                    {
-                        headers.push(Header::RequestTarget);
-                    } else {
-                        return Err(HttpSignatureError::InvalidSigningString { line: line.to_owned() });
                     }
+
+                    signature_type.sign(signing_string.as_bytes(), private_key)?
                 }
+                SigningStringGenMethod::FromHttpRequest(http_request) => {
+                    // Generate signing string.
+                    // See https://tools.ietf.org/html/draft-cavage-http-signatures-12#section-2.3
 
-                signature_type.sign(signing_string.as_bytes(), private_key)?
-            }
-            SigningStringGenMethod::FromHttpRequest(http_request) => {
-                // Generate signing string.
-                // See https://tools.ietf.org/html/draft-cavage-http-signatures-12#section-2.3
+                    if headers.is_empty() {
+                        return Err(HttpSignatureError::BuilderEmptyHeaders);
+                    }
 
-                if headers.is_empty() {
-                    return Err(HttpSignatureError::BuilderEmptyHeaders);
-                }
-
-                let mut acc = Vec::with_capacity(headers.len());
-                for header in &headers {
-                    match header {
-                        Header::Name(header_name) => {
-                            let concatenated_values = http_request.get_header_concatenated_values(header_name)?;
-                            if concatenated_values.is_empty() {
-                                acc.push(format!("{}:", header_name.as_str()));
-                            } else {
-                                acc.push(format!("{}: {}", header_name.as_str(), concatenated_values));
+                    let mut acc = Vec::with_capacity(headers.len());
+                    for header in &headers {
+                        match header {
+                            Header::Name(header_name) => {
+                                let concatenated_values = http_request.get_header_concatenated_values(header_name)?;
+                                if concatenated_values.is_empty() {
+                                    acc.push(format!("{}:", header_name.as_str()));
+                                } else {
+                                    acc.push(format!("{}: {}", header_name.as_str(), concatenated_values));
+                                }
                             }
+                            Header::RequestTarget => {
+                                acc.push(format!(
+                                    "{} {}",
+                                    http_request.get_lowercased_method()?,
+                                    http_request.get_target()?
+                                ));
+                            }
+                            Header::Created => acc.push(format!(
+                                "{}: {}",
+                                header.as_str(),
+                                created.expect("Some by builder construction")
+                            )),
+                            Header::Expires => acc.push(format!(
+                                "{}: {}",
+                                header.as_str(),
+                                expires.expect("Some by builder construction")
+                            )),
                         }
-                        Header::RequestTarget => {
-                            acc.push(format!(
-                                "{} {}",
-                                http_request.get_lowercased_method()?,
-                                http_request.get_target()?
-                            ));
-                        }
-                        Header::Created => acc.push(format!(
-                            "{}: {}",
-                            header.as_str(),
-                            created.expect("Some by builder construction")
-                        )),
-                        Header::Expires => acc.push(format!(
-                            "{}: {}",
-                            header.as_str(),
-                            expires.expect("Some by builder construction")
-                        )),
                     }
+
+                    let signing_string = acc.join("\n");
+
+                    signature_type.sign(signing_string.as_bytes(), private_key)?
                 }
-
-                let signing_string = acc.join("\n");
-
-                signature_type.sign(signing_string.as_bytes(), private_key)?
-            }
-        };
+            };
 
         Ok(HttpSignature {
             key_id,

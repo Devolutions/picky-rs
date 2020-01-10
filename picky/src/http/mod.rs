@@ -7,13 +7,13 @@
 //!
 //! # Example
 //! ```
-//! use http::{request, header::{self, HeaderName}, method::Method};
 //! use picky::{
 //!     http::http_signature::{HttpSignatureBuilder, HttpSignature},
-//!     pem::parse_pem,
 //!     signature::SignatureHashType,
 //!     key::PrivateKey,
+//!     pem::parse_pem,
 //! };
+//! use http::{request, header::{self, HeaderName}, method::Method};
 //!
 //! // all you need to generate a http signature
 //!
@@ -66,14 +66,15 @@
 //! let http_signature = HttpSignatureBuilder::new()
 //!     .key_id("my-rsa-key")
 //!     .signature_method(&private_key, SignatureHashType::RsaSha224)
+//!     // `picky::http::http_request::HttpRequest` trait is implemented for `http::request::Parts`
 //!     .generate_signing_string_using_http_request(&parts)
 //!     .request_target()
 //!     .created(1402170695)
-//!     .http_header(header::HOST)
-//!     .http_header(header::DATE)
-//!     .http_header(header::CACHE_CONTROL)
-//!     .http_header(HeaderName::from_static("x-emptyheader"))
-//!     .http_header(HeaderName::from_static("x-example"))
+//!     .http_header("host")
+//!     .http_header(header::DATE.as_str())
+//!     .http_header(header::CACHE_CONTROL.as_str())
+//!     .http_header("x-emptyheader")
+//!     .http_header("X-EXAMPLE")
 //!     .build()
 //!     .expect("couldn't generate http signature");
 //!
@@ -135,9 +136,8 @@
 //!     .expect("couldn't verify signature using pre-generated signing string");
 //! ```
 
-pub mod header;
 pub mod http_request;
 pub mod http_signature;
 
-pub use header::Header;
+pub use http_request::HttpRequest;
 pub use http_signature::HttpSignature;
