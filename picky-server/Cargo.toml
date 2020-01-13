@@ -31,9 +31,11 @@ base64 = "0.10"
 hex = "0.3"
 snafu = "0.6"
 rand = { version = "0.7", optional = true }
+unicase = "2.6"
 
 [dev-dependencies]
 rand = "0.7"
+http = "0.1"
 
 [features]
 pre-gen-pk = ["rand"]

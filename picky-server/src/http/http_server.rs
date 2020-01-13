@@ -1,4 +1,4 @@
-use crate::{configuration::ServerConfig, http::controllers::server::ServerController};
+use crate::{configuration::ServerConfig, http::controller::ServerController};
 use saphir::{router::Builder, Server as SaphirServer};
 
 pub struct HttpServer {

@@ -1,6 +1,6 @@
 use clap::App;
 use log::LevelFilter;
-use picky::signature::SignatureHashType;
+use picky::{key::PublicKey, pem::Pem, signature::SignatureHashType};
 use std::env;
 
 const DEFAULT_PICKY_REALM: &str = "Picky";
@@ -56,7 +56,7 @@ pub struct ServerConfig {
     pub intermediate_key: String,
     pub save_file_path: String,
     pub save_certificate: bool,
-    pub den_public_key: String,
+    pub den_public_key: Option<PublicKey>,
 }
 
 impl ServerConfig {
@@ -152,12 +152,19 @@ impl ServerConfig {
             }
         }
 
-        if let Ok(val) = env::var(PICKY_DEN_PUBLIC_KEY_DATA_ENV) {
-            self.den_public_key = val;
-        }
-
-        if let Ok(val) = env::var(PICKY_DEN_PUBLIC_KEY_FILE_ENV) {
-            self.den_public_key = std::fs::read_to_string(val).expect("couldn't read den public key file");
+        let den_public_key = if let Ok(val) = env::var(PICKY_DEN_PUBLIC_KEY_DATA_ENV) {
+            Some(val)
+        } else if let Ok(val) = env::var(PICKY_DEN_PUBLIC_KEY_FILE_ENV) {
+            Some(std::fs::read_to_string(val).expect("couldn't read den public key file"))
+        } else {
+            None
+        };
+        if let Some(den_public_key) = den_public_key {
+            let pem = den_public_key
+                .parse::<Pem>()
+                .expect("couldn't parse den public key pem");
+            let public_key = PublicKey::from_pem(&pem).expect("couldn't parse den public key");
+            self.den_public_key = Some(public_key);
         }
     }
 }
@@ -177,7 +184,7 @@ impl Default for ServerConfig {
             intermediate_key: String::default(),
             save_file_path: String::default(),
             save_certificate: false,
-            den_public_key: String::default(),
+            den_public_key: None,
         }
     }
 }

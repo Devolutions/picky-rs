@@ -1,7 +1,10 @@
 use crate::{
     configuration::ServerConfig,
     db::{get_storage, BoxedPickyStorage, CertificateEntry, PickyStorage},
-    http::utils::SyncRequestUtil,
+    http::{
+        authorization::{check_authorization, Authorized, CsrClaims},
+        utils::SyncRequestUtil,
+    },
     multihash::*,
     picky_controller::Picky,
 };
@@ -78,7 +81,7 @@ impl ServerController {
         dispatch.add(Method::GET, "/chain", get_default_chain);
         dispatch.add(Method::POST, "/signcert", cert_signature_request); // FIXME: deprecated
         dispatch.add(Method::POST, "/sign", cert_signature_request);
-        dispatch.add(Method::POST, "/name", get_name);
+        dispatch.add(Method::POST, "/name", get_name); // FIXME: deprecated
         dispatch.add(Method::GET, "/health", health);
         dispatch.add(Method::GET, "/cert/<format>/<multihash>", get_cert); // FIXME: deprecated
         dispatch.add(Method::GET, "/cert/<multihash>", get_cert);
@@ -289,6 +292,19 @@ fn post_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut Sync
 fn cert_signature_request(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse) {
     res.status(StatusCode::BAD_REQUEST);
 
+    let locked_subject_name: Option<String> = match check_authorization(&controller_data.config, req) {
+        Ok(Authorized::ApiKey) => None,
+        Ok(Authorized::Token(token)) => {
+            let csr_claims: CsrClaims = saphir_try!(serde_json::from_value(token.into_claims()));
+            Some(csr_claims.sub)
+        }
+        Err(e) => {
+            error!("Authorization failed: {}", e);
+            res.status(StatusCode::UNAUTHORIZED);
+            return;
+        }
+    };
+
     let request_format = saphir_try!(Format::request_format(req));
     let mut ca_name = format!("{} Authority", &controller_data.config.realm);
     let csr = match request_format {
@@ -327,6 +343,23 @@ fn cert_signature_request(controller_data: &ControllerData, req: &SyncRequest, r
         }
     };
 
+    if let Some(locked_subject_name) = locked_subject_name {
+        let subject_name = unwrap_opt!(
+            csr.subject_name().find_common_name(),
+            "couldn't find signed CSR subject common name"
+        )
+        .to_string();
+
+        if locked_subject_name != subject_name {
+            error!(
+                "Requested a certificate with an unauthorized subject name: {}, expected: {}",
+                subject_name, locked_subject_name
+            );
+            res.status(StatusCode::UNAUTHORIZED);
+            return;
+        }
+    }
+
     // Sign CSR
     let signed_cert = saphir_try!(sign_certificate(
         &ca_name,
@@ -354,6 +387,7 @@ fn cert_signature_request(controller_data: &ControllerData, req: &SyncRequest, r
             return;
         }
     }
+
     res.status(StatusCode::OK);
 }
 
