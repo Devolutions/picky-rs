@@ -169,7 +169,7 @@ pub struct HttpSignature {
 }
 
 impl HttpSignature {
-    pub fn verifier<'a>(&'a self) -> HttpSignatureVerifier<'a> {
+    pub fn verifier(&self) -> HttpSignatureVerifier<'_> {
         HttpSignatureVerifier {
             http_signature: self,
             inner: Default::default(),
@@ -436,7 +436,7 @@ impl<'a> HttpSignatureBuilder<'a> {
                     // parse pre-generated signing string to fill our HttpSignature struct properly.
 
                     for line in signing_string.lines() {
-                        let mut split = line.split(":");
+                        let mut split = line.split(':');
                         let key = split.next().expect("there is always at least one element in the split");
                         if let Some(value) = split.next() {
                             match key {
