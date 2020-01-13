@@ -5,7 +5,7 @@ use crate::{
 use base64::DecodeError;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use snafu::Snafu;
-use std::borrow::Cow;
+use std::{borrow::Cow, fmt};
 
 // === error type === //
 
@@ -254,7 +254,7 @@ const JWT_TYPE: &str = "JWT";
 const EXPIRATION_TIME_CLAIM: &str = "exp";
 const NOT_BEFORE_CLAIM: &str = "nbf";
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct Header<'a> {
     alg: SignatureHashType,
     typ: Cow<'a, str>,
@@ -263,6 +263,24 @@ struct Header<'a> {
 pub struct Jwt<'a, C> {
     header: Header<'a>,
     claims: C,
+}
+
+impl<'a, C: Clone> Clone for Jwt<'a, C> {
+    fn clone(&self) -> Self {
+        Self {
+            header: self.header.clone(),
+            claims: self.claims.clone(),
+        }
+    }
+}
+
+impl<'a, C: fmt::Debug> fmt::Debug for Jwt<'a, C> {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_struct("Jwt")
+            .field("header", &self.header)
+            .field("claims", &self.claims)
+            .finish()
+    }
 }
 
 impl<'a, C> Jwt<'a, C> {
