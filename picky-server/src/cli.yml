@@ -31,9 +31,8 @@ args:
       takes_value: true
       possible_values:
         - mongodb
-        - sqlite
-        - mysql
         - memory
+        - file
   - db-url:
       long: db-url
       value_name: DB_URL
