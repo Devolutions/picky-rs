@@ -15,6 +15,8 @@ const PICKY_INTERMEDIATE_CERT_ENV: &str = "PICKY_INTERMEDIATE_CERT";
 const PICKY_INTERMEDIATE_KEY_ENV: &str = "PICKY_INTERMEDIATE_KEY";
 const PICKY_SAVE_CERTIFICATE_ENV: &str = "PICKY_SAVE_CERTIFICATE";
 const PICKY_BACKEND_FILE_PATH_ENV: &str = "PICKY_BACKEND_FILE_PATH";
+const PICKY_DEN_PUBLIC_KEY_FILE_ENV: &str = "PICKY_DEN_PUBLIC_KEY_FILE";
+const PICKY_DEN_PUBLIC_KEY_DATA_ENV: &str = "PICKY_DEN_PUBLIC_KEY_DATA";
 
 #[derive(PartialEq, Clone)]
 pub enum BackendType {
@@ -44,7 +46,7 @@ impl From<&str> for BackendType {
 pub struct ServerConfig {
     pub log_level: String,
     pub api_key: String,
-    pub database: Database,
+    pub database_url: String,
     pub realm: String,
     pub key_config: SignatureHashType,
     pub backend: BackendType,
@@ -54,6 +56,7 @@ pub struct ServerConfig {
     pub intermediate_key: String,
     pub save_file_path: String,
     pub save_certificate: bool,
+    pub den_public_key: String,
 }
 
 impl ServerConfig {
@@ -90,7 +93,7 @@ impl ServerConfig {
         }
 
         if let Some(v) = matches.value_of("db-url") {
-            self.database.url = v.to_string();
+            self.database_url = v.to_string();
         }
 
         if let Some(v) = matches.value_of("api-key") {
@@ -116,7 +119,7 @@ impl ServerConfig {
         }
 
         if let Ok(val) = env::var(PICKY_DATABASE_URL_ENV) {
-            self.database.url = val;
+            self.database_url = val;
         }
 
         if let Ok(val) = env::var(PICKY_BACKEND_ENV) {
@@ -148,6 +151,14 @@ impl ServerConfig {
                 self.save_certificate = save_certificate;
             }
         }
+
+        if let Ok(val) = env::var(PICKY_DEN_PUBLIC_KEY_DATA_ENV) {
+            self.den_public_key = val;
+        }
+
+        if let Ok(val) = env::var(PICKY_DEN_PUBLIC_KEY_FILE_ENV) {
+            self.den_public_key = std::fs::read_to_string(val).expect("couldn't read den public key file");
+        }
     }
 }
 
@@ -156,7 +167,7 @@ impl Default for ServerConfig {
         ServerConfig {
             log_level: "info".to_string(),
             api_key: String::default(),
-            database: Database::default(),
+            database_url: "mongodb://127.0.0.1:27017".to_owned(),
             realm: DEFAULT_PICKY_REALM.to_string(),
             key_config: SignatureHashType::RsaSha256,
             backend: BackendType::default(),
@@ -166,19 +177,7 @@ impl Default for ServerConfig {
             intermediate_key: String::default(),
             save_file_path: String::default(),
             save_certificate: false,
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct Database {
-    pub url: String,
-}
-
-impl Default for Database {
-    fn default() -> Self {
-        Database {
-            url: "mongodb://127.0.0.1:27017".to_string(),
+            den_public_key: String::default(),
         }
     }
 }
