@@ -57,9 +57,9 @@ pub fn check_authorization(config: &ServerConfig, req: &SyncRequest) -> Result<A
 
             // try JWT
             let public_key = config
-                .den_public_key
+                .provisioner_public_key
                 .as_ref()
-                .ok_or_else(|| "Den public key is missing".to_owned())?;
+                .ok_or_else(|| "provisioner public key is missing".to_owned())?;
             Ok(Authorized::Token(
                 Jwt::decode(
                     auth_vec[1],
@@ -118,7 +118,7 @@ mod tests {
     fn config(den_key: Option<PublicKey>) -> ServerConfig {
         let mut config = ServerConfig::default();
         config.backend = BackendType::Memory;
-        config.den_public_key = den_key;
+        config.provisioner_public_key = den_key;
         config
     }
 
@@ -152,6 +152,6 @@ mod tests {
         let saphir_req = build_saphir_req(&token);
         let config = config(None);
         let err = check_authorization(&config, &saphir_req).err().expect("auth err");
-        assert_eq!(err, "Den public key is missing");
+        assert_eq!(err, "provisioner public key is missing");
     }
 }

@@ -15,8 +15,8 @@ const PICKY_INTERMEDIATE_CERT_ENV: &str = "PICKY_INTERMEDIATE_CERT";
 const PICKY_INTERMEDIATE_KEY_ENV: &str = "PICKY_INTERMEDIATE_KEY";
 const PICKY_SAVE_CERTIFICATE_ENV: &str = "PICKY_SAVE_CERTIFICATE";
 const PICKY_BACKEND_FILE_PATH_ENV: &str = "PICKY_BACKEND_FILE_PATH";
-const PICKY_DEN_PUBLIC_KEY_FILE_ENV: &str = "PICKY_DEN_PUBLIC_KEY_FILE";
-const PICKY_DEN_PUBLIC_KEY_DATA_ENV: &str = "PICKY_DEN_PUBLIC_KEY_DATA";
+const PICKY_PROVISIONER_PUBLIC_KEY_FILE_ENV: &str = "PICKY_PROVISIONER_PUBLIC_KEY_FILE";
+const PICKY_PROVISIONER_PUBLIC_KEY_DATA_ENV: &str = "PICKY_PROVISIONER_PUBLIC_KEY_DATA";
 
 #[derive(PartialEq, Clone)]
 pub enum BackendType {
@@ -56,7 +56,7 @@ pub struct ServerConfig {
     pub intermediate_key: String,
     pub save_file_path: String,
     pub save_certificate: bool,
-    pub den_public_key: Option<PublicKey>,
+    pub provisioner_public_key: Option<PublicKey>,
 }
 
 impl ServerConfig {
@@ -152,19 +152,19 @@ impl ServerConfig {
             }
         }
 
-        let den_public_key = if let Ok(val) = env::var(PICKY_DEN_PUBLIC_KEY_DATA_ENV) {
+        let provisioner_public_key = if let Ok(val) = env::var(PICKY_PROVISIONER_PUBLIC_KEY_DATA_ENV) {
             Some(val)
-        } else if let Ok(val) = env::var(PICKY_DEN_PUBLIC_KEY_FILE_ENV) {
-            Some(std::fs::read_to_string(val).expect("couldn't read den public key file"))
+        } else if let Ok(val) = env::var(PICKY_PROVISIONER_PUBLIC_KEY_FILE_ENV) {
+            Some(std::fs::read_to_string(val).expect("couldn't read provisioner public key file"))
         } else {
             None
         };
-        if let Some(den_public_key) = den_public_key {
-            let pem = den_public_key
+        if let Some(provisioner_public_key) = provisioner_public_key {
+            let pem = provisioner_public_key
                 .parse::<Pem>()
-                .expect("couldn't parse den public key pem");
-            let public_key = PublicKey::from_pem(&pem).expect("couldn't parse den public key");
-            self.den_public_key = Some(public_key);
+                .expect("couldn't parse provisioner public key pem");
+            let public_key = PublicKey::from_pem(&pem).expect("couldn't parse provisioner public key");
+            self.provisioner_public_key = Some(public_key);
         }
     }
 }
@@ -184,7 +184,7 @@ impl Default for ServerConfig {
             intermediate_key: String::default(),
             save_file_path: String::default(),
             save_certificate: false,
-            den_public_key: None,
+            provisioner_public_key: None,
         }
     }
 }
