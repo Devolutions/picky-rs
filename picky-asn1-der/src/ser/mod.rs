@@ -108,25 +108,22 @@ impl<'se> Serializer<'se> {
     }
 
     fn h_write_header(&mut self, tag: Tag, len: usize) -> Result<usize> {
-        if self.no_header {
-            self.no_header = false; // reset state
-            return Ok(0);
-        }
-
         let mut written;
-        if let Some(last_encapsulator_tag) = self.encapsulators.last() {
-            if last_encapsulator_tag.is_context_specific() {
+        match self.encapsulators.last() {
+            Some(last_encapsulator_tag) if last_encapsulator_tag.is_context_specific() => {
                 written = self.h_write_encapsulator(len)?;
-            } else {
-                written = self.h_write_encapsulator(Length::encoded_len(len) + len + 1)?;
-                written += self.writer.write_one(tag.number())?;
-                written += Length::serialize(len, &mut self.writer)?;
             }
-        } else {
-            written = self.h_write_encapsulator(Length::encoded_len(len) + len + 1)?;
-            written += self.writer.write_one(tag.number())?;
-            written += Length::serialize(len, &mut self.writer)?;
+            _ => {
+                if self.no_header {
+                    written = self.h_write_encapsulator(len)?;
+                } else {
+                    written = self.h_write_encapsulator(Length::encoded_len(len) + len + 1)?;
+                    written += self.writer.write_one(tag.number())?;
+                    written += Length::serialize(len, &mut self.writer)?;
+                }
+            }
         }
+        self.no_header = false; // reset state
         Ok(written)
     }
 
