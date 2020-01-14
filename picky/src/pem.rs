@@ -9,13 +9,13 @@ const PEM_DASHES_BOUNDARIES: &str = "-----";
 
 #[derive(Debug, Clone, Snafu)]
 pub enum PemError {
-    /// pem header not found
+    /// header not found
     HeaderNotFound,
 
     /// invalid pem header
     InvalidHeader,
 
-    /// pem footer not found
+    /// footer not found
     FooterNotFound,
 
     /// couldn't decode base64

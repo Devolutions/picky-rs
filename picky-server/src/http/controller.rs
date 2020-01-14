@@ -1,7 +1,10 @@
 use crate::{
     configuration::ServerConfig,
     db::{get_storage, BoxedPickyStorage, CertificateEntry, PickyStorage},
-    http::controllers::utils::SyncRequestUtil,
+    http::{
+        authorization::{check_authorization, Authorized, CsrClaims},
+        utils::SyncRequestUtil,
+    },
     multihash::*,
     picky_controller::Picky,
 };
@@ -25,27 +28,49 @@ pub struct ServerController {
 }
 
 impl ServerController {
-    pub fn new(config: ServerConfig) -> Self {
+    pub fn from_config(config: ServerConfig) -> Result<Self, String> {
         let storage = get_storage(&config);
 
-        if let Err(e) = check_certs_in_env(&config, storage.as_ref()) {
-            error!("Error loading certificates in environment: {}", e);
+        if !config.root_cert.is_empty() && !config.root_key.is_empty() {
+            info!("Inject Root CA provided by settings");
+            if let Err(e) = inject_config_provided_cert(
+                &format!("{} Root CA", config.realm),
+                &config.root_cert,
+                &config.root_key,
+                storage.as_ref(),
+            ) {
+                return Err(format!("couldn't inject Root CA: {}", e));
+            }
+        } else {
+            info!("Root CA...");
+            let created =
+                generate_root_ca(&config, storage.as_ref()).map_err(|e| format!("couldn't generate root CA: {}", e))?;
+            if created {
+                info!("Created");
+            } else {
+                info!("Already exists");
+            }
         }
 
-        info!("Creating root CA...");
-        let created = generate_root_ca(&config, storage.as_ref()).expect("couldn't generate root CA");
-        if created {
-            info!("Root CA Created");
+        if !config.intermediate_cert.is_empty() && !config.intermediate_key.is_empty() {
+            info!("Inject Intermediate CA provided by settings");
+            if let Err(e) = inject_config_provided_cert(
+                &format!("{} Authority", config.realm),
+                &config.intermediate_cert,
+                &config.intermediate_key,
+                storage.as_ref(),
+            ) {
+                return Err(format!("couldn't inject Intermediate CA: {}", e));
+            }
         } else {
-            info!("Root CA already exists");
-        }
-
-        info!("Creating intermediate CA...");
-        let created = generate_intermediate_ca(&config, storage.as_ref()).expect("couldn't generate intermediate CA");
-        if created {
-            info!("Intermediate Created");
-        } else {
-            info!("Intermediate already exists");
+            info!("Intermediate CA...");
+            let created = generate_intermediate_ca(&config, storage.as_ref())
+                .map_err(|e| format!("couldn't generate intermediate CA: {}", e))?;
+            if created {
+                info!("Created");
+            } else {
+                info!("Already exists");
+            }
         }
 
         let controller_data = ControllerData { storage, config };
@@ -56,13 +81,13 @@ impl ServerController {
         dispatch.add(Method::GET, "/chain", get_default_chain);
         dispatch.add(Method::POST, "/signcert", cert_signature_request); // FIXME: deprecated
         dispatch.add(Method::POST, "/sign", cert_signature_request);
-        dispatch.add(Method::POST, "/name", get_name);
+        dispatch.add(Method::POST, "/name", get_name); // FIXME: deprecated
         dispatch.add(Method::GET, "/health", health);
         dispatch.add(Method::GET, "/cert/<format>/<multihash>", get_cert); // FIXME: deprecated
         dispatch.add(Method::GET, "/cert/<multihash>", get_cert);
         dispatch.add(Method::POST, "/cert", post_cert);
 
-        ServerController { dispatch }
+        Ok(ServerController { dispatch })
     }
 }
 
@@ -267,6 +292,19 @@ fn post_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut Sync
 fn cert_signature_request(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse) {
     res.status(StatusCode::BAD_REQUEST);
 
+    let locked_subject_name: Option<String> = match check_authorization(&controller_data.config, req) {
+        Ok(Authorized::ApiKey) => None,
+        Ok(Authorized::Token(token)) => {
+            let csr_claims: CsrClaims = saphir_try!(serde_json::from_value(token.into_claims()));
+            Some(csr_claims.sub)
+        }
+        Err(e) => {
+            error!("Authorization failed: {}", e);
+            res.status(StatusCode::UNAUTHORIZED);
+            return;
+        }
+    };
+
     let request_format = saphir_try!(Format::request_format(req));
     let mut ca_name = format!("{} Authority", &controller_data.config.realm);
     let csr = match request_format {
@@ -305,6 +343,23 @@ fn cert_signature_request(controller_data: &ControllerData, req: &SyncRequest, r
         }
     };
 
+    if let Some(locked_subject_name) = locked_subject_name {
+        let subject_name = unwrap_opt!(
+            csr.subject_name().find_common_name(),
+            "couldn't find signed CSR subject common name"
+        )
+        .to_string();
+
+        if locked_subject_name != subject_name {
+            error!(
+                "Requested a certificate with an unauthorized subject name: {}, expected: {}",
+                subject_name, locked_subject_name
+            );
+            res.status(StatusCode::UNAUTHORIZED);
+            return;
+        }
+    }
+
     // Sign CSR
     let signed_cert = saphir_try!(sign_certificate(
         &ca_name,
@@ -332,6 +387,7 @@ fn cert_signature_request(controller_data: &ControllerData, req: &SyncRequest, r
             return;
         }
     }
+
     res.status(StatusCode::OK);
 }
 
@@ -633,25 +689,14 @@ fn generate_intermediate_ca(config: &ServerConfig, storage: &dyn PickyStorage) -
     Ok(true)
 }
 
-// === check certificates in env === //
+// === inject config provided certificates in picky storage === //
 
-fn check_certs_in_env(config: &ServerConfig, storage: &dyn PickyStorage) -> Result<(), String> {
-    if !config.root_cert.is_empty() && !config.root_key.is_empty() {
-        if let Err(e) = get_and_store_env_cert_info(&config.root_cert, &config.root_key, storage) {
-            return Err(e);
-        }
-    }
-
-    if !config.intermediate_cert.is_empty() && !config.intermediate_key.is_empty() {
-        if let Err(e) = get_and_store_env_cert_info(&config.intermediate_cert, &config.intermediate_key, storage) {
-            return Err(e);
-        }
-    }
-
-    Ok(())
-}
-
-fn get_and_store_env_cert_info(cert_pem: &str, key_pem: &str, storage: &dyn PickyStorage) -> Result<(), String> {
+fn inject_config_provided_cert(
+    expected_subject_name: &str,
+    cert_pem: &str,
+    key_pem: &str,
+    storage: &dyn PickyStorage,
+) -> Result<(), String> {
     let cert_pem = cert_pem
         .parse::<Pem>()
         .map_err(|e| format!("couldn't parse cert pem: {}", e))?;
@@ -665,6 +710,13 @@ fn get_and_store_env_cert_info(cert_pem: &str, key_pem: &str, storage: &dyn Pick
         .find_common_name()
         .ok_or_else(|| "couldn't find subject common name".to_owned())?
         .to_string();
+
+    if subject_name != expected_subject_name {
+        return Err(format!(
+            "unexpected subject name: {} ; expected: {}",
+            subject_name, expected_subject_name
+        ));
+    }
 
     let key_pem = key_pem
         .parse::<Pem>()

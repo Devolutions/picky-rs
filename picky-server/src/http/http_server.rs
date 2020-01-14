@@ -1,7 +1,4 @@
-use crate::{
-    configuration::ServerConfig,
-    http::{controllers::server_controller::ServerController, middlewares::auth::AuthMiddleware},
-};
+use crate::{configuration::ServerConfig, http::controller::ServerController};
 use saphir::{router::Builder, Server as SaphirServer};
 
 pub struct HttpServer {
@@ -10,14 +7,13 @@ pub struct HttpServer {
 
 impl HttpServer {
     pub fn new(config: ServerConfig) -> Self {
+        let controller = match ServerController::from_config(config) {
+            Ok(controller) => controller,
+            Err(e) => panic!("Couldn't build server controller: {}", e),
+        };
+
         let server = SaphirServer::builder()
-            .configure_middlewares(|middle_stack| {
-                middle_stack.apply(AuthMiddleware::new(config.clone()), vec!["/sign", "/signcert"], None)
-            })
-            .configure_router(|router: Builder| {
-                let controller = ServerController::new(config);
-                router.add(controller)
-            })
+            .configure_router(|router: Builder| router.add(controller))
             .configure_listener(|listener_config| listener_config.set_uri("http://0.0.0.0:12345"))
             .build();
 

@@ -58,3 +58,18 @@ pub struct Asn1RawDer(#[serde(with = "serde_bytes")] pub Vec<u8>);
 impl Asn1RawDer {
     pub const NAME: &'static str = "Asn1RawDer";
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use picky_asn1::wrapper::ApplicationTag0;
+
+    #[test]
+    fn raw_der_behind_application_tag() {
+        let encoded = crate::to_vec(&ApplicationTag0(Asn1RawDer(vec![0x02, 0x01, 0x07]))).expect("to vec");
+        pretty_assertions::assert_eq!(encoded.as_slice(), [0xA0, 0x03, 0x02, 0x01, 0x07]);
+
+        let decoded: ApplicationTag0<Asn1RawDer> = crate::from_bytes(&encoded).expect("from bytes");
+        pretty_assertions::assert_eq!((decoded.0).0.as_slice(), [0x02, 0x01, 0x07]);
+    }
+}

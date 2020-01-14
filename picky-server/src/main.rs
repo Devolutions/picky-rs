@@ -5,6 +5,9 @@ extern crate bson;
 #[macro_use]
 extern crate log;
 
+#[macro_use]
+mod macros;
+
 mod configuration;
 mod db;
 mod http;

@@ -352,7 +352,7 @@ impl IntegerAsn1 {
     /// Prefer `from_signed_bytes_be` if you can build a signed bytes string without
     /// overhead on you side.
     pub fn from_unsigned_bytes_be(mut bytes: Vec<u8>) -> Self {
-        if bytes[0] & 0x80 == 0x80 {
+        if !bytes.is_empty() && bytes[0] & 0x80 == 0x80 {
             bytes.insert(0, 0x00);
         }
         Self(bytes)
@@ -692,5 +692,15 @@ where
             Err(_) => Ok(Self(T::default())),
             result => result,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn integer_from_unsigned_bytes_be_no_panic() {
+        IntegerAsn1::from_unsigned_bytes_be(vec![]);
     }
 }

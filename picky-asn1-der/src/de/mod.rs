@@ -74,18 +74,23 @@ impl<'de> Deserializer<'de> {
 
     /// Reads the next DER object into `self.buf` and returns the tag
     fn h_next_object(&mut self) -> Result<Tag> {
-        let (tag, len) = if let Some((tag, len)) = self.h_decapsulate()? {
-            if tag.is_context_specific() {
-                (tag, len)
-            } else {
-                let tag = Tag::from(self.reader.read_one()?);
-                let len = Length::deserialized(&mut self.reader)?;
+        let (tag, len) = match self.h_decapsulate()? {
+            Some((tag, len)) if tag.is_context_specific() => {
                 (tag, len)
             }
-        } else {
-            let tag = Tag::from(self.reader.read_one()?);
-            let len = Length::deserialized(&mut self.reader)?;
-            (tag, len)
+            _ => {
+                if self.raw_der {
+                    self.raw_der = false;
+                    let peeked = self.reader.peek_buffer()?;
+                    let msg_len = Length::deserialized(&mut Cursor::new(&peeked.buffer()[1..]))?;
+                    let header_len = Length::encoded_len(msg_len) + 1;
+                    (Tag::from(peeked.buffer()[0]), header_len + msg_len)
+                } else {
+                    let tag = Tag::from(self.reader.read_one()?);
+                    let len = Length::deserialized(&mut self.reader)?;
+                    (tag, len)
+                }
+            }
         };
 
         if len > self.max_len {
@@ -452,18 +457,8 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Tag::PRINTABLE_STRING => {}
             Tag::NUMERIC_STRING => {}
             Tag::IA5_STRING => {}
-            tag if tag.is_context_specific() => {}
+            tag if tag.is_context_specific() || self.raw_der => {}
             _tag => {
-                if self.raw_der {
-                    self.raw_der = false;
-                    let peeked = self.reader.peek_buffer()?;
-                    let msg_len = Length::deserialized(&mut Cursor::new(&peeked.buffer()[1..]))?;
-                    let header_len = Length::encoded_len(msg_len) + 1;
-                    self.buf.resize(header_len + msg_len, 0);
-                    self.reader.read_exact(&mut self.buf)?;
-                    return visitor.visit_bytes(&self.buf);
-                }
-
                 debug_log!("deserialize_byte_buf: INVALID (found {})", _tag);
                 return Err(Asn1DerError::InvalidData);
             }
