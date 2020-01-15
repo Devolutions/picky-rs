@@ -24,6 +24,8 @@ jobs:
         fetchDepth: 1
 
       - script: |
+          echo "Check formatting"
+          cargo +stable fmt --all -- --check 2> /dev/null
           conan install openssl/$(OPENSSL_VERSION)@devolutions/stable -g virtualenv -pr linux-x86_64
           . activate.sh
           cargo build --release
