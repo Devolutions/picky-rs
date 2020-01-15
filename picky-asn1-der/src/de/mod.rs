@@ -75,9 +75,7 @@ impl<'de> Deserializer<'de> {
     /// Reads the next DER object into `self.buf` and returns the tag
     fn h_next_object(&mut self) -> Result<Tag> {
         let (tag, len) = match self.h_decapsulate()? {
-            Some((tag, len)) if tag.is_context_specific() => {
-                (tag, len)
-            }
+            Some((tag, len)) if tag.is_context_specific() => (tag, len),
             _ => {
                 if self.raw_der {
                     self.raw_der = false;

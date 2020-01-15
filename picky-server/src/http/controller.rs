@@ -8,7 +8,6 @@ use crate::{
     multihash::*,
     picky_controller::Picky,
 };
-use base64::URL_SAFE_NO_PAD;
 use picky::{
     pem::{parse_pem, to_pem, Pem},
     x509::{Cert, Csr},
@@ -77,13 +76,9 @@ impl ServerController {
 
         let dispatch = ControllerDispatch::new(controller_data);
 
-        dispatch.add(Method::GET, "/chain/<ca>", get_chain); // FIXME: deprecated
         dispatch.add(Method::GET, "/chain", get_default_chain);
-        dispatch.add(Method::POST, "/signcert", cert_signature_request); // FIXME: deprecated
         dispatch.add(Method::POST, "/sign", cert_signature_request);
-        dispatch.add(Method::POST, "/name", get_name); // FIXME: deprecated
         dispatch.add(Method::GET, "/health", health);
-        dispatch.add(Method::GET, "/cert/<format>/<multihash>", get_cert); // FIXME: deprecated
         dispatch.add(Method::GET, "/cert/<multihash>", get_cert);
         dispatch.add(Method::POST, "/cert", post_cert);
 
@@ -462,14 +457,7 @@ fn get_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncR
         }
     };
 
-    // FIXME: deprecated
-    let response_format =
-        Format::response_format(req).unwrap_or_else(|_| match req.captures().get("format").map(|s| s.as_str()) {
-            Some("der") => Format::PkixCertBinary,
-            Some("base64") => Format::PkixCertBase64,
-            _ => Format::PemFile,
-        });
-
+    let response_format = Format::response_format(req).unwrap_or(Format::PemFile);
     match response_format {
         Format::PemFile => {
             res.body(to_pem("CERTIFICATE", &cert_der));
@@ -497,26 +485,6 @@ fn get_default_chain(controller_data: &ControllerData, _: &SyncRequest, res: &mu
     let chain = saphir_try!(find_ca_chain(controller_data.storage.as_ref(), &ca));
     res.body(chain.join("\n"));
     res.status(StatusCode::OK);
-}
-
-fn get_chain(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse) {
-    res.status(StatusCode::BAD_REQUEST);
-
-    if let Some(common_name) = req
-        .captures()
-        .get("ca")
-        .and_then(|c| base64::decode_config(c, URL_SAFE_NO_PAD).ok())
-    {
-        let decoded = String::from_utf8_lossy(&common_name);
-        let chain = saphir_try!(find_ca_chain(controller_data.storage.as_ref(), &decoded));
-        res.body(chain.join("\n"));
-        res.status(StatusCode::OK);
-    } else {
-        error!(
-            "Wrong path or can't decode base64: {}",
-            req.captures().get("ca").unwrap_or(&"No capture ca".to_string())
-        );
-    }
 }
 
 fn find_ca_chain(storage: &dyn PickyStorage, ca_name: &str) -> Result<Vec<String>, String> {
@@ -558,32 +526,6 @@ fn find_ca_chain(storage: &dyn PickyStorage, ca_name: &str) -> Result<Vec<String
     }
 
     Ok(chain)
-}
-
-// === name === //
-
-fn get_name(_: &ControllerData, req: &SyncRequest, res: &mut SyncResponse) {
-    res.status(StatusCode::BAD_REQUEST);
-
-    let body = saphir_try!(std::str::from_utf8(req.body()), "couldn't parse body as utf8");
-    let json = saphir_try!(serde_json::from_str::<Value>(body), "couldn't parse json");
-    let csr_pem = saphir_try!(
-        json["csr"]
-            .to_string()
-            .trim_matches('"')
-            .replace("\\n", "\n")
-            .parse::<Pem>(),
-        "couldn't parse pem"
-    );
-    let csr = saphir_try!(Csr::from_der(csr_pem.data()), "couldn't deserialize CSR");
-    let subject_name = unwrap_opt!(
-        csr.subject_name().find_common_name(),
-        "couldn't find subject common name"
-    )
-    .to_string();
-
-    res.body(subject_name);
-    res.status(StatusCode::OK);
 }
 
 // === generate root CA === //
