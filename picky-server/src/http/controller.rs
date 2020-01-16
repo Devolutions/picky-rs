@@ -13,9 +13,8 @@ use picky::{
     x509::{Cert, Csr},
 };
 use saphir::{Controller, ControllerDispatch, Method, StatusCode, SyncRequest, SyncResponse};
-use serde::export::{fmt::Error, Formatter};
 use serde_json::{self, Value};
-use std::fmt::Display;
+use std::fmt;
 
 struct ControllerData {
     pub storage: BoxedPickyStorage,
@@ -137,8 +136,8 @@ enum Format {
     Pkcs10Base64,
 }
 
-impl Display for Format {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+impl fmt::Display for Format {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         match self {
             Format::PemFile => write!(f, "pem file"),
             Format::Json => write!(f, "json"),
