@@ -1,12 +1,13 @@
 use crate::{
+    addressing::{encode_to_alternative_addresses, encode_to_canonical_address},
     configuration::ServerConfig,
-    db::{CertificateEntry, PickyStorage, StorageError},
-    multihash::multihash_encode,
+    db::{CertificateEntry, PickyStorage, StorageError, SCHEMA_LAST_VERSION},
 };
 use snafu::Snafu;
 use std::{
     fs::File,
     io::{Read, Write},
+    path::Path,
 };
 
 #[derive(Debug, Snafu)]
@@ -71,11 +72,15 @@ where
     }
 }
 
-const DEFAULT_FILEBASE_PATH: &str = "database/";
-const REPO_CERTIFICATE: &str = "CertificateStore/";
-const REPO_KEY: &str = "KeyStore/";
-const REPO_CERTNAME: &str = "NameStore/";
-const REPO_KEYIDENTIFIER: &str = "KeyIdentifierStore/";
+const REPO_CERTIFICATE_OLD: &str = "CertificateStore/";
+
+const DEFAULT_BASE_PATH: &str = "database/";
+const REPO_CERTIFICATE: &str = "certificate_store/";
+const REPO_KEY: &str = "key_store/";
+const REPO_CERT_NAME: &str = "name_store/";
+const REPO_KEY_IDENTIFIER: &str = "key_identifier_store/";
+const REPO_HASH_LOOKUP_TABLE: &str = "hash_lookup_store/";
+const REPO_CONFIG: &str = "config_store/";
 const TXT_EXT: &str = ".txt";
 const DER_EXT: &str = ".der";
 
@@ -84,21 +89,57 @@ pub struct FileStorage {
     cert: FileRepo<Vec<u8>>,
     keys: FileRepo<Vec<u8>>,
     key_identifiers: FileRepo<String>,
+    hash_lookup: FileRepo<String>,
 }
 
 impl FileStorage {
     pub fn new(config: &ServerConfig) -> Self {
         let path = if config.save_file_path.eq("") {
-            DEFAULT_FILEBASE_PATH.to_owned()
+            DEFAULT_BASE_PATH.to_owned()
         } else {
-            format!("{}{}", &config.save_file_path, DEFAULT_FILEBASE_PATH)
+            format!("{}{}", &config.save_file_path, DEFAULT_BASE_PATH)
         };
 
+        let config_repo: FileRepo<String> =
+            FileRepo::new(path.clone(), REPO_CONFIG).expect("couldn't initialize config repo");
+        let schema_version = config_repo
+            .get_collection()
+            .expect("config collection")
+            .into_iter()
+            .find(|filename| filename.eq("schema_version.txt"))
+            .map(|version_file| {
+                let file_path = format!("{}{}", config_repo.folder_path, version_file);
+                let version = std::fs::read_to_string(file_path).expect("read schema version file");
+                version.parse::<u8>().expect("parse schema version")
+            });
+        match schema_version {
+            None => {
+                if Path::new(&format!("{}{}", DEFAULT_BASE_PATH, REPO_CERTIFICATE_OLD)).exists() {
+                    // v0 schema, unsupported for file backend
+                    panic!("detected schema version 0 that isn't supported anymore by file backend");
+                } else {
+                    // fresh new database, insert last schema version
+                    config_repo
+                        .insert("schema_version.txt", &SCHEMA_LAST_VERSION.to_string())
+                        .expect("insert schema version");
+                }
+            }
+            Some(SCHEMA_LAST_VERSION) => {
+                // supported schema version, we're cool.
+            }
+            Some(unsupported) => {
+                panic!("unsupported schema version: {}", unsupported);
+            }
+        }
+
         FileStorage {
-            name: FileRepo::new(path.clone(), REPO_CERTNAME).expect("couldn't initialize name repo"),
+            name: FileRepo::new(path.clone(), REPO_CERT_NAME).expect("couldn't initialize name repo"),
             cert: FileRepo::new(path.clone(), REPO_CERTIFICATE).expect("couldn't initialize cert repo"),
             keys: FileRepo::new(path.clone(), REPO_KEY).expect("couldn't initialize keys repo"),
-            key_identifiers: FileRepo::new(path, REPO_KEYIDENTIFIER).expect("couldn't initialize key identifiers repo"),
+            key_identifiers: FileRepo::new(path.clone(), REPO_KEY_IDENTIFIER)
+                .expect("couldn't initialize key identifiers repo"),
+            hash_lookup: FileRepo::new(path, REPO_HASH_LOOKUP_TABLE)
+                .expect("couldn't initialize hash lookup table repo"),
         }
     }
 
@@ -144,26 +185,45 @@ impl PickyStorage for FileStorage {
         let key_identifier = entry.key_identifier;
         let key = entry.key;
 
-        let cert_hash = multihash_encode(&cert).map_err(|e| FileStorageError::Other {
+        let addressing_hash = encode_to_canonical_address(&cert).map_err(|e| FileStorageError::Other {
             description: format!("couldn't hash certificate der: {}", e),
         })?;
 
+        let alternative_addresses = encode_to_alternative_addresses(&cert).map_err(|e| FileStorageError::Other {
+            description: format!("couldn't encode alternative addresses: {}", e),
+        })?;
+
         self.name
-            .insert(&format!("{}{}", name.replace(" ", "_"), TXT_EXT), &cert_hash)?;
+            .insert(&format!("{}{}", name.replace(" ", "_"), TXT_EXT), &addressing_hash)?;
+        self.cert
+            .insert(&format!("{}{}", addressing_hash, DER_EXT), &cert.to_vec())?;
+        self.key_identifiers
+            .insert(&format!("{}{}", key_identifier, TXT_EXT), &addressing_hash)?;
 
-        self.cert.insert(&format!("{}{}", cert_hash, DER_EXT), &cert.to_vec())?;
-
-        if let Some(key) = key {
-            self.keys.insert(&format!("{}{}", cert_hash, DER_EXT), &key.to_vec())?;
+        for alternative_address in alternative_addresses.into_iter() {
+            self.hash_lookup
+                .insert(&format!("{}{}", alternative_address, TXT_EXT), &addressing_hash)?;
         }
 
-        self.key_identifiers
-            .insert(&format!("{}{}", key_identifier, TXT_EXT), &cert_hash)?;
+        if let Some(key) = key {
+            self.keys
+                .insert(&format!("{}{}", addressing_hash, DER_EXT), &key.to_vec())?;
+        }
 
         Ok(())
     }
 
-    fn get_hash_by_name(&self, name: &str) -> Result<String, StorageError> {
+    fn get_cert_by_addressing_hash(&self, hash: &str) -> Result<Vec<u8>, StorageError> {
+        let cert = self.h_get(hash, &self.cert, "Cert")?;
+        Ok(cert)
+    }
+
+    fn get_key_by_addressing_hash(&self, hash: &str) -> Result<Vec<u8>, StorageError> {
+        let key = self.h_get(hash, &self.keys, "Key")?;
+        Ok(key)
+    }
+
+    fn get_addressing_hash_by_name(&self, name: &str) -> Result<String, StorageError> {
         let name = format!("{}{}", name, TXT_EXT).replace(" ", "_");
         let file = self
             .name
@@ -174,28 +234,12 @@ impl PickyStorage for FileStorage {
                 description: format!("'{}' not found", name),
             })?;
         let file_path = format!("{}{}", self.name.folder_path, file);
-
-        let hash = std::fs::read_to_string(file_path).map_err(|e| FileStorageError::Other {
+        Ok(std::fs::read_to_string(file_path).map_err(|e| FileStorageError::Other {
             description: format!("error reading file '{}': {}", file, e),
-        })?;
-        Ok(hash)
+        })?)
     }
 
-    fn get_cert_by_hash(&self, hash: &str) -> Result<Vec<u8>, StorageError> {
-        let cert = self.h_get(hash, &self.cert, "Cert")?;
-        Ok(cert)
-    }
-
-    fn get_key_by_hash(&self, hash: &str) -> Result<Vec<u8>, StorageError> {
-        let key = self.h_get(hash, &self.keys, "Key")?;
-        Ok(key)
-    }
-
-    fn get_key_identifier_by_hash(&self, _: &str) -> Result<String, StorageError> {
-        unimplemented!()
-    }
-
-    fn get_hash_by_key_identifier(&self, key_identifier: &str) -> Result<String, StorageError> {
+    fn get_addressing_hash_by_key_identifier(&self, key_identifier: &str) -> Result<String, StorageError> {
         let key_identifier = format!("{}{}", key_identifier, TXT_EXT);
         let file = self
             .key_identifiers
@@ -206,10 +250,24 @@ impl PickyStorage for FileStorage {
                 description: format!("'{}' not found", key_identifier),
             })?;
         let file_path = format!("{}{}", self.key_identifiers.folder_path, file);
-
-        let hash = std::fs::read_to_string(file_path).map_err(|e| FileStorageError::Other {
+        Ok(std::fs::read_to_string(file_path).map_err(|e| FileStorageError::Other {
             description: format!("error reading file '{}': {}", file, e),
-        })?;
-        Ok(hash)
+        })?)
+    }
+
+    fn lookup_addressing_hash(&self, lookup_key: &str) -> Result<String, StorageError> {
+        let lookup_key_file = format!("{}{}", lookup_key, TXT_EXT);
+        let file = self
+            .hash_lookup
+            .get_collection()?
+            .into_iter()
+            .find(|filename| filename.eq(&lookup_key_file))
+            .ok_or_else(|| FileStorageError::Other {
+                description: format!("'{}' not found", lookup_key_file),
+            })?;
+        let file_path = format!("{}{}", self.hash_lookup.folder_path, file);
+        Ok(std::fs::read_to_string(file_path).map_err(|e| FileStorageError::Other {
+            description: format!("error reading file '{}': {}", file, e),
+        })?)
     }
 }

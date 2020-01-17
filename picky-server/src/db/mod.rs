@@ -12,6 +12,8 @@ use crate::{
 };
 use snafu::Snafu;
 
+pub const SCHEMA_LAST_VERSION: u8 = 1;
+
 #[derive(Debug, Snafu)]
 pub enum StorageError {
     #[snafu(display("mongo storage error: {}", source))]
@@ -63,9 +65,9 @@ pub struct CertificateEntry {
 pub trait PickyStorage: Send + Sync {
     fn health(&self) -> Result<(), StorageError>;
     fn store(&self, entry: CertificateEntry) -> Result<(), StorageError>;
-    fn get_hash_by_name(&self, name: &str) -> Result<String, StorageError>;
-    fn get_cert_by_hash(&self, hash: &str) -> Result<Vec<u8>, StorageError>;
-    fn get_key_by_hash(&self, hash: &str) -> Result<Vec<u8>, StorageError>;
-    fn get_key_identifier_by_hash(&self, hash: &str) -> Result<String, StorageError>;
-    fn get_hash_by_key_identifier(&self, key_identifier: &str) -> Result<String, StorageError>;
+    fn get_cert_by_addressing_hash(&self, hash: &str) -> Result<Vec<u8>, StorageError>;
+    fn get_key_by_addressing_hash(&self, hash: &str) -> Result<Vec<u8>, StorageError>;
+    fn get_addressing_hash_by_name(&self, name: &str) -> Result<String, StorageError>;
+    fn get_addressing_hash_by_key_identifier(&self, key_identifier: &str) -> Result<String, StorageError>;
+    fn lookup_addressing_hash(&self, lookup_key: &str) -> Result<String, StorageError>;
 }

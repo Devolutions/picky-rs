@@ -1,11 +1,11 @@
 use crate::{
+    addressing::{convert_to_canonical_base, CANONICAL_HASH},
     configuration::ServerConfig,
     db::{get_storage, BoxedPickyStorage, CertificateEntry, PickyStorage},
     http::{
         authorization::{check_authorization, Authorized, CsrClaims},
         utils::SyncRequestUtil,
     },
-    multihash::*,
     picky_controller::Picky,
 };
 use picky::{
@@ -392,16 +392,16 @@ fn sign_certificate(
     storage: &dyn PickyStorage,
 ) -> Result<Cert, String> {
     let ca_hash = storage
-        .get_hash_by_name(ca_name)
+        .get_addressing_hash_by_name(ca_name)
         .map_err(|e| format!("couldn't fetch CA: {}", e))?;
 
     let ca_cert_der = storage
-        .get_cert_by_hash(&ca_hash)
+        .get_cert_by_addressing_hash(&ca_hash)
         .map_err(|e| format!("couldn't get CA cert der: {}", e))?;
     let ca_cert = Cert::from_der(&ca_cert_der).map_err(|e| format!("couldn't deserialize CA cert: {}", e))?;
 
     let ca_pk_der = storage
-        .get_key_by_hash(&ca_hash)
+        .get_key_by_addressing_hash(&ca_hash)
         .map_err(|e| format!("couldn't fetch CA private key: {}", e))?;
     let ca_pk = Picky::parse_pk_from_magic_der(&ca_pk_der).map_err(|e| e.to_string())?;
 
@@ -442,17 +442,21 @@ fn sign_certificate(
 fn get_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse) {
     res.status(StatusCode::BAD_REQUEST);
 
-    let hash = unwrap_opt!(req.captures().get("multihash"), "multihash is missing");
+    let addressing_hash_any_base = unwrap_opt!(req.captures().get("multihash"), "multihash is missing");
+    let (addressing_hash, hash) = saphir_try!(convert_to_canonical_base(addressing_hash_any_base));
+    let canonical_address = if hash == CANONICAL_HASH {
+        addressing_hash
+    } else {
+        let converted = saphir_try!(controller_data.storage.lookup_addressing_hash(&addressing_hash));
+        info!("converted cert address {} -> {}", addressing_hash_any_base, converted);
+        converted
+    };
 
-    let cert_der = match controller_data.storage.get_cert_by_hash(hash) {
+    let cert_der = match controller_data.storage.get_cert_by_addressing_hash(&canonical_address) {
         Ok(cert_der) => cert_der,
         Err(e) => {
-            info!(
-                "couldn't fetch certificate using hash {}: {}. Trying again assuming sha256.",
-                hash, e
-            );
-            let multihash = saphir_try!(sha256_to_multihash(hash));
-            saphir_try!(controller_data.storage.get_cert_by_hash(&multihash))
+            error!("couldn't fetch certificate using hash {}: {}", canonical_address, e);
+            return;
         }
     };
 
@@ -488,11 +492,11 @@ fn get_default_chain(controller_data: &ControllerData, _: &SyncRequest, res: &mu
 
 fn find_ca_chain(storage: &dyn PickyStorage, ca_name: &str) -> Result<Vec<String>, String> {
     let ca_hash = storage
-        .get_hash_by_name(ca_name)
+        .get_addressing_hash_by_name(ca_name)
         .map_err(|e| format!("couldn't fetch CA hash id for {}: {}", ca_name, e))?;
 
     let mut cert_der = storage
-        .get_cert_by_hash(&ca_hash)
+        .get_cert_by_addressing_hash(&ca_hash)
         .map_err(|e| format!("couldn't fetch CA certificate der: {}", e))?;
     let mut chain = vec![to_pem("CERTIFICATE", &cert_der)];
     let mut current_key_id = String::default();
@@ -511,12 +515,12 @@ fn find_ca_chain(storage: &dyn PickyStorage, ca_name: &str) -> Result<Vec<String
             break;
         }
 
-        let hash = storage
-            .get_hash_by_key_identifier(&parent_key_id)
+        let hash_address = storage
+            .get_addressing_hash_by_key_identifier(&parent_key_id)
             .map_err(|e| format!("couldn't fetch hash: {}", e))?;
 
         cert_der = storage
-            .get_cert_by_hash(&hash)
+            .get_cert_by_addressing_hash(&hash_address)
             .map_err(|e| format!("couldn't fetch certificate der: {}", e))?;
 
         chain.push(to_pem("CERTIFICATE", &cert_der));
@@ -532,7 +536,7 @@ fn find_ca_chain(storage: &dyn PickyStorage, ca_name: &str) -> Result<Vec<String
 fn generate_root_ca(config: &ServerConfig, storage: &dyn PickyStorage) -> Result<bool, String> {
     let name = format!("{} Root CA", config.realm);
 
-    if let Ok(certs) = storage.get_hash_by_name(&name) {
+    if let Ok(certs) = storage.get_addressing_hash_by_name(&name) {
         if !certs.is_empty() {
             // already exists
             return Ok(false);
@@ -572,20 +576,20 @@ fn generate_intermediate_ca(config: &ServerConfig, storage: &dyn PickyStorage) -
     let root_name = format!("{} Root CA", config.realm);
     let intermediate_name = format!("{} Authority", config.realm);
 
-    if let Ok(certs) = storage.get_hash_by_name(&intermediate_name) {
+    if let Ok(certs) = storage.get_addressing_hash_by_name(&intermediate_name) {
         if !certs.is_empty() {
             // already exists
             return Ok(false);
         }
     }
 
-    let (root_cert_der, root_key_der) = match storage.get_hash_by_name(&root_name) {
+    let (root_cert_der, root_key_der) = match storage.get_addressing_hash_by_name(&root_name) {
         Ok(root_hash) => (
             storage
-                .get_cert_by_hash(&root_hash)
+                .get_cert_by_addressing_hash(&root_hash)
                 .map_err(|e| format!("couldn't fetch root CA: {}", e))?,
             storage
-                .get_key_by_hash(&root_hash)
+                .get_key_by_addressing_hash(&root_hash)
                 .map_err(|e| format!("couldn't fetch root CA private key: {}", e))?,
         ),
         Err(e) => {
