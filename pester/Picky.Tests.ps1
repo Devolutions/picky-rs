@@ -12,7 +12,7 @@ param(
 . "$PSScriptRoot/Private/DerToPem.ps1"
 . "$PSScriptRoot/Private/GenerateCsrDer.ps1"
 . "$PSScriptRoot/Private/PemToDer.ps1"
-. "$PSScriptRoot/Private/SHA256.ps1"
+. "$PSScriptRoot/Private/Hashing.ps1"
 . "$PSScriptRoot/Private/ToCert.ps1"
 
 $picky_url = "http://127.0.0.1:12345"
@@ -217,7 +217,7 @@ Describe 'picky-server REST API tests' {
         $response.StatusCode | Should -Be 400
     }
 
-    function SignCertAndGetHash {
+    function SignCertAndGetDer {
         $csr_der = GenerateCsrDer "CN=test.${picky_realm}"
         $csr_base64 = [Convert]::ToBase64String($csr_der)
 
@@ -232,13 +232,12 @@ Describe 'picky-server REST API tests' {
             -Body $csr_base64
         $cert_der = CheckSignResponse $response
 
-        $hash = Get-HashFromByte($cert_der)
-
-        return $hash
+        return $cert_der
     }
 
-    It 'get cert in binary with sha256' {
-        $hash = SignCertAndGetHash
+    It 'fetch cert in binary with upper hex-encoded sha1 address' {
+        $cert_der = SignCertAndGetDer
+        $hash = HexSha1Hash $cert_der
 
         $headers = @{
             "Accept-Encoding" = "binary"
@@ -262,8 +261,35 @@ Describe 'picky-server REST API tests' {
         }
     }
 
-    It 'get cert in base64 with sha256' {
-        $hash = SignCertAndGetHash
+    It 'fetch cert in binary with upper hex-encoded sha256 address' {
+        $cert_der = SignCertAndGetDer
+        $hash = HexSha256Hash $cert_der
+
+        $headers = @{
+            "Accept-Encoding" = "binary"
+            "Accept" = "application/pkix-cert"
+        }
+
+        if ($SavePickyCertificates) {
+            $response = Invoke-WebRequest `
+                -Uri "$picky_url/cert/$hash" `
+                -Method GET `
+                -Headers $headers
+            $response.StatusCode | Should -Be 200
+            DerToCert $response.Content
+        } else {
+            {
+                Invoke-RestMethod `
+                    -Uri "$picky_url/cert/$hash" `
+                    -Method GET `
+                    -Headers $headers
+            } | Should -Throw
+        }
+    }
+
+    It 'fetch cert in base64 with upper hex-encoded sha256 address' {
+        $cert_der = SignCertAndGetDer
+        $hash = HexSha256Hash $cert_der
 
         $headers = @{
             "Accept-Encoding" = "base64"
@@ -288,8 +314,9 @@ Describe 'picky-server REST API tests' {
         }
     }
 
-    It 'get cert in PEM with sha256' {
-        $hash = SignCertAndGetHash
+    It 'fetch cert in PEM with upper hex-encoded sha256 address' {
+        $cert_der = SignCertAndGetDer
+        $hash = HexSha256Hash $cert_der
 
         $headers = @{
             "Accept" = "application/x-pem-file"
