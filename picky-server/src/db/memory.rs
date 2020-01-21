@@ -1,6 +1,6 @@
 use crate::{
+    addressing::{encode_to_alternative_addresses, encode_to_canonical_address},
     db::{CertificateEntry, PickyStorage, StorageError},
-    multihash::multihash_encode,
 };
 use snafu::Snafu;
 use std::{
@@ -53,6 +53,7 @@ pub struct MemoryStorage {
     cert: MemoryRepository<Vec<u8>>,
     keys: MemoryRepository<Vec<u8>>,
     key_identifiers: MemoryRepository<String>,
+    hash_lookup: MemoryRepository<String>,
 }
 
 impl MemoryStorage {
@@ -72,78 +73,81 @@ impl PickyStorage for MemoryStorage {
         let key_identifier = entry.key_identifier;
         let key = entry.key;
 
-        let cert_hash = multihash_encode(&cert).map_err(|e| MemoryStorageError::Other {
+        let addressing_hash = encode_to_canonical_address(&cert).map_err(|e| MemoryStorageError::Other {
             description: format!("couldn't hash certificate: {}", e),
         })?;
 
-        self.name.insert(name, cert_hash.clone());
-        self.cert.insert(cert_hash.clone(), cert);
-        if let Some(key) = key {
-            self.keys.insert(cert_hash.clone(), key);
+        let alternative_addresses = encode_to_alternative_addresses(&cert).map_err(|e| MemoryStorageError::Other {
+            description: format!("couldn't encode alternative addresses: {}", e),
+        })?;
+
+        self.name.insert(name, addressing_hash.clone());
+        self.cert.insert(addressing_hash.clone(), cert);
+        self.key_identifiers.insert(key_identifier, addressing_hash.clone());
+
+        for alternative_address in alternative_addresses.into_iter() {
+            self.hash_lookup.insert(alternative_address, addressing_hash.clone());
         }
-        self.key_identifiers.insert(key_identifier, cert_hash);
+
+        if let Some(key) = key {
+            self.keys.insert(addressing_hash, key);
+        }
 
         Ok(())
     }
 
-    fn get_hash_by_name(&self, name: &str) -> Result<String, StorageError> {
-        let hash = self
-            .name
-            .get_collection()
-            .get(name)
-            .cloned()
-            .ok_or_else(|| MemoryStorageError::Other {
-                description: format!("hash not found using name {}", name),
-            })?;
-        Ok(hash)
-    }
-
-    fn get_cert_by_hash(&self, hash: &str) -> Result<Vec<u8>, StorageError> {
-        let cert = self
+    fn get_cert_by_addressing_hash(&self, hash: &str) -> Result<Vec<u8>, StorageError> {
+        Ok(self
             .cert
             .get_collection()
             .get(hash)
             .cloned()
             .ok_or_else(|| MemoryStorageError::Other {
                 description: "cert not found".to_owned(),
-            })?;
-        Ok(cert)
+            })?)
     }
 
-    fn get_key_by_hash(&self, hash: &str) -> Result<Vec<u8>, StorageError> {
-        let key = self
+    fn get_key_by_addressing_hash(&self, hash: &str) -> Result<Vec<u8>, StorageError> {
+        Ok(self
             .keys
             .get_collection()
             .get(hash)
             .cloned()
             .ok_or_else(|| MemoryStorageError::Other {
                 description: "key not found".to_owned(),
-            })?;
-        Ok(key)
+            })?)
     }
 
-    fn get_key_identifier_by_hash(&self, hash: &str) -> Result<String, StorageError> {
-        let key_identifier = self
-            .key_identifiers
+    fn get_addressing_hash_by_name(&self, name: &str) -> Result<String, StorageError> {
+        Ok(self
+            .name
             .get_collection()
-            .keys()
-            .find(|key| hash.eq(key.as_str()))
+            .get(name)
             .cloned()
             .ok_or_else(|| MemoryStorageError::Other {
-                description: "key identifier not found".to_owned(),
-            })?;
-        Ok(key_identifier)
+                description: format!("hash not found using name {}", name),
+            })?)
     }
 
-    fn get_hash_by_key_identifier(&self, key_identifier: &str) -> Result<String, StorageError> {
-        let hash = self
+    fn get_addressing_hash_by_key_identifier(&self, key_identifier: &str) -> Result<String, StorageError> {
+        Ok(self
             .key_identifiers
             .get_collection()
             .get(key_identifier)
             .cloned()
             .ok_or_else(|| MemoryStorageError::Other {
                 description: "hash not found".to_owned(),
-            })?;
-        Ok(hash)
+            })?)
+    }
+
+    fn lookup_addressing_hash(&self, lookup_key: &str) -> Result<String, StorageError> {
+        Ok(self
+            .hash_lookup
+            .get_collection()
+            .get(lookup_key)
+            .cloned()
+            .ok_or_else(|| MemoryStorageError::Other {
+                description: "hash not found".to_owned(),
+            })?)
     }
 }

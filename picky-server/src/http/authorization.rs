@@ -77,10 +77,10 @@ mod tests {
     use super::*;
     use crate::configuration::BackendType;
     use http::{request, Method};
-    use picky::signature::SignatureHashType;
     use picky::{
         key::{PrivateKey, PublicKey},
         pem::Pem,
+        signature::SignatureHashType,
     };
 
     fn get_private_key_1() -> PrivateKey {

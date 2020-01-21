@@ -19,6 +19,14 @@ pub type CertificateModel = Model<Bson>;
 pub type CertificateStoreRepository = MongoRepository<CertificateModel>;
 pub const CERTIFICATE_COLLECTION_NAME: &str = "certificate_store";
 
+pub type ConfigModel = Model<Bson>;
+pub type ConfigStoreRepository = MongoRepository<ConfigModel>;
+pub const CONFIG_COLLECTION_NAME: &str = "config";
+
+pub type HashLookupTableModel = Model<String>;
+pub type HashLookupTableStoreRepository = MongoRepository<HashLookupTableModel>;
+pub const HASH_LOOKUP_TABLE_COLLECTION_NAME: &str = "hash_lookup_table";
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Model<T> {
     #[serde(rename = "_id")]

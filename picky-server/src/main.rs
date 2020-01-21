@@ -8,10 +8,10 @@ extern crate log;
 #[macro_use]
 mod macros;
 
+mod addressing;
 mod configuration;
 mod db;
 mod http;
-mod multihash;
 mod picky_controller;
 
 use crate::{configuration::ServerConfig, http::http_server::HttpServer};
