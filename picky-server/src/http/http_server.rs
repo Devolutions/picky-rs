@@ -22,7 +22,7 @@ impl HttpServer {
 
     pub fn run(&self) {
         if let Err(e) = self.server.run() {
-            error!("{}", e);
+            log::error!("{}", e);
         }
     }
 }

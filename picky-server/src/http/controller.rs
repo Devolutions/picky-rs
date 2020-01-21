@@ -7,6 +7,7 @@ use crate::{
         utils::SyncRequestUtil,
     },
     picky_controller::Picky,
+    utils::GreedyError,
 };
 use picky::{
     pem::{parse_pem, to_pem, Pem},
@@ -30,7 +31,7 @@ impl ServerController {
         let storage = get_storage(&config);
 
         if !config.root_cert.is_empty() && !config.root_key.is_empty() {
-            info!("Inject Root CA provided by settings");
+            log::info!("inject Root CA provided by settings");
             if let Err(e) = inject_config_provided_cert(
                 &format!("{} Root CA", config.realm),
                 &config.root_cert,
@@ -40,18 +41,18 @@ impl ServerController {
                 return Err(format!("couldn't inject Root CA: {}", e));
             }
         } else {
-            info!("Root CA...");
+            log::info!("root CA...");
             let created =
                 generate_root_ca(&config, storage.as_ref()).map_err(|e| format!("couldn't generate root CA: {}", e))?;
             if created {
-                info!("Created");
+                log::info!("created");
             } else {
-                info!("Already exists");
+                log::info!("already exists");
             }
         }
 
         if !config.intermediate_cert.is_empty() && !config.intermediate_key.is_empty() {
-            info!("Inject Intermediate CA provided by settings");
+            log::info!("inject Intermediate CA provided by settings");
             if let Err(e) = inject_config_provided_cert(
                 &format!("{} Authority", config.realm),
                 &config.intermediate_cert,
@@ -61,13 +62,13 @@ impl ServerController {
                 return Err(format!("couldn't inject Intermediate CA: {}", e));
             }
         } else {
-            info!("Intermediate CA...");
+            log::info!("intermediate CA...");
             let created = generate_intermediate_ca(&config, storage.as_ref())
                 .map_err(|e| format!("couldn't generate intermediate CA: {}", e))?;
             if created {
-                info!("Created");
+                log::info!("created");
             } else {
-                info!("Already exists");
+                log::info!("already exists");
             }
         }
 
@@ -105,7 +106,7 @@ macro_rules! saphir_try {
         match $result {
             Ok(value) => value,
             Err(e) => {
-                error!(concat!($context, ": {}"), e);
+                log::error!(concat!($context, ": {}"), e);
                 return;
             }
         }
@@ -117,7 +118,7 @@ macro_rules! unwrap_opt {
         match $opt {
             Some(value) => value,
             None => {
-                error!($error);
+                log::error!($error);
                 return;
             }
         }
@@ -217,37 +218,7 @@ fn health(controller_data: &ControllerData, _req: &SyncRequest, res: &mut SyncRe
 fn post_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse) {
     res.status(StatusCode::BAD_REQUEST);
 
-    let request_format = saphir_try!(Format::request_format(req));
-    let cert = match request_format {
-        Format::PemFile => {
-            let pem = saphir_try!(parse_pem(req.body()), "couldn't parse pem");
-            saphir_try!(Cert::from_der(pem.data()), "(pem) couldn't deserialize certificate")
-        }
-        Format::Json => {
-            let json = saphir_try!(
-                serde_json::from_slice::<Value>(req.body()),
-                "(json) couldn't parse json"
-            );
-            let pem = saphir_try!(
-                json["certificate"]
-                    .to_string()
-                    .trim_matches('"')
-                    .replace("\\n", "\n")
-                    .parse::<Pem>(),
-                "(json) couldn't parse pem",
-            );
-            saphir_try!(Cert::from_der(pem.data()), "(json) couldn't deserialize certificate")
-        }
-        Format::PkixCertBinary => saphir_try!(Cert::from_der(req.body()), "(binary) couldn't deserialize certificate"),
-        Format::PkixCertBase64 => {
-            let der = saphir_try!(base64::decode(&req.body()), "couldn't decode base64 body");
-            saphir_try!(Cert::from_der(&der), "(base64) couldn't deserialize certificate")
-        }
-        unexpected => {
-            error!("unexpected request format: {}", unexpected);
-            return;
-        }
-    };
+    let cert = saphir_try!(extract_cert_from_request(req));
 
     let ski = hex::encode(saphir_try!(cert.subject_key_identifier(), "couldn't fetch SKI"));
 
@@ -258,7 +229,7 @@ fn post_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut Sync
     .to_string();
 
     if issuer_name != format!("{} Authority", &controller_data.config.realm) {
-        error!("this certificate was not signed by the CA of this server.");
+        log::error!("this certificate was not signed by the CA of this server.");
         return;
     }
 
@@ -275,9 +246,34 @@ fn post_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut Sync
         key_identifier: ski,
         key: None,
     }) {
-        error!("Insertion error for leaf {}: {}", subject_name, e);
+        log::error!("insertion failed for leaf {}: {}", subject_name, e);
     } else {
         res.status(StatusCode::OK);
+    }
+}
+
+fn extract_cert_from_request(req: &SyncRequest) -> Result<Cert, GreedyError> {
+    let request_format = Format::request_format(req)?;
+    match request_format {
+        Format::PemFile => {
+            let pem = parse_pem(req.body())?;
+            Ok(Cert::from_der(pem.data())?)
+        }
+        Format::Json => {
+            let json = serde_json::from_slice::<Value>(req.body())?;
+            let pem = json["certificate"]
+                .to_string()
+                .trim_matches('"')
+                .replace("\\n", "\n")
+                .parse::<Pem>()?;
+            Ok(Cert::from_der(pem.data())?)
+        }
+        Format::PkixCertBinary => Ok(Cert::from_der(req.body())?),
+        Format::PkixCertBase64 => {
+            let der = base64::decode(&req.body())?;
+            Ok(Cert::from_der(&der)?)
+        }
+        unexpected => Err(GreedyError(format!("unexpected request format: {}", unexpected))),
     }
 }
 
@@ -293,49 +289,13 @@ fn cert_signature_request(controller_data: &ControllerData, req: &SyncRequest, r
             Some(csr_claims.sub)
         }
         Err(e) => {
-            error!("Authorization failed: {}", e);
+            log::error!("authorization failed: {}", e);
             res.status(StatusCode::UNAUTHORIZED);
             return;
         }
     };
 
-    let request_format = saphir_try!(Format::request_format(req));
-    let mut ca_name = format!("{} Authority", &controller_data.config.realm);
-    let csr = match request_format {
-        Format::PemFile => {
-            let pem = saphir_try!(parse_pem(req.body()), "couldn't parse pem");
-            saphir_try!(Csr::from_der(pem.data()), "(pem) couldn't deserialize csr")
-        }
-        Format::Json => {
-            let json = saphir_try!(
-                serde_json::from_slice::<Value>(req.body()),
-                "(json) couldn't parse json"
-            );
-
-            if let Some(ca) = json["ca"].as_str() {
-                ca_name = ca.trim_matches('"').to_owned();
-            }
-
-            let pem = saphir_try!(
-                json["csr"]
-                    .to_string()
-                    .trim_matches('"')
-                    .replace("\\n", "\n")
-                    .parse::<Pem>(),
-                "(json) couldn't parse pem",
-            );
-            saphir_try!(Csr::from_der(pem.data()), "(json) couldn't deserialize csr")
-        }
-        Format::Pkcs10Binary => saphir_try!(Csr::from_der(req.body()), "(binary) couldn't deserialize csr"),
-        Format::Pkcs10Base64 => {
-            let der = saphir_try!(base64::decode(&req.body()), "couldn't decode base64 body");
-            saphir_try!(Csr::from_der(&der), "(base64) couldn't deserialize csr")
-        }
-        unexpected => {
-            error!("unexpected request format: {}", unexpected);
-            return;
-        }
-    };
+    let csr = saphir_try!(extract_csr_from_request(req));
 
     if let Some(locked_subject_name) = locked_subject_name {
         let subject_name = unwrap_opt!(
@@ -345,9 +305,10 @@ fn cert_signature_request(controller_data: &ControllerData, req: &SyncRequest, r
         .to_string();
 
         if locked_subject_name != subject_name {
-            error!(
+            log::error!(
                 "Requested a certificate with an unauthorized subject name: {}, expected: {}",
-                subject_name, locked_subject_name
+                subject_name,
+                locked_subject_name
             );
             res.status(StatusCode::UNAUTHORIZED);
             return;
@@ -356,7 +317,7 @@ fn cert_signature_request(controller_data: &ControllerData, req: &SyncRequest, r
 
     // Sign CSR
     let signed_cert = saphir_try!(sign_certificate(
-        &ca_name,
+        &format!("{} Authority", &controller_data.config.realm),
         csr,
         &controller_data.config,
         controller_data.storage.as_ref()
@@ -377,12 +338,37 @@ fn cert_signature_request(controller_data: &ControllerData, req: &SyncRequest, r
             res.body(base64::encode(&der));
         }
         unexpected => {
-            error!("unexpected response format: {}", unexpected);
+            log::error!("unexpected response format: {}", unexpected);
             return;
         }
     }
 
     res.status(StatusCode::OK);
+}
+
+fn extract_csr_from_request(req: &SyncRequest) -> Result<Csr, GreedyError> {
+    let request_format = Format::request_format(req)?;
+    match request_format {
+        Format::PemFile => {
+            let pem = parse_pem(req.body())?;
+            Ok(Csr::from_der(pem.data())?)
+        }
+        Format::Json => {
+            let json = serde_json::from_slice::<Value>(req.body())?;
+            let pem = json["csr"]
+                .to_string()
+                .trim_matches('"')
+                .replace("\\n", "\n")
+                .parse::<Pem>()?;
+            Ok(Csr::from_der(pem.data())?)
+        }
+        Format::Pkcs10Binary => Ok(Csr::from_der(req.body())?),
+        Format::Pkcs10Base64 => {
+            let der = base64::decode(&req.body())?;
+            Ok(Csr::from_der(&der)?)
+        }
+        unexpected => Err(GreedyError(format!("unexpected request format: {}", unexpected))),
+    }
 }
 
 fn sign_certificate(
@@ -448,14 +434,14 @@ fn get_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncR
         addressing_hash
     } else {
         let converted = saphir_try!(controller_data.storage.lookup_addressing_hash(&addressing_hash));
-        info!("converted cert address {} -> {}", addressing_hash_any_base, converted);
+        log::info!("converted cert address {} -> {}", addressing_hash_any_base, converted);
         converted
     };
 
     let cert_der = match controller_data.storage.get_cert_by_addressing_hash(&canonical_address) {
         Ok(cert_der) => cert_der,
         Err(e) => {
-            error!("couldn't fetch certificate using hash {}: {}", canonical_address, e);
+            log::error!("couldn't fetch certificate using hash {}: {}", canonical_address, e);
             return;
         }
     };
@@ -472,7 +458,7 @@ fn get_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncR
             res.body(base64::encode(&cert_der));
         }
         unexpected => {
-            error!("unexpected response format: {}", unexpected);
+            log::error!("unexpected response format: {}", unexpected);
             return;
         }
     }

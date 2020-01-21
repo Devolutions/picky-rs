@@ -163,7 +163,7 @@ impl Picky {
         use picky::pem::Pem;
         use rand::prelude::*;
 
-        warn!(
+        log::warn!(
             "FETCHING A PRE-GENERATED PRIVATE KEY. \
              THIS BUILD IS FOR DEBUG PURPOSE ONLY, DON'T USE THIS BUILD IN PRODUCTION."
         );
@@ -182,11 +182,11 @@ impl Picky {
         let choice: usize = random();
         let pk_pem_str = match bits {
             2048 => {
-                info!("Selected pk number {} from RSA_2048_POOL", choice % RSA_2048_POOL.len());
+                log::info!("selected pk number {} from RSA_2048_POOL", choice % RSA_2048_POOL.len());
                 RSA_2048_POOL[choice % RSA_2048_POOL.len()]
             }
             4096 => {
-                info!("Selected pk number {} from RSA_4096_POOL", choice % RSA_4096_POOL.len());
+                log::info!("selected pk number {} from RSA_4096_POOL", choice % RSA_4096_POOL.len());
                 RSA_4096_POOL[choice % RSA_4096_POOL.len()]
             }
             num_bits => {

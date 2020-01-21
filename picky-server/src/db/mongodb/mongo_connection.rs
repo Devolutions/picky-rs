@@ -1,3 +1,4 @@
+use bson::{bson, doc};
 use mongodb::{
     common::{ReadMode, ReadPreference},
     connstring,

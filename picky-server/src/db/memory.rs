@@ -42,7 +42,7 @@ where
             .insert(key, value)
             .is_some()
         {
-            info!("Key was updated because it was already stored");
+            log::info!("Key was updated because it was already stored");
         }
     }
 }

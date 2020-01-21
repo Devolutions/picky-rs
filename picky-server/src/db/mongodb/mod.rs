@@ -18,7 +18,7 @@ use crate::{
         CertificateEntry, PickyStorage, StorageError, SCHEMA_LAST_VERSION,
     },
 };
-use bson::{from_bson, spec::BinarySubtype, Bson};
+use bson::{bson, doc, from_bson, spec::BinarySubtype, Bson};
 use picky::x509::Cert;
 use snafu::Snafu;
 use std::{collections::HashMap, convert::TryFrom};
@@ -131,7 +131,7 @@ impl MongoStorage {
         {
             match schema_version.value {
                 Bson::I32(supported) if supported == i32::from(SCHEMA_LAST_VERSION) => {
-                    info!("detected database using supported v{} schema", supported);
+                    log::info!("detected database using supported v{} schema", supported);
                 }
                 Bson::I32(unsupported) => {
                     panic!("unsupported schema version: v{}", unsupported);
@@ -150,7 +150,7 @@ impl MongoStorage {
                 .expect("count number of certificates in store");
 
             if certs_count != 0 {
-                info!("detected v0 schema: migrate database to v{}...", SCHEMA_LAST_VERSION);
+                log::info!("detected v0 schema: migrate database to v{}...", SCHEMA_LAST_VERSION);
 
                 let key_identifier_collection = storage
                     .key_identifier_store
@@ -211,9 +211,9 @@ impl MongoStorage {
                         .expect("couldn't store certificate (migration from v0 schema)");
                 }
 
-                info!("migrated to v{} successfully!", SCHEMA_LAST_VERSION);
+                log::info!("migrated to v{} successfully!", SCHEMA_LAST_VERSION);
             } else {
-                info!("fresh new database using v{} schema", SCHEMA_LAST_VERSION);
+                log::info!("fresh new database using v{} schema", SCHEMA_LAST_VERSION);
             }
 
             // insert last schema version

@@ -1,18 +1,9 @@
-#[macro_use]
-extern crate clap;
-#[macro_use(bson, doc)]
-extern crate bson;
-#[macro_use]
-extern crate log;
-
-#[macro_use]
-mod macros;
-
 mod addressing;
 mod configuration;
 mod db;
 mod http;
 mod picky_controller;
+mod utils;
 
 use crate::{configuration::ServerConfig, http::http_server::HttpServer};
 use log::LevelFilter;
@@ -22,9 +13,9 @@ fn main() {
 
     init_logs(&conf);
 
-    info!("Building http server ...");
+    log::info!("building http server ...");
     let http_server = HttpServer::new(conf);
-    info!("Starting http server ...");
+    log::info!("starting http server ...");
     http_server.run();
 }
 

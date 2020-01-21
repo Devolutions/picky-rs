@@ -80,7 +80,7 @@ impl ServerConfig {
     }
 
     fn load_cli(&mut self) {
-        let yaml = load_yaml!("cli.yml");
+        let yaml = clap::load_yaml!("cli.yml");
         let app = App::from_yaml(yaml);
         let matches = app.get_matches();
 

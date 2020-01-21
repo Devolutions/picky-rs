@@ -1,4 +1,4 @@
-use crate::configuration::ServerConfig;
+use crate::{configuration::ServerConfig, utils::unix_epoch};
 use picky::jose::jwt::{Jwt, JwtDate, JwtValidator};
 use saphir::{header, SyncRequest};
 use serde::{Deserialize, Serialize};
@@ -63,7 +63,7 @@ pub fn check_authorization(config: &ServerConfig, req: &SyncRequest) -> Result<A
             Ok(Authorized::Token(
                 Jwt::decode(
                     auth_vec[1],
-                    &JwtValidator::strict(public_key, &JwtDate::new_with_leeway(epoch_until!(0) as i64, 10)),
+                    &JwtValidator::strict(public_key, &JwtDate::new_with_leeway(unix_epoch() as i64, 10)),
                 )
                 .map_err(|e| format!("couldn't validate json web token: {}", e))?,
             ))
@@ -75,7 +75,7 @@ pub fn check_authorization(config: &ServerConfig, req: &SyncRequest) -> Result<A
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::configuration::BackendType;
+    use crate::{configuration::BackendType, utils::unix_epoch};
     use http::{request, Method};
     use picky::{
         key::{PrivateKey, PublicKey},
@@ -100,8 +100,8 @@ mod tests {
     fn get_csr_token(private_key: &PrivateKey) -> String {
         let claims = CsrClaims {
             sub: "CoolSubject".to_owned(),
-            nbf: epoch_until!(0),
-            exp: epoch_until!(10),
+            nbf: unix_epoch(),
+            exp: unix_epoch() + 10,
         };
         let jwt = Jwt::new(SignatureHashType::RsaSha256, claims);
         jwt.encode(&private_key).expect("jwt encode")
