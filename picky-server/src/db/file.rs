@@ -1,3 +1,4 @@
+use crate::db::config::DatabaseConfig;
 use crate::{
     addressing::{encode_to_alternative_addresses, encode_to_canonical_address},
     config::Config,
@@ -80,9 +81,10 @@ const REPO_KEY: &str = "key_store/";
 const REPO_CERT_NAME: &str = "name_store/";
 const REPO_KEY_IDENTIFIER: &str = "key_identifier_store/";
 const REPO_HASH_LOOKUP_TABLE: &str = "hash_lookup_store/";
-const REPO_CONFIG: &str = "config_store/";
 const TXT_EXT: &str = ".txt";
 const DER_EXT: &str = ".der";
+
+const CONFIG_FILE_NAME: &str = "config.json";
 
 pub struct FileStorage {
     name: FileRepo<String>,
@@ -94,36 +96,28 @@ pub struct FileStorage {
 
 impl FileStorage {
     pub fn new(config: &Config) -> Self {
-        let config_repo: FileRepo<String> =
-            FileRepo::new(&config.file_backend_path, REPO_CONFIG).expect("couldn't initialize config repo");
-        let schema_version = config_repo
-            .get_collection()
-            .expect("config collection")
-            .into_iter()
-            .find(|filename| filename.eq("schema_version.txt"))
-            .map(|version_file| {
-                let file_path = config_repo.folder_path.join(version_file);
-                let version = std::fs::read_to_string(file_path).expect("read schema version file");
-                version.parse::<u8>().expect("parse schema version")
-            });
-        match schema_version {
-            None => {
-                if config.file_backend_path.join(REPO_CERTIFICATE_OLD).exists() {
-                    // v0 schema, unsupported for file backend
-                    panic!("detected schema version 0 that isn't supported anymore by file backend");
-                } else {
-                    // fresh new database, insert last schema version
-                    config_repo
-                        .insert("schema_version.txt", &SCHEMA_LAST_VERSION.to_string())
-                        .expect("insert schema version");
+        std::fs::create_dir_all(&config.file_backend_path).expect("create file backend directory");
+
+        let config_path = config.file_backend_path.join(CONFIG_FILE_NAME);
+        if config_path.exists() {
+            let json = std::fs::read_to_string(config_path).expect("read config file");
+            let db_config: DatabaseConfig = serde_json::from_str(&json).expect("decode json config");
+            match db_config.schema_version {
+                SCHEMA_LAST_VERSION => {
+                    // supported schema version, we're cool.
                 }
+                unsupported => panic!("unsupported schema version: {}", unsupported),
             }
-            Some(SCHEMA_LAST_VERSION) => {
-                // supported schema version, we're cool.
-            }
-            Some(unsupported) => {
-                panic!("unsupported schema version: {}", unsupported);
-            }
+        } else if config.file_backend_path.join(REPO_CERTIFICATE_OLD).exists() {
+            // v0 schema, unsupported for file backend
+            panic!("detected schema version 0 that isn't supported anymore by file backend");
+        } else {
+            // fresh new database, insert last schema version
+            let db_config = DatabaseConfig {
+                schema_version: SCHEMA_LAST_VERSION,
+            };
+            let json = serde_json::to_string_pretty(&db_config).expect("encode json config");
+            std::fs::write(config_path, json).expect("write json config");
         }
 
         FileStorage {

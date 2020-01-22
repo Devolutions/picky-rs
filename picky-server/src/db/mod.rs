@@ -1,3 +1,4 @@
+mod config;
 mod file;
 mod memory;
 mod mongodb;
