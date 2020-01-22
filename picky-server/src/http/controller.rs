@@ -6,20 +6,37 @@ use crate::{
         authorization::{check_authorization, Authorized, CsrClaims},
         utils::SyncRequestUtil,
     },
+    logging::build_logger_config,
     picky_controller::Picky,
     utils::{GreedyError, PathOr},
 };
+use log4rs::Handle;
 use picky::{
     pem::{parse_pem, to_pem, Pem},
     x509::{Cert, Csr},
 };
 use saphir::{Controller, ControllerDispatch, Method, StatusCode, SyncRequest, SyncResponse};
 use serde_json::{self, Value};
-use std::{borrow::Cow, fmt};
+use std::{
+    borrow::Cow,
+    fmt,
+    sync::{RwLock, RwLockReadGuard, RwLockWriteGuard},
+};
 
 struct ControllerData {
-    pub storage: BoxedPickyStorage,
-    pub config: Config,
+    storage: BoxedPickyStorage,
+    config: RwLock<Config>,
+    log_handle: Handle,
+}
+
+impl ControllerData {
+    fn read_conf(&self) -> RwLockReadGuard<Config> {
+        self.config.read().expect("config lock") // if this fail, we're basically screwed
+    }
+
+    fn write_conf(&self) -> RwLockWriteGuard<Config> {
+        self.config.write().expect("config lock") // if this fail, we're basically screwed
+    }
 }
 
 pub struct ServerController {
@@ -27,50 +44,16 @@ pub struct ServerController {
 }
 
 impl ServerController {
-    pub fn from_config(config: Config) -> Result<Self, String> {
+    pub fn new(config: Config, log_handle: Handle) -> Result<Self, String> {
         let storage = get_storage(&config);
 
-        if let Some(root_cert_key_pair) = &config.root {
-            log::info!("inject root CA provided by settings");
-            if let Err(e) = inject_config_provided_cert(
-                &format!("{} Root CA", config.realm),
-                root_cert_key_pair,
-                storage.as_ref(),
-            ) {
-                return Err(format!("couldn't inject root CA: {}", e));
-            }
-        } else {
-            log::info!("root CA...");
-            let created =
-                generate_root_ca(&config, storage.as_ref()).map_err(|e| format!("couldn't generate root CA: {}", e))?;
-            if created {
-                log::info!("created");
-            } else {
-                log::info!("already exists");
-            }
-        }
+        init_storage_from_config(storage.as_ref(), &config)?;
 
-        if let Some(intermediate_cert_key_pair) = &config.intermediate {
-            log::info!("inject intermediate CA provided by settings");
-            if let Err(e) = inject_config_provided_cert(
-                &format!("{} Authority", config.realm),
-                intermediate_cert_key_pair,
-                storage.as_ref(),
-            ) {
-                return Err(format!("couldn't inject intermediate CA: {}", e));
-            }
-        } else {
-            log::info!("intermediate CA...");
-            let created = generate_intermediate_ca(&config, storage.as_ref())
-                .map_err(|e| format!("couldn't generate intermediate CA: {}", e))?;
-            if created {
-                log::info!("created");
-            } else {
-                log::info!("already exists");
-            }
-        }
-
-        let controller_data = ControllerData { storage, config };
+        let controller_data = ControllerData {
+            storage,
+            config: RwLock::new(config),
+            log_handle,
+        };
 
         let dispatch = ControllerDispatch::new(controller_data);
 
@@ -79,6 +62,7 @@ impl ServerController {
         dispatch.add(Method::GET, "/health", health);
         dispatch.add(Method::GET, "/cert/<multihash>", get_cert);
         dispatch.add(Method::POST, "/cert", post_cert);
+        dispatch.add(Method::GET, "/reload", reload_yaml_conf);
 
         Ok(ServerController { dispatch })
     }
@@ -226,7 +210,7 @@ fn post_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut Sync
     )
     .to_string();
 
-    if issuer_name != format!("{} Authority", &controller_data.config.realm) {
+    if issuer_name != format!("{} Authority", &controller_data.read_conf().realm) {
         log::error!("this certificate was not signed by the CA of this server.");
         return;
     }
@@ -280,7 +264,7 @@ fn extract_cert_from_request(req: &SyncRequest) -> Result<Cert, GreedyError> {
 fn cert_signature_request(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse) {
     res.status(StatusCode::BAD_REQUEST);
 
-    let locked_subject_name: Option<String> = match check_authorization(&controller_data.config, req) {
+    let locked_subject_name: Option<String> = match check_authorization(&controller_data.read_conf(), req) {
         Ok(Authorized::ApiKey) => None,
         Ok(Authorized::Token(token)) => {
             let csr_claims: CsrClaims = saphir_try!(serde_json::from_value(token.into_claims()));
@@ -314,12 +298,14 @@ fn cert_signature_request(controller_data: &ControllerData, req: &SyncRequest, r
     }
 
     // Sign CSR
+    let conf = controller_data.read_conf();
     let signed_cert = saphir_try!(sign_certificate(
-        &format!("{} Authority", &controller_data.config.realm),
+        &format!("{} Authority", &conf.realm),
         csr,
-        &controller_data.config,
+        &conf,
         controller_data.storage.as_ref()
     ));
+    drop(conf); // release lock early
 
     let response_format = Format::response_format(req).unwrap_or(Format::PemFile);
     match response_format {
@@ -463,7 +449,7 @@ fn get_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncR
 
 fn get_default_chain(controller_data: &ControllerData, _: &SyncRequest, res: &mut SyncResponse) {
     res.status(StatusCode::BAD_REQUEST);
-    let ca = format!("{} Authority", &controller_data.config.realm);
+    let ca = format!("{} Authority", &controller_data.read_conf().realm);
     let chain = saphir_try!(find_ca_chain(controller_data.storage.as_ref(), &ca));
     res.body(chain.join("\n"));
     res.status(StatusCode::OK);
@@ -675,6 +661,96 @@ fn inject_config_provided_cert(
             key: Some(key_der),
         })
         .map_err(|e| format!("couldn't store certificate: {}", e))?;
+
+    Ok(())
+}
+
+// === config management === //
+
+fn reload_yaml_conf(controller_data: &ControllerData, _: &SyncRequest, res: &mut SyncResponse) {
+    match reload_yaml_conf_impl(controller_data) {
+        Ok(()) => {
+            res.body("Config reloaded successfully!");
+            res.status(StatusCode::OK);
+        }
+        Err(e) => {
+            log::error!("couldn't reload config: {}", e);
+            res.body("Couldn't reload config... See logs");
+            res.status(StatusCode::BAD_REQUEST);
+        }
+    }
+}
+
+fn reload_yaml_conf_impl(controller_data: &ControllerData) -> Result<(), String> {
+    match Config::init_yaml() {
+        Ok(new_conf) => {
+            log::info!("new config: {:#?}", new_conf);
+
+            init_storage_from_config(controller_data.storage.as_ref(), &new_conf)?;
+
+            match build_logger_config(&new_conf) {
+                Ok(logger_config) => controller_data.log_handle.set_config(logger_config),
+                Err(e) => {
+                    log::warn!("couldn't reload logger configuration: {}", e);
+                }
+            }
+
+            let mut old_conf = controller_data.write_conf();
+            if old_conf.database_url != new_conf.database_url {
+                log::warn!("'database_url' modification require service restart");
+            }
+            if old_conf.file_backend_path != new_conf.file_backend_path {
+                log::warn!("'file_backend_path' modification require service restart");
+            }
+            if old_conf.backend != new_conf.backend {
+                log::warn!("'backend' modification require service restart");
+            }
+            *old_conf = new_conf;
+
+            log::info!("reloaded successfully");
+            Ok(())
+        }
+        Err(e) => Err(format!("couldn't reload config: {}", e)),
+    }
+}
+
+fn init_storage_from_config(storage: &dyn PickyStorage, config: &Config) -> Result<(), String> {
+    log::info!("init storage from config");
+
+    if let Some(root_cert_key_pair) = &config.root {
+        log::info!("inject root CA provided by settings");
+        if let Err(e) = inject_config_provided_cert(&format!("{} Root CA", config.realm), root_cert_key_pair, storage) {
+            return Err(format!("couldn't inject root CA: {}", e));
+        }
+    } else {
+        log::info!("root CA...");
+        let created = generate_root_ca(&config, storage).map_err(|e| format!("couldn't generate root CA: {}", e))?;
+        if created {
+            log::info!("created");
+        } else {
+            log::info!("already exists");
+        }
+    }
+
+    if let Some(intermediate_cert_key_pair) = &config.intermediate {
+        log::info!("inject intermediate CA provided by settings");
+        if let Err(e) = inject_config_provided_cert(
+            &format!("{} Authority", config.realm),
+            intermediate_cert_key_pair,
+            storage,
+        ) {
+            return Err(format!("couldn't inject intermediate CA: {}", e));
+        }
+    } else {
+        log::info!("intermediate CA...");
+        let created = generate_intermediate_ca(&config, storage)
+            .map_err(|e| format!("couldn't generate intermediate CA: {}", e))?;
+        if created {
+            log::info!("created");
+        } else {
+            log::info!("already exists");
+        }
+    }
 
     Ok(())
 }

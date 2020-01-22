@@ -4,7 +4,7 @@ use picky::{
     pem::{Pem, PemError},
     x509::{certificate::CertError, csr::CsrError, Cert},
 };
-use serde::{de, ser, Serialize};
+use serde::{de, export::fmt::Debug, ser, Serialize};
 use std::{
     error::Error,
     fmt,
@@ -70,8 +70,8 @@ impl From<DecodeError> for GreedyError {
 }
 
 /// A path or something else
-#[derive(Clone)]
-pub enum PathOr<T: Clone> {
+#[derive(Clone, Debug)]
+pub enum PathOr<T: Clone + Debug> {
     Path(PathBuf),
     Some(T),
 }

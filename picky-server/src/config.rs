@@ -70,7 +70,7 @@ fn parse_level_filter(s: &str) -> LevelFilter {
     }
 }
 
-#[derive(PartialEq, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum BackendType {
     MongoDb,
@@ -95,13 +95,13 @@ impl From<&str> for BackendType {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CertKeyPair {
     pub cert: PathOr<Cert>,
     pub key: PathOr<PrivateKey>,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Config {
     pub api_key: String,
     #[serde(default = "default_picky_realm")]
@@ -147,7 +147,7 @@ impl Default for Config {
 }
 
 impl Config {
-    pub fn new() -> Self {
+    pub fn startup_init() -> Self {
         let mut config = if let Ok(yaml_conf) = std::fs::read_to_string(YAML_CONF_PATH) {
             serde_yaml::from_str(&yaml_conf).expect("yaml conf")
         } else {
@@ -160,12 +160,10 @@ impl Config {
         config
     }
 
-    pub fn reload_from_yml_conf(&mut self) -> Result<(), String> {
+    pub fn init_yaml() -> Result<Self, String> {
         let yaml_conf =
             std::fs::read_to_string(YAML_CONF_PATH).map_err(|e| format!("couldn't read yaml config: {}", e))?;
-        let read_config = serde_yaml::from_str(&yaml_conf).map_err(|e| format!("invalid yaml conf: {}", e))?;
-        *self = read_config;
-        Ok(())
+        Ok(serde_yaml::from_str(&yaml_conf).map_err(|e| format!("invalid yaml conf: {}", e))?)
     }
 
     fn inject_cli(&mut self) {
