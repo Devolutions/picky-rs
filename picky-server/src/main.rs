@@ -1,15 +1,15 @@
 mod addressing;
-mod configuration;
+mod config;
 mod db;
 mod http;
 mod picky_controller;
 mod utils;
 
-use crate::{configuration::ServerConfig, http::http_server::HttpServer};
+use crate::{config::Config, http::http_server::HttpServer};
 use log::LevelFilter;
 
 fn main() {
-    let conf = ServerConfig::new();
+    let conf = Config::new();
 
     init_logs(&conf);
 
@@ -19,7 +19,7 @@ fn main() {
     http_server.run();
 }
 
-fn init_logs(config: &ServerConfig) {
+fn init_logs(config: &Config) {
     use log4rs::{
         append::console::ConsoleAppender,
         config::{Appender, Config as ConfigLog4rs, Logger, Root},
@@ -37,7 +37,7 @@ fn init_logs(config: &ServerConfig) {
         .logger(Logger::builder().build("tokio_reactor", LevelFilter::Off))
         .logger(Logger::builder().build("tokio_threadpool", LevelFilter::Off))
         .logger(Logger::builder().build("tokio_core", LevelFilter::Off))
-        .build(Root::builder().appender("stdout").build(config.level_filter()))
+        .build(Root::builder().appender("stdout").build(config.log_level))
         .expect("Unable to configure logger");
 
     if let Err(e) = log4rs::init_config(config) {

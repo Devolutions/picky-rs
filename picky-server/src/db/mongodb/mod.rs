@@ -3,7 +3,7 @@ mod mongo_repository;
 
 use crate::{
     addressing::{encode_to_alternative_addresses, encode_to_canonical_address},
-    configuration::ServerConfig,
+    config::Config,
     db::{
         mongodb::{
             mongo_connection::MongoConnection,
@@ -110,7 +110,7 @@ pub struct MongoStorage {
 }
 
 impl MongoStorage {
-    pub fn new(config: &ServerConfig) -> Self {
+    pub fn new(config: &Config) -> Self {
         let db = MongoConnection::new(&config.database_url).expect("build mongo connection");
 
         let storage = MongoStorage {

@@ -1,13 +1,13 @@
 use crate::{
     addressing::{convert_to_canonical_base, CANONICAL_HASH},
-    configuration::ServerConfig,
+    config::{CertKeyPair, Config},
     db::{get_storage, BoxedPickyStorage, CertificateEntry, PickyStorage},
     http::{
         authorization::{check_authorization, Authorized, CsrClaims},
         utils::SyncRequestUtil,
     },
     picky_controller::Picky,
-    utils::GreedyError,
+    utils::{GreedyError, PathOr},
 };
 use picky::{
     pem::{parse_pem, to_pem, Pem},
@@ -15,11 +15,11 @@ use picky::{
 };
 use saphir::{Controller, ControllerDispatch, Method, StatusCode, SyncRequest, SyncResponse};
 use serde_json::{self, Value};
-use std::fmt;
+use std::{borrow::Cow, fmt};
 
 struct ControllerData {
     pub storage: BoxedPickyStorage,
-    pub config: ServerConfig,
+    pub config: Config,
 }
 
 pub struct ServerController {
@@ -27,18 +27,17 @@ pub struct ServerController {
 }
 
 impl ServerController {
-    pub fn from_config(config: ServerConfig) -> Result<Self, String> {
+    pub fn from_config(config: Config) -> Result<Self, String> {
         let storage = get_storage(&config);
 
-        if !config.root_cert.is_empty() && !config.root_key.is_empty() {
-            log::info!("inject Root CA provided by settings");
+        if let Some(root_cert_key_pair) = &config.root {
+            log::info!("inject root CA provided by settings");
             if let Err(e) = inject_config_provided_cert(
                 &format!("{} Root CA", config.realm),
-                &config.root_cert,
-                &config.root_key,
+                root_cert_key_pair,
                 storage.as_ref(),
             ) {
-                return Err(format!("couldn't inject Root CA: {}", e));
+                return Err(format!("couldn't inject root CA: {}", e));
             }
         } else {
             log::info!("root CA...");
@@ -51,15 +50,14 @@ impl ServerController {
             }
         }
 
-        if !config.intermediate_cert.is_empty() && !config.intermediate_key.is_empty() {
-            log::info!("inject Intermediate CA provided by settings");
+        if let Some(intermediate_cert_key_pair) = &config.intermediate {
+            log::info!("inject intermediate CA provided by settings");
             if let Err(e) = inject_config_provided_cert(
                 &format!("{} Authority", config.realm),
-                &config.intermediate_cert,
-                &config.intermediate_key,
+                intermediate_cert_key_pair,
                 storage.as_ref(),
             ) {
-                return Err(format!("couldn't inject Intermediate CA: {}", e));
+                return Err(format!("couldn't inject intermediate CA: {}", e));
             }
         } else {
             log::info!("intermediate CA...");
@@ -371,12 +369,7 @@ fn extract_csr_from_request(req: &SyncRequest) -> Result<Csr, GreedyError> {
     }
 }
 
-fn sign_certificate(
-    ca_name: &str,
-    csr: Csr,
-    config: &ServerConfig,
-    storage: &dyn PickyStorage,
-) -> Result<Cert, String> {
+fn sign_certificate(ca_name: &str, csr: Csr, config: &Config, storage: &dyn PickyStorage) -> Result<Cert, String> {
     let ca_hash = storage
         .get_addressing_hash_by_name(ca_name)
         .map_err(|e| format!("couldn't fetch CA: {}", e))?;
@@ -397,7 +390,7 @@ fn sign_certificate(
         .ok_or_else(|| "couldn't find signed cert subject common name")?
         .to_string();
 
-    let signed_cert = Picky::generate_leaf_from_csr(csr, &ca_cert, &ca_pk, config.key_config, &dns_name)
+    let signed_cert = Picky::generate_leaf_from_csr(csr, &ca_cert, &ca_pk, config.signing_algorithm, &dns_name)
         .map_err(|e| format!("couldn't generate leaf certificate: {}", e))?;
 
     if config.save_certificate {
@@ -519,7 +512,7 @@ fn find_ca_chain(storage: &dyn PickyStorage, ca_name: &str) -> Result<Vec<String
 
 // === generate root CA === //
 
-fn generate_root_ca(config: &ServerConfig, storage: &dyn PickyStorage) -> Result<bool, String> {
+fn generate_root_ca(config: &Config, storage: &dyn PickyStorage) -> Result<bool, String> {
     let name = format!("{} Root CA", config.realm);
 
     if let Ok(certs) = storage.get_addressing_hash_by_name(&name) {
@@ -530,7 +523,7 @@ fn generate_root_ca(config: &ServerConfig, storage: &dyn PickyStorage) -> Result
     }
 
     let pk = Picky::generate_private_key(4096).map_err(|e| format!("couldn't generate private key: {}", e))?;
-    let root = Picky::generate_root(&name, &pk, config.key_config)
+    let root = Picky::generate_root(&name, &pk, config.signing_algorithm)
         .map_err(|e| format!("couldn't generate root certificate: {}", e))?;
     let ski = root
         .subject_key_identifier()
@@ -558,7 +551,7 @@ fn generate_root_ca(config: &ServerConfig, storage: &dyn PickyStorage) -> Result
 
 // === generate intermediate CA === //
 
-fn generate_intermediate_ca(config: &ServerConfig, storage: &dyn PickyStorage) -> Result<bool, String> {
+fn generate_intermediate_ca(config: &Config, storage: &dyn PickyStorage) -> Result<bool, String> {
     let root_name = format!("{} Root CA", config.realm);
     let intermediate_name = format!("{} Authority", config.realm);
 
@@ -592,7 +585,7 @@ fn generate_intermediate_ca(config: &ServerConfig, storage: &dyn PickyStorage) -
         pk.to_public_key(),
         &root_cert,
         &root_key,
-        config.key_config,
+        config.signing_algorithm,
     )
     .map_err(|e| format!("couldn't generate intermediate certificate: {}", e))?;
 
@@ -624,14 +617,26 @@ fn generate_intermediate_ca(config: &ServerConfig, storage: &dyn PickyStorage) -
 
 fn inject_config_provided_cert(
     expected_subject_name: &str,
-    cert_pem: &str,
-    key_pem: &str,
+    cert_key_pair: &CertKeyPair,
     storage: &dyn PickyStorage,
 ) -> Result<(), String> {
-    let cert_pem = cert_pem
-        .parse::<Pem>()
-        .map_err(|e| format!("couldn't parse cert pem: {}", e))?;
-    let cert = Cert::from_der(cert_pem.data()).map_err(|e| format!("couldn't parse cert from der: {}", e))?;
+    let (cert, cert_der) = match &cert_key_pair.cert {
+        PathOr::Path(path) => {
+            let pem_str = std::fs::read_to_string(path).map_err(|e| format!("couldn't read cert: {}", e))?;
+            let pem = pem_str
+                .parse::<Pem>()
+                .map_err(|e| format!("couldn't parse cert pem: {}", e))?;
+            let cert = Cert::from_pem(&pem).map_err(|e| format!("couldn't parse cert: {}", e))?;
+            (Cow::Owned(cert), pem.into_data().into_owned())
+        }
+        PathOr::Some(cert) => {
+            let cert_der = cert
+                .to_der()
+                .map_err(|e| format!("couldn't encode cert to der: {}", e))?;
+            (Cow::Borrowed(cert), cert_der)
+        }
+    };
+
     let ski = hex::encode(
         cert.subject_key_identifier()
             .map_err(|e| format!("couldn't parse fetch subject key identifier: {}", e))?,
@@ -649,16 +654,25 @@ fn inject_config_provided_cert(
         ));
     }
 
-    let key_pem = key_pem
-        .parse::<Pem>()
-        .map_err(|e| format!("couldn't parse key pem: {}", e))?;
+    let key_der = match &cert_key_pair.key {
+        PathOr::Path(path) => {
+            let pem_str = std::fs::read_to_string(path).map_err(|e| format!("couldn't read key: {}", e))?;
+            let pem = pem_str
+                .parse::<Pem>()
+                .map_err(|e| format!("couldn't parse key pem: {}", e))?;
+            pem.into_data().into_owned()
+        }
+        PathOr::Some(key) => key
+            .to_pkcs8()
+            .map_err(|e| format!("couldn't convert key to pkcs8: {}", e))?,
+    };
 
     storage
         .store(CertificateEntry {
             name: subject_name,
-            cert: cert_pem.into_data().into_owned(),
+            cert: cert_der,
             key_identifier: ski,
-            key: Some(key_pem.into_data().into_owned()),
+            key: Some(key_der),
         })
         .map_err(|e| format!("couldn't store certificate: {}", e))?;
 
@@ -668,14 +682,14 @@ fn inject_config_provided_cert(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::configuration::BackendType;
+    use crate::config::BackendType;
     use picky::{
         signature::SignatureHashType,
         x509::{date::UTCDate, name::DirectoryName},
     };
 
-    fn config() -> ServerConfig {
-        let mut config = ServerConfig::default();
+    fn config() -> Config {
+        let mut config = Config::default();
         config.backend = BackendType::Memory;
         config
     }

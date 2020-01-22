@@ -3,7 +3,7 @@ mod memory;
 mod mongodb;
 
 use crate::{
-    configuration::{BackendType, ServerConfig},
+    config::{BackendType, Config},
     db::{
         file::{FileStorage, FileStorageError},
         memory::{MemoryStorage, MemoryStorageError},
@@ -46,7 +46,7 @@ impl From<MemoryStorageError> for StorageError {
 
 pub type BoxedPickyStorage = Box<dyn PickyStorage>;
 
-pub fn get_storage(config: &ServerConfig) -> BoxedPickyStorage {
+pub fn get_storage(config: &Config) -> BoxedPickyStorage {
     match config.backend {
         BackendType::MongoDb => Box::new(MongoStorage::new(config)),
         BackendType::Memory => Box::new(MemoryStorage::new()),

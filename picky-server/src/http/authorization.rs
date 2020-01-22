@@ -1,7 +1,15 @@
-use crate::{configuration::ServerConfig, utils::unix_epoch};
-use picky::jose::jwt::{Jwt, JwtDate, JwtValidator};
+use crate::{
+    config::Config,
+    utils::{unix_epoch, PathOr},
+};
+use picky::{
+    jose::jwt::{Jwt, JwtDate, JwtValidator},
+    key::PublicKey,
+    pem::Pem,
+};
 use saphir::{header, SyncRequest};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CsrClaims {
@@ -32,7 +40,7 @@ impl From<&str> for AuthorizationMethod {
     }
 }
 
-pub fn check_authorization(config: &ServerConfig, req: &SyncRequest) -> Result<Authorized, String> {
+pub fn check_authorization(config: &Config, req: &SyncRequest) -> Result<Authorized, String> {
     let header = match req.headers_map().get(header::AUTHORIZATION) {
         Some(h) => h,
         None => return Err("Authorization header is missing".to_owned()),
@@ -56,14 +64,29 @@ pub fn check_authorization(config: &ServerConfig, req: &SyncRequest) -> Result<A
             }
 
             // try JWT
-            let public_key = config
+            let public_key = match config
                 .provisioner_public_key
                 .as_ref()
-                .ok_or_else(|| "provisioner public key is missing".to_owned())?;
+                .ok_or_else(|| "provisioner public key is missing".to_owned())?
+            {
+                PathOr::Path(path) => {
+                    let pem_str = std::fs::read_to_string(path)
+                        .map_err(|e| format!("couldn't read provisioner public key: {}", e))?;
+                    let pem = pem_str
+                        .parse::<Pem>()
+                        .map_err(|e| format!("couldn't parse provisioner public key pem: {}", e))?;
+                    Cow::Owned(
+                        PublicKey::from_pem(&pem)
+                            .map_err(|e| format!("couldn't parse provisioner public key: {}", e))?,
+                    )
+                }
+                PathOr::Some(key) => Cow::Borrowed(key),
+            };
+
             Ok(Authorized::Token(
                 Jwt::decode(
                     auth_vec[1],
-                    &JwtValidator::strict(public_key, &JwtDate::new_with_leeway(unix_epoch() as i64, 10)),
+                    &JwtValidator::strict(&public_key, &JwtDate::new_with_leeway(unix_epoch() as i64, 10)),
                 )
                 .map_err(|e| format!("couldn't validate json web token: {}", e))?,
             ))
@@ -75,7 +98,7 @@ pub fn check_authorization(config: &ServerConfig, req: &SyncRequest) -> Result<A
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{configuration::BackendType, utils::unix_epoch};
+    use crate::{config::BackendType, utils::unix_epoch};
     use http::{request, Method};
     use picky::{
         key::{PrivateKey, PublicKey},
@@ -119,10 +142,10 @@ mod tests {
         SyncRequest::new(parts, body)
     }
 
-    fn config(den_key: Option<PublicKey>) -> ServerConfig {
-        let mut config = ServerConfig::default();
+    fn config(den_key: Option<PublicKey>) -> Config {
+        let mut config = Config::default();
         config.backend = BackendType::Memory;
-        config.provisioner_public_key = den_key;
+        config.provisioner_public_key = den_key.map(PathOr::Some);
         config
     }
 

@@ -1,13 +1,13 @@
 use crate::{
     addressing::{encode_to_alternative_addresses, encode_to_canonical_address},
-    configuration::ServerConfig,
+    config::Config,
     db::{CertificateEntry, PickyStorage, StorageError, SCHEMA_LAST_VERSION},
 };
 use snafu::Snafu;
 use std::{
     fs::File,
     io::{Read, Write},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 #[derive(Debug, Snafu)]
@@ -24,7 +24,7 @@ impl From<String> for FileStorageError {
 
 #[derive(Clone)]
 struct FileRepo<T> {
-    folder_path: String,
+    folder_path: PathBuf,
     _pd: std::marker::PhantomData<T>,
 }
 
@@ -32,17 +32,12 @@ impl<T> FileRepo<T>
 where
     T: Eq + Clone + AsRef<[u8]>,
 {
-    fn new(mut db_folder_path: String, name: &str) -> Result<Self, FileStorageError> {
-        if !db_folder_path.ends_with('/') {
-            db_folder_path.push('/');
-        }
-        db_folder_path.push_str(name);
-
-        std::fs::create_dir_all(&db_folder_path)
-            .map_err(|e| format!("couldn't create folder '{}': {}", db_folder_path, e))?;
-
+    fn new(db_folder_path: &Path, name: &str) -> Result<Self, FileStorageError> {
+        let folder_path = db_folder_path.join(name);
+        std::fs::create_dir_all(&folder_path)
+            .map_err(|e| format!("couldn't create folder '{}': {}", folder_path.to_string_lossy(), e))?;
         Ok(Self {
-            folder_path: db_folder_path,
+            folder_path,
             _pd: std::marker::PhantomData,
         })
     }
@@ -64,8 +59,14 @@ where
     }
 
     fn insert(&self, key: &str, value: &T) -> Result<(), FileStorageError> {
-        let mut file = File::create(format!("{}{}", self.folder_path, key))
-            .map_err(|e| format!("couldn't open file ({}{}): {}", self.folder_path, key, e))?;
+        let mut file = File::create(self.folder_path.join(key)).map_err(|e| {
+            format!(
+                "couldn't open file ({}{}): {}",
+                self.folder_path.to_string_lossy(),
+                key,
+                e
+            )
+        })?;
         file.write_all(value.as_ref())
             .map_err(|e| format!("Error writing data to {}: {}", key, e))?;
         Ok(())
@@ -74,7 +75,6 @@ where
 
 const REPO_CERTIFICATE_OLD: &str = "CertificateStore/";
 
-const DEFAULT_BASE_PATH: &str = "database/";
 const REPO_CERTIFICATE: &str = "certificate_store/";
 const REPO_KEY: &str = "key_store/";
 const REPO_CERT_NAME: &str = "name_store/";
@@ -93,28 +93,22 @@ pub struct FileStorage {
 }
 
 impl FileStorage {
-    pub fn new(config: &ServerConfig) -> Self {
-        let path = if config.save_file_path.eq("") {
-            DEFAULT_BASE_PATH.to_owned()
-        } else {
-            format!("{}{}", &config.save_file_path, DEFAULT_BASE_PATH)
-        };
-
+    pub fn new(config: &Config) -> Self {
         let config_repo: FileRepo<String> =
-            FileRepo::new(path.clone(), REPO_CONFIG).expect("couldn't initialize config repo");
+            FileRepo::new(&config.file_backend_path, REPO_CONFIG).expect("couldn't initialize config repo");
         let schema_version = config_repo
             .get_collection()
             .expect("config collection")
             .into_iter()
             .find(|filename| filename.eq("schema_version.txt"))
             .map(|version_file| {
-                let file_path = format!("{}{}", config_repo.folder_path, version_file);
+                let file_path = config_repo.folder_path.join(version_file);
                 let version = std::fs::read_to_string(file_path).expect("read schema version file");
                 version.parse::<u8>().expect("parse schema version")
             });
         match schema_version {
             None => {
-                if Path::new(&format!("{}{}", DEFAULT_BASE_PATH, REPO_CERTIFICATE_OLD)).exists() {
+                if config.file_backend_path.join(REPO_CERTIFICATE_OLD).exists() {
                     // v0 schema, unsupported for file backend
                     panic!("detected schema version 0 that isn't supported anymore by file backend");
                 } else {
@@ -133,12 +127,12 @@ impl FileStorage {
         }
 
         FileStorage {
-            name: FileRepo::new(path.clone(), REPO_CERT_NAME).expect("couldn't initialize name repo"),
-            cert: FileRepo::new(path.clone(), REPO_CERTIFICATE).expect("couldn't initialize cert repo"),
-            keys: FileRepo::new(path.clone(), REPO_KEY).expect("couldn't initialize keys repo"),
-            key_identifiers: FileRepo::new(path.clone(), REPO_KEY_IDENTIFIER)
+            name: FileRepo::new(&config.file_backend_path, REPO_CERT_NAME).expect("couldn't initialize name repo"),
+            cert: FileRepo::new(&config.file_backend_path, REPO_CERTIFICATE).expect("couldn't initialize cert repo"),
+            keys: FileRepo::new(&config.file_backend_path, REPO_KEY).expect("couldn't initialize keys repo"),
+            key_identifiers: FileRepo::new(&config.file_backend_path, REPO_KEY_IDENTIFIER)
                 .expect("couldn't initialize key identifiers repo"),
-            hash_lookup: FileRepo::new(path, REPO_HASH_LOOKUP_TABLE)
+            hash_lookup: FileRepo::new(&config.file_backend_path, REPO_HASH_LOOKUP_TABLE)
                 .expect("couldn't initialize hash lookup table repo"),
         }
     }
@@ -156,7 +150,7 @@ impl FileStorage {
         let mut found_item = Vec::new();
         for item in repo_collection {
             if hash.eq(&item) {
-                if let Ok(mut file) = File::open(format!("{}{}", repo.folder_path, item)) {
+                if let Ok(mut file) = File::open(repo.folder_path.join(item)) {
                     file.read_to_end(&mut found_item)
                         .map_err(|e| format!("Error reading file: {}", e))?;
                     break;
@@ -233,10 +227,12 @@ impl PickyStorage for FileStorage {
             .ok_or_else(|| FileStorageError::Other {
                 description: format!("'{}' not found", name),
             })?;
-        let file_path = format!("{}{}", self.name.folder_path, file);
-        Ok(std::fs::read_to_string(file_path).map_err(|e| FileStorageError::Other {
-            description: format!("error reading file '{}': {}", file, e),
-        })?)
+        let file_path = self.name.folder_path.join(file);
+        Ok(
+            std::fs::read_to_string(&file_path).map_err(|e| FileStorageError::Other {
+                description: format!("error reading file '{}': {}", file_path.to_string_lossy(), e),
+            })?,
+        )
     }
 
     fn get_addressing_hash_by_key_identifier(&self, key_identifier: &str) -> Result<String, StorageError> {
@@ -249,10 +245,12 @@ impl PickyStorage for FileStorage {
             .ok_or_else(|| FileStorageError::Other {
                 description: format!("'{}' not found", key_identifier),
             })?;
-        let file_path = format!("{}{}", self.key_identifiers.folder_path, file);
-        Ok(std::fs::read_to_string(file_path).map_err(|e| FileStorageError::Other {
-            description: format!("error reading file '{}': {}", file, e),
-        })?)
+        let file_path = self.key_identifiers.folder_path.join(file);
+        Ok(
+            std::fs::read_to_string(&file_path).map_err(|e| FileStorageError::Other {
+                description: format!("error reading file '{}': {}", file_path.to_string_lossy(), e),
+            })?,
+        )
     }
 
     fn lookup_addressing_hash(&self, lookup_key: &str) -> Result<String, StorageError> {
@@ -265,9 +263,11 @@ impl PickyStorage for FileStorage {
             .ok_or_else(|| FileStorageError::Other {
                 description: format!("'{}' not found", lookup_key_file),
             })?;
-        let file_path = format!("{}{}", self.hash_lookup.folder_path, file);
-        Ok(std::fs::read_to_string(file_path).map_err(|e| FileStorageError::Other {
-            description: format!("error reading file '{}': {}", file, e),
-        })?)
+        let file_path = self.hash_lookup.folder_path.join(file);
+        Ok(
+            std::fs::read_to_string(&file_path).map_err(|e| FileStorageError::Other {
+                description: format!("error reading file '{}': {}", file_path.to_string_lossy(), e),
+            })?,
+        )
     }
 }

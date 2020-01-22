@@ -1,4 +1,4 @@
-use crate::{configuration::ServerConfig, http::controller::ServerController};
+use crate::{config::Config, http::controller::ServerController};
 use saphir::{router::Builder, Server as SaphirServer};
 
 pub struct HttpServer {
@@ -6,7 +6,7 @@ pub struct HttpServer {
 }
 
 impl HttpServer {
-    pub fn new(config: ServerConfig) -> Self {
+    pub fn new(config: Config) -> Self {
         let controller = match ServerController::from_config(config) {
             Ok(controller) => controller,
             Err(e) => panic!("Couldn't build server controller: {}", e),

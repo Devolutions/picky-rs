@@ -1,11 +1,14 @@
 use base64::DecodeError;
 use picky::{
-    pem::PemError,
-    x509::{certificate::CertError, csr::CsrError},
+    key::{PrivateKey, PublicKey},
+    pem::{Pem, PemError},
+    x509::{certificate::CertError, csr::CsrError, Cert},
 };
+use serde::{de, ser, Serialize};
 use std::{
     error::Error,
     fmt,
+    path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -65,3 +68,66 @@ impl From<DecodeError> for GreedyError {
         Self(format!("base64 decode: {}", e))
     }
 }
+
+/// A path or something else
+#[derive(Clone)]
+pub enum PathOr<T: Clone> {
+    Path(PathBuf),
+    Some(T),
+}
+
+macro_rules! path_or_impl_serde {
+    ($ty:ident) => {
+        impl<'de> de::Deserialize<'de> for PathOr<$ty> {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: de::Deserializer<'de>,
+            {
+                struct V;
+                impl<'de> de::Visitor<'de> for V {
+                    type Value = PathOr<$ty>;
+
+                    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                        formatter.write_str(concat!("a path or some pem-formatted ", stringify!($ty)))
+                    }
+
+                    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+                    where
+                        E: de::Error,
+                    {
+                        if let Ok(pem) = v.parse::<Pem>() {
+                            let thing = $ty::from_pem(&pem)
+                                .map_err(|e| E::custom(format!(concat!(stringify!($ty), " from pem: {}"), e)))?;
+                            Ok(PathOr::Some(thing))
+                        } else {
+                            Ok(PathOr::Path(PathBuf::from(v)))
+                        }
+                    }
+                }
+
+                deserializer.deserialize_str(V)
+            }
+        }
+
+        impl Serialize for PathOr<$ty> {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: ser::Serializer,
+            {
+                let s = match self {
+                    PathOr::Path(path) => path.to_string_lossy().into_owned(),
+                    PathOr::Some(thing) => thing
+                        .to_pem()
+                        .map_err(|e| ser::Error::custom(format!(concat!(stringify!($ty), " to pem: {}"), e)))?
+                        .to_string(),
+                };
+
+                serializer.serialize_str(&s)
+            }
+        }
+    };
+}
+
+path_or_impl_serde!(Cert);
+path_or_impl_serde!(PrivateKey);
+path_or_impl_serde!(PublicKey);
