@@ -1,6 +1,6 @@
 [package]
 name = "picky-server"
-version = "4.2.1"
+version = "4.3.0"
 authors = [
     "jtrepanier-devolutions <jtrepanier@devolutions.net>",
     "Benoît CORTIER <benoit.cortier@fried-world.eu>",
