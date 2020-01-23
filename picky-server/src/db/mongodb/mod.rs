@@ -8,11 +8,11 @@ use crate::{
         mongodb::{
             mongo_connection::MongoConnection,
             mongo_repository::{
-                CertificateModel, CertificateStoreRepository, ConfigModel, ConfigStoreRepository,
-                HashLookupTableStoreRepository, KeyIdentifierModel, KeyIdentifierStoreRepository, KeyModel,
-                KeyStoreRepository, NameModel, NameStoreRepository, CERTIFICATE_COLLECTION_NAME,
-                CONFIG_COLLECTION_NAME, HASH_LOOKUP_TABLE_COLLECTION_NAME, KEY_IDENTIFIER_COLLECTION_NAME,
-                KEY_STORE_COLLECTION_NAME, NAME_STORE_COLLECTION_NAME,
+                CertificateModel, CertificateStoreRepository, ConfigStoreRepository, HashLookupTableStoreRepository,
+                KeyIdentifierModel, KeyIdentifierStoreRepository, KeyModel, KeyStoreRepository, NameModel,
+                NameStoreRepository, CERTIFICATE_COLLECTION_NAME, CONFIG_COLLECTION_NAME,
+                HASH_LOOKUP_TABLE_COLLECTION_NAME, KEY_IDENTIFIER_COLLECTION_NAME, KEY_STORE_COLLECTION_NAME,
+                NAME_STORE_COLLECTION_NAME,
             },
         },
         CertificateEntry, PickyStorage, StorageError, SCHEMA_LAST_VERSION,
@@ -123,24 +123,31 @@ impl MongoStorage {
         };
 
         let config = ConfigStoreRepository::new(db, CONFIG_COLLECTION_NAME);
+        let config_collection = config.get_collection().expect("config collection");
+        let mut config_cursor = config_collection.find(None, None).expect("find config doc");
+        if let Some(config_doc) = config_cursor.next() {
+            let config_doc = config_doc.expect("config doc");
+            if config_cursor.has_next().expect("collection cursor next") {
+                panic!("multiple config doc found in database!");
+            }
 
-        let schema_version_filter_doc = doc!("key": "schema_version");
-        if let Some(schema_version) = config
-            .get(schema_version_filter_doc.clone())
-            .expect("access schema version")
-        {
-            match schema_version.value {
-                Bson::I32(supported) if supported == i32::from(SCHEMA_LAST_VERSION) => {
+            match config_doc.get("schema_version") {
+                Some(Bson::I32(supported)) if supported == &i32::from(SCHEMA_LAST_VERSION) => {
                     log::info!("detected database using supported v{} schema", supported);
                 }
-                Bson::I32(unsupported) => {
+                Some(Bson::I32(unsupported)) => {
                     panic!("unsupported schema version: v{}", unsupported);
                 }
-                invalid => {
+                Some(invalid) => {
                     panic!("invalid schema version config format: {:?}", invalid);
+                }
+                None => {
+                    panic!("'schema_version' field not found in config doc");
                 }
             }
         } else {
+            // no config doc found
+
             let cert_collection = storage
                 .certificate_store
                 .get_collection()
@@ -216,14 +223,9 @@ impl MongoStorage {
                 log::info!("fresh new database using v{} schema", SCHEMA_LAST_VERSION);
             }
 
-            // insert last schema version
-            config
-                .update_with_options(
-                    schema_version_filter_doc,
-                    ConfigModel::new("schema_version".to_owned(), Bson::I32(SCHEMA_LAST_VERSION.into())),
-                    true,
-                )
-                .expect("update config collection");
+            config_collection
+                .insert_one(doc!("schema_version": 1), None)
+                .expect("insert config doc");
         }
 
         storage
