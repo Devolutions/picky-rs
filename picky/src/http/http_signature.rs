@@ -213,7 +213,7 @@ impl ToString for HttpSignature {
 
         acc.push(format!("{}=\"{}\"", HTTP_SIGNATURE_SIGNATURE, self.signature));
 
-        acc.join(", ")
+        acc.join(",")
     }
 }
 
