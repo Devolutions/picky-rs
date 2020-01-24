@@ -1,5 +1,5 @@
 name: picky
-author: Jonathan Trépanier <jtrepanier@devolutions.net>
+author: Devolutions
 about: A custom public key infrastructure server
 args:
   - log-level:
@@ -53,4 +53,8 @@ args:
   - show-config:
       long: show-config
       help: Show the current config before startup
+      takes_value: false
+  - dump-config:
+      long: dump-config
+      help: Dump configuration to yaml file
       takes_value: false

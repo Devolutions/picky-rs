@@ -1,6 +1,6 @@
 [package]
 name = "picky-server"
-version = "4.2.1"
+version = "4.3.0"
 authors = [
     "jtrepanier-devolutions <jtrepanier@devolutions.net>",
     "Benoît CORTIER <benoit.cortier@fried-world.eu>",
@@ -18,6 +18,7 @@ clap = { features = ["yaml"], version = "2.32" }
 saphir = { version = "0.9", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+serde_yaml = "0.8"
 multihash = "0.9"
 multibase = "0.7"
 bson = "0.13"

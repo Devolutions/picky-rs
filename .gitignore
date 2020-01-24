@@ -2,3 +2,5 @@
 target/
 database/
 **/*.rs.bk
+
+picky_server_conf.yaml

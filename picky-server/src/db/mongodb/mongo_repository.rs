@@ -21,7 +21,7 @@ pub const CERTIFICATE_COLLECTION_NAME: &str = "certificate_store";
 
 pub type ConfigModel = Model<Bson>;
 pub type ConfigStoreRepository = MongoRepository<ConfigModel>;
-pub const CONFIG_COLLECTION_NAME: &str = "config";
+pub const CONFIG_COLLECTION_NAME: &str = "configuration";
 
 pub type HashLookupTableModel = Model<String>;
 pub type HashLookupTableStoreRepository = MongoRepository<HashLookupTableModel>;

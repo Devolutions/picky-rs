@@ -1,57 +1,22 @@
-#[macro_use]
-extern crate clap;
-#[macro_use(bson, doc)]
-extern crate bson;
-#[macro_use]
-extern crate log;
-
-#[macro_use]
-mod macros;
-
 mod addressing;
-mod configuration;
+mod config;
 mod db;
 mod http;
+mod logging;
 mod picky_controller;
+mod utils;
 
-use crate::{configuration::ServerConfig, http::http_server::HttpServer};
-use log::LevelFilter;
+use crate::{config::Config, http::http_server::HttpServer};
 
 fn main() {
-    let conf = ServerConfig::new();
+    let conf = Config::startup_init();
+    let log_handle = logging::init_logs(&conf);
 
-    init_logs(&conf);
+    log::info!("building http server ...");
+    let http_server = HttpServer::new(conf, log_handle);
 
-    info!("Building http server ...");
-    let http_server = HttpServer::new(conf);
-    info!("Starting http server ...");
+    log::info!("starting http server ...");
     http_server.run();
-}
-
-fn init_logs(config: &ServerConfig) {
-    use log4rs::{
-        append::console::ConsoleAppender,
-        config::{Appender, Config as ConfigLog4rs, Logger, Root},
-    };
-    let console_appender = ConsoleAppender::builder().build();
-
-    let config = ConfigLog4rs::builder()
-        .appender(Appender::builder().build("stdout", Box::new(console_appender)))
-        .logger(Logger::builder().build("poston", LevelFilter::Off))
-        .logger(Logger::builder().build("mio", LevelFilter::Off))
-        .logger(Logger::builder().build("mio_extras", LevelFilter::Off))
-        .logger(Logger::builder().build("hyper", LevelFilter::Off))
-        .logger(Logger::builder().build("r2d2", LevelFilter::Warn))
-        .logger(Logger::builder().build("tokio_io", LevelFilter::Off))
-        .logger(Logger::builder().build("tokio_reactor", LevelFilter::Off))
-        .logger(Logger::builder().build("tokio_threadpool", LevelFilter::Off))
-        .logger(Logger::builder().build("tokio_core", LevelFilter::Off))
-        .build(Root::builder().appender("stdout").build(config.level_filter()))
-        .expect("Unable to configure logger");
-
-    if let Err(e) = log4rs::init_config(config) {
-        println!("Can't init log4rs: {}", e);
-    }
 }
 
 #[cfg(any(feature = "pre-gen-pk", all(debug_assertions, test)))]
