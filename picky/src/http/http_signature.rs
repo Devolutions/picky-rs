@@ -3,7 +3,7 @@ use crate::{
     key::{PrivateKey, PublicKey},
     signature::{SignatureError, SignatureHashType},
 };
-use base64::DecodeError;
+use base64::{DecodeError, URL_SAFE_NO_PAD};
 use snafu::Snafu;
 use std::{
     borrow::Cow,
@@ -189,20 +189,20 @@ impl ToString for HttpSignature {
         let mut acc = Vec::with_capacity(5);
 
         acc.push(format!(
-            "{} {}=\"{}\"",
+            "{} {}={}",
             HTTP_SIGNATURE_HEADER, HTTP_SIGNATURE_KEY_ID, self.key_id
         ));
 
         if let Some(created) = self.created {
-            acc.push(format!("{}=\"{}\"", HTTP_SIGNATURE_CREATED, created));
+            acc.push(format!("{}={}", HTTP_SIGNATURE_CREATED, created));
         }
 
         if let Some(expires) = self.expires {
-            acc.push(format!("{}=\"{}\"", HTTP_SIGNATURE_EXPIRES, expires));
+            acc.push(format!("{}={}", HTTP_SIGNATURE_EXPIRES, expires));
         }
 
         acc.push(format!(
-            "{}=\"{}\"",
+            "{}={}",
             HTTP_SIGNATURE_HEADERS,
             self.headers
                 .iter()
@@ -211,7 +211,7 @@ impl ToString for HttpSignature {
                 .join(" "),
         ));
 
-        acc.push(format!("{}=\"{}\"", HTTP_SIGNATURE_SIGNATURE, self.signature));
+        acc.push(format!("{}={}", HTTP_SIGNATURE_SIGNATURE, self.signature));
 
         acc.join(",")
     }
@@ -517,7 +517,7 @@ impl<'a> HttpSignatureBuilder<'a> {
             headers,
             created,
             expires,
-            signature: base64::encode(&signature_binary),
+            signature: base64::encode_config(&signature_binary, URL_SAFE_NO_PAD),
         })
     }
 }
