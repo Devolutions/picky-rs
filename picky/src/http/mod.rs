@@ -83,8 +83,8 @@
 //!
 //! assert_eq!(
 //!     http_signature_str,
-//!     "Signature keyId=\"my-rsa-key\", created=\"1402170695\", \
-//!      headers=\"(request-target) (created) host date cache-control x-emptyheader x-example\", \
+//!     "Signature keyId=\"my-rsa-key\",created=1402170695,\
+//!      headers=\"(request-target) (created) host date cache-control x-emptyheader x-example\",\
 //!      signature=\"QwuxxMSuvCdA5a2cDOjg+1WFEEGa/gD8fWwKm7gah4IUCssrie+bA5sp9wH7Jz8TQYh/XNDRUHKc\
 //!                  0oziBAIy1CsfDQWGRM+pAonfXEJufdt07v/i0OFhj5rBJfoOWPUcJ0cXzu0gs6svNhvimS3h2g30\
 //!                  gsnw1+Qjgv0+5HFwqZH4i+bHzaj0r9vIZZnnk3ecg8O2uOLuG5jCszJU9SBA0ug8l/NrQPJXMhCO\
