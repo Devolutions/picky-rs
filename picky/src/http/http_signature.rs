@@ -166,6 +166,8 @@ pub struct HttpSignature {
     /// corresponding to `algorithm`.  The `signature` parameter is then set
     /// to the base 64 encoding of the signature.
     pub signature: String,
+
+    legacy: bool,
 }
 
 impl HttpSignature {
@@ -188,10 +190,17 @@ impl ToString for HttpSignature {
     fn to_string(&self) -> String {
         let mut acc = Vec::with_capacity(5);
 
-        acc.push(format!(
-            "{} {}={}",
-            HTTP_SIGNATURE_HEADER, HTTP_SIGNATURE_KEY_ID, self.key_id
-        ));
+        if self.legacy {
+            acc.push(format!(
+                "{} {}={}",
+                HTTP_SIGNATURE_HEADER, HTTP_SIGNATURE_KEY_ID, self.key_id
+            ));
+        } else {
+            acc.push(format!(
+                "{} {}=\"{}\"",
+                HTTP_SIGNATURE_HEADER, HTTP_SIGNATURE_KEY_ID, self.key_id
+            ));
+        }
 
         if let Some(created) = self.created {
             acc.push(format!("{}={}", HTTP_SIGNATURE_CREATED, created));
@@ -201,17 +210,31 @@ impl ToString for HttpSignature {
             acc.push(format!("{}={}", HTTP_SIGNATURE_EXPIRES, expires));
         }
 
-        acc.push(format!(
-            "{}={}",
-            HTTP_SIGNATURE_HEADERS,
-            self.headers
-                .iter()
-                .map(|header| header.as_str())
-                .collect::<Vec<&str>>()
-                .join(" "),
-        ));
+        if self.legacy {
+            acc.push(format!(
+                "{}={}",
+                HTTP_SIGNATURE_HEADERS,
+                self.headers
+                    .iter()
+                    .map(|header| header.as_str())
+                    .collect::<Vec<&str>>()
+                    .join(" "),
+            ));
 
-        acc.push(format!("{}={}", HTTP_SIGNATURE_SIGNATURE, self.signature));
+            acc.push(format!("{}={}", HTTP_SIGNATURE_SIGNATURE, self.signature));
+        } else {
+            acc.push(format!(
+                "{}=\"{}\"",
+                HTTP_SIGNATURE_HEADERS,
+                self.headers
+                    .iter()
+                    .map(|header| header.as_str())
+                    .collect::<Vec<&str>>()
+                    .join(" "),
+            ));
+
+            acc.push(format!("{}=\"{}\"", HTTP_SIGNATURE_SIGNATURE, self.signature));
+        }
 
         acc.join(",")
     }
@@ -229,12 +252,8 @@ impl FromStr for HttpSignature {
         for item in items {
             if let Some(index) = item.find('=') {
                 let (key, value) = item.split_at(index);
-                let value = value[1..].trim();
-                if value.starts_with('"') && value.len() >= 2 {
-                    keys.insert(key.trim(), value[1..value.len() - 1].to_owned());
-                } else {
-                    keys.insert(key.trim(), value.trim().to_owned());
-                }
+                let value = value[1..].trim().trim_matches('"');
+                keys.insert(key.trim(), value.trim().to_owned());
             }
         }
 
@@ -275,6 +294,14 @@ impl FromStr for HttpSignature {
             None
         };
 
+        let signature =
+            keys.remove(HTTP_SIGNATURE_SIGNATURE)
+                .ok_or_else(|| HttpSignatureError::MissingRequiredParameter {
+                    parameter: HTTP_SIGNATURE_SIGNATURE,
+                })?;
+
+        let legacy = !signature.contains(|c: char| c == '/' || c == '+');
+
         Ok(HttpSignature {
             key_id: keys
                 .remove(HTTP_SIGNATURE_KEY_ID)
@@ -284,11 +311,8 @@ impl FromStr for HttpSignature {
             headers,
             created,
             expires,
-            signature: keys.remove(HTTP_SIGNATURE_SIGNATURE).ok_or_else(|| {
-                HttpSignatureError::MissingRequiredParameter {
-                    parameter: HTTP_SIGNATURE_SIGNATURE,
-                }
-            })?,
+            signature,
+            legacy,
         })
     }
 }
@@ -328,6 +352,7 @@ struct HttpSignatureBuilderInner<'a> {
     expires: Option<u64>,
     headers: Vec<Header>,
     signing_string_generation: Option<SigningStringGenMethod<'a>>,
+    legacy: bool,
 }
 
 #[derive(Default, Clone, Debug)]
@@ -407,6 +432,13 @@ impl<'a> HttpSignatureBuilder<'a> {
         self
     }
 
+    #[inline]
+    #[doc(hidden)]
+    pub fn legacy(&self) -> &Self {
+        self.inner.borrow_mut().legacy = true;
+        self
+    }
+
     pub fn build(&self) -> Result<HttpSignature, HttpSignatureError> {
         let mut inner = self.inner.borrow_mut();
 
@@ -426,6 +458,7 @@ impl<'a> HttpSignatureBuilder<'a> {
         let mut created = inner.created.take();
         let mut expires = inner.expires.take();
         let mut headers: Vec<Header> = inner.headers.drain(..).collect();
+        let legacy = inner.legacy;
 
         drop(inner);
 
@@ -520,7 +553,12 @@ impl<'a> HttpSignatureBuilder<'a> {
             headers,
             created,
             expires,
-            signature: base64::encode_config(&signature_binary, URL_SAFE_NO_PAD),
+            signature: if legacy {
+                base64::encode_config(&signature_binary, URL_SAFE_NO_PAD)
+            } else {
+                base64::encode(&signature_binary)
+            },
+            legacy,
         })
     }
 }
@@ -665,7 +703,12 @@ impl<'a> HttpSignatureVerifier<'a> {
             }
         };
 
-        let decoded_signature = base64::decode(&self.http_signature.signature)?;
+        let decoded_signature = if self.http_signature.legacy {
+            base64::decode_config(&self.http_signature.signature, URL_SAFE_NO_PAD)?
+        } else {
+            base64::decode(&self.http_signature.signature)?
+        };
+
         signature_type.verify(public_key, signing_string.as_bytes(), &decoded_signature)?;
 
         Ok(())
@@ -771,6 +814,7 @@ mod tests {
             HttpSignature::from_str(HTTP_SIGNATURE_EXAMPLE).expect("http signature example"),
             HttpSignature::from_str(HTTP_SIGNATURE_WEIRD_FORMAT).expect("http signature weird format"),
         ] {
+            assert!(!http_signature.legacy);
             http_signature
                 .verifier()
                 .now(1402170700)
@@ -915,5 +959,54 @@ mod tests {
             ),
             "invalid parameter: created"
         );
+    }
+
+    const HTTP_SIGNATURE_LEGACY: &str =
+        "Signature keyId=my-rsa-key,created=1402170695,\
+         headers=(request-target) (created) date,\
+         signature=CM3Ui6l4Z6-yYdWaX5Cz10OAqUceS53Zy_qA-e4xG5Nabe215iTlnj_sfVJ3nBaMIOj_4e\
+         gxTKNDXAJbLm6nOF8zUOdJBuKQZNO1mfzrMKLsz7gc2PQI1eVxGNJoBZ40L7CouertpowQFpKyizNXqH_y\
+         YBgqPEnLk-p5ISkXeHd7P_YbAAQGnSe3hnJ_gkkJ5rS6mGuu2C8-Qm68tcSGz9qwVdNTFPpji5VPxprs2J\
+         2Z1vjsMVW97rsKOs8lo-qxPGfni27udledH2ZQABGZHOgZsChj59Xb3oVAA8_V3rjt5Un7gsz2AHQ6aY6o\
+         ky59Rsg_CpB8gP7szjK_wrCclA";
+
+    #[test]
+    fn legacy() {
+        let req = request::Builder::new()
+            .method(Method::GET)
+            .uri("/foo")
+            .header(header::DATE, "Tue, 07 Jun 2014 20:51:35 GMT")
+            .body(())
+            .expect("couldn't build request");
+        let (parts, _) = req.into_parts();
+
+        {
+            // sign
+            let private_key = private_key_1();
+            let http_signature = HttpSignatureBuilder::new()
+                .key_id("my-rsa-key")
+                .signature_method(&private_key, SignatureHashType::RsaSha256)
+                .request_target()
+                .created(1402170695)
+                .generate_signing_string_using_http_request(&parts)
+                .http_header("Date")
+                .legacy()
+                .build()
+                .expect("build http signature");
+
+            pretty_assertions::assert_eq!(http_signature.to_string(), HTTP_SIGNATURE_LEGACY);
+        }
+
+        {
+            // verify
+            let http_signature = HttpSignature::from_str(HTTP_SIGNATURE_LEGACY).expect("http signature legacy");
+            http_signature
+                .verifier()
+                .now(1402170700)
+                .signature_method(&private_key_1().to_public_key(), SignatureHashType::RsaSha256)
+                .generate_signing_string_using_http_request(&parts)
+                .verify()
+                .expect("couldn't verify");
+        }
     }
 }
