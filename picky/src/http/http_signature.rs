@@ -229,8 +229,11 @@ impl FromStr for HttpSignature {
         for item in items {
             if let Some(index) = item.find('=') {
                 let (key, value) = item.split_at(index);
-                if value.len() >= 3 {
-                    keys.insert(key.trim(), value[2..value.len() - 1].to_owned());
+                let value = value[1..].trim();
+                if value.starts_with('"') && value.len() >= 2 {
+                    keys.insert(key.trim(), value[1..value.len() - 1].to_owned());
+                } else {
+                    keys.insert(key.trim(), value.trim().to_owned());
                 }
             }
         }
@@ -676,13 +679,22 @@ mod tests {
     use http_0_2::{header, method::Method, request};
 
     const HTTP_SIGNATURE_EXAMPLE: &str =
-        "Signature keyId=\"my-rsa-key\", created=\"1402170695\", \
-         headers=\"(request-target) (created) date\", \
+        "Signature keyId=\"my-rsa-key\",created=1402170695,\
+         headers=\"(request-target) (created) date\",\
          signature=\"CM3Ui6l4Z6+yYdWaX5Cz10OAqUceS53Zy/qA+e4xG5Nabe215iTlnj/sfVJ3nBaMIOj/4e\
          gxTKNDXAJbLm6nOF8zUOdJBuKQZNO1mfzrMKLsz7gc2PQI1eVxGNJoBZ40L7CouertpowQFpKyizNXqH/y\
          YBgqPEnLk+p5ISkXeHd7P/YbAAQGnSe3hnJ/gkkJ5rS6mGuu2C8+Qm68tcSGz9qwVdNTFPpji5VPxprs2J\
          2Z1vjsMVW97rsKOs8lo+qxPGfni27udledH2ZQABGZHOgZsChj59Xb3oVAA8/V3rjt5Un7gsz2AHQ6aY6o\
          ky59Rsg/CpB8gP7szjK/wrCclA==\"";
+
+    const HTTP_SIGNATURE_WEIRD_FORMAT: &str =
+        "Signature keyId = my-rsa-key ,created= \"1402170695\",\
+         headers=(request-target) (created) date  ,\
+         signature=CM3Ui6l4Z6+yYdWaX5Cz10OAqUceS53Zy/qA+e4xG5Nabe215iTlnj/sfVJ3nBaMIOj/4e\
+         gxTKNDXAJbLm6nOF8zUOdJBuKQZNO1mfzrMKLsz7gc2PQI1eVxGNJoBZ40L7CouertpowQFpKyizNXqH/y\
+         YBgqPEnLk+p5ISkXeHd7P/YbAAQGnSe3hnJ/gkkJ5rS6mGuu2C8+Qm68tcSGz9qwVdNTFPpji5VPxprs2J\
+         2Z1vjsMVW97rsKOs8lo+qxPGfni27udledH2ZQABGZHOgZsChj59Xb3oVAA8/V3rjt5Un7gsz2AHQ6aY6o\
+         ky59Rsg/CpB8gP7szjK/wrCclA==";
 
     fn private_key_1() -> PrivateKey {
         let pem = crate::test_files::RSA_2048_PK_7.parse::<Pem>().expect("pem 1");
@@ -755,14 +767,18 @@ mod tests {
             .expect("couldn't build request");
         let (parts, _) = req.into_parts();
 
-        let http_signature = HttpSignature::from_str(HTTP_SIGNATURE_EXAMPLE).expect("http signature");
-        http_signature
-            .verifier()
-            .now(1402170700)
-            .signature_method(&private_key_1().to_public_key(), SignatureHashType::RsaSha256)
-            .generate_signing_string_using_http_request(&parts)
-            .verify()
-            .expect("couldn't verify");
+        for http_signature in &[
+            HttpSignature::from_str(HTTP_SIGNATURE_EXAMPLE).expect("http signature example"),
+            HttpSignature::from_str(HTTP_SIGNATURE_WEIRD_FORMAT).expect("http signature weird format"),
+        ] {
+            http_signature
+                .verifier()
+                .now(1402170700)
+                .signature_method(&private_key_1().to_public_key(), SignatureHashType::RsaSha256)
+                .generate_signing_string_using_http_request(&parts)
+                .verify()
+                .expect("couldn't verify");
+        }
     }
 
     #[test]
