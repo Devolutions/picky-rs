@@ -1,9 +1,11 @@
 [package]
 name = "picky"
-version = "4.5.1"
+version = "4.6.0"
 authors = [
     "jtrepanier-devolutions <jtrepanier@devolutions.net>",
     "Benoît CORTIER <benoit.cortier@fried-world.eu>",
+    "François Dubois <fdubois@devolutions.net>",
+    "Richard Markiewicz <rmarkiewicz@devolutions.net>",
 ]
 description = "Portable X.509, Jose and PKI implementation."
 edition = "2018"

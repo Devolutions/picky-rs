@@ -1180,7 +1180,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "picky"
-version = "4.5.1"
+version = "4.6.0"
 dependencies = [
  "base64 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "cfg-if 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1243,7 +1243,7 @@ dependencies = [
  "mongodb_cwal 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "multibase 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "multihash 0.9.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "picky 4.5.1",
+ "picky 4.6.0",
  "picky-asn1 0.2.1",
  "r2d2 0.8.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.7.3 (registry+https://github.com/rust-lang/crates.io-index)",
