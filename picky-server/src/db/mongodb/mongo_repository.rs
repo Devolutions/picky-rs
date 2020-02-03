@@ -62,11 +62,23 @@ impl<Model> MongoRepository<Model> {
 }
 
 impl<Model: serde::ser::Serialize> MongoRepository<Model> {
-    pub fn get_collection(&self) -> Result<mongodb::coll::Collection, MongoStorageError> {
-        Ok(self.mongo_conn.get()?.collection(self.collection_name))
+    pub async fn get_collection(&self) -> Result<mongodb::coll::Collection, MongoStorageError> {
+        let shallow_clone = self.mongo_conn.clone();
+        let connection = tokio::task::spawn_blocking(move || shallow_clone.get())
+            .await
+            .map_err(|e| MongoStorageError::Other {
+                description: format!("couldn't join replace_one mongo task: {}", e),
+            })??;
+
+        Ok(connection.collection(self.collection_name))
     }
 
-    pub fn update_with_options(&self, doc: Document, model: Model, upsert: bool) -> Result<(), MongoStorageError> {
+    pub async fn update_with_options(
+        &self,
+        doc: Document,
+        model: Model,
+        upsert: bool,
+    ) -> Result<(), MongoStorageError> {
         let serialized_model = to_bson(&model)?;
 
         if let Bson::Document(mut document) = serialized_model {
@@ -74,14 +86,22 @@ impl<Model: serde::ser::Serialize> MongoRepository<Model> {
             // not work on data targeting the id field index
             document.remove("_id");
 
-            self.get_collection()?.replace_one(
-                doc,
-                document,
-                Some(ReplaceOptions {
-                    upsert: Some(upsert),
-                    ..ReplaceOptions::new()
-                }),
-            )?;
+            let col = self.get_collection().await?;
+            tokio::task::spawn_blocking(move || {
+                col.replace_one(
+                    doc,
+                    document,
+                    Some(ReplaceOptions {
+                        upsert: Some(upsert),
+                        ..ReplaceOptions::new()
+                    }),
+                )
+            })
+            .await
+            .map_err(|e| MongoStorageError::Other {
+                description: format!("couldn't join replace_one mongo task: {}", e),
+            })??;
+
             Ok(())
         } else {
             Err(MongoStorageError::UpdateError)
@@ -90,8 +110,14 @@ impl<Model: serde::ser::Serialize> MongoRepository<Model> {
 }
 
 impl<Model: serde::de::DeserializeOwned + serde::ser::Serialize> MongoRepository<Model> {
-    pub fn get(&self, doc: Document) -> Result<Option<Model>, MongoStorageError> {
-        let document_opt = self.get_collection()?.find_one(Some(doc), None)?;
+    pub async fn get(&self, doc: Document) -> Result<Option<Model>, MongoStorageError> {
+        let col = self.get_collection().await?;
+
+        let document_opt = tokio::task::spawn_blocking(move || col.find_one(Some(doc), None))
+            .await
+            .map_err(|e| MongoStorageError::Other {
+                description: format!("couldn't join find_one mongo task: {}", e),
+            })??;
 
         if let Some(doc) = document_opt {
             let model = from_bson(Bson::Document(doc))?;

@@ -11,6 +11,7 @@ use crate::{
         mongodb::{MongoStorage, MongoStorageError},
     },
 };
+use futures::future::BoxFuture;
 use snafu::Snafu;
 
 pub const SCHEMA_LAST_VERSION: u8 = 1;
@@ -47,9 +48,9 @@ impl From<MemoryStorageError> for StorageError {
 
 pub type BoxedPickyStorage = Box<dyn PickyStorage>;
 
-pub fn get_storage(config: &Config) -> BoxedPickyStorage {
+pub async fn get_storage(config: &Config) -> BoxedPickyStorage {
     match config.backend {
-        BackendType::MongoDb => Box::new(MongoStorage::new(config)),
+        BackendType::MongoDb => Box::new(MongoStorage::new(config).await),
         BackendType::Memory => Box::new(MemoryStorage::new()),
         BackendType::File => Box::new(FileStorage::new(config)),
     }
@@ -64,11 +65,14 @@ pub struct CertificateEntry {
 }
 
 pub trait PickyStorage: Send + Sync {
-    fn health(&self) -> Result<(), StorageError>;
-    fn store(&self, entry: CertificateEntry) -> Result<(), StorageError>;
-    fn get_cert_by_addressing_hash(&self, hash: &str) -> Result<Vec<u8>, StorageError>;
-    fn get_key_by_addressing_hash(&self, hash: &str) -> Result<Vec<u8>, StorageError>;
-    fn get_addressing_hash_by_name(&self, name: &str) -> Result<String, StorageError>;
-    fn get_addressing_hash_by_key_identifier(&self, key_identifier: &str) -> Result<String, StorageError>;
-    fn lookup_addressing_hash(&self, lookup_key: &str) -> Result<String, StorageError>;
+    fn health(&self) -> BoxFuture<'_, Result<(), StorageError>>;
+    fn store(&self, entry: CertificateEntry) -> BoxFuture<'_, Result<(), StorageError>>;
+    fn get_cert_by_addressing_hash<'a>(&'a self, hash: &'a str) -> BoxFuture<'a, Result<Vec<u8>, StorageError>>;
+    fn get_key_by_addressing_hash<'a>(&'a self, hash: &'a str) -> BoxFuture<'a, Result<Vec<u8>, StorageError>>;
+    fn get_addressing_hash_by_name<'a>(&'a self, name: &'a str) -> BoxFuture<'a, Result<String, StorageError>>;
+    fn get_addressing_hash_by_key_identifier<'a>(
+        &'a self,
+        key_identifier: &'a str,
+    ) -> BoxFuture<'a, Result<String, StorageError>>;
+    fn lookup_addressing_hash<'a>(&'a self, lookup_key: &'a str) -> BoxFuture<'a, Result<String, StorageError>>;
 }

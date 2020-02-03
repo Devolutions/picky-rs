@@ -7,12 +7,12 @@ use picky::{
     key::PublicKey,
     pem::Pem,
 };
-use saphir::{header, SyncRequest};
+use saphir::{body::Body, http::header, request::Request};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct CsrClaims {
+pub struct ProviderClaims {
     pub sub: String,
     pub nbf: u64,
     pub exp: u64,
@@ -40,8 +40,8 @@ impl From<&str> for AuthorizationMethod {
     }
 }
 
-pub fn check_authorization(config: &Config, req: &SyncRequest) -> Result<Authorized, String> {
-    let header = match req.headers_map().get(header::AUTHORIZATION) {
+pub fn check_authorization(config: &Config, req: &Request<Body>) -> Result<Authorized, String> {
+    let header = match req.headers().get(header::AUTHORIZATION) {
         Some(h) => h,
         None => return Err("Authorization header is missing".to_owned()),
     };
@@ -99,12 +99,12 @@ pub fn check_authorization(config: &Config, req: &SyncRequest) -> Result<Authori
 mod tests {
     use super::*;
     use crate::{config::BackendType, utils::unix_epoch};
-    use http::{request, Method};
     use picky::{
         key::{PrivateKey, PublicKey},
         pem::Pem,
         signature::SignatureHashType,
     };
+    use saphir::http::{request, Method};
 
     fn get_private_key_1() -> PrivateKey {
         let pem = include_str!("../../../test_assets/private_keys/rsa-2048-pk_4.key")
@@ -120,8 +120,8 @@ mod tests {
         PrivateKey::from_pem(&pem).expect("key 2")
     }
 
-    fn get_csr_token(private_key: &PrivateKey) -> String {
-        let claims = CsrClaims {
+    fn get_provider_token(private_key: &PrivateKey) -> String {
+        let claims = ProviderClaims {
             sub: "CoolSubject".to_owned(),
             nbf: unix_epoch(),
             exp: unix_epoch() + 10,
@@ -130,16 +130,15 @@ mod tests {
         jwt.encode(&private_key).expect("jwt encode")
     }
 
-    fn build_saphir_req(token: &str) -> SyncRequest {
+    fn build_saphir_req(token: &str) -> Request<Body> {
         let req = request::Builder::new()
             .method(Method::POST)
             .uri("/sign")
             .header(header::DATE, "Tue, 07 Jun 2014 20:51:35 GMT")
             .header(header::AUTHORIZATION, format!("BEARER {}", token))
-            .body(vec![])
+            .body(Body::empty())
             .expect("couldn't build request");
-        let (parts, body) = req.into_parts();
-        SyncRequest::new(parts, body)
+        Request::new(req, None)
     }
 
     fn config(den_key: Option<PublicKey>) -> Config {
@@ -152,7 +151,7 @@ mod tests {
     #[test]
     fn token_authorized() {
         let key = get_private_key_1();
-        let token = get_csr_token(&key);
+        let token = get_provider_token(&key);
         let saphir_req = build_saphir_req(&token);
         let config = config(Some(key.to_public_key()));
         match check_authorization(&config, &saphir_req).expect("auth") {
@@ -163,7 +162,7 @@ mod tests {
 
     #[test]
     fn token_unauthorized_bad_signature() {
-        let token = get_csr_token(&get_private_key_1());
+        let token = get_provider_token(&get_private_key_1());
         let saphir_req = build_saphir_req(&token);
         let config = config(Some(get_private_key_2().to_public_key()));
         let err = check_authorization(&config, &saphir_req).err().expect("auth err");
@@ -175,7 +174,7 @@ mod tests {
 
     #[test]
     fn token_unauthorized_no_den_key() {
-        let token = get_csr_token(&get_private_key_1());
+        let token = get_provider_token(&get_private_key_1());
         let saphir_req = build_saphir_req(&token);
         let config = config(None);
         let err = check_authorization(&config, &saphir_req).err().expect("auth err");

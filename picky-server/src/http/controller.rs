@@ -3,8 +3,8 @@ use crate::{
     config::{CertKeyPair, Config},
     db::{get_storage, BoxedPickyStorage, CertificateEntry, PickyStorage},
     http::{
-        authorization::{check_authorization, Authorized, CsrClaims},
-        utils::SyncRequestUtil,
+        authorization::{check_authorization, Authorized, ProviderClaims},
+        utils::{Format, StatusCodeResult},
     },
     logging::build_logger_config,
     picky_controller::Picky,
@@ -15,231 +15,256 @@ use picky::{
     pem::{parse_pem, to_pem, Pem},
     x509::{Cert, Csr},
 };
-use saphir::{Controller, ControllerDispatch, Method, StatusCode, SyncRequest, SyncResponse};
+use saphir::{prelude::*, response::Builder as ResponseBuilder};
 use serde_json::{self, Value};
-use std::{
-    borrow::Cow,
-    fmt,
-    sync::{RwLock, RwLockReadGuard, RwLockWriteGuard},
-};
+use std::borrow::Cow;
+use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-struct ControllerData {
+pub struct ServerController {
     storage: BoxedPickyStorage,
     config: RwLock<Config>,
     log_handle: Handle,
 }
 
-impl ControllerData {
-    fn read_conf(&self) -> RwLockReadGuard<Config> {
-        self.config.read().expect("config lock") // if this fail, we're basically screwed
-    }
-
-    fn write_conf(&self) -> RwLockWriteGuard<Config> {
-        self.config.write().expect("config lock") // if this fail, we're basically screwed
-    }
-}
-
-pub struct ServerController {
-    dispatch: ControllerDispatch<ControllerData>,
-}
-
 impl ServerController {
-    pub fn new(config: Config, log_handle: Handle) -> Result<Self, String> {
-        let storage = get_storage(&config);
-
-        init_storage_from_config(storage.as_ref(), &config)?;
-
-        let controller_data = ControllerData {
+    pub async fn new(config: Config, log_handle: Handle) -> Result<Self, String> {
+        let storage = get_storage(&config).await;
+        init_storage_from_config(storage.as_ref(), &config).await?;
+        Ok(Self {
             storage,
             config: RwLock::new(config),
             log_handle,
+        })
+    }
+
+    async fn read_conf(&self) -> RwLockReadGuard<'_, Config> {
+        self.config.read().await
+    }
+
+    async fn write_conf(&self) -> RwLockWriteGuard<'_, Config> {
+        self.config.write().await
+    }
+}
+
+#[controller(name = "")]
+impl ServerController {
+    #[get("/health")]
+    async fn health(&self) -> Result<&'static str, StatusCode> {
+        self.storage.health().await.service_unavailable()?;
+        Ok("I'm alive!")
+    }
+
+    #[post("/cert")]
+    async fn post_cert(&self, req: Request<Body>) -> Result<StatusCode, StatusCode> {
+        let req = req
+            .async_map(|b| async { saphir::hyper::body::to_bytes(b).await })
+            .await
+            .transpose()
+            .bad_request()?;
+
+        let (cert, der) = extract_cert_from_request(&req).await.bad_request()?;
+        let ski = hex::encode(cert.subject_key_identifier().bad_request_desc("couldn't fetch SKI")?);
+        let issuer_name = cert
+            .issuer_name()
+            .find_common_name()
+            .bad_request_desc("couldn't find issuer common name")?
+            .to_string();
+
+        if issuer_name != format!("{} Authority", &self.read_conf().await.realm) {
+            log::error!("this certificate was not signed by the CA of this server.");
+            return Err(StatusCode::UNAUTHORIZED);
+        }
+
+        let subject_name = cert
+            .subject_name()
+            .find_common_name()
+            .bad_request_desc("couldn't find subject issuer common name")?
+            .to_string();
+
+        if let Err(e) = self
+            .storage
+            .store(CertificateEntry {
+                name: subject_name.clone(),
+                cert: der,
+                key_identifier: ski,
+                key: None,
+            })
+            .await
+        {
+            log::error!("insertion failed for leaf {}: {}", subject_name, e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+
+        Ok(StatusCode::OK)
+    }
+
+    #[post("/sign")]
+    async fn cert_signature_request(&self, req: Request<Body>) -> Result<ResponseBuilder, StatusCode> {
+        let locked_subject_name: Option<String> = match check_authorization(&*self.read_conf().await, &req) {
+            Ok(Authorized::ApiKey) => None,
+            Ok(Authorized::Token(token)) => {
+                let provider_claims: ProviderClaims = serde_json::from_value(token.into_claims()).bad_request()?;
+                Some(provider_claims.sub)
+            }
+            Err(e) => {
+                log::error!("authorization failed: {}", e);
+                return Err(StatusCode::UNAUTHORIZED);
+            }
         };
 
-        let dispatch = ControllerDispatch::new(controller_data);
+        let req = req
+            .async_map(|b| async { saphir::hyper::body::to_bytes(b).await })
+            .await
+            .transpose()
+            .bad_request()?;
 
-        dispatch.add(Method::GET, "/chain", get_default_chain);
-        dispatch.add(Method::POST, "/sign", cert_signature_request);
-        dispatch.add(Method::GET, "/health", health);
-        dispatch.add(Method::GET, "/cert/<multihash>", get_cert);
-        dispatch.add(Method::POST, "/cert", post_cert);
-        dispatch.add(Method::GET, "/reload", reload_yaml_conf);
+        let csr = extract_csr_from_request(&req).await.bad_request()?;
 
-        Ok(ServerController { dispatch })
+        if let Some(locked_subject_name) = locked_subject_name {
+            let subject_name = csr
+                .subject_name()
+                .find_common_name()
+                .bad_request_desc("couldn't find signed CSR subject common name")?
+                .to_string();
+
+            if locked_subject_name != subject_name {
+                log::error!(
+                    "Requested a certificate with an unauthorized subject name: {}, expected: {}",
+                    subject_name,
+                    locked_subject_name
+                );
+                return Err(StatusCode::UNAUTHORIZED);
+            }
+        }
+
+        // Sign CSR
+        let conf = self.read_conf().await;
+        let ca_name = format!("{} Authority", &conf.realm);
+        let signed_cert = sign_certificate(&ca_name, csr, &conf, self.storage.as_ref())
+            .await
+            .internal_error()?;
+        drop(conf); // release lock early
+
+        match Format::response_format(&req).unwrap_or(Format::PemFile) {
+            Format::PemFile => {
+                let pem = signed_cert
+                    .to_pem()
+                    .internal_error_desc("couldn't get certificate pem")?;
+                Ok(ResponseBuilder::new().body(pem.to_string()))
+            }
+            Format::PkixCertBinary => {
+                let der = signed_cert
+                    .to_der()
+                    .internal_error_desc("couldn't get certificate der")?;
+                Ok(ResponseBuilder::new().body(der))
+            }
+            Format::PkixCertBase64 => {
+                let der = signed_cert
+                    .to_der()
+                    .internal_error_desc("couldn't get certificate der")?;
+                Ok(ResponseBuilder::new().body(base64::encode(&der)))
+            }
+            unexpected => {
+                log::error!("unexpected response format: {}", unexpected);
+                Err(StatusCode::BAD_REQUEST)
+            }
+        }
     }
-}
 
-impl Controller for ServerController {
-    fn handle(&self, req: &mut SyncRequest, res: &mut SyncResponse) {
-        self.dispatch.dispatch(req, res);
-    }
+    #[get("/cert/<multihash>")]
+    async fn get_cert(&self, multihash: String, req: Request<Body>) -> Result<ResponseBuilder, StatusCode> {
+        let addressing_hash_any_base = multihash;
+        let (addressing_hash, hash) = convert_to_canonical_base(&addressing_hash_any_base).internal_error()?;
+        let canonical_address = if hash == CANONICAL_HASH {
+            addressing_hash
+        } else {
+            let converted = self
+                .storage
+                .lookup_addressing_hash(&addressing_hash)
+                .await
+                .internal_error_desc("address lookup failed")?;
+            log::info!("converted cert address {} -> {}", addressing_hash_any_base, converted);
+            converted
+        };
 
-    fn base_path(&self) -> &str {
-        "/"
-    }
-}
-
-// === helper macros === //
-
-macro_rules! saphir_try {
-    ( $result:expr ) => {
-        saphir_try!($result, "Error")
-    };
-    ( $result:expr , $context:literal $(,)? ) => {
-        match $result {
-            Ok(value) => value,
+        let cert_der = match self.storage.get_cert_by_addressing_hash(&canonical_address).await {
+            Ok(cert_der) => cert_der,
             Err(e) => {
-                log::error!(concat!($context, ": {}"), e);
-                return;
+                log::error!("couldn't fetch certificate using hash {}: {}", canonical_address, e);
+                return Err(StatusCode::NOT_FOUND);
+            }
+        };
+
+        match Format::response_format(&req).unwrap_or(Format::PemFile) {
+            Format::PemFile => Ok(ResponseBuilder::new().body(to_pem("CERTIFICATE", &cert_der))),
+            Format::PkixCertBinary => Ok(ResponseBuilder::new().body(cert_der)),
+            Format::PkixCertBase64 => Ok(ResponseBuilder::new().body(base64::encode(&cert_der))),
+            unexpected => {
+                log::error!("unexpected response format: {}", unexpected);
+                Err(StatusCode::BAD_REQUEST)
             }
         }
-    };
-}
+    }
 
-macro_rules! unwrap_opt {
-    ( $opt:expr , $error:literal $(,)? ) => {
-        match $opt {
-            Some(value) => value,
-            None => {
-                log::error!($error);
-                return;
+    #[get("/chain")]
+    async fn get_default_chain(&self) -> Result<String, StatusCode> {
+        let ca = format!("{} Authority", &self.read_conf().await.realm);
+        let chain = find_ca_chain(self.storage.as_ref(), &ca).await.not_found()?;
+        Ok(chain.join("\n"))
+    }
+
+    #[get("/reload")]
+    async fn reload_yaml_conf(&self) -> (&'static str, StatusCode) {
+        match self.reload_yaml_conf_impl().await {
+            Ok(()) => ("Config reloaded successfully!", StatusCode::OK),
+            Err(e) => {
+                log::error!("couldn't reload config: {}", e);
+                ("Couldn't reload config... See logs", StatusCode::INTERNAL_SERVER_ERROR)
             }
         }
-    };
-}
-
-// === header format === //
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum Format {
-    PemFile,
-    Json,
-    PkixCertBinary,
-    PkixCertBase64,
-    Pkcs10Binary,
-    Pkcs10Base64,
-}
-
-impl fmt::Display for Format {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        match self {
-            Format::PemFile => write!(f, "pem file"),
-            Format::Json => write!(f, "json"),
-            Format::PkixCertBinary => write!(f, "binary-encoded pkix-cert"),
-            Format::PkixCertBase64 => write!(f, "base64-encoded pkix-cert"),
-            Format::Pkcs10Binary => write!(f, "binary-encoded pkcs10"),
-            Format::Pkcs10Base64 => write!(f, "base64-encoded pkcs10"),
-        }
     }
 }
 
-impl Format {
-    fn request_format(req: &SyncRequest) -> Result<Self, String> {
-        let content_type_opt = req.get_header_string_value("Content-Type");
-        let content_transfert_encoding_opt = req.get_header_string_value("Content-Transfer-Encoding");
+impl ServerController {
+    async fn reload_yaml_conf_impl(&self) -> Result<(), String> {
+        match Config::init_yaml() {
+            Ok(new_conf) => {
+                log::info!("new config: {:#?}", new_conf);
 
-        if let Some(content_type) = content_type_opt {
-            Self::new(
-                content_type.as_str(),
-                content_transfert_encoding_opt.as_ref().map(|s| s.as_str()),
-            )
-        } else {
-            Err("Content-Type header is missing".to_string())
-        }
-    }
+                init_storage_from_config(self.storage.as_ref(), &new_conf).await?;
 
-    fn response_format(req: &SyncRequest) -> Result<Self, String> {
-        let accept_opt = req.get_header_string_value("Accept").map(|s| {
-            // cannot panic
-            s.split(',').next().unwrap().split(';').next().unwrap().to_owned()
-        });
-        let accept_encoding_opt = req.get_header_string_value("Accept-Encoding").map(|s| {
-            // cannot panic
-            s.split(',').next().unwrap().split(';').next().unwrap().to_owned()
-        });
+                match build_logger_config(&new_conf) {
+                    Ok(logger_config) => self.log_handle.set_config(logger_config),
+                    Err(e) => {
+                        log::warn!("couldn't reload logger configuration: {}", e);
+                    }
+                }
 
-        if let Some(accept) = accept_opt {
-            Self::new(accept.as_str(), accept_encoding_opt.as_ref().map(|s| s.as_str()))
-        } else {
-            Err("Accept header is missing".to_string())
-        }
-    }
+                let mut old_conf = self.write_conf().await;
+                if old_conf.database_url != new_conf.database_url {
+                    log::warn!("'database_url' modification require service restart");
+                }
+                if old_conf.file_backend_path != new_conf.file_backend_path {
+                    log::warn!("'file_backend_path' modification require service restart");
+                }
+                if old_conf.backend != new_conf.backend {
+                    log::warn!("'backend' modification require service restart");
+                }
+                *old_conf = new_conf;
 
-    fn new(format: &str, encoding: Option<&str>) -> Result<Self, String> {
-        match (format, encoding) {
-            ("application/x-pem-file", _) => Ok(Self::PemFile),
-            ("application/json", _) => Ok(Self::Json),
-            ("application/pkix-cert", Some("binary")) => Ok(Self::PkixCertBinary),
-            ("application/pkix-cert", Some("base64")) => Ok(Self::PkixCertBase64),
-            ("application/pkix-cert", Some(unsupported)) => {
-                Err(format!("unsupported encoding format for pkix-cert: {}", unsupported))
+                log::info!("reloaded successfully");
+                Ok(())
             }
-            ("application/pkix-cert", None) => Err("format encoding for pkix-cert is missing".to_owned()),
-            ("application/pkcs10", Some("binary")) => Ok(Self::Pkcs10Binary),
-            ("application/pkcs10", Some("base64")) => Ok(Self::Pkcs10Base64),
-            ("application/pkcs10", Some(unsupported)) => {
-                Err(format!("unsupported encoding format for pkcs10: {}", unsupported))
-            }
-            ("application/pkcs10", None) => Err("format encoding for pkcs10 is missing".to_owned()),
-            (unsupported, _) => Err(format!("unsupported format: {}", unsupported)),
+            Err(e) => Err(format!("couldn't reload config: {}", e)),
         }
     }
 }
 
-// === health === //
-
-fn health(controller_data: &ControllerData, _req: &SyncRequest, res: &mut SyncResponse) {
-    if controller_data.storage.health().is_ok() {
-        res.status(StatusCode::OK).body("Everything should be alright!");
-    } else {
-        res.status(StatusCode::SERVICE_UNAVAILABLE);
-    }
-}
-
-// === post_cert === //
-
-fn post_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse) {
-    res.status(StatusCode::BAD_REQUEST);
-
-    let cert = saphir_try!(extract_cert_from_request(req));
-
-    let ski = hex::encode(saphir_try!(cert.subject_key_identifier(), "couldn't fetch SKI"));
-
-    let issuer_name = unwrap_opt!(
-        cert.issuer_name().find_common_name(),
-        "couldn't find issuer common name"
-    )
-    .to_string();
-
-    if issuer_name != format!("{} Authority", &controller_data.read_conf().realm) {
-        log::error!("this certificate was not signed by the CA of this server.");
-        return;
-    }
-
-    let der = saphir_try!(cert.to_der(), "couldn't serialize certificate into der");
-    let subject_name = unwrap_opt!(
-        cert.subject_name().find_common_name(),
-        "couldn't find subject issuer common name"
-    )
-    .to_string();
-
-    if let Err(e) = controller_data.storage.store(CertificateEntry {
-        name: subject_name.clone(),
-        cert: der,
-        key_identifier: ski,
-        key: None,
-    }) {
-        log::error!("insertion failed for leaf {}: {}", subject_name, e);
-    } else {
-        res.status(StatusCode::OK);
-    }
-}
-
-fn extract_cert_from_request(req: &SyncRequest) -> Result<Cert, GreedyError> {
-    let request_format = Format::request_format(req)?;
-    match request_format {
+async fn extract_cert_from_request(req: &Request<Bytes>) -> Result<(Cert, Vec<u8>), GreedyError> {
+    match Format::request_format(&req)? {
         Format::PemFile => {
             let pem = parse_pem(req.body())?;
-            Ok(Cert::from_der(pem.data())?)
+            Ok((Cert::from_der(pem.data())?, pem.into_data().into_owned()))
         }
         Format::Json => {
             let json = serde_json::from_slice::<Value>(req.body())?;
@@ -248,91 +273,19 @@ fn extract_cert_from_request(req: &SyncRequest) -> Result<Cert, GreedyError> {
                 .trim_matches('"')
                 .replace("\\n", "\n")
                 .parse::<Pem>()?;
-            Ok(Cert::from_der(pem.data())?)
+            Ok((Cert::from_der(pem.data())?, pem.into_data().into_owned()))
         }
-        Format::PkixCertBinary => Ok(Cert::from_der(req.body())?),
+        Format::PkixCertBinary => Ok((Cert::from_der(req.body())?, req.body().to_vec())),
         Format::PkixCertBase64 => {
-            let der = base64::decode(&req.body())?;
-            Ok(Cert::from_der(&der)?)
+            let der = base64::decode(req.body())?;
+            Ok((Cert::from_der(&der)?, der))
         }
         unexpected => Err(GreedyError(format!("unexpected request format: {}", unexpected))),
     }
 }
 
-// === cert_signature_request ===
-
-fn cert_signature_request(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse) {
-    res.status(StatusCode::BAD_REQUEST);
-
-    let locked_subject_name: Option<String> = match check_authorization(&controller_data.read_conf(), req) {
-        Ok(Authorized::ApiKey) => None,
-        Ok(Authorized::Token(token)) => {
-            let csr_claims: CsrClaims = saphir_try!(serde_json::from_value(token.into_claims()));
-            Some(csr_claims.sub)
-        }
-        Err(e) => {
-            log::error!("authorization failed: {}", e);
-            res.status(StatusCode::UNAUTHORIZED);
-            return;
-        }
-    };
-
-    let csr = saphir_try!(extract_csr_from_request(req));
-
-    if let Some(locked_subject_name) = locked_subject_name {
-        let subject_name = unwrap_opt!(
-            csr.subject_name().find_common_name(),
-            "couldn't find signed CSR subject common name"
-        )
-        .to_string();
-
-        if locked_subject_name != subject_name {
-            log::error!(
-                "Requested a certificate with an unauthorized subject name: {}, expected: {}",
-                subject_name,
-                locked_subject_name
-            );
-            res.status(StatusCode::UNAUTHORIZED);
-            return;
-        }
-    }
-
-    // Sign CSR
-    let conf = controller_data.read_conf();
-    let signed_cert = saphir_try!(sign_certificate(
-        &format!("{} Authority", &conf.realm),
-        csr,
-        &conf,
-        controller_data.storage.as_ref()
-    ));
-    drop(conf); // release lock early
-
-    let response_format = Format::response_format(req).unwrap_or(Format::PemFile);
-    match response_format {
-        Format::PemFile => {
-            let pem = saphir_try!(signed_cert.to_pem(), "couldn't get certificate pem");
-            res.body(pem.to_string());
-        }
-        Format::PkixCertBinary => {
-            let der = saphir_try!(signed_cert.to_der(), "couldn't get certificate der");
-            res.body(der);
-        }
-        Format::PkixCertBase64 => {
-            let der = saphir_try!(signed_cert.to_der(), "couldn't get certificate der");
-            res.body(base64::encode(&der));
-        }
-        unexpected => {
-            log::error!("unexpected response format: {}", unexpected);
-            return;
-        }
-    }
-
-    res.status(StatusCode::OK);
-}
-
-fn extract_csr_from_request(req: &SyncRequest) -> Result<Csr, GreedyError> {
-    let request_format = Format::request_format(req)?;
-    match request_format {
+async fn extract_csr_from_request(req: &Request<Bytes>) -> Result<Csr, GreedyError> {
+    match Format::request_format(req)? {
         Format::PemFile => {
             let pem = parse_pem(req.body())?;
             Ok(Csr::from_der(pem.data())?)
@@ -348,25 +301,33 @@ fn extract_csr_from_request(req: &SyncRequest) -> Result<Csr, GreedyError> {
         }
         Format::Pkcs10Binary => Ok(Csr::from_der(req.body())?),
         Format::Pkcs10Base64 => {
-            let der = base64::decode(&req.body())?;
+            let der = base64::decode(req.body())?;
             Ok(Csr::from_der(&der)?)
         }
         unexpected => Err(GreedyError(format!("unexpected request format: {}", unexpected))),
     }
 }
 
-fn sign_certificate(ca_name: &str, csr: Csr, config: &Config, storage: &dyn PickyStorage) -> Result<Cert, String> {
+async fn sign_certificate(
+    ca_name: &str,
+    csr: Csr,
+    config: &Config,
+    storage: &dyn PickyStorage,
+) -> Result<Cert, String> {
     let ca_hash = storage
         .get_addressing_hash_by_name(ca_name)
+        .await
         .map_err(|e| format!("couldn't fetch CA: {}", e))?;
 
     let ca_cert_der = storage
         .get_cert_by_addressing_hash(&ca_hash)
+        .await
         .map_err(|e| format!("couldn't get CA cert der: {}", e))?;
     let ca_cert = Cert::from_der(&ca_cert_der).map_err(|e| format!("couldn't deserialize CA cert: {}", e))?;
 
     let ca_pk_der = storage
         .get_key_by_addressing_hash(&ca_hash)
+        .await
         .map_err(|e| format!("couldn't fetch CA private key: {}", e))?;
     let ca_pk = Picky::parse_pk_from_magic_der(&ca_pk_der).map_err(|e| e.to_string())?;
 
@@ -396,72 +357,22 @@ fn sign_certificate(ca_name: &str, csr: Csr, config: &Config, storage: &dyn Pick
                 key_identifier: ski,
                 key: None,
             })
+            .await
             .map_err(|e| format!("insertion error for leaf {}: {}", dns_name, e))?;
     }
 
     Ok(signed_cert)
 }
 
-// === get_cert === //
-
-fn get_cert(controller_data: &ControllerData, req: &SyncRequest, res: &mut SyncResponse) {
-    res.status(StatusCode::BAD_REQUEST);
-
-    let addressing_hash_any_base = unwrap_opt!(req.captures().get("multihash"), "multihash is missing");
-    let (addressing_hash, hash) = saphir_try!(convert_to_canonical_base(addressing_hash_any_base));
-    let canonical_address = if hash == CANONICAL_HASH {
-        addressing_hash
-    } else {
-        let converted = saphir_try!(controller_data.storage.lookup_addressing_hash(&addressing_hash));
-        log::info!("converted cert address {} -> {}", addressing_hash_any_base, converted);
-        converted
-    };
-
-    let cert_der = match controller_data.storage.get_cert_by_addressing_hash(&canonical_address) {
-        Ok(cert_der) => cert_der,
-        Err(e) => {
-            log::error!("couldn't fetch certificate using hash {}: {}", canonical_address, e);
-            return;
-        }
-    };
-
-    let response_format = Format::response_format(req).unwrap_or(Format::PemFile);
-    match response_format {
-        Format::PemFile => {
-            res.body(to_pem("CERTIFICATE", &cert_der));
-        }
-        Format::PkixCertBinary => {
-            res.body(cert_der);
-        }
-        Format::PkixCertBase64 => {
-            res.body(base64::encode(&cert_der));
-        }
-        unexpected => {
-            log::error!("unexpected response format: {}", unexpected);
-            return;
-        }
-    }
-
-    res.status(StatusCode::OK);
-}
-
-// === chain ===
-
-fn get_default_chain(controller_data: &ControllerData, _: &SyncRequest, res: &mut SyncResponse) {
-    res.status(StatusCode::BAD_REQUEST);
-    let ca = format!("{} Authority", &controller_data.read_conf().realm);
-    let chain = saphir_try!(find_ca_chain(controller_data.storage.as_ref(), &ca));
-    res.body(chain.join("\n"));
-    res.status(StatusCode::OK);
-}
-
-fn find_ca_chain(storage: &dyn PickyStorage, ca_name: &str) -> Result<Vec<String>, String> {
+async fn find_ca_chain(storage: &dyn PickyStorage, ca_name: &str) -> Result<Vec<String>, String> {
     let ca_hash = storage
         .get_addressing_hash_by_name(ca_name)
+        .await
         .map_err(|e| format!("couldn't fetch CA hash id for {}: {}", ca_name, e))?;
 
     let mut cert_der = storage
         .get_cert_by_addressing_hash(&ca_hash)
+        .await
         .map_err(|e| format!("couldn't fetch CA certificate der: {}", e))?;
     let mut chain = vec![to_pem("CERTIFICATE", &cert_der)];
     let mut current_key_id = String::default();
@@ -482,10 +393,12 @@ fn find_ca_chain(storage: &dyn PickyStorage, ca_name: &str) -> Result<Vec<String
 
         let hash_address = storage
             .get_addressing_hash_by_key_identifier(&parent_key_id)
+            .await
             .map_err(|e| format!("couldn't fetch hash: {}", e))?;
 
         cert_der = storage
             .get_cert_by_addressing_hash(&hash_address)
+            .await
             .map_err(|e| format!("couldn't fetch certificate der: {}", e))?;
 
         chain.push(to_pem("CERTIFICATE", &cert_der));
@@ -496,12 +409,10 @@ fn find_ca_chain(storage: &dyn PickyStorage, ca_name: &str) -> Result<Vec<String
     Ok(chain)
 }
 
-// === generate root CA === //
-
-fn generate_root_ca(config: &Config, storage: &dyn PickyStorage) -> Result<bool, String> {
+async fn generate_root_ca(config: &Config, storage: &dyn PickyStorage) -> Result<bool, String> {
     let name = format!("{} Root CA", config.realm);
 
-    if let Ok(certs) = storage.get_addressing_hash_by_name(&name) {
+    if let Ok(certs) = storage.get_addressing_hash_by_name(&name).await {
         if !certs.is_empty() {
             // already exists
             return Ok(false);
@@ -530,31 +441,32 @@ fn generate_root_ca(config: &Config, storage: &dyn PickyStorage) -> Result<bool,
             key_identifier: hex::encode(ski),
             key: Some(pk_pkcs8),
         })
+        .await
         .map_err(|e| format!("couldn't store generated root certificate: {}", e))?;
 
     Ok(true)
 }
 
-// === generate intermediate CA === //
-
-fn generate_intermediate_ca(config: &Config, storage: &dyn PickyStorage) -> Result<bool, String> {
+async fn generate_intermediate_ca(config: &Config, storage: &dyn PickyStorage) -> Result<bool, String> {
     let root_name = format!("{} Root CA", config.realm);
     let intermediate_name = format!("{} Authority", config.realm);
 
-    if let Ok(certs) = storage.get_addressing_hash_by_name(&intermediate_name) {
+    if let Ok(certs) = storage.get_addressing_hash_by_name(&intermediate_name).await {
         if !certs.is_empty() {
             // already exists
             return Ok(false);
         }
     }
 
-    let (root_cert_der, root_key_der) = match storage.get_addressing_hash_by_name(&root_name) {
+    let (root_cert_der, root_key_der) = match storage.get_addressing_hash_by_name(&root_name).await {
         Ok(root_hash) => (
             storage
                 .get_cert_by_addressing_hash(&root_hash)
+                .await
                 .map_err(|e| format!("couldn't fetch root CA: {}", e))?,
             storage
                 .get_key_by_addressing_hash(&root_hash)
+                .await
                 .map_err(|e| format!("couldn't fetch root CA private key: {}", e))?,
         ),
         Err(e) => {
@@ -594,21 +506,22 @@ fn generate_intermediate_ca(config: &Config, storage: &dyn PickyStorage) -> Resu
             key_identifier: hex::encode(ski),
             key: Some(pk_pkcs8),
         })
+        .await
         .map_err(|e| format!("couldn't store generated intermediate certificate: {}", e))?;
 
     Ok(true)
 }
 
-// === inject config provided certificates in picky storage === //
-
-fn inject_config_provided_cert(
+async fn inject_config_provided_cert(
     expected_subject_name: &str,
     cert_key_pair: &CertKeyPair,
     storage: &dyn PickyStorage,
 ) -> Result<(), String> {
     let (cert, cert_der) = match &cert_key_pair.cert {
         PathOr::Path(path) => {
-            let pem_str = std::fs::read_to_string(path).map_err(|e| format!("couldn't read cert: {}", e))?;
+            let pem_str = tokio::fs::read_to_string(path)
+                .await
+                .map_err(|e| format!("couldn't read cert: {}", e))?;
             let pem = pem_str
                 .parse::<Pem>()
                 .map_err(|e| format!("couldn't parse cert pem: {}", e))?;
@@ -642,7 +555,9 @@ fn inject_config_provided_cert(
 
     let key_der = match &cert_key_pair.key {
         PathOr::Path(path) => {
-            let pem_str = std::fs::read_to_string(path).map_err(|e| format!("couldn't read key: {}", e))?;
+            let pem_str = tokio::fs::read_to_string(path)
+                .await
+                .map_err(|e| format!("couldn't read key: {}", e))?;
             let pem = pem_str
                 .parse::<Pem>()
                 .map_err(|e| format!("couldn't parse key pem: {}", e))?;
@@ -660,71 +575,26 @@ fn inject_config_provided_cert(
             key_identifier: ski,
             key: Some(key_der),
         })
+        .await
         .map_err(|e| format!("couldn't store certificate: {}", e))?;
 
     Ok(())
 }
 
-// === config management === //
-
-fn reload_yaml_conf(controller_data: &ControllerData, _: &SyncRequest, res: &mut SyncResponse) {
-    match reload_yaml_conf_impl(controller_data) {
-        Ok(()) => {
-            res.body("Config reloaded successfully!");
-            res.status(StatusCode::OK);
-        }
-        Err(e) => {
-            log::error!("couldn't reload config: {}", e);
-            res.body("Couldn't reload config... See logs");
-            res.status(StatusCode::BAD_REQUEST);
-        }
-    }
-}
-
-fn reload_yaml_conf_impl(controller_data: &ControllerData) -> Result<(), String> {
-    match Config::init_yaml() {
-        Ok(new_conf) => {
-            log::info!("new config: {:#?}", new_conf);
-
-            init_storage_from_config(controller_data.storage.as_ref(), &new_conf)?;
-
-            match build_logger_config(&new_conf) {
-                Ok(logger_config) => controller_data.log_handle.set_config(logger_config),
-                Err(e) => {
-                    log::warn!("couldn't reload logger configuration: {}", e);
-                }
-            }
-
-            let mut old_conf = controller_data.write_conf();
-            if old_conf.database_url != new_conf.database_url {
-                log::warn!("'database_url' modification require service restart");
-            }
-            if old_conf.file_backend_path != new_conf.file_backend_path {
-                log::warn!("'file_backend_path' modification require service restart");
-            }
-            if old_conf.backend != new_conf.backend {
-                log::warn!("'backend' modification require service restart");
-            }
-            *old_conf = new_conf;
-
-            log::info!("reloaded successfully");
-            Ok(())
-        }
-        Err(e) => Err(format!("couldn't reload config: {}", e)),
-    }
-}
-
-fn init_storage_from_config(storage: &dyn PickyStorage, config: &Config) -> Result<(), String> {
+async fn init_storage_from_config(storage: &dyn PickyStorage, config: &Config) -> Result<(), String> {
     log::info!("init storage from config");
 
     if let Some(root_cert_key_pair) = &config.root {
         log::info!("inject root CA provided by settings");
-        if let Err(e) = inject_config_provided_cert(&format!("{} Root CA", config.realm), root_cert_key_pair, storage) {
+        let expected = format!("{} Root CA", config.realm);
+        if let Err(e) = inject_config_provided_cert(&expected, root_cert_key_pair, storage).await {
             return Err(format!("couldn't inject root CA: {}", e));
         }
     } else {
         log::info!("root CA...");
-        let created = generate_root_ca(&config, storage).map_err(|e| format!("couldn't generate root CA: {}", e))?;
+        let created = generate_root_ca(&config, storage)
+            .await
+            .map_err(|e| format!("couldn't generate root CA: {}", e))?;
         if created {
             log::info!("created");
         } else {
@@ -734,16 +604,14 @@ fn init_storage_from_config(storage: &dyn PickyStorage, config: &Config) -> Resu
 
     if let Some(intermediate_cert_key_pair) = &config.intermediate {
         log::info!("inject intermediate CA provided by settings");
-        if let Err(e) = inject_config_provided_cert(
-            &format!("{} Authority", config.realm),
-            intermediate_cert_key_pair,
-            storage,
-        ) {
+        let expected = format!("{} Authority", config.realm);
+        if let Err(e) = inject_config_provided_cert(&expected, intermediate_cert_key_pair, storage).await {
             return Err(format!("couldn't inject intermediate CA: {}", e));
         }
     } else {
         log::info!("intermediate CA...");
         let created = generate_intermediate_ca(&config, storage)
+            .await
             .map_err(|e| format!("couldn't generate intermediate CA: {}", e))?;
         if created {
             log::info!("created");
@@ -763,6 +631,7 @@ mod tests {
         signature::SignatureHashType,
         x509::{date::UTCDate, name::DirectoryName},
     };
+    use tokio_test::block_on;
 
     fn config() -> Config {
         let mut config = Config::default();
@@ -773,12 +642,12 @@ mod tests {
     #[test]
     fn generate_chain_and_verify() {
         let config = config();
-        let storage = get_storage(&config);
+        let storage = block_on(get_storage(&config));
 
         let ca_name = format!("{} Authority", config.realm);
 
-        generate_root_ca(&config, storage.as_ref()).expect("couldn't generate root ca");
-        generate_intermediate_ca(&config, storage.as_ref()).expect("couldn't generate intermediate ca");
+        block_on(generate_root_ca(&config, storage.as_ref())).expect("couldn't generate root ca");
+        block_on(generate_intermediate_ca(&config, storage.as_ref())).expect("couldn't generate intermediate ca");
 
         let pk = Picky::generate_private_key(2048).expect("couldn't generate private key");
         let csr = Csr::generate(
@@ -789,10 +658,10 @@ mod tests {
         .expect("couldn't generate csr");
 
         let signed_cert =
-            sign_certificate(&ca_name, csr, &config, storage.as_ref()).expect("couldn't sign certificate");
+            block_on(sign_certificate(&ca_name, csr, &config, storage.as_ref())).expect("couldn't sign certificate");
 
         let issuer_name = signed_cert.issuer_name().find_common_name().unwrap().to_string();
-        let chain_pem = find_ca_chain(storage.as_ref(), &issuer_name).expect("couldn't fetch CA chain");
+        let chain_pem = block_on(find_ca_chain(storage.as_ref(), &issuer_name)).expect("couldn't fetch CA chain");
 
         assert_eq!(chain_pem.len(), 2);
 
@@ -810,104 +679,5 @@ mod tests {
         signed_cert
             .verify_chain(chain.iter(), &UTCDate::now())
             .expect("couldn't validate ca chain");
-    }
-
-    fn new_saphir_request(headers: Vec<(&str, &str)>) -> SyncRequest {
-        use saphir::Request;
-
-        let mut request = Request::builder();
-        for (header, value) in headers.into_iter() {
-            request.header(header, value);
-        }
-        let (parts, _) = request.body(()).unwrap().into_parts();
-
-        SyncRequest::new(parts, vec![])
-    }
-
-    #[test]
-    fn request_format() {
-        let format =
-            Format::request_format(&new_saphir_request(vec![("Content-Type", "application/x-pem-file")])).unwrap();
-        assert_eq!(format, Format::PemFile);
-
-        let format = Format::request_format(&new_saphir_request(vec![("Content-Type", "application/json")])).unwrap();
-        assert_eq!(format, Format::Json);
-
-        let format = Format::request_format(&new_saphir_request(vec![
-            ("Content-Type", "application/pkix-cert"),
-            ("Content-Transfer-Encoding", "binary"),
-        ]))
-        .unwrap();
-        assert_eq!(format, Format::PkixCertBinary);
-
-        let format = Format::request_format(&new_saphir_request(vec![
-            ("Content-Type", "application/pkcs10"),
-            ("Content-Transfer-Encoding", "base64"),
-        ]))
-        .unwrap();
-        assert_eq!(format, Format::Pkcs10Base64);
-    }
-
-    #[test]
-    fn request_format_err() {
-        let err = Format::request_format(&new_saphir_request(vec![])).err().unwrap();
-        assert_eq!(err, "Content-Type header is missing");
-
-        let err = Format::request_format(&new_saphir_request(vec![("Content-Type", "application/pkcs10")]))
-            .err()
-            .unwrap();
-        assert_eq!(err, "format encoding for pkcs10 is missing");
-
-        let err = Format::request_format(&new_saphir_request(vec![
-            ("Content-Type", "application/unknown"),
-            ("Content-Transfer-Encoding", "unknown"),
-        ]))
-        .err()
-        .unwrap();
-        assert_eq!(err, "unsupported format: application/unknown");
-
-        let err = Format::request_format(&new_saphir_request(vec![
-            ("Content-Type", "application/pkcs10"),
-            ("Content-Transfer-Encoding", "unknown"),
-        ]))
-        .err()
-        .unwrap();
-        assert_eq!(err, "unsupported encoding format for pkcs10: unknown");
-    }
-
-    #[test]
-    fn response_format() {
-        let format = Format::response_format(&new_saphir_request(vec![("Accept", "application/x-pem-file")])).unwrap();
-        assert_eq!(format, Format::PemFile);
-
-        let format = Format::response_format(&new_saphir_request(vec![(
-            "Accept",
-            "application/json;q=0.5, application/x-pem-file",
-        )]))
-        .unwrap();
-        assert_eq!(format, Format::Json);
-
-        let format = Format::response_format(&new_saphir_request(vec![
-            (
-                "Accept",
-                "application/pkix-cert, application/x-pem-file, snateinsrturiest",
-            ),
-            ("Accept-Encoding", "binary, base64"),
-        ]))
-        .unwrap();
-        assert_eq!(format, Format::PkixCertBinary);
-
-        let format = Format::response_format(&new_saphir_request(vec![
-            ("Accept", "application/pkcs10;q=1"),
-            ("Accept-Encoding", "base64;q=1"),
-        ]))
-        .unwrap();
-        assert_eq!(format, Format::Pkcs10Base64);
-    }
-
-    #[test]
-    fn response_format_err() {
-        let err = Format::response_format(&new_saphir_request(vec![])).err().unwrap();
-        assert_eq!(err, "Accept header is missing");
     }
 }

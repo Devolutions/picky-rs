@@ -3,6 +3,7 @@ use crate::{
     config::Config,
     db::{config::DatabaseConfig, CertificateEntry, PickyStorage, StorageError, SCHEMA_LAST_VERSION},
 };
+use futures::{future::BoxFuture, FutureExt};
 use snafu::Snafu;
 use std::{
     fs::File,
@@ -42,13 +43,19 @@ where
         })
     }
 
-    fn get_collection(&self) -> Result<Vec<String>, FileStorageError> {
+    async fn get_collection(&self) -> Result<Vec<String>, FileStorageError> {
         // This isn't an efficient way to proceed.
         // Implementing a lazy wrapper would be a better approach should this be used in production.
         let mut coll = Vec::new();
-        let d = std::fs::read_dir(&self.folder_path).map_err(|e| format!("repository folder not found: {}", e))?;
-        for f in d {
-            let f = f.map_err(|e| format!("error looking for directory: {}", e))?;
+        let mut d = tokio::fs::read_dir(&self.folder_path)
+            .await
+            .map_err(|e| format!("repository folder not found: {}", e))?;
+
+        while let Some(f) = d
+            .next_entry()
+            .await
+            .map_err(|e| format!("couldn't read entry: {}", e))?
+        {
             coll.push(
                 f.file_name()
                     .into_string()
@@ -58,7 +65,7 @@ where
         Ok(coll)
     }
 
-    fn insert(&self, key: &str, value: &T) -> Result<(), FileStorageError> {
+    async fn insert(&self, key: &str, value: &T) -> Result<(), FileStorageError> {
         let mut file = File::create(self.folder_path.join(key)).map_err(|e| {
             format!(
                 "couldn't open file ({}{}): {}",
@@ -130,9 +137,14 @@ impl FileStorage {
         }
     }
 
-    fn h_get(&self, hash: &str, repo: &FileRepo<Vec<u8>>, type_err: &'static str) -> Result<Vec<u8>, FileStorageError> {
+    async fn h_get<'a>(
+        &'a self,
+        hash: &'a str,
+        repo: &'a FileRepo<Vec<u8>>,
+        type_err: &'static str,
+    ) -> Result<Vec<u8>, FileStorageError> {
         let hash = format!("{}{}", hash, DER_EXT);
-        let repo_collection = if let Ok(repo_collection) = repo.get_collection() {
+        let repo_collection = if let Ok(repo_collection) = repo.get_collection().await {
             repo_collection
         } else {
             return Err(FileStorageError::Other {
@@ -162,105 +174,135 @@ impl FileStorage {
 }
 
 impl PickyStorage for FileStorage {
-    fn health(&self) -> Result<(), StorageError> {
-        Ok(())
+    fn health(&self) -> BoxFuture<'_, Result<(), StorageError>> {
+        async { Ok(()) }.boxed()
     }
 
-    fn store(&self, entry: CertificateEntry) -> Result<(), StorageError> {
+    fn store(&self, entry: CertificateEntry) -> BoxFuture<'_, Result<(), StorageError>> {
         let name = entry.name;
         let cert = entry.cert;
         let key_identifier = entry.key_identifier;
         let key = entry.key;
 
-        let addressing_hash = encode_to_canonical_address(&cert).map_err(|e| FileStorageError::Other {
-            description: format!("couldn't hash certificate der: {}", e),
-        })?;
+        async move {
+            let addressing_hash = encode_to_canonical_address(&cert).map_err(|e| FileStorageError::Other {
+                description: format!("couldn't hash certificate der: {}", e),
+            })?;
 
-        let alternative_addresses = encode_to_alternative_addresses(&cert).map_err(|e| FileStorageError::Other {
-            description: format!("couldn't encode alternative addresses: {}", e),
-        })?;
+            let alternative_addresses =
+                encode_to_alternative_addresses(&cert).map_err(|e| FileStorageError::Other {
+                    description: format!("couldn't encode alternative addresses: {}", e),
+                })?;
 
-        self.name
-            .insert(&format!("{}{}", name.replace(" ", "_"), TXT_EXT), &addressing_hash)?;
-        self.cert
-            .insert(&format!("{}{}", addressing_hash, DER_EXT), &cert.to_vec())?;
-        self.key_identifiers
-            .insert(&format!("{}{}", key_identifier, TXT_EXT), &addressing_hash)?;
+            self.name
+                .insert(&format!("{}{}", name.replace(" ", "_"), TXT_EXT), &addressing_hash)
+                .await?;
+            self.cert
+                .insert(&format!("{}{}", addressing_hash, DER_EXT), &cert.to_vec())
+                .await?;
+            self.key_identifiers
+                .insert(&format!("{}{}", key_identifier, TXT_EXT), &addressing_hash)
+                .await?;
 
-        for alternative_address in alternative_addresses.into_iter() {
-            self.hash_lookup
-                .insert(&format!("{}{}", alternative_address, TXT_EXT), &addressing_hash)?;
+            for alternative_address in alternative_addresses.into_iter() {
+                self.hash_lookup
+                    .insert(&format!("{}{}", alternative_address, TXT_EXT), &addressing_hash)
+                    .await?;
+            }
+
+            if let Some(key) = key {
+                self.keys
+                    .insert(&format!("{}{}", addressing_hash, DER_EXT), &key.to_vec())
+                    .await?;
+            }
+
+            Ok(())
         }
+        .boxed()
+    }
 
-        if let Some(key) = key {
-            self.keys
-                .insert(&format!("{}{}", addressing_hash, DER_EXT), &key.to_vec())?;
+    fn get_cert_by_addressing_hash<'a>(&'a self, hash: &'a str) -> BoxFuture<'a, Result<Vec<u8>, StorageError>> {
+        async move {
+            let cert = self.h_get(hash, &self.cert, "Cert").await?;
+            Ok(cert)
         }
-
-        Ok(())
+        .boxed()
     }
 
-    fn get_cert_by_addressing_hash(&self, hash: &str) -> Result<Vec<u8>, StorageError> {
-        let cert = self.h_get(hash, &self.cert, "Cert")?;
-        Ok(cert)
+    fn get_key_by_addressing_hash<'a>(&'a self, hash: &'a str) -> BoxFuture<'a, Result<Vec<u8>, StorageError>> {
+        async move {
+            let key = self.h_get(hash, &self.keys, "Key").await?;
+            Ok(key)
+        }
+        .boxed()
     }
 
-    fn get_key_by_addressing_hash(&self, hash: &str) -> Result<Vec<u8>, StorageError> {
-        let key = self.h_get(hash, &self.keys, "Key")?;
-        Ok(key)
-    }
-
-    fn get_addressing_hash_by_name(&self, name: &str) -> Result<String, StorageError> {
+    fn get_addressing_hash_by_name(&self, name: &str) -> BoxFuture<'_, Result<String, StorageError>> {
         let name = format!("{}{}", name, TXT_EXT).replace(" ", "_");
-        let file = self
-            .name
-            .get_collection()?
-            .into_iter()
-            .find(|filename| filename.eq(&name))
-            .ok_or_else(|| FileStorageError::Other {
-                description: format!("'{}' not found", name),
-            })?;
-        let file_path = self.name.folder_path.join(file);
-        Ok(
-            std::fs::read_to_string(&file_path).map_err(|e| FileStorageError::Other {
-                description: format!("error reading file '{}': {}", file_path.to_string_lossy(), e),
-            })?,
-        )
+        async move {
+            let file = self
+                .name
+                .get_collection()
+                .await?
+                .into_iter()
+                .find(|filename| filename.eq(&name))
+                .ok_or_else(|| FileStorageError::Other {
+                    description: format!("'{}' not found", name),
+                })?;
+            let file_path = self.name.folder_path.join(file);
+            Ok(tokio::fs::read_to_string(&file_path)
+                .await
+                .map_err(|e| FileStorageError::Other {
+                    description: format!("error reading file '{}': {}", file_path.to_string_lossy(), e),
+                })?)
+        }
+        .boxed()
     }
 
-    fn get_addressing_hash_by_key_identifier(&self, key_identifier: &str) -> Result<String, StorageError> {
+    fn get_addressing_hash_by_key_identifier(
+        &self,
+        key_identifier: &str,
+    ) -> BoxFuture<'_, Result<String, StorageError>> {
         let key_identifier = format!("{}{}", key_identifier, TXT_EXT);
-        let file = self
-            .key_identifiers
-            .get_collection()?
-            .into_iter()
-            .find(|filename| filename.eq(&key_identifier))
-            .ok_or_else(|| FileStorageError::Other {
-                description: format!("'{}' not found", key_identifier),
-            })?;
-        let file_path = self.key_identifiers.folder_path.join(file);
-        Ok(
-            std::fs::read_to_string(&file_path).map_err(|e| FileStorageError::Other {
-                description: format!("error reading file '{}': {}", file_path.to_string_lossy(), e),
-            })?,
-        )
+        async move {
+            let file = self
+                .key_identifiers
+                .get_collection()
+                .await?
+                .into_iter()
+                .find(|filename| filename.eq(&key_identifier))
+                .ok_or_else(|| FileStorageError::Other {
+                    description: format!("'{}' not found", key_identifier),
+                })?;
+            let file_path = self.key_identifiers.folder_path.join(file);
+            Ok(tokio::fs::read_to_string(&file_path)
+                .await
+                .map_err(|e| FileStorageError::Other {
+                    description: format!("error reading file '{}': {}", file_path.to_string_lossy(), e),
+                })?)
+        }
+        .boxed()
     }
 
-    fn lookup_addressing_hash(&self, lookup_key: &str) -> Result<String, StorageError> {
+    fn lookup_addressing_hash(&self, lookup_key: &str) -> BoxFuture<'_, Result<String, StorageError>> {
         let lookup_key_file = format!("{}{}", lookup_key, TXT_EXT);
-        let file = self
-            .hash_lookup
-            .get_collection()?
-            .into_iter()
-            .find(|filename| filename.eq(&lookup_key_file))
-            .ok_or_else(|| FileStorageError::Other {
-                description: format!("'{}' not found", lookup_key_file),
-            })?;
-        let file_path = self.hash_lookup.folder_path.join(file);
-        Ok(
-            std::fs::read_to_string(&file_path).map_err(|e| FileStorageError::Other {
-                description: format!("error reading file '{}': {}", file_path.to_string_lossy(), e),
-            })?,
-        )
+        async move {
+            let file = self
+                .hash_lookup
+                .get_collection()
+                .await?
+                .into_iter()
+                .find(|filename| filename.eq(&lookup_key_file))
+                .ok_or_else(|| FileStorageError::Other {
+                    description: format!("'{}' not found", lookup_key_file),
+                })?;
+            let file_path = self.hash_lookup.folder_path.join(file);
+            Ok(tokio::fs::read_to_string(&file_path)
+                .await
+                .map_err(|e| FileStorageError::Other {
+                    description: format!("error reading file '{}': {}", file_path.to_string_lossy(), e),
+                })?)
+        }
+        .boxed()
     }
 }

@@ -39,6 +39,18 @@ impl From<String> for GreedyError {
     }
 }
 
+impl From<&str> for GreedyError {
+    fn from(e: &str) -> Self {
+        Self(e.to_owned())
+    }
+}
+
+impl From<saphir::hyper::error::Error> for GreedyError {
+    fn from(e: saphir::hyper::error::Error) -> Self {
+        Self(format!("hyper: {}", e))
+    }
+}
+
 impl From<PemError> for GreedyError {
     fn from(e: PemError) -> Self {
         Self(format!("pem: {}", e))
