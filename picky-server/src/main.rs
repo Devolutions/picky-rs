@@ -8,15 +8,16 @@ mod utils;
 
 use crate::{config::Config, http::http_server::HttpServer};
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let conf = Config::startup_init();
     let log_handle = logging::init_logs(&conf);
 
     log::info!("building http server ...");
-    let http_server = HttpServer::new(conf, log_handle);
+    let http_server = HttpServer::new(conf, log_handle).await;
 
     log::info!("starting http server ...");
-    http_server.run();
+    http_server.run().await;
 }
 
 #[cfg(any(feature = "pre-gen-pk", all(debug_assertions, test)))]
