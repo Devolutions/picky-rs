@@ -37,6 +37,12 @@ futures = "0.3"
 [dev-dependencies]
 rand = "0.7"
 tokio-test = "0.2"
+criterion = "0.3"
+reqwest = "0.10"
 
 [features]
 pre-gen-pk = ["rand"]
+
+[[bench]]
+name = "basic"
+harness = false
