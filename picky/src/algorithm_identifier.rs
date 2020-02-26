@@ -88,6 +88,34 @@ impl AlgorithmIdentifier {
             parameters: AlgorithmIdentifierParameters::EC(ec_params.into()),
         }
     }
+
+    pub fn new_aes128(mode: AesMode) -> Self {
+        Self {
+            algorithm: mode.to_128bit_oid(),
+            parameters: AlgorithmIdentifierParameters::None,
+        }
+    }
+
+    pub fn new_aes192(mode: AesMode) -> Self {
+        Self {
+            algorithm: mode.to_192bit_oid(),
+            parameters: AlgorithmIdentifierParameters::None,
+        }
+    }
+
+    pub fn new_aes256(mode: AesMode) -> Self {
+        Self {
+            algorithm: mode.to_256bit_oid(),
+            parameters: AlgorithmIdentifierParameters::None,
+        }
+    }
+
+    pub fn new_sha(variant: SHAVariant) -> Self {
+        Self {
+            algorithm: variant.into(),
+            parameters: AlgorithmIdentifierParameters::None,
+        }
+    }
 }
 
 impl ser::Serialize for AlgorithmIdentifier {
@@ -250,5 +278,91 @@ impl<'de> de::Deserialize<'de> for ECParameters {
         }
 
         deserializer.deserialize_enum("DirectoryString", &["NamedCurve", "ImplicitCurve"], Visitor)
+    }
+}
+
+pub enum AesMode {
+    ECB,
+    CBC,
+    OFB,
+    CFB,
+    Wrap,
+    GCM,
+    CCM,
+    WrapPad,
+}
+
+impl AesMode {
+    fn to_128bit_oid(self) -> ObjectIdentifierAsn1 {
+        match self {
+            AesMode::ECB => oids::aes128_ecb().into(),
+            AesMode::CBC => oids::aes128_cbc().into(),
+            AesMode::OFB => oids::aes128_ofb().into(),
+            AesMode::CFB => oids::aes128_cfb().into(),
+            AesMode::Wrap => oids::aes128_wrap().into(),
+            AesMode::GCM => oids::aes128_gcm().into(),
+            AesMode::CCM => oids::aes128_ccm().into(),
+            AesMode::WrapPad => oids::aes128_wrap_pad().into(),
+        }
+    }
+
+    fn to_192bit_oid(self) -> ObjectIdentifierAsn1 {
+        match self {
+            AesMode::ECB => oids::aes192_ecb().into(),
+            AesMode::CBC => oids::aes192_cbc().into(),
+            AesMode::OFB => oids::aes192_ofb().into(),
+            AesMode::CFB => oids::aes192_cfb().into(),
+            AesMode::Wrap => oids::aes192_wrap().into(),
+            AesMode::GCM => oids::aes192_gcm().into(),
+            AesMode::CCM => oids::aes192_ccm().into(),
+            AesMode::WrapPad => oids::aes192_wrap_pad().into(),
+        }
+    }
+
+    fn to_256bit_oid(self) -> ObjectIdentifierAsn1 {
+        match self {
+            AesMode::ECB => oids::aes256_ecb().into(),
+            AesMode::CBC => oids::aes256_cbc().into(),
+            AesMode::OFB => oids::aes256_ofb().into(),
+            AesMode::CFB => oids::aes256_cfb().into(),
+            AesMode::Wrap => oids::aes256_wrap().into(),
+            AesMode::GCM => oids::aes256_gcm().into(),
+            AesMode::CCM => oids::aes256_ccm().into(),
+            AesMode::WrapPad => oids::aes256_wrap_pad().into(),
+        }
+    }
+}
+
+pub enum SHAVariant {
+    SHA2_224,
+    SHA2_256,
+    SHA2_384,
+    SHA2_512,
+    SHA2_512_224,
+    SHA2_512_256,
+    SHA3_224,
+    SHA3_256,
+    SHA3_384,
+    SHA3_512,
+    SHAKE128,
+    SHAKE256,
+}
+
+impl From<SHAVariant> for ObjectIdentifierAsn1 {
+    fn from(variant: SHAVariant) -> Self {
+        match variant {
+            SHAVariant::SHA2_224 => oids::sha224().into(),
+            SHAVariant::SHA2_256 => oids::sha256().into(),
+            SHAVariant::SHA2_384 => oids::sha384().into(),
+            SHAVariant::SHA2_512 => oids::sha512().into(),
+            SHAVariant::SHA2_512_224 => oids::sha512_224().into(),
+            SHAVariant::SHA2_512_256 => oids::sha512_256().into(),
+            SHAVariant::SHA3_224 => oids::sha3_224().into(),
+            SHAVariant::SHA3_256 => oids::sha3_256().into(),
+            SHAVariant::SHA3_384 => oids::sha3_384().into(),
+            SHAVariant::SHA3_512 => oids::sha3_512().into(),
+            SHAVariant::SHAKE128 => oids::shake128().into(),
+            SHAVariant::SHAKE256 => oids::shake256().into(),
+        }
     }
 }
