@@ -1,8 +1,7 @@
-use crate::db::config::DatabaseConfig;
 use crate::{
     addressing::{encode_to_alternative_addresses, encode_to_canonical_address},
     config::Config,
-    db::{CertificateEntry, PickyStorage, StorageError, SCHEMA_LAST_VERSION},
+    db::{config::DatabaseConfig, CertificateEntry, PickyStorage, StorageError, SCHEMA_LAST_VERSION},
 };
 use snafu::Snafu;
 use std::{

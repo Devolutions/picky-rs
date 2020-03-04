@@ -721,8 +721,7 @@ mod tests {
     use crate::pem::Pem;
     use http_0_2::{header, method::Method, request};
 
-    const HTTP_SIGNATURE_EXAMPLE: &str =
-        "Signature keyId=\"my-rsa-key\",created=1402170695,\
+    const HTTP_SIGNATURE_EXAMPLE: &str = "Signature keyId=\"my-rsa-key\",created=1402170695,\
          headers=\"(request-target) (created) date\",\
          signature=\"CM3Ui6l4Z6+yYdWaX5Cz10OAqUceS53Zy/qA+e4xG5Nabe215iTlnj/sfVJ3nBaMIOj/4e\
          gxTKNDXAJbLm6nOF8zUOdJBuKQZNO1mfzrMKLsz7gc2PQI1eVxGNJoBZ40L7CouertpowQFpKyizNXqH/y\
@@ -730,8 +729,7 @@ mod tests {
          2Z1vjsMVW97rsKOs8lo+qxPGfni27udledH2ZQABGZHOgZsChj59Xb3oVAA8/V3rjt5Un7gsz2AHQ6aY6o\
          ky59Rsg/CpB8gP7szjK/wrCclA==\"";
 
-    const HTTP_SIGNATURE_WEIRD_FORMAT: &str =
-        "Signature keyId = my-rsa-key ,created= \"1402170695\",\
+    const HTTP_SIGNATURE_WEIRD_FORMAT: &str = "Signature keyId = my-rsa-key ,created= \"1402170695\",\
          headers=(request-target) (created) date  ,\
          signature=CM3Ui6l4Z6+yYdWaX5Cz10OAqUceS53Zy/qA+e4xG5Nabe215iTlnj/sfVJ3nBaMIOj/4e\
          gxTKNDXAJbLm6nOF8zUOdJBuKQZNO1mfzrMKLsz7gc2PQI1eVxGNJoBZ40L7CouertpowQFpKyizNXqH/y\
@@ -961,8 +959,7 @@ mod tests {
         );
     }
 
-    const HTTP_SIGNATURE_LEGACY: &str =
-        "Signature keyId=my-rsa-key,created=1402170695,\
+    const HTTP_SIGNATURE_LEGACY: &str = "Signature keyId=my-rsa-key,created=1402170695,\
          headers=(request-target) (created) date,\
          signature=CM3Ui6l4Z6-yYdWaX5Cz10OAqUceS53Zy_qA-e4xG5Nabe215iTlnj_sfVJ3nBaMIOj_4e\
          gxTKNDXAJbLm6nOF8zUOdJBuKQZNO1mfzrMKLsz7gc2PQI1eVxGNJoBZ40L7CouertpowQFpKyizNXqH_y\
