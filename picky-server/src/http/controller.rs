@@ -56,11 +56,7 @@ impl ServerController {
 
     #[post("/cert")]
     async fn post_cert(&self, req: Request<Body>) -> Result<StatusCode, StatusCode> {
-        let req = req
-            .async_map(|b| async { saphir::hyper::body::to_bytes(b).await })
-            .await
-            .transpose()
-            .bad_request()?;
+        let req = req.load_body().await.bad_request()?;
 
         let (cert, der) = extract_cert_from_request(&req).await.bad_request()?;
         let ski = hex::encode(cert.subject_key_identifier().bad_request_desc("couldn't fetch SKI")?);
@@ -112,11 +108,7 @@ impl ServerController {
             }
         };
 
-        let req = req
-            .async_map(|b| async { saphir::hyper::body::to_bytes(b).await })
-            .await
-            .transpose()
-            .bad_request()?;
+        let req = req.load_body().await.bad_request()?;
 
         let csr = extract_csr_from_request(&req).await.bad_request()?;
 
