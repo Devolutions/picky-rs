@@ -31,10 +31,25 @@ jobs:
       - script: |
           echo "Check formatting"
           cargo +stable fmt --all -- --check 2> /dev/null
+          if ! [ $? -eq 0 ] ; then
+              printf "\n$(tput setaf 3)Bad formatting, please run 'cargo +stable fmt'\n\n"
+              exit 1
+          fi
+
           conan install openssl/$(OPENSSL_VERSION)@devolutions/stable -g virtualenv -pr linux-x86_64
           . activate.sh
           cargo build --release
+          if ! [ $? -eq 0 ] ; then
+              printf "\n$(tput setaf 3)Build failed\n\n"
+              exit 1
+          fi
+
           cargo test --release
+          if ! [ $? -eq 0 ] ; then
+              printf "\n$(tput setaf 3)Unit tests failed\n\n"
+              exit 1
+          fi
+
           mkdir -p $(Build.ArtifactStagingDirectory)/linux/x86_64
           cp $(Build.Repository.LocalPath)/target/release/picky-server $(Build.ArtifactStagingDirectory)/linux/x86_64/
         displayName: Building picky-rs
