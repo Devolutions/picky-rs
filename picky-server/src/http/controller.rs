@@ -15,6 +15,7 @@ use picky::{
     pem::{parse_pem, to_pem, Pem},
     x509::{Cert, Csr},
 };
+use saphir::prelude::header::HeaderValue;
 use saphir::{prelude::*, response::Builder as ResponseBuilder};
 use serde_json::{self, Value};
 use std::borrow::Cow;
@@ -94,6 +95,19 @@ impl ServerController {
         Ok(StatusCode::OK)
     }
 
+    #[options("/sign")]
+    async fn cert_signature_request_cors(&self, req: Request<Body>) -> ResponseBuilder {
+        let builder = ResponseBuilder::new()
+            .header("Access-Control-Allow-Methods", "POST")
+            .header("Access-Control-Allow-Headers", "Authorization, Content-Type");
+
+        if let Some(origin_header) = req.headers().get("Origin") {
+            builder.header("Access-Control-Allow-Origin", origin_header)
+        } else {
+            builder
+        }
+    }
+
     #[post("/sign")]
     async fn cert_signature_request(&self, req: Request<Body>) -> Result<ResponseBuilder, StatusCode> {
         let locked_subject_name: Option<String> = match check_authorization(&*self.read_conf().await, &req) {
@@ -137,30 +151,37 @@ impl ServerController {
             .internal_error()?;
         drop(conf); // release lock early
 
-        match Format::response_format(&req).unwrap_or(Format::PemFile) {
+        let mut builder = match Format::response_format(&req).unwrap_or(Format::PemFile) {
             Format::PemFile => {
                 let pem = signed_cert
                     .to_pem()
                     .internal_error_desc("couldn't get certificate pem")?;
-                Ok(ResponseBuilder::new().body(pem.to_string()))
+                ResponseBuilder::new().body(pem.to_string())
             }
             Format::PkixCertBinary => {
                 let der = signed_cert
                     .to_der()
                     .internal_error_desc("couldn't get certificate der")?;
-                Ok(ResponseBuilder::new().body(der))
+                ResponseBuilder::new().body(der)
             }
             Format::PkixCertBase64 => {
                 let der = signed_cert
                     .to_der()
                     .internal_error_desc("couldn't get certificate der")?;
-                Ok(ResponseBuilder::new().body(base64::encode(&der)))
+                ResponseBuilder::new().body(base64::encode(&der))
             }
             unexpected => {
                 log::error!("unexpected response format: {}", unexpected);
-                Err(StatusCode::BAD_REQUEST)
+                return Err(StatusCode::BAD_REQUEST);
             }
-        }
+        };
+
+        builder
+            .headers_mut()
+            .internal_error()?
+            .insert("Access-Control-Allow-Origin", HeaderValue::from_static("*"));
+
+        Ok(builder)
     }
 
     #[get("/cert/<multihash>")]
