@@ -187,13 +187,9 @@ impl fmt::Display for Format {
 impl Format {
     pub fn request_format<T>(req: &Request<T>) -> Result<Self, String> {
         let content_type_opt = req.get_header_string_value("Content-Type");
-        let content_transfert_encoding_opt = req.get_header_string_value("Content-Transfer-Encoding");
 
         if let Some(content_type) = content_type_opt {
-            Self::new(
-                content_type.as_str(),
-                content_transfert_encoding_opt.as_ref().map(|s| s.as_str()),
-            )
+            Self::new(content_type.as_str())
         } else {
             Err("Content-Type header is missing".to_string())
         }
@@ -204,35 +200,23 @@ impl Format {
             // cannot panic
             s.split(',').next().unwrap().split(';').next().unwrap().to_owned()
         });
-        let accept_encoding_opt = req.get_header_string_value("Accept-Encoding").map(|s| {
-            // cannot panic
-            s.split(',').next().unwrap().split(';').next().unwrap().to_owned()
-        });
 
         if let Some(accept) = accept_opt {
-            Self::new(accept.as_str(), accept_encoding_opt.as_ref().map(|s| s.as_str()))
+            Self::new(accept.as_str())
         } else {
             Err("Accept header is missing".to_string())
         }
     }
 
-    fn new(format: &str, encoding: Option<&str>) -> Result<Self, String> {
-        match (format, encoding) {
-            ("application/x-pem-file", _) => Ok(Self::PemFile),
-            ("application/json", _) => Ok(Self::Json),
-            ("application/pkix-cert", Some("binary")) => Ok(Self::PkixCertBinary),
-            ("application/pkix-cert", Some("base64")) => Ok(Self::PkixCertBase64),
-            ("application/pkix-cert", Some(unsupported)) => {
-                Err(format!("unsupported encoding format for pkix-cert: {}", unsupported))
-            }
-            ("application/pkix-cert", None) => Err("format encoding for pkix-cert is missing".to_owned()),
-            ("application/pkcs10", Some("binary")) => Ok(Self::Pkcs10Binary),
-            ("application/pkcs10", Some("base64")) => Ok(Self::Pkcs10Base64),
-            ("application/pkcs10", Some(unsupported)) => {
-                Err(format!("unsupported encoding format for pkcs10: {}", unsupported))
-            }
-            ("application/pkcs10", None) => Err("format encoding for pkcs10 is missing".to_owned()),
-            (unsupported, _) => Err(format!("unsupported format: {}", unsupported)),
+    fn new(mime: &str) -> Result<Self, String> {
+        match mime {
+            "application/x-pem-file" => Ok(Self::PemFile),
+            "application/json" => Ok(Self::Json),
+            "application/pkix-cert" => Ok(Self::PkixCertBinary),
+            "application/pkix-cert-base64" => Ok(Self::PkixCertBase64),
+            "application/pkcs10" => Ok(Self::Pkcs10Binary),
+            "application/pkcs10-base64" => Ok(Self::Pkcs10Base64),
+            unsupported => Err(format!("unsupported format: {}", unsupported)),
         }
     }
 }
@@ -264,18 +248,12 @@ mod tests {
         let format = Format::request_format(&new_saphir_request(vec![("Content-Type", "application/json")])).unwrap();
         assert_eq!(format, Format::Json);
 
-        let format = Format::request_format(&new_saphir_request(vec![
-            ("Content-Type", "application/pkix-cert"),
-            ("Content-Transfer-Encoding", "binary"),
-        ]))
-        .unwrap();
+        let format =
+            Format::request_format(&new_saphir_request(vec![("Content-Type", "application/pkix-cert")])).unwrap();
         assert_eq!(format, Format::PkixCertBinary);
 
-        let format = Format::request_format(&new_saphir_request(vec![
-            ("Content-Type", "application/pkcs10"),
-            ("Content-Transfer-Encoding", "base64"),
-        ]))
-        .unwrap();
+        let format =
+            Format::request_format(&new_saphir_request(vec![("Content-Type", "application/pkcs10-base64")])).unwrap();
         assert_eq!(format, Format::Pkcs10Base64);
     }
 
@@ -284,26 +262,10 @@ mod tests {
         let err = Format::request_format(&new_saphir_request(vec![])).err().unwrap();
         assert_eq!(err, "Content-Type header is missing");
 
-        let err = Format::request_format(&new_saphir_request(vec![("Content-Type", "application/pkcs10")]))
+        let err = Format::request_format(&new_saphir_request(vec![("Content-Type", "application/unknown")]))
             .err()
             .unwrap();
-        assert_eq!(err, "format encoding for pkcs10 is missing");
-
-        let err = Format::request_format(&new_saphir_request(vec![
-            ("Content-Type", "application/unknown"),
-            ("Content-Transfer-Encoding", "unknown"),
-        ]))
-        .err()
-        .unwrap();
         assert_eq!(err, "unsupported format: application/unknown");
-
-        let err = Format::request_format(&new_saphir_request(vec![
-            ("Content-Type", "application/pkcs10"),
-            ("Content-Transfer-Encoding", "unknown"),
-        ]))
-        .err()
-        .unwrap();
-        assert_eq!(err, "unsupported encoding format for pkcs10: unknown");
     }
 
     #[test]
@@ -318,21 +280,15 @@ mod tests {
         .unwrap();
         assert_eq!(format, Format::Json);
 
-        let format = Format::response_format(&new_saphir_request(vec![
-            (
-                "Accept",
-                "application/pkix-cert, application/x-pem-file, snateinsrturiest",
-            ),
-            ("Accept-Encoding", "binary, base64"),
-        ]))
+        let format = Format::response_format(&new_saphir_request(vec![(
+            "Accept",
+            "application/pkix-cert, application/pkix-cert-base64, application/x-pem-file, snateinsrturiest",
+        )]))
         .unwrap();
         assert_eq!(format, Format::PkixCertBinary);
 
-        let format = Format::response_format(&new_saphir_request(vec![
-            ("Accept", "application/pkcs10;q=1"),
-            ("Accept-Encoding", "base64;q=1"),
-        ]))
-        .unwrap();
+        let format =
+            Format::response_format(&new_saphir_request(vec![("Accept", "application/pkcs10-base64;q=1")])).unwrap();
         assert_eq!(format, Format::Pkcs10Base64);
     }
 
