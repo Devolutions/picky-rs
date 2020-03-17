@@ -184,19 +184,18 @@ Describe 'picky-server REST API tests' {
 
         $headers = @{
             "Authorization" = "Bearer $picky_api_key"
-            "Content-Transfer-Encoding" = "base64"
         }
 
         $response = Invoke-WebRequest `
             -Uri $picky_url/sign/ -Method POST `
-            -ContentType 'application/pkcs10' `
+            -ContentType 'application/pkcs10-base64' `
             -Headers $headers `
             -Body $csr_base64
 
         CheckSignResponse $response
     }
 
-    It 'sign certificate request without Content-Transfert-Encoding returns bad request' {
+    It 'sign certificate request with unsupported content mime type returns bad request' {
         $csr_der = GenerateCsrDer "CN=test.${picky_realm}"
         $csr_base64 = [Convert]::ToBase64String($csr_der)
 
@@ -207,7 +206,7 @@ Describe 'picky-server REST API tests' {
         $response = try {
             Invoke-WebRequest `
                 -Uri $picky_url/sign/ -Method POST `
-                -ContentType 'application/pkcs10' `
+                -ContentType 'application/unsupported-type' `
                 -Headers $headers `
                 -Body $csr_base64
         } catch {
@@ -223,11 +222,10 @@ Describe 'picky-server REST API tests' {
 
         $headers = @{
             "Authorization" = "Bearer $picky_api_key"
-            "Content-Transfer-Encoding" = "base64"
         }
         $response = Invoke-WebRequest `
             -Uri $picky_url/sign/ -Method POST `
-            -ContentType 'application/pkcs10' `
+            -ContentType 'application/pkcs10-base64' `
             -Headers $headers `
             -Body $csr_base64
         $cert_der = CheckSignResponse $response
@@ -240,7 +238,6 @@ Describe 'picky-server REST API tests' {
         $hash = HexSha1Hash $cert_der
 
         $headers = @{
-            "Accept-Encoding" = "binary"
             "Accept" = "application/pkix-cert"
         }
 
@@ -266,7 +263,6 @@ Describe 'picky-server REST API tests' {
         $hash = HexSha256Hash $cert_der
 
         $headers = @{
-            "Accept-Encoding" = "binary"
             "Accept" = "application/pkix-cert"
         }
 
@@ -292,8 +288,7 @@ Describe 'picky-server REST API tests' {
         $hash = HexSha256Hash $cert_der
 
         $headers = @{
-            "Accept-Encoding" = "base64"
-            "Accept" = "application/pkix-cert"
+            "Accept" = "application/pkix-cert-base64"
         }
 
         if ($SavePickyCertificates) {
@@ -345,23 +340,18 @@ Describe 'picky-server REST API tests' {
         $csr_base64 = [Convert]::ToBase64String($csr_der)
         $headers = @{
             "Authorization" = "Bearer $picky_api_key"
-            "Content-Transfer-Encoding" = "base64"
             "Accept" = "application/x-pem-file"
         }
         $response = Invoke-WebRequest `
             -Uri $picky_url/sign/ -Method POST `
-            -ContentType 'application/pkcs10' `
+            -ContentType 'application/pkcs10-base64' `
             -Headers $headers `
             -Body $csr_base64
         $signed_cert_der = CheckSignResponse $response
         $signed_cert_base64 = [Convert]::ToBase64String($signed_cert_der)
 
-        $headers = @{
-            "Content-Transfer-Encoding" = "base64"
-        }
         $postCert = Invoke-RestMethod -Uri $picky_url/cert/ -Method POST `
-            -ContentType 'application/pkix-cert' `
-            -Headers $headers `
+            -ContentType 'application/pkix-cert-base64' `
             -Body $signed_cert_base64
         $postCert | Should -Not -Be $null
     }
@@ -371,12 +361,10 @@ Describe 'picky-server REST API tests' {
         $csr_base64 = [Convert]::ToBase64String($csr_der)
         $headers = @{
             "Authorization" = "Bearer $picky_api_key"
-            "Content-Transfer-Encoding" = "base64"
-            "Accept" = "application/pkix-cert"
-            "Accept-Encoding" = "base64"
+            "Accept" = "application/pkix-cert-base64"
         }
         $signed_cert_base64 = Invoke-RestMethod -Uri $picky_url/sign/ -Method POST `
-            -ContentType 'application/pkcs10' `
+            -ContentType 'application/pkcs10-base64' `
             -Headers $headers `
             -Body $csr_base64
         $signed_cert_der = [Convert]::FromBase64String($signed_cert_base64)
