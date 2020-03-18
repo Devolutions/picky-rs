@@ -56,7 +56,7 @@ impl ServerController {
     }
 
     #[post("/cert")]
-    async fn post_cert(&self, req: Request<Body>) -> Result<StatusCode, StatusCode> {
+    async fn post_cert(&self, req: Request) -> Result<StatusCode, StatusCode> {
         let req = req.load_body().await.bad_request()?;
 
         let (cert, der) = extract_cert_from_request(&req).await.bad_request()?;
@@ -96,7 +96,7 @@ impl ServerController {
     }
 
     #[options("/sign")]
-    async fn cert_signature_request_cors(&self, req: Request<Body>) -> ResponseBuilder {
+    async fn cert_signature_request_cors(&self, req: Request) -> ResponseBuilder {
         let builder = ResponseBuilder::new()
             .header("Access-Control-Allow-Methods", "POST")
             .header("Access-Control-Allow-Headers", "Authorization, Content-Type");
@@ -109,7 +109,7 @@ impl ServerController {
     }
 
     #[post("/sign")]
-    async fn cert_signature_request(&self, req: Request<Body>) -> Result<ResponseBuilder, StatusCode> {
+    async fn cert_signature_request(&self, req: Request) -> Result<ResponseBuilder, StatusCode> {
         let locked_subject_name: Option<String> = match check_authorization(&*self.read_conf().await, &req) {
             Ok(Authorized::ApiKey) => None,
             Ok(Authorized::Token(token)) => {
@@ -185,7 +185,7 @@ impl ServerController {
     }
 
     #[get("/cert/<multihash>")]
-    async fn get_cert(&self, multihash: String, req: Request<Body>) -> Result<ResponseBuilder, StatusCode> {
+    async fn get_cert(&self, multihash: String, req: Request) -> Result<ResponseBuilder, StatusCode> {
         let addressing_hash_any_base = multihash;
         let (addressing_hash, hash) = convert_to_canonical_base(&addressing_hash_any_base).internal_error()?;
         let canonical_address = if hash == CANONICAL_HASH {

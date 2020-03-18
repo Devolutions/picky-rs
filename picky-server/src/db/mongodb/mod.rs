@@ -18,7 +18,7 @@ use crate::{
         CertificateEntry, PickyStorage, StorageError, SCHEMA_LAST_VERSION,
     },
 };
-use bson::{bson, doc, from_bson, spec::BinarySubtype, Bson};
+use bson::{doc, from_bson, spec::BinarySubtype, Bson};
 use futures::{future::BoxFuture, FutureExt};
 use picky::x509::Cert;
 use snafu::Snafu;
