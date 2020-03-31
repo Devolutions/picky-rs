@@ -11,3 +11,21 @@ pub async fn log_middleware(
     log::info!("{} {} {}", method, uri, res.status());
     Ok(res)
 }
+
+pub async fn cors_middleware(
+    _: &(),
+    ctx: HttpContext<Body>,
+    chain: &dyn MiddlewareChain,
+) -> Result<Response<Body>, SaphirError> {
+    let origin_header = ctx.request.headers().get("Origin").cloned();
+
+    let mut response: Response<Body> = chain.next(ctx).await?;
+
+    if let Some(origin_header) = origin_header {
+        response
+            .headers_mut()
+            .insert("Access-Control-Allow-Origin", origin_header);
+    }
+
+    Ok(response)
+}

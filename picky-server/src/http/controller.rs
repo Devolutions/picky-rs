@@ -175,11 +175,6 @@ impl ServerController {
             }
         };
 
-        builder
-            .headers_mut()
-            .internal_error()?
-            .insert("Access-Control-Allow-Origin", HeaderValue::from_static("*"));
-
         Ok(builder)
     }
 
