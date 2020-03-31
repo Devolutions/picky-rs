@@ -5,6 +5,7 @@
 ### Added
 
 - Cors support for `/sign` route
+- Certificate validity duration can be specified with the provider token instead of always using a default duration
 
 ### Changed
 

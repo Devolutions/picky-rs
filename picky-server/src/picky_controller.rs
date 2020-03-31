@@ -14,9 +14,9 @@ use picky::{
 use picky_asn1::restricted_string::CharSetError;
 use snafu::{ResultExt, Snafu};
 
-const ROOT_DURATION_DAYS: i64 = 3650;
-const INTERMEDIATE_DURATION_DAYS: i64 = 1825;
-const LEAF_DURATION_DAYS: i64 = 365;
+const DEFAULT_ROOT_DURATION_DAYS: i64 = 3650;
+const DEFAULT_INTERMEDIATE_DURATION_DAYS: i64 = 1825;
+const DEFAULT_LEAF_DURATION_DAYS: i64 = 365;
 
 #[derive(Debug, Snafu)]
 pub enum PickyError {
@@ -65,7 +65,7 @@ impl Picky {
         // validity
         let now = chrono::offset::Utc::now();
         let valid_from = UTCDate::from(now);
-        let valid_to = UTCDate::from(now + chrono::Duration::days(ROOT_DURATION_DAYS));
+        let valid_to = UTCDate::from(now + chrono::Duration::days(DEFAULT_ROOT_DURATION_DAYS));
 
         let mut key_usage = KeyUsage::default();
         key_usage.set_key_cert_sign(true);
@@ -91,7 +91,7 @@ impl Picky {
         // validity
         let now = chrono::offset::Utc::now();
         let valid_from = UTCDate::from(now);
-        let valid_to = UTCDate::from(now + chrono::Duration::days(INTERMEDIATE_DURATION_DAYS));
+        let valid_to = UTCDate::from(now + chrono::Duration::days(DEFAULT_INTERMEDIATE_DURATION_DAYS));
 
         let subject_name = DirectoryName::new_common_name(intermediate_name);
 
@@ -119,10 +119,28 @@ impl Picky {
         signature_hash_type: SignatureHashType,
         dns_name: &str,
     ) -> Result<Cert, PickyError> {
+        Self::generate_leaf_from_csr_with_duration(
+            csr,
+            issuer_cert,
+            issuer_key,
+            signature_hash_type,
+            dns_name,
+            chrono::Duration::days(DEFAULT_LEAF_DURATION_DAYS),
+        )
+    }
+
+    pub fn generate_leaf_from_csr_with_duration(
+        csr: Csr,
+        issuer_cert: &Cert,
+        issuer_key: &PrivateKey,
+        signature_hash_type: SignatureHashType,
+        dns_name: &str,
+        validity_duration: chrono::Duration,
+    ) -> Result<Cert, PickyError> {
         // validity
         let now = chrono::offset::Utc::now();
         let valid_from = UTCDate::from(now);
-        let valid_to = UTCDate::from(now + chrono::Duration::days(LEAF_DURATION_DAYS));
+        let valid_to = UTCDate::from(now + validity_duration);
 
         let mut key_usage = KeyUsage::default();
         key_usage.set_digital_signature(true);

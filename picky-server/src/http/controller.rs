@@ -15,10 +15,9 @@ use picky::{
     pem::{parse_pem, to_pem, Pem},
     x509::{Cert, Csr},
 };
-use saphir::prelude::header::HeaderValue;
 use saphir::{prelude::*, response::Builder as ResponseBuilder};
 use serde_json::{self, Value};
-use std::borrow::Cow;
+use std::{borrow::Cow, convert::TryFrom};
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 pub struct ServerController {
@@ -110,11 +109,11 @@ impl ServerController {
 
     #[post("/sign")]
     async fn cert_signature_request(&self, req: Request) -> Result<ResponseBuilder, StatusCode> {
-        let locked_subject_name: Option<String> = match check_authorization(&*self.read_conf().await, &req) {
-            Ok(Authorized::ApiKey) => None,
+        let (locked_subject_name, x509_duration_secs) = match check_authorization(&*self.read_conf().await, &req) {
+            Ok(Authorized::ApiKey) => (None, None),
             Ok(Authorized::Token(token)) => {
                 let provider_claims: ProviderClaims = serde_json::from_value(token.into_claims()).bad_request()?;
-                Some(provider_claims.sub)
+                (Some(provider_claims.sub), provider_claims.x509_duration_secs)
             }
             Err(e) => {
                 log::error!("authorization failed: {}", e);
@@ -146,12 +145,12 @@ impl ServerController {
         // Sign CSR
         let conf = self.read_conf().await;
         let ca_name = format!("{} Authority", &conf.realm);
-        let signed_cert = sign_certificate(&ca_name, csr, &conf, self.storage.as_ref())
+        let signed_cert = sign_certificate(&ca_name, csr, &conf, self.storage.as_ref(), x509_duration_secs)
             .await
             .internal_error()?;
         drop(conf); // release lock early
 
-        let mut builder = match Format::response_format(&req).unwrap_or(Format::PemFile) {
+        let builder = match Format::response_format(&req).unwrap_or(Format::PemFile) {
             Format::PemFile => {
                 let pem = signed_cert
                     .to_pem()
@@ -326,6 +325,7 @@ async fn sign_certificate(
     csr: Csr,
     config: &Config,
     storage: &dyn PickyStorage,
+    x509_duration_secs: Option<u64>,
 ) -> Result<Cert, String> {
     let ca_hash = storage
         .get_addressing_hash_by_name(ca_name)
@@ -350,8 +350,21 @@ async fn sign_certificate(
         .ok_or_else(|| "couldn't find signed cert subject common name")?
         .to_string();
 
-    let signed_cert = Picky::generate_leaf_from_csr(csr, &ca_cert, &ca_pk, config.signing_algorithm, &dns_name)
-        .map_err(|e| format!("couldn't generate leaf certificate: {}", e))?;
+    let signed_cert = if let Some(duration_secs) = x509_duration_secs {
+        Picky::generate_leaf_from_csr_with_duration(
+            csr,
+            &ca_cert,
+            &ca_pk,
+            config.signing_algorithm,
+            &dns_name,
+            chrono::Duration::seconds(
+                i64::try_from(duration_secs).map_err(|e| format!("invalid x509 duration (too big?): {}", e))?,
+            ),
+        )
+    } else {
+        Picky::generate_leaf_from_csr(csr, &ca_cert, &ca_pk, config.signing_algorithm, &dns_name)
+    }
+    .map_err(|e| format!("couldn't generate leaf certificate: {}", e))?;
 
     if config.save_certificate {
         let cert_der = signed_cert
@@ -670,8 +683,8 @@ mod tests {
         )
         .expect("couldn't generate csr");
 
-        let signed_cert =
-            block_on(sign_certificate(&ca_name, csr, &config, storage.as_ref())).expect("couldn't sign certificate");
+        let signed_cert = block_on(sign_certificate(&ca_name, csr, &config, storage.as_ref(), None))
+            .expect("couldn't sign certificate");
 
         let issuer_name = signed_cert.issuer_name().find_common_name().unwrap().to_string();
         let chain_pem = block_on(find_ca_chain(storage.as_ref(), &issuer_name)).expect("couldn't fetch CA chain");
