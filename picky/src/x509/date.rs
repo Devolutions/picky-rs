@@ -119,6 +119,13 @@ impl From<DateTime<Utc>> for UTCDate {
     }
 }
 
+#[cfg(feature = "chrono_conversion")]
+impl From<UTCDate> for DateTime<Utc> {
+    fn from(date: UTCDate) -> Self {
+        date.0.into()
+    }
+}
+
 impl fmt::Display for UTCDate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
