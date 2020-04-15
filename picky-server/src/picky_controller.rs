@@ -16,7 +16,6 @@ use snafu::{ResultExt, Snafu};
 
 const DEFAULT_ROOT_DURATION_DAYS: i64 = 3650;
 const DEFAULT_INTERMEDIATE_DURATION_DAYS: i64 = 1825;
-const DEFAULT_LEAF_DURATION_DAYS: i64 = 365;
 
 #[derive(Debug, Snafu)]
 pub enum PickyError {
@@ -113,23 +112,6 @@ impl Picky {
     }
 
     pub fn generate_leaf_from_csr(
-        csr: Csr,
-        issuer_cert: &Cert,
-        issuer_key: &PrivateKey,
-        signature_hash_type: SignatureHashType,
-        dns_name: &str,
-    ) -> Result<Cert, PickyError> {
-        Self::generate_leaf_from_csr_with_duration(
-            csr,
-            issuer_cert,
-            issuer_key,
-            signature_hash_type,
-            dns_name,
-            chrono::Duration::days(DEFAULT_LEAF_DURATION_DAYS),
-        )
-    }
-
-    pub fn generate_leaf_from_csr_with_duration(
         csr: Csr,
         issuer_cert: &Cert,
         issuer_key: &PrivateKey,
