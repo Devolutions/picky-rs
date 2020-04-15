@@ -577,6 +577,7 @@ macro_rules! verifier_argument_missing_err {
 #[derive(Default, Clone, Debug)]
 struct HttpSignatureVerifierInner<'a> {
     now: Option<u64>,
+    leeway: u64,
     signature_method: Option<(&'a PublicKey, SignatureHashType)>,
     signing_string_generation: Option<SigningStringGenMethod<'a>>,
 }
@@ -593,6 +594,13 @@ impl<'a> HttpSignatureVerifier<'a> {
     /// Optional. Required only if http signature contains (expires) or (created) parameters.
     pub fn now(&self, unix_timestamp: u64) -> &Self {
         self.inner.borrow_mut().now = Some(unix_timestamp);
+        self
+    }
+
+    #[inline]
+    /// Optional. Add leeway to check expiration and creation times.
+    pub fn leeway(&self, leeway: u64) -> &Self {
+        self.inner.borrow_mut().leeway = leeway;
         self
     }
 
@@ -634,7 +642,7 @@ impl<'a> HttpSignatureVerifier<'a> {
 
         if let Some(expires) = self.http_signature.expires {
             let now = inner.now.ok_or(verifier_argument_missing_err!(now))?;
-            if expires < now {
+            if now - inner.leeway > expires {
                 return Err(HttpSignatureError::Expired {
                     not_after: expires,
                     now,
@@ -644,7 +652,7 @@ impl<'a> HttpSignatureVerifier<'a> {
 
         if let Some(created) = self.http_signature.created {
             let now = inner.now.ok_or(verifier_argument_missing_err!(now))?;
-            if now < created {
+            if now + inner.leeway < created {
                 return Err(HttpSignatureError::NotYetValid { created, now });
             }
         }
@@ -929,6 +937,20 @@ mod tests {
         http_signature
             .verifier()
             .now(1402170700)
+            .signature_method(&private_key_1().to_public_key(), SignatureHashType::RsaSha256)
+            .pre_generated_signing_string(signing_string)
+            .verify()
+            .expect("couldn't verify");
+    }
+
+    #[test]
+    fn verify_with_leeway() {
+        let signing_string = "get /foo\n(created): 1402170695\ndate: Tue, 07 Jun 2014 20:51:35 GMT";
+        let http_signature = HttpSignature::from_str(HTTP_SIGNATURE_EXAMPLE).expect("http signature");
+        http_signature
+            .verifier()
+            .now(1402170690)
+            .leeway(10)
             .signature_method(&private_key_1().to_public_key(), SignatureHashType::RsaSha256)
             .pre_generated_signing_string(signing_string)
             .verify()
