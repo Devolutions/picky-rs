@@ -13,7 +13,7 @@ use std::borrow::Cow;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ProviderClaims {
-    pub x509_duration_secs: Option<u64>,
+    pub x509_duration_secs: u64,
     pub sub: String,
     pub nbf: u64,
     pub exp: u64,
@@ -123,7 +123,7 @@ mod tests {
 
     fn get_provider_token(private_key: &PrivateKey) -> String {
         let claims = ProviderClaims {
-            x509_duration_secs: None,
+            x509_duration_secs: 7_776_000, // 3 months
             sub: "CoolSubject".to_owned(),
             nbf: unix_epoch(),
             exp: unix_epoch() + 10,
