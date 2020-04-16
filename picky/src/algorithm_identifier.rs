@@ -281,6 +281,7 @@ impl<'de> de::Deserialize<'de> for ECParameters {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum AesMode {
     ECB,
     CBC,
@@ -333,6 +334,7 @@ impl AesMode {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum SHAVariant {
     SHA2_224,
     SHA2_256,
