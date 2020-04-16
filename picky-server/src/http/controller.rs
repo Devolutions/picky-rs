@@ -706,7 +706,10 @@ mod tests {
         assert_eq!(chain[1].subject_name().to_string(), "CN=Picky Root CA");
 
         signed_cert
-            .verify_chain(chain.iter(), &UTCDate::now())
+            .verifier()
+            .chain(chain.iter())
+            .exact_date(&UTCDate::now())
+            .verify()
             .expect("couldn't validate ca chain");
     }
 }
