@@ -1,5 +1,6 @@
 use saphir::prelude::*;
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 pub async fn log_middleware(
     _: &(),
     ctx: HttpContext<Body>,
@@ -12,6 +13,7 @@ pub async fn log_middleware(
     Ok(res)
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 pub async fn cors_middleware(
     _: &(),
     ctx: HttpContext<Body>,
