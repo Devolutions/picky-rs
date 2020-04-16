@@ -250,28 +250,6 @@ impl Cert {
         (&self.0.tbs_certificate.subject_public_key_info).into()
     }
 
-    pub fn verify(&self, now: &UTCDate) -> Result<(), CertError> {
-        let validity = &self.0.tbs_certificate.validity;
-        let not_before: UTCDate = validity.not_before.clone().into();
-        let not_after: UTCDate = validity.not_after.clone().into();
-
-        if not_before.gt(now) {
-            return Err(CertError::CertificateNotYetValid {
-                not_before,
-                now: now.clone(),
-            });
-        }
-
-        if not_after.lt(now) {
-            return Err(CertError::CertificateExpired {
-                not_after,
-                now: now.clone(),
-            });
-        }
-
-        Ok(())
-    }
-
     pub fn is_parent_of(&self, other: &Cert) -> Result<(), CertError> {
         if let Ok(other_aki) = other.authority_key_identifier() {
             if let Some(other_aki) = other_aki.key_identifier() {
@@ -308,16 +286,159 @@ impl Cert {
         Ok(())
     }
 
+    /// This only check validity dates.
+    #[deprecated(
+        since = "4.7.0",
+        note = "Verifier API has been added as a superior way of handling verifications"
+    )]
+    pub fn verify(&self, now: &UTCDate) -> Result<(), CertError> {
+        verify_cert_validity(self, &CheckStrictness::default(), ValidityCheck::Exact(now))
+    }
+
+    #[deprecated(
+        since = "4.7.0",
+        note = "Verifier API has been added as a superior way of handling verifications"
+    )]
     pub fn verify_chain<'a, Chain: Iterator<Item = &'a Cert>>(
         &self,
         chain: Chain,
         now: &UTCDate,
     ) -> Result<(), CertError> {
-        self.verify(now).with_context(|| InvalidCertificate {
-            id: self.subject_name().to_string(),
-        })?;
+        self.verifier().exact_date(now).chain(chain).verify()
+    }
 
-        let mut current_cert = self;
+    pub fn verifier<'a, 'b, Chain: Iterator<Item = &'b Cert>>(&'a self) -> CertValidator<'a, 'b, Chain> {
+        CertValidator {
+            cert: self,
+            inner: RefCell::new(CertValidatorInner {
+                strictness: Default::default(),
+                now: None,
+                chain: None,
+            }),
+        }
+    }
+}
+
+// === certificate verifier === /
+
+#[derive(Debug, Clone)]
+enum ValidityCheck<'a> {
+    Interval { lower: &'a UTCDate, upper: &'a UTCDate },
+    Exact(&'a UTCDate),
+}
+
+#[derive(Debug, Clone)]
+struct CheckStrictness {
+    require_not_before_check: bool,
+    require_not_after_check: bool,
+    require_chain_check: bool,
+}
+
+impl Default for CheckStrictness {
+    fn default() -> Self {
+        Self {
+            require_not_before_check: true,
+            require_not_after_check: true,
+            require_chain_check: true,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct CertValidatorInner<'a, 'b, Chain: Iterator<Item = &'b Cert>> {
+    strictness: CheckStrictness,
+    now: Option<ValidityCheck<'a>>,
+    chain: Option<Chain>,
+}
+
+/// Utility to verify x509 `Cert`s
+#[derive(Clone, Debug)]
+pub struct CertValidator<'a, 'b, Chain: Iterator<Item = &'b Cert>> {
+    cert: &'a Cert,
+    inner: RefCell<CertValidatorInner<'a, 'b, Chain>>,
+}
+
+impl<'a, 'b, Chain: Iterator<Item = &'b Cert>> CertValidator<'a, 'b, Chain> {
+    #[inline]
+    pub fn exact_date(&self, exact: &'a UTCDate) -> &Self {
+        self.inner.borrow_mut().now = Some(ValidityCheck::Exact(exact));
+        self
+    }
+
+    #[inline]
+    pub fn interval_date(&self, lower: &'a UTCDate, upper: &'a UTCDate) -> &Self {
+        self.inner.borrow_mut().now = Some(ValidityCheck::Interval { lower, upper });
+        self
+    }
+
+    #[inline]
+    pub fn chain(&self, chain: Chain) -> &Self {
+        self.inner.borrow_mut().chain = Some(chain);
+        self
+    }
+
+    #[inline]
+    pub fn require_not_before_check(&self) -> &Self {
+        self.inner.borrow_mut().strictness.require_not_before_check = true;
+        self
+    }
+
+    #[inline]
+    pub fn require_not_after_check(&self) -> &Self {
+        self.inner.borrow_mut().strictness.require_not_after_check = true;
+        self
+    }
+
+    #[inline]
+    pub fn require_chain_check(&self) -> &Self {
+        self.inner.borrow_mut().strictness.require_chain_check = true;
+        self
+    }
+
+    #[inline]
+    pub fn ignore_not_before_check(&self) -> &Self {
+        self.inner.borrow_mut().strictness.require_not_before_check = false;
+        self
+    }
+
+    #[inline]
+    pub fn ignore_not_after_check(&self) -> &Self {
+        self.inner.borrow_mut().strictness.require_not_after_check = false;
+        self
+    }
+
+    #[inline]
+    pub fn ignore_chain_check(&self) -> &Self {
+        self.inner.borrow_mut().strictness.require_chain_check = false;
+        self
+    }
+
+    pub fn verify(&self) -> Result<(), CertError> {
+        let mut inner = self.inner.borrow_mut();
+
+        if (inner.strictness.require_not_after_check || inner.strictness.require_not_before_check)
+            && inner.now.is_none()
+        {
+            return Err(CertError::MissingBuilderArgument { arg: "now" });
+        }
+
+        if let Some(now) = &inner.now {
+            verify_cert_validity(self.cert, &inner.strictness, now.clone()).with_context(|| InvalidCertificate {
+                id: self.cert.subject_name().to_string(),
+            })?;
+        }
+
+        if !inner.strictness.require_chain_check {
+            return Ok(());
+        }
+
+        let chain = if let Some(chain) = inner.chain.take() {
+            chain
+        } else {
+            return Err(CertError::MissingBuilderArgument { arg: "chain" });
+        };
+
+        let mut current_cert = self.cert;
 
         for (number_certs, parent_cert) in chain.enumerate() {
             // check basic constraints
@@ -342,10 +463,14 @@ impl Cert {
                 _ => {}
             }
 
-            // verify parent
-            parent_cert.verify(now).with_context(|| InvalidCertificate {
-                id: parent_cert.subject_name().to_string(),
-            })?;
+            // verify parent validity
+            if let Some(now) = &inner.now {
+                verify_cert_validity(parent_cert, &inner.strictness, now.clone()).with_context(|| {
+                    InvalidCertificate {
+                        id: parent_cert.subject_name().to_string(),
+                    }
+                })?;
+            }
 
             // check parent_cert is the parent of current_cert
             parent_cert.is_parent_of(current_cert)?;
@@ -383,6 +508,49 @@ impl Cert {
         Ok(())
     }
 }
+
+fn verify_cert_validity(cert: &Cert, strictness: &CheckStrictness, now: ValidityCheck<'_>) -> Result<(), CertError> {
+    let validity = &cert.0.tbs_certificate.validity;
+    let not_before: UTCDate = validity.not_before.clone().into();
+    let not_after: UTCDate = validity.not_after.clone().into();
+
+    match now {
+        ValidityCheck::Interval { lower, upper } => {
+            if not_before.gt(upper) && strictness.require_not_before_check {
+                return Err(CertError::CertificateNotYetValid {
+                    not_before,
+                    now: upper.clone(),
+                });
+            }
+
+            if not_after.lt(lower) && strictness.require_not_after_check {
+                return Err(CertError::CertificateExpired {
+                    not_after,
+                    now: lower.clone(),
+                });
+            }
+        }
+        ValidityCheck::Exact(now) => {
+            if not_before.gt(now) && strictness.require_not_before_check {
+                return Err(CertError::CertificateNotYetValid {
+                    not_before,
+                    now: now.clone(),
+                });
+            }
+
+            if not_after.lt(now) && strictness.require_not_after_check {
+                return Err(CertError::CertificateExpired {
+                    not_after,
+                    now: now.clone(),
+                });
+            }
+        }
+    }
+
+    Ok(())
+}
+
+// === builder === //
 
 #[derive(Clone, Debug)]
 enum SubjectInfos {
@@ -829,12 +997,48 @@ mod tests {
 
         let chain = [intermediate, root];
 
+        // check with exact date
         signed_leaf
-            .verify_chain(chain.iter(), &UTCDate::ymd(2069, 10, 1).unwrap())
+            .verifier()
+            .chain(chain.iter())
+            .exact_date(&UTCDate::ymd(2069, 10, 1).unwrap())
+            .verify()
             .expect("couldn't verify chain");
 
+        // check with interval date
+        signed_leaf
+            .verifier()
+            .chain(chain.iter())
+            .interval_date(
+                &UTCDate::new(2068, 12, 31, 23, 59, 59).unwrap(),
+                &UTCDate::ymd(2069, 1, 1).unwrap(),
+            )
+            .verify()
+            .expect("couldn't verify chain with interval date");
+
+        // check with ignore not before
+        signed_leaf
+            .verifier()
+            .chain(chain.iter())
+            .exact_date(&UTCDate::new(2068, 12, 31, 23, 59, 59).unwrap())
+            .ignore_not_before_check()
+            .verify()
+            .expect("couldn't verify chain with interval date");
+
+        // check with no date validity check
+        signed_leaf
+            .verifier()
+            .chain(chain.iter())
+            .ignore_not_after_check()
+            .ignore_not_before_check()
+            .verify()
+            .expect("couldn't verify chain with no date validity check");
+
         let expired_err = signed_leaf
-            .verify_chain(chain.iter(), &UTCDate::ymd(2080, 10, 1).unwrap())
+            .verifier()
+            .chain(chain.iter())
+            .exact_date(&UTCDate::ymd(2080, 10, 1).unwrap())
+            .verify()
             .unwrap_err();
         assert_eq!(
             expired_err.to_string(),
@@ -843,7 +1047,10 @@ mod tests {
         );
 
         let intermediate_expired_err = signed_leaf
-            .verify_chain(chain.iter(), &UTCDate::ymd(2071, 6, 1).unwrap())
+            .verifier()
+            .chain(chain.iter())
+            .exact_date(&UTCDate::ymd(2071, 6, 1).unwrap())
+            .verify()
             .unwrap_err();
         assert_eq!(
             intermediate_expired_err.to_string(),
@@ -852,7 +1059,10 @@ mod tests {
         );
 
         let root_expired_err = signed_leaf
-            .verify_chain(chain.iter(), &UTCDate::ymd(2070, 6, 16).unwrap())
+            .verifier()
+            .chain(chain.iter())
+            .exact_date(&UTCDate::ymd(2070, 6, 16).unwrap())
+            .verify()
             .unwrap_err();
         assert_eq!(
             root_expired_err.to_string(),
@@ -861,12 +1071,36 @@ mod tests {
         );
 
         let still_in_2019_err = signed_leaf
-            .verify_chain(chain.iter(), &UTCDate::ymd(2019, 11, 14).unwrap())
+            .verifier()
+            .chain(chain.iter())
+            .exact_date(&UTCDate::ymd(2019, 11, 14).unwrap())
+            .verify()
             .unwrap_err();
         assert_eq!(
             still_in_2019_err.to_string(),
             "invalid certificate \'CN=ChillingInTheFuture.usobakkari\': \
              certificate is not yet valid (not before: 2069-01-01 00:00:00, now: 2019-11-14 00:00:00)"
+        );
+
+        let not_yet_valid_with_interval_err = signed_leaf
+            .verifier()
+            .chain(chain.iter())
+            .interval_date(
+                &UTCDate::ymd(2068, 12, 30).unwrap(),
+                &UTCDate::ymd(2068, 12, 31).unwrap(),
+            )
+            .verify()
+            .unwrap_err();
+        assert_eq!(
+            not_yet_valid_with_interval_err.to_string(),
+            "invalid certificate \'CN=ChillingInTheFuture.usobakkari\': \
+             certificate is not yet valid (not before: 2069-01-01 00:00:00, now: 2068-12-31 00:00:00)"
+        );
+
+        let date_is_missing_err = signed_leaf.verifier().chain(chain.iter()).verify().unwrap_err();
+        assert_eq!(
+            date_is_missing_err.to_string(),
+            "missing required builder argument `now`"
         );
     }
 
@@ -920,7 +1154,10 @@ mod tests {
         let chain = [intermediate, root];
 
         let root_missing_err = signed_leaf
-            .verify_chain(chain[..1].iter(), &UTCDate::ymd(2069, 10, 1).unwrap())
+            .verifier()
+            .chain(chain[..1].iter())
+            .exact_date(&UTCDate::ymd(2069, 10, 1).unwrap())
+            .verify()
             .unwrap_err();
         assert_eq!(
             root_missing_err.to_string(),
@@ -928,7 +1165,10 @@ mod tests {
         );
 
         let invalid_sig_err = signed_leaf
-            .verify_chain(chain.iter(), &UTCDate::ymd(2069, 10, 1).unwrap())
+            .verifier()
+            .chain(chain.iter())
+            .exact_date(&UTCDate::ymd(2069, 10, 1).unwrap())
+            .verify()
             .unwrap_err();
         assert_eq!(
             invalid_sig_err.to_string(),
@@ -979,7 +1219,10 @@ mod tests {
         let chain = [intermediate.clone(), root.clone()];
 
         let invalid_pathlen_err = signed_leaf
-            .verify_chain(chain.iter(), &UTCDate::ymd(2069, 10, 1).unwrap())
+            .verifier()
+            .chain(chain.iter())
+            .exact_date(&UTCDate::ymd(2069, 10, 1).unwrap())
+            .verify()
             .unwrap_err();
         assert_eq!(
             invalid_pathlen_err.to_string(),
@@ -997,7 +1240,10 @@ mod tests {
         let chain = [signed_leaf, intermediate.clone(), root.clone()];
 
         let invalid_issuer_err = invalid_issuer_signed_leaf
-            .verify_chain(chain.iter(), &UTCDate::ymd(2069, 10, 1).unwrap())
+            .verifier()
+            .chain(chain.iter())
+            .exact_date(&UTCDate::ymd(2069, 10, 1).unwrap())
+            .verify()
             .unwrap_err();
         assert_eq!(
             invalid_issuer_err.to_string(),
