@@ -1,11 +1,15 @@
 # Changelog
 
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
 ## [Unreleased]
 
 ### Added
 
 - Cors support for `/sign` route
-- Certificate validity duration can be specified with the provider token instead of always using a default duration
 
 ### Changed
 
@@ -17,6 +21,7 @@
     - X509 certificate in base64: `application/pkix-cert-base64`
     - PKCS10 (CSR) in binary: `application/pkcs10`
     - PKCS10 (CSR) in base64: `application/pkcs10-base64`
+- Certificate validity duration has to be specified with the provider token's `x509_duration_secs` field
  
 ### Removed
 
@@ -27,4 +32,4 @@
 
 ### Changed
 
-- Update mongodb driver to support connection string starting with `mongodb+srv`.
+- Update mongodb driver to support connection string starting with `mongodb+srv`
