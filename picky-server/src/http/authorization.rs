@@ -28,7 +28,7 @@ pub enum AuthorizationMethod {
 #[derive(Debug, Clone)]
 pub enum Authorized {
     ApiKey,
-    Token(Jwt<'static, serde_json::Value>),
+    Token(Jwt<serde_json::Value>),
 }
 
 impl From<&str> for AuthorizationMethod {
