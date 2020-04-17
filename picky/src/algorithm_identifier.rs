@@ -335,6 +335,7 @@ impl AesMode {
 }
 
 #[derive(Clone, Copy, PartialEq, Debug)]
+#[allow(non_camel_case_types)] // 'SHA2_512_224' is clearer than 'SHA2512224' imo
 pub enum SHAVariant {
     SHA2_224,
     SHA2_256,
