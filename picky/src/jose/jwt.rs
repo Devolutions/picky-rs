@@ -3,9 +3,10 @@ use crate::{
     signature::{SignatureError, SignatureHashType},
 };
 use base64::DecodeError;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
+use serde_json::{from_value, Value};
 use snafu::Snafu;
-use std::{borrow::Cow, fmt};
+use std::fmt;
 
 // === error type === //
 
@@ -254,18 +255,18 @@ const JWT_TYPE: &str = "JWT";
 const EXPIRATION_TIME_CLAIM: &str = "exp";
 const NOT_BEFORE_CLAIM: &str = "nbf";
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-struct Header<'a> {
+#[derive(Serialize, Debug, Clone)]
+struct Header {
     alg: SignatureHashType,
-    typ: Cow<'a, str>,
+    typ: &'static str,
 }
 
-pub struct Jwt<'a, C> {
-    header: Header<'a>,
+pub struct Jwt<C> {
+    header: Header,
     claims: C,
 }
 
-impl<'a, C: Clone> Clone for Jwt<'a, C> {
+impl<C: Clone> Clone for Jwt<C> {
     fn clone(&self) -> Self {
         Self {
             header: self.header.clone(),
@@ -274,7 +275,7 @@ impl<'a, C: Clone> Clone for Jwt<'a, C> {
     }
 }
 
-impl<'a, C: fmt::Debug> fmt::Debug for Jwt<'a, C> {
+impl<C: fmt::Debug> fmt::Debug for Jwt<C> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("Jwt")
             .field("header", &self.header)
@@ -283,12 +284,12 @@ impl<'a, C: fmt::Debug> fmt::Debug for Jwt<'a, C> {
     }
 }
 
-impl<'a, C> Jwt<'a, C> {
+impl<C> Jwt<C> {
     pub fn new(hashtype: SignatureHashType, claims: C) -> Self {
         Jwt {
             header: Header {
                 alg: hashtype,
-                typ: Cow::Borrowed("JWT"),
+                typ: JWT_TYPE,
             },
             claims,
         }
@@ -323,7 +324,7 @@ impl<'a, C> Jwt<'a, C> {
     }
 }
 
-impl<'a, C: Serialize> Jwt<'a, C> {
+impl<C: Serialize> Jwt<C> {
     pub fn encode(&self, private_key: &PrivateKey) -> Result<String, JwtError> {
         let header_base64 = base64::encode_config(&serde_json::to_vec(&self.header)?, base64::URL_SAFE_NO_PAD);
         let claims_base64 = base64::encode_config(&serde_json::to_vec(&self.claims)?, base64::URL_SAFE_NO_PAD);
@@ -334,7 +335,7 @@ impl<'a, C: Serialize> Jwt<'a, C> {
     }
 }
 
-impl<'a, C: DeserializeOwned> Jwt<'a, C> {
+impl<C: DeserializeOwned> Jwt<C> {
     /// Validate using validator and returns decoded JWT.
     pub fn decode(encoded_token: &str, validator: &JwtValidator) -> Result<Self, JwtError> {
         let first_dot_idx = encoded_token.find('.').ok_or_else(|| JwtError::InvalidEncoding {
@@ -351,12 +352,20 @@ impl<'a, C: DeserializeOwned> Jwt<'a, C> {
             });
         }
 
-        let header_json = base64::decode_config(&encoded_token[..first_dot_idx], base64::URL_SAFE_NO_PAD)?;
-        let header = serde_json::from_slice::<Header>(&header_json)?;
-
-        if header.typ != JWT_TYPE {
-            return Err(JwtError::UnexpectedType { typ: header.typ.into() });
-        }
+        let header = {
+            let header_json = base64::decode_config(&encoded_token[..first_dot_idx], base64::URL_SAFE_NO_PAD)?;
+            let mut header_val = serde_json::from_slice::<Value>(&header_json)?;
+            let typ = header_val["typ"].as_str().ok_or_else(|| JwtError::UnexpectedType {
+                typ: header_val["typ"].to_string(),
+            })?;
+            if typ != JWT_TYPE {
+                return Err(JwtError::UnexpectedType { typ: typ.to_owned() });
+            }
+            Header {
+                alg: from_value(header_val["alg"].take())?,
+                typ: JWT_TYPE,
+            }
+        };
 
         if let Some(public_key) = &validator.public_key {
             let signature = base64::decode_config(&encoded_token[last_dot_idx + 1..], base64::URL_SAFE_NO_PAD)?;
@@ -442,6 +451,8 @@ impl<'a, C: DeserializeOwned> Jwt<'a, C> {
 mod tests {
     use super::*;
     use crate::pem::Pem;
+    use serde::Deserialize;
+    use std::borrow::Cow;
 
     #[derive(Serialize, Deserialize, Debug, PartialEq)]
     struct MyClaims {
