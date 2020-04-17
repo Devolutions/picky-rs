@@ -286,27 +286,6 @@ impl Cert {
         Ok(())
     }
 
-    /// This only check validity dates.
-    #[deprecated(
-        since = "4.7.0",
-        note = "Verifier API has been added as a superior way of handling verifications"
-    )]
-    pub fn verify(&self, now: &UTCDate) -> Result<(), CertError> {
-        verify_cert_validity(self, &CheckStrictness::default(), ValidityCheck::Exact(now))
-    }
-
-    #[deprecated(
-        since = "4.7.0",
-        note = "Verifier API has been added as a superior way of handling verifications"
-    )]
-    pub fn verify_chain<'a, Chain: Iterator<Item = &'a Cert>>(
-        &self,
-        chain: Chain,
-        now: &UTCDate,
-    ) -> Result<(), CertError> {
-        self.verifier().exact_date(now).chain(chain).verify()
-    }
-
     pub fn verifier<'a, 'b, Chain: Iterator<Item = &'b Cert>>(&'a self) -> CertValidator<'a, 'b, Chain> {
         CertValidator {
             cert: self,
