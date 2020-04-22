@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+### Changed
+### Removed
+
+## [4.5.0] 2020-04-22
+
+### Added
 
 - Cors support for `/sign` route
 
