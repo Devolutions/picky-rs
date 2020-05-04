@@ -2,7 +2,7 @@ use crate::oids;
 use oid::ObjectIdentifier;
 use picky_asn1::{
     tag::{Tag, TagPeeker},
-    wrapper::ObjectIdentifierAsn1,
+    wrapper::{IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1},
 };
 use serde::{de, ser};
 use std::fmt;
@@ -89,31 +89,31 @@ impl AlgorithmIdentifier {
         }
     }
 
-    pub fn new_aes128(mode: AesMode) -> Self {
+    pub fn new_aes128(mode: AesMode, params: AESParameters) -> Self {
         Self {
             algorithm: mode.to_128bit_oid(),
-            parameters: AlgorithmIdentifierParameters::None,
+            parameters: AlgorithmIdentifierParameters::AES(params),
         }
     }
 
-    pub fn new_aes192(mode: AesMode) -> Self {
+    pub fn new_aes192(mode: AesMode, params: AESParameters) -> Self {
         Self {
             algorithm: mode.to_192bit_oid(),
-            parameters: AlgorithmIdentifierParameters::None,
+            parameters: AlgorithmIdentifierParameters::AES(params),
         }
     }
 
-    pub fn new_aes256(mode: AesMode) -> Self {
+    pub fn new_aes256(mode: AesMode, params: AESParameters) -> Self {
         Self {
             algorithm: mode.to_256bit_oid(),
-            parameters: AlgorithmIdentifierParameters::None,
+            parameters: AlgorithmIdentifierParameters::AES(params),
         }
     }
 
     pub fn new_sha(variant: SHAVariant) -> Self {
         Self {
             algorithm: variant.into(),
-            parameters: AlgorithmIdentifierParameters::None,
+            parameters: AlgorithmIdentifierParameters::Null,
         }
     }
 }
@@ -133,6 +133,9 @@ impl ser::Serialize for AlgorithmIdentifier {
             }
             AlgorithmIdentifierParameters::EC(ec_params) => {
                 seq.serialize_element(ec_params)?;
+            }
+            AlgorithmIdentifierParameters::AES(aes_params) => {
+                seq.serialize_element(aes_params)?;
             }
         }
         seq.end()
@@ -175,6 +178,15 @@ impl<'de> de::Deserialize<'de> for AlgorithmIdentifier {
                         AlgorithmIdentifier,
                         "elliptic curves parameters"
                     )),
+                    // AES
+                    x if x.starts_with("2.16.840.1.101.3.4.1.") => AlgorithmIdentifierParameters::AES(
+                        seq_next_element!(seq, AlgorithmIdentifier, "aes algorithm identifier"),
+                    ),
+                    // SHA
+                    x if x.starts_with("2.16.840.1.101.3.4.2.") => {
+                        seq_next_element!(seq, AlgorithmIdentifier, "sha algorithm identifier");
+                        AlgorithmIdentifierParameters::Null
+                    }
                     _ => {
                         return Err(serde_invalid_value!(
                             AlgorithmIdentifier,
@@ -199,6 +211,7 @@ impl<'de> de::Deserialize<'de> for AlgorithmIdentifier {
 pub enum AlgorithmIdentifierParameters {
     None,
     Null,
+    AES(AESParameters),
     EC(ECParameters),
 }
 
@@ -293,6 +306,19 @@ pub enum AesMode {
     WrapPad,
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub enum AESParameters {
+    Null,
+    InitializationVector(OctetStringAsn1),
+    AuthenticatedEncryptionParameters(AesAuthEncParams),
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq, Clone)]
+pub struct AesAuthEncParams {
+    nonce: OctetStringAsn1,
+    icv_len: IntegerAsn1,
+}
+
 impl AesMode {
     fn to_128bit_oid(self) -> ObjectIdentifierAsn1 {
         match self {
@@ -334,6 +360,70 @@ impl AesMode {
     }
 }
 
+impl ser::Serialize for AESParameters {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
+    where
+        S: ser::Serializer,
+    {
+        match self {
+            AESParameters::Null => ().serialize(serializer),
+            AESParameters::InitializationVector(iv) => iv.serialize(serializer),
+            AESParameters::AuthenticatedEncryptionParameters(params) => params.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> de::Deserialize<'de> for AESParameters {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = AESParameters;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a valid DER-encoded DirectoryString")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let tag_peeker: TagPeeker = seq_next_element!(seq, AESParameters, "choice tag");
+                match tag_peeker.next_tag {
+                    Tag::OCTET_STRING => Ok(AESParameters::InitializationVector(seq_next_element!(
+                        seq,
+                        AESParameters,
+                        "Object Identifier"
+                    ))),
+                    Tag::NULL => {
+                        seq.next_element::<()>()?.expect("should not panic");
+                        Ok(AESParameters::Null)
+                    }
+                    Tag::SEQUENCE => Ok(AESParameters::AuthenticatedEncryptionParameters(seq_next_element!(
+                        seq,
+                        AesAuthEncParams,
+                        "AES Authenticated Encryption parameters"
+                    ))),
+                    _ => Err(serde_invalid_value!(
+                        AESParameters,
+                        "unsupported or unknown AES parameter",
+                        "a supported AES parameter"
+                    )),
+                }
+            }
+        }
+
+        deserializer.deserialize_enum(
+            "DirectoryString",
+            &["Null", "InitializationVector", "AuthenticatedEncryptionParameters"],
+            Visitor,
+        )
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[allow(non_camel_case_types)] // 'SHA2_512_224' is clearer than 'SHA2512224' imo
 pub enum SHAVariant {
@@ -367,5 +457,57 @@ impl From<SHAVariant> for ObjectIdentifierAsn1 {
             SHAVariant::SHAKE128 => oids::shake128().into(),
             SHAVariant::SHAKE256 => oids::shake256().into(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn aes_null_params() {
+        let aes_id = AlgorithmIdentifier::new_aes128(AesMode::ECB, AESParameters::Null);
+        let serialized = picky_asn1_der::to_vec(&aes_id).unwrap();
+        let deserialized: AlgorithmIdentifier = picky_asn1_der::from_bytes(&serialized).unwrap();
+        assert_eq!(deserialized, aes_id);
+    }
+
+    #[test]
+    fn aes_iv_params() {
+        let aes_id =
+            AlgorithmIdentifier::new_aes128(AesMode::ECB, AESParameters::InitializationVector(vec![0xA5; 12].into()));
+        let serialized = picky_asn1_der::to_vec(&aes_id).unwrap();
+        let deserialized: AlgorithmIdentifier = picky_asn1_der::from_bytes(&serialized).unwrap();
+        assert_eq!(deserialized, aes_id);
+    }
+
+    #[test]
+    fn aes_ae_params() {
+        let aes_id = AlgorithmIdentifier::new_aes128(
+            AesMode::ECB,
+            AESParameters::AuthenticatedEncryptionParameters(AesAuthEncParams {
+                nonce: vec![0xff; 12].into(),
+                icv_len: vec![12].into(),
+            }),
+        );
+        let serialized = picky_asn1_der::to_vec(&aes_id).unwrap();
+        let deserialized: AlgorithmIdentifier = picky_asn1_der::from_bytes(&serialized).unwrap();
+        assert_eq!(deserialized, aes_id);
+    }
+
+    #[test]
+    fn sha256() {
+        let sha = AlgorithmIdentifier::new_sha(SHAVariant::SHA2_256);
+        let serialized = picky_asn1_der::to_vec(&sha).unwrap();
+        let deserialized: AlgorithmIdentifier = picky_asn1_der::from_bytes(&serialized).unwrap();
+        assert_eq!(deserialized, sha);
+    }
+
+    #[test]
+    fn ecc_params() {
+        let sha = AlgorithmIdentifier::new_elliptic_curve(ECParameters::NamedCurve(oids::ecdsa_with_sha256().into()));
+        let serialized = picky_asn1_der::to_vec(&sha).unwrap();
+        let deserialized: AlgorithmIdentifier = picky_asn1_der::from_bytes(&serialized).unwrap();
+        assert_eq!(deserialized, sha);
     }
 }
