@@ -30,9 +30,9 @@ jobs:
 
       - script: |
           echo "Check formatting"
-          cargo +stable fmt --all -- --check 2> /dev/null
+          cargo fmt --all -- --check
           if ! [ $? -eq 0 ] ; then
-              printf "\n$(tput setaf 3)Bad formatting, please run 'cargo +stable fmt'\n\n"
+              echo "Bad formatting, please run 'cargo +stable fmt --all'"
               exit 1
           fi
 
@@ -40,13 +40,13 @@ jobs:
           . activate.sh
           cargo build --release
           if ! [ $? -eq 0 ] ; then
-              printf "\n$(tput setaf 3)Build failed\n\n"
+              echo "Build failed"
               exit 1
           fi
 
           cargo test --release
           if ! [ $? -eq 0 ] ; then
-              printf "\n$(tput setaf 3)Unit tests failed\n\n"
+              echo "Unit tests failed"
               exit 1
           fi
 
