@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [UNPUBLISHED] (5.0.0)
 
+### Added
+
+- Add `into_public_key` method to `x509::Cert`
+
 ### Changed
 
 - `Jwt` has no generic lifetime parameter anymore
