@@ -250,6 +250,10 @@ impl Cert {
         (&self.0.tbs_certificate.subject_public_key_info).into()
     }
 
+    pub fn into_public_key(self) -> PublicKey {
+        self.0.tbs_certificate.subject_public_key_info.into()
+    }
+
     pub fn is_parent_of(&self, other: &Cert) -> Result<(), CertError> {
         if let Ok(other_aki) = other.authority_key_identifier() {
             if let Some(other_aki) = other_aki.key_identifier() {
