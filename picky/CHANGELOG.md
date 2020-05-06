@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `Cert::verify` and `Cert::verify_chain` methods (previously deprecated)
 
+### Fixed
+
+- Add missing parameters for AES and SHA object identifiers ([668c06e8d](https://github.com/Devolutions/picky-rs/commit/668c06e8d8e8a0caae8bd13cf81c189bbc2e4918))
+
 ## [4.7.0] 2020-04-16
 
 ### Added
