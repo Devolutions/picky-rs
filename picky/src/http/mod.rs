@@ -13,7 +13,7 @@
 //!     key::PrivateKey,
 //!     pem::parse_pem,
 //! };
-//! use http_0_2::{request, header::{self, HeaderName}, method::Method};
+//! use http::{request, header::{self, HeaderName}, method::Method};
 //!
 //! // all you need to generate a http signature
 //!

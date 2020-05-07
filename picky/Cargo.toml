@@ -22,8 +22,7 @@ snafu = "0.6"
 static_assertions = "1.1"
 chrono = { version = "0.4", optional = true }
 serde_json = { version = "1.0", optional = true }
-http_0_1 = { package = "http", version = "0.1", optional = true }
-http_0_2 = { package = "http", version = "0.2", optional = true }
+http = { version = "0.2", optional = true }
 
 # /!\ ===== cryptography dependencies ===== /!\
 # These should be updated as soon as possible.
@@ -46,5 +45,5 @@ x509 = []
 jose = ["serde_json"]
 http_signature = []
 
-http_trait_impl = ["http_0_1", "http_0_2"]
+http_trait_impl = ["http"]
 chrono_conversion = ["chrono", "picky-asn1/chrono_conversion"]

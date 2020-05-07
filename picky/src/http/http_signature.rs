@@ -820,7 +820,7 @@ mod tests {
     use crate::pem::Pem;
     use crate::private::SubjectPublicKeyInfo;
     use crate::AlgorithmIdentifier;
-    use http_0_2::{header, method::Method, request};
+    use http::{header, method::Method, request};
 
     const HTTP_SIGNATURE_EXAMPLE: &str = "Signature keyId=\"my-rsa-key\",algorithm=\"rsa-sha256\"\
          ,created=1402170695,headers=\"(request-target) (created) date\",\

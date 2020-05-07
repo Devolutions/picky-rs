@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - `Cert::verify` and `Cert::verify_chain` methods (previously deprecated)
+- `HttpRequest` trait impl for `http` crate v0.1
 
 ### Fixed
 
