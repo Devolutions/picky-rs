@@ -59,6 +59,10 @@ pub enum HttpSignatureError {
     /// a parameter is present but invalid
     #[snafu(display("invalid parameter: {}", parameter))]
     InvalidParameter { parameter: &'static str },
+
+    /// incompatible 'algorithm' parameter with provided signature verification method
+    #[snafu(display("incompatible 'algorithm' parameter: {:?}", value))]
+    IncompatibleAlgorithm { value: SignatureHashType },
 }
 
 impl From<DecodeError> for HttpSignatureError {
@@ -167,6 +171,16 @@ pub struct HttpSignature {
     /// to the base 64 encoding of the signature.
     pub signature: String,
 
+    /// Used to specify the signature string construction mechanism.
+    /// Implementers SHOULD derive the digital signature algorithm used by an implementation from
+    /// the key metadata identified by the `keyId` rather than from this field. If `algorithm`
+    /// is provided and differs from the key metadata identified by the `keyId`, for example
+    /// `rsa-sha256` but an EdDSA key is identified via `keyId`, then an implementation
+    /// MUST produce an error.
+    /// Note: as of draft 12 there is only one signature string construction mechanism. As such
+    /// this parameter is only used to hint the digital signature algorithm.
+    pub algorithm: Option<SignatureHashType>,
+
     legacy: bool,
 }
 
@@ -185,6 +199,7 @@ const HTTP_SIGNATURE_SIGNATURE: &str = "signature";
 const HTTP_SIGNATURE_CREATED: &str = "created";
 const HTTP_SIGNATURE_EXPIRES: &str = "expires";
 const HTTP_SIGNATURE_HEADERS: &str = "headers";
+const HTTP_SIGNATURE_ALGORITHM: &str = "algorithm";
 
 impl ToString for HttpSignature {
     fn to_string(&self) -> String {
@@ -200,6 +215,14 @@ impl ToString for HttpSignature {
                 "{} {}=\"{}\"",
                 HTTP_SIGNATURE_HEADER, HTTP_SIGNATURE_KEY_ID, self.key_id
             ));
+
+            if let Some(algorithm) = self.algorithm {
+                acc.push(format!(
+                    "{}=\"{}\"",
+                    HTTP_SIGNATURE_ALGORITHM,
+                    to_http_sig_algo_str(algorithm)
+                ));
+            }
         }
 
         if let Some(created) = self.created {
@@ -294,6 +317,16 @@ impl FromStr for HttpSignature {
             None
         };
 
+        let algorithm = if let Some(algorithm) = keys.remove(HTTP_SIGNATURE_ALGORITHM) {
+            Some(
+                from_http_sig_algo_str(&algorithm).ok_or_else(|| HttpSignatureError::InvalidParameter {
+                    parameter: HTTP_SIGNATURE_ALGORITHM,
+                })?,
+            )
+        } else {
+            None
+        };
+
         let signature =
             keys.remove(HTTP_SIGNATURE_SIGNATURE)
                 .ok_or_else(|| HttpSignatureError::MissingRequiredParameter {
@@ -312,6 +345,7 @@ impl FromStr for HttpSignature {
             created,
             expires,
             signature,
+            algorithm,
             legacy,
         })
     }
@@ -558,12 +592,13 @@ impl<'a> HttpSignatureBuilder<'a> {
             } else {
                 base64::encode(&signature_binary)
             },
+            algorithm: Some(signature_type),
             legacy,
         })
     }
 }
 
-// === http signature verifier === /
+// === http signature verifier === //
 
 macro_rules! verifier_argument_missing_err {
     ($field:ident) => {{
@@ -634,6 +669,13 @@ impl<'a> HttpSignatureVerifier<'a> {
                 .take()
                 .ok_or(verifier_argument_missing_err!(signature_method))?
         };
+
+        // Sanity checks based on optional http signature parameter "algorithm"
+        if let Some(http_sig_algo) = self.http_signature.algorithm {
+            if http_sig_algo != signature_type || !is_algo_compatible_with_key(http_sig_algo, public_key) {
+                return Err(HttpSignatureError::IncompatibleAlgorithm { value: http_sig_algo });
+            }
+        }
 
         let signing_string_generation = inner
             .signing_string_generation
@@ -723,14 +765,65 @@ impl<'a> HttpSignatureVerifier<'a> {
     }
 }
 
+// === http signature algorithms === //
+
+const HTTP_SIG_ALGO_RSA_SHA_1: &str = "rsa-sha1";
+const HTTP_SIG_ALGO_RSA_SHA_224: &str = "rsa-sha224";
+const HTTP_SIG_ALGO_RSA_SHA_256: &str = "rsa-sha256";
+const HTTP_SIG_ALGO_RSA_SHA_384: &str = "rsa-sha384";
+const HTTP_SIG_ALGO_RSA_SHA_512: &str = "rsa-sha512";
+
+fn to_http_sig_algo_str(algo: SignatureHashType) -> &'static str {
+    match algo {
+        SignatureHashType::RsaSha1 => HTTP_SIG_ALGO_RSA_SHA_1,
+        SignatureHashType::RsaSha224 => HTTP_SIG_ALGO_RSA_SHA_224,
+        SignatureHashType::RsaSha256 => HTTP_SIG_ALGO_RSA_SHA_256,
+        SignatureHashType::RsaSha384 => HTTP_SIG_ALGO_RSA_SHA_384,
+        SignatureHashType::RsaSha512 => HTTP_SIG_ALGO_RSA_SHA_512,
+    }
+}
+
+fn from_http_sig_algo_str(s: &str) -> Option<SignatureHashType> {
+    match s {
+        HTTP_SIG_ALGO_RSA_SHA_1 => Some(SignatureHashType::RsaSha1),
+        HTTP_SIG_ALGO_RSA_SHA_224 => Some(SignatureHashType::RsaSha224),
+        HTTP_SIG_ALGO_RSA_SHA_256 => Some(SignatureHashType::RsaSha256),
+        HTTP_SIG_ALGO_RSA_SHA_384 => Some(SignatureHashType::RsaSha384),
+        HTTP_SIG_ALGO_RSA_SHA_512 => Some(SignatureHashType::RsaSha512),
+        _ => None,
+    }
+}
+
+fn is_algo_compatible_with_key(algo: SignatureHashType, key: &PublicKey) -> bool {
+    use crate::oids::*;
+
+    let key_algo = Into::<String>::into(key.as_inner().algorithm.oid());
+    match algo {
+        // Currently, SignatureHashType only contains RSA methods, so this is a an auto-win
+        _ if key_algo == RSA_ENCRYPTION => true,
+
+        // Otherwise we need to check for specific hash algorithm
+        SignatureHashType::RsaSha1 if key_algo == SHA1_WITH_RSA_ENCRYPTION => true,
+        SignatureHashType::RsaSha224 if key_algo == SHA224_WITH_RSA_ENCRYPTION => true,
+        SignatureHashType::RsaSha256 if key_algo == SHA256_WITH_RSA_ENCRYPTION => true,
+        SignatureHashType::RsaSha384 if key_algo == SHA384_WITH_RSA_ENCRYPTION => true,
+        SignatureHashType::RsaSha512 if key_algo == SHA512_WITH_RSA_ENCRYPTION => true,
+
+        // Key metadata is incompatible with this algorithm
+        _ => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::pem::Pem;
+    use crate::private::SubjectPublicKeyInfo;
+    use crate::AlgorithmIdentifier;
     use http_0_2::{header, method::Method, request};
 
-    const HTTP_SIGNATURE_EXAMPLE: &str = "Signature keyId=\"my-rsa-key\",created=1402170695,\
-         headers=\"(request-target) (created) date\",\
+    const HTTP_SIGNATURE_EXAMPLE: &str = "Signature keyId=\"my-rsa-key\",algorithm=\"rsa-sha256\"\
+         ,created=1402170695,headers=\"(request-target) (created) date\",\
          signature=\"CM3Ui6l4Z6+yYdWaX5Cz10OAqUceS53Zy/qA+e4xG5Nabe215iTlnj/sfVJ3nBaMIOj/4e\
          gxTKNDXAJbLm6nOF8zUOdJBuKQZNO1mfzrMKLsz7gc2PQI1eVxGNJoBZ40L7CouertpowQFpKyizNXqH/y\
          YBgqPEnLk+p5ISkXeHd7P/YbAAQGnSe3hnJ/gkkJ5rS6mGuu2C8+Qm68tcSGz9qwVdNTFPpji5VPxprs2J\
@@ -738,7 +831,7 @@ mod tests {
          ky59Rsg/CpB8gP7szjK/wrCclA==\"";
 
     const HTTP_SIGNATURE_WEIRD_FORMAT: &str = "Signature keyId = my-rsa-key ,created= \"1402170695\",\
-         headers=(request-target) (created) date  ,\
+         ,algorithm =\"rsa-sha256  \",headers=(request-target) (created) date  ,\
          signature=CM3Ui6l4Z6+yYdWaX5Cz10OAqUceS53Zy/qA+e4xG5Nabe215iTlnj/sfVJ3nBaMIOj/4e\
          gxTKNDXAJbLm6nOF8zUOdJBuKQZNO1mfzrMKLsz7gc2PQI1eVxGNJoBZ40L7CouertpowQFpKyizNXqH/y\
          YBgqPEnLk+p5ISkXeHd7P/YbAAQGnSe3hnJ/gkkJ5rS6mGuu2C8+Qm68tcSGz9qwVdNTFPpji5VPxprs2J\
@@ -783,7 +876,7 @@ mod tests {
             .expect("couldn't generate http signature");
         let http_signature_str = http_signature.to_string();
 
-        pretty_assertions::assert_eq!(http_signature_str, HTTP_SIGNATURE_EXAMPLE,);
+        pretty_assertions::assert_eq!(http_signature_str, HTTP_SIGNATURE_EXAMPLE);
 
         // changing unused headers should not change signature
 
@@ -870,7 +963,7 @@ mod tests {
             .verify()
             .err()
             .expect("verify");
-        assert_eq!(err.to_string(), "signature error: invalid signature");
+        assert_eq!(err.to_string(), "incompatible \'algorithm\' parameter: RsaSha256");
 
         let err = http_signature
             .verifier()
@@ -911,6 +1004,18 @@ mod tests {
             .now(1402170700)
             .signature_method(&private_key_1().to_public_key(), SignatureHashType::RsaSha256)
             .generate_signing_string_using_http_request(&parts_2)
+            .verify()
+            .err()
+            .expect("verify");
+        assert_eq!(err.to_string(), "signature error: invalid signature");
+
+        let mut invalid_algorithm_http_sig = http_signature.clone();
+        invalid_algorithm_http_sig.algorithm = None;
+        let err = invalid_algorithm_http_sig
+            .verifier()
+            .now(1402170700)
+            .signature_method(&private_key_1().to_public_key(), SignatureHashType::RsaSha1)
+            .generate_signing_string_using_http_request(&parts)
             .verify()
             .err()
             .expect("verify");
@@ -1027,5 +1132,41 @@ mod tests {
                 .verify()
                 .expect("couldn't verify");
         }
+    }
+
+    #[test]
+    fn incompatible_algorithm_err() {
+        let req = request::Builder::new()
+            .method(Method::GET)
+            .uri("/foo")
+            .header(header::DATE, "Tue, 07 Jun 2014 20:51:35 GMT")
+            .body(())
+            .expect("couldn't build request");
+        let (parts, _) = req.into_parts();
+
+        let private_key = private_key_1();
+        let http_signature = HttpSignatureBuilder::new()
+            .key_id("my-rsa-key")
+            .signature_method(&private_key, SignatureHashType::RsaSha384)
+            .request_target()
+            .created(1402170695)
+            .generate_signing_string_using_http_request(&parts)
+            .http_header("Date")
+            .build()
+            .expect("build http signature");
+
+        let mut spki = SubjectPublicKeyInfo::from(private_key_1().to_public_key());
+        spki.algorithm = AlgorithmIdentifier::new_sha512_with_rsa_encryption();
+        let sha512_only_key = PublicKey::from(spki);
+
+        let err = http_signature
+            .verifier()
+            .now(1402170700)
+            .signature_method(&sha512_only_key, SignatureHashType::RsaSha384)
+            .generate_signing_string_using_http_request(&parts)
+            .verify()
+            .err()
+            .expect("verify");
+        assert_eq!(err.to_string(), "incompatible 'algorithm' parameter: RsaSha384");
     }
 }
