@@ -466,23 +466,28 @@ mod tests {
 
     #[test]
     fn aes_null_params() {
+        let expected = [48, 13, 6, 9, 96, 134, 72, 1, 101, 3, 4, 1, 1, 5, 0];
         let aes_id = AlgorithmIdentifier::new_aes128(AesMode::ECB, AESParameters::Null);
-        let serialized = picky_asn1_der::to_vec(&aes_id).unwrap();
-        let deserialized: AlgorithmIdentifier = picky_asn1_der::from_bytes(&serialized).unwrap();
-        assert_eq!(deserialized, aes_id);
+        check_serde!(aes_id: AlgorithmIdentifier in expected);
     }
 
     #[test]
     fn aes_iv_params() {
+        let expected = [
+            48, 25, 6, 9, 96, 134, 72, 1, 101, 3, 4, 1, 1, 4, 12, 165, 165, 165, 165, 165, 165, 165, 165, 165, 165,
+            165, 165,
+        ];
         let aes_id =
             AlgorithmIdentifier::new_aes128(AesMode::ECB, AESParameters::InitializationVector(vec![0xA5; 12].into()));
-        let serialized = picky_asn1_der::to_vec(&aes_id).unwrap();
-        let deserialized: AlgorithmIdentifier = picky_asn1_der::from_bytes(&serialized).unwrap();
-        assert_eq!(deserialized, aes_id);
+        check_serde!(aes_id: AlgorithmIdentifier in expected);
     }
 
     #[test]
     fn aes_ae_params() {
+        let expected = [
+            48, 30, 6, 9, 96, 134, 72, 1, 101, 3, 4, 1, 1, 48, 17, 4, 12, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+            255, 255, 255, 2, 1, 12,
+        ];
         let aes_id = AlgorithmIdentifier::new_aes128(
             AesMode::ECB,
             AESParameters::AuthenticatedEncryptionParameters(AesAuthEncParams {
@@ -490,24 +495,23 @@ mod tests {
                 icv_len: vec![12].into(),
             }),
         );
-        let serialized = picky_asn1_der::to_vec(&aes_id).unwrap();
-        let deserialized: AlgorithmIdentifier = picky_asn1_der::from_bytes(&serialized).unwrap();
-        assert_eq!(deserialized, aes_id);
+        check_serde!(aes_id: AlgorithmIdentifier in expected);
     }
 
     #[test]
     fn sha256() {
+        let expected = [48, 13, 6, 9, 96, 134, 72, 1, 101, 3, 4, 2, 1, 5, 0];
         let sha = AlgorithmIdentifier::new_sha(SHAVariant::SHA2_256);
-        let serialized = picky_asn1_der::to_vec(&sha).unwrap();
-        let deserialized: AlgorithmIdentifier = picky_asn1_der::from_bytes(&serialized).unwrap();
-        assert_eq!(deserialized, sha);
+        check_serde!(sha: AlgorithmIdentifier in expected);
     }
 
     #[test]
-    fn ecc_params() {
-        let sha = AlgorithmIdentifier::new_elliptic_curve(ECParameters::NamedCurve(oids::ecdsa_with_sha256().into()));
-        let serialized = picky_asn1_der::to_vec(&sha).unwrap();
-        let deserialized: AlgorithmIdentifier = picky_asn1_der::from_bytes(&serialized).unwrap();
-        assert_eq!(deserialized, sha);
+    fn ec_params() {
+        let expected = [
+            48, 19, 6, 7, 42, 134, 72, 206, 61, 2, 1, 6, 8, 42, 134, 72, 206, 61, 4, 3, 2,
+        ];
+        let ec_params =
+            AlgorithmIdentifier::new_elliptic_curve(ECParameters::NamedCurve(oids::ecdsa_with_sha256().into()));
+        check_serde!(ec_params: AlgorithmIdentifier in expected);
     }
 }
