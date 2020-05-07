@@ -481,21 +481,20 @@ async fn generate_intermediate_ca(config: &Config, storage: &dyn PickyStorage) -
         }
     }
 
-    let (root_cert_der, root_key_der) = match storage.get_addressing_hash_by_name(&root_name).await {
-        Ok(root_hash) => (
-            storage
-                .get_cert_by_addressing_hash(&root_hash)
-                .await
-                .map_err(|e| format!("couldn't fetch root CA: {}", e))?,
-            storage
-                .get_key_by_addressing_hash(&root_hash)
-                .await
-                .map_err(|e| format!("couldn't fetch root CA private key: {}", e))?,
-        ),
-        Err(e) => {
-            return Err(format!("error while fetching root: {}", e));
-        }
-    };
+    let root_hash = storage
+        .get_addressing_hash_by_name(&root_name)
+        .await
+        .map_err(|e| format!("error while fetching root: {}", e))?;
+
+    let root_cert_der = storage
+        .get_cert_by_addressing_hash(&root_hash)
+        .await
+        .map_err(|e| format!("couldn't fetch root CA: {}", e))?;
+
+    let root_key_der = storage
+        .get_key_by_addressing_hash(&root_hash)
+        .await
+        .map_err(|e| format!("couldn't fetch root CA private key: {}", e))?;
 
     let pk = Picky::generate_private_key(2048).map_err(|e| e.to_string())?;
     let root_cert = Cert::from_der(&root_cert_der).map_err(|e| format!("couldn't parse root cert from der: {}", e))?;
