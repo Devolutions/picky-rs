@@ -23,7 +23,7 @@ pub trait HttpRequest {
 mod http_trait_impl {
     use super::*;
 
-    impl HttpRequest for http_0_1::request::Parts {
+    impl HttpRequest for http::request::Parts {
         fn get_header_concatenated_values<'a>(&'a self, header_name: &str) -> Result<Cow<'a, str>, HttpRequestError> {
             let mut values = Vec::new();
             let all_values = self.headers.get_all(header_name);
@@ -44,52 +44,7 @@ mod http_trait_impl {
             Ok(Cow::Borrowed(self.uri.path()))
         }
     }
-
-    impl HttpRequest for http_0_2::request::Parts {
-        fn get_header_concatenated_values<'a>(&'a self, header_name: &str) -> Result<Cow<'a, str>, HttpRequestError> {
-            let mut values = Vec::new();
-            let all_values = self.headers.get_all(header_name);
-            for value in all_values {
-                let value_str = value.to_str().map_err(|_| HttpRequestError::HeaderValueToStr {
-                    key: header_name.to_owned(),
-                })?;
-                values.push(value_str.trim());
-            }
-            Ok(Cow::Owned(values.join(", ")))
-        }
-
-        fn get_lowercased_method(&self) -> Result<Cow<'_, str>, HttpRequestError> {
-            Ok(Cow::Owned(self.method.as_str().to_lowercase()))
-        }
-
-        fn get_target(&self) -> Result<Cow<'_, str>, HttpRequestError> {
-            Ok(Cow::Borrowed(self.uri.path()))
-        }
-    }
-
-    impl<T> HttpRequest for http_0_1::request::Request<T> {
-        fn get_header_concatenated_values<'a>(&'a self, header_name: &str) -> Result<Cow<'a, str>, HttpRequestError> {
-            let mut values = Vec::new();
-            let all_values = self.headers().get_all(header_name);
-            for value in all_values {
-                let value_str = value.to_str().map_err(|_| HttpRequestError::HeaderValueToStr {
-                    key: header_name.to_owned(),
-                })?;
-                values.push(value_str.trim());
-            }
-            Ok(Cow::Owned(values.join(", ")))
-        }
-
-        fn get_lowercased_method(&self) -> Result<Cow<'_, str>, HttpRequestError> {
-            Ok(Cow::Owned(self.method().as_str().to_lowercase()))
-        }
-
-        fn get_target(&self) -> Result<Cow<'_, str>, HttpRequestError> {
-            Ok(Cow::Borrowed(self.uri().path()))
-        }
-    }
-
-    impl<T> HttpRequest for http_0_2::request::Request<T> {
+    impl<T> HttpRequest for http::request::Request<T> {
         fn get_header_concatenated_values<'a>(&'a self, header_name: &str) -> Result<Cow<'a, str>, HttpRequestError> {
             let mut values = Vec::new();
             let all_values = self.headers().get_all(header_name);
@@ -114,7 +69,7 @@ mod http_trait_impl {
     #[cfg(test)]
     mod tests {
         use super::*;
-        use http_0_2::{header, method::Method, request};
+        use http::{header, method::Method, request};
 
         #[test]
         fn http_request_parts() {
