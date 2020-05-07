@@ -5,11 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [UNPUBLISHED] (5.0.0)
+## [5.0.0] 2020-05-06
 
 ### Added
 
 - Add `into_public_key` method to `x509::Cert`
+- Support for the ["algorithm" http signature parameter](https://tools.ietf.org/html/draft-cavage-http-signatures-12#section-2.1.3).
 
 ### Changed
 
