@@ -317,15 +317,9 @@ impl FromStr for HttpSignature {
             None
         };
 
-        let algorithm = if let Some(algorithm) = keys.remove(HTTP_SIGNATURE_ALGORITHM) {
-            Some(
-                from_http_sig_algo_str(&algorithm).ok_or_else(|| HttpSignatureError::InvalidParameter {
-                    parameter: HTTP_SIGNATURE_ALGORITHM,
-                })?,
-            )
-        } else {
-            None
-        };
+        let algorithm = keys
+            .remove(HTTP_SIGNATURE_ALGORITHM)
+            .and_then(|val| from_http_sig_algo_str(&val));
 
         let signature =
             keys.remove(HTTP_SIGNATURE_SIGNATURE)
@@ -817,9 +811,7 @@ fn is_algo_compatible_with_key(algo: SignatureHashType, key: &PublicKey) -> bool
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pem::Pem;
-    use crate::private::SubjectPublicKeyInfo;
-    use crate::AlgorithmIdentifier;
+    use crate::{pem::Pem, private::SubjectPublicKeyInfo, AlgorithmIdentifier};
     use http::{header, method::Method, request};
 
     const HTTP_SIGNATURE_EXAMPLE: &str = "Signature keyId=\"my-rsa-key\",algorithm=\"rsa-sha256\"\
@@ -1168,5 +1160,14 @@ mod tests {
             .err()
             .expect("verify");
         assert_eq!(err.to_string(), "incompatible 'algorithm' parameter: RsaSha384");
+    }
+
+    const HTTP_SIGNATURE_UNKNOWN_ALGO: &str = "Signature keyId=\"my-rsa-key\",algorithm=\"magical-algo\",\
+                                               headers=\"(request-target)\",signature=\"GARBAGE\"";
+
+    #[test]
+    fn unknown_algorithms_are_ignored() {
+        let http_signature = HttpSignature::from_str(HTTP_SIGNATURE_UNKNOWN_ALGO).expect("from str");
+        assert!(http_signature.algorithm.is_none());
     }
 }
