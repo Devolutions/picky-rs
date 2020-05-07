@@ -1506,7 +1506,7 @@ checksum = "d4fd5641d01c8f18a23da7b6fe29298ff4b55afcccdf78973b24cf3175fee32e"
 
 [[package]]
 name = "picky"
-version = "4.7.0"
+version = "5.0.0"
 dependencies = [
  "base64 0.10.1",
  "cfg-if",
