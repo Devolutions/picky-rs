@@ -1,10 +1,15 @@
+//! Privacy-Enhanced Mail (PEM) format utilities
+//!
+//! Based on the RFC-7468
+//! ([Textual Encodings of PKIX, PKCS, and CMS Structures](https://tools.ietf.org/html/rfc7468)).
+
 use base64::DecodeError;
 use serde::export::Formatter;
-use snafu::{ResultExt, Snafu};
-use std::{borrow::Cow, fmt, str::FromStr};
+use snafu::Snafu;
+use std::{borrow::Cow, fmt, io::BufRead, str::FromStr};
 
 const PEM_HEADER_START: &str = "-----BEGIN";
-const PEM_HEADER_END: &str = "-----END";
+const PEM_FOOTER_START: &str = "-----END";
 const PEM_DASHES_BOUNDARIES: &str = "-----";
 
 #[derive(Debug, Clone, Snafu)]
@@ -23,7 +28,7 @@ pub enum PemError {
     Base64Decoding { source: DecodeError },
 }
 
-// https://tools.ietf.org/html/rfc7468
+/// Privacy-Enhanced Mail (PEM) format structured representation
 #[derive(Debug, Clone, PartialEq)]
 pub struct Pem<'a> {
     label: String,
@@ -51,6 +56,12 @@ impl<'a> Pem<'a> {
     }
 }
 
+impl Pem<'static> {
+    pub fn read_from(reader: &mut impl BufRead) -> Result<Self, PemError> {
+        read_pem(reader)
+    }
+}
+
 impl FromStr for Pem<'static> {
     type Err = PemError;
 
@@ -70,7 +81,7 @@ impl fmt::Display for Pem<'_> {
             writeln!(f, "{}", chunk)?;
         }
 
-        write!(f, "{} {}-----", PEM_HEADER_END, self.label)?;
+        write!(f, "{} {}-----", PEM_FOOTER_START, self.label)?;
 
         Ok(())
     }
@@ -82,7 +93,7 @@ impl Into<String> for Pem<'_> {
     }
 }
 
-/// Read a PEM-encoded structure
+/// Parse a PEM-encoded stream from a [u8] representation
 ///
 /// If the input contains line ending characters (`\r`, `\n`), a copy of input
 /// is allocated striping these. If you can strip these with minimal data copy
@@ -106,7 +117,7 @@ fn parse_pem_impl(input: &[u8]) -> Result<Pem<'static>, PemError> {
         + PEM_DASHES_BOUNDARIES.as_bytes().len();
 
     let footer_start_idx =
-        h_find(&input[header_end_idx..], PEM_HEADER_END.as_bytes()).ok_or(PemError::FooterNotFound)? + header_end_idx;
+        h_find(&input[header_end_idx..], PEM_FOOTER_START.as_bytes()).ok_or(PemError::FooterNotFound)? + header_end_idx;
 
     let raw_data = &input[header_end_idx..footer_start_idx];
 
@@ -115,12 +126,12 @@ fn parse_pem_impl(input: &[u8]) -> Result<Pem<'static>, PemError> {
         let striped_raw_data: Vec<u8> = raw_data
             .iter()
             .copied()
-            .filter(|byte| *byte != b'\r' && *byte != b'\n')
+            .filter(|&byte| byte != b'\r' && byte != b'\n')
             .collect();
-        base64::decode(&striped_raw_data).context(Base64Decoding)?
+        base64::decode(&striped_raw_data).map_err(|source| PemError::Base64Decoding { source })?
     } else {
         // Can be decoded as is!
-        base64::decode(raw_data).context(Base64Decoding)?
+        base64::decode(raw_data).map_err(|source| PemError::Base64Decoding { source })?
     };
 
     Ok(Pem {
@@ -131,6 +142,76 @@ fn parse_pem_impl(input: &[u8]) -> Result<Pem<'static>, PemError> {
 
 fn h_find(buffer: &[u8], value: &[u8]) -> Option<usize> {
     buffer.windows(value.len()).position(|window| window == value)
+}
+
+/// Parse a PEM-encoded stream from a BufRead object.
+///
+/// Maybe slower than the AsRef<[u8]>-based implementation because additional copies are incurred,
+/// but in most cases it's probably easier to work with and not that bad anyway.
+pub fn read_pem(reader: &mut impl BufRead) -> Result<Pem<'static>, PemError> {
+    let mut buf = Vec::with_capacity(1024);
+
+    // skip until start of header
+    h_read_until(reader, PEM_HEADER_START.as_bytes(), &mut buf).ok_or(PemError::HeaderNotFound)?;
+    buf.clear();
+
+    // read until end of header
+    h_read_until(reader, PEM_DASHES_BOUNDARIES.as_bytes(), &mut buf).ok_or(PemError::InvalidHeader)?;
+    let buf_utf8 = core::str::from_utf8(&buf).map_err(|_| PemError::InvalidHeader)?;
+    let label = buf_utf8.trim_end_matches(PEM_DASHES_BOUNDARIES).trim().to_owned();
+    buf.clear();
+
+    // read to footer
+    h_read_until(reader, PEM_FOOTER_START.as_bytes(), &mut buf).ok_or(PemError::FooterNotFound)?;
+    let base64_data: Vec<u8> = h_trim_end_matches(&buf, PEM_FOOTER_START.as_bytes())
+        .iter()
+        .cloned()
+        .filter(|&byte| byte != b'\r' && byte != b'\n')
+        .collect();
+    let data = base64::decode(&base64_data).map_err(|source| PemError::Base64Decoding { source })?;
+
+    // read until end of footer
+    h_read_until(reader, PEM_DASHES_BOUNDARIES.as_bytes(), &mut buf).ok_or(PemError::FooterNotFound)?;
+
+    Ok(Pem {
+        label,
+        data: Cow::Owned(data),
+    })
+}
+
+// Helper to read until some pattern is matched. Returns None on any error
+// (cannot be copy pasted for any purpose and should stay private!).
+fn h_read_until(reader: &mut impl BufRead, pat: &[u8], buf: &mut Vec<u8>) -> Option<usize> {
+    let mut read = 0;
+    let first_delim = *pat.first()?;
+    'outer: loop {
+        read += reader.read_until(first_delim, buf).ok()?;
+
+        for &next_delim in &pat[1..] {
+            let mut next = [0];
+            reader.read_exact(&mut next).ok()?;
+            buf.push(next[0]);
+            read += 1;
+
+            if next[0] != next_delim {
+                continue 'outer;
+            }
+        }
+
+        break Some(read);
+    }
+}
+
+// Helper to trim trailing characters matching the given pattern for bytes slice
+fn h_trim_end_matches<'a>(slice: &'a [u8], pat: &[u8]) -> &'a [u8] {
+    for (&slice_elem, &pat_elem) in slice.iter().rev().zip(pat.iter().rev()) {
+        if slice_elem != pat_elem {
+            return slice; // pattern doesn't match, return all the slice
+        }
+    }
+
+    // pattern did match, return sub-slice
+    &slice[..slice.len() - pat.len()]
 }
 
 /// Build a PEM-encoded structure into a String.
@@ -145,13 +226,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::BufReader;
 
     const PEM_BYTES: &[u8] = include_bytes!("../../test_assets/intermediate_ca.crt");
     const PEM_STR: &str = include_str!("../../test_assets/intermediate_ca.crt");
-    const FLATTENED_PEM: &str = "-----BEGIN GARBAGE-----GARBAGE-----END GARBAGE-----";
 
     #[test]
-    fn read_pem() {
+    fn parse() {
         let pem_from_bytes = parse_pem(PEM_BYTES).unwrap();
         assert_eq!(pem_from_bytes.label, "CERTIFICATE");
 
@@ -160,14 +241,41 @@ mod tests {
     }
 
     #[test]
-    fn to_pem() {
+    fn reader_based() {
+        let mut reader = BufReader::new(PEM_BYTES);
+
+        let pem_from_reader = read_pem(&mut reader).unwrap();
+        assert_eq!(pem_from_reader.label, "CERTIFICATE");
+
+        let pem_from_str = PEM_STR.parse::<Pem>().unwrap();
+        pretty_assertions::assert_eq!(pem_from_reader, pem_from_str);
+    }
+
+    #[test]
+    fn to_string() {
         let pem = PEM_STR.parse::<Pem>().unwrap();
         let reconverted_pem = pem.to_string();
         pretty_assertions::assert_eq!(reconverted_pem, PEM_STR);
     }
 
+    const FLATTENED_PEM: &str = "-----BEGIN GARBAGE-----GARBAGE-----END GARBAGE-----";
+
     #[test]
-    fn flattened_pem() {
+    fn flattened() {
         FLATTENED_PEM.parse::<Pem>().unwrap();
+        read_pem(&mut BufReader::new(FLATTENED_PEM.as_bytes())).unwrap();
+    }
+
+    const MULTIPLE_PEM: &str = "-----BEGIN GARBAGE1-----GARBAGE-----END GARBAGE1-----\
+         -----BEGIN GARBAGE2-----GARBAGE-----END GARBAGE2-----";
+
+    #[test]
+    fn multiple() {
+        // reading multiple PEM from some bytes stream is easier with read-based API
+        let mut reader = BufReader::new(MULTIPLE_PEM.as_bytes());
+        let pem1 = read_pem(&mut reader).unwrap();
+        assert_eq!(pem1.label, "GARBAGE1");
+        let pem2 = read_pem(&mut reader).unwrap();
+        assert_eq!(pem2.label, "GARBAGE2");
     }
 }
