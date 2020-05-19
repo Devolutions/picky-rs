@@ -29,6 +29,6 @@ More advanced types are supported through wrappers:
 - Application Tags from 0 to 15
 - Context Tags from 0 to 15
 
-Everything sequence-like combined out of this types is also supported out of the box.
+Everything sequence-like combined out of these types is also supported out of the box.
 
 Check out doc.rs for tested code examples.
