@@ -21,6 +21,7 @@ const PICKY_SAVE_CERTIFICATE_ENV: &str = "PICKY_SAVE_CERTIFICATE";
 const PICKY_BACKEND_ENV: &str = "PICKY_BACKEND";
 const PICKY_FILE_BACKEND_PATH_ENV: &str = "PICKY_FILE_BACKEND_PATH";
 const PICKY_DATABASE_URL_ENV: &str = "PICKY_DATABASE_URL";
+const PICKY_DATABASE_NAME_ENV: &str = "PICKY_DATABASE_NAME";
 
 const PICKY_ROOT_CERT_ENV: &str = "PICKY_ROOT_CERT";
 const PICKY_ROOT_CERT_PATH_ENV: &str = "PICKY_ROOT_CERT_PATH";
@@ -41,6 +42,10 @@ fn default_picky_realm() -> String {
 
 fn default_database_url() -> String {
     String::from("mongodb://127.0.0.1:27017")
+}
+
+fn default_database_name() -> String {
+    String::from("picky")
 }
 
 fn default_file_backend_path() -> PathBuf {
@@ -119,6 +124,8 @@ pub struct Config {
     pub file_backend_path: PathBuf,
     #[serde(default = "default_database_url")]
     pub database_url: String,
+    #[serde(default = "default_database_name")]
+    pub database_name: String,
 
     #[serde(default)]
     pub root: Option<CertKeyPair>,
@@ -139,6 +146,7 @@ impl Default for Config {
             backend: BackendType::default(),
             file_backend_path: default_file_backend_path(),
             database_url: default_database_url(),
+            database_name: default_database_name(),
             root: None,
             intermediate: None,
             provisioner_public_key: None,
@@ -195,6 +203,10 @@ impl Config {
             self.database_url = v.to_string();
         }
 
+        if let Some(v) = matches.value_of("db-name") {
+            self.database_name = v.to_string();
+        }
+
         if matches.is_present("dump-config") {
             let yaml_conf = serde_yaml::to_string(&self).expect("conf to yaml");
             if let Err(e) = std::fs::write(YAML_CONF_PATH, yaml_conf) {
@@ -230,6 +242,10 @@ impl Config {
 
         if let Ok(val) = env::var(PICKY_DATABASE_URL_ENV) {
             self.database_url = val;
+        }
+
+        if let Ok(val) = env::var(PICKY_DATABASE_NAME_ENV) {
+            self.database_name = val;
         }
 
         if !inject_cert_key_pair(&mut self.root, PICKY_ROOT_CERT_ENV, PICKY_ROOT_KEY_ENV) {

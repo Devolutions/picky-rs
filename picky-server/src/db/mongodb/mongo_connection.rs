@@ -10,7 +10,6 @@ use std::time::Duration;
 
 const CONNECTION_IDLE_TIMEOUT_SECS: u64 = 600;
 const DB_CONNECTION_TIMEOUT_SECS: u64 = 15;
-const DATABASE_NAME: &str = "picky";
 
 #[derive(Clone)]
 pub struct MongoConnection {
@@ -18,7 +17,7 @@ pub struct MongoConnection {
 }
 
 impl MongoConnection {
-    pub fn new(mongo_url: &str) -> Result<Self, String> {
+    pub fn new(mongo_url: &str, db_name: &str) -> Result<Self, String> {
         let conn_str = connstring::parse(mongo_url).map_err(|e| format!("couldn't parse connection string: {}", e))?;
 
         let mut client_options = match conn_str.options.as_ref().and_then(|options| options.options.get("ssl")) {
@@ -29,7 +28,7 @@ impl MongoConnection {
         client_options.pool_size = Some(1);
         client_options.read_preference = Some(ReadPreference::new(ReadMode::SecondaryPreferred, None));
 
-        let manager = r2d2_mongo::MongoConnectionManager::new(conn_str, DATABASE_NAME, client_options);
+        let manager = r2d2_mongo::MongoConnectionManager::new(conn_str, db_name, client_options);
 
         let pool = r2d2::Pool::builder()
             .max_size(20)

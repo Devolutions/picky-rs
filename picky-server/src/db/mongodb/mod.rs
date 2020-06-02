@@ -112,7 +112,7 @@ pub struct MongoStorage {
 
 impl MongoStorage {
     pub async fn new(config: &Config) -> Self {
-        let db = MongoConnection::new(&config.database_url).expect("build mongo connection");
+        let db = MongoConnection::new(&config.database_url, &config.database_name).expect("build mongo connection");
 
         let storage = MongoStorage {
             mongo_conn: db.clone(),
