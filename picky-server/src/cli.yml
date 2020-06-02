@@ -37,7 +37,12 @@ args:
       long: db-url
       value_name: DB_URL
       help: Url of the database used by the service.
-      long_help: Url on which the listener will listen.
+      takes_value: true
+      empty_values: false
+  - db-name:
+      long: db-name
+      value_name: DB_NAME
+      help: Name of the database used by the service.
       takes_value: true
       empty_values: false
   - api-key:
