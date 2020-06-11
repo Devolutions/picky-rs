@@ -8,7 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
 ### Changed
+
+- Update saphir dependency to `2.6`
+
 ### Removed
 
 ## [4.5.0] 2020-04-22
@@ -28,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - PKCS10 (CSR) in binary: `application/pkcs10`
     - PKCS10 (CSR) in base64: `application/pkcs10-base64`
 - Certificate validity duration has to be specified with the provider token's `x509_duration_secs` field
- 
+
 ### Removed
 
 - `Accept-Encoding` HTTP header is now ignored
