@@ -1,33 +1,28 @@
 use saphir::prelude::*;
 
-#[allow(clippy::trivially_copy_pass_by_ref)]
-pub async fn log_middleware(
-    _: &(),
-    ctx: HttpContext<Body>,
-    chain: &dyn MiddlewareChain,
-) -> Result<Response<Body>, SaphirError> {
-    let uri = ctx.request.uri().path().to_owned();
-    let method = ctx.request.method().to_owned();
-    let res = chain.next(ctx).await?;
+pub async fn log_middleware(ctx: HttpContext, chain: &dyn MiddlewareChain) -> Result<HttpContext, SaphirError> {
+    let req = ctx.state.request().unwrap(); // should not panic because this is before the chain.next(..) call
+    let uri = req.uri().path().to_owned();
+    let method = req.method().to_owned();
+
+    let ctx = chain.next(ctx).await?;
+
+    let res = ctx.state.response().unwrap(); // should not panic because this is after the chain.next(..) call
     log::info!("{} {} {}", method, uri, res.status());
-    Ok(res)
+
+    Ok(ctx)
 }
 
-#[allow(clippy::trivially_copy_pass_by_ref)]
-pub async fn cors_middleware(
-    _: &(),
-    ctx: HttpContext<Body>,
-    chain: &dyn MiddlewareChain,
-) -> Result<Response<Body>, SaphirError> {
-    let origin_header = ctx.request.headers().get("Origin").cloned();
+pub async fn cors_middleware(ctx: HttpContext, chain: &dyn MiddlewareChain) -> Result<HttpContext, SaphirError> {
+    let req = ctx.state.request().unwrap(); // should not panic because this is before chain.next(..) call
+    let origin_header = req.headers().get("Origin").cloned();
 
-    let mut response: Response<Body> = chain.next(ctx).await?;
+    let mut ctx = chain.next(ctx).await?;
 
     if let Some(origin_header) = origin_header {
-        response
-            .headers_mut()
-            .insert("Access-Control-Allow-Origin", origin_header);
+        let res = ctx.state.response_mut().unwrap(); // should not panic because this is after chain.next(..) call
+        res.headers_mut().insert("Access-Control-Allow-Origin", origin_header);
     }
 
-    Ok(response)
+    Ok(ctx)
 }
