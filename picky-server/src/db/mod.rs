@@ -50,7 +50,11 @@ pub type BoxedPickyStorage = Box<dyn PickyStorage>;
 
 pub async fn get_storage(config: &Config) -> BoxedPickyStorage {
     match config.backend {
-        BackendType::MongoDb => Box::new(MongoStorage::new(config).await),
+        BackendType::MongoDb => {
+            let client = mongodb::build_client(&config.database_url).await.expect("mongo client");
+            let db = client.database(&config.database_name);
+            Box::new(MongoStorage::new(db).await)
+        }
         BackendType::Memory => Box::new(MemoryStorage::new()),
         BackendType::File => Box::new(FileStorage::new(config)),
     }
