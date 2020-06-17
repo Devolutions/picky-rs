@@ -1,44 +1,42 @@
-mod mongo_connection;
-mod mongo_repository;
+mod model;
 
 use crate::{
     addressing::{encode_to_alternative_addresses, encode_to_canonical_address},
-    config::Config,
-    db::{
-        mongodb::{
-            mongo_connection::MongoConnection,
-            mongo_repository::{
-                CertificateModel, CertificateStoreRepository, ConfigStoreRepository, HashLookupTableStoreRepository,
-                KeyIdentifierModel, KeyIdentifierStoreRepository, KeyModel, KeyStoreRepository, NameModel,
-                NameStoreRepository, CERTIFICATE_COLLECTION_NAME, CONFIG_COLLECTION_NAME,
-                HASH_LOOKUP_TABLE_COLLECTION_NAME, KEY_IDENTIFIER_COLLECTION_NAME, KEY_STORE_COLLECTION_NAME,
-                NAME_STORE_COLLECTION_NAME,
-            },
-        },
-        CertificateEntry, PickyStorage, StorageError, SCHEMA_LAST_VERSION,
-    },
+    db::{CertificateEntry, PickyStorage, StorageError, SCHEMA_LAST_VERSION},
 };
-use bson::{doc, from_bson, spec::BinarySubtype, Bson};
-use futures::{future::BoxFuture, FutureExt};
+use futures::{future::BoxFuture, stream::StreamExt, FutureExt};
+use model::*;
+use mongodm::{
+    f,
+    mongo::{
+        bson::{doc, oid::ObjectId, spec::BinarySubtype, Binary, Bson},
+        options::{ClientOptions, ReadPreference, ReplaceOptions, SelectionCriteria},
+        Client, Database,
+    },
+    ToRepository,
+};
 use picky::x509::Cert;
 use snafu::Snafu;
 use std::{collections::HashMap, convert::TryFrom};
 
+const DB_CONNECTION_TIMEOUT_SECS: u64 = 15;
+
+pub async fn build_client(mongo_url: &str) -> mongodm::mongo::error::Result<Client> {
+    let mut client_options = ClientOptions::parse(mongo_url).await?;
+    client_options.app_name = Some(String::from("Picky"));
+    client_options.selection_criteria = Some(SelectionCriteria::ReadPreference(ReadPreference::SecondaryPreferred {
+        options: Default::default(),
+    }));
+    client_options.connect_timeout = Some(std::time::Duration::from_secs(DB_CONNECTION_TIMEOUT_SECS));
+
+    Client::with_options(client_options)
+}
+
 #[derive(Debug, Snafu)]
 pub enum MongoStorageError {
-    #[snafu(display("bson encode error: {}", source))]
-    BsonEncodeError {
-        source: bson::EncoderError,
-    },
-
-    #[snafu(display("bson decode error: {}", source))]
-    BsonDecodeError {
-        source: bson::DecoderError,
-    },
-
     #[snafu(display("mongo error: {}", source))]
     MongoError {
-        source: mongodb::Error,
+        source: mongodm::mongo::error::Error,
     },
 
     // insert error
@@ -59,42 +57,14 @@ impl From<String> for MongoStorageError {
     }
 }
 
-impl From<bson::EncoderError> for MongoStorageError {
-    fn from(source: bson::EncoderError) -> Self {
-        MongoStorageError::BsonEncodeError { source }
-    }
-}
-
-impl From<bson::DecoderError> for MongoStorageError {
-    fn from(source: bson::DecoderError) -> Self {
-        MongoStorageError::BsonDecodeError { source }
-    }
-}
-
-impl From<mongodb::Error> for MongoStorageError {
-    fn from(source: mongodb::Error) -> Self {
+impl From<mongodm::mongo::error::Error> for MongoStorageError {
+    fn from(source: mongodm::mongo::error::Error) -> Self {
         MongoStorageError::MongoError { source }
     }
 }
 
-impl From<bson::EncoderError> for StorageError {
-    fn from(source: bson::EncoderError) -> Self {
-        StorageError::Mongo {
-            source: MongoStorageError::BsonEncodeError { source },
-        }
-    }
-}
-
-impl From<bson::DecoderError> for StorageError {
-    fn from(source: bson::DecoderError) -> Self {
-        StorageError::Mongo {
-            source: MongoStorageError::BsonDecodeError { source },
-        }
-    }
-}
-
-impl From<mongodb::Error> for StorageError {
-    fn from(source: mongodb::Error) -> Self {
+impl From<mongodm::mongo::error::Error> for StorageError {
+    fn from(source: mongodm::mongo::error::Error) -> Self {
         StorageError::Mongo {
             source: MongoStorageError::MongoError { source },
         }
@@ -102,140 +72,128 @@ impl From<mongodb::Error> for StorageError {
 }
 
 pub struct MongoStorage {
-    mongo_conn: MongoConnection,
-    certificate_store: CertificateStoreRepository,
-    key_identifier_store: KeyIdentifierStoreRepository,
-    key_store: KeyStoreRepository,
-    name_store: NameStoreRepository,
-    hash_lookup: HashLookupTableStoreRepository,
+    db: Database,
+}
+
+impl ToRepository for MongoStorage {
+    fn repository<M: mongodm::Model>(&self) -> mongodm::Repository<M> {
+        self.db.repository()
+    }
+
+    fn repository_with_options<M: mongodm::Model>(
+        &self,
+        options: mongodm::mongo::options::CollectionOptions,
+    ) -> mongodm::Repository<M> {
+        self.db.repository_with_options(options)
+    }
 }
 
 impl MongoStorage {
-    pub async fn new(config: &Config) -> Self {
-        let db = MongoConnection::new(&config.database_url, &config.database_name).expect("build mongo connection");
+    pub async fn new(db: Database) -> Self {
+        let storage = MongoStorage { db };
 
-        let storage = MongoStorage {
-            mongo_conn: db.clone(),
-            certificate_store: CertificateStoreRepository::new(db.clone(), CERTIFICATE_COLLECTION_NAME),
-            key_identifier_store: KeyIdentifierStoreRepository::new(db.clone(), KEY_IDENTIFIER_COLLECTION_NAME),
-            key_store: KeyStoreRepository::new(db.clone(), KEY_STORE_COLLECTION_NAME),
-            name_store: NameStoreRepository::new(db.clone(), NAME_STORE_COLLECTION_NAME),
-            hash_lookup: HashLookupTableStoreRepository::new(db.clone(), HASH_LOOKUP_TABLE_COLLECTION_NAME),
-        };
+        let config_repo = storage.repository::<Config>();
+        let config_opt = config_repo.find_one(doc!(), None).await.expect("config repo");
 
-        let config = ConfigStoreRepository::new(db, CONFIG_COLLECTION_NAME);
-        let config_collection = config.get_collection().await.expect("config collection");
-        let mut config_cursor = config_collection.find(None, None).expect("find config doc");
-        if let Some(config_doc) = config_cursor.next() {
-            let config_doc = config_doc.expect("config doc");
-            if config_cursor.has_next().expect("collection cursor next") {
-                panic!("multiple config doc found in database!");
+        const SUPPORTED: i32 = SCHEMA_LAST_VERSION as i32;
+        match config_opt {
+            Some(Config {
+                schema_version: SUPPORTED,
+                ..
+            }) => {
+                log::info!("detected database using supported v{} schema", SUPPORTED);
             }
-
-            match config_doc.get("schema_version") {
-                Some(Bson::I32(supported)) if supported == &i32::from(SCHEMA_LAST_VERSION) => {
-                    log::info!("detected database using supported v{} schema", supported);
-                }
-                Some(Bson::I32(unsupported)) => {
-                    panic!("unsupported schema version: v{}", unsupported);
-                }
-                Some(invalid) => {
-                    panic!("invalid schema version config format: {:?}", invalid);
-                }
-                None => {
-                    panic!("'schema_version' field not found in config doc");
-                }
+            Some(Config {
+                schema_version: unsupported,
+                ..
+            }) => {
+                panic!("unsupported schema version: v{}", unsupported);
             }
-        } else {
-            // no config doc found
+            None => {
+                // no config doc found
 
-            let cert_collection = storage
-                .certificate_store
-                .get_collection()
-                .await
-                .expect("access certificate store collection");
-            let certs_count = cert_collection
-                .count(None, None)
-                .expect("count number of certificates in store");
-
-            if certs_count != 0 {
-                log::info!("detected v0 schema: migrate database to v{}...", SCHEMA_LAST_VERSION);
-
-                let key_identifier_collection = storage
-                    .key_identifier_store
-                    .get_collection()
+                let cert_collection = storage.repository::<Certificate>();
+                let certs_count = cert_collection
+                    .estimated_document_count(None)
                     .await
-                    .expect("access key identifier store collection");
-                let key_collection = storage
-                    .key_store
-                    .get_collection()
-                    .await
-                    .expect("access key store collection");
-                let name_collection = storage
-                    .name_store
-                    .get_collection()
-                    .await
-                    .expect("access name store collection");
-                let hash_lookup_collection = storage
-                    .hash_lookup
-                    .get_collection()
-                    .await
-                    .expect("access hash lookup store collection");
+                    .expect("count number of certificates in store");
 
-                let mut original_data =
-                    HashMap::with_capacity(usize::try_from(certs_count).expect("try from certs count"));
+                if certs_count > 0 {
+                    log::info!("detected v0 schema: migrate database to v{}...", SCHEMA_LAST_VERSION);
 
-                for doc in cert_collection.find(None, None).expect("find certificates") {
-                    let doc = doc.expect("unwrap cert doc");
-                    let cert_model: CertificateModel =
-                        from_bson(Bson::Document(doc)).expect("cert model from cert bson doc");
-                    if let Bson::Binary(BinarySubtype::Generic, bin) = cert_model.value {
-                        original_data.insert(cert_model.key, (bin, None));
+                    let key_identifier_collection = storage.repository::<KeyIdentifier>();
+                    let key_collection = storage.repository::<Key>();
+                    let name_collection = storage.repository::<Name>();
+                    let hash_lookup_collection = storage.repository::<HashLookupEntry>();
+
+                    let mut original_data =
+                        HashMap::with_capacity(usize::try_from(certs_count).expect("try from certs count"));
+
+                    let mut certs_cursor = cert_collection.find(doc!(), None).await.expect("certs cursor");
+                    while let Some(cert_model) = certs_cursor.next().await {
+                        let cert_model = cert_model.expect("unwrap cert model");
+                        if let Bson::Binary(Binary {
+                            subtype: BinarySubtype::Generic,
+                            bytes: bin,
+                        }) = cert_model.value
+                        {
+                            original_data.insert(cert_model.key, (bin, None));
+                        }
                     }
-                }
 
-                for doc in key_collection.find(None, None).expect("find private keys") {
-                    let doc = doc.expect("unwrap key doc");
-                    let key_model: KeyModel = from_bson(Bson::Document(doc)).expect("key model from key bson doc");
-                    if let Bson::Binary(BinarySubtype::Generic, bin) = key_model.value {
-                        original_data
-                            .entry(key_model.key)
-                            .and_modify(|entry| entry.1 = Some(bin));
+                    let mut keys_cursor = key_collection.find(doc!(), None).await.expect("find private keys");
+                    while let Some(key_model) = keys_cursor.next().await {
+                        let key_model = key_model.expect("unwrap key model");
+                        if let Bson::Binary(Binary {
+                            subtype: BinarySubtype::Generic,
+                            bytes: bin,
+                        }) = key_model.value
+                        {
+                            original_data
+                                .entry(key_model.key)
+                                .and_modify(|entry| entry.1 = Some(bin));
+                        }
                     }
-                }
 
-                // clean all
-                cert_collection.drop().expect("drop certificate store");
-                key_identifier_collection.drop().expect("drop key identifier store");
-                key_collection.drop().expect("drop key store");
-                name_collection.drop().expect("drop name store");
-                hash_lookup_collection.drop().expect("drop hash lookup table");
-
-                for (_, (cert_der, key_pkcs10)) in original_data.into_iter() {
-                    let cert = Cert::from_der(&cert_der).expect("decode cert from der");
-                    storage
-                        .store(CertificateEntry {
-                            name: cert
-                                .subject_name()
-                                .find_common_name()
-                                .expect("cert common name")
-                                .to_string(),
-                            cert: cert_der,
-                            key_identifier: hex::encode(cert.subject_key_identifier().expect("cert key id")),
-                            key: key_pkcs10,
-                        })
+                    // clean all
+                    cert_collection.drop(None).await.expect("drop certificate store");
+                    key_identifier_collection
+                        .drop(None)
                         .await
-                        .expect("couldn't store certificate (migration from v0 schema)");
+                        .expect("drop key identifier store");
+                    key_collection.drop(None).await.expect("drop key store");
+                    name_collection.drop(None).await.expect("drop name store");
+                    hash_lookup_collection.drop(None).await.expect("drop hash lookup table");
+
+                    for (_, (cert_der, key_pkcs10)) in original_data.into_iter() {
+                        let cert = Cert::from_der(&cert_der).expect("decode cert from der");
+                        storage
+                            .store(CertificateEntry {
+                                name: cert
+                                    .subject_name()
+                                    .find_common_name()
+                                    .expect("cert common name")
+                                    .to_string(),
+                                cert: cert_der,
+                                key_identifier: hex::encode(cert.subject_key_identifier().expect("cert key id")),
+                                key: key_pkcs10,
+                            })
+                            .await
+                            .expect("couldn't store certificate (migration from v0 schema)");
+                    }
+
+                    log::info!("migrated to v{} successfully!", SCHEMA_LAST_VERSION);
+                } else {
+                    log::info!("fresh new database using v{} schema", SCHEMA_LAST_VERSION);
                 }
 
-                log::info!("migrated to v{} successfully!", SCHEMA_LAST_VERSION);
-            } else {
-                log::info!("fresh new database using v{} schema", SCHEMA_LAST_VERSION);
-            }
+                let config = Config {
+                    id: ObjectId::new(),
+                    schema_version: i32::from(SCHEMA_LAST_VERSION),
+                };
 
-            config_collection
-                .insert_one(doc!("schema_version": 1), None)
-                .expect("insert config doc");
+                config_repo.insert_one(&config, None).await.expect("insert config doc");
+            }
         }
 
         storage
@@ -245,12 +203,9 @@ impl MongoStorage {
 impl PickyStorage for MongoStorage {
     fn health(&self) -> BoxFuture<'_, Result<(), StorageError>> {
         async move {
-            let shallow_clone = self.mongo_conn.clone();
-            tokio::task::spawn_blocking(move || shallow_clone.ping())
+            self.db
+                .list_collection_names(None)
                 .await
-                .map_err(|e| MongoStorageError::Other {
-                    description: format!("couldn't join ping task: {}", e),
-                })?
                 .map_err(|e| MongoStorageError::Other {
                     description: format!("ping to mongo connexion failed: {}", e),
                 })?;
@@ -275,35 +230,71 @@ impl PickyStorage for MongoStorage {
                     description: format!("couldn't encode alternative addresses: {}", e),
                 })?;
 
-            let name_doc = doc!("key": name.clone());
-            let name_item = NameModel::new(name, addressing_hash.clone());
-            self.name_store.update_with_options(name_doc, name_item, true).await?;
-
-            let certificate_doc = doc!("key": addressing_hash.clone());
-            let certificate_item =
-                CertificateModel::new(addressing_hash.clone(), Bson::Binary(BinarySubtype::Generic, cert));
-            self.certificate_store
-                .update_with_options(certificate_doc, certificate_item, true)
+            let query = doc! {f!(key in Name): &name};
+            let name = Name {
+                key: name,
+                value: addressing_hash.clone(),
+            };
+            self.repository::<Name>()
+                .replace_one(query, &name, Some(ReplaceOptions::builder().upsert(true).build()))
                 .await?;
 
-            let key_identifier_doc = doc!("key": key_identifier.clone());
-            let key_identifier_item = KeyIdentifierModel::new(key_identifier, addressing_hash.clone());
-            self.key_identifier_store
-                .update_with_options(key_identifier_doc, key_identifier_item, true)
+            let query = doc! {f!(key in Certificate): &addressing_hash };
+            let certificate = Certificate {
+                key: addressing_hash.clone(),
+                value: Bson::Binary(Binary {
+                    subtype: BinarySubtype::Generic,
+                    bytes: cert,
+                }),
+            };
+            self.repository::<Certificate>()
+                .replace_one(
+                    query,
+                    &certificate,
+                    Some(ReplaceOptions::builder().upsert(true).build()),
+                )
+                .await?;
+
+            let query = doc! { f!(key in KeyIdentifier): &key_identifier };
+            let key_identifier = KeyIdentifier {
+                key: key_identifier,
+                value: addressing_hash.clone(),
+            };
+            self.repository::<KeyIdentifier>()
+                .replace_one(
+                    query,
+                    &key_identifier,
+                    Some(ReplaceOptions::builder().upsert(true).build()),
+                )
                 .await?;
 
             for alternative_address in alternative_addresses.into_iter() {
-                let alternative_hash_doc = doc!("key": alternative_address.clone());
-                let alternative_hash_item = KeyIdentifierModel::new(alternative_address, addressing_hash.clone());
-                self.hash_lookup
-                    .update_with_options(alternative_hash_doc, alternative_hash_item, true)
+                let query = doc! { f!(key in HashLookupEntry): &alternative_address };
+                let alternative_key_identifier = HashLookupEntry {
+                    key: alternative_address,
+                    value: addressing_hash.clone(),
+                };
+                self.repository::<HashLookupEntry>()
+                    .replace_one(
+                        query,
+                        &alternative_key_identifier,
+                        Some(ReplaceOptions::builder().upsert(true).build()),
+                    )
                     .await?;
             }
 
             if let Some(key) = key {
-                let key_doc = doc!("key": addressing_hash.clone());
-                let key_item = KeyModel::new(addressing_hash, Bson::Binary(BinarySubtype::Generic, key));
-                self.key_store.update_with_options(key_doc, key_item, true).await?;
+                let query = doc! {f!(key in Key): &addressing_hash};
+                let key = Key {
+                    key: addressing_hash,
+                    value: Bson::Binary(Binary {
+                        subtype: BinarySubtype::Generic,
+                        bytes: key,
+                    }),
+                };
+                self.repository::<Key>()
+                    .replace_one(query, &key, Some(ReplaceOptions::builder().upsert(true).build()))
+                    .await?;
             }
 
             Ok(())
@@ -314,8 +305,8 @@ impl PickyStorage for MongoStorage {
     fn get_addressing_hash_by_name<'a>(&'a self, name: &'a str) -> BoxFuture<'a, Result<String, StorageError>> {
         async move {
             let hash = self
-                .name_store
-                .get(doc!("key": name))
+                .repository::<Name>()
+                .find_one(doc!(f!(key in Name): name), None)
                 .await?
                 .map(|model| model.value)
                 .ok_or_else(|| MongoStorageError::Other {
@@ -328,16 +319,19 @@ impl PickyStorage for MongoStorage {
 
     fn get_cert_by_addressing_hash<'a>(&'a self, hash: &'a str) -> BoxFuture<'a, Result<Vec<u8>, StorageError>> {
         async move {
-            let cert =
-                self.certificate_store
-                    .get(doc!("key": hash))
-                    .await?
-                    .ok_or_else(|| MongoStorageError::Other {
-                        description: "cert not found".to_owned(),
-                    })?;
+            let cert = self
+                .repository::<Certificate>()
+                .find_one(doc!(f!(key in Certificate): hash), None)
+                .await?
+                .ok_or_else(|| MongoStorageError::Other {
+                    description: "cert not found".to_owned(),
+                })?;
 
             match cert.value {
-                Bson::Binary(BinarySubtype::Generic, bin) => Ok(bin),
+                Bson::Binary(Binary {
+                    subtype: BinarySubtype::Generic,
+                    bytes: bin,
+                }) => Ok(bin),
                 unexpected => Err(MongoStorageError::Other {
                     description: format!("expected binary DB content but got {}", unexpected),
                 }
@@ -350,14 +344,18 @@ impl PickyStorage for MongoStorage {
     fn get_key_by_addressing_hash<'a>(&'a self, hash: &'a str) -> BoxFuture<'a, Result<Vec<u8>, StorageError>> {
         async move {
             let key = self
-                .key_store
-                .get(doc!("key": hash))
+                .repository::<Key>()
+                .find_one(doc!(f!(key in Key): hash), None)
                 .await?
                 .ok_or_else(|| MongoStorageError::Other {
                     description: "key not found".to_owned(),
                 })?;
+
             match key.value {
-                Bson::Binary(BinarySubtype::Generic, bin) => Ok(bin),
+                Bson::Binary(Binary {
+                    subtype: BinarySubtype::Generic,
+                    bytes: bin,
+                }) => Ok(bin),
                 unexpected => Err(MongoStorageError::Other {
                     description: format!("expected binary DB content but got {}", unexpected),
                 }
@@ -372,28 +370,30 @@ impl PickyStorage for MongoStorage {
         key_identifier: &'a str,
     ) -> BoxFuture<'a, Result<String, StorageError>> {
         async move {
-            Ok(self
-                .key_identifier_store
-                .get(doc!("key": key_identifier))
+            let addressing_hash = self
+                .repository::<KeyIdentifier>()
+                .find_one(doc!(f!(key in KeyIdentifier): key_identifier), None)
                 .await?
                 .ok_or_else(|| MongoStorageError::Other {
                     description: format!("addressing hash not found by key identifier \"{}\"", key_identifier),
                 })?
-                .value)
+                .value;
+            Ok(addressing_hash)
         }
         .boxed()
     }
 
     fn lookup_addressing_hash<'a>(&'a self, lookup_key: &'a str) -> BoxFuture<'a, Result<String, StorageError>> {
         async move {
-            Ok(self
-                .hash_lookup
-                .get(doc!("key": lookup_key))
+            let addressing_hash = self
+                .repository::<HashLookupEntry>()
+                .find_one(doc!(f!(key in HashLookupEntry): lookup_key), None)
                 .await?
                 .ok_or_else(|| MongoStorageError::Other {
                     description: format!("addressing hash not found using lookup key \"{}\"", lookup_key),
                 })?
-                .value)
+                .value;
+            Ok(addressing_hash)
         }
         .boxed()
     }
