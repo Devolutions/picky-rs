@@ -1584,6 +1584,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "picky-asn1-x509"
+version = "0.1.0"
+dependencies = [
+ "base64 0.10.1",
+ "hex 0.3.2",
+ "num-bigint-dig 0.5.0",
+ "oid",
+ "picky-asn1",
+ "picky-asn1-der",
+ "pretty_assertions",
+ "serde",
+]
+
+[[package]]
 name = "picky-server"
 version = "4.6.0"
 dependencies = [
