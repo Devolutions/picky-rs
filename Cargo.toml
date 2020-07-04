@@ -4,6 +4,7 @@ members = [
     "picky-server",
     "picky-asn1",
     "picky-asn1-der",
+    "picky-asn1-x509",
 ]
 
 [patch.crates-io]
