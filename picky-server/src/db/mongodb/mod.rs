@@ -16,8 +16,8 @@ use mongodm::{
     ToRepository,
 };
 use picky::x509::Cert;
-use snafu::Snafu;
 use std::{collections::HashMap, convert::TryFrom};
+use thiserror::Error;
 
 const DB_CONNECTION_TIMEOUT_SECS: u64 = 15;
 
@@ -32,23 +32,13 @@ pub async fn build_client(mongo_url: &str) -> mongodm::mongo::error::Result<Clie
     Client::with_options(client_options)
 }
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, Error)]
 pub enum MongoStorageError {
-    #[snafu(display("mongo error: {}", source))]
-    MongoError {
-        source: mongodm::mongo::error::Error,
-    },
+    #[error("mongo error: {}", source)]
+    MongoError { source: mongodm::mongo::error::Error },
 
-    // insert error
-    InsertError,
-
-    /// update error
-    UpdateError,
-
-    #[snafu(display("generic error: {}", description))]
-    Other {
-        description: String,
-    },
+    #[error("generic error: {}", description)]
+    Other { description: String },
 }
 
 impl From<String> for MongoStorageError {

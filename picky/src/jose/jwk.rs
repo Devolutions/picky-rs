@@ -2,22 +2,22 @@ use crate::{key::PublicKey, signature::SignatureHashType};
 use base64::DecodeError;
 use picky_asn1_x509::SubjectPublicKeyInfo;
 use serde::{Deserialize, Serialize};
-use snafu::Snafu;
+use thiserror::Error;
 
 // === error type === //
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, Error)]
 pub enum JwkError {
     /// Json error
-    #[snafu(display("JSON error: {}", source))]
+    #[error("JSON error: {}", source)]
     Json { source: serde_json::Error },
 
     /// couldn't decode base64
-    #[snafu(display("couldn't decode base64: {}", source))]
+    #[error("couldn't decode base64: {}", source)]
     Base64Decoding { source: DecodeError },
 
     /// unsupported algorithm
-    #[snafu(display("unsupported algorithm: {}", algorithm))]
+    #[error("unsupported algorithm: {}", algorithm)]
     UnsupportedAlgorithm { algorithm: &'static str },
 }
 

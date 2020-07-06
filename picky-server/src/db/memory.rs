@@ -3,16 +3,16 @@ use crate::{
     db::{CertificateEntry, PickyStorage, StorageError},
 };
 use futures::{future::BoxFuture, FutureExt};
-use snafu::Snafu;
 use std::{
     collections::HashMap,
     hash::Hash,
     sync::{RwLock, RwLockReadGuard},
 };
+use thiserror::Error;
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, Error)]
 pub enum MemoryStorageError {
-    #[snafu(display("generic error: {}", description))]
+    #[error("generic error: {}", description)]
     Other { description: String },
 }
 

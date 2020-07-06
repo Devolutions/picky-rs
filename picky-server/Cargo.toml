@@ -26,7 +26,7 @@ log4rs = "0.8"
 chrono = "0.4"
 base64 = "0.10"
 hex = "0.3"
-snafu = "0.6"
+thiserror = "1.0"
 unicase = "2.6"
 rand = { version = "0.7", optional = true }
 tokio = "0.2"

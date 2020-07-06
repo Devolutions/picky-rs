@@ -15,7 +15,7 @@ oid = { version = "^0.1.1", features = ["serde_support"] }
 base64 = "0.10"
 
 [dev-dependencies]
-num-bigint-dig = "0.5"
+num-bigint-dig = "0.6"
 pretty_assertions = "^0.6"
 hex = "0.3"
 

@@ -5,26 +5,29 @@
 
 use base64::DecodeError;
 use serde::export::Formatter;
-use snafu::Snafu;
 use std::{borrow::Cow, fmt, io::BufRead, str::FromStr};
+use thiserror::Error;
 
 const PEM_HEADER_START: &str = "-----BEGIN";
 const PEM_FOOTER_START: &str = "-----END";
 const PEM_DASHES_BOUNDARIES: &str = "-----";
 
-#[derive(Debug, Clone, Snafu)]
+#[derive(Debug, Clone, Error)]
 pub enum PemError {
     /// header not found
+    #[error("header not found")]
     HeaderNotFound,
 
     /// invalid pem header
+    #[error("invalid pem header")]
     InvalidHeader,
 
     /// footer not found
+    #[error("footer not found")]
     FooterNotFound,
 
     /// couldn't decode base64
-    #[snafu(display("couldn't decode base64: {}", source))]
+    #[error("couldn't decode base64: {source}")]
     Base64Decoding { source: DecodeError },
 }
 

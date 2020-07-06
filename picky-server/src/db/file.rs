@@ -4,16 +4,16 @@ use crate::{
     db::{config::DatabaseConfig, CertificateEntry, PickyStorage, StorageError, SCHEMA_LAST_VERSION},
 };
 use futures::{future::BoxFuture, FutureExt};
-use snafu::Snafu;
 use std::{
     fs::File,
     io::{Read, Write},
     path::{Path, PathBuf},
 };
+use thiserror::Error;
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, Error)]
 pub enum FileStorageError {
-    #[snafu(display("generic error: {}", description))]
+    #[error("generic error: {}", description)]
     Other { description: String },
 }
 
