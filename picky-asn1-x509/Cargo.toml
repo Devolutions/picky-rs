@@ -12,10 +12,10 @@ picky-asn1 = { version = "0.2", path = "../picky-asn1" }
 picky-asn1-der = { version = "0.2", path = "../picky-asn1-der" }
 serde = { version = "1.0", features = ["derive"] }
 oid = { version = "^0.1.1", features = ["serde_support"] }
-base64 = "0.10"
+base64 = "0.12"
 
 [dev-dependencies]
 num-bigint-dig = "0.6"
 pretty_assertions = "^0.6"
-hex = "0.3"
+hex = "0.4"
 

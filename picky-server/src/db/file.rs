@@ -185,9 +185,7 @@ impl PickyStorage for FileStorage {
         let key = entry.key;
 
         async move {
-            let addressing_hash = encode_to_canonical_address(&cert).map_err(|e| FileStorageError::Other {
-                description: format!("couldn't hash certificate der: {}", e),
-            })?;
+            let addressing_hash = encode_to_canonical_address(&cert);
 
             let alternative_addresses =
                 encode_to_alternative_addresses(&cert).map_err(|e| FileStorageError::Other {
