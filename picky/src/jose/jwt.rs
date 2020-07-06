@@ -5,63 +5,63 @@ use crate::{
 use base64::DecodeError;
 use serde::{de::DeserializeOwned, Serialize};
 use serde_json::{from_value, Value};
-use snafu::Snafu;
 use std::fmt;
+use thiserror::Error;
 
 // === error type === //
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum JwtError {
     /// RSA error
-    #[snafu(display("RSA error: {}", context))]
+    #[error("RSA error: {}", context)]
     Rsa { context: String },
 
     /// Json error
-    #[snafu(display("JSON error: {}", source))]
+    #[error("JSON error: {}", source)]
     Json { source: serde_json::Error },
 
     /// signature error
-    #[snafu(display("signature error: {}", source))]
+    #[error("signature error: {}", source)]
     Signature { source: SignatureError },
 
     /// invalid token encoding
-    #[snafu(display("input isn't a valid token string: {}", input))]
+    #[error("input isn't a valid token string: {}", input)]
     InvalidEncoding { input: String },
 
     /// couldn't decode base64
-    #[snafu(display("couldn't decode base64: {}", source))]
+    #[error("couldn't decode base64: {}", source)]
     Base64Decoding { source: DecodeError },
 
     /// input isn't valid utf8
-    #[snafu(display("input isn't valid utf8: {}, input: {:?}", source, input))]
+    #[error("input isn't valid utf8: {}, input: {:?}", source, input)]
     InvalidUtf8 {
         source: std::string::FromUtf8Error,
         input: Vec<u8>,
     },
 
     /// expected JWT but got an unexpected type
-    #[snafu(display("header says input is not a JWT: expected JWT, found {}", typ))]
+    #[error("header says input is not a JWT: expected JWT, found {}", typ)]
     UnexpectedType { typ: String },
 
     /// registered claim type is invalid
-    #[snafu(display("registered claim `{}` has invalid type", claim))]
+    #[error("registered claim `{}` has invalid type", claim)]
     InvalidRegisteredClaimType { claim: &'static str },
 
     /// a required claim is missing
-    #[snafu(display("required claim `{}` is missing", claim))]
+    #[error("required claim `{}` is missing", claim)]
     RequiredClaimMissing { claim: &'static str },
 
     /// token not yet valid
-    #[snafu(display("token not yet valid (not before: {}, now: {} [leeway: {}])", not_before, now.numeric_date, now.leeway))]
+    #[error("token not yet valid (not before: {}, now: {} [leeway: {}])", not_before, now.numeric_date, now.leeway)]
     NotYetValid { not_before: i64, now: JwtDate },
 
     /// token expired
-    #[snafu(display("token expired (not after: {}, now: {} [leeway: {}])", not_after, now.numeric_date, now.leeway))]
+    #[error("token expired (not after: {}, now: {} [leeway: {}])", not_after, now.numeric_date, now.leeway)]
     Expired { not_after: i64, now: JwtDate },
 
     /// validator is invalid
-    #[snafu(display("invalid validator: {}", description))]
+    #[error("invalid validator: {}", description)]
     InvalidValidator { description: &'static str },
 }
 

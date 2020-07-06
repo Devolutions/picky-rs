@@ -15,100 +15,92 @@ use picky_asn1_x509::{
     oids, AlgorithmIdentifier, AuthorityKeyIdentifier, BasicConstraints, Certificate, ExtendedKeyUsage, Extension,
     ExtensionView, Extensions, KeyIdentifier, KeyUsage, TBSCertificate, Validity, Version,
 };
-use snafu::{ResultExt, Snafu};
 use std::cell::RefCell;
+use thiserror::Error;
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, Error)]
 pub enum CertError {
     /// couldn't generate certificate
-    #[snafu(display("couldn't generate certificate: {}", source))]
-    CertGeneration {
-        #[snafu(source(from(CertError, Box::new)))]
-        source: Box<CertError>,
-    },
+    #[error("couldn't generate certificate: {source}")]
+    CertGeneration { source: Box<CertError> },
 
     /// invalid certificate
-    #[snafu(display("invalid certificate '{}': {}", id, source))]
-    InvalidCertificate {
-        id: String,
-        #[snafu(source(from(CertError, Box::new)))]
-        source: Box<CertError>,
-    },
+    #[error("invalid certificate '{id}': {source}")]
+    InvalidCertificate { id: String, source: Box<CertError> },
 
     /// asn1 serialization error
-    #[snafu(display("(asn1) couldn't serialize {}: {}", element, source))]
+    #[error("(asn1) couldn't serialize {element}: {source}")]
     Asn1Serialization {
         element: &'static str,
         source: Asn1DerError,
     },
 
     /// asn1 deserialization error
-    #[snafu(display("(asn1) couldn't deserialize {}: {}", element, source))]
+    #[error("(asn1) couldn't deserialize {element}: {source}")]
     Asn1Deserialization {
         element: &'static str,
         source: Asn1DerError,
     },
 
     /// signature error
-    #[snafu(display("signature error: {}", source))]
+    #[error("signature error: {source}")]
     Signature { source: SignatureError },
 
     /// key id generation error
-    #[snafu(display("key id generation error: {}", source))]
+    #[error("key id generation error: {source}")]
     KeyIdGen { source: KeyIdGenError },
 
     /// CA chain error
-    #[snafu(display("CA chain error: {}", source))]
+    #[error("CA chain error: {source}")]
     InvalidChain { source: CaChainError },
 
     /// CSR error
-    #[snafu(display("CSR error: {}", source))]
+    #[error("CSR error: {source}")]
     InvalidCsr { source: CsrError },
 
     /// extension not found
-    #[snafu(display("extension not found: {}", name))]
+    #[error("extension not found: {name}")]
     ExtensionNotFound { name: &'static str },
 
     /// missing required builder argument
-    #[snafu(display("missing required builder argument `{}`", arg))]
+    #[error("missing required builder argument `{arg}`")]
     MissingBuilderArgument { arg: &'static str },
 
     /// certificate is not yet valid
-    #[snafu(display("certificate is not yet valid (not before: {}, now: {})", not_before, now))]
+    #[error("certificate is not yet valid (not before: {not_before}, now: {now})")]
     CertificateNotYetValid { not_before: UTCDate, now: UTCDate },
 
     /// certificate expired
-    #[snafu(display("certificate expired (not after: {}, now: {})", not_after, now))]
+    #[error("certificate expired (not after: {not_after}, now: {now})")]
     CertificateExpired { not_after: UTCDate, now: UTCDate },
 
     /// invalid PEM label error
-    #[snafu(display("invalid PEM label: {}", label))]
+    #[error("invalid PEM label: {label}")]
     InvalidPemLabel { label: String },
 }
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, Error)]
 pub enum CaChainError {
     /// chain depth does't satisfy basic constraints extension
-    #[snafu(display(
-        "chain depth doesn't satisfy basic constraints extension: certificate '{}' has pathlen of {}",
-        cert_id,
-        pathlen
-    ))]
+    #[error(
+        "chain depth doesn't satisfy basic constraints extension: certificate '{cert_id}' has pathlen of {pathlen}"
+    )]
     TooDeep { cert_id: String, pathlen: u8 },
 
     /// chain is missing a root certificate
+    #[error("chain is missing a root certificate")]
     NoRoot,
 
     /// issuer certificate is not a CA
-    #[snafu(display("issuer certificate '{}' is not a CA", issuer_id))]
+    #[error("issuer certificate '{issuer_id}' is not a CA")]
     IssuerIsNotCA { issuer_id: String },
 
     /// authority key id doesn't match
-    #[snafu(display("authority key id doesn't match (expected: {:?}, got: {:?})", expected, actual))]
+    #[error("authority key id doesn't match (expected: {expected:?}, got: {actual:?})")]
     AuthorityKeyIdMismatch { expected: Vec<u8>, actual: Vec<u8> },
 
     /// issuer name doesn't match
-    #[snafu(display("issuer name doesn't match (expected: {}, got: {})", expected, actual))]
+    #[error("issuer name doesn't match (expected: {expected}, got: {actual})")]
     IssuerNameMismatch { expected: String, actual: String },
 }
 
@@ -150,9 +142,12 @@ macro_rules! find_ext {
 
 impl Cert {
     pub fn from_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, CertError> {
-        Ok(Self(
-            picky_asn1_der::from_bytes(der.as_ref()).context(Asn1Deserialization { element: "certificate" })?,
-        ))
+        Ok(Self(picky_asn1_der::from_bytes(der.as_ref()).map_err(|e| {
+            CertError::Asn1Deserialization {
+                source: e,
+                element: "certificate",
+            }
+        })?))
     }
 
     pub fn from_pem(pem: &Pem) -> Result<Self, CertError> {
@@ -165,7 +160,10 @@ impl Cert {
     }
 
     pub fn to_der(&self) -> Result<Vec<u8>, CertError> {
-        picky_asn1_der::to_vec(&self.0).context(Asn1Serialization { element: "certificate" })
+        picky_asn1_der::to_vec(&self.0).map_err(|e| CertError::Asn1Serialization {
+            source: e,
+            element: "certificate",
+        })
     }
 
     pub fn to_pem(&self) -> Result<Pem<'static>, CertError> {
@@ -260,17 +258,21 @@ impl Cert {
     pub fn is_parent_of(&self, other: &Cert) -> Result<(), CertError> {
         if let Ok(other_aki) = other.authority_key_identifier() {
             if let Some(other_aki) = other_aki.key_identifier() {
-                let parent_ski = self.subject_key_identifier().with_context(|| InvalidCertificate {
-                    id: self.subject_name().to_string(),
-                })?;
+                let parent_ski = self
+                    .subject_key_identifier()
+                    .map_err(|e| CertError::InvalidCertificate {
+                        source: Box::new(e),
+                        id: self.subject_name().to_string(),
+                    })?;
 
                 if parent_ski != other_aki {
                     return Err(CaChainError::AuthorityKeyIdMismatch {
                         expected: other_aki.to_vec(),
                         actual: parent_ski.to_vec(),
                     })
-                    .context(InvalidChain)
-                    .context(InvalidCertificate {
+                    .map_err(|e| CertError::InvalidChain { source: e })
+                    .map_err(|e| CertError::InvalidCertificate {
+                        source: Box::new(e),
                         id: other.subject_name().to_string(),
                     });
                 }
@@ -284,8 +286,9 @@ impl Cert {
                 expected: other_issuer_name.to_string(),
                 actual: self_subject_name.to_string(),
             })
-            .context(InvalidChain)
-            .context(InvalidCertificate {
+            .map_err(|e| CertError::InvalidChain { source: e })
+            .map_err(|e| CertError::InvalidCertificate {
+                source: Box::new(e),
                 id: other.subject_name().to_string(),
             });
         }
@@ -409,8 +412,11 @@ impl<'a, 'b, Chain: Iterator<Item = &'b Cert>> CertValidator<'a, 'b, Chain> {
         }
 
         if let Some(now) = &inner.now {
-            verify_cert_validity(self.cert, &inner.strictness, now.clone()).with_context(|| InvalidCertificate {
-                id: self.cert.subject_name().to_string(),
+            verify_cert_validity(self.cert, &inner.strictness, now.clone()).map_err(|e| {
+                CertError::InvalidCertificate {
+                    source: Box::new(e),
+                    id: self.cert.subject_name().to_string(),
+                }
             })?;
         }
 
@@ -437,22 +443,23 @@ impl<'a, 'b, Chain: Iterator<Item = &'b Cert>> CertValidator<'a, 'b, Chain> {
                     return Err(CaChainError::IssuerIsNotCA {
                         issuer_id: parent_cert.subject_name().to_string(),
                     })
-                    .context(InvalidChain);
+                    .map_err(|e| CertError::InvalidChain { source: e });
                 }
                 (_, Some(pathlen)) if usize::from(pathlen) < number_certs => {
                     return Err(CaChainError::TooDeep {
                         cert_id: parent_cert.subject_name().to_string(),
                         pathlen,
                     })
-                    .context(InvalidChain);
+                    .map_err(|e| CertError::InvalidChain { source: e });
                 }
                 _ => {}
             }
 
             // verify parent validity
             if let Some(now) = &inner.now {
-                verify_cert_validity(parent_cert, &inner.strictness, now.clone()).with_context(|| {
-                    InvalidCertificate {
+                verify_cert_validity(parent_cert, &inner.strictness, now.clone()).map_err(|e| {
+                    CertError::InvalidCertificate {
+                        source: Box::new(e),
                         id: parent_cert.subject_name().to_string(),
                     }
                 })?;
@@ -462,14 +469,16 @@ impl<'a, 'b, Chain: Iterator<Item = &'b Cert>> CertValidator<'a, 'b, Chain> {
             parent_cert.is_parent_of(current_cert)?;
 
             // validate current cert signature using parent public key
-            let hash_type =
-                SignatureHashType::from_algorithm_identifier(&current_cert.0.signature_algorithm).context(Signature)?;
+            let hash_type = SignatureHashType::from_algorithm_identifier(&current_cert.0.signature_algorithm)
+                .map_err(|e| CertError::Signature { source: e })?;
             let public_key = &parent_cert.0.tbs_certificate.subject_public_key_info;
             let msg = picky_asn1_der::to_vec(&current_cert.0.tbs_certificate)
-                .context(Asn1Serialization {
+                .map_err(|e| CertError::Asn1Serialization {
+                    source: e,
                     element: "tbs certificate",
                 })
-                .with_context(|| InvalidCertificate {
+                .map_err(|e| CertError::InvalidCertificate {
+                    source: Box::new(e),
                     id: current_cert.subject_name().to_string(),
                 })?;
             hash_type
@@ -478,8 +487,9 @@ impl<'a, 'b, Chain: Iterator<Item = &'b Cert>> CertValidator<'a, 'b, Chain> {
                     &msg,
                     current_cert.0.signature_value.0.payload_view(),
                 )
-                .context(Signature)
-                .with_context(|| InvalidCertificate {
+                .map_err(|e| CertError::Signature { source: e })
+                .map_err(|e| CertError::InvalidCertificate {
+                    source: Box::new(e),
                     id: current_cert.subject_name().to_string(),
                 })?;
 
@@ -488,7 +498,7 @@ impl<'a, 'b, Chain: Iterator<Item = &'b Cert>> CertValidator<'a, 'b, Chain> {
 
         // make sure `current_cert` (the last certificate of the chain) is a root CA
         if current_cert.ty() != CertType::Root {
-            return Err(CaChainError::NoRoot).context(InvalidChain);
+            return Err(CaChainError::NoRoot).map_err(|e| CertError::InvalidChain { source: e });
         }
 
         Ok(())
@@ -737,8 +747,8 @@ impl<'a> CertificateBuilder<'a> {
                 let public_key = issuer_infos.key.to_public_key();
                 let aki = key_id_gen_method
                     .generate_from(&public_key)
-                    .context(KeyIdGen)
-                    .context(CertGeneration)?;
+                    .map_err(|e| CertError::KeyIdGen { source: e })
+                    .map_err(|e| CertError::CertGeneration { source: Box::new(e) })?;
                 let subject_infos = SubjectInfos::NameAndPublicKey {
                     name: issuer_infos.name.clone(),
                     public_key,
@@ -761,7 +771,7 @@ impl<'a> CertificateBuilder<'a> {
         };
         let (subject_name, subject_public_key) = match subject_infos {
             SubjectInfos::Csr(csr) => {
-                csr.verify().context(InvalidCsr)?;
+                csr.verify().map_err(|e| CertError::InvalidCsr { source: e })?;
                 csr.into_subject_infos()
             }
             SubjectInfos::NameAndPublicKey { name, public_key } => (name, public_key),
@@ -816,8 +826,8 @@ impl<'a> CertificateBuilder<'a> {
             // ski
             let ski = key_id_gen_method
                 .generate_from(&subject_public_key)
-                .context(KeyIdGen)
-                .context(CertGeneration)?;
+                .map_err(|e| CertError::KeyIdGen { source: e })
+                .map_err(|e| CertError::CertGeneration { source: Box::new(e) })?;
             extensions.push(Extension::new_subject_key_identifier(ski));
 
             // aki
@@ -842,15 +852,16 @@ impl<'a> CertificateBuilder<'a> {
         };
 
         let tbs_der = picky_asn1_der::to_vec(&tbs_certificate)
-            .context(Asn1Serialization {
+            .map_err(|e| CertError::Asn1Serialization {
+                source: e,
                 element: "tbs certificate",
             })
-            .context(CertGeneration)?;
+            .map_err(|e| CertError::CertGeneration { source: Box::new(e) })?;
         let signature_value = BitString::with_bytes(
             signature_hash_type
                 .sign(&tbs_der, issuer_key)
-                .context(Signature)
-                .context(CertGeneration)?,
+                .map_err(|e| CertError::Signature { source: e })
+                .map_err(|e| CertError::CertGeneration { source: Box::new(e) })?,
         );
 
         Ok(Cert(Certificate {

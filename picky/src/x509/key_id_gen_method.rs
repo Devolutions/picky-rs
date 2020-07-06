@@ -3,19 +3,19 @@ use picky_asn1::wrapper::BitStringAsn1Container;
 use picky_asn1_der::Asn1DerError;
 use sha1::{Digest, Sha1};
 use sha2::{Sha224, Sha256, Sha384, Sha512};
-use snafu::{ResultExt, Snafu};
+use thiserror::Error;
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, Error)]
 pub enum KeyIdGenError {
     /// asn1 serialization error
-    #[snafu(display("(asn1) couldn't serialize {}: {}", element, source))]
+    #[error("(asn1) couldn't serialize {element}: {source}")]
     Asn1Serialization {
         element: &'static str,
         source: Asn1DerError,
     },
 
     /// invalid key
-    #[snafu(display("invalid key: {}", source))]
+    #[error("invalid key: {source}")]
     InvalidKey { source: KeyError },
 }
 
@@ -65,7 +65,8 @@ impl KeyIdGenMethod {
         match self {
             KeyIdGenMethod::SPKValueHashedLeftmost160(hash_algo) => match &public_key.as_inner().subject_public_key {
                 InnerPublicKey::RSA(BitStringAsn1Container(rsa_pk)) => {
-                    let der = picky_asn1_der::to_vec(rsa_pk).context(Asn1Serialization {
+                    let der = picky_asn1_der::to_vec(rsa_pk).map_err(|e| KeyIdGenError::Asn1Serialization {
+                        source: e,
                         element: "RSA private key",
                     })?;
                     Ok(hash!(hash_algo, der)[..20].to_vec())
@@ -76,7 +77,9 @@ impl KeyIdGenMethod {
                 }
             },
             KeyIdGenMethod::SPKFullDER(hash_algo) => {
-                let der = public_key.to_der().context(InvalidKey)?;
+                let der = public_key
+                    .to_der()
+                    .map_err(|e| KeyIdGenError::InvalidKey { source: e })?;
                 Ok(hash!(hash_algo, der))
             }
         }

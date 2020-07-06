@@ -2,30 +2,30 @@ use crate::pem::{to_pem, Pem};
 use picky_asn1::wrapper::{IntegerAsn1, OctetStringAsn1Container};
 use picky_asn1_der::Asn1DerError;
 use picky_asn1_x509::{PrivateKeyInfo, PrivateKeyValue, SubjectPublicKeyInfo};
-use snafu::{ResultExt, Snafu};
+use thiserror::Error;
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, Error)]
 pub enum KeyError {
     /// asn1 serialization error
-    #[snafu(display("(asn1) couldn't serialize {}: {}", element, source))]
+    #[error("(asn1) couldn't serialize {element}: {source}")]
     Asn1Serialization {
         element: &'static str,
         source: Asn1DerError,
     },
 
     /// asn1 deserialization error
-    #[snafu(display("(asn1) couldn't deserialize {}: {}", element, source))]
+    #[error("(asn1) couldn't deserialize {element}: {source}")]
     Asn1Deserialization {
         element: &'static str,
         source: Asn1DerError,
     },
 
     /// RSA error
-    #[snafu(display("RSA error: {}", context))]
+    #[error("RSA error: {context}")]
     Rsa { context: String },
 
     /// invalid PEM label error
-    #[snafu(display("invalid PEM label: {}", label))]
+    #[error("invalid PEM label: {label}")]
     InvalidPemLabel { label: String },
 }
 
@@ -78,19 +78,22 @@ impl PrivateKey {
     }
 
     pub fn from_pkcs8<T: ?Sized + AsRef<[u8]>>(pkcs8: &T) -> Result<Self, KeyError> {
-        Ok(Self(picky_asn1_der::from_bytes(pkcs8.as_ref()).context(
-            Asn1Deserialization {
+        Ok(Self(picky_asn1_der::from_bytes(pkcs8.as_ref()).map_err(|e| {
+            KeyError::Asn1Deserialization {
+                source: e,
                 element: "private key info (pkcs8)",
-            },
-        )?))
+            }
+        })?))
     }
 
     pub fn from_rsa_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, KeyError> {
         use picky_asn1_x509::{AlgorithmIdentifier, RSAPrivateKey};
 
-        let private_key = picky_asn1_der::from_bytes::<RSAPrivateKey>(der.as_ref()).context(Asn1Deserialization {
-            element: "rsa private key",
-        })?;
+        let private_key =
+            picky_asn1_der::from_bytes::<RSAPrivateKey>(der.as_ref()).map_err(|e| KeyError::Asn1Deserialization {
+                source: e,
+                element: "rsa private key",
+            })?;
 
         Ok(Self(PrivateKeyInfo {
             version: 0,
@@ -100,7 +103,8 @@ impl PrivateKey {
     }
 
     pub fn to_pkcs8(&self) -> Result<Vec<u8>, KeyError> {
-        picky_asn1_der::to_vec(&self.0).context(Asn1Serialization {
+        picky_asn1_der::to_vec(&self.0).map_err(|e| KeyError::Asn1Serialization {
+            source: e,
             element: "private key info (pkcs8)",
         })
     }
@@ -203,7 +207,8 @@ impl AsRef<PublicKey> for PublicKey {
 
 impl PublicKey {
     pub fn to_der(&self) -> Result<Vec<u8>, KeyError> {
-        picky_asn1_der::to_vec(&self.0).context(Asn1Serialization {
+        picky_asn1_der::to_vec(&self.0).map_err(|e| KeyError::Asn1Serialization {
+            source: e,
             element: "subject public key info",
         })
     }
@@ -223,19 +228,22 @@ impl PublicKey {
     }
 
     pub fn from_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, KeyError> {
-        Ok(Self(picky_asn1_der::from_bytes(der.as_ref()).context(
-            Asn1Deserialization {
+        Ok(Self(picky_asn1_der::from_bytes(der.as_ref()).map_err(|e| {
+            KeyError::Asn1Deserialization {
+                source: e,
                 element: "subject public key info",
-            },
-        )?))
+            }
+        })?))
     }
 
     pub fn from_rsa_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, KeyError> {
         use picky_asn1_x509::{AlgorithmIdentifier, PublicKey, RSAPublicKey};
 
-        let public_key = picky_asn1_der::from_bytes::<RSAPublicKey>(der.as_ref()).context(Asn1Deserialization {
-            element: "rsa public key",
-        })?;
+        let public_key =
+            picky_asn1_der::from_bytes::<RSAPublicKey>(der.as_ref()).map_err(|e| KeyError::Asn1Deserialization {
+                source: e,
+                element: "rsa public key",
+            })?;
 
         Ok(Self(SubjectPublicKeyInfo {
             algorithm: AlgorithmIdentifier::new_rsa_encryption(),

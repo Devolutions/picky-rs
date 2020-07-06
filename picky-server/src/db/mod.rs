@@ -12,19 +12,19 @@ use crate::{
     },
 };
 use futures::future::BoxFuture;
-use snafu::Snafu;
+use thiserror::Error;
 
 pub const SCHEMA_LAST_VERSION: u8 = 1;
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, Error)]
 pub enum StorageError {
-    #[snafu(display("mongo storage error: {}", source))]
+    #[error("mongo storage error: {}", source)]
     Mongo { source: MongoStorageError },
 
-    #[snafu(display("file storage error: {}", source))]
+    #[error("file storage error: {}", source)]
     File { source: FileStorageError },
 
-    #[snafu(display("memory storage error: {}", source))]
+    #[error("memory storage error: {}", source)]
     Memory { source: MemoryStorageError },
 }
 

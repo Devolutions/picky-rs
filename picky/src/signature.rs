@@ -5,19 +5,20 @@ use rsa::{hash::Hashes, BigUint, PaddingScheme, PublicKey as RsaPublicKeyInterfa
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
 use sha2::{Sha224, Sha256, Sha384, Sha512};
-use snafu::Snafu;
+use thiserror::Error;
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, Error)]
 pub enum SignatureError {
     /// RSA error
-    #[snafu(display("RSA error: {}", context))]
+    #[error("RSA error: {context}")]
     Rsa { context: String },
 
     /// invalid signature
+    #[error("invalid signature")]
     BadSignature,
 
     /// unsupported algorithm
-    #[snafu(display("unsupported algorithm: {}", algorithm))]
+    #[error("unsupported algorithm: {algorithm}")]
     UnsupportedAlgorithm { algorithm: String },
 }
 

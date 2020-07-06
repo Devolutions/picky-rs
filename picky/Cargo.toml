@@ -19,7 +19,7 @@ picky-asn1-x509 = { version = "0.1", path = "../picky-asn1-x509" }
 serde = { version = "1.0", features = ["derive"] }
 oid = { version = "^0.1.1", features = ["serde_support"] }
 base64 = "0.10"
-snafu = "0.6"
+thiserror = "1"
 chrono = { version = "0.4", optional = true }
 serde_json = { version = "1.0", optional = true }
 http = { version = "0.2", optional = true }
@@ -33,7 +33,7 @@ rsa = "0.2"
 rand = "0.7"
 
 [dev-dependencies]
-num-bigint-dig = "0.5"
+num-bigint-dig = "0.6"
 pretty_assertions = "^0.6"
 hex = "0.3"
 cfg-if = "0.1"

@@ -1,7 +1,6 @@
 use picky::{
     key::{KeyError, PrivateKey, PublicKey},
     oids,
-    pem::PemError,
     signature::SignatureHashType,
     x509::{
         certificate::{Cert, CertError, CertificateBuilder},
@@ -12,40 +11,42 @@ use picky::{
     },
 };
 use picky_asn1::restricted_string::CharSetError;
-use snafu::{ResultExt, Snafu};
+use thiserror::Error;
 
 const DEFAULT_ROOT_DURATION_DAYS: i64 = 3650;
 const DEFAULT_INTERMEDIATE_DURATION_DAYS: i64 = 1825;
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, Error)]
 pub enum PickyError {
     /// certificate error
-    #[snafu(display("certificate error: {}", source))]
+    #[error("certificate error: {}", source)]
     Certificate { source: CertError },
 
     /// input has invalid charset
-    #[snafu(display("input has invalid charset: {}", input))]
+    #[error("input has invalid charset: {}", input)]
     InvalidCharSet { input: String, source: CharSetError },
 
     /// couldn't generate private key
-    #[snafu(display("couldn't generate private key: {}", source))]
+    #[error("couldn't generate private key: {}", source)]
     PrivateKeyGeneration { source: KeyError },
 
     /// no pre-generated private key for given size
-    #[snafu(display("no {}-bits pre-generated private key available", num_bits))]
+    #[cfg(any(feature = "pre-gen-pk", all(debug_assertions, test)))]
+    #[error("no {}-bits pre-generated private key available", num_bits)]
     NoPreGenKey { num_bits: usize },
 
     /// couldn't parse private key der (two sources)
-    #[snafu(display(
+    #[error(
         "couldn't parse private key as pkcs8: {} ; couldn't parse private key as raw der-encoded RSA key either: {}",
         pkcs8_err,
         rsa_der_err
-    ))]
+    )]
     PrivateKeyParsing { pkcs8_err: KeyError, rsa_der_err: KeyError },
 
     /// couldn't parse private key pem
-    #[snafu(display("couldn't parse private key pem: {}", source))]
-    PrivateKeyPem { source: PemError },
+    #[cfg(any(feature = "pre-gen-pk", all(debug_assertions, test)))]
+    #[error("couldn't parse private key pem: {}", source)]
+    PrivateKeyPem { source: picky::pem::PemError },
 }
 
 impl From<CertError> for PickyError {
@@ -77,7 +78,7 @@ impl Picky {
             .ca(true)
             .key_usage(key_usage)
             .build()
-            .context(Certificate)
+            .map_err(|e| PickyError::Certificate { source: e })
     }
 
     pub fn generate_intermediate(
@@ -108,7 +109,7 @@ impl Picky {
             .pathlen(0)
             .ca(true)
             .build()
-            .context(Certificate)
+            .map_err(|e| PickyError::Certificate { source: e })
     }
 
     pub fn generate_leaf_from_csr(
@@ -130,7 +131,8 @@ impl Picky {
 
         let eku = vec![oids::kp_server_auth(), oids::kp_client_auth()];
 
-        let dns_gn = GeneralName::new_dns_name(dns_name).context(InvalidCharSet {
+        let dns_gn = GeneralName::new_dns_name(dns_name).map_err(|e| PickyError::InvalidCharSet {
+            source: e,
             input: dns_name.to_owned(),
         })?;
         let san = GeneralNames::new(dns_gn);
@@ -144,13 +146,13 @@ impl Picky {
             .extended_key_usage(eku.into())
             .subject_alt_name(san)
             .build()
-            .context(Certificate)
+            .map_err(|e| PickyError::Certificate { source: e })
     }
 
     /// This function is also used by tests in release mode.
     #[cfg(not(any(feature = "pre-gen-pk", all(debug_assertions, test))))]
     pub fn generate_private_key(bits: usize) -> Result<PrivateKey, PickyError> {
-        PrivateKey::generate_rsa(bits).context(PrivateKeyGeneration)
+        PrivateKey::generate_rsa(bits).map_err(|e| PickyError::PrivateKeyGeneration { source: e })
     }
 
     /// !!! DEBUGGING PURPOSE ONLY !!!
@@ -194,8 +196,10 @@ impl Picky {
             }
         };
 
-        let pem = pk_pem_str.parse::<Pem>().context(PrivateKeyPem)?;
-        PrivateKey::from_pem(&pem).context(PrivateKeyGeneration)
+        let pem = pk_pem_str
+            .parse::<Pem>()
+            .map_err(|e| PickyError::PrivateKeyPem { source: e })?;
+        PrivateKey::from_pem(&pem).map_err(|e| PickyError::PrivateKeyGeneration { source: e })
     }
 
     pub fn parse_pk_from_magic_der(der: &[u8]) -> Result<PrivateKey, PickyError> {

@@ -4,7 +4,6 @@ use crate::{
     signature::{SignatureError, SignatureHashType},
 };
 use base64::{DecodeError, URL_SAFE_NO_PAD};
-use snafu::Snafu;
 use std::{
     borrow::Cow,
     cell::RefCell,
@@ -12,56 +11,59 @@ use std::{
     fmt::{self, Debug},
     str::FromStr,
 };
+use thiserror::Error;
 
 // === error type === //
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum HttpSignatureError {
     /// couldn't decode base64
-    #[snafu(display("couldn't decode base64: {}", source))]
+    #[error("couldn't decode base64: {source}")]
     Base64Decoding { source: DecodeError },
 
     /// signature is not yet valid
-    #[snafu(display("signature is not yet valid (created: {}, now: {})", created, now))]
+    #[error("signature is not yet valid (created: {created}, now: {now})")]
     NotYetValid { created: u64, now: u64 },
 
     /// certificate expired
-    #[snafu(display("certificate expired (not after: {}, now: {})", not_after, now))]
+    #[error("certificate expired (not after: {not_after}, now: {now})")]
     Expired { not_after: u64, now: u64 },
 
     /// signature error occurred
-    #[snafu(display("signature error: {}", source))]
+    #[error("signature error: {source}")]
     Signature { source: SignatureError },
 
     /// couldn't generate signing string
-    #[snafu(display("couldn't generate signing string: {}", source))]
+    #[error("couldn't generate signing string: {source}")]
     SigningStringGeneration { source: HttpRequestError },
 
     /// invalid signing string
-    #[snafu(display("signing string invalid for line `{}`", line))]
+    #[error("signing string invalid for line `{line}`")]
     InvalidSigningString { line: String },
 
     /// missing required builder argument
-    #[snafu(display("missing required builder argument `{}`", arg))]
+    #[error("missing required builder argument `{arg}`")]
     MissingBuilderArgument { arg: &'static str },
 
     /// builder requires a non empty `headers` parameter
+    #[error("builder requires a non empty `headers` parameter")]
     BuilderEmptyHeaders,
 
     /// `headers` parameter shouldn't be provided when using builder with a pre-generated signing string
+    #[error("`headers` parameter shouldn't be provided when using builder with a pre-generated signing string")]
     BuilderHeadersProvidedWithPreGenerated,
 
     /// required parameter is missing from http signature string
-    #[snafu(display("required parameter is missing from http signature string: {}", parameter))]
+    #[error("required parameter is missing from http signature string: {parameter}")]
     MissingRequiredParameter { parameter: &'static str },
 
     /// a parameter is present but invalid
-    #[snafu(display("invalid parameter: {}", parameter))]
+    #[error("invalid parameter: {parameter}")]
     InvalidParameter { parameter: &'static str },
 
     /// incompatible 'algorithm' parameter with provided signature verification method
-    #[snafu(display("incompatible 'algorithm' parameter: {:?}", value))]
+    #[error("incompatible 'algorithm' parameter: {value:?}")]
     IncompatibleAlgorithm { value: SignatureHashType },
 }
 

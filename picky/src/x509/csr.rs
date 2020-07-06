@@ -7,30 +7,30 @@ use crate::{
 use picky_asn1::bit_string::BitString;
 use picky_asn1_der::Asn1DerError;
 use picky_asn1_x509::{CertificationRequest, CertificationRequestInfo};
-use snafu::{ResultExt, Snafu};
+use thiserror::Error;
 
-#[derive(Debug, Snafu)]
+#[derive(Debug, Error)]
 pub enum CsrError {
     /// asn1 serialization error
-    #[snafu(display("(asn1) couldn't serialize {}: {}", element, source))]
+    #[error("(asn1) couldn't serialize {element}: {source}")]
     Asn1Serialization {
         element: &'static str,
         source: Asn1DerError,
     },
 
     /// asn1 deserialization error
-    #[snafu(display("(asn1) couldn't deserialize {}: {}", element, source))]
+    #[error("(asn1) couldn't deserialize {}: {}", element, source)]
     Asn1Deserialization {
         element: &'static str,
         source: Asn1DerError,
     },
 
     /// signature error
-    #[snafu(display("signature error: {}", source))]
+    #[error("signature error: {}", source)]
     Signature { source: SignatureError },
 
     /// invalid PEM label error
-    #[snafu(display("invalid PEM label: {}", label))]
+    #[error("invalid PEM label: {}", label)]
     InvalidPemLabel { label: String },
 }
 
@@ -48,11 +48,12 @@ impl From<CertificationRequest> for Csr {
 
 impl Csr {
     pub fn from_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, CsrError> {
-        Ok(Self(picky_asn1_der::from_bytes(der.as_ref()).context(
-            Asn1Deserialization {
+        Ok(Self(picky_asn1_der::from_bytes(der.as_ref()).map_err(|e| {
+            CsrError::Asn1Deserialization {
+                source: e,
                 element: "certification request",
-            },
-        )?))
+            }
+        })?))
     }
 
     pub fn from_pem(pem: &Pem) -> Result<Self, CsrError> {
@@ -65,7 +66,8 @@ impl Csr {
     }
 
     pub fn to_der(&self) -> Result<Vec<u8>, CsrError> {
-        picky_asn1_der::to_vec(&self.0).context(Asn1Serialization {
+        picky_asn1_der::to_vec(&self.0).map_err(|e| CsrError::Asn1Serialization {
+            source: e,
             element: "certification request",
         })
     }
@@ -80,10 +82,15 @@ impl Csr {
         signature_hash_type: SignatureHashType,
     ) -> Result<Self, CsrError> {
         let info = CertificationRequestInfo::new(subject.into(), private_key.to_public_key().into());
-        let info_der = picky_asn1_der::to_vec(&info).context(Asn1Serialization {
+        let info_der = picky_asn1_der::to_vec(&info).map_err(|e| CsrError::Asn1Serialization {
+            source: e,
             element: "certification request info",
         })?;
-        let signature = BitString::with_bytes(signature_hash_type.sign(&info_der, private_key).context(Signature)?);
+        let signature = BitString::with_bytes(
+            signature_hash_type
+                .sign(&info_der, private_key)
+                .map_err(|e| CsrError::Signature { source: e })?,
+        );
 
         Ok(Self(CertificationRequest {
             certification_request_info: info,
@@ -108,17 +115,20 @@ impl Csr {
     }
 
     pub fn verify(&self) -> Result<(), CsrError> {
-        let hash_type = SignatureHashType::from_algorithm_identifier(&self.0.signature_algorithm).context(Signature)?;
+        let hash_type = SignatureHashType::from_algorithm_identifier(&self.0.signature_algorithm)
+            .map_err(|e| CsrError::Signature { source: e })?;
 
         let public_key = &self.0.certification_request_info.subject_public_key_info;
 
-        let msg = picky_asn1_der::to_vec(&self.0.certification_request_info).context(Asn1Serialization {
-            element: "certification request info",
-        })?;
+        let msg =
+            picky_asn1_der::to_vec(&self.0.certification_request_info).map_err(|e| CsrError::Asn1Serialization {
+                source: e,
+                element: "certification request info",
+            })?;
 
         hash_type
             .verify(&public_key.clone().into(), &msg, self.0.signature.0.payload_view())
-            .context(Signature)?;
+            .map_err(|e| CsrError::Signature { source: e })?;
 
         Ok(())
     }

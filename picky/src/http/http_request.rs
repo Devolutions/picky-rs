@@ -1,15 +1,15 @@
-use snafu::Snafu;
 use std::borrow::Cow;
+use thiserror::Error;
 
-#[derive(Debug, Snafu, Clone)]
+#[derive(Debug, Error, Clone)]
 #[non_exhaustive]
 pub enum HttpRequestError {
     /// couldn't convert a http header value to string
-    #[snafu(display("couldn't convert http header value to string for header key {}", key))]
+    #[error("couldn't convert http header value to string for header key {key}")]
     HeaderValueToStr { key: String },
 
     /// unexpected error occurred
-    #[snafu(display("unexpected error: {}", reason))]
+    #[error("unexpected error: {reason}")]
     Unexpected { reason: String },
 }
 
