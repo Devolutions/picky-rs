@@ -5,12 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-
-## [Unreleased] (5.1.0)
+## [5.1.0] 2020-07-07
 
 ### Added
 
 - Add `BufRead`-based API to read PEM streams: `pem::Pem::read_from` and `pem::read_pem`.
+
+### Changed
+
+- Some internal types are moved to a new `picky_asn1_x509` crate but API is unchanged
+- Dependencies clean up
 
 ## [5.0.0] 2020-05-06
 
