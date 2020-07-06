@@ -1,7 +1,7 @@
-use crate::x509::private::validity::Time;
 #[cfg(feature = "chrono_conversion")]
 use chrono::{DateTime, Utc};
 use picky_asn1::date::{Date, GeneralizedTime, UTCTime, UTCTimeRepr};
+use picky_asn1_x509::validity::Time;
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

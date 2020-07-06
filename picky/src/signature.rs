@@ -1,10 +1,6 @@
-use crate::{
-    key::{PrivateKey, PublicKey},
-    oids,
-    private::private_key_info,
-    AlgorithmIdentifier,
-};
+use crate::key::{PrivateKey, PublicKey};
 use picky_asn1::wrapper::{BitStringAsn1Container, OctetStringAsn1Container};
+use picky_asn1_x509::{oids, private_key_info, AlgorithmIdentifier};
 use rsa::{hash::Hashes, BigUint, PaddingScheme, PublicKey as RsaPublicKeyInterface, RSAPrivateKey, RSAPublicKey};
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
@@ -110,7 +106,7 @@ impl SignatureHashType {
     }
 
     pub fn verify(self, public_key: &PublicKey, msg: &[u8], signature: &[u8]) -> Result<(), SignatureError> {
-        use crate::private::subject_public_key_info::PublicKey as InnerPublicKey;
+        use picky_asn1_x509::PublicKey as InnerPublicKey;
 
         let public_key = match &public_key.as_inner().subject_public_key {
             InnerPublicKey::RSA(BitStringAsn1Container(key)) => RSAPublicKey::new(

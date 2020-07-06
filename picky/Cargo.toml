@@ -15,11 +15,11 @@ repository = "https://github.com/Devolutions/picky-rs"
 [dependencies]
 picky-asn1 = { version = "0.2", path = "../picky-asn1" }
 picky-asn1-der = { version = "0.2", path = "../picky-asn1-der" }
+picky-asn1-x509 = { version = "0.1", path = "../picky-asn1-x509" }
 serde = { version = "1.0", features = ["derive"] }
 oid = { version = "^0.1.1", features = ["serde_support"] }
 base64 = "0.10"
 snafu = "0.6"
-static_assertions = "1.1"
 chrono = { version = "0.4", optional = true }
 serde_json = { version = "1.0", optional = true }
 http = { version = "0.2", optional = true }

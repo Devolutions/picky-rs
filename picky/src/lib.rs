@@ -1,7 +1,3 @@
-#[macro_use]
-mod macros;
-mod private;
-
 #[cfg(feature = "http_signature")]
 pub mod http;
 
@@ -11,13 +7,11 @@ pub mod jose;
 #[cfg(feature = "x509")]
 pub mod x509;
 
-pub mod algorithm_identifier;
 pub mod key;
-pub mod oids;
 pub mod pem;
 pub mod signature;
 
-pub use algorithm_identifier::AlgorithmIdentifier;
+pub use picky_asn1_x509::{oids, AlgorithmIdentifier};
 
 #[cfg(test)]
 mod test_files {
@@ -33,8 +27,6 @@ mod test_files {
             include_str!("../../test_assets/private_keys/rsa-2048-pk_3.key");
         pub const RSA_2048_PK_4: &str =
             include_str!("../../test_assets/private_keys/rsa-2048-pk_4.key");
-
-        pub const CSR: &str = include_str!("../../test_assets/certification_request.csr");
 
         pub const INTERMEDIATE_CA: &str = include_str!("../../test_assets/intermediate_ca.crt");
         pub const ROOT_CA: &str = include_str!("../../test_assets/root_ca.crt");
