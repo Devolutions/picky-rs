@@ -44,9 +44,9 @@ pub enum KeyIdGenMethod {
 
 macro_rules! hash {
     ( @ $algorithm:ident, $input:ident) => {{
-        let mut digest = $algorithm::new();
-        digest.input($input);
-        digest.result().as_slice().to_vec()
+        let mut hasher = $algorithm::new();
+        hasher.update($input);
+        hasher.finalize().as_slice().to_vec()
     }};
     ($hash_algo:ident, $input:ident) => {
         match $hash_algo {

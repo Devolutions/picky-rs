@@ -75,9 +75,7 @@ impl PickyStorage for MemoryStorage {
         let key = entry.key;
 
         async move {
-            let addressing_hash = encode_to_canonical_address(&cert).map_err(|e| MemoryStorageError::Other {
-                description: format!("couldn't hash certificate: {}", e),
-            })?;
+            let addressing_hash = encode_to_canonical_address(&cert);
 
             let alternative_addresses =
                 encode_to_alternative_addresses(&cert).map_err(|e| MemoryStorageError::Other {
