@@ -349,7 +349,10 @@ impl FromStr for HttpSignature {
 
 macro_rules! builder_argument_missing_err {
     ($field:ident) => {{
-        ::static_assertions::assert_fields!(HttpSignatureBuilderInner: $field);
+        const _: fn() = || {
+            let HttpSignatureBuilderInner { $field: _, .. };
+        };
+
         HttpSignatureError::MissingBuilderArgument {
             arg: stringify!($field),
         }
@@ -596,7 +599,10 @@ impl<'a> HttpSignatureBuilder<'a> {
 
 macro_rules! verifier_argument_missing_err {
     ($field:ident) => {{
-        ::static_assertions::assert_fields!(HttpSignatureVerifierInner: $field);
+        const _: fn() = || {
+            let HttpSignatureVerifierInner { $field: _, .. };
+        };
+
         HttpSignatureError::MissingBuilderArgument {
             arg: stringify!($field),
         }
@@ -789,7 +795,7 @@ fn from_http_sig_algo_str(s: &str) -> Option<SignatureHashType> {
 }
 
 fn is_algo_compatible_with_key(algo: SignatureHashType, key: &PublicKey) -> bool {
-    use crate::oids::*;
+    use picky_asn1_x509::oids::*;
 
     let key_algo = Into::<String>::into(key.as_inner().algorithm.oid());
     match algo {
@@ -811,8 +817,9 @@ fn is_algo_compatible_with_key(algo: SignatureHashType, key: &PublicKey) -> bool
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{pem::Pem, private::SubjectPublicKeyInfo, AlgorithmIdentifier};
+    use crate::pem::Pem;
     use http::{header, method::Method, request};
+    use picky_asn1_x509::{AlgorithmIdentifier, SubjectPublicKeyInfo};
 
     const HTTP_SIGNATURE_EXAMPLE: &str = "Signature keyId=\"my-rsa-key\",algorithm=\"rsa-sha256\"\
          ,created=1402170695,headers=\"(request-target) (created) date\",\

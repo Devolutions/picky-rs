@@ -1,5 +1,6 @@
-use crate::{key::PublicKey, private::SubjectPublicKeyInfo, signature::SignatureHashType};
+use crate::{key::PublicKey, signature::SignatureHashType};
 use base64::DecodeError;
+use picky_asn1_x509::SubjectPublicKeyInfo;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 
@@ -151,8 +152,8 @@ impl Jwk {
     }
 
     pub fn from_public_key(public_key: &PublicKey) -> Result<Self, JwkError> {
-        use crate::private::subject_public_key_info::PublicKey as SerdePublicKey;
         use picky_asn1::wrapper::BitStringAsn1Container;
+        use picky_asn1_x509::PublicKey as SerdePublicKey;
 
         match &public_key.as_inner().subject_public_key {
             SerdePublicKey::RSA(BitStringAsn1Container(rsa)) => Ok(Self::new(JwkKeyType::new_rsa_key(

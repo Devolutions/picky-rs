@@ -1547,6 +1547,7 @@ dependencies = [
  "oid",
  "picky-asn1",
  "picky-asn1-der",
+ "picky-asn1-x509",
  "pretty_assertions",
  "rand 0.7.3",
  "rsa",
@@ -1555,7 +1556,6 @@ dependencies = [
  "sha-1",
  "sha2 0.8.1",
  "snafu",
- "static_assertions",
 ]
 
 [[package]]
@@ -2443,12 +2443,6 @@ name = "spin"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
-
-[[package]]
-name = "static_assertions"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "stringprep"

@@ -1,32 +1,16 @@
-use crate::x509::{
-    private::{
-        attribute_type_and_value::AttributeTypeAndValueParameters,
-        name::{GeneralName as SerdeGeneralName, GeneralNames as SerdeGeneralNames, NamePrettyFormatter},
-        AttributeTypeAndValue, Name,
-    },
-    DirectoryString,
-};
 use oid::ObjectIdentifier;
 use picky_asn1::{
     restricted_string::{CharSetError, IA5String},
-    wrapper::{Asn1SequenceOf, Asn1SetOf},
+    wrapper::Asn1SequenceOf,
+};
+use picky_asn1_x509::{
+    DirectoryString, GeneralName as SerdeGeneralName, GeneralNames as SerdeGeneralNames, Name, NamePrettyFormatter,
 };
 use std::fmt;
 
 // === DirectoryName ===
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum NameAttr {
-    CommonName,
-    Surname,
-    SerialNumber,
-    CountryName,
-    LocalityName,
-    StateOrProvinceName,
-    StreetName,
-    OrganisationName,
-    OrganisationalUnitName,
-}
+pub use picky_asn1_x509::NameAttr;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct DirectoryName(Name);
@@ -39,40 +23,20 @@ impl Default for DirectoryName {
 
 impl DirectoryName {
     pub fn new() -> Self {
-        Self(Asn1SequenceOf(vec![Asn1SetOf(vec![])]))
+        Self(Name::new())
     }
 
     pub fn new_common_name<S: Into<DirectoryString>>(name: S) -> Self {
-        let mut dn = Self::default();
-        dn.add_attr(NameAttr::CommonName, name);
-        dn
+        Self(Name::new_common_name(name))
     }
 
     /// Find the first common name contained in this `Name`
     pub fn find_common_name(&self) -> Option<&DirectoryString> {
-        for relative_distinguished_name in &((self.0).0) {
-            for attr_ty_val in &relative_distinguished_name.0 {
-                if let AttributeTypeAndValueParameters::CommonName(dir_string) = &attr_ty_val.value {
-                    return Some(dir_string);
-                }
-            }
-        }
-        None
+        self.0.find_common_name()
     }
 
     pub fn add_attr<S: Into<DirectoryString>>(&mut self, attr: NameAttr, value: S) {
-        let ty_val = match attr {
-            NameAttr::CommonName => AttributeTypeAndValue::new_common_name(value),
-            NameAttr::Surname => AttributeTypeAndValue::new_surname(value),
-            NameAttr::SerialNumber => AttributeTypeAndValue::new_serial_number(value),
-            NameAttr::CountryName => AttributeTypeAndValue::new_country_name(value),
-            NameAttr::LocalityName => AttributeTypeAndValue::new_locality_name(value),
-            NameAttr::StateOrProvinceName => AttributeTypeAndValue::new_state_or_province_name(value),
-            NameAttr::StreetName => AttributeTypeAndValue::new_street_name(value),
-            NameAttr::OrganisationName => AttributeTypeAndValue::new_organisation_name(value),
-            NameAttr::OrganisationalUnitName => AttributeTypeAndValue::new_organisational_unit_name(value),
-        };
-        ((self.0).0)[0].0.push(ty_val);
+        self.0.add_attr(attr, value)
     }
 }
 

@@ -1,23 +1,20 @@
 use crate::{
     key::{PrivateKey, PublicKey},
-    oids,
     pem::Pem,
     signature::{SignatureError, SignatureHashType},
     x509::{
         csr::{Csr, CsrError},
         date::UTCDate,
-        extension::{
-            AuthorityKeyIdentifier, BasicConstraints, ExtendedKeyUsage, ExtensionView, KeyIdentifier, KeyUsage,
-        },
         key_id_gen_method::{KeyIdGenError, KeyIdGenMethod, KeyIdHashAlgo},
         name::{DirectoryName, GeneralNames},
-        private::{certificate::TBSCertificate, Certificate, Validity, Version},
-        Extension, Extensions,
     },
-    AlgorithmIdentifier,
 };
 use picky_asn1::{bit_string::BitString, wrapper::IntegerAsn1};
 use picky_asn1_der::Asn1DerError;
+use picky_asn1_x509::{
+    oids, AlgorithmIdentifier, AuthorityKeyIdentifier, BasicConstraints, Certificate, ExtendedKeyUsage, Extension,
+    ExtensionView, Extensions, KeyIdentifier, KeyUsage, TBSCertificate, Validity, Version,
+};
 use snafu::{ResultExt, Snafu};
 use std::cell::RefCell;
 
@@ -131,6 +128,12 @@ pub struct Cert(Certificate);
 impl From<Certificate> for Cert {
     fn from(certificate: Certificate) -> Self {
         Self(certificate)
+    }
+}
+
+impl From<Cert> for Certificate {
+    fn from(certificate: Cert) -> Self {
+        certificate.0
     }
 }
 
@@ -551,7 +554,9 @@ struct IssuerInfos<'a> {
 // Statically checks the field actually exists and returns a &'static str of the field name
 macro_rules! field_str {
     ($field:ident) => {{
-        ::static_assertions::assert_fields!(CertificateBuilderInner: $field);
+        const _: fn() = || {
+            let CertificateBuilderInner { $field: _, .. };
+        };
         stringify!($field)
     }};
 }

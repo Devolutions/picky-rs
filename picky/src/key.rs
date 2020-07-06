@@ -1,9 +1,7 @@
-use crate::{
-    pem::{to_pem, Pem},
-    private::{private_key_info::PrivateKeyValue, PrivateKeyInfo, SubjectPublicKeyInfo},
-};
+use crate::pem::{to_pem, Pem};
 use picky_asn1::wrapper::{IntegerAsn1, OctetStringAsn1Container};
 use picky_asn1_der::Asn1DerError;
+use picky_asn1_x509::{PrivateKeyInfo, PrivateKeyValue, SubjectPublicKeyInfo};
 use snafu::{ResultExt, Snafu};
 
 #[derive(Debug, Snafu)]
@@ -88,7 +86,7 @@ impl PrivateKey {
     }
 
     pub fn from_rsa_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, KeyError> {
-        use crate::{private::private_key_info::RSAPrivateKey, AlgorithmIdentifier};
+        use picky_asn1_x509::{AlgorithmIdentifier, RSAPrivateKey};
 
         let private_key = picky_asn1_der::from_bytes::<RSAPrivateKey>(der.as_ref()).context(Asn1Deserialization {
             element: "rsa private key",
@@ -233,10 +231,7 @@ impl PublicKey {
     }
 
     pub fn from_rsa_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, KeyError> {
-        use crate::{
-            private::subject_public_key_info::{PublicKey, RSAPublicKey},
-            AlgorithmIdentifier,
-        };
+        use picky_asn1_x509::{AlgorithmIdentifier, PublicKey, RSAPublicKey};
 
         let public_key = picky_asn1_der::from_bytes::<RSAPublicKey>(der.as_ref()).context(Asn1Deserialization {
             element: "rsa public key",

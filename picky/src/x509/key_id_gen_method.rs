@@ -61,7 +61,7 @@ macro_rules! hash {
 
 impl KeyIdGenMethod {
     pub fn generate_from(&self, public_key: &PublicKey) -> Result<Vec<u8>, KeyIdGenError> {
-        use crate::private::subject_public_key_info::PublicKey as InnerPublicKey;
+        use picky_asn1_x509::PublicKey as InnerPublicKey;
         match self {
             KeyIdGenMethod::SPKValueHashedLeftmost160(hash_algo) => match &public_key.as_inner().subject_public_key {
                 InnerPublicKey::RSA(BitStringAsn1Container(rsa_pk)) => {

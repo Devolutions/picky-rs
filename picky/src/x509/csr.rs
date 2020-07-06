@@ -2,13 +2,11 @@ use crate::{
     key::{PrivateKey, PublicKey},
     pem::Pem,
     signature::{SignatureError, SignatureHashType},
-    x509::{
-        name::DirectoryName,
-        private::{certification_request::CertificationRequestInfo, CertificationRequest},
-    },
+    x509::name::DirectoryName,
 };
 use picky_asn1::bit_string::BitString;
 use picky_asn1_der::Asn1DerError;
+use picky_asn1_x509::{CertificationRequest, CertificationRequestInfo};
 use snafu::{ResultExt, Snafu};
 
 #[derive(Debug, Snafu)]
