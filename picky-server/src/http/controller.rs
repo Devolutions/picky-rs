@@ -3,7 +3,7 @@ use crate::{
     config::{CertKeyPair, Config},
     db::{get_storage, BoxedPickyStorage, CertificateEntry, PickyStorage},
     http::{
-        authorization::{check_authorization, Authorized, ProviderClaims},
+        authorization::{check_authorization, ProviderClaims},
         utils::{Format, StatusCodeResult},
     },
     logging::build_logger_config,
@@ -19,8 +19,6 @@ use saphir::{prelude::*, response::Builder as ResponseBuilder};
 use serde_json::{self, Value};
 use std::{borrow::Cow, convert::TryFrom};
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
-
-const DEFAULT_LEAF_VALIDITY_DURATION_SECS: u64 = 7_776_000; // 3 months
 
 pub struct ServerController {
     storage: BoxedPickyStorage,
@@ -111,11 +109,10 @@ impl ServerController {
 
     #[post("/sign")]
     async fn cert_signature_request(&self, req: Request) -> Result<ResponseBuilder, StatusCode> {
-        let token_infos = match check_authorization(&*self.read_conf().await, &req) {
-            Ok(Authorized::ApiKey) => None,
-            Ok(Authorized::Token(token)) => {
+        let (locked_subject_name, x509_duration_secs) = match check_authorization(&*self.read_conf().await, &req) {
+            Ok(token) => {
                 let provider_claims: ProviderClaims = serde_json::from_value(token.into_claims()).bad_request()?;
-                Some((provider_claims.sub, provider_claims.x509_duration_secs))
+                (provider_claims.sub, provider_claims.x509_duration_secs)
             }
             Err(e) => {
                 log::error!("authorization failed: {}", e);
@@ -127,31 +124,25 @@ impl ServerController {
 
         let csr = extract_csr_from_request(&req).await.bad_request()?;
 
-        let duration_secs = if let Some((locked_subject_name, x509_duration_secs)) = token_infos {
-            let subject_name = csr
-                .subject_name()
-                .find_common_name()
-                .bad_request_desc("couldn't find signed CSR subject common name")?
-                .to_string();
+        let subject_name = csr
+            .subject_name()
+            .find_common_name()
+            .bad_request_desc("couldn't find signed CSR subject common name")?
+            .to_string();
 
-            if locked_subject_name != subject_name {
-                log::error!(
-                    "Requested a certificate with an unauthorized subject name: {}, expected: {}",
-                    subject_name,
-                    locked_subject_name
-                );
-                return Err(StatusCode::UNAUTHORIZED);
-            }
-
-            x509_duration_secs
-        } else {
-            DEFAULT_LEAF_VALIDITY_DURATION_SECS
-        };
+        if locked_subject_name != subject_name {
+            log::error!(
+                "Requested a certificate with an unauthorized subject name: {}, expected: {}",
+                subject_name,
+                locked_subject_name
+            );
+            return Err(StatusCode::UNAUTHORIZED);
+        }
 
         // Sign CSR
         let conf = self.read_conf().await;
         let ca_name = format!("{} Authority", &conf.realm);
-        let signed_cert = sign_certificate(&ca_name, csr, &conf, self.storage.as_ref(), duration_secs)
+        let signed_cert = sign_certificate(&ca_name, csr, &conf, self.storage.as_ref(), x509_duration_secs)
             .await
             .internal_error()?;
         drop(conf); // release lock early
@@ -220,10 +211,16 @@ impl ServerController {
     }
 
     #[get("/chain")]
-    async fn get_default_chain(&self) -> Result<String, StatusCode> {
+    async fn get_default_chain(&self, req: Request) -> Result<ResponseBuilder, StatusCode> {
+        let builder = if let Some(origin_header) = req.headers().get("Origin") {
+            ResponseBuilder::new().header("Access-Control-Allow-Origin", origin_header)
+        } else {
+            ResponseBuilder::new()
+        };
+
         let ca = format!("{} Authority", &self.read_conf().await.realm);
         let chain = find_ca_chain(self.storage.as_ref(), &ca).await.not_found()?;
-        Ok(chain.join("\n"))
+        Ok(builder.body(chain.join("\n")))
     }
 
     #[get("/reload")]
@@ -684,7 +681,7 @@ mod tests {
             csr,
             &config,
             storage.as_ref(),
-            DEFAULT_LEAF_VALIDITY_DURATION_SECS,
+            7_776_000, // 3 months,
         ))
         .expect("couldn't sign certificate");
 

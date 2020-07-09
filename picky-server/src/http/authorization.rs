@@ -25,12 +25,6 @@ pub enum AuthorizationMethod {
     Unknown,
 }
 
-#[derive(Debug, Clone)]
-pub enum Authorized {
-    ApiKey,
-    Token(Jwt<serde_json::Value>),
-}
-
 impl From<&str> for AuthorizationMethod {
     fn from(method_str: &str) -> Self {
         if unicase::eq_ascii(method_str, "bearer") {
@@ -41,7 +35,7 @@ impl From<&str> for AuthorizationMethod {
     }
 }
 
-pub fn check_authorization(config: &Config, req: &Request<Body>) -> Result<Authorized, String> {
+pub fn check_authorization(config: &Config, req: &Request<Body>) -> Result<Jwt<serde_json::Value>, String> {
     let header = match req.headers().get(header::AUTHORIZATION) {
         Some(h) => h,
         None => return Err("Authorization header is missing".to_owned()),
@@ -59,12 +53,6 @@ pub fn check_authorization(config: &Config, req: &Request<Body>) -> Result<Autho
     let method = AuthorizationMethod::from(auth_vec[0]);
     match method {
         AuthorizationMethod::Bearer => {
-            let token = auth_vec[1];
-            if token == config.api_key {
-                return Ok(Authorized::ApiKey);
-            }
-
-            // try JWT
             let public_key = match config
                 .provisioner_public_key
                 .as_ref()
@@ -84,13 +72,11 @@ pub fn check_authorization(config: &Config, req: &Request<Body>) -> Result<Autho
                 PathOr::Some(key) => Cow::Borrowed(key),
             };
 
-            Ok(Authorized::Token(
-                Jwt::decode(
-                    auth_vec[1],
-                    &JwtValidator::strict(&public_key, &JwtDate::new_with_leeway(unix_epoch() as i64, 10)),
-                )
-                .map_err(|e| format!("couldn't validate json web token: {}", e))?,
-            ))
+            Ok(Jwt::decode(
+                auth_vec[1],
+                &JwtValidator::strict(&public_key, &JwtDate::new_with_leeway(unix_epoch() as i64, 10)),
+            )
+            .map_err(|e| format!("couldn't validate json web token: {}", e))?)
         }
         AuthorizationMethod::Unknown => Err(format!("Unknown authorization method: {}", auth_vec[0])),
     }
@@ -156,10 +142,7 @@ mod tests {
         let token = get_provider_token(&key);
         let saphir_req = build_saphir_req(&token);
         let config = config(Some(key.to_public_key()));
-        match check_authorization(&config, &saphir_req).expect("auth") {
-            Authorized::Token(_) => {}
-            unexpected => panic!("expected token, got {:?}", unexpected),
-        }
+        check_authorization(&config, &saphir_req).expect("auth");
     }
 
     #[test]

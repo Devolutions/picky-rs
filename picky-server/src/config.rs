@@ -16,7 +16,6 @@ use std::{
 const YAML_CONF_PATH: &str = "picky_server_conf.yaml";
 
 const PICKY_REALM_ENV: &str = "PICKY_REALM";
-const PICKY_API_KEY_ENV: &str = "PICKY_API_KEY";
 const PICKY_SAVE_CERTIFICATE_ENV: &str = "PICKY_SAVE_CERTIFICATE";
 const PICKY_BACKEND_ENV: &str = "PICKY_BACKEND";
 const PICKY_FILE_BACKEND_PATH_ENV: &str = "PICKY_FILE_BACKEND_PATH";
@@ -108,7 +107,6 @@ pub struct CertKeyPair {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Config {
-    pub api_key: String,
     #[serde(default = "default_picky_realm")]
     pub realm: String,
     #[serde(default = "default_save_certificate")]
@@ -138,7 +136,6 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            api_key: "".to_owned(),
             realm: default_picky_realm(),
             save_certificate: default_save_certificate(),
             log_level: default_log_level(),
@@ -179,10 +176,6 @@ impl Config {
         let app = App::from_yaml(yaml);
         let matches = app.get_matches();
 
-        if let Some(v) = matches.value_of("api-key") {
-            self.api_key = v.to_string();
-        }
-
         if let Some(v) = matches.value_of("realm") {
             self.realm = v.to_string();
         }
@@ -220,10 +213,6 @@ impl Config {
     }
 
     fn inject_env(&mut self) {
-        if let Ok(val) = env::var(PICKY_API_KEY_ENV) {
-            self.api_key = val;
-        }
-
         if let Ok(val) = env::var(PICKY_REALM_ENV) {
             self.realm = val;
         }
