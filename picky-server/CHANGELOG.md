@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [Official mongo driver](https://github.com/mongodb/mongo-rust-driver) is now used instead of the prototype
 - Dependencies clean up
 
+### Removed
+
+- API Key
+
 ## [4.5.0] 2020-04-22
 
 ### Added
