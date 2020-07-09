@@ -45,12 +45,6 @@ args:
       help: Name of the database used by the service.
       takes_value: true
       empty_values: false
-  - api-key:
-      long: api-key
-      value_name: API_KEY
-      help: The api key used by the server to authenticate client queries.
-      takes_value: true
-      empty_values: false
   - save-certificate:
       long: save-certificate
       help: Flag to save all certificates generated in backend
