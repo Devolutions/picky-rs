@@ -8,6 +8,7 @@ authors = [
     "Richard Markiewicz <rmarkiewicz@devolutions.net>",
 ]
 description = "Portable X.509, Jose and PKI implementation."
+keywords = ["x509", "jwt", "http", "signatures", "pem", "pki", "digest"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Devolutions/picky-rs"
