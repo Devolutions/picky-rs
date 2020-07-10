@@ -34,6 +34,16 @@ $picky_url = "http://127.0.0.1:12345"
 $picky_realm = "WaykDen"
 $picky_authority = "${picky_realm} Authority"
 
+$picky_provisioner_public_key = "-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA6CbtUnGihZ7UIYfc/m94
+GjsSZptk7zIdiraDMPns3ziKjxsgJhwCLjal1MgTgKSI6U2hnV8wV+L7iSC+0AcE
+O2PDlsVv1KeTySLatDBmlXcH0mK6PeBR0NAlJfgRo6PL+isZuBTn8c/bbG1hI8Rs
+8lHChH2wT48mQrkBhS5okdJA79fOFFWlKbbFnhDxd8PmazKHXqYArMo3hzxmN3OS
+x56x+lRUBvGunSIDKyb100HnG9Lm4P9v6pxVXHlZy+umzlA++ETDj899gRxCMd/6
+5i5kfMZcAAOQrVkt/vtLNJmEfKr9MEvmHYBCrvwy0mc8be5YiSL+ZjFMhRpcb7Bw
+cwIDAQAB
+-----END PUBLIC KEY-----"
+
 $parameters = New-Object System.Security.Cryptography.RSAParameters
 $parameters.Modulus = [System.Convert]::FromBase64String("AOgm7VJxooWe1CGH3P5veBo7EmabZO8yHYq2gzD57N84io8bICYcAi42pdTIE4CkiOlNoZ1fMFfi+4kgvtAHBDtjw5bFb9Snk8ki2rQwZpV3B9Jiuj3gUdDQJSX4EaOjy/orGbgU5/HP22xtYSPEbPJRwoR9sE+PJkK5AYUuaJHSQO/XzhRVpSm2xZ4Q8XfD5msyh16mAKzKN4c8ZjdzkseesfpUVAbxrp0iAysm9dNB5xvS5uD/b+qcVVx5Wcvrps5QPvhEw4/PfYEcQjHf+uYuZHzGXAADkK1ZLf77SzSZhHyq/TBL5h2AQq78MtJnPG3uWIki/mYxTIUaXG+wcHM=")
 $parameters.Exponent = [System.Convert]::FromBase64String("AQAB")
@@ -101,8 +111,12 @@ Describe 'picky-server REST API tests' {
 
             & 'cargo' 'build' '--manifest-path' $location '--quiet'
 
-            Start-Process pwsh `
-                -Args "-File ./Private/RunPicky.ps1 $picky_realm $picky_provisioner_public_key $picky_backend $SavePickyCertificatesString $location -Verbose:$Verbose"
+            $pickyCmd = {
+                param($script_root, $picky_realm, $picky_provisioner_public_key, $picky_backend, $SavePickyCertificatesString, $location)
+                . "$script_root/Private/RunPicky.ps1"
+                RunPicky $picky_realm $picky_provisioner_public_key $picky_backend $SavePickyCertificatesString $location
+            }
+            Start-Job -Name "picky-server" -ScriptBlock $pickyCmd -ArgumentList $PSScriptRoot, $picky_realm, $picky_provisioner_public_key, $picky_backend, $SavePickyCertificatesString, $location
         } else {
             & 'docker' 'stop' 'picky-server'
             & 'docker' 'rm' 'picky-server'
@@ -448,7 +462,10 @@ Od8i323fM5dQS1qQpBjBc/5fPw==
             }
 
             if ($Debug){
-                Stop-Process -Name 'picky-server'
+                if ($Verbose) {
+                    Receive-Job -Name "picky-server"
+                }
+                Stop-Job -Name "picky-server"
             } else {
                 & 'docker' 'stop' 'picky-server'
                 & 'docker' 'rm' 'picky-server'
