@@ -8,18 +8,6 @@ param(
     [switch] $NoClean
 )
 
-. "$PSScriptRoot/Private/Base64Url.ps1"
-. "$PSScriptRoot/Private/DerToPem.ps1"
-. "$PSScriptRoot/Private/GenerateCsrDer.ps1"
-. "$PSScriptRoot/Private/PemToDer.ps1"
-. "$PSScriptRoot/Private/Hashing.ps1"
-. "$PSScriptRoot/Private/ToCert.ps1"
-
-$picky_url = "http://127.0.0.1:12345"
-$picky_realm = "WaykDen"
-$picky_authority = "${picky_realm} Authority"
-$picky_api_key = "secret"
-
 if ($UseMemory) {
     $picky_backend = "memory"
     $picky_database_url = "memory"
@@ -34,6 +22,50 @@ if ($UseMemory) {
 if ($Verbose) {
     $VerbosePreference = "Continue"
 }
+
+. "$PSScriptRoot/Private/Base64Url.ps1"
+. "$PSScriptRoot/Private/DerToPem.ps1"
+. "$PSScriptRoot/Private/GenerateCsrDer.ps1"
+. "$PSScriptRoot/Private/PemToDer.ps1"
+. "$PSScriptRoot/Private/Hashing.ps1"
+. "$PSScriptRoot/Private/ToCert.ps1"
+
+$picky_url = "http://127.0.0.1:12345"
+$picky_realm = "WaykDen"
+$picky_authority = "${picky_realm} Authority"
+
+$parameters = New-Object System.Security.Cryptography.RSAParameters
+$parameters.Modulus = [System.Convert]::FromBase64String("AOgm7VJxooWe1CGH3P5veBo7EmabZO8yHYq2gzD57N84io8bICYcAi42pdTIE4CkiOlNoZ1fMFfi+4kgvtAHBDtjw5bFb9Snk8ki2rQwZpV3B9Jiuj3gUdDQJSX4EaOjy/orGbgU5/HP22xtYSPEbPJRwoR9sE+PJkK5AYUuaJHSQO/XzhRVpSm2xZ4Q8XfD5msyh16mAKzKN4c8ZjdzkseesfpUVAbxrp0iAysm9dNB5xvS5uD/b+qcVVx5Wcvrps5QPvhEw4/PfYEcQjHf+uYuZHzGXAADkK1ZLf77SzSZhHyq/TBL5h2AQq78MtJnPG3uWIki/mYxTIUaXG+wcHM=")
+$parameters.Exponent = [System.Convert]::FromBase64String("AQAB")
+$parameters.D = [System.Convert]::FromBase64String("AMylZBeFLKt1s7JLPjjcspcM88+XtIZXO0uIUGXgKzsrcJluZAy0LAfpDI5iQS7p2/cuBAXiX49Z/DqJrytaxBRGgahrK4Xeo5xvKTQmZofjgfWoKl1ZXUYh9l1eLM6AGdPSIr3vT/gOL3OJiFQrV47VHBAHbGD149h1li19F5lSfMARBaG4gN7BIYdo3af1go4hDLm5Dh7Ab6ANK1tNsYT1ol55xVVr3Sxgn/whpyzwLzZO/egPW1o//GRxZgO3jvX0gid4iCzn0UNiYMbjyK2ikVM9nKrXuTBhrd8Nz+STY9WrOQXrFk+Q+Uti8cGu7gvRG1nGcWLb2oZEk3ut+YE=")
+$parameters.P = [System.Convert]::FromBase64String("AP9M5sqjzVi4y/amzbZS2q5IXluWJdVB2HBihTdQ7OA6MtscAt7L/0b0kf7QWC6UQZdyVT3cZCAPcpq5WIaHXF1ahzc9LDCdtnRGp/H2dlbYTdtp2ZXBkC51AmWW5q3ilbMFXBr1AOm6+mSZ6R0uZs98aedpQSikYN61AIn37ZHD")
+$parameters.Q = [System.Convert]::FromBase64String("AOjJyVZzW+LpHke5DjYWxTD1hpy2snAewHBp39i850/dzqP/ZGOP6h2sgdpunen5rqJoiYjwsjKDrROB+Y3IDavD6/KaWKahsqpZyyEGcsVja6mSwt+Nkp1eD/9eOhbrg+n1BFa7Y9E/oDh1sQ+hDmli46VPuzdcsDwIOMMQVIuR")
+$parameters.DP = [System.Convert]::FromBase64String("APbV336lCPFzGqELfXF+gjhnd/ONJF8gHqfqWWq2L5BMNMdsOco36kUsScvYnKnMZe6LeKcq4xOsW94Evfa0ATWxRXK/Dm6izbl2ZwKmjJxC3mP534nPcBu6veqDD92naZ2A3SCjKZLSWS3TMXQpXPXXEH3RYlJtO8uXrUG4GFYJ")
+$parameters.DQ = [System.Convert]::FromBase64String("CRfYxYe8DyEMDcEszPAWw9LTb0uzrK2G1t1L4St/3Z7Mc5uGUF1Ox9n1OJMZmAooyC9NMAw26cI7AIgTN3aZEhyVGuTskZW/ZOgdBy05TnyTuAwDkLf3Ai6qcU889ag9fuYTRVAMlh/mIk52nCWuam9ydQKoTYFRYQbxMK1yoAE=")
+$parameters.InverseQ = [System.Convert]::FromBase64String("YaK3OHOvk048DY0wt3fjn3QkE3xt2YqxX1IJYR9FJG0ckj3FHVRLytl5eN+nx5ZCZsFlZlHyu/HQggHPHyAbPawz0RkNAaJ9LCRAuKcERzimPgW2n5cub1XHQeFatP5M0su/GtWkUBJzGxcLKQ3TYp0v5UBz+1rMNb7M5yYslVg=")
+
+$rsa_private_key = New-Object System.Security.Cryptography.RSAOpenSsl
+$rsa_private_key.ImportParameters($parameters)
+
+$header = @{ alg = "RS256"; typ = "JWT" } | ConvertTo-Json -Compress
+$headerBase64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($header)).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+Write-Verbose "token header: $header"
+
+$payload = @{
+    x509_duration_secs = 300
+    sub = "test.WaykDen"
+    nbf = [int](Get-Date -UFormat %s -Millisecond 0)
+    exp = [int](Get-Date -UFormat %s -Millisecond 0) + 60
+} | ConvertTo-Json -Compress
+$payloadBase64 = [Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($payload)).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+Write-Verbose "token payload: $payload"
+
+$toSign = [System.Text.Encoding]::UTF8.GetBytes($headerBase64 + "." + $payloadBase64)
+$hashAlgo = [Security.Cryptography.HashAlgorithmName]::SHA256
+$padding = [Security.Cryptography.RSASignaturePadding]::Pkcs1
+$signature = [Convert]::ToBase64String($rsa_private_key.SignData($toSign, $hashAlgo, $padding)).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+$bearerToken = "$headerBase64.$payloadBase64.$signature"
+Write-Verbose "bearer token: $bearerToken"
 
 Describe 'picky-server REST API tests' {
     BeforeAll {
@@ -70,14 +102,14 @@ Describe 'picky-server REST API tests' {
             & 'cargo' 'build' '--manifest-path' $location '--quiet'
 
             Start-Process pwsh `
-                -Args "-File ./Private/RunPicky.ps1 $picky_realm $picky_api_key $picky_backend $SavePickyCertificatesString $location -Verbose:$Verbose"
+                -Args "-File ./Private/RunPicky.ps1 $picky_realm $picky_provisioner_public_key $picky_backend $SavePickyCertificatesString $location -Verbose:$Verbose"
         } else {
             & 'docker' 'stop' 'picky-server'
             & 'docker' 'rm' 'picky-server'
             & 'docker' 'run' '-p' '12345:12345' '-d' '--network=picky' '--name' 'picky-server' `
                 '--mount' "source=pickyvolume,target=$currentPath/database/" `
                 '-e' "PICKY_REALM=$picky_realm" `
-                '-e' "PICKY_API_KEY=$picky_api_key" `
+                '-e' "PICKY_PROVISIONER_PUBLIC_KEY=$picky_provisioner_public_key" `
                 '-e' "PICKY_BACKEND=$picky_backend" `
                 '-e' "PICKY_DATABASE_URL=$picky_database_url" `
                 '-e' "PICKY_SAVE_CERTIFICATE=$SavePickyCertificatesString" `
@@ -143,7 +175,7 @@ Describe 'picky-server REST API tests' {
         $csr_pem = CsrDerToPem $csr_der
 
         $headers = @{
-            "Authorization" = "Bearer $picky_api_key"
+            "Authorization" = "Bearer $bearerToken"
             "Accept" = 'application/x-pem-file'
         }
 
@@ -166,7 +198,7 @@ Describe 'picky-server REST API tests' {
         $csr_pem = CsrDerToPem $csr_der
 
         $headers = @{
-            "Authorization" = "Bearer $picky_api_key"
+            "Authorization" = "Bearer $bearerToken"
         }
 
         $response = Invoke-WebRequest `
@@ -183,7 +215,7 @@ Describe 'picky-server REST API tests' {
         $csr_base64 = [Convert]::ToBase64String($csr_der)
 
         $headers = @{
-            "Authorization" = "Bearer $picky_api_key"
+            "Authorization" = "Bearer $bearerToken"
         }
 
         $response = Invoke-WebRequest `
@@ -200,7 +232,7 @@ Describe 'picky-server REST API tests' {
         $csr_base64 = [Convert]::ToBase64String($csr_der)
 
         $headers = @{
-            "Authorization" = "Bearer $picky_api_key"
+            "Authorization" = "Bearer $bearerToken"
         }
 
         $response = try {
@@ -221,7 +253,7 @@ Describe 'picky-server REST API tests' {
         $csr_base64 = [Convert]::ToBase64String($csr_der)
 
         $headers = @{
-            "Authorization" = "Bearer $picky_api_key"
+            "Authorization" = "Bearer $bearerToken"
         }
         $response = Invoke-WebRequest `
             -Uri $picky_url/sign/ -Method POST `
@@ -339,7 +371,7 @@ Describe 'picky-server REST API tests' {
         $csr_der = GenerateCsrDer "CN=test.${picky_realm}"
         $csr_base64 = [Convert]::ToBase64String($csr_der)
         $headers = @{
-            "Authorization" = "Bearer $picky_api_key"
+            "Authorization" = "Bearer $bearerToken"
             "Accept" = "application/x-pem-file"
         }
         $response = Invoke-WebRequest `
@@ -360,7 +392,7 @@ Describe 'picky-server REST API tests' {
         $csr_der = GenerateCsrDer "CN=test.${picky_realm}"
         $csr_base64 = [Convert]::ToBase64String($csr_der)
         $headers = @{
-            "Authorization" = "Bearer $picky_api_key"
+            "Authorization" = "Bearer $bearerToken"
             "Accept" = "application/pkix-cert-base64"
         }
         $signed_cert_base64 = Invoke-RestMethod -Uri $picky_url/sign/ -Method POST `
