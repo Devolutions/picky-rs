@@ -61,6 +61,20 @@ impl AlgorithmIdentifier {
         }
     }
 
+    pub fn new_sha3_384_with_rsa_encryption() -> Self {
+        Self {
+            algorithm: oids::id_rsassa_pkcs1_v1_5_with_sha3_384().into(),
+            parameters: AlgorithmIdentifierParameters::Null,
+        }
+    }
+
+    pub fn new_sha3_512_with_rsa_encryption() -> Self {
+        Self {
+            algorithm: oids::id_rsassa_pkcs1_v1_5_with_sha3_512().into(),
+            parameters: AlgorithmIdentifierParameters::Null,
+        }
+    }
+
     pub fn new_rsa_encryption() -> Self {
         Self {
             algorithm: oids::rsa_encryption().into(),
