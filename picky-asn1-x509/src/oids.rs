@@ -54,6 +54,17 @@ define_oid! {
     SHA224_WITH_RSA_ENCRYPTION => sha224_with_rsa_encryption => "1.2.840.113549.1.1.14",
     EMAIL_ADDRESS => email_address => "1.2.840.113549.1.9.1", // deprecated
 
+    // NIST
+    DSA_WITH_SHA224 => dsa_with_sha224 => "2.16.840.1.101.3.4.3.1",
+    DSA_WITH_SHA256 => dsa_with_sha256 => "2.16.840.1.101.3.4.3.2",
+    DSA_WITH_SHA384 => dsa_with_sha384 => "2.16.840.1.101.3.4.3.3",
+    DSA_WITH_SHA512 => dsa_with_sha512 => "2.16.840.1.101.3.4.3.4",
+    ID_ECDSA_WITH_SHA3_256 => id_ecdsa_with_sha3_256 => "2.16.840.1.101.3.4.3.10",
+    ID_RSASSA_PKCS1_V1_5_WITH_SHA3_224 => id_rsassa_pkcs1_v1_5_with_sha3_224 => "2.16.840.1.101.3.4.3.13",
+    ID_RSASSA_PKCS1_V1_5_WITH_SHA3_256 => id_rsassa_pkcs1_v1_5_with_sha3_256 => "2.16.840.1.101.3.4.3.14",
+    ID_RSASSA_PKCS1_V1_5_WITH_SHA3_384 => id_rsassa_pkcs1_v1_5_with_sha3_384 => "2.16.840.1.101.3.4.3.15",
+    ID_RSASSA_PKCS1_V1_5_WITH_SHA3_512 => id_rsassa_pkcs1_v1_5_with_sha3_512 => "2.16.840.1.101.3.4.3.16",
+
     // Certicom Object Identifiers
     SECP384R1 => secp384r1 => "1.3.132.0.34",
 
