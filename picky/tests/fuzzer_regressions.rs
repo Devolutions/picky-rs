@@ -5,7 +5,7 @@
 use picky::{
     jose::{
         jwk::Jwk,
-        jwt::{Jwt, JwtDate, JwtValidator},
+        jws::{Jws, JwsDate, JwsValidator},
     },
     key::{PrivateKey, PublicKey},
     pem::{parse_pem, Pem},
@@ -50,9 +50,9 @@ fn fuzz_target(data: &[u8]) {
                 + (data[1] as i64) * 2_i64.pow(8)
                 + (data[2] as i64) * 2_i64.pow(16)
                 + (data[3] as i64) * 2_i64.pow(24);
-            let date = JwtDate::new(numeric_date);
-            let validator = JwtValidator::dangerous().current_date(&date);
-            let _ = Jwt::<()>::decode(s, &validator);
+            let date = JwsDate::new(numeric_date);
+            let validator = JwsValidator::dangerous().current_date(&date);
+            let _ = Jws::<()>::decode(s, &validator);
         }
 
         let _ = Jwk::from_json(s);

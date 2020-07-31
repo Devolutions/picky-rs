@@ -1,14 +1,22 @@
-use crate::key::{PrivateKey, PublicKey};
-use picky_asn1::wrapper::{BitStringAsn1Container, OctetStringAsn1Container};
-use picky_asn1_x509::{oids, private_key_info, AlgorithmIdentifier};
-use rsa::{hash::Hashes, BigUint, PaddingScheme, PublicKey as RsaPublicKeyInterface, RSAPrivateKey, RSAPublicKey};
+//! Signature algorithms supported by picky
+
+use crate::{
+    hash::HashAlgorithm,
+    key::{KeyError, PrivateKey, PublicKey},
+};
+use core::convert::TryFrom;
+use picky_asn1_x509::{oids, AlgorithmIdentifier};
+use rsa::{PublicKey as RsaPublicKeyInterface, RSAPrivateKey, RSAPublicKey};
 use serde::{Deserialize, Serialize};
-use sha1::{Digest, Sha1};
-use sha2::{Sha224, Sha256, Sha384, Sha512};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum SignatureError {
+    /// Key error
+    #[error("Key error: {source}")]
+    Key { source: KeyError },
+
     /// RSA error
     #[error("RSA error: {context}")]
     Rsa { context: String },
@@ -28,125 +36,95 @@ impl From<rsa::errors::Error> for SignatureError {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum SignatureHashType {
-    #[serde(rename = "RS1")]
-    RsaSha1,
-    #[serde(rename = "RS224")]
-    RsaSha224,
-    #[serde(rename = "RS256")]
-    RsaSha256,
-    #[serde(rename = "RS384")]
-    RsaSha384,
-    #[serde(rename = "RS512")]
-    RsaSha512,
+impl From<KeyError> for SignatureError {
+    fn from(e: KeyError) -> Self {
+        SignatureError::Key { source: e }
+    }
 }
 
-macro_rules! hash {
-    ($algorithm:ident, $input:ident) => {{
-        let mut hasher = $algorithm::new();
-        hasher.update($input);
-        hasher.finalize().as_slice().to_vec()
-    }};
+/// Supported signature algorithms
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum SignatureAlgorithm {
+    RsaPkcs1v15(HashAlgorithm),
 }
 
-impl SignatureHashType {
-    pub fn from_algorithm_identifier(algorithm_identifier: &AlgorithmIdentifier) -> Result<Self, SignatureError> {
-        let oid_string: String = algorithm_identifier.oid().into();
+impl TryFrom<&'_ AlgorithmIdentifier> for SignatureAlgorithm {
+    type Error = SignatureError;
+
+    fn try_from(v: &AlgorithmIdentifier) -> Result<Self, Self::Error> {
+        let oid_string: String = v.oid().into();
         match oid_string.as_str() {
-            oids::SHA1_WITH_RSA_ENCRYPTION => Ok(Self::RsaSha1),
-            oids::SHA224_WITH_RSA_ENCRYPTION => Ok(Self::RsaSha224),
-            oids::SHA256_WITH_RSA_ENCRYPTION => Ok(Self::RsaSha256),
-            oids::SHA384_WITH_RSA_ENCRYPTION => Ok(Self::RsaSha384),
-            oids::SHA512_WITH_RSA_ENCRYPTION => Ok(Self::RsaSha512),
+            oids::SHA1_WITH_RSA_ENCRYPTION => Ok(Self::RsaPkcs1v15(HashAlgorithm::SHA1)),
+            oids::SHA224_WITH_RSA_ENCRYPTION => Ok(Self::RsaPkcs1v15(HashAlgorithm::SHA2_224)),
+            oids::SHA256_WITH_RSA_ENCRYPTION => Ok(Self::RsaPkcs1v15(HashAlgorithm::SHA2_256)),
+            oids::SHA384_WITH_RSA_ENCRYPTION => Ok(Self::RsaPkcs1v15(HashAlgorithm::SHA2_384)),
+            oids::SHA512_WITH_RSA_ENCRYPTION => Ok(Self::RsaPkcs1v15(HashAlgorithm::SHA2_512)),
+            oids::ID_RSASSA_PKCS1_V1_5_WITH_SHA3_384 => Ok(Self::RsaPkcs1v15(HashAlgorithm::SHA3_384)),
+            oids::ID_RSASSA_PKCS1_V1_5_WITH_SHA3_512 => Ok(Self::RsaPkcs1v15(HashAlgorithm::SHA3_512)),
             _ => Err(SignatureError::UnsupportedAlgorithm { algorithm: oid_string }),
         }
     }
+}
 
-    pub fn hash(self, msg: &[u8]) -> Vec<u8> {
-        match self {
-            Self::RsaSha1 => hash!(Sha1, msg),
-            Self::RsaSha224 => hash!(Sha224, msg),
-            Self::RsaSha256 => hash!(Sha256, msg),
-            Self::RsaSha384 => hash!(Sha384, msg),
-            Self::RsaSha512 => hash!(Sha512, msg),
+impl From<SignatureAlgorithm> for AlgorithmIdentifier {
+    fn from(ty: SignatureAlgorithm) -> Self {
+        match ty {
+            SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA1) => AlgorithmIdentifier::new_sha1_with_rsa_encryption(),
+            SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_224) => {
+                AlgorithmIdentifier::new_sha224_with_rsa_encryption()
+            }
+            SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256) => {
+                AlgorithmIdentifier::new_sha256_with_rsa_encryption()
+            }
+            SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_384) => {
+                AlgorithmIdentifier::new_sha384_with_rsa_encryption()
+            }
+            SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_512) => {
+                AlgorithmIdentifier::new_sha512_with_rsa_encryption()
+            }
+            SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA3_384) => {
+                AlgorithmIdentifier::new_sha3_384_with_rsa_encryption()
+            }
+            SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA3_512) => {
+                AlgorithmIdentifier::new_sha3_512_with_rsa_encryption()
+            }
         }
+    }
+}
+
+impl SignatureAlgorithm {
+    pub fn from_algorithm_identifier(algorithm_identifier: &AlgorithmIdentifier) -> Result<Self, SignatureError> {
+        Self::try_from(algorithm_identifier)
     }
 
     pub fn sign(self, msg: &[u8], private_key: &PrivateKey) -> Result<Vec<u8>, SignatureError> {
-        let rsa_private_key = match &private_key.as_inner().private_key {
-            private_key_info::PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => RSAPrivateKey::from_components(
-                BigUint::from_bytes_be(key.modulus().as_unsigned_bytes_be()),
-                BigUint::from_bytes_be(key.public_exponent().as_unsigned_bytes_be()),
-                BigUint::from_bytes_be(key.private_exponent().as_unsigned_bytes_be()),
-                key.primes()
-                    .iter()
-                    .map(|p| BigUint::from_bytes_be(p.as_unsigned_bytes_be()))
-                    .collect(),
-            ),
+        let signature = match self {
+            SignatureAlgorithm::RsaPkcs1v15(picky_hash_algo) => {
+                let rsa_private_key = RSAPrivateKey::try_from(private_key)?;
+                let digest = picky_hash_algo.digest(msg);
+                let rsa_hash_algo = rsa::Hash::from(picky_hash_algo);
+                let padding_scheme = rsa::PaddingScheme::new_pkcs1v15_sign(Some(rsa_hash_algo));
+                rsa_private_key.sign_blinded(&mut rand::rngs::OsRng, padding_scheme, &digest)?
+            }
         };
-
-        let digest = self.hash(msg);
-
-        let hash_algo = match self {
-            Self::RsaSha1 => &Hashes::SHA1,
-            Self::RsaSha224 => &Hashes::SHA2_224,
-            Self::RsaSha256 => &Hashes::SHA2_256,
-            Self::RsaSha384 => &Hashes::SHA2_384,
-            Self::RsaSha512 => &Hashes::SHA2_512,
-        };
-
-        let signature = rsa_private_key.sign_blinded(
-            &mut rand::rngs::OsRng,
-            PaddingScheme::PKCS1v15,
-            Some(hash_algo),
-            &digest,
-        )?;
 
         Ok(signature)
     }
 
     pub fn verify(self, public_key: &PublicKey, msg: &[u8], signature: &[u8]) -> Result<(), SignatureError> {
-        use picky_asn1_x509::PublicKey as InnerPublicKey;
-
-        let public_key = match &public_key.as_inner().subject_public_key {
-            InnerPublicKey::RSA(BitStringAsn1Container(key)) => RSAPublicKey::new(
-                BigUint::from_bytes_be(key.modulus.as_unsigned_bytes_be()),
-                BigUint::from_bytes_be(key.public_exponent.as_unsigned_bytes_be()),
-            )?,
-            InnerPublicKey::EC(_) => {
-                return Err(SignatureError::UnsupportedAlgorithm {
-                    algorithm: "elliptic curves".into(),
-                });
+        match self {
+            SignatureAlgorithm::RsaPkcs1v15(picky_hash_algo) => {
+                let rsa_public_key = RSAPublicKey::try_from(public_key)?;
+                let digest = picky_hash_algo.digest(msg);
+                let rsa_hash_algo = rsa::Hash::from(picky_hash_algo);
+                let padding_scheme = rsa::PaddingScheme::new_pkcs1v15_sign(Some(rsa_hash_algo));
+                rsa_public_key
+                    .verify(padding_scheme, &digest, signature)
+                    .map_err(|_| SignatureError::BadSignature)?;
             }
-        };
-
-        let hash_algorithm = match self {
-            Self::RsaSha1 => &Hashes::SHA1,
-            Self::RsaSha224 => &Hashes::SHA2_224,
-            Self::RsaSha256 => &Hashes::SHA2_256,
-            Self::RsaSha384 => &Hashes::SHA2_384,
-            Self::RsaSha512 => &Hashes::SHA2_512,
-        };
-
-        let digest = self.hash(msg);
-
-        public_key
-            .verify(PaddingScheme::PKCS1v15, Some(hash_algorithm), &digest, signature)
-            .map_err(|_| SignatureError::BadSignature)?;
+        }
 
         Ok(())
-    }
-}
-
-impl From<SignatureHashType> for AlgorithmIdentifier {
-    fn from(ty: SignatureHashType) -> Self {
-        match ty {
-            SignatureHashType::RsaSha1 => AlgorithmIdentifier::new_sha1_with_rsa_encryption(),
-            SignatureHashType::RsaSha224 => AlgorithmIdentifier::new_sha224_with_rsa_encryption(),
-            SignatureHashType::RsaSha256 => AlgorithmIdentifier::new_sha256_with_rsa_encryption(),
-            SignatureHashType::RsaSha384 => AlgorithmIdentifier::new_sha384_with_rsa_encryption(),
-            SignatureHashType::RsaSha512 => AlgorithmIdentifier::new_sha512_with_rsa_encryption(),
-        }
     }
 }

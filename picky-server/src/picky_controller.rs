@@ -1,7 +1,7 @@
 use picky::{
     key::{KeyError, PrivateKey, PublicKey},
     oids,
-    signature::SignatureHashType,
+    signature::SignatureAlgorithm,
     x509::{
         certificate::{Cert, CertError, CertificateBuilder},
         csr::Csr,
@@ -60,7 +60,7 @@ impl Picky {
     pub fn generate_root(
         name: &str,
         key: &PrivateKey,
-        signature_hash_type: SignatureHashType,
+        signature_hash_type: SignatureAlgorithm,
     ) -> Result<Cert, PickyError> {
         // validity
         let now = chrono::offset::Utc::now();
@@ -86,7 +86,7 @@ impl Picky {
         intermediate_key: PublicKey,
         issuer_cert: &Cert,
         issuer_key: &PrivateKey,
-        signature_hash_type: SignatureHashType,
+        signature_hash_type: SignatureAlgorithm,
     ) -> Result<Cert, PickyError> {
         // validity
         let now = chrono::offset::Utc::now();
@@ -116,7 +116,7 @@ impl Picky {
         csr: Csr,
         issuer_cert: &Cert,
         issuer_key: &PrivateKey,
-        signature_hash_type: SignatureHashType,
+        signature_hash_type: SignatureAlgorithm,
         dns_name: &str,
         validity_duration: chrono::Duration,
     ) -> Result<Cert, PickyError> {

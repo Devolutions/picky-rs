@@ -1,4 +1,14 @@
-use crate::{key::PublicKey, signature::SignatureHashType};
+//! A JSON Web Key (JWK) is a JavaScript Object Notation (JSON) data structure that represents a cryptographic key.
+//!
+//! See [RFC7517](https://tools.ietf.org/html/rfc7517).
+
+use crate::{
+    jose::{
+        jwe::{JweAlg, JweEnc},
+        jws::JwsAlg,
+    },
+    key::PublicKey,
+};
 use base64::DecodeError;
 use picky_asn1_x509::SubjectPublicKeyInfo;
 use serde::{Deserialize, Serialize};
@@ -9,15 +19,15 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum JwkError {
     /// Json error
-    #[error("JSON error: {}", source)]
+    #[error("JSON error: {source}")]
     Json { source: serde_json::Error },
 
     /// couldn't decode base64
-    #[error("couldn't decode base64: {}", source)]
+    #[error("couldn't decode base64: {source}")]
     Base64Decoding { source: DecodeError },
 
     /// unsupported algorithm
-    #[error("unsupported algorithm: {}", algorithm)]
+    #[error("unsupported algorithm: {algorithm}")]
     UnsupportedAlgorithm { algorithm: &'static str },
 }
 
@@ -35,11 +45,27 @@ impl From<DecodeError> for JwkError {
 
 // === key type === //
 
+/// Algorithm type for JWK
+///
+/// See [RFC7518 #6](https://tools.ietf.org/html/rfc7518#section-6.1)
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "kty")]
 pub enum JwkKeyType {
+    /// Elliptic Curve (unsupported)
+    ///
+    /// Recommended+ by RFC
+    #[serde(rename = "EC")]
+    Ec,
+    /// Elliptic Curve
+    ///
+    /// Required by RFC
     #[serde(rename = "RSA")]
     Rsa(JwkPublicRsaKey),
+    /// Octet sequence (used to represent symmetric keys) (unsupported)
+    ///
+    /// Required by RFC
+    #[serde(rename = "oct")]
+    Oct,
 }
 
 impl JwkKeyType {
@@ -60,6 +86,7 @@ impl JwkKeyType {
     pub fn as_rsa(&self) -> Option<&JwkPublicRsaKey> {
         match self {
             JwkKeyType::Rsa(rsa) => Some(rsa),
+            _ => None,
         }
     }
 
@@ -70,6 +97,9 @@ impl JwkKeyType {
 
 // === public key use === //
 
+/// Public Key Use, identifies the intended use of the public key.
+///
+/// See [RFC7517 #4](https://tools.ietf.org/html/rfc7517#section-4.2)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum JwkPubKeyUse {
     #[serde(rename = "sig")]
@@ -80,6 +110,9 @@ pub enum JwkPubKeyUse {
 
 // === key operations === //
 
+/// Key Operations, identifies the operation(s) for which the key is intended to be used.
+///
+/// See [RFC7517 #4](https://tools.ietf.org/html/rfc7517#section-4.3)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum JwkKeyOps {
     #[serde(rename = "sign")]
@@ -100,50 +133,85 @@ pub enum JwkKeyOps {
     DeriveBits,
 }
 
+// === algorithms === //
+
+/// JOSE algorithms names as defined by [RFC7518](https://tools.ietf.org/html/rfc7518)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Jwa {
+    Sig(JwsAlg),
+    Enc(JweEnc),
+    CEKAlg(JweAlg),
+}
+
 // === json web key === //
 
+/// Represents a cryptographic key as defined by [RFC7517](https://tools.ietf.org/html/rfc7517).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Jwk {
+    // -- specific to JWK -- //
     #[serde(flatten)]
     pub key: JwkKeyType,
 
-    #[serde(rename = "alg", skip_serializing_if = "Option::is_none")]
-    pub algorithm: Option<SignatureHashType>,
+    /// Identifies the algorithm intended for use with the key.
+    pub alg: Option<Jwa>,
 
+    /// Public Key Use
+    ///
+    /// Intended use of the public key.
     #[serde(rename = "use", skip_serializing_if = "Option::is_none")]
-    pub pub_key_use: Option<JwkPubKeyUse>,
+    pub key_use: Option<JwkPubKeyUse>,
 
-    #[serde(rename = "key_ops", skip_serializing_if = "Option::is_none")]
-    pub key_operations: Option<Vec<JwkKeyOps>>,
+    /// Key Operations
+    ///
+    /// identifies the operation(s) for which the key is intended to be used.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub key_ops: Option<Vec<JwkKeyOps>>,
 
-    #[serde(rename = "kid", skip_serializing_if = "Option::is_none")]
-    pub key_id: Option<String>,
+    // -- common with all -- //
+    /// Key ID Header
+    ///
+    /// A hint indicating which key was used.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kid: Option<String>,
 
-    #[serde(rename = "x5u", skip_serializing_if = "Option::is_none")]
-    pub x509_url: Option<String>,
+    /// X.509 URL Header
+    ///
+    /// URI that refers to a resource for an X.509 public key certificate or certificate chain.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub x5u: Option<String>,
 
-    #[serde(rename = "x5c", skip_serializing_if = "Option::is_none")]
-    pub x509_chain: Option<Vec<String>>,
+    /// X.509 Certificate Chain
+    ///
+    /// Chain of one or more PKIX certificates.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub x5c: Option<Vec<String>>,
 
-    #[serde(rename = "x5t", skip_serializing_if = "Option::is_none")]
-    pub x509_sha1_thumbprint: Option<String>,
+    /// X.509 Certificate SHA-1 Thumbprint
+    ///
+    /// base64url-encoded SHA-1 thumbprint (a.k.a. digest) of the DER encoding of an X.509 certificate.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub x5t: Option<String>,
 
-    #[serde(rename = "x5t#S256", skip_serializing_if = "Option::is_none")]
-    pub x509_sha256_thumbprint: Option<String>,
+    /// X.509 Certificate SHA-256 Thumbprint
+    ///
+    /// base64url-encoded SHA-256 thumbprint (a.k.a. digest) of the DER encoding of an X.509 certificate.
+    #[serde(rename = "x5t#S256", alias = "x5t#s256", skip_serializing_if = "Option::is_none")]
+    pub x5t_s256: Option<String>,
 }
 
 impl Jwk {
     pub fn new(key: JwkKeyType) -> Self {
         Jwk {
             key,
-            algorithm: None,
-            pub_key_use: None,
-            key_operations: None,
-            key_id: None,
-            x509_url: None,
-            x509_chain: None,
-            x509_sha1_thumbprint: None,
-            x509_sha256_thumbprint: None,
+            alg: None,
+            key_use: None,
+            key_ops: None,
+            kid: None,
+            x5u: None,
+            x5c: None,
+            x5t: None,
+            x5t_s256: None,
         }
     }
 
@@ -180,6 +248,12 @@ impl Jwk {
                 let spki = SubjectPublicKeyInfo::new_rsa_key(rsa.modulus()?.into(), rsa.public_exponent()?.into());
                 Ok(spki.into())
             }
+            JwkKeyType::Ec => Err(JwkError::UnsupportedAlgorithm {
+                algorithm: "elliptic curves",
+            }),
+            JwkKeyType::Oct => Err(JwkError::UnsupportedAlgorithm {
+                algorithm: "octet sequence",
+            }),
         }
     }
 }
@@ -226,6 +300,7 @@ impl JwkPublicRsaKey {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::jose::jws::JwsAlg;
 
     const RSA_MODULUS: &str = "rpJjxW0nNZiq1mPC3ZAxqf9qNjmKurP7XuKrpWrfv3IOUldqChQVPNg8zCvDOMZIO-ZDuRmVH\
                                EZ5E1vz5auHNACnpl6AvDGJ-4qyX42vfUDMNZx8i86d7bQpwJkO_MVMLj8qMGmTVbQ8zqVw2z\
@@ -302,11 +377,11 @@ mod tests {
     fn get_jwk_set() -> JwkSet {
         JwkSet {
             keys: vec![Jwk {
-                algorithm: Some(SignatureHashType::RsaSha256),
-                key_operations: Some(vec![JwkKeyOps::Verify]),
-                key_id: Some("bG9naW4uZGV2b2x1dGlvbnMuY29tIFRva2VuLk1hciAxMyAxMzoxNTozNSAyMDE5IEdNVA".to_owned()),
-                x509_sha1_thumbprint: Some(X509_SHA1_THUMBPRINT.to_owned()),
-                x509_chain: Some(vec![
+                alg: Some(Jwa::Sig(JwsAlg::RS256)),
+                key_ops: Some(vec![JwkKeyOps::Verify]),
+                kid: Some("bG9naW4uZGV2b2x1dGlvbnMuY29tIFRva2VuLk1hciAxMyAxMzoxNTozNSAyMDE5IEdNVA".to_owned()),
+                x5t: Some(X509_SHA1_THUMBPRINT.to_owned()),
+                x5c: Some(vec![
                     X509_CERT_0.to_owned(),
                     X509_CERT_1.to_owned(),
                     X509_CERT_2.to_owned(),

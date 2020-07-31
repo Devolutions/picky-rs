@@ -1,11 +1,12 @@
 use crate::{
+    hash::HashAlgorithm,
     key::{PrivateKey, PublicKey},
     pem::Pem,
-    signature::{SignatureError, SignatureHashType},
+    signature::{SignatureAlgorithm, SignatureError},
     x509::{
         csr::{Csr, CsrError},
         date::UTCDate,
-        key_id_gen_method::{KeyIdGenError, KeyIdGenMethod, KeyIdHashAlgo},
+        key_id_gen_method::{KeyIdGenError, KeyIdGenMethod},
         name::{DirectoryName, GeneralNames},
     },
 };
@@ -469,7 +470,7 @@ impl<'a, 'b, Chain: Iterator<Item = &'b Cert>> CertValidator<'a, 'b, Chain> {
             parent_cert.is_parent_of(current_cert)?;
 
             // validate current cert signature using parent public key
-            let hash_type = SignatureHashType::from_algorithm_identifier(&current_cert.0.signature_algorithm)
+            let hash_type = SignatureAlgorithm::from_algorithm_identifier(&current_cert.0.signature_algorithm)
                 .map_err(|e| CertError::Signature { source: e })?;
             let public_key = &parent_cert.0.tbs_certificate.subject_public_key_info;
             let msg = picky_asn1_der::to_vec(&current_cert.0.tbs_certificate)
@@ -580,7 +581,7 @@ struct CertificateBuilderInner<'a> {
     authority_key_identifier: Option<Vec<u8>>,
     ca: Option<bool>,
     pathlen: Option<u8>,
-    signature_hash_type: Option<SignatureHashType>,
+    signature_hash_type: Option<SignatureAlgorithm>,
     key_id_gen_method: Option<KeyIdGenMethod>,
     key_usage: Option<KeyUsage>,
     extended_key_usage: Option<ExtendedKeyUsage>,
@@ -682,7 +683,7 @@ impl<'a> CertificateBuilder<'a> {
 
     /// Optional
     #[inline]
-    pub fn signature_hash_type(&self, signature_hash_type: SignatureHashType) -> &Self {
+    pub fn signature_hash_type(&self, signature_hash_type: SignatureAlgorithm) -> &Self {
         self.inner.borrow_mut().signature_hash_type = Some(signature_hash_type);
         self
     }
@@ -732,12 +733,15 @@ impl<'a> CertificateBuilder<'a> {
             arg: field_str!(valid_to),
         })?;
 
-        let signature_hash_type = inner.signature_hash_type.take().unwrap_or(SignatureHashType::RsaSha256);
+        let signature_hash_type = inner
+            .signature_hash_type
+            .take()
+            .unwrap_or(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256));
 
         let key_id_gen_method = inner
             .key_id_gen_method
             .take()
-            .unwrap_or(KeyIdGenMethod::SPKFullDER(KeyIdHashAlgo::Sha256));
+            .unwrap_or(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_256));
 
         let issuer_infos = inner.issuer_infos.take().ok_or(CertError::MissingBuilderArgument {
             arg: field_str!(issuer_infos),
@@ -955,8 +959,8 @@ mod tests {
             .valididy(UTCDate::ymd(2065, 6, 15).unwrap(), UTCDate::ymd(2070, 6, 15).unwrap())
             .self_signed(DirectoryName::new_common_name("TheFuture.usodakedo Root CA"), &root_key)
             .ca(true)
-            .signature_hash_type(SignatureHashType::RsaSha512)
-            .key_id_gen_method(KeyIdGenMethod::SPKFullDER(KeyIdHashAlgo::Sha384))
+            .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_512))
+            .key_id_gen_method(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_384))
             .build()
             .expect("couldn't build root ca");
         assert_eq!(root.ty(), CertType::Root);
@@ -968,8 +972,8 @@ mod tests {
                 intermediate_key.to_public_key(),
             )
             .issuer_cert(&root, &root_key)
-            .signature_hash_type(SignatureHashType::RsaSha224)
-            .key_id_gen_method(KeyIdGenMethod::SPKValueHashedLeftmost160(KeyIdHashAlgo::Sha1))
+            .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_224))
+            .key_id_gen_method(KeyIdGenMethod::SPKValueHashedLeftmost160(HashAlgorithm::SHA1))
             .ca(true)
             .pathlen(0)
             .build()
@@ -979,7 +983,7 @@ mod tests {
         let csr = Csr::generate(
             DirectoryName::new_common_name("ChillingInTheFuture.usobakkari"),
             &leaf_key,
-            SignatureHashType::RsaSha1,
+            SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA1),
         )
         .unwrap();
 
@@ -987,8 +991,8 @@ mod tests {
             .valididy(UTCDate::ymd(2069, 1, 1).unwrap(), UTCDate::ymd(2072, 1, 1).unwrap())
             .subject_from_csr(csr)
             .issuer_cert(&intermediate, &intermediate_key)
-            .signature_hash_type(SignatureHashType::RsaSha384)
-            .key_id_gen_method(KeyIdGenMethod::SPKFullDER(KeyIdHashAlgo::Sha512))
+            .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_384))
+            .key_id_gen_method(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_512))
             .pathlen(0) // not meaningful in non-CA certificates
             .build()
             .expect("couldn't build signed leaf");
@@ -1115,8 +1119,8 @@ mod tests {
             .self_signed(DirectoryName::new_common_name("VerySafe Root CA"), &root_key)
             .ca(true)
             .pathlen(1)
-            .signature_hash_type(SignatureHashType::RsaSha1)
-            .key_id_gen_method(KeyIdGenMethod::SPKFullDER(KeyIdHashAlgo::Sha224))
+            .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA1))
+            .key_id_gen_method(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_224))
             .build()
             .expect("couldn't build root ca");
 
@@ -1127,8 +1131,8 @@ mod tests {
                 intermediate_key.to_public_key(),
             )
             .issuer_cert(&root, &malicious_root_key)
-            .signature_hash_type(SignatureHashType::RsaSha512)
-            .key_id_gen_method(KeyIdGenMethod::SPKValueHashedLeftmost160(KeyIdHashAlgo::Sha384))
+            .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_512))
+            .key_id_gen_method(KeyIdGenMethod::SPKValueHashedLeftmost160(HashAlgorithm::SHA2_384))
             .ca(true)
             .pathlen(0)
             .build()
@@ -1137,7 +1141,7 @@ mod tests {
         let csr = Csr::generate(
             DirectoryName::new_common_name("I Trust This V.E.R.Y Legitimate Intermediate Certificate"),
             &leaf_key,
-            SignatureHashType::RsaSha1,
+            SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA1),
         )
         .unwrap();
 
@@ -1145,8 +1149,8 @@ mod tests {
             .valididy(UTCDate::ymd(2069, 1, 1).unwrap(), UTCDate::ymd(2072, 1, 1).unwrap())
             .subject_from_csr(csr)
             .issuer_cert(&intermediate, &intermediate_key)
-            .signature_hash_type(SignatureHashType::RsaSha224)
-            .key_id_gen_method(KeyIdGenMethod::SPKFullDER(KeyIdHashAlgo::Sha384))
+            .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_224))
+            .key_id_gen_method(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_384))
             .build()
             .expect("couldn't build signed leaf");
 
@@ -1204,7 +1208,7 @@ mod tests {
         let csr = Csr::generate(
             DirectoryName::new_common_name("I Trust This V.E.R.Y Legitimate Intermediate Certificate"),
             &leaf_key,
-            SignatureHashType::RsaSha1,
+            SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA1),
         )
         .unwrap();
 

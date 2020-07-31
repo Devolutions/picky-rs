@@ -1,7 +1,11 @@
+//! Wrappers around public and private keys raw data providing an easy to use API
+
 use crate::pem::{to_pem, Pem};
-use picky_asn1::wrapper::{IntegerAsn1, OctetStringAsn1Container};
+use core::convert::TryFrom;
+use picky_asn1::wrapper::{BitStringAsn1Container, IntegerAsn1, OctetStringAsn1Container};
 use picky_asn1_der::Asn1DerError;
-use picky_asn1_x509::{PrivateKeyInfo, PrivateKeyValue, SubjectPublicKeyInfo};
+use picky_asn1_x509::{private_key_info, PrivateKeyInfo, PrivateKeyValue, SubjectPublicKeyInfo};
+use rsa::{BigUint, RSAPrivateKey, RSAPublicKey};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -27,6 +31,10 @@ pub enum KeyError {
     /// invalid PEM label error
     #[error("invalid PEM label: {label}")]
     InvalidPemLabel { label: String },
+
+    /// unsupported algorithm
+    #[error("unsupported algorithm: {algorithm}")]
+    UnsupportedAlgorithm { algorithm: &'static str },
 }
 
 impl From<rsa::errors::Error> for KeyError {
@@ -62,6 +70,39 @@ impl From<PrivateKey> for SubjectPublicKeyInfo {
                 let (modulus, public_exponent) = key.into_public_components();
                 SubjectPublicKeyInfo::new_rsa_key(modulus, public_exponent)
             }
+        }
+    }
+}
+
+impl TryFrom<&'_ PrivateKey> for RSAPrivateKey {
+    type Error = KeyError;
+
+    fn try_from(v: &PrivateKey) -> Result<Self, Self::Error> {
+        match &v.as_inner().private_key {
+            private_key_info::PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => {
+                Ok(RSAPrivateKey::from_components(
+                    BigUint::from_bytes_be(key.modulus().as_unsigned_bytes_be()),
+                    BigUint::from_bytes_be(key.public_exponent().as_unsigned_bytes_be()),
+                    BigUint::from_bytes_be(key.private_exponent().as_unsigned_bytes_be()),
+                    key.primes()
+                        .iter()
+                        .map(|p| BigUint::from_bytes_be(p.as_unsigned_bytes_be()))
+                        .collect(),
+                ))
+            }
+        }
+    }
+}
+
+impl TryFrom<&'_ PrivateKey> for RSAPublicKey {
+    type Error = KeyError;
+
+    fn try_from(v: &PrivateKey) -> Result<Self, Self::Error> {
+        match &v.as_inner().private_key {
+            private_key_info::PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => Ok(RSAPublicKey::new(
+                BigUint::from_bytes_be(key.modulus().as_unsigned_bytes_be()),
+                BigUint::from_bytes_be(key.public_exponent().as_unsigned_bytes_be()),
+            )?),
         }
     }
 }
@@ -124,7 +165,7 @@ impl PrivateKey {
     /// **Beware**: this is insanely slow in debug builds.
     pub fn generate_rsa(bits: usize) -> Result<Self, KeyError> {
         use rand::rngs::OsRng;
-        use rsa::{PublicKey, RSAPrivateKey};
+        use rsa::PublicKeyParts;
 
         let key = RSAPrivateKey::new(&mut OsRng, bits)?;
         let modulus = IntegerAsn1::from_signed_bytes_be(key.n().to_bytes_be());
@@ -205,6 +246,24 @@ impl AsRef<PublicKey> for PublicKey {
     }
 }
 
+impl TryFrom<&'_ PublicKey> for RSAPublicKey {
+    type Error = KeyError;
+
+    fn try_from(v: &PublicKey) -> Result<Self, Self::Error> {
+        use picky_asn1_x509::PublicKey as InnerPublicKey;
+
+        match &v.as_inner().subject_public_key {
+            InnerPublicKey::RSA(BitStringAsn1Container(key)) => Ok(RSAPublicKey::new(
+                BigUint::from_bytes_be(key.modulus.as_unsigned_bytes_be()),
+                BigUint::from_bytes_be(key.public_exponent.as_unsigned_bytes_be()),
+            )?),
+            InnerPublicKey::EC(_) => Err(KeyError::UnsupportedAlgorithm {
+                algorithm: "elliptic curves",
+            }),
+        }
+    }
+}
+
 impl PublicKey {
     pub fn to_der(&self) -> Result<Vec<u8>, KeyError> {
         picky_asn1_der::to_vec(&self.0).map_err(|e| KeyError::Asn1Serialization {
@@ -259,7 +318,7 @@ impl PublicKey {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::signature::SignatureHashType;
+    use crate::{hash::HashAlgorithm, signature::SignatureAlgorithm};
 
     // Generating RSA keys in debug is very slow. Therefore, this test only run in release mode.
     cfg_if::cfg_if! { if #[cfg(not(debug_assertions))] {
@@ -366,9 +425,9 @@ mod tests {
 
         let pem = pem_str.parse::<Pem>().expect("pem");
         let pk = PrivateKey::from_pem(&pem).expect("private key");
-        let signed_rsa = SignatureHashType::RsaSha256.sign(MSG, &pk).expect("rsa sign");
-        SignatureHashType::RsaSha256
-            .verify(&pk.to_public_key(), MSG, &signed_rsa)
+        let algo = SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256);
+        let signed_rsa = algo.sign(MSG, &pk).expect("rsa sign");
+        algo.verify(&pk.to_public_key(), MSG, &signed_rsa)
             .expect("rsa verify rsa");
 
         println!("Success!");

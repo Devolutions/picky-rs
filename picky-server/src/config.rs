@@ -2,9 +2,10 @@ use crate::utils::PathOr;
 use clap::App;
 use log::LevelFilter;
 use picky::{
+    hash::HashAlgorithm,
     key::{PrivateKey, PublicKey},
     pem::Pem,
-    signature::SignatureHashType,
+    signature::SignatureAlgorithm,
     x509::Cert,
 };
 use serde::{Deserialize, Serialize};
@@ -59,8 +60,8 @@ const fn default_log_level() -> LevelFilter {
     LevelFilter::Info
 }
 
-const fn default_signing_algorithm() -> SignatureHashType {
-    SignatureHashType::RsaSha256
+const fn default_signing_algorithm() -> SignatureAlgorithm {
+    SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256)
 }
 
 fn parse_level_filter(s: &str) -> LevelFilter {
@@ -114,7 +115,7 @@ pub struct Config {
     #[serde(default = "default_log_level")]
     pub log_level: LevelFilter,
     #[serde(default = "default_signing_algorithm")]
-    pub signing_algorithm: SignatureHashType,
+    pub signing_algorithm: SignatureAlgorithm,
 
     #[serde(default)]
     pub backend: BackendType,

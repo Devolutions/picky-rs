@@ -1,7 +1,7 @@
 use crate::{
     key::{PrivateKey, PublicKey},
     pem::Pem,
-    signature::{SignatureError, SignatureHashType},
+    signature::{SignatureAlgorithm, SignatureError},
     x509::name::DirectoryName,
 };
 use picky_asn1::bit_string::BitString;
@@ -79,7 +79,7 @@ impl Csr {
     pub fn generate(
         subject: DirectoryName,
         private_key: &PrivateKey,
-        signature_hash_type: SignatureHashType,
+        signature_hash_type: SignatureAlgorithm,
     ) -> Result<Self, CsrError> {
         let info = CertificationRequestInfo::new(subject.into(), private_key.to_public_key().into());
         let info_der = picky_asn1_der::to_vec(&info).map_err(|e| CsrError::Asn1Serialization {
@@ -115,7 +115,7 @@ impl Csr {
     }
 
     pub fn verify(&self) -> Result<(), CsrError> {
-        let hash_type = SignatureHashType::from_algorithm_identifier(&self.0.signature_algorithm)
+        let hash_type = SignatureAlgorithm::from_algorithm_identifier(&self.0.signature_algorithm)
             .map_err(|e| CsrError::Signature { source: e })?;
 
         let public_key = &self.0.certification_request_info.subject_public_key_info;
