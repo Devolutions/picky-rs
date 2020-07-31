@@ -1,7 +1,8 @@
 use crate::{
+    hash::HashAlgorithm,
     http::http_request::{HttpRequest, HttpRequestError},
     key::{PrivateKey, PublicKey},
-    signature::{SignatureError, SignatureHashType},
+    signature::{SignatureAlgorithm, SignatureError},
 };
 use base64::{DecodeError, URL_SAFE_NO_PAD};
 use std::{
@@ -64,7 +65,7 @@ pub enum HttpSignatureError {
 
     /// incompatible 'algorithm' parameter with provided signature verification method
     #[error("incompatible 'algorithm' parameter: {value:?}")]
-    IncompatibleAlgorithm { value: SignatureHashType },
+    IncompatibleAlgorithm { value: SignatureAlgorithm },
 }
 
 impl From<DecodeError> for HttpSignatureError {
@@ -136,11 +137,50 @@ impl From<&str> for Header {
     }
 }
 
+// === signature algorithm === //
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub enum HttpSigAlgorithm {
+    Known(SignatureAlgorithm),
+    Custom(String),
+}
+
+impl HttpSigAlgorithm {
+    pub fn as_known(&self) -> Option<SignatureAlgorithm> {
+        if let Self::Known(algo) = self {
+            Some(*algo)
+        } else {
+            None
+        }
+    }
+
+    pub fn is_known(&self) -> bool {
+        self.as_known().is_some()
+    }
+
+    pub fn as_custom(&self) -> Option<&str> {
+        if let Self::Custom(name) = self {
+            Some(name.as_str())
+        } else {
+            None
+        }
+    }
+
+    pub fn is_custom(&self) -> bool {
+        self.as_custom().is_some()
+    }
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Known(algo) => to_http_sig_algo_str(*algo),
+            Self::Custom(name) => &name,
+        }
+    }
+}
+
 // === http signature ===
 
 /// Contains signature parameters.
-///
-/// This doesn't support `algorithm` signature parameter.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct HttpSignature {
     /// An opaque string that the server can
@@ -165,7 +205,7 @@ pub struct HttpSignature {
     /// NOT be processed.
     pub expires: Option<u64>,
 
-    /// Base 64 encoded digital signature, as described in RFC 4648, Section 4.  The
+    /// Base 64 encoded digital signature, as described in RFC4648, Section 4.  The
     /// client uses the `algorithm` and `headers` signature parameters to
     /// form a canonicalized `signing string`.  This `signing string` is then
     /// signed with the key associated with `key_id` and the algorithm
@@ -181,7 +221,7 @@ pub struct HttpSignature {
     /// MUST produce an error.
     /// Note: as of draft 12 there is only one signature string construction mechanism. As such
     /// this parameter is only used to hint the digital signature algorithm.
-    pub algorithm: Option<SignatureHashType>,
+    pub algorithm: Option<HttpSigAlgorithm>,
 
     legacy: bool,
 }
@@ -218,12 +258,18 @@ impl ToString for HttpSignature {
                 HTTP_SIGNATURE_HEADER, HTTP_SIGNATURE_KEY_ID, self.key_id
             ));
 
-            if let Some(algorithm) = self.algorithm {
-                acc.push(format!(
-                    "{}=\"{}\"",
-                    HTTP_SIGNATURE_ALGORITHM,
-                    to_http_sig_algo_str(algorithm)
-                ));
+            match &self.algorithm {
+                Some(HttpSigAlgorithm::Custom(algorithm_name)) => {
+                    acc.push(format!("{}=\"{}\"", HTTP_SIGNATURE_ALGORITHM, algorithm_name));
+                }
+                Some(HttpSigAlgorithm::Known(algorithm)) => {
+                    acc.push(format!(
+                        "{}=\"{}\"",
+                        HTTP_SIGNATURE_ALGORITHM,
+                        to_http_sig_algo_str(*algorithm)
+                    ));
+                }
+                None => {}
             }
         }
 
@@ -319,9 +365,13 @@ impl FromStr for HttpSignature {
             None
         };
 
-        let algorithm = keys
-            .remove(HTTP_SIGNATURE_ALGORITHM)
-            .and_then(|val| from_http_sig_algo_str(&val));
+        let algorithm = keys.remove(HTTP_SIGNATURE_ALGORITHM).map(|val| {
+            if let Some(algo) = from_http_sig_algo_str(&val) {
+                HttpSigAlgorithm::Known(algo)
+            } else {
+                HttpSigAlgorithm::Custom(val)
+            }
+        });
 
         let signature =
             keys.remove(HTTP_SIGNATURE_SIGNATURE)
@@ -380,7 +430,7 @@ impl<'a> Debug for SigningStringGenMethod<'a> {
 #[derive(Default, Clone, Debug)]
 struct HttpSignatureBuilderInner<'a> {
     key_id: Option<String>,
-    signature_method: Option<(&'a PrivateKey, SignatureHashType)>,
+    signature_method: Option<(&'a PrivateKey, SignatureAlgorithm)>,
     created: Option<u64>,
     expires: Option<u64>,
     headers: Vec<Header>,
@@ -408,7 +458,7 @@ impl<'a> HttpSignatureBuilder<'a> {
 
     #[inline]
     /// Required
-    pub fn signature_method(&self, private_key: &'a PrivateKey, signature_type: SignatureHashType) -> &Self {
+    pub fn signature_method(&self, private_key: &'a PrivateKey, signature_type: SignatureAlgorithm) -> &Self {
         self.inner.borrow_mut().signature_method = Some((private_key, signature_type));
         self
     }
@@ -591,7 +641,7 @@ impl<'a> HttpSignatureBuilder<'a> {
             } else {
                 base64::encode(&signature_binary)
             },
-            algorithm: Some(signature_type),
+            algorithm: Some(HttpSigAlgorithm::Known(signature_type)),
             legacy,
         })
     }
@@ -615,7 +665,7 @@ macro_rules! verifier_argument_missing_err {
 struct HttpSignatureVerifierInner<'a> {
     now: Option<u64>,
     leeway: u64,
-    signature_method: Option<(&'a PublicKey, SignatureHashType)>,
+    signature_method: Option<(&'a PublicKey, SignatureAlgorithm)>,
     signing_string_generation: Option<SigningStringGenMethod<'a>>,
 }
 
@@ -643,7 +693,7 @@ impl<'a> HttpSignatureVerifier<'a> {
 
     #[inline]
     /// Required
-    pub fn signature_method(&self, public_key: &'a PublicKey, signature_type: SignatureHashType) -> &Self {
+    pub fn signature_method(&self, public_key: &'a PublicKey, signature_type: SignatureAlgorithm) -> &Self {
         self.inner.borrow_mut().signature_method = Some((public_key, signature_type));
         self
     }
@@ -673,7 +723,7 @@ impl<'a> HttpSignatureVerifier<'a> {
         };
 
         // Sanity checks based on optional http signature parameter "algorithm"
-        if let Some(http_sig_algo) = self.http_signature.algorithm {
+        if let Some(HttpSigAlgorithm::Known(http_sig_algo)) = self.http_signature.algorithm {
             if http_sig_algo != signature_type || !is_algo_compatible_with_key(http_sig_algo, public_key) {
                 return Err(HttpSignatureError::IncompatibleAlgorithm { value: http_sig_algo });
             }
@@ -770,33 +820,53 @@ impl<'a> HttpSignatureVerifier<'a> {
 // === http signature algorithms === //
 
 const HTTP_SIG_ALGO_RSA_SHA_1: &str = "rsa-sha1";
+
 const HTTP_SIG_ALGO_RSA_SHA_224: &str = "rsa-sha224";
 const HTTP_SIG_ALGO_RSA_SHA_256: &str = "rsa-sha256";
 const HTTP_SIG_ALGO_RSA_SHA_384: &str = "rsa-sha384";
 const HTTP_SIG_ALGO_RSA_SHA_512: &str = "rsa-sha512";
+const HTTP_SIG_ALGO_RSA_SHA2_224: &str = "rsa-sha2-224";
+const HTTP_SIG_ALGO_RSA_SHA2_256: &str = "rsa-sha2-256";
+const HTTP_SIG_ALGO_RSA_SHA2_384: &str = "rsa-sha2-384";
+const HTTP_SIG_ALGO_RSA_SHA2_512: &str = "rsa-sha2-512";
 
-fn to_http_sig_algo_str(algo: SignatureHashType) -> &'static str {
+const HTTP_SIG_ALGO_RSA_SHA3_384: &str = "rsa-sha3-384";
+const HTTP_SIG_ALGO_RSA_SHA3_512: &str = "rsa-sha3-512";
+
+fn to_http_sig_algo_str(algo: SignatureAlgorithm) -> &'static str {
     match algo {
-        SignatureHashType::RsaSha1 => HTTP_SIG_ALGO_RSA_SHA_1,
-        SignatureHashType::RsaSha224 => HTTP_SIG_ALGO_RSA_SHA_224,
-        SignatureHashType::RsaSha256 => HTTP_SIG_ALGO_RSA_SHA_256,
-        SignatureHashType::RsaSha384 => HTTP_SIG_ALGO_RSA_SHA_384,
-        SignatureHashType::RsaSha512 => HTTP_SIG_ALGO_RSA_SHA_512,
+        SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA1) => HTTP_SIG_ALGO_RSA_SHA_1,
+        SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_224) => HTTP_SIG_ALGO_RSA_SHA_224,
+        SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256) => HTTP_SIG_ALGO_RSA_SHA_256,
+        SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_384) => HTTP_SIG_ALGO_RSA_SHA_384,
+        SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_512) => HTTP_SIG_ALGO_RSA_SHA_512,
+        SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA3_384) => HTTP_SIG_ALGO_RSA_SHA3_384,
+        SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA3_512) => HTTP_SIG_ALGO_RSA_SHA3_512,
     }
 }
 
-fn from_http_sig_algo_str(s: &str) -> Option<SignatureHashType> {
+fn from_http_sig_algo_str(s: &str) -> Option<SignatureAlgorithm> {
     match s {
-        HTTP_SIG_ALGO_RSA_SHA_1 => Some(SignatureHashType::RsaSha1),
-        HTTP_SIG_ALGO_RSA_SHA_224 => Some(SignatureHashType::RsaSha224),
-        HTTP_SIG_ALGO_RSA_SHA_256 => Some(SignatureHashType::RsaSha256),
-        HTTP_SIG_ALGO_RSA_SHA_384 => Some(SignatureHashType::RsaSha384),
-        HTTP_SIG_ALGO_RSA_SHA_512 => Some(SignatureHashType::RsaSha512),
+        HTTP_SIG_ALGO_RSA_SHA_1 => Some(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA1)),
+        HTTP_SIG_ALGO_RSA_SHA_224 | HTTP_SIG_ALGO_RSA_SHA2_224 => {
+            Some(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_224))
+        }
+        HTTP_SIG_ALGO_RSA_SHA_256 | HTTP_SIG_ALGO_RSA_SHA2_256 => {
+            Some(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256))
+        }
+        HTTP_SIG_ALGO_RSA_SHA_384 | HTTP_SIG_ALGO_RSA_SHA2_384 => {
+            Some(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_384))
+        }
+        HTTP_SIG_ALGO_RSA_SHA_512 | HTTP_SIG_ALGO_RSA_SHA2_512 => {
+            Some(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_512))
+        }
+        HTTP_SIG_ALGO_RSA_SHA3_384 => Some(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA3_384)),
+        HTTP_SIG_ALGO_RSA_SHA3_512 => Some(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA3_512)),
         _ => None,
     }
 }
 
-fn is_algo_compatible_with_key(algo: SignatureHashType, key: &PublicKey) -> bool {
+fn is_algo_compatible_with_key(algo: SignatureAlgorithm, key: &PublicKey) -> bool {
     use picky_asn1_x509::oids::*;
 
     let key_algo = Into::<String>::into(key.as_inner().algorithm.oid());
@@ -805,11 +875,17 @@ fn is_algo_compatible_with_key(algo: SignatureHashType, key: &PublicKey) -> bool
         _ if key_algo == RSA_ENCRYPTION => true,
 
         // Otherwise we need to check for specific hash algorithm
-        SignatureHashType::RsaSha1 if key_algo == SHA1_WITH_RSA_ENCRYPTION => true,
-        SignatureHashType::RsaSha224 if key_algo == SHA224_WITH_RSA_ENCRYPTION => true,
-        SignatureHashType::RsaSha256 if key_algo == SHA256_WITH_RSA_ENCRYPTION => true,
-        SignatureHashType::RsaSha384 if key_algo == SHA384_WITH_RSA_ENCRYPTION => true,
-        SignatureHashType::RsaSha512 if key_algo == SHA512_WITH_RSA_ENCRYPTION => true,
+        SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA1) if key_algo == SHA1_WITH_RSA_ENCRYPTION => true,
+        SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_224) if key_algo == SHA224_WITH_RSA_ENCRYPTION => true,
+        SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256) if key_algo == SHA256_WITH_RSA_ENCRYPTION => true,
+        SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_384) if key_algo == SHA384_WITH_RSA_ENCRYPTION => true,
+        SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_512) if key_algo == SHA512_WITH_RSA_ENCRYPTION => true,
+        SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA3_384) if key_algo == ID_RSASSA_PKCS1_V1_5_WITH_SHA3_384 => {
+            true
+        }
+        SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA3_512) if key_algo == ID_RSASSA_PKCS1_V1_5_WITH_SHA3_512 => {
+            true
+        }
 
         // Key metadata is incompatible with this algorithm
         _ => false,
@@ -855,7 +931,7 @@ mod tests {
         let http_signature_builder = HttpSignatureBuilder::new();
         http_signature_builder
             .key_id("my-rsa-key")
-            .signature_method(&private_key, SignatureHashType::RsaSha256)
+            .signature_method(&private_key, SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256))
             .request_target()
             .created(1402170695)
             .http_header("Date");
@@ -918,7 +994,10 @@ mod tests {
             http_signature
                 .verifier()
                 .now(1402170700)
-                .signature_method(&private_key_1().to_public_key(), SignatureHashType::RsaSha256)
+                .signature_method(
+                    &private_key_1().to_public_key(),
+                    SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256),
+                )
                 .generate_signing_string_using_http_request(&parts)
                 .verify()
                 .expect("couldn't verify");
@@ -937,7 +1016,10 @@ mod tests {
 
         let http_signature = HttpSignatureBuilder::new()
             .key_id("my-rsa-key")
-            .signature_method(&private_key_1(), SignatureHashType::RsaSha256)
+            .signature_method(
+                &private_key_1(),
+                SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256),
+            )
             .request_target()
             .created(1402170695)
             .expires(1402170705)
@@ -949,7 +1031,10 @@ mod tests {
         let err = http_signature
             .verifier()
             .now(1402170700)
-            .signature_method(&private_key_2().to_public_key(), SignatureHashType::RsaSha256)
+            .signature_method(
+                &private_key_2().to_public_key(),
+                SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256),
+            )
             .generate_signing_string_using_http_request(&parts)
             .verify()
             .err()
@@ -959,17 +1044,26 @@ mod tests {
         let err = http_signature
             .verifier()
             .now(1402170700)
-            .signature_method(&private_key_1().to_public_key(), SignatureHashType::RsaSha1)
+            .signature_method(
+                &private_key_1().to_public_key(),
+                SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA1),
+            )
             .generate_signing_string_using_http_request(&parts)
             .verify()
             .err()
             .expect("verify");
-        assert_eq!(err.to_string(), "incompatible \'algorithm\' parameter: RsaSha256");
+        assert_eq!(
+            err.to_string(),
+            "incompatible \'algorithm\' parameter: RsaPkcs1v15(SHA2_256)"
+        );
 
         let err = http_signature
             .verifier()
             .now(1402170710)
-            .signature_method(&private_key_1().to_public_key(), SignatureHashType::RsaSha256)
+            .signature_method(
+                &private_key_1().to_public_key(),
+                SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256),
+            )
             .generate_signing_string_using_http_request(&parts)
             .verify()
             .err()
@@ -982,7 +1076,10 @@ mod tests {
         let err = http_signature
             .verifier()
             .now(1402170600)
-            .signature_method(&private_key_1().to_public_key(), SignatureHashType::RsaSha256)
+            .signature_method(
+                &private_key_1().to_public_key(),
+                SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256),
+            )
             .generate_signing_string_using_http_request(&parts)
             .verify()
             .err()
@@ -1003,7 +1100,10 @@ mod tests {
         let err = http_signature
             .verifier()
             .now(1402170700)
-            .signature_method(&private_key_1().to_public_key(), SignatureHashType::RsaSha256)
+            .signature_method(
+                &private_key_1().to_public_key(),
+                SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256),
+            )
             .generate_signing_string_using_http_request(&parts_2)
             .verify()
             .err()
@@ -1015,7 +1115,10 @@ mod tests {
         let err = invalid_algorithm_http_sig
             .verifier()
             .now(1402170700)
-            .signature_method(&private_key_1().to_public_key(), SignatureHashType::RsaSha1)
+            .signature_method(
+                &private_key_1().to_public_key(),
+                SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA1),
+            )
             .generate_signing_string_using_http_request(&parts)
             .verify()
             .err()
@@ -1028,7 +1131,10 @@ mod tests {
         let signing_string = "get /foo\n(created): 1402170695\ndate: Tue, 07 Jun 2014 20:51:35 GMT";
         let http_signature = HttpSignatureBuilder::new()
             .key_id("my-rsa-key")
-            .signature_method(&private_key_1(), SignatureHashType::RsaSha256)
+            .signature_method(
+                &private_key_1(),
+                SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256),
+            )
             .pre_generated_signing_string(signing_string)
             .build()
             .expect("couldn't generate http signature using pre-generated signing string");
@@ -1043,7 +1149,10 @@ mod tests {
         http_signature
             .verifier()
             .now(1402170700)
-            .signature_method(&private_key_1().to_public_key(), SignatureHashType::RsaSha256)
+            .signature_method(
+                &private_key_1().to_public_key(),
+                SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256),
+            )
             .pre_generated_signing_string(signing_string)
             .verify()
             .expect("couldn't verify");
@@ -1057,7 +1166,10 @@ mod tests {
             .verifier()
             .now(1402170690)
             .leeway(10)
-            .signature_method(&private_key_1().to_public_key(), SignatureHashType::RsaSha256)
+            .signature_method(
+                &private_key_1().to_public_key(),
+                SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256),
+            )
             .pre_generated_signing_string(signing_string)
             .verify()
             .expect("couldn't verify");
@@ -1110,7 +1222,7 @@ mod tests {
             let private_key = private_key_1();
             let http_signature = HttpSignatureBuilder::new()
                 .key_id("my-rsa-key")
-                .signature_method(&private_key, SignatureHashType::RsaSha256)
+                .signature_method(&private_key, SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256))
                 .request_target()
                 .created(1402170695)
                 .generate_signing_string_using_http_request(&parts)
@@ -1128,7 +1240,10 @@ mod tests {
             http_signature
                 .verifier()
                 .now(1402170700)
-                .signature_method(&private_key_1().to_public_key(), SignatureHashType::RsaSha256)
+                .signature_method(
+                    &private_key_1().to_public_key(),
+                    SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256),
+                )
                 .generate_signing_string_using_http_request(&parts)
                 .verify()
                 .expect("couldn't verify");
@@ -1148,7 +1263,7 @@ mod tests {
         let private_key = private_key_1();
         let http_signature = HttpSignatureBuilder::new()
             .key_id("my-rsa-key")
-            .signature_method(&private_key, SignatureHashType::RsaSha384)
+            .signature_method(&private_key, SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_384))
             .request_target()
             .created(1402170695)
             .generate_signing_string_using_http_request(&parts)
@@ -1163,12 +1278,18 @@ mod tests {
         let err = http_signature
             .verifier()
             .now(1402170700)
-            .signature_method(&sha512_only_key, SignatureHashType::RsaSha384)
+            .signature_method(
+                &sha512_only_key,
+                SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_384),
+            )
             .generate_signing_string_using_http_request(&parts)
             .verify()
             .err()
             .expect("verify");
-        assert_eq!(err.to_string(), "incompatible 'algorithm' parameter: RsaSha384");
+        assert_eq!(
+            err.to_string(),
+            "incompatible 'algorithm' parameter: RsaPkcs1v15(SHA2_384)"
+        );
     }
 
     const HTTP_SIGNATURE_UNKNOWN_ALGO: &str = "Signature keyId=\"my-rsa-key\",algorithm=\"magical-algo\",\
@@ -1177,6 +1298,6 @@ mod tests {
     #[test]
     fn unknown_algorithms_are_ignored() {
         let http_signature = HttpSignature::from_str(HTTP_SIGNATURE_UNKNOWN_ALGO).expect("from str");
-        assert!(http_signature.algorithm.is_none());
+        assert_eq!(http_signature.algorithm.unwrap().as_str(), "magical-algo");
     }
 }

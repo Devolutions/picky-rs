@@ -1,3 +1,5 @@
+//! X.509 certificates implementation based on [RFC5280](https://tools.ietf.org/html/rfc5280)
+
 pub mod certificate;
 pub mod csr;
 pub mod date;

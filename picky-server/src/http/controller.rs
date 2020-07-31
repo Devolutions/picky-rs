@@ -111,7 +111,7 @@ impl ServerController {
     async fn cert_signature_request(&self, req: Request) -> Result<ResponseBuilder, StatusCode> {
         let (locked_subject_name, x509_duration_secs) = match check_authorization(&*self.read_conf().await, &req) {
             Ok(token) => {
-                let provider_claims: ProviderClaims = serde_json::from_value(token.into_claims()).bad_request()?;
+                let provider_claims: ProviderClaims = serde_json::from_value(token.claims).bad_request()?;
                 (provider_claims.sub, provider_claims.x509_duration_secs)
             }
             Err(e) => {
@@ -647,7 +647,8 @@ mod tests {
     use super::*;
     use crate::config::BackendType;
     use picky::{
-        signature::SignatureHashType,
+        hash::HashAlgorithm,
+        signature::SignatureAlgorithm,
         x509::{date::UTCDate, name::DirectoryName},
     };
     use tokio_test::block_on;
@@ -672,7 +673,7 @@ mod tests {
         let csr = Csr::generate(
             DirectoryName::new_common_name("Mister Bushido"),
             &pk,
-            SignatureHashType::RsaSha384,
+            SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_384),
         )
         .expect("couldn't generate csr");
 

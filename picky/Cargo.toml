@@ -2,8 +2,8 @@
 name = "picky"
 version = "5.1.1"
 authors = [
-    "jtrepanier-devolutions <jtrepanier@devolutions.net>",
     "Benoît CORTIER <benoit.cortier@fried-world.eu>",
+    "Jonathan Trepanier <jtrepanier@devolutions.net>",
     "François Dubois <fdubois@devolutions.net>",
     "Richard Markiewicz <rmarkiewicz@devolutions.net>",
 ]
@@ -28,9 +28,11 @@ http = { version = "0.2", optional = true }
 # /!\ ===== cryptography dependencies ===== /!\
 # These should be updated as soon as possible.
 # /!\ ===================================== /!\
-sha-1 = "0.9"
+sha1 = { package = "sha-1", version = "0.9" }
 sha2 = "0.9"
-rsa = "0.2"
+sha3 = "0.9"
+digest = "0.9"
+rsa = "0.3"
 rand = "0.7"
 
 [dev-dependencies]
