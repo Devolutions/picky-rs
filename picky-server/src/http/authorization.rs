@@ -3,7 +3,7 @@ use crate::{
     utils::{unix_epoch, PathOr},
 };
 use picky::{
-    jose::jws::{Jws, JwsDate, JwsValidator},
+    jose::jwt::{JwtDate, JwtSig, JwtValidator},
     key::PublicKey,
     pem::Pem,
 };
@@ -35,7 +35,7 @@ impl From<&str> for AuthorizationMethod {
     }
 }
 
-pub fn check_authorization(config: &Config, req: &Request<Body>) -> Result<Jws<serde_json::Value>, String> {
+pub fn check_authorization(config: &Config, req: &Request<Body>) -> Result<JwtSig<serde_json::Value>, String> {
     let header = match req.headers().get(header::AUTHORIZATION) {
         Some(h) => h,
         None => return Err("Authorization header is missing".to_owned()),
@@ -72,9 +72,10 @@ pub fn check_authorization(config: &Config, req: &Request<Body>) -> Result<Jws<s
                 PathOr::Some(key) => Cow::Borrowed(key),
             };
 
-            Ok(Jws::decode(
+            Ok(JwtSig::decode(
                 auth_vec[1],
-                &JwsValidator::strict(&public_key, &JwsDate::new_with_leeway(unix_epoch() as i64, 10)),
+                &public_key,
+                &JwtValidator::strict(&JwtDate::new_with_leeway(unix_epoch() as i64, 10)),
             )
             .map_err(|e| format!("couldn't validate json web token: {}", e))?)
         }
@@ -114,7 +115,7 @@ mod tests {
             nbf: unix_epoch(),
             exp: unix_epoch() + 10,
         };
-        let jwt = Jws::new(JwsAlg::RS256, claims);
+        let jwt = JwtSig::new(JwsAlg::RS256, claims);
         jwt.encode(&private_key).expect("jwt encode")
     }
 
@@ -153,7 +154,7 @@ mod tests {
         let err = check_authorization(&config, &saphir_req).err().expect("auth err");
         assert_eq!(
             err,
-            "couldn\'t validate json web token: signature error: invalid signature"
+            "couldn\'t validate json web token: JWS error: signature error: invalid signature"
         );
     }
 
