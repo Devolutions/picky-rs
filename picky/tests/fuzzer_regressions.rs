@@ -3,10 +3,7 @@
 //! This test run problematic artifacts found by fuzzing
 
 use picky::{
-    jose::{
-        jwk::Jwk,
-        jws::{Jws, JwsDate, JwsValidator},
-    },
+    jose::{jwk::Jwk, jws::Jws},
     key::{PrivateKey, PublicKey},
     pem::{parse_pem, Pem},
     x509::{certificate::Cert, csr::Csr},
@@ -45,16 +42,8 @@ fn fuzz_target(data: &[u8]) {
 
     println!("JOSE...");
     if let Ok(s) = std::str::from_utf8(data) {
-        if data.len() >= 4 {
-            let numeric_date = (data[0] as i64)
-                + (data[1] as i64) * 2_i64.pow(8)
-                + (data[2] as i64) * 2_i64.pow(16)
-                + (data[3] as i64) * 2_i64.pow(24);
-            let date = JwsDate::new(numeric_date);
-            let validator = JwsValidator::dangerous().current_date(&date);
-            let _ = Jws::<()>::decode(s, &validator);
-        }
-
+        let _ = Jws::decode_without_validation(s);
+        // TODO: Jwe
         let _ = Jwk::from_json(s);
     }
 

@@ -77,22 +77,24 @@ pub enum JweAlg {
     EcdhEsAesKeyWrap256,
 }
 
+// === JWE header === //
+
 /// `enc` header parameter values for JWE to encrypt content
 ///
 /// [JSON Web Algorithms (JWA) draft-ietf-jose-json-web-algorithms-40 #5](https://www.rfc-editor.org/rfc/rfc7518.html#section-5.1)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum JweEnc {
-    /// AES_128_CBC_HMAC_SHA_256 authenticated encryption algorithm.
+    /// AES_128_CBC_HMAC_SHA_256 authenticated encryption algorithm. (unsupported)
     ///
     /// Required by RFC
     #[serde(rename = "A128CBC-HS256")]
     Aes128CbcHmacSha256,
 
-    /// AES_192_CBC_HMAC_SHA_384 authenticated encryption algorithm.
+    /// AES_192_CBC_HMAC_SHA_384 authenticated encryption algorithm. (unsupported)
     #[serde(rename = "A192CBC-HS384")]
     Aes192CbcHmacSha384,
 
-    /// AES_256_CBC_HMAC_SHA_512 authenticated encryption algorithm.
+    /// AES_256_CBC_HMAC_SHA_512 authenticated encryption algorithm. (unsupported)
     ///
     /// Required by RFC
     #[serde(rename = "A256CBC-HS512")]
@@ -186,4 +188,22 @@ pub struct JweHeader {
     /// base64url-encoded SHA-256 thumbprint (a.k.a. digest) of the DER encoding of an X.509 certificate.
     #[serde(rename = "x5t#S256", alias = "x5t#s256", skip_serializing_if = "Option::is_none")]
     pub x5t_s256: Option<String>,
+}
+
+impl JweHeader {
+    pub fn new(alg: JweAlg, enc: JweEnc) -> Self {
+        Self {
+            alg,
+            enc,
+            jku: None,
+            jwk: None,
+            typ: None,
+            cty: None,
+            kid: None,
+            x5u: None,
+            x5c: None,
+            x5t: None,
+            x5t_s256: None,
+        }
+    }
 }

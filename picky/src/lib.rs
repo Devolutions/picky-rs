@@ -34,10 +34,10 @@ mod test_files {
     }}
 
     cfg_if::cfg_if! { if #[cfg(feature = "jose")] {
-        pub const JOSE_JWS_EXAMPLE: &str =
-            include_str!("../../test_assets/jose/jwt_example.txt");
-        pub const JOSE_JWS_WITH_EXP: &str =
-            include_str!("../../test_assets/jose/jwt_with_exp.txt");
+        pub const JOSE_JWT_SIG_EXAMPLE: &str =
+            include_str!("../../test_assets/jose/jwt_sig_example.txt");
+        pub const JOSE_JWT_SIG_WITH_EXP: &str =
+            include_str!("../../test_assets/jose/jwt_sig_with_exp.txt");
         pub const JOSE_JWK_SET: &str =
             include_str!("../../test_assets/jose/jwk_set.json");
     }}
