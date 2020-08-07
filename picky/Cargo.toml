@@ -34,6 +34,7 @@ sha3 = "0.9"
 digest = "0.9"
 rsa = "0.3"
 rand = "0.7"
+aes-gcm = { version = "0.6", optional = true }
 
 [dev-dependencies]
 num-bigint-dig = "0.6"
@@ -45,7 +46,7 @@ cfg-if = "0.1"
 default = ["x509", "jose", "http_signature", "http_trait_impl"]
 
 x509 = []
-jose = ["serde_json"]
+jose = ["serde_json", "aes-gcm"]
 http_signature = []
 
 http_trait_impl = ["http"]

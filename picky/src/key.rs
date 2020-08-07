@@ -86,6 +86,7 @@ impl TryFrom<&'_ PrivateKey> for RSAPrivateKey {
                     BigUint::from_bytes_be(key.private_exponent().as_unsigned_bytes_be()),
                     key.primes()
                         .iter()
+                        .take(2) // TODO: follow issue: https://github.com/RustCrypto/RSA/issues/58
                         .map(|p| BigUint::from_bytes_be(p.as_unsigned_bytes_be()))
                         .collect(),
                 ))
@@ -319,6 +320,7 @@ impl PublicKey {
 mod tests {
     use super::*;
     use crate::{hash::HashAlgorithm, signature::SignatureAlgorithm};
+    use rsa::PublicKeyParts;
 
     // Generating RSA keys in debug is very slow. Therefore, this test only run in release mode.
     cfg_if::cfg_if! { if #[cfg(not(debug_assertions))] {
@@ -439,5 +441,24 @@ mod tests {
         check_pk(crate::test_files::RSA_2048_PK_7);
         println!("4096 PK 3");
         check_pk(crate::test_files::RSA_4096_PK_3);
+    }
+
+    #[test]
+    fn rsa_crate_private_key_conversion() {
+        let pk_pem = crate::test_files::RSA_2048_PK_1.parse::<crate::pem::Pem>().unwrap();
+        let pk = PrivateKey::from_pem(&pk_pem).unwrap();
+        let converted_rsa_private_key = RSAPrivateKey::try_from(&pk).unwrap();
+        let expected_rsa_private_key = RSAPrivateKey::from_pkcs8(pk_pem.data()).unwrap();
+
+        assert_eq!(converted_rsa_private_key.n(), expected_rsa_private_key.n());
+        assert_eq!(converted_rsa_private_key.e(), expected_rsa_private_key.e());
+        assert_eq!(converted_rsa_private_key.d(), expected_rsa_private_key.d());
+
+        let converted_primes = converted_rsa_private_key.primes();
+        let expected_primes = expected_rsa_private_key.primes();
+        assert_eq!(converted_primes.len(), expected_primes.len());
+        for (converted_prime, expected_prime) in converted_primes.iter().zip(expected_primes.iter()) {
+            assert_eq!(converted_prime, expected_prime);
+        }
     }
 }
