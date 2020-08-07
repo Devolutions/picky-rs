@@ -1,6 +1,7 @@
+use super::jwe::Jwe;
 use crate::{
     jose::{
-        jwe::{JweAlg, JweEnc, JweHeader},
+        jwe::{JweAlg, JweEnc, JweError, JweHeader},
         jws::{Jws, JwsAlg, JwsError, JwsHeader},
     },
     key::{PrivateKey, PublicKey},
@@ -19,8 +20,8 @@ pub enum JwtError {
     Jws { source: JwsError },
 
     /// JWE error
-    //#[error("JWE error: {source}")]
-    //Jwe { source: JweError },
+    #[error("JWE error: {source}")]
+    Jwe { source: JweError },
 
     /// Json error
     #[error("JSON error: {source}")]
@@ -59,11 +60,11 @@ impl From<serde_json::Error> for JwtError {
     }
 }
 
-/*impl From<JweError> for JwtError {
+impl From<JweError> for JwtError {
     fn from(s: JweError) -> Self {
         Self::Jwe { source: s }
     }
-}*/
+}
 
 // === JWT date === //
 
@@ -122,7 +123,7 @@ pub struct JwtValidator<'a> {
     not_before_claim: CheckStrictness,
 }
 
-pub const DANGEROUS_VALIDATOR: JwtValidator<'static> = JwtValidator::dangerous();
+pub const NO_CHECK_VALIDATOR: JwtValidator<'static> = JwtValidator::no_check();
 
 impl<'a> JwtValidator<'a> {
     /// Check signature and the registered exp and nbf claims. If a claim is missing token is rejected.
@@ -144,7 +145,7 @@ impl<'a> JwtValidator<'a> {
     }
 
     /// No check.
-    pub const fn dangerous() -> Self {
+    pub const fn no_check() -> Self {
         Self {
             current_date: None,
             expiration_claim: CheckStrictness::Ignored,
@@ -157,7 +158,6 @@ impl<'a> JwtValidator<'a> {
             current_date: Some(current_date),
             expiration_claim: CheckStrictness::Required,
             not_before_claim: CheckStrictness::Required,
-            ..self
         }
     }
 
@@ -254,6 +254,10 @@ impl<C> Jwt<JwsHeader, C> {
             claims,
         }
     }
+
+    pub fn new_signed(alg: JwsAlg, claims: C) -> Self {
+        Self::new(alg, claims)
+    }
 }
 
 impl<C> Jwt<JweHeader, C> {
@@ -265,6 +269,10 @@ impl<C> Jwt<JweHeader, C> {
             },
             claims,
         }
+    }
+
+    pub fn new_encrypted(alg: JweAlg, enc: JweEnc, claims: C) -> Self {
+        Self::new(alg, enc, claims)
     }
 }
 
@@ -278,12 +286,13 @@ impl<C> Jwt<JwsHeader, C>
 where
     C: Serialize,
 {
-    pub fn encode(self, private_key: &PrivateKey) -> Result<String, JwsError> {
+    pub fn encode(self, private_key: &PrivateKey) -> Result<String, JwtError> {
         let jws = Jws {
             header: self.header,
             payload: serde_json::to_vec(&self.claims)?,
         };
-        jws.encode(private_key)
+        let encoded = jws.encode(private_key)?;
+        Ok(encoded)
     }
 }
 
@@ -296,7 +305,7 @@ where
         let jws = Jws::decode(encoded_token, public_key)?;
         Ok(Jwt {
             header: jws.header,
-            claims: h_decode_check_claims(&jws.payload, validator)?,
+            claims: h_decode_and_validate_claims(&jws.payload, validator)?,
         })
     }
 
@@ -305,12 +314,63 @@ where
         let jws = Jws::decode_without_validation(encoded_token)?;
         Ok(Jwt {
             header: jws.header,
-            claims: h_decode_check_claims(&jws.payload, validator)?,
+            claims: h_decode_and_validate_claims(&jws.payload, validator)?,
         })
     }
 }
 
-fn h_decode_check_claims<C: DeserializeOwned>(claims_json: &[u8], validator: &JwtValidator) -> Result<C, JwtError> {
+impl<C> Jwt<JweHeader, C>
+where
+    C: Serialize,
+{
+    /// Encode with CEK encrypted and included in the token using asymmetric cryptography.
+    pub fn encode(self, asymmetric_key: &PublicKey) -> Result<String, JwtError> {
+        let jwe = Jwe {
+            header: self.header,
+            payload: serde_json::to_vec(&self.claims)?,
+        };
+        let encoded = jwe.encode(asymmetric_key)?;
+        Ok(encoded)
+    }
+
+    /// Encode with provided CEK (a symmetric key). This will ignore `alg` value and override it with "dir".
+    pub fn encode_direct(self, cek: &[u8]) -> Result<String, JweError> {
+        let jwe = Jwe {
+            header: self.header,
+            payload: serde_json::to_vec(&self.claims)?,
+        };
+        let encoded = jwe.encode_direct(cek)?;
+        Ok(encoded)
+    }
+}
+
+impl<C> Jwt<JweHeader, C>
+where
+    C: DeserializeOwned,
+{
+    /// Encode with CEK encrypted and included in the token using asymmetric cryptography.
+    pub fn decode(encoded_token: &str, key: &PrivateKey, validator: &JwtValidator) -> Result<Self, JwtError> {
+        let jwe = Jwe::decode(encoded_token, key)?;
+        Ok(Jwt {
+            header: jwe.header,
+            claims: h_decode_and_validate_claims(&jwe.payload, validator)?,
+        })
+    }
+
+    /// Decode with provided CEK (a symmetric key).
+    pub fn decode_direct(encoded_token: &str, cek: &[u8], validator: &JwtValidator) -> Result<Self, JwtError> {
+        let jwe = Jwe::decode_direct(encoded_token, cek)?;
+        Ok(Jwt {
+            header: jwe.header,
+            claims: h_decode_and_validate_claims(&jwe.payload, validator)?,
+        })
+    }
+}
+
+fn h_decode_and_validate_claims<C: DeserializeOwned>(
+    claims_json: &[u8],
+    validator: &JwtValidator,
+) -> Result<C, JwtError> {
     let claims = match (
         validator.current_date,
         validator.not_before_claim,
@@ -417,7 +477,7 @@ mod tests {
         let jwt = JwtSig::<MyClaims>::decode(
             crate::test_files::JOSE_JWT_SIG_EXAMPLE,
             &public_key,
-            &JwtValidator::dangerous(),
+            &JwtValidator::no_check(),
         )
         .unwrap();
         assert_eq!(jwt.claims, get_strongly_typed_claims());
@@ -435,7 +495,7 @@ mod tests {
     #[test]
     fn decode_jws_invalid_validator_err() {
         let public_key = get_private_key_1().to_public_key();
-        let validator = JwtValidator::dangerous()
+        let validator = JwtValidator::no_check()
             .expiration_check_required()
             .not_before_check_optional();
         let err = JwtSig::<MyClaims>::decode(crate::test_files::JOSE_JWT_SIG_EXAMPLE, &public_key, &validator)
@@ -458,13 +518,23 @@ mod tests {
     #[test]
     fn decode_jws_rsa_sha256_using_json_value_claims() {
         let public_key = get_private_key_1().to_public_key();
-        let validator = JwtValidator::dangerous();
+        let validator = JwtValidator::no_check();
         let jwt = JwtSig::<serde_json::Value>::decode(crate::test_files::JOSE_JWT_SIG_EXAMPLE, &public_key, &validator)
             .unwrap();
         assert_eq!(jwt.claims["sub"].as_str().expect("sub"), "1234567890");
         assert_eq!(jwt.claims["name"].as_str().expect("name"), "John Doe");
         assert_eq!(jwt.claims["admin"].as_bool().expect("sub"), true);
         assert_eq!(jwt.claims["iat"].as_i64().expect("iat"), 1516239022);
+    }
+
+    #[test]
+    fn jwe_direct_aes_256_gcm() {
+        let claims = get_strongly_typed_claims();
+        let key = crate::hash::HashAlgorithm::SHA2_256.digest(b"magic_password");
+        let jwt = Jwt::new_encrypted(JweAlg::Direct, JweEnc::Aes256Gcm, claims);
+        let encoded = jwt.encode_direct(&key).unwrap();
+        let decoded = Jwt::<_, MyClaims>::decode_direct(&encoded, &key, &NO_CHECK_VALIDATOR).unwrap();
+        assert_eq!(decoded.claims, get_strongly_typed_claims());
     }
 
     #[derive(Serialize, Deserialize)]

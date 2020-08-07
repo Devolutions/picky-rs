@@ -237,8 +237,9 @@ impl JwsHeader {
     }
 }
 
-// === json web token === //
+// === json web signature === //
 
+/// Provides an API to sign any kind of data (binary). JSON claims are part of `Jwt` only.
 #[derive(Debug, Clone)]
 pub struct Jws {
     pub header: JwsHeader,
@@ -273,17 +274,15 @@ impl Jws {
 
     pub fn encode(&self, private_key: &PrivateKey) -> Result<String, JwsError> {
         let header_base64 = base64::encode_config(&serde_json::to_vec(&self.header)?, base64::URL_SAFE_NO_PAD);
-        let claims_base64 = base64::encode_config(&self.payload, base64::URL_SAFE_NO_PAD);
-        let header_claims = [header_base64, claims_base64].join(".");
+        let payload_base64 = base64::encode_config(&self.payload, base64::URL_SAFE_NO_PAD);
+        let header_and_payload = [header_base64, payload_base64].join(".");
         let signature_algo = SignatureAlgorithm::try_from(self.header.alg)?;
-        let signature = signature_algo.sign(header_claims.as_bytes(), private_key)?;
+        let signature = signature_algo.sign(header_and_payload.as_bytes(), private_key)?;
         let signature_base64 = base64::encode_config(&signature, base64::URL_SAFE_NO_PAD);
-        Ok([header_claims, signature_base64].join("."))
+        Ok([header_and_payload, signature_base64].join("."))
     }
-}
 
-impl Jws {
-    /// Validate using validator and returns decoded JWT claims.
+    /// Validate using validator and returns decoded JWS payload.
     pub fn decode(encoded_token: &str, public_key: &PublicKey) -> Result<Self, JwsError> {
         decode_impl(encoded_token, Some(public_key))
     }
@@ -332,12 +331,12 @@ mod tests {
 
     fn get_private_key_1() -> PrivateKey {
         let pk_pem = crate::test_files::RSA_2048_PK_1.parse::<Pem>().unwrap();
-        PrivateKey::from_pkcs8(pk_pem.data()).unwrap()
+        PrivateKey::from_pem(&pk_pem).unwrap()
     }
 
     fn get_private_key_2() -> PrivateKey {
-        let pk_pem = crate::test_files::RSA_2048_PK_2.parse::<Pem>().unwrap();
-        PrivateKey::from_pkcs8(pk_pem.data()).unwrap()
+        let pk_pem = crate::test_files::RSA_2048_PK_7.parse::<Pem>().unwrap();
+        PrivateKey::from_pem(&pk_pem).unwrap()
     }
 
     #[test]

@@ -3,7 +3,7 @@
 //! This test run problematic artifacts found by fuzzing
 
 use picky::{
-    jose::{jwk::Jwk, jws::Jws},
+    jose::{jwe::Jwe, jwk::Jwk, jws::Jws},
     key::{PrivateKey, PublicKey},
     pem::{parse_pem, Pem},
     x509::{certificate::Cert, csr::Csr},
@@ -43,7 +43,7 @@ fn fuzz_target(data: &[u8]) {
     println!("JOSE...");
     if let Ok(s) = std::str::from_utf8(data) {
         let _ = Jws::decode_without_validation(s);
-        // TODO: Jwe
+        let _ = Jwe::decode_direct(s, s.as_bytes());
         let _ = Jwk::from_json(s);
     }
 

@@ -16,12 +16,11 @@ pub use picky_asn1_x509::{oids, AlgorithmIdentifier};
 
 #[cfg(test)]
 mod test_files {
+    pub const RSA_2048_PK_1: &str = include_str!("../../test_assets/private_keys/rsa-2048-pk_1.key");
     pub const RSA_2048_PK_7: &str = include_str!("../../test_assets/private_keys/rsa-2048-pk_7.key");
     pub const RSA_4096_PK_3: &str = include_str!("../../test_assets/private_keys/rsa-4096-pk_3.key");
 
     cfg_if::cfg_if! { if #[cfg(feature = "x509")] {
-        pub const RSA_2048_PK_1: &str =
-            include_str!("../../test_assets/private_keys/rsa-2048-pk_1.key");
         pub const RSA_2048_PK_2: &str =
             include_str!("../../test_assets/private_keys/rsa-2048-pk_2.key");
         pub const RSA_2048_PK_3: &str =
