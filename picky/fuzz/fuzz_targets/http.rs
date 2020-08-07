@@ -1,10 +1,11 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 use picky::{
-    http::{http_signature::*, *},
+    hash::HashAlgorithm,
+    http::http_signature::*,
     key::PrivateKey,
     pem::Pem,
-    signature::SignatureHashType,
+    signature::SignatureAlgorithm,
 };
 use std::str::FromStr;
 
@@ -30,7 +31,10 @@ fuzz_target!(|data: &[u8]| {
         let signing_string = s;
         let _ = HttpSignatureBuilder::new()
             .key_id(s)
-            .signature_method(&private_key_1(), SignatureHashType::RsaSha256)
+            .signature_method(
+                &private_key_1(),
+                SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256),
+            )
             .pre_generated_signing_string(signing_string)
             .build();
 
@@ -43,7 +47,10 @@ fuzz_target!(|data: &[u8]| {
             let _ = http_signature
                 .verifier()
                 .now(now)
-                .signature_method(&private_key_1().to_public_key(), SignatureHashType::RsaSha256)
+                .signature_method(
+                    &private_key_1().to_public_key(),
+                    SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256),
+                )
                 .pre_generated_signing_string(s)
                 .verify();
         }
