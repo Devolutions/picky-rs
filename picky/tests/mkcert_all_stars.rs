@@ -85,5 +85,5 @@ fn all_stars_parsing() {
     );
 
     // we currently support 132 certificates out of the 136.
-    assert!(number_decoded >= 132);
+    assert!(number_decoded >= 134);
 }
