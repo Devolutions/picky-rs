@@ -1,5 +1,5 @@
 use crate::{oids, DirectoryString};
-use picky_asn1::wrapper::ObjectIdentifierAsn1;
+use picky_asn1::wrapper::{IA5StringAsn1, ObjectIdentifierAsn1};
 use serde::{de, ser};
 use std::fmt;
 
@@ -14,6 +14,7 @@ pub enum AttributeTypeAndValueParameters {
     StreetName(DirectoryString),
     OrganisationName(DirectoryString),
     OrganisationalUnitName(DirectoryString),
+    EmailAddress(IA5StringAsn1),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -85,6 +86,13 @@ impl AttributeTypeAndValue {
             value: AttributeTypeAndValueParameters::OrganisationalUnitName(name.into()),
         }
     }
+
+    pub fn new_email_address<S: Into<IA5StringAsn1>>(name: S) -> Self {
+        Self {
+            ty: oids::email_address().into(),
+            value: AttributeTypeAndValueParameters::EmailAddress(name.into()),
+        }
+    }
 }
 
 impl ser::Serialize for AttributeTypeAndValue {
@@ -121,6 +129,9 @@ impl ser::Serialize for AttributeTypeAndValue {
                 seq.serialize_element(name)?;
             }
             AttributeTypeAndValueParameters::OrganisationalUnitName(name) => {
+                seq.serialize_element(name)?;
+            }
+            AttributeTypeAndValueParameters::EmailAddress(name) => {
                 seq.serialize_element(name)?;
             }
         }
@@ -189,14 +200,11 @@ impl<'de> de::Deserialize<'de> for AttributeTypeAndValue {
                         oids::AT_ORGANISATIONAL_UNIT_NAME => AttributeTypeAndValueParameters::OrganisationalUnitName(
                             seq_next_element!(seq, AttributeTypeAndValue, "at organisational unit name"),
                         ),
-                        oids::EMAIL_ADDRESS => {
-                            return Err(serde_invalid_value!(
-                                AttributeTypeAndValue,
-                                "1.2.840.113549.1.9.1 (e-mailAddress) \
-                                 attribute is deprecated and won't be supported",
-                                "a supported type"
-                            ));
-                        }
+                        oids::EMAIL_ADDRESS => AttributeTypeAndValueParameters::EmailAddress(seq_next_element!(
+                            seq,
+                            AttributeTypeAndValue,
+                            "at email address"
+                        )),
                         _ => {
                             return Err(serde_invalid_value!(
                                 AttributeTypeAndValue,

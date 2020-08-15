@@ -96,6 +96,10 @@ impl Name {
         };
         ((self.0).0)[0].0.push(ty_val);
     }
+
+    pub fn add_email<S: Into<IA5StringAsn1>>(&mut self, value: S) {
+        ((self.0).0)[0].0.push(AttributeTypeAndValue::new_email_address(value));
+    }
 }
 
 impl fmt::Display for Name {
@@ -144,6 +148,9 @@ impl fmt::Display for NamePrettyFormatter<'_> {
                     }
                     AttributeTypeAndValueParameters::OrganisationalUnitName(name) => {
                         write!(f, "OU={}", name)?;
+                    }
+                    AttributeTypeAndValueParameters::EmailAddress(name) => {
+                        write!(f, "EMAIL={}", String::from_utf8_lossy(name.as_bytes()))?;
                     }
                 }
             }
@@ -347,11 +354,11 @@ mod tests {
         #[rustfmt::skip]
         let encoded = [
             0x30, 0x1D, // sequence
-                0x31, 0x1B, // set
-                    0x30, 0x19, // sequence
-                        0x06, 0x03, 0x55, 0x04, 0x03, // oid
-                        0x0c, 0x12, 0x74, 0x65, 0x73, 0x74, 0x2E, 0x63, 0x6F, 0x6E, 0x74, 0x6F,
-                            0x73, 0x6F, 0x2E, 0x6C, 0x6F, 0x63, 0x61, 0x6C, // utf8 string
+            0x31, 0x1B, // set
+            0x30, 0x19, // sequence
+            0x06, 0x03, 0x55, 0x04, 0x03, // oid
+            0x0c, 0x12, 0x74, 0x65, 0x73, 0x74, 0x2E, 0x63, 0x6F, 0x6E, 0x74, 0x6F,
+            0x73, 0x6F, 0x2E, 0x6C, 0x6F, 0x63, 0x61, 0x6C, // utf8 string
         ];
         let expected = Name::new_common_name("test.contoso.local");
         check_serde!(expected: Name in encoded);
@@ -362,7 +369,7 @@ mod tests {
         #[rustfmt::skip]
         let encoded = [
             0x82, 0x11,
-                0x64, 0x65, 0x76, 0x65, 0x6C, 0x2E, 0x65, 0x78, 0x61, 0x6D, 0x70, 0x6C, 0x65, 0x2E, 0x63, 0x6F, 0x6D,
+            0x64, 0x65, 0x76, 0x65, 0x6C, 0x2E, 0x65, 0x78, 0x61, 0x6D, 0x70, 0x6C, 0x65, 0x2E, 0x63, 0x6F, 0x6D,
         ];
         let expected = GeneralName::DNSName(IA5String::from_string("devel.example.com".into()).unwrap().into());
         check_serde!(expected: GeneralName in encoded);
