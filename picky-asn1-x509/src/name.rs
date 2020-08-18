@@ -97,6 +97,8 @@ impl Name {
         ((self.0).0)[0].0.push(ty_val);
     }
 
+    /// Add an emailAddress attribute.
+    /// NOTE: this attribute does not conform with the RFC 5280, email should be placed in SAN instead
     pub fn add_email<S: Into<IA5StringAsn1>>(&mut self, value: S) {
         ((self.0).0)[0].0.push(AttributeTypeAndValue::new_email_address(value));
     }

@@ -58,8 +58,7 @@ fn all_stars_parsing() {
             }
             Err(e) => {
                 let formatted_str = e.to_string();
-                if formatted_str.contains("1.2.840.113549.1.9.1 (e-mailAddress) attribute is deprecated")
-                    || formatted_str.contains("TeletexString not supported")
+                if formatted_str.contains("TeletexString not supported")
                     || formatted_str.contains("V1 certificates unsupported")
                 {
                     // these won't be supported

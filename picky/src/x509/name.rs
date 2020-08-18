@@ -1,7 +1,7 @@
 use oid::ObjectIdentifier;
 use picky_asn1::{
     restricted_string::{CharSetError, IA5String},
-    wrapper::Asn1SequenceOf,
+    wrapper::{Asn1SequenceOf, IA5StringAsn1},
 };
 use picky_asn1_x509::{
     DirectoryString, GeneralName as SerdeGeneralName, GeneralNames as SerdeGeneralNames, Name, NamePrettyFormatter,
@@ -37,6 +37,12 @@ impl DirectoryName {
 
     pub fn add_attr<S: Into<DirectoryString>>(&mut self, attr: NameAttr, value: S) {
         self.0.add_attr(attr, value)
+    }
+
+    /// Add an emailAddress attribute.
+    /// NOTE: this attribute does not conform with the RFC 5280, email should be placed in SAN instead
+    pub fn add_email<S: Into<IA5StringAsn1>>(&mut self, value: S) {
+        self.0.add_email(value)
     }
 }
 
