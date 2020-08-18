@@ -1046,7 +1046,7 @@ mod tests {
         assert_eq!(
             expired_err.to_string(),
             "invalid certificate \'CN=ChillingInTheFuture.usobakkari\': \
-             certificate expired (not after: 2072-01-01 00:00:00, now: 2080-10-01 00:00:00)"
+            certificate expired (not after: 2072-01-01 00:00:00, now: 2080-10-01 00:00:00)"
         );
 
         let intermediate_expired_err = signed_leaf
@@ -1058,7 +1058,7 @@ mod tests {
         assert_eq!(
             intermediate_expired_err.to_string(),
             "invalid certificate \'CN=TheFuture.usodakedo Authority\': \
-             certificate expired (not after: 2071-01-01 00:00:00, now: 2071-06-01 00:00:00)"
+            certificate expired (not after: 2071-01-01 00:00:00, now: 2071-06-01 00:00:00)"
         );
 
         let root_expired_err = signed_leaf
@@ -1070,7 +1070,7 @@ mod tests {
         assert_eq!(
             root_expired_err.to_string(),
             "invalid certificate \'CN=TheFuture.usodakedo Root CA\': \
-             certificate expired (not after: 2070-06-15 00:00:00, now: 2070-06-16 00:00:00)"
+            certificate expired (not after: 2070-06-15 00:00:00, now: 2070-06-16 00:00:00)"
         );
 
         let still_in_2019_err = signed_leaf
@@ -1082,7 +1082,7 @@ mod tests {
         assert_eq!(
             still_in_2019_err.to_string(),
             "invalid certificate \'CN=ChillingInTheFuture.usobakkari\': \
-             certificate is not yet valid (not before: 2069-01-01 00:00:00, now: 2019-11-14 00:00:00)"
+            certificate is not yet valid (not before: 2069-01-01 00:00:00, now: 2019-11-14 00:00:00)"
         );
 
         let not_yet_valid_with_interval_err = signed_leaf
@@ -1097,7 +1097,7 @@ mod tests {
         assert_eq!(
             not_yet_valid_with_interval_err.to_string(),
             "invalid certificate \'CN=ChillingInTheFuture.usobakkari\': \
-             certificate is not yet valid (not before: 2069-01-01 00:00:00, now: 2068-12-31 00:00:00)"
+            certificate is not yet valid (not before: 2069-01-01 00:00:00, now: 2068-12-31 00:00:00)"
         );
 
         let date_is_missing_err = signed_leaf.verifier().chain(chain.iter()).verify().unwrap_err();
@@ -1230,7 +1230,7 @@ mod tests {
         assert_eq!(
             invalid_pathlen_err.to_string(),
             "CA chain error: chain depth doesn\'t satisfy basic constraints extension: \
-             certificate \'CN=VerySafe Root CA\' has pathlen of 0"
+            certificate \'CN=VerySafe Root CA\' has pathlen of 0"
         );
 
         let invalid_issuer_signed_leaf = CertificateBuilder::new()
