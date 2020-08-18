@@ -12,8 +12,8 @@ pub enum AttributeTypeAndValueParameters {
     LocalityName(DirectoryString),
     StateOrProvinceName(DirectoryString),
     StreetName(DirectoryString),
-    OrganisationName(DirectoryString),
-    OrganisationalUnitName(DirectoryString),
+    OrganizationName(DirectoryString),
+    OrganizationalUnitName(DirectoryString),
     EmailAddress(IA5StringAsn1),
 }
 
@@ -73,17 +73,17 @@ impl AttributeTypeAndValue {
         }
     }
 
-    pub fn new_organisation_name<S: Into<DirectoryString>>(name: S) -> Self {
+    pub fn new_organization_name<S: Into<DirectoryString>>(name: S) -> Self {
         Self {
-            ty: oids::at_organisation_name().into(),
-            value: AttributeTypeAndValueParameters::OrganisationName(name.into()),
+            ty: oids::at_organization_name().into(),
+            value: AttributeTypeAndValueParameters::OrganizationName(name.into()),
         }
     }
 
-    pub fn new_organisational_unit_name<S: Into<DirectoryString>>(name: S) -> Self {
+    pub fn new_organizational_unit_name<S: Into<DirectoryString>>(name: S) -> Self {
         Self {
-            ty: oids::at_organisational_unit_name().into(),
-            value: AttributeTypeAndValueParameters::OrganisationalUnitName(name.into()),
+            ty: oids::at_organizational_unit_name().into(),
+            value: AttributeTypeAndValueParameters::OrganizationalUnitName(name.into()),
         }
     }
 
@@ -125,10 +125,10 @@ impl ser::Serialize for AttributeTypeAndValue {
             AttributeTypeAndValueParameters::StreetName(name) => {
                 seq.serialize_element(name)?;
             }
-            AttributeTypeAndValueParameters::OrganisationName(name) => {
+            AttributeTypeAndValueParameters::OrganizationName(name) => {
                 seq.serialize_element(name)?;
             }
-            AttributeTypeAndValueParameters::OrganisationalUnitName(name) => {
+            AttributeTypeAndValueParameters::OrganizationalUnitName(name) => {
                 seq.serialize_element(name)?;
             }
             AttributeTypeAndValueParameters::EmailAddress(name) => {
@@ -194,11 +194,11 @@ impl<'de> de::Deserialize<'de> for AttributeTypeAndValue {
                             AttributeTypeAndValue,
                             "at street name"
                         )),
-                        oids::AT_ORGANISATION_NAME => AttributeTypeAndValueParameters::OrganisationName(
-                            seq_next_element!(seq, AttributeTypeAndValue, "at organisation name"),
+                        oids::AT_ORGANIZATION_NAME => AttributeTypeAndValueParameters::OrganizationName(
+                            seq_next_element!(seq, AttributeTypeAndValue, "at organization name"),
                         ),
-                        oids::AT_ORGANISATIONAL_UNIT_NAME => AttributeTypeAndValueParameters::OrganisationalUnitName(
-                            seq_next_element!(seq, AttributeTypeAndValue, "at organisational unit name"),
+                        oids::AT_ORGANIZATIONAL_UNIT_NAME => AttributeTypeAndValueParameters::OrganizationalUnitName(
+                            seq_next_element!(seq, AttributeTypeAndValue, "at organizational unit name"),
                         ),
                         oids::EMAIL_ADDRESS => AttributeTypeAndValueParameters::EmailAddress(seq_next_element!(
                             seq,

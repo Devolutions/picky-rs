@@ -19,8 +19,8 @@ pub enum NameAttr {
     LocalityName,
     StateOrProvinceName,
     StreetName,
-    OrganisationName,
-    OrganisationalUnitName,
+    OrganizationName,
+    OrganizationalUnitName,
 }
 
 /// [RFC 5280 #4.1.2.4](https://tools.ietf.org/html/rfc5280#section-4.1.2.4)
@@ -91,8 +91,8 @@ impl Name {
             NameAttr::LocalityName => AttributeTypeAndValue::new_locality_name(value),
             NameAttr::StateOrProvinceName => AttributeTypeAndValue::new_state_or_province_name(value),
             NameAttr::StreetName => AttributeTypeAndValue::new_street_name(value),
-            NameAttr::OrganisationName => AttributeTypeAndValue::new_organisation_name(value),
-            NameAttr::OrganisationalUnitName => AttributeTypeAndValue::new_organisational_unit_name(value),
+            NameAttr::OrganizationName => AttributeTypeAndValue::new_organization_name(value),
+            NameAttr::OrganizationalUnitName => AttributeTypeAndValue::new_organizational_unit_name(value),
         };
         ((self.0).0)[0].0.push(ty_val);
     }
@@ -145,10 +145,10 @@ impl fmt::Display for NamePrettyFormatter<'_> {
                     AttributeTypeAndValueParameters::StreetName(name) => {
                         write!(f, "STREET NAME={}", name)?;
                     }
-                    AttributeTypeAndValueParameters::OrganisationName(name) => {
+                    AttributeTypeAndValueParameters::OrganizationName(name) => {
                         write!(f, "O={}", name)?;
                     }
-                    AttributeTypeAndValueParameters::OrganisationalUnitName(name) => {
+                    AttributeTypeAndValueParameters::OrganizationalUnitName(name) => {
                         write!(f, "OU={}", name)?;
                     }
                     AttributeTypeAndValueParameters::EmailAddress(name) => {

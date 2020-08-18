@@ -88,8 +88,8 @@ define_oid! {
     AT_LOCALITY_NAME => at_locality_name => "2.5.4.7",
     AT_STATE_OR_PROVINCE_NAME => at_state_or_province_name => "2.5.4.8",
     AT_STREET_NAME => at_street_name => "2.5.4.9",
-    AT_ORGANISATION_NAME => at_organisation_name => "2.5.4.10",
-    AT_ORGANISATIONAL_UNIT_NAME => at_organisational_unit_name => "2.5.4.11",
+    AT_ORGANIZATION_NAME => at_organization_name => "2.5.4.10",
+    AT_ORGANIZATIONAL_UNIT_NAME => at_organizational_unit_name => "2.5.4.11",
 
     // certificate extensions
     SUBJECT_KEY_IDENTIFIER => subject_key_identifier => "2.5.29.14",
