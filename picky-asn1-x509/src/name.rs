@@ -61,7 +61,7 @@ impl Default for Name {
 
 impl Name {
     pub fn new() -> Self {
-        Self(Asn1SequenceOf(vec![Asn1SetOf(vec![])]))
+        Self(Asn1SequenceOf(Vec::new()))
     }
 
     pub fn new_common_name<S: Into<DirectoryString>>(name: S) -> Self {
@@ -94,13 +94,15 @@ impl Name {
             NameAttr::OrganizationName => AttributeTypeAndValue::new_organization_name(value),
             NameAttr::OrganizationalUnitName => AttributeTypeAndValue::new_organizational_unit_name(value),
         };
-        ((self.0).0)[0].0.push(ty_val);
+        let set_val = Asn1SetOf(vec![ty_val]);
+        ((self.0).0).push(set_val);
     }
 
     /// Add an emailAddress attribute.
     /// NOTE: this attribute does not conform with the RFC 5280, email should be placed in SAN instead
     pub fn add_email<S: Into<IA5StringAsn1>>(&mut self, value: S) {
-        ((self.0).0)[0].0.push(AttributeTypeAndValue::new_email_address(value));
+        let set_val = Asn1SetOf(vec![AttributeTypeAndValue::new_email_address(value)]);
+        ((self.0).0).push(set_val);
     }
 }
 
@@ -350,6 +352,7 @@ pub struct EDIPartyName {
 mod tests {
     use super::*;
     use picky_asn1::restricted_string::IA5String;
+    use std::str::FromStr;
 
     #[test]
     fn common_name() {
@@ -358,11 +361,46 @@ mod tests {
             0x30, 0x1D, // sequence
             0x31, 0x1B, // set
             0x30, 0x19, // sequence
-            0x06, 0x03, 0x55, 0x04, 0x03, // oid
-            0x0c, 0x12, 0x74, 0x65, 0x73, 0x74, 0x2E, 0x63, 0x6F, 0x6E, 0x74, 0x6F,
+            0x06, 0x03, // tag of oid
+            0x55, 0x04, 0x03, // oid of common name
+            0x0c, 0x12,  // tag of utf-8 string
+            0x74, 0x65, 0x73, 0x74, 0x2E, 0x63, 0x6F, 0x6E, 0x74, 0x6F,
             0x73, 0x6F, 0x2E, 0x6C, 0x6F, 0x63, 0x61, 0x6C, // utf8 string
         ];
         let expected = Name::new_common_name("test.contoso.local");
+        check_serde!(expected: Name in encoded);
+    }
+
+    #[test]
+    fn multiple_attributes() {
+        #[rustfmt::skip]
+        let encoded = [
+            0x30, 0x52, // sequence, 0x52(82) bytes
+            0x31, 0x1B, // set 1 (common name), 0x1b(27) bytes
+            0x30, 0x19, // sequence, 0x19(25) bytes
+            0x06, 0x03, // oid tag
+            0x55, 0x04, 0x03, // oid of common name attribute
+            0x0c, 0x12,  // tag of utf-8 string
+            b't', b'e', b's', b't', b'.', b'c', b'o', b'n', b't', b'o', b's', b'o', b'.', b'l', b'o', b'c', b'a', b'l',
+
+            0x31, 0x10, // set 2 (locality)
+            0x30, 0x0E, // sequence
+            0x06, 0x03, //oid tag
+            0x55, 0x04, 0x07, // oid of locality attribute
+            0x0c, 0x07,  // tag of utf-8 string
+            b'U', b'n', b'k', b'n', b'o', b'w', b'n', // utf8 string data
+
+            0x31, 0x21, // set 3 (emailAddress)
+            0x30, 0x1F, // sequence
+            0x06, 0x09, // oid tag
+            0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x09, 0x01, // oid of emailAddress
+            0x16, 0x12,  // tag of IA5String
+            b's', b'o', b'm', b'e', b'@', b'c', b'o', b'n', b't', b'o', b's', b'o', b'.', b'l', b'o', b'c', b'a', b'l', // utf-8 string data
+            ];
+        let mut expected = Name::new_common_name("test.contoso.local");
+        expected.add_attr(NameAttr::LocalityName, "Unknown");
+        let email = IA5StringAsn1(IA5String::from_str("some@contoso.local").unwrap());
+        expected.add_email(email);
         check_serde!(expected: Name in encoded);
     }
 
