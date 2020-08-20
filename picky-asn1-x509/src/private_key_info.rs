@@ -152,62 +152,91 @@ impl ser::Serialize for PrivateKeyValue {
     }
 }
 
+/// [PKCS #1: RSA Cryptography Specifications Version 2.2](https://tools.ietf.org/html/rfc8017.html#appendix-A.1.2)
+///
+/// # Section A.1.2
+///
+/// An RSA private key should be represented with the ASN.1 type RSAPrivateKey:
+///
+/// ```not_rust
+///      RSAPrivateKey ::= SEQUENCE {
+///          version           Version,
+///          modulus           INTEGER,  -- n
+///          publicExponent    INTEGER,  -- e
+///          privateExponent   INTEGER,  -- d
+///          prime1            INTEGER,  -- p
+///          prime2            INTEGER,  -- q
+///          exponent1         INTEGER,  -- d mod (p-1)
+///          exponent2         INTEGER,  -- d mod (q-1)
+///          coefficient       INTEGER,  -- (inverse of q) mod p
+///          otherPrimeInfos   OtherPrimeInfos OPTIONAL
+///      }
+/// ```
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct RSAPrivateKey {
-    version: IntegerAsn1,
-    modulus: IntegerAsn1,
-    public_exponent: IntegerAsn1,
-    private_exponent: IntegerAsn1,
-    prime_1: IntegerAsn1,
-    prime_2: IntegerAsn1,
-    exponent_1: IntegerAsn1,
-    exponent_2: IntegerAsn1,
-    coefficient: IntegerAsn1,
+    pub version: IntegerAsn1,
+    pub modulus: IntegerAsn1,
+    pub public_exponent: IntegerAsn1,
+    pub private_exponent: IntegerAsn1,
+    pub prime_1: IntegerAsn1,
+    pub prime_2: IntegerAsn1,
+    pub exponent_1: IntegerAsn1,
+    pub exponent_2: IntegerAsn1,
+    pub coefficient: IntegerAsn1,
 }
 
 impl RSAPrivateKey {
-    // NOTE: Getters are included here for backward compatibility.
-
+    #[deprecated(note = "field is now public")]
     pub fn modulus(&self) -> &IntegerAsn1 {
         &self.modulus
     }
 
+    #[deprecated(note = "field is now public")]
     pub fn public_exponent(&self) -> &IntegerAsn1 {
         &self.public_exponent
     }
 
+    #[deprecated(note = "field is now public")]
     pub fn private_exponent(&self) -> &IntegerAsn1 {
         &self.private_exponent
     }
 
+    #[deprecated(note = "field is now public")]
     pub fn prime_1(&self) -> &IntegerAsn1 {
         &self.prime_1
     }
 
+    #[deprecated(note = "field is now public")]
     pub fn prime_2(&self) -> &IntegerAsn1 {
         &self.prime_2
     }
 
+    #[deprecated(note = "field is now public")]
     pub fn primes(&self) -> (&IntegerAsn1, &IntegerAsn1) {
         (&self.prime_1, &self.prime_2)
     }
 
+    #[deprecated(note = "field is now public")]
     pub fn exponent_1(&self) -> &IntegerAsn1 {
         &self.exponent_1
     }
 
+    #[deprecated(note = "field is now public")]
     pub fn exponent_2(&self) -> &IntegerAsn1 {
         &self.exponent_2
     }
 
+    #[deprecated(note = "field is now public")]
     pub fn exponents(&self) -> (&IntegerAsn1, &IntegerAsn1) {
         (&self.exponent_1, &self.exponent_2)
     }
 
+    #[deprecated(note = "field is now public")]
     pub fn coefficient(&self) -> &IntegerAsn1 {
         &self.coefficient
     }
 
+    #[deprecated(note = "field is now public")]
     pub fn into_public_components(self) -> (IntegerAsn1, IntegerAsn1) {
         (self.modulus, self.public_exponent)
     }

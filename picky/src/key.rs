@@ -68,8 +68,7 @@ impl From<PrivateKey> for SubjectPublicKeyInfo {
     fn from(key: PrivateKey) -> Self {
         match key.0.private_key {
             PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => {
-                let (modulus, public_exponent) = key.into_public_components();
-                SubjectPublicKeyInfo::new_rsa_key(modulus, public_exponent)
+                SubjectPublicKeyInfo::new_rsa_key(key.modulus, key.public_exponent)
             }
         }
     }
@@ -81,12 +80,12 @@ impl TryFrom<&'_ PrivateKey> for RSAPrivateKey {
     fn try_from(v: &PrivateKey) -> Result<Self, Self::Error> {
         match &v.as_inner().private_key {
             private_key_info::PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => {
-                let p1 = BigUint::from_bytes_be(key.prime_1().as_unsigned_bytes_be());
-                let p2 = BigUint::from_bytes_be(key.prime_2().as_unsigned_bytes_be());
+                let p1 = BigUint::from_bytes_be(key.prime_1.as_unsigned_bytes_be());
+                let p2 = BigUint::from_bytes_be(key.prime_2.as_unsigned_bytes_be());
                 Ok(RSAPrivateKey::from_components(
-                    BigUint::from_bytes_be(key.modulus().as_unsigned_bytes_be()),
-                    BigUint::from_bytes_be(key.public_exponent().as_unsigned_bytes_be()),
-                    BigUint::from_bytes_be(key.private_exponent().as_unsigned_bytes_be()),
+                    BigUint::from_bytes_be(key.modulus.as_unsigned_bytes_be()),
+                    BigUint::from_bytes_be(key.public_exponent.as_unsigned_bytes_be()),
+                    BigUint::from_bytes_be(key.private_exponent.as_unsigned_bytes_be()),
                     vec![p1, p2],
                 ))
             }
@@ -100,8 +99,8 @@ impl TryFrom<&'_ PrivateKey> for RSAPublicKey {
     fn try_from(v: &PrivateKey) -> Result<Self, Self::Error> {
         match &v.as_inner().private_key {
             private_key_info::PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => Ok(RSAPublicKey::new(
-                BigUint::from_bytes_be(key.modulus().as_unsigned_bytes_be()),
-                BigUint::from_bytes_be(key.public_exponent().as_unsigned_bytes_be()),
+                BigUint::from_bytes_be(key.modulus.as_unsigned_bytes_be()),
+                BigUint::from_bytes_be(key.public_exponent.as_unsigned_bytes_be()),
             )?),
         }
     }
@@ -157,7 +156,7 @@ impl PrivateKey {
     pub fn to_public_key(&self) -> PublicKey {
         match &self.0.private_key {
             PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => {
-                SubjectPublicKeyInfo::new_rsa_key(key.modulus().clone(), key.public_exponent().clone()).into()
+                SubjectPublicKeyInfo::new_rsa_key(key.modulus.clone(), key.public_exponent.clone()).into()
             }
         }
     }
