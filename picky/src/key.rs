@@ -187,10 +187,16 @@ impl PrivateKey {
             IntegerAsn1::from_signed_bytes_be(modulus.to_bytes_be()),
             IntegerAsn1::from_signed_bytes_be(public_exponent.to_bytes_be()),
             IntegerAsn1::from_signed_bytes_be(private_exponent.to_bytes_be()),
-            IntegerAsn1::from_signed_bytes_be(prime_1.to_bytes_be()),
-            IntegerAsn1::from_signed_bytes_be(prime_2.to_bytes_be()),
-            IntegerAsn1::from_signed_bytes_be(exponent_1.to_bytes_be()),
-            IntegerAsn1::from_signed_bytes_be(exponent_2.to_bytes_be()),
+            (
+                // primes
+                IntegerAsn1::from_signed_bytes_be(prime_1.to_bytes_be()),
+                IntegerAsn1::from_signed_bytes_be(prime_2.to_bytes_be()),
+            ),
+            (
+                // exponents
+                IntegerAsn1::from_signed_bytes_be(exponent_1.to_bytes_be()),
+                IntegerAsn1::from_signed_bytes_be(exponent_2.to_bytes_be()),
+            ),
             IntegerAsn1::from_signed_bytes_be(coefficient.to_bytes_be()),
         )))
     }

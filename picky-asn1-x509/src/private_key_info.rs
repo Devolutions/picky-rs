@@ -56,23 +56,21 @@ impl PrivateKeyInfo {
         modulus: IntegerAsn1,
         public_exponent: IntegerAsn1,
         private_exponent: IntegerAsn1,
-        prime_1: IntegerAsn1,
-        prime_2: IntegerAsn1,
-        exponent_1: IntegerAsn1,
-        exponent_2: IntegerAsn1,
+        primes: (IntegerAsn1, IntegerAsn1),
+        exponents: (IntegerAsn1, IntegerAsn1),
         coefficient: IntegerAsn1,
     ) -> Self {
         let private_key = PrivateKeyValue::RSA(
             RSAPrivateKey {
                 version: vec![0].into(),
-                modulus: modulus,
-                public_exponent: public_exponent,
-                private_exponent: private_exponent,
-                prime_1: prime_1,
-                prime_2: prime_2,
-                exponent_1: exponent_1,
-                exponent_2: exponent_2,
-                coefficient: coefficient,
+                modulus,
+                public_exponent,
+                private_exponent,
+                prime_1: primes.0,
+                prime_2: primes.1,
+                exponent_1: exponents.0,
+                exponent_2: exponents.1,
+                coefficient,
             }
             .into(),
         );
@@ -273,10 +271,8 @@ mod tests {
             modulus,
             public_exponent,
             private_exponent,
-            prime_1,
-            prime_2,
-            exponent_1,
-            exponent_2,
+            (prime_1, prime_2),
+            (exponent_1, exponent_2),
             coefficient,
         );
         check_serde!(private_key: PrivateKeyInfo in encoded);
