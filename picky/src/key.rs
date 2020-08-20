@@ -2,6 +2,7 @@
 
 use crate::pem::{to_pem, Pem};
 use core::convert::TryFrom;
+use num_bigint_dig::traits::ModInverse;
 use picky_asn1::wrapper::{BitStringAsn1Container, IntegerAsn1, OctetStringAsn1Container};
 use picky_asn1_der::Asn1DerError;
 use picky_asn1_x509::{private_key_info, PrivateKeyInfo, PrivateKeyValue, SubjectPublicKeyInfo};
@@ -80,15 +81,13 @@ impl TryFrom<&'_ PrivateKey> for RSAPrivateKey {
     fn try_from(v: &PrivateKey) -> Result<Self, Self::Error> {
         match &v.as_inner().private_key {
             private_key_info::PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => {
+                let p1 = BigUint::from_bytes_be(key.prime_1().as_unsigned_bytes_be());
+                let p2 = BigUint::from_bytes_be(key.prime_2().as_unsigned_bytes_be());
                 Ok(RSAPrivateKey::from_components(
                     BigUint::from_bytes_be(key.modulus().as_unsigned_bytes_be()),
                     BigUint::from_bytes_be(key.public_exponent().as_unsigned_bytes_be()),
                     BigUint::from_bytes_be(key.private_exponent().as_unsigned_bytes_be()),
-                    key.primes()
-                        .iter()
-                        .take(2) // TODO: follow issue: https://github.com/RustCrypto/RSA/issues/58
-                        .map(|p| BigUint::from_bytes_be(p.as_unsigned_bytes_be()))
-                        .collect(),
+                    vec![p1, p2],
                 ))
             }
         }
@@ -169,18 +168,31 @@ impl PrivateKey {
         use rsa::PublicKeyParts;
 
         let key = RSAPrivateKey::new(&mut OsRng, bits)?;
-        let modulus = IntegerAsn1::from_signed_bytes_be(key.n().to_bytes_be());
-        let public_exponent = IntegerAsn1::from_signed_bytes_be(key.e().to_bytes_be());
-        let private_exponent = IntegerAsn1::from_signed_bytes_be(key.d().to_bytes_be());
+
+        let modulus = key.n();
+        let public_exponent = key.e();
+        let private_exponent = key.d();
+
+        let prime_1 = &key.primes()[0];
+        let prime_2 = &key.primes()[1];
+        let exponent_1 = private_exponent.clone() % (prime_1 - 1u16);
+        let exponent_2 = private_exponent.clone();
+
+        let coefficient = prime_2
+            .mod_inverse(prime_1)
+            .expect("No modular inverse for prime_1!") // should never happen
+            .to_biguint()
+            .expect("Conversion to BigUint failed!"); // should never happen
 
         Ok(Self(PrivateKeyInfo::new_rsa_encryption(
-            modulus,
-            public_exponent,
-            private_exponent,
-            key.primes()
-                .iter()
-                .map(|p| IntegerAsn1::from_signed_bytes_be(p.to_bytes_be()))
-                .collect(),
+            IntegerAsn1::from_signed_bytes_be(modulus.to_bytes_be()),
+            IntegerAsn1::from_signed_bytes_be(public_exponent.to_bytes_be()),
+            IntegerAsn1::from_signed_bytes_be(private_exponent.to_bytes_be()),
+            IntegerAsn1::from_signed_bytes_be(prime_1.to_bytes_be()),
+            IntegerAsn1::from_signed_bytes_be(prime_2.to_bytes_be()),
+            IntegerAsn1::from_signed_bytes_be(exponent_1.to_bytes_be()),
+            IntegerAsn1::from_signed_bytes_be(exponent_2.to_bytes_be()),
+            IntegerAsn1::from_signed_bytes_be(coefficient.to_bytes_be()),
         )))
     }
 

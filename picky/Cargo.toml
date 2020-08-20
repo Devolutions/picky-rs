@@ -35,9 +35,9 @@ digest = "0.9"
 rsa = "0.3"
 rand = "0.7"
 aes-gcm = { version = "0.6", optional = true }
+num-bigint-dig = "0.6"
 
 [dev-dependencies]
-num-bigint-dig = "0.6"
 pretty_assertions = "^0.6"
 hex = "0.4"
 cfg-if = "0.1"
