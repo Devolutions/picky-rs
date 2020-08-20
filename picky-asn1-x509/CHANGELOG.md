@@ -5,11 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.1] 2020-08-??
+## [0.2.0] 2020-08-20
 
 ### Added
 
 - NIST signature related OIDs
 - `AlgorithmIdentifier::new_sha3_384_with_rsa_encryption` constructor
 - `AlgorithmIdentifier::new_sha3_512_with_rsa_encryption` constructor
+- Support for email attribute in certificate subject
+
+### Changed
+
+- Rename "organisation" to "organization"
+- Change attribute structure in directory names to follow common practices
+
+### Fixed
+
+- `RSAPrivateKey` is now RFC8017 compliant
 
