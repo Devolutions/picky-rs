@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- `RSAPrivateKey` fields are now `pub`
+- `PrivateKeyInfo::new_rsa_encryption` takes 6 arguments instead of 8
+
+### Deprecated
+
+- `RSAPrivateKey` getters are deprecated in favor of direct access of public fields
+
 ## [0.2.0] 2020-08-20
 
 ### Added
