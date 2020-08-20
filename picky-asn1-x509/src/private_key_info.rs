@@ -1,5 +1,5 @@
 use crate::{oids, AlgorithmIdentifier};
-use picky_asn1::wrapper::{Asn1SequenceOf, IntegerAsn1, OctetStringAsn1Container};
+use picky_asn1::wrapper::{IntegerAsn1, OctetStringAsn1Container};
 use serde::{de, ser, Deserialize, Serialize};
 use std::fmt;
 
@@ -56,11 +56,26 @@ impl PrivateKeyInfo {
         modulus: IntegerAsn1,
         public_exponent: IntegerAsn1,
         private_exponent: IntegerAsn1,
-        primes: Vec<IntegerAsn1>,
+        prime_1: IntegerAsn1,
+        prime_2: IntegerAsn1,
+        exponent_1: IntegerAsn1,
+        exponent_2: IntegerAsn1,
+        coefficient: IntegerAsn1,
     ) -> Self {
-        let mut seq = Asn1SequenceOf(vec![vec![0].into(), modulus, public_exponent, private_exponent]);
-        seq.0.extend(primes);
-        let private_key = PrivateKeyValue::RSA(RSAPrivateKey(seq).into());
+        let private_key = PrivateKeyValue::RSA(
+            RSAPrivateKey {
+                version: vec![0].into(),
+                modulus: modulus,
+                public_exponent: public_exponent,
+                private_exponent: private_exponent,
+                prime_1: prime_1,
+                prime_2: prime_2,
+                exponent_1: exponent_1,
+                exponent_2: exponent_2,
+                coefficient: coefficient,
+            }
+            .into(),
+        );
 
         Self {
             version: 0,
@@ -138,32 +153,63 @@ impl ser::Serialize for PrivateKeyValue {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct RSAPrivateKey(Asn1SequenceOf<IntegerAsn1>);
+pub struct RSAPrivateKey {
+    version: IntegerAsn1,
+    modulus: IntegerAsn1,
+    public_exponent: IntegerAsn1,
+    private_exponent: IntegerAsn1,
+    prime_1: IntegerAsn1,
+    prime_2: IntegerAsn1,
+    exponent_1: IntegerAsn1,
+    exponent_2: IntegerAsn1,
+    coefficient: IntegerAsn1,
+}
 
 impl RSAPrivateKey {
+    // NOTE: Getters are included here for backward compatibility.
+
     pub fn modulus(&self) -> &IntegerAsn1 {
-        &(self.0).0[1]
+        &self.modulus
     }
 
     pub fn public_exponent(&self) -> &IntegerAsn1 {
-        &(self.0).0[2]
+        &self.public_exponent
     }
 
     pub fn private_exponent(&self) -> &IntegerAsn1 {
-        &(self.0).0[3]
+        &self.private_exponent
     }
 
-    pub fn primes(&self) -> &[IntegerAsn1] {
-        &(self.0).0[4..]
+    pub fn prime_1(&self) -> &IntegerAsn1 {
+        &self.prime_1
+    }
+
+    pub fn prime_2(&self) -> &IntegerAsn1 {
+        &self.prime_2
+    }
+
+    pub fn primes(&self) -> (&IntegerAsn1, &IntegerAsn1) {
+        (&self.prime_1, &self.prime_2)
+    }
+
+    pub fn exponent_1(&self) -> &IntegerAsn1 {
+        &self.exponent_1
+    }
+
+    pub fn exponent_2(&self) -> &IntegerAsn1 {
+        &self.exponent_2
+    }
+
+    pub fn exponents(&self) -> (&IntegerAsn1, &IntegerAsn1) {
+        (&self.exponent_1, &self.exponent_2)
+    }
+
+    pub fn coefficient(&self) -> &IntegerAsn1 {
+        &self.coefficient
     }
 
     pub fn into_public_components(self) -> (IntegerAsn1, IntegerAsn1) {
-        let mut iter = (self.0).0.into_iter();
-        iter.next().expect("should not panic");
-        (
-            iter.next().expect("should not panic"),
-            iter.next().expect("should not panic"),
-        )
+        (self.modulus, self.public_exponent)
     }
 }
 
@@ -188,14 +234,22 @@ mod tests {
         let modulus = IntegerAsn1::from(encoded[35..100].to_vec());
         let public_exponent = IntegerAsn1::from(encoded[102..105].to_vec());
         let private_exponent = IntegerAsn1::from(encoded[107..171].to_vec());
-        let primes = vec![
-            IntegerAsn1::from(encoded[173..206].to_vec()),
-            IntegerAsn1::from(encoded[208..241].to_vec()),
-            IntegerAsn1::from(encoded[243..276].to_vec()),
-            IntegerAsn1::from(encoded[278..311].to_vec()),
-            IntegerAsn1::from(encoded[313..346].to_vec()),
-        ];
-        let private_key = PrivateKeyInfo::new_rsa_encryption(modulus, public_exponent, private_exponent, primes);
+        let prime_1 = IntegerAsn1::from(encoded[173..206].to_vec());
+        let prime_2 = IntegerAsn1::from(encoded[208..241].to_vec());
+        let exponent_1 = IntegerAsn1::from(encoded[243..276].to_vec());
+        let exponent_2 = IntegerAsn1::from(encoded[278..311].to_vec());
+        let coefficient = IntegerAsn1::from(encoded[313..346].to_vec());
+
+        let private_key = PrivateKeyInfo::new_rsa_encryption(
+            modulus,
+            public_exponent,
+            private_exponent,
+            prime_1,
+            prime_2,
+            exponent_1,
+            exponent_2,
+            coefficient,
+        );
         check_serde!(private_key: PrivateKeyInfo in encoded);
     }
 }
