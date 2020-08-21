@@ -4,7 +4,7 @@ use picky_asn1::{
     tag::{Tag, TagPeeker},
     wrapper::{IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1},
 };
-use serde::{de, ser};
+use serde::{de, ser, Deserialize, Serialize};
 use std::fmt;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -474,6 +474,25 @@ impl From<SHAVariant> for ObjectIdentifierAsn1 {
     }
 }
 
+/// [PKCS #1: RSA Cryptography Specifications Version
+/// 2.2](https://tools.ietf.org/html/rfc8017.html#section-9.2)
+///
+/// # Section 9.2
+///
+/// The type DigestInfo has the syntax:
+///
+/// ```not_rust
+///    DigestInfo ::= SEQUENCE {
+///        digestAlgorithm AlgorithmIdentifier,
+///        digest OCTET STRING
+///    }
+/// ```
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct DigestInfo {
+    pub oid: AlgorithmIdentifier,
+    pub digest: OctetStringAsn1,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -527,5 +546,27 @@ mod tests {
         let ec_params =
             AlgorithmIdentifier::new_elliptic_curve(ECParameters::NamedCurve(oids::ecdsa_with_sha256().into()));
         check_serde!(ec_params: AlgorithmIdentifier in expected);
+    }
+
+    #[test]
+    fn digest_info() {
+        let digest = picky_asn1_der::to_vec(&DigestInfo {
+            oid: AlgorithmIdentifier::new_sha(SHAVariant::SHA2_256),
+            // Random 32 bytes generated for a SHA256 hash
+            digest: vec![
+                0xf4, 0x12, 0x6b, 0x55, 0xbf, 0xcf, 0x8c, 0xc4, 0xe9, 0xe0, 0xbe, 0x5a, 0x9c, 0x16, 0x88, 0x55, 0x0f,
+                0x26, 0x00, 0x8c, 0x2c, 0xa5, 0xf6, 0xaf, 0xbd, 0xe7, 0x9c, 0x42, 0x22, 0xe9, 0x25, 0xed,
+            ]
+            .into(),
+        })
+        .unwrap();
+
+        let expected = vec![
+            0x30, 0x31, 0x30, 0x0D, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01, 0x05, 0x00, 0x04,
+            0x20, 0xf4, 0x12, 0x6b, 0x55, 0xbf, 0xcf, 0x8c, 0xc4, 0xe9, 0xe0, 0xbe, 0x5a, 0x9c, 0x16, 0x88, 0x55, 0x0f,
+            0x26, 0x00, 0x8c, 0x2c, 0xa5, 0xf6, 0xaf, 0xbd, 0xe7, 0x9c, 0x42, 0x22, 0xe9, 0x25, 0xed,
+        ];
+
+        assert_eq!(digest, expected);
     }
 }
