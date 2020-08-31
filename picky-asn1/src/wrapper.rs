@@ -341,7 +341,7 @@ impl IntegerAsn1 {
         }
     }
 
-    pub fn from_signed_bytes_be(bytes: Vec<u8>) -> Self {
+    pub fn from_bytes_be_signed(bytes: Vec<u8>) -> Self {
         Self(bytes)
     }
 
@@ -351,7 +351,7 @@ impl IntegerAsn1 {
     /// and add a leading 0x00 byte indicating the number is positive.
     /// Prefer `from_signed_bytes_be` if you can build a signed bytes string without
     /// overhead on you side.
-    pub fn from_unsigned_bytes_be(mut bytes: Vec<u8>) -> Self {
+    pub fn from_bytes_be_unsigned(mut bytes: Vec<u8>) -> Self {
         if !bytes.is_empty() && bytes[0] & 0x80 == 0x80 {
             bytes.insert(0, 0x00);
         }
@@ -701,6 +701,6 @@ mod tests {
 
     #[test]
     fn integer_from_unsigned_bytes_be_no_panic() {
-        IntegerAsn1::from_unsigned_bytes_be(vec![]);
+        IntegerAsn1::from_bytes_be_unsigned(vec![]);
     }
 }

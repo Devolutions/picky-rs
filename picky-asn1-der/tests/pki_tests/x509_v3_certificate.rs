@@ -176,7 +176,7 @@ fn x509_v3_certificate() {
             parameters: (),
         },
         subject_public_key: RSAPublicKey {
-            modulus: IntegerAsn1::from_signed_bytes_be(encoded[165..422].to_vec()),
+            modulus: IntegerAsn1::from_bytes_be_signed(encoded[165..422].to_vec()),
             public_exponent: BigInt::from(65537).to_signed_bytes_be().into(),
         }
         .into(),
