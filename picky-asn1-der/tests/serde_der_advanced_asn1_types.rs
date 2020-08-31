@@ -89,7 +89,7 @@ fn big_integer() {
 
     // from signed bytes
 
-    let big_integer = IntegerAsn1::from_signed_bytes_be(big_integer_buffer[3..].to_vec());
+    let big_integer = IntegerAsn1::from_bytes_be_signed(big_integer_buffer[3..].to_vec());
     assert!(big_integer.is_positive());
     assert!(!big_integer.is_negative());
     assert_eq!(big_integer.as_unsigned_bytes_be(), &big_integer_buffer[4..]);
@@ -97,7 +97,7 @@ fn big_integer() {
 
     // check we have same result using unsigned bytes
 
-    let big_integer = IntegerAsn1::from_unsigned_bytes_be(big_integer_buffer[4..].to_vec());
+    let big_integer = IntegerAsn1::from_bytes_be_unsigned(big_integer_buffer[4..].to_vec());
     assert!(big_integer.is_positive());
     assert!(!big_integer.is_negative());
     assert_eq!(big_integer.as_signed_bytes_be(), &big_integer_buffer[3..]);
