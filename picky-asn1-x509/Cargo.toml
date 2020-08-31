@@ -1,6 +1,6 @@
 [package]
 name = "picky-asn1-x509"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Benoît CORTIER <benoit.cortier@fried-world.eu>"]
 description = "Provides ASN1 types defined by X.509 related RFCs"
 edition = "2018"
@@ -8,7 +8,7 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/Devolutions/picky-rs"
 
 [dependencies]
-picky-asn1 = { version = "0.2", path = "../picky-asn1" }
+picky-asn1 = { version = "0.3", path = "../picky-asn1" }
 picky-asn1-der = { version = "0.2", path = "../picky-asn1-der" }
 serde = { version = "1.0", features = ["derive"] }
 oid = { version = "^0.1.1", features = ["serde_support"] }
