@@ -1,6 +1,6 @@
 [package]
 name = "picky-asn1-der"
-version = "0.2.3"
+version = "0.2.4"
 edition = "2018"
 authors = [
     "KizzyCode Software Labs./Keziah Biermann <development@kizzycode.de>",
@@ -14,7 +14,7 @@ repository = "https://github.com/Devolutions/picky-rs"
 readme = "README.md"
 
 [dependencies]
-picky-asn1 = { version = "0.2", path = "../picky-asn1" }
+picky-asn1 = { version = "0.3", path = "../picky-asn1" }
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 serde_bytes = "0.11"
 lazy_static = { version = "1.4", optional = true }
