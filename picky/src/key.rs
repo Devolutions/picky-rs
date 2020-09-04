@@ -172,6 +172,16 @@ impl PrivateKey {
         let public_exponent = key.e();
         let private_exponent = key.d();
 
+        if key.primes().len() != 2 {
+            // to be really safe
+            return Err(KeyError::Rsa {
+                context: format!(
+                    "invalid number of primes generated: expected 2, got: {}",
+                    key.primes().len()
+                ),
+            });
+        }
+
         let prime_1 = &key.primes()[0];
         let prime_2 = &key.primes()[1];
         let exponent_1 = private_exponent.clone() % (prime_1 - 1u16);
@@ -179,9 +189,13 @@ impl PrivateKey {
 
         let coefficient = prime_2
             .mod_inverse(prime_1)
-            .expect("No modular inverse for prime_1!") // should never happen
+            .ok_or_else(|| KeyError::Rsa {
+                context: "no modular inverse for prime 1".to_string(),
+            })?
             .to_biguint()
-            .expect("Conversion to BigUint failed!"); // should never happen
+            .ok_or_else(|| KeyError::Rsa {
+                context: "BigUint conversion failed".to_string(),
+            })?;
 
         Ok(Self(PrivateKeyInfo::new_rsa_encryption(
             IntegerAsn1::from_bytes_be_unsigned(modulus.to_bytes_be()),
