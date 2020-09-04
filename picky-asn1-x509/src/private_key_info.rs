@@ -1,6 +1,8 @@
 use crate::{oids, AlgorithmIdentifier};
 use picky_asn1::wrapper::{IntegerAsn1, OctetStringAsn1Container};
-use serde::{de, ser, Deserialize, Serialize};
+#[cfg(not(feature = "legacy"))]
+use serde::Deserialize;
+use serde::{de, ser, Serialize};
 use std::fmt;
 
 /// [Public-Key Cryptography Standards (PKCS) #8](https://tools.ietf.org/html/rfc5208#section-5)
@@ -170,7 +172,8 @@ impl ser::Serialize for PrivateKeyValue {
 ///          otherPrimeInfos   OtherPrimeInfos OPTIONAL
 ///      }
 /// ```
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Debug, Clone, PartialEq)]
+#[cfg_attr(not(feature = "legacy"), derive(Deserialize))]
 pub struct RSAPrivateKey {
     pub version: IntegerAsn1,
     pub modulus: IntegerAsn1,
@@ -181,6 +184,90 @@ pub struct RSAPrivateKey {
     pub exponent_1: IntegerAsn1,
     pub exponent_2: IntegerAsn1,
     pub coefficient: IntegerAsn1,
+}
+
+#[cfg(feature = "legacy")]
+impl<'de> de::Deserialize<'de> for RSAPrivateKey {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = RSAPrivateKey;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("struct RSAPrivateKey with 6 or 9 elements")
+            }
+
+            fn visit_seq<V>(self, mut seq: V) -> Result<Self::Value, V::Error>
+            where
+                V: de::SeqAccess<'de>,
+            {
+                let version: IntegerAsn1 = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(0, &self))?;
+                let modulus: IntegerAsn1 = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(1, &self))?;
+                let public_exponent: IntegerAsn1 =
+                    seq.next_element()?.ok_or_else(|| de::Error::invalid_length(2, &self))?;
+                let private_exponent: IntegerAsn1 =
+                    seq.next_element()?.ok_or_else(|| de::Error::invalid_length(3, &self))?;
+                let prime_1: IntegerAsn1 = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(4, &self))?;
+                let prime_2: IntegerAsn1 = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(5, &self))?;
+
+                let (exponent_1, exponent_2, coefficient) = if let Some(exponent_1) = seq.next_element()? {
+                    let exponent_2 = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(7, &self))?;
+                    let coefficient = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(8, &self))?;
+                    (exponent_1, exponent_2, coefficient)
+                } else {
+                    use num_bigint_dig::{BigUint, ModInverse};
+
+                    let exponent_2 = private_exponent.clone();
+
+                    // conversion to num_bigint_dig format BigUint
+                    let private_exponent = BigUint::from_bytes_be(private_exponent.as_unsigned_bytes_be());
+                    let prime_1 = BigUint::from_bytes_be(prime_1.as_unsigned_bytes_be());
+                    let prime_2 = BigUint::from_bytes_be(prime_2.as_unsigned_bytes_be());
+
+                    let exponent_1 = private_exponent % (&prime_1 - 1u16);
+                    let coefficient = prime_2
+                        .mod_inverse(prime_1)
+                        .ok_or_else(|| {
+                            de::Error::invalid_value(
+                                de::Unexpected::Other("[RSAPrivateKey] no modular inverse for prime 1"),
+                                &"an invertible prime 1 value",
+                            )
+                        })?
+                        .to_biguint()
+                        .ok_or_else(|| {
+                            de::Error::invalid_value(
+                                de::Unexpected::Other("[RSAPrivateKey] BigUint conversion failed"),
+                                &"a valid prime 1 value",
+                            )
+                        })?;
+
+                    // conversion to IntegerAsn1
+                    let exponent_1 = IntegerAsn1::from_bytes_be_unsigned(exponent_1.to_bytes_be());
+                    let coefficient = IntegerAsn1::from_bytes_be_unsigned(coefficient.to_bytes_be());
+
+                    (exponent_1, exponent_2, coefficient)
+                };
+
+                Ok(RSAPrivateKey {
+                    version,
+                    modulus,
+                    public_exponent,
+                    private_exponent,
+                    prime_1,
+                    prime_2,
+                    exponent_1,
+                    exponent_2,
+                    coefficient,
+                })
+            }
+        }
+
+        deserializer.deserialize_seq(Visitor)
+    }
 }
 
 impl RSAPrivateKey {
@@ -276,5 +363,36 @@ mod tests {
             coefficient,
         );
         check_serde!(private_key: PrivateKeyInfo in encoded);
+    }
+
+    #[test]
+    #[cfg(feature = "legacy")]
+    fn old_broken_key_legacy_support() {
+        // Version previous to picky-asn1-x509 6.0.0 could generate weird keys with negative values
+        // https://github.com/Devolutions/picky-rs/issues/53
+        // We want to support these for now.
+
+        let encoded = base64::decode(
+            "MIIDMAIBADANBgkqhkiG9w0BAQEFAASCAxowggMWAgEAAoIBAOB9jOJvCkMHOc98Q\
+             GPFikxAvBKANkme5f/nNuNnEnbefoKDFkS6ElfqASAAkIHxUREnRvBTTa6b+qba/0\
+             DhBuXsYGCl8VF0pUE4JGujv1HIi5aRCar0WmY66s7DJ4uR3Nk9Jy0WeRiH4yyzEIG\
+             8+6QDu4d/U6slWTmE8eZtQEE7rz4FGpQU9OhrGM3xJOIIbLX/xU2SFt83Xs3JREEt\
+             bfrXQpSxAHmtwvlBKpeZacrcobm6eQKsoI2MIg3LFvoHs0+40dadm14ngpgwx4qqk\
+             bG34jvWH13OhHRweFGNkQpcg99rlzZYkCM13e9EcmirQ9XYHuB5pHS31eznolZKbx\
+             cCAwEAAQKCAQCrPFlopxaGxk48jCR5dkbln0NWQWInigMazf06PHcDIPgTCXbE+cH\
+             gOWieRo/z7mTN1s3vpztMA0KQX9/wVzVx0Ho7fpiyb21WcEKnsIHRGk4PjZZ4Rmdm\
+             L27IRGg3uA1jz5fAdrHsGksY34Wp0MOJ+ibjViY2GAkVLOlvwMoQds6eNIGO88T5O\
+             fcmvutjK43ObU1vgx2ptTaLNAVczEE5VHqcLx4GZPv6k71afOQfIDQerIpsGb4gvr\
+             1JdwYKb4z02z2SaNIA3Vly0q5s4r8uU36eg9z65utu93M7zI7f8/MX2byZ2Jz4b3T\
+             nH10FURmbPoNQH/O2T0TbtT4M1y0xAoGA72JW0IcFxze7j7PPaP6cQN1IXvFDZUFF\
+             dZHqFI8+4VPcv3EKTs+iQflM7pqtRuEWtwonIn3f7CGOx317uKwpVsZvfnDhXCUPJ\
+             Q3pns7KgaROGXyruFFQ9gl6XsXGK02Wop9nX0/iRK3ruwZ4uJwDioEYcvGw+ocqAc\
+             yOdodNnpUCgYDwEo/sPJNaPOzc7fpaQr2PUUJ3ksL0ncGRO2h1JGYgDtWe5u1srSI\
+             DlpM2NdYSZyT04ebOF2SqNUBwY3LB1tPOFnjYwCutp4c75OYhOor7TodZHlzt3GeQ\
+             ntUw6XbHX0ohTgs4u2NXwOTq5yKeW4VYzuevN5ksF8GoW2noalpn+w==",
+        )
+        .unwrap();
+
+        picky_asn1_der::from_bytes::<PrivateKeyInfo>(&encoded).unwrap();
     }
 }
