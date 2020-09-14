@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+### Removed
+
+## [4.6.0] 2020-09-14
+
+### Changed
+
 - Update saphir dependency to `2.6`
 - [Official mongo driver](https://github.com/mongodb/mongo-rust-driver) is now used instead of the prototype
 - Dependencies clean up
