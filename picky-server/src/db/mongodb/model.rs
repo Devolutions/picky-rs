@@ -4,6 +4,20 @@ use mongodm::{
 };
 use serde::{Deserialize, Serialize};
 
+// == name == //
+
+pub struct NameCollConf;
+
+impl mongodm::CollectionConfig for NameCollConf {
+    fn collection_name() -> &'static str {
+        "name_store"
+    }
+
+    fn indexes() -> Indexes {
+        Indexes::new().with(Index::new("key").with_option(IndexOption::Unique))
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Name {
     pub key: String,
@@ -11,8 +25,16 @@ pub struct Name {
 }
 
 impl mongodm::Model for Name {
-    fn coll_name() -> &'static str {
-        "name_store"
+    type CollConf = NameCollConf;
+}
+
+// == key == //
+
+pub struct KeyCollConf;
+
+impl mongodm::CollectionConfig for KeyCollConf {
+    fn collection_name() -> &'static str {
+        "key_store"
     }
 
     fn indexes() -> Indexes {
@@ -27,8 +49,16 @@ pub struct Key {
 }
 
 impl mongodm::Model for Key {
-    fn coll_name() -> &'static str {
-        "key_store"
+    type CollConf = KeyCollConf;
+}
+
+// == key identifier == //
+
+pub struct KeyIdCollConf;
+
+impl mongodm::CollectionConfig for KeyIdCollConf {
+    fn collection_name() -> &'static str {
+        "key_identifier_store"
     }
 
     fn indexes() -> Indexes {
@@ -43,8 +73,16 @@ pub struct KeyIdentifier {
 }
 
 impl mongodm::Model for KeyIdentifier {
-    fn coll_name() -> &'static str {
-        "key_identifier_store"
+    type CollConf = KeyIdCollConf;
+}
+
+// == certificate == //
+
+pub struct CertCollConf;
+
+impl mongodm::CollectionConfig for CertCollConf {
+    fn collection_name() -> &'static str {
+        "certificate_store"
     }
 
     fn indexes() -> Indexes {
@@ -59,12 +97,16 @@ pub struct Certificate {
 }
 
 impl mongodm::Model for Certificate {
-    fn coll_name() -> &'static str {
-        "certificate_store"
-    }
+    type CollConf = CertCollConf;
+}
 
-    fn indexes() -> Indexes {
-        Indexes::new().with(Index::new("key").with_option(IndexOption::Unique))
+// == config == //
+
+pub struct ConfigCollConf;
+
+impl mongodm::CollectionConfig for ConfigCollConf {
+    fn collection_name() -> &'static str {
+        "configuration"
     }
 }
 
@@ -76,8 +118,20 @@ pub struct Config {
 }
 
 impl mongodm::Model for Config {
-    fn coll_name() -> &'static str {
-        "configuration"
+    type CollConf = ConfigCollConf;
+}
+
+// == hash lookup entry == //
+
+pub struct HashCollConf;
+
+impl mongodm::CollectionConfig for HashCollConf {
+    fn collection_name() -> &'static str {
+        "hash_lookup_table"
+    }
+
+    fn indexes() -> Indexes {
+        Indexes::new().with(Index::new("key").with_option(IndexOption::Unique))
     }
 }
 
@@ -88,11 +142,5 @@ pub struct HashLookupEntry {
 }
 
 impl mongodm::Model for HashLookupEntry {
-    fn coll_name() -> &'static str {
-        "hash_lookup_table"
-    }
-
-    fn indexes() -> Indexes {
-        Indexes::new().with(Index::new("key").with_option(IndexOption::Unique))
-    }
+    type CollConf = HashCollConf;
 }
