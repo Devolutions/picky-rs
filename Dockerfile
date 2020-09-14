@@ -4,7 +4,7 @@ LABEL maintainer "Devolutions Inc."
 WORKDIR /opt/wayk
 
 RUN apt-get update
-RUN apt-get install -y --no-install-recommends ca-certificates curl
+RUN apt-get install -y --no-install-recommends ca-certificates curl lsb-release
 RUN rm -rf /var/lib/apt/lists/*
 
 COPY picky-server .
