@@ -15,7 +15,7 @@ picky = { version = "6.0.0-beta3", default-features = false, features = ["x509",
 picky-asn1 = { version = "0.3", path = "../picky-asn1" }
 mongodm = { version = "0.4", features = ["tokio-runtime"] }
 clap = { features = ["yaml"], version = "2.32" }
-saphir = { version = "2.6", features = ["macro"] }
+saphir = { version = "2.7", features = ["macro"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0"
 serde_yaml = "0.8"
