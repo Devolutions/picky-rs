@@ -605,4 +605,27 @@ mod tests {
             "token not yet valid (not before: 1545263000, now: 1545262998 [leeway: 1])"
         );
     }
+
+    #[test]
+    fn decode_step_cli_generated_token() {
+        let pk_pem = crate::test_files::RSA_2048_PK_7.parse::<Pem>().unwrap();
+        let pk = PrivateKey::from_pem(&pk_pem).expect("private_key 7");
+
+        let token: &str = "eyJhbGciOiJSU0EtT0FFUC0yNTYiLCJlbmMiOiJBMjU2R0NNIiwia2lkIjoiekZIVnNNOWRjNE9sSEl3dkVuVnFmS3pSajF1anFZR3NablhBY2duX0NxSSJ9.nYfNbetIs-ot-lc2_kWdDATEduiY-uEjF6FWUwYgsKHCrrqwbgKnx0qu7gdhghqJ3-WwgOywlwyQL8EUSxhYFJqkBuISTpyUEdBmcEAjKgdG9wDiajzsHF32awTmVQCVKbS45knI4rnNQj6o37h7JX1IU9p0ZLl5s8SQ4HhwwD6yRRdFgrCk811LIfSWhBOadQNX2AqODGAKU9Dz30BqZMlmrrh0yoGltandsYsNcsQTCgP6a6kFW9tSIx2PN7ox7PpPL2DIos6VS-7qpGgxHwvhxGmsBYLWqE9D3Q0oqx-oiAdxEgknU355Ld6PiJm_Q2K8SnS0Fk83laRDU2FRuQ.OP91ilVez0ErRRXt._Q2yVghXSubt44LbhS4iIF5A8vohaVasnsa_Xnx3cH6LU5kPr_gtSVNT5ZXV67mBz9xY2QNTlArtmR7z1yJrx2yftePxxDOBqz9Bdo189h1iQ_QrzLaGQogkuCFf2BuOAv4wYh6kJ4S835MXM6afNmItQcLV45LX_Bu02GuUa7syx9n4UU0KMKKpyEt79Fx-WN9BDrrQ-P-6eJTuiGi4x7d5O1Dp7ocV4CxgIA4faZznMi05fZsY4ebEP2O9VZ2zfMyv_KT7WeGyB2pcBfpupMGmKybqXweT8QdoFSMnfmE_vqnIxQzFHHVOYrrrUKu9T-294TicUdmgohqIAWzBq0_dm9HFrdD_BnHfOtfnFJn_uHdtsTPPA7L54Mb_81ijLrooZvbrIPXZsJc_YLq65vkYWtdbfA5JDZIK8jDZr-79YyBIrqsYgn3w2LwgNHuKU0Ro-zheV208xCsKYbOooX4E86YAgeltwt_W-VyD-06fKpADUyN2p8ck3AG5k2FV2LUJ7ZSkesixprcOmzDDIjmMrKFyqsbEj0Fwm4kk-RNO3M8T2b00IEdcrP3EUoDm6CG-Ur7NNOosR-7xuK4wnH9KN8x9ePRJeil3G0zWNpIsV9dQhDQaP42HdYfyJ28LLn1tBn9aG_L8Erp7_Yv0Y21VrpoNLLnsptms4N82le3iYXN6Rlk-R6Mv04SupNEOoOFG3NpPa7NF-phcoR65BIFgjonTLPabEanAxu3vBhqGiX9N9A57N1av10cjVhqiOY-FxUTlubIDaw00F1974AuDGhx5bWllVr-68qXEpmatyee8j7tJd1XlEvHy6CpDrOFh-fEFKuwy_e0iMKPEF_Jj2vdX5sb8DAriAkoUY_m9zL29RNZzhdsbWamUMlIFlObkj09f_Db1P-FdolZga3xfdteUOB5Ig9vecEm7B9iE4hBJ4HcJY8yMGT1XS1_b9MSmWkUz4wf_3DHbgK6EUlDjqrLfHWBWZr7--stcFlVmxChu5wL5zAqIDoIcoAT_yIU8DgeRknZImbRAhXBtGoGvcCoRktLTNwoul4I.5SToM5GtHWm-beaADd1uhg";
+        let jwe = Jwe::decode(token, &pk).unwrap();
+
+        #[derive(Deserialize)]
+        struct SomeJetClaims {
+            jet_ap: String,
+            prx_usr: String,
+            nbf: i64,
+        };
+
+        let payload = core::str::from_utf8(&jwe.payload).unwrap();
+        let jwk = JwtSig::<SomeJetClaims>::decode_dangerous(payload, &JwtValidator::no_check()).unwrap();
+
+        assert_eq!(jwk.claims.jet_ap, "rdp");
+        assert_eq!(jwk.claims.prx_usr, "username");
+        assert_eq!(jwk.claims.nbf, 1600373587);
+    }
 }
