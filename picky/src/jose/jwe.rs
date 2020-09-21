@@ -344,7 +344,7 @@ impl Jwe {
 
     /// Encode with CEK encrypted and included in the token using asymmetric cryptography.
     pub fn encode(self, asymmetric_key: &PublicKey) -> Result<String, JweError> {
-        encode_impl(self, EncoderMode::Normal(asymmetric_key))
+        encode_impl(self, EncoderMode::Asymetric(asymmetric_key))
     }
 
     /// Encode with provided CEK (a symmetric key). This will ignore `alg` value and override it with "dir".
@@ -367,12 +367,13 @@ impl Jwe {
 
 #[derive(Debug, Clone)]
 enum EncoderMode<'a> {
-    Normal(&'a PublicKey),
+    Asymetric(&'a PublicKey),
     Direct(&'a [u8]),
 }
 
 fn encode_impl(jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
     let mut header = jwe.header;
+    let protected_header_base64 = base64::encode_config(&serde_json::to_vec(&header)?, base64::URL_SAFE_NO_PAD);
 
     let (encrypted_key_base64, jwe_cek) = match mode {
         EncoderMode::Direct(symmetric_key) => {
@@ -392,7 +393,7 @@ fn encode_impl(jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
                 Cow::Borrowed(symmetric_key),
             )
         }
-        EncoderMode::Normal(public_key) => {
+        EncoderMode::Asymetric(public_key) => {
             // Currently, only rsa is supported
             let rsa_public_key = RSAPublicKey::try_from(public_key)?;
 
@@ -423,7 +424,7 @@ fn encode_impl(jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
 
     let mut buffer = jwe.payload;
     let nonce = <aes_gcm::aead::Nonce<_> as From<[u8; 12]>>::from(rand::random()); // 96-bits nonce for AES-GCM
-    let aad = b""; // The Additional Authenticated Data value used is the empty octet string for AES-GCM.
+    let aad = protected_header_base64.as_bytes(); // The Additional Authenticated Data value used for AES-GCM.
     let authentication_tag = match header.enc {
         JweEnc::Aes128Gcm => {
             Aes128Gcm::new(GenericArray::from_slice(&jwe_cek)).encrypt_in_place_detached(&nonce, aad, &mut buffer)?
@@ -441,7 +442,6 @@ fn encode_impl(jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
         }
     };
 
-    let protected_header_base64 = base64::encode_config(&serde_json::to_vec(&header)?, base64::URL_SAFE_NO_PAD);
     let initialization_vector_base64 = base64::encode_config(nonce.as_slice(), base64::URL_SAFE_NO_PAD);
     let ciphertext_base64 = base64::encode_config(&buffer, base64::URL_SAFE_NO_PAD);
     let authentication_tag_base64 = base64::encode_config(&authentication_tag, base64::URL_SAFE_NO_PAD);
@@ -458,13 +458,14 @@ fn encode_impl(jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
 
 // decoder
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 enum DecoderMode<'a> {
     Normal(&'a PrivateKey),
     Direct(&'a [u8]),
 }
 
-struct Parts {
+struct Parts<'a> {
+    protected_header_base64: &'a str,
     protected_header: Vec<u8>,
     encrypted_key: Vec<u8>,
     initialization_vector: Vec<u8>,
@@ -472,11 +473,13 @@ struct Parts {
     authentication_tag: Vec<u8>,
 }
 
-impl Parts {
-    fn break_down(encoded_token: &str) -> Option<Self> {
+impl<'a> Parts<'a> {
+    fn break_down(encoded_token: &'a str) -> Option<Self> {
         let mut split = encoded_token.splitn(5, '.');
+        let protected_header_base64 = split.next()?;
         Some(Parts {
-            protected_header: base64::decode_config(split.next()?, base64::URL_SAFE_NO_PAD).ok()?,
+            protected_header_base64,
+            protected_header: base64::decode_config(protected_header_base64, base64::URL_SAFE_NO_PAD).ok()?,
             encrypted_key: base64::decode_config(split.next()?, base64::URL_SAFE_NO_PAD).ok()?,
             initialization_vector: base64::decode_config(split.next()?, base64::URL_SAFE_NO_PAD).ok()?,
             ciphertext: base64::decode_config(split.next()?, base64::URL_SAFE_NO_PAD).ok()?,
@@ -540,7 +543,7 @@ fn decode_impl<'a>(encoded_token: &str, mode: DecoderMode<'a>) -> Result<Jwe, Jw
 
     let mut buffer = parts.ciphertext;
     let nonce = GenericArray::from_slice(&parts.initialization_vector);
-    let aad = b""; // The Additional Authenticated Data value used is the empty octet string for AES-GCM.
+    let aad = parts.protected_header_base64.as_bytes(); // The Additional Authenticated Data value used for AES-GCM.
     match header.enc {
         JweEnc::Aes128Gcm => Aes128Gcm::new(GenericArray::from_slice(&jwe_cek)).decrypt_in_place_detached(
             &nonce,
@@ -580,14 +583,12 @@ mod tests {
 
     fn get_private_key_1() -> PrivateKey {
         let pk_pem = crate::test_files::RSA_2048_PK_1.parse::<Pem>().unwrap();
-        PrivateKey::from_pem(&pk_pem).unwrap()
+        PrivateKey::from_pem(&pk_pem).expect("private_key 1")
     }
 
     fn get_private_key_2() -> PrivateKey {
-        let pk_pem = crate::test_files::RSA_2048_PK_7
-            .parse::<Pem>()
-            .expect("private key pem");
-        PrivateKey::from_pem(&pk_pem).expect("private_key")
+        let pk_pem = crate::test_files::RSA_2048_PK_7.parse::<Pem>().unwrap();
+        PrivateKey::from_pem(&pk_pem).expect("private_key 7")
     }
 
     #[test]
@@ -648,5 +649,77 @@ mod tests {
 
         let err = Jwe::decode_direct(&encoded, b"zzzzzzzzabcdefghzzzzzzzz").err().unwrap();
         assert_eq!(err.to_string(), "AES-GCM error (opaque)");
+    }
+
+    #[test]
+    #[ignore = "this is not directly using picky code"]
+    fn rfc7516_example_using_rsaes_oaep_and_aes_gcm() {
+        // See: https://tools.ietf.org/html/rfc7516#appendix-A.1
+
+        let plaintext = b"The true sign of intelligence is not knowledge but imagination.";
+        let jwe = Jwe::new(JweAlg::RsaOaep, JweEnc::Aes256Gcm, plaintext.to_vec());
+
+        // 1: JOSE header
+
+        let protected_header_base64 =
+            base64::encode_config(&serde_json::to_vec(&jwe.header).unwrap(), base64::URL_SAFE_NO_PAD);
+        assert_eq!(
+            protected_header_base64,
+            "eyJhbGciOiJSU0EtT0FFUCIsImVuYyI6IkEyNTZHQ00ifQ"
+        );
+
+        // 2: Content Encryption Key (CEK)
+
+        let cek = [
+            177, 161, 244, 128, 84, 143, 225, 115, 63, 180, 3, 255, 107, 154, 212, 246, 138, 7, 110, 91, 112, 46, 34,
+            105, 47, 130, 203, 46, 122, 234, 64, 252,
+        ];
+
+        // 3: Key Encryption
+
+        let encrypted_key_base64 = "OKOawDo13gRp2ojaHV7LFpZcgV7T6DVZKTyKOMTYUmKoTCVJRgckCL9kiMT03JGeipsEdY3mx_etLbbWSrFr05kLzcSr4qKAq7YN7e9jwQRb23nfa6c9d-StnImGyFDbSv04uVuxIp5Zms1gNxKKK2Da14B8S4rzVRltdYwam_lDp5XnZAYpQdb76FdIKLaVmqgfwX7XWRxv2322i-vDxRfqNzo_tETKzpVLzfiwQyeyPGLBIO56YJ7eObdv0je81860ppamavo35UgoRdbYaBcoh9QcfylQr66oc6vFWXRcZ_ZT2LawVCWTIy3brGPi6UklfCpIMfIjf7iGdXKHzg";
+
+        // 4: Initialization Vector
+
+        let iv_base64 = "48V1_ALb6US04U3b";
+        let iv = base64::decode_config(iv_base64, base64::URL_SAFE_NO_PAD).unwrap();
+
+        // 5: AAD
+
+        let aad = protected_header_base64.as_bytes();
+
+        // 6: Content Encryption
+
+        let mut buffer = plaintext.to_vec();
+        let tag = Aes256Gcm::new(GenericArray::from_slice(&cek))
+            .encrypt_in_place_detached(GenericArray::from_slice(&iv), aad, &mut buffer)
+            .unwrap();
+        let ciphertext = buffer;
+
+        assert_eq!(
+            ciphertext.as_slice(),
+            &[
+                229, 236, 166, 241, 53, 191, 115, 196, 174, 43, 73, 109, 39, 122, 233, 96, 140, 206, 120, 52, 51, 237,
+                48, 11, 190, 219, 186, 80, 111, 104, 50, 142, 47, 167, 59, 61, 181, 127, 196, 21, 40, 82, 242, 32, 123,
+                143, 168, 226, 73, 216, 176, 144, 138, 247, 106, 60, 16, 205, 160, 109, 64, 63, 192
+            ]
+        );
+        assert_eq!(
+            tag.as_slice(),
+            &[92, 80, 104, 49, 133, 25, 161, 215, 173, 101, 219, 211, 136, 91, 210, 145]
+        );
+
+        // 7: Complete Representation
+
+        let token = format!(
+            "{}.{}.{}.{}.{}",
+            protected_header_base64,
+            encrypted_key_base64,
+            iv_base64,
+            base64::encode_config(&ciphertext, base64::URL_SAFE_NO_PAD),
+            base64::encode_config(&tag, base64::URL_SAFE_NO_PAD),
+        );
+
+        assert_eq!(token, "eyJhbGciOiJSU0EtT0FFUCIsImVuYyI6IkEyNTZHQ00ifQ.OKOawDo13gRp2ojaHV7LFpZcgV7T6DVZKTyKOMTYUmKoTCVJRgckCL9kiMT03JGeipsEdY3mx_etLbbWSrFr05kLzcSr4qKAq7YN7e9jwQRb23nfa6c9d-StnImGyFDbSv04uVuxIp5Zms1gNxKKK2Da14B8S4rzVRltdYwam_lDp5XnZAYpQdb76FdIKLaVmqgfwX7XWRxv2322i-vDxRfqNzo_tETKzpVLzfiwQyeyPGLBIO56YJ7eObdv0je81860ppamavo35UgoRdbYaBcoh9QcfylQr66oc6vFWXRcZ_ZT2LawVCWTIy3brGPi6UklfCpIMfIjf7iGdXKHzg.48V1_ALb6US04U3b.5eym8TW_c8SuK0ltJ3rpYIzOeDQz7TALvtu6UG9oMo4vpzs9tX_EFShS8iB7j6jiSdiwkIr3ajwQzaBtQD_A.XFBoMYUZodetZdvTiFvSkQ");
     }
 }
