@@ -2182,9 +2182,9 @@ dependencies = [
 
 [[package]]
 name = "saphir"
-version = "2.7.2"
+version = "2.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8bfe676c590e849f3356bc7da2681bdb714e99688dc4cd3f6b4ff9f086b63065"
+checksum = "8bceb3cea8b798f101afefbc57cf086b1a31eef4bfc92d8e12fb1b8992ec876a"
 dependencies = [
  "futures",
  "futures-util",
@@ -2202,10 +2202,11 @@ dependencies = [
 
 [[package]]
 name = "saphir-cookie"
-version = "0.13.1"
+version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aee29ab535cc4082ced8fb810b7059ef2b94f09e2211936b23d7f58d3654b401"
+checksum = "ebbfddbcede862061268cdcf2657ebb430d139d33d82932f0f7accc3a78bff74"
 dependencies = [
+ "chrono",
  "time",
 ]
 
