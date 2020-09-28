@@ -72,7 +72,7 @@ impl Picky {
         key_usage.set_crl_sign(true);
 
         CertificateBuilder::new()
-            .valididy(valid_from, valid_to)
+            .validity(valid_from, valid_to)
             .self_signed(DirectoryName::new_common_name(name), &key)
             .signature_hash_type(signature_hash_type)
             .ca(true)
@@ -101,7 +101,7 @@ impl Picky {
         key_usage.set_crl_sign(true);
 
         CertificateBuilder::new()
-            .valididy(valid_from, valid_to)
+            .validity(valid_from, valid_to)
             .subject(subject_name, intermediate_key)
             .issuer_cert(issuer_cert, issuer_key)
             .signature_hash_type(signature_hash_type)
@@ -138,7 +138,7 @@ impl Picky {
         let san = GeneralNames::new(dns_gn);
 
         CertificateBuilder::new()
-            .valididy(valid_from, valid_to)
+            .validity(valid_from, valid_to)
             .subject_from_csr(csr)
             .issuer_cert(issuer_cert, issuer_key)
             .signature_hash_type(signature_hash_type)

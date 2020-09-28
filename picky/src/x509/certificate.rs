@@ -601,7 +601,7 @@ impl<'a> CertificateBuilder<'a> {
 
     /// Required
     #[inline]
-    pub fn valididy(&self, valid_from: UTCDate, valid_to: UTCDate) -> &Self {
+    pub fn validity(&self, valid_from: UTCDate, valid_to: UTCDate) -> &Self {
         let mut inner_mut = self.inner.borrow_mut();
         inner_mut.valid_from = Some(valid_from);
         inner_mut.valid_to = Some(valid_to);
@@ -918,7 +918,7 @@ mod tests {
         let valid_to = UTCDate::ymd(2019, 10, 11).unwrap();
 
         let root = CertificateBuilder::new()
-            .valididy(valid_from, valid_to)
+            .validity(valid_from, valid_to)
             .self_signed(DirectoryName::new_common_name("test"), &private_key)
             .ca(true)
             .build()
@@ -956,7 +956,7 @@ mod tests {
         let leaf_key = parse_key(crate::test_files::RSA_2048_PK_3);
 
         let root = CertificateBuilder::new()
-            .valididy(UTCDate::ymd(2065, 6, 15).unwrap(), UTCDate::ymd(2070, 6, 15).unwrap())
+            .validity(UTCDate::ymd(2065, 6, 15).unwrap(), UTCDate::ymd(2070, 6, 15).unwrap())
             .self_signed(DirectoryName::new_common_name("TheFuture.usodakedo Root CA"), &root_key)
             .ca(true)
             .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_512))
@@ -966,7 +966,7 @@ mod tests {
         assert_eq!(root.ty(), CertType::Root);
 
         let intermediate = CertificateBuilder::new()
-            .valididy(UTCDate::ymd(2068, 1, 1).unwrap(), UTCDate::ymd(2071, 1, 1).unwrap())
+            .validity(UTCDate::ymd(2068, 1, 1).unwrap(), UTCDate::ymd(2071, 1, 1).unwrap())
             .subject(
                 DirectoryName::new_common_name("TheFuture.usodakedo Authority"),
                 intermediate_key.to_public_key(),
@@ -988,7 +988,7 @@ mod tests {
         .unwrap();
 
         let signed_leaf = CertificateBuilder::new()
-            .valididy(UTCDate::ymd(2069, 1, 1).unwrap(), UTCDate::ymd(2072, 1, 1).unwrap())
+            .validity(UTCDate::ymd(2069, 1, 1).unwrap(), UTCDate::ymd(2072, 1, 1).unwrap())
             .subject_from_csr(csr)
             .issuer_cert(&intermediate, &intermediate_key)
             .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_384))
@@ -1115,7 +1115,7 @@ mod tests {
         let malicious_root_key = parse_key(crate::test_files::RSA_2048_PK_4);
 
         let root = CertificateBuilder::new()
-            .valididy(UTCDate::ymd(2065, 6, 15).unwrap(), UTCDate::ymd(2070, 6, 15).unwrap())
+            .validity(UTCDate::ymd(2065, 6, 15).unwrap(), UTCDate::ymd(2070, 6, 15).unwrap())
             .self_signed(DirectoryName::new_common_name("VerySafe Root CA"), &root_key)
             .ca(true)
             .pathlen(1)
@@ -1125,7 +1125,7 @@ mod tests {
             .expect("couldn't build root ca");
 
         let intermediate = CertificateBuilder::new()
-            .valididy(UTCDate::ymd(2068, 1, 1).unwrap(), UTCDate::ymd(2071, 1, 1).unwrap())
+            .validity(UTCDate::ymd(2068, 1, 1).unwrap(), UTCDate::ymd(2071, 1, 1).unwrap())
             .subject(
                 DirectoryName::new_common_name("V.E.R.Y Legitimate VerySafe Authority"),
                 intermediate_key.to_public_key(),
@@ -1146,7 +1146,7 @@ mod tests {
         .unwrap();
 
         let signed_leaf = CertificateBuilder::new()
-            .valididy(UTCDate::ymd(2069, 1, 1).unwrap(), UTCDate::ymd(2072, 1, 1).unwrap())
+            .validity(UTCDate::ymd(2069, 1, 1).unwrap(), UTCDate::ymd(2072, 1, 1).unwrap())
             .subject_from_csr(csr)
             .issuer_cert(&intermediate, &intermediate_key)
             .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_224))
@@ -1186,7 +1186,7 @@ mod tests {
         let leaf_key = parse_key(crate::test_files::RSA_2048_PK_3);
 
         let root = CertificateBuilder::new()
-            .valididy(UTCDate::ymd(2065, 6, 15).unwrap(), UTCDate::ymd(2070, 6, 15).unwrap())
+            .validity(UTCDate::ymd(2065, 6, 15).unwrap(), UTCDate::ymd(2070, 6, 15).unwrap())
             .self_signed(DirectoryName::new_common_name("VerySafe Root CA"), &root_key)
             .ca(true)
             .pathlen(0)
@@ -1194,7 +1194,7 @@ mod tests {
             .expect("couldn't build root ca");
 
         let intermediate = CertificateBuilder::new()
-            .valididy(UTCDate::ymd(2068, 1, 1).unwrap(), UTCDate::ymd(2071, 1, 1).unwrap())
+            .validity(UTCDate::ymd(2068, 1, 1).unwrap(), UTCDate::ymd(2071, 1, 1).unwrap())
             .subject(
                 DirectoryName::new_common_name("V.E.R.Y Legitimate VerySafe Authority"),
                 intermediate_key.to_public_key(),
@@ -1213,7 +1213,7 @@ mod tests {
         .unwrap();
 
         let signed_leaf = CertificateBuilder::new()
-            .valididy(UTCDate::ymd(2069, 1, 1).unwrap(), UTCDate::ymd(2072, 1, 1).unwrap())
+            .validity(UTCDate::ymd(2069, 1, 1).unwrap(), UTCDate::ymd(2072, 1, 1).unwrap())
             .subject_from_csr(csr.clone())
             .issuer_cert(&intermediate, &intermediate_key)
             .build()
@@ -1234,7 +1234,7 @@ mod tests {
         );
 
         let invalid_issuer_signed_leaf = CertificateBuilder::new()
-            .valididy(UTCDate::ymd(2069, 1, 1).unwrap(), UTCDate::ymd(2072, 1, 1).unwrap())
+            .validity(UTCDate::ymd(2069, 1, 1).unwrap(), UTCDate::ymd(2072, 1, 1).unwrap())
             .subject_from_csr(csr)
             .issuer_cert(&signed_leaf, &leaf_key)
             .build()
