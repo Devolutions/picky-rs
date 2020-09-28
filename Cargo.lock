@@ -1669,7 +1669,7 @@ checksum = "d4fd5641d01c8f18a23da7b6fe29298ff4b55afcccdf78973b24cf3175fee32e"
 
 [[package]]
 name = "picky"
-version = "6.0.0-beta4"
+version = "6.0.0-beta5"
 dependencies = [
  "aes-gcm",
  "base64 0.12.3",

@@ -1,14 +1,14 @@
 [package]
 name = "picky"
-version = "6.0.0-beta4"
+version = "6.0.0-beta5"
 authors = [
     "Benoît CORTIER <benoit.cortier@fried-world.eu>",
     "Jonathan Trepanier <jtrepanier@devolutions.net>",
     "François Dubois <fdubois@devolutions.net>",
     "Richard Markiewicz <rmarkiewicz@devolutions.net>",
 ]
-description = "Portable X.509, Jose and PKI implementation."
-keywords = ["x509", "jwt", "http", "signatures", "pki"]
+description = "Portable X.509, PKI, JOSE and HTTP signature implementation."
+keywords = ["x509", "jwt", "signature", "jose", "pki"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Devolutions/picky-rs"
@@ -45,9 +45,11 @@ cfg-if = "0.1"
 [features]
 default = ["x509", "jose", "http_signature", "http_trait_impl"]
 
+# main features
 x509 = []
 jose = ["serde_json", "aes-gcm"]
 http_signature = []
 
+# secondary features
 http_trait_impl = ["http"]
 chrono_conversion = ["chrono", "picky-asn1/chrono_conversion"]
