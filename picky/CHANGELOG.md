@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.0.0-beta5] 2020-09-28
+
+## Added
+
+- `from_pem_str` method to `Cert`, `Csr`, `PrivateKey` and `PublicKey`.
+
+## Changed
+
+- Typo in `CertificateBuilder` API: `valididy` has been renamed to `validity`.
+
 ## [6.0.0-beta2] 2020-08-31
 
 ## Fixed
@@ -15,8 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Added
 
-- Implementation of `Jwe` (JSON Web Encryption) RFC
-- Email attribute can be added to `DirectoryName` using `add_email` method
+- Implementation of `Jwe` (JSON Web Encryption) RFC.
+- Email attribute can be added to `DirectoryName` using `add_email` method.
 
 ## Changed
 
