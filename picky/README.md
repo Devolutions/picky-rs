@@ -12,7 +12,7 @@ Portable X.509, PKI, JOSE and HTTP signature implementation.
 
 ## HTTP signature
 
-[See doc](https://docs.rs/picky/latest/picky/html/index.html) for tested examples.
+[See doc](https://docs.rs/picky/latest/picky/http/index.html) for tested examples.
 
 ## JOSE
 
