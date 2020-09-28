@@ -258,8 +258,8 @@ mod tests {
         let err = Picky::parse_pk_from_magic_der(pem.data()).unwrap_err();
         assert_eq!(
             err.to_string(),
-            "couldn't parse private key as pkcs8: (asn1) couldn't deserialize private key info (pkcs8): InvalidData ; \
-             couldn't parse private key as raw der-encoded RSA key either: (asn1) couldn't deserialize rsa private key: InvalidData"
+            "couldn't parse private key as pkcs8: (ASN1) couldn't deserialize private key info (pkcs8): InvalidData ; \
+             couldn't parse private key as raw der-encoded RSA key either: (ASN1) couldn't deserialize rsa private key: InvalidData"
         );
     }
 }

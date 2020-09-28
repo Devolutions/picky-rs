@@ -1,6 +1,6 @@
 //! Wrappers around public and private keys raw data providing an easy to use API
 
-use crate::pem::{to_pem, Pem};
+use crate::pem::{parse_pem, to_pem, Pem, PemError};
 use core::convert::TryFrom;
 use num_bigint_dig::traits::ModInverse;
 use picky_asn1::wrapper::{BitStringAsn1Container, IntegerAsn1, OctetStringAsn1Container};
@@ -11,15 +11,15 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum KeyError {
-    /// asn1 serialization error
-    #[error("(asn1) couldn't serialize {element}: {source}")]
+    /// ASN1 serialization error
+    #[error("(ASN1) couldn't serialize {element}: {source}")]
     Asn1Serialization {
         element: &'static str,
         source: Asn1DerError,
     },
 
-    /// asn1 deserialization error
-    #[error("(asn1) couldn't deserialize {element}: {source}")]
+    /// ASN1 deserialization error
+    #[error("(ASN1) couldn't deserialize {element}: {source}")]
     Asn1Deserialization {
         element: &'static str,
         source: Asn1DerError,
@@ -36,11 +36,21 @@ pub enum KeyError {
     /// unsupported algorithm
     #[error("unsupported algorithm: {algorithm}")]
     UnsupportedAlgorithm { algorithm: &'static str },
+
+    /// invalid PEM provided
+    #[error("invalid PEM provided: {source}")]
+    Pem { source: PemError },
 }
 
 impl From<rsa::errors::Error> for KeyError {
     fn from(e: rsa::errors::Error) -> Self {
-        KeyError::Rsa { context: e.to_string() }
+        Self::Rsa { context: e.to_string() }
+    }
+}
+
+impl From<PemError> for KeyError {
+    fn from(e: PemError) -> Self {
+        Self::Pem { source: e }
     }
 }
 
@@ -115,6 +125,11 @@ impl PrivateKey {
                 label: pem.label().to_owned(),
             }),
         }
+    }
+
+    pub fn from_pem_str(pem_str: &str) -> Result<Self, KeyError> {
+        let pem = parse_pem(pem_str)?;
+        Self::from_pem(&pem)
     }
 
     pub fn from_pkcs8<T: ?Sized + AsRef<[u8]>>(pkcs8: &T) -> Result<Self, KeyError> {
@@ -316,6 +331,11 @@ impl PublicKey {
                 label: pem.label().to_owned(),
             }),
         }
+    }
+
+    pub fn from_pem_str(pem_str: &str) -> Result<Self, KeyError> {
+        let pem = parse_pem(pem_str)?;
+        Self::from_pem(&pem)
     }
 
     pub fn from_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, KeyError> {

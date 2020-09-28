@@ -1,3 +1,5 @@
+//! OIDs commonly used with X.509 certificates
+
 /// Unsafely marks a branch as unreachable.
 /// This won't panic if reached, however children will be sacrificed and dark magic performed.
 ///

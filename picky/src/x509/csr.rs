@@ -1,6 +1,6 @@
 use crate::{
     key::{PrivateKey, PublicKey},
-    pem::Pem,
+    pem::{parse_pem, Pem, PemError},
     signature::{SignatureAlgorithm, SignatureError},
     x509::name::DirectoryName,
 };
@@ -11,15 +11,15 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum CsrError {
-    /// asn1 serialization error
-    #[error("(asn1) couldn't serialize {element}: {source}")]
+    /// ASN1 serialization error
+    #[error("(ASN1) couldn't serialize {element}: {source}")]
     Asn1Serialization {
         element: &'static str,
         source: Asn1DerError,
     },
 
-    /// asn1 deserialization error
-    #[error("(asn1) couldn't deserialize {}: {}", element, source)]
+    /// ASN1 deserialization error
+    #[error("(ASN1) couldn't deserialize {}: {}", element, source)]
     Asn1Deserialization {
         element: &'static str,
         source: Asn1DerError,
@@ -32,6 +32,16 @@ pub enum CsrError {
     /// invalid PEM label error
     #[error("invalid PEM label: {}", label)]
     InvalidPemLabel { label: String },
+
+    /// invalid PEM provided
+    #[error("invalid PEM provided: {source}")]
+    Pem { source: PemError },
+}
+
+impl From<PemError> for CsrError {
+    fn from(e: PemError) -> Self {
+        Self::Pem { source: e }
+    }
 }
 
 const CSR_PEM_LABEL: &str = "CERTIFICATE REQUEST";
@@ -54,6 +64,11 @@ impl Csr {
                 element: "certification request",
             }
         })?))
+    }
+
+    pub fn from_pem_str(pem_str: &str) -> Result<Self, CsrError> {
+        let pem = parse_pem(pem_str)?;
+        Self::from_pem(&pem)
     }
 
     pub fn from_pem(pem: &Pem) -> Result<Self, CsrError> {

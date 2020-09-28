@@ -1,7 +1,7 @@
 use crate::{
     hash::HashAlgorithm,
     key::{PrivateKey, PublicKey},
-    pem::Pem,
+    pem::{parse_pem, Pem, PemError},
     signature::{SignatureAlgorithm, SignatureError},
     x509::{
         csr::{Csr, CsrError},
@@ -29,15 +29,15 @@ pub enum CertError {
     #[error("invalid certificate '{id}': {source}")]
     InvalidCertificate { id: String, source: Box<CertError> },
 
-    /// asn1 serialization error
-    #[error("(asn1) couldn't serialize {element}: {source}")]
+    /// ASN1 serialization error
+    #[error("(ASN1) couldn't serialize {element}: {source}")]
     Asn1Serialization {
         element: &'static str,
         source: Asn1DerError,
     },
 
-    /// asn1 deserialization error
-    #[error("(asn1) couldn't deserialize {element}: {source}")]
+    /// ASN1 deserialization error
+    #[error("(ASN1) couldn't deserialize {element}: {source}")]
     Asn1Deserialization {
         element: &'static str,
         source: Asn1DerError,
@@ -78,6 +78,16 @@ pub enum CertError {
     /// invalid PEM label error
     #[error("invalid PEM label: {label}")]
     InvalidPemLabel { label: String },
+
+    /// invalid PEM provided
+    #[error("invalid PEM provided: {source}")]
+    Pem { source: PemError },
+}
+
+impl From<PemError> for CertError {
+    fn from(e: PemError) -> Self {
+        Self::Pem { source: e }
+    }
 }
 
 #[derive(Debug, Error)]
@@ -158,6 +168,11 @@ impl Cert {
                 label: pem.label().to_owned(),
             }),
         }
+    }
+
+    pub fn from_pem_str(pem_str: &str) -> Result<Self, CertError> {
+        let pem = parse_pem(pem_str)?;
+        Self::from_pem(&pem)
     }
 
     pub fn to_der(&self) -> Result<Vec<u8>, CertError> {
