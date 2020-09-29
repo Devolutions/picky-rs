@@ -384,7 +384,7 @@ mod tests {
                 let valid_to = UTCDate::ymd(2019, 10, 11).unwrap();
 
                 CertificateBuilder::new()
-                    .valididy(valid_from, valid_to)
+                    .validity(valid_from, valid_to)
                     .self_signed(DirectoryName::new_common_name("Test Root CA"), &private_key)
                     .ca(true)
                     .build()
