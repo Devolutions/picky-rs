@@ -1,6 +1,6 @@
 [package]
 name = "picky-asn1-x509"
-version = "0.3.2"
+version = "0.3.3"
 authors = ["Benoît CORTIER <benoit.cortier@fried-world.eu>"]
 description = "Provides ASN1 types defined by X.509 related RFCs"
 edition = "2018"
