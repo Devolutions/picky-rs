@@ -373,18 +373,18 @@ impl FromStr for HttpSignature {
             }
         });
 
-        let signature =
-            keys.remove(HTTP_SIGNATURE_SIGNATURE)
-                .ok_or_else(|| HttpSignatureError::MissingRequiredParameter {
-                    parameter: HTTP_SIGNATURE_SIGNATURE,
-                })?;
+        let signature = keys
+            .remove(HTTP_SIGNATURE_SIGNATURE)
+            .ok_or(HttpSignatureError::MissingRequiredParameter {
+                parameter: HTTP_SIGNATURE_SIGNATURE,
+            })?;
 
         let legacy = !signature.contains(|c: char| c == '/' || c == '+');
 
         Ok(HttpSignature {
             key_id: keys
                 .remove(HTTP_SIGNATURE_KEY_ID)
-                .ok_or_else(|| HttpSignatureError::MissingRequiredParameter {
+                .ok_or(HttpSignatureError::MissingRequiredParameter {
                     parameter: HTTP_SIGNATURE_KEY_ID,
                 })?,
             headers,
@@ -783,20 +783,20 @@ impl<'a> HttpSignatureVerifier<'a> {
                         Header::Created => acc.push(format!(
                             "{}: {}",
                             header.as_str(),
-                            self.http_signature.created.ok_or_else(|| {
-                                HttpSignatureError::MissingRequiredParameter {
+                            self.http_signature
+                                .created
+                                .ok_or(HttpSignatureError::MissingRequiredParameter {
                                     parameter: HTTP_SIGNATURE_CREATED,
-                                }
-                            })?
+                                })?
                         )),
                         Header::Expires => acc.push(format!(
                             "{}: {}",
                             header.as_str(),
-                            self.http_signature.expires.ok_or_else(|| {
-                                HttpSignatureError::MissingRequiredParameter {
+                            self.http_signature
+                                .expires
+                                .ok_or(HttpSignatureError::MissingRequiredParameter {
                                     parameter: HTTP_SIGNATURE_EXPIRES,
-                                }
-                            })?
+                                })?
                         )),
                     }
                 }

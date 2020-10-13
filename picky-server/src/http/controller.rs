@@ -345,7 +345,7 @@ async fn sign_certificate(
     let dns_name = csr
         .subject_name()
         .find_common_name()
-        .ok_or_else(|| "couldn't find signed cert subject common name")?
+        .ok_or("couldn't find signed cert subject common name")?
         .to_string();
 
     let signed_cert = Picky::generate_leaf_from_csr(

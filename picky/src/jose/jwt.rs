@@ -393,7 +393,7 @@ fn h_decode_and_validate_claims<C: DeserializeOwned>(
                     })
                 }
                 (_, Some(nbf)) => {
-                    let nbf_i64 = nbf.as_i64().ok_or_else(|| JwtError::InvalidRegisteredClaimType {
+                    let nbf_i64 = nbf.as_i64().ok_or(JwtError::InvalidRegisteredClaimType {
                         claim: NOT_BEFORE_CLAIM,
                     })?;
                     if !current_date.is_after(nbf_i64) {
@@ -414,7 +414,7 @@ fn h_decode_and_validate_claims<C: DeserializeOwned>(
                     })
                 }
                 (_, Some(exp)) => {
-                    let exp_i64 = exp.as_i64().ok_or_else(|| JwtError::InvalidRegisteredClaimType {
+                    let exp_i64 = exp.as_i64().ok_or(JwtError::InvalidRegisteredClaimType {
                         claim: EXPIRATION_TIME_CLAIM,
                     })?;
                     if !current_date.is_before_strict(exp_i64) {
