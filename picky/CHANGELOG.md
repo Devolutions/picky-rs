@@ -5,28 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [6.0.0-beta5] 2020-09-28
-
-## Added
-
-- `from_pem_str` method to `Cert`, `Csr`, `PrivateKey` and `PublicKey`.
-
-## Changed
-
-- Typo in `CertificateBuilder` API: `valididy` has been renamed to `validity`.
-
-## [6.0.0-beta2] 2020-08-31
-
-## Fixed
-
-- RSA private key generation ([#53](https://github.com/Devolutions/picky-rs/issues/53)).
-
-## [6.0.0-beta1] 2020-08-20
+## [6.0.0] 2020-10-13
 
 ## Added
 
 - Implementation of `Jwe` (JSON Web Encryption) RFC.
 - Email attribute can be added to `DirectoryName` using `add_email` method.
+- `from_pem_str` method to `Cert`, `Csr`, `PrivateKey` and `PublicKey`.
 
 ## Changed
 
@@ -39,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `Jwt` is now divided into `Jws` (JSON Web Signature) and `Jwe` (JSON Web Encryption)
   - `Jws` provides an API to sign any kind of data (binary). JSON claims are part of `Jwt` only.
   - `Jwe` provides an API to encrypt any kind of data (binary). JSON claims are part of `Jwt` only.
+- Typo in `CertificateBuilder` API: `valididy` has been renamed to `validity`.
+
+## Fixed
+
+- RSA private key generation ([#53](https://github.com/Devolutions/picky-rs/issues/53)).
 
 ## [5.1.1] 2020-07-13
 
