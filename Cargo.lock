@@ -1685,6 +1685,7 @@ dependencies = [
  "picky-asn1-x509",
  "pretty_assertions",
  "rand",
+ "ring",
  "rsa",
  "serde",
  "serde_json",

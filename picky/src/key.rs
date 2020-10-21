@@ -199,8 +199,8 @@ impl PrivateKey {
 
         let prime_1 = &key.primes()[0];
         let prime_2 = &key.primes()[1];
-        let exponent_1 = private_exponent.clone() % (prime_1 - 1u16);
-        let exponent_2 = private_exponent.clone();
+        let exponent_1 = private_exponent.clone() % (prime_1 - 1u8);
+        let exponent_2 = private_exponent.clone() % (prime_2 - 1u8);
 
         let coefficient = prime_2
             .mod_inverse(prime_1)
@@ -510,5 +510,14 @@ mod tests {
         for (converted_prime, expected_prime) in converted_primes.iter().zip(expected_primes.iter()) {
             assert_eq!(converted_prime, expected_prime);
         }
+    }
+
+    #[test]
+    #[cfg_attr(debug_assertions, ignore)] // this test is slow in debug
+    fn ring_understands_picky_pkcs8() {
+        // Make sure we're generating pkcs8 understood by the `ring` crate
+        let key = PrivateKey::generate_rsa(2048).unwrap();
+        let pkcs8 = key.to_pkcs8().unwrap();
+        ring::signature::RsaKeyPair::from_pkcs8(&pkcs8).unwrap();
     }
 }
