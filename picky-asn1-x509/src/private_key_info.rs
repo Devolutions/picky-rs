@@ -221,14 +221,14 @@ impl<'de> de::Deserialize<'de> for RSAPrivateKey {
                 } else {
                     use num_bigint_dig::{BigUint, ModInverse};
 
-                    let exponent_2 = private_exponent.clone();
-
                     // conversion to num_bigint_dig format BigUint
                     let private_exponent = BigUint::from_bytes_be(private_exponent.as_unsigned_bytes_be());
                     let prime_1 = BigUint::from_bytes_be(prime_1.as_unsigned_bytes_be());
                     let prime_2 = BigUint::from_bytes_be(prime_2.as_unsigned_bytes_be());
 
-                    let exponent_1 = private_exponent % (&prime_1 - 1u16);
+                    let exponent_1 = &private_exponent % (&prime_1 - 1u8);
+                    let exponent_2 = &private_exponent % (&prime_2 - 1u8);
+
                     let coefficient = prime_2
                         .mod_inverse(prime_1)
                         .ok_or_else(|| {
@@ -247,6 +247,7 @@ impl<'de> de::Deserialize<'de> for RSAPrivateKey {
 
                     // conversion to IntegerAsn1
                     let exponent_1 = IntegerAsn1::from_bytes_be_unsigned(exponent_1.to_bytes_be());
+                    let exponent_2 = IntegerAsn1::from_bytes_be_unsigned(exponent_2.to_bytes_be());
                     let coefficient = IntegerAsn1::from_bytes_be_unsigned(coefficient.to_bytes_be());
 
                     (exponent_1, exponent_2, coefficient)
