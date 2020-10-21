@@ -41,6 +41,7 @@ num-bigint-dig = "0.6"
 pretty_assertions = "^0.6"
 hex = "0.4"
 cfg-if = "0.1"
+ring = "0.16"
 
 [features]
 default = ["x509", "jose", "http_signature", "http_trait_impl"]
