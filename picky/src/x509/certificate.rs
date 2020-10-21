@@ -605,6 +605,7 @@ struct CertificateBuilderInner<'a> {
     extended_key_usage: Option<ExtendedKeyUsage>,
     subject_alt_name: Option<GeneralNames>,
     issuer_alt_name: Option<GeneralNames>,
+    serial_number: Option<Vec<u8>>,
 }
 
 #[derive(Default, Clone, Debug)]
@@ -741,6 +742,15 @@ impl<'a> CertificateBuilder<'a> {
         self
     }
 
+    /// Optional
+    ///
+    /// Bypass picky serial number generator by providing your own.
+    #[inline]
+    pub fn serial_number(&self, unsigned_integer_bytes: Vec<u8>) -> &Self {
+        self.inner.borrow_mut().serial_number = Some(unsigned_integer_bytes);
+        self
+    }
+
     pub fn build(&self) -> Result<Cert, CertError> {
         let mut inner = self.inner.borrow_mut();
 
@@ -806,9 +816,13 @@ impl<'a> CertificateBuilder<'a> {
         let subject_alt_name_opt = inner.subject_alt_name.take();
         let issuer_alt_name_opt = inner.issuer_alt_name.take();
 
-        drop(inner);
+        let serial_number = if let Some(unsigned_integer_bytes) = inner.serial_number.take() {
+            IntegerAsn1::from_bytes_be_unsigned(unsigned_integer_bytes)
+        } else {
+            generate_serial_number()
+        };
 
-        let serial_number = generate_serial_number();
+        drop(inner);
 
         let validity = Validity {
             not_before: valid_from.into(),
@@ -1271,5 +1285,24 @@ mod tests {
             invalid_issuer_err.to_string(),
             "CA chain error: issuer certificate \'CN=I Trust This V.E.R.Y Legitimate Intermediate Certificate\' is not a CA"
         );
+    }
+
+    #[test]
+    fn bypass_serial_number_generator() {
+        let root_key = parse_key(crate::test_files::RSA_2048_PK_1);
+
+        let unsigned_integer_bytes = [21, 84, 58, 122];
+
+        let cert = CertificateBuilder::new()
+            .validity(UTCDate::ymd(2065, 6, 15).unwrap(), UTCDate::ymd(2070, 6, 15).unwrap())
+            .self_signed(DirectoryName::new_common_name("TheFuture.usodakedo Root CA"), &root_key)
+            .ca(true)
+            .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_512))
+            .key_id_gen_method(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_384))
+            .serial_number(unsigned_integer_bytes.to_vec())
+            .build()
+            .expect("couldn't build root ca");
+
+        assert_eq!(cert.serial_number().as_unsigned_bytes_be(), unsigned_integer_bytes);
     }
 }
