@@ -488,7 +488,7 @@ impl<'a> Parts<'a> {
     }
 }
 
-fn decode_impl<'a>(encoded_token: &str, mode: DecoderMode<'a>) -> Result<Jwe, JweError> {
+fn decode_impl(encoded_token: &str, mode: DecoderMode<'_>) -> Result<Jwe, JweError> {
     let parts = Parts::break_down(encoded_token).ok_or_else(|| JweError::InvalidEncoding {
         input: encoded_token.to_owned(),
     })?;
