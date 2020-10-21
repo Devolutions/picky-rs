@@ -373,33 +373,32 @@ mod tests {
     use crate::{hash::HashAlgorithm, signature::SignatureAlgorithm};
     use rsa::PublicKeyParts;
 
-    // Generating RSA keys in debug is very slow. Therefore, this test only run in release mode.
-    cfg_if::cfg_if! { if #[cfg(not(debug_assertions))] {
-        cfg_if::cfg_if! { if #[cfg(feature = "x509")] {
-            use crate::x509::{certificate::CertificateBuilder, date::UTCDate, name::DirectoryName};
+    cfg_if::cfg_if! { if #[cfg(feature = "x509")] {
+        use crate::x509::{certificate::CertificateBuilder, date::UTCDate, name::DirectoryName};
 
-            fn generate_certificate_from_pk(private_key: PrivateKey) {
-                // validity
-                let valid_from = UTCDate::ymd(2019, 10, 10).unwrap();
-                let valid_to = UTCDate::ymd(2019, 10, 11).unwrap();
+        fn generate_certificate_from_pk(private_key: PrivateKey) {
+            // validity
+            let valid_from = UTCDate::ymd(2019, 10, 10).unwrap();
+            let valid_to = UTCDate::ymd(2019, 10, 11).unwrap();
 
-                CertificateBuilder::new()
-                    .validity(valid_from, valid_to)
-                    .self_signed(DirectoryName::new_common_name("Test Root CA"), &private_key)
-                    .ca(true)
-                    .build()
-                    .expect("couldn't build root ca");
-            }
-        } else {
-            fn generate_certificate_from_pk(_: PrivateKey) {}
-        }}
-
-        #[test]
-        fn generate_rsa_keys() {
-            let private_key = PrivateKey::generate_rsa(4096).expect("couldn't generate rsa key");
-            generate_certificate_from_pk(private_key);
+            CertificateBuilder::new()
+                .validity(valid_from, valid_to)
+                .self_signed(DirectoryName::new_common_name("Test Root CA"), &private_key)
+                .ca(true)
+                .build()
+                .expect("couldn't build root ca");
         }
+    } else {
+        fn generate_certificate_from_pk(_: PrivateKey) {}
     }}
+
+    /// Generating RSA keys in debug is very slow. Therefore, this test is ignored in debug builds
+    #[test]
+    #[cfg_attr(debug_assertions, ignore)]
+    fn generate_rsa_key() {
+        let private_key = PrivateKey::generate_rsa(4096).expect("couldn't generate rsa key");
+        generate_certificate_from_pk(private_key);
+    }
 
     const RSA_PRIVATE_KEY_PEM: &str = "-----BEGIN RSA PRIVATE KEY-----\n\
                                        MIIEpAIBAAKCAQEA5Kz4i/+XZhiE+fyrgtx/4yI3i6C6HXbC4QJYpDuSUEKN2bO9\n\
