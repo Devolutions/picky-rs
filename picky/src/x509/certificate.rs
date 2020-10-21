@@ -10,11 +10,14 @@ use crate::{
         name::{DirectoryName, GeneralNames},
     },
 };
-use picky_asn1::{bit_string::BitString, wrapper::IntegerAsn1};
+use picky_asn1::{
+    bit_string::BitString,
+    wrapper::{ApplicationTag0, ApplicationTag3, IntegerAsn1},
+};
 use picky_asn1_der::Asn1DerError;
 use picky_asn1_x509::{
     oids, AlgorithmIdentifier, AuthorityKeyIdentifier, BasicConstraints, Certificate, ExtendedKeyUsage, Extension,
-    ExtensionView, Extensions, KeyIdentifier, KeyUsage, TBSCertificate, Validity, Version,
+    ExtensionView, Extensions, KeyIdentifier, KeyUsage, Name, SubjectPublicKeyInfo, TBSCertificate, Validity, Version,
 };
 use std::cell::RefCell;
 use thiserror::Error;
@@ -860,14 +863,14 @@ impl<'a> CertificateBuilder<'a> {
         };
 
         let tbs_certificate = TBSCertificate {
-            version: Version::V3.into(),
-            serial_number: serial_number.into(),
-            signature: signature_hash_type.into(),
-            issuer: issuer_name.into(),
+            version: ApplicationTag0(Version::V3),
+            serial_number,
+            signature: AlgorithmIdentifier::from(signature_hash_type),
+            issuer: Name::from(issuer_name),
             validity,
-            subject: subject_name.into(),
-            subject_public_key_info: subject_public_key.into(),
-            extensions: extensions.into(),
+            subject: Name::from(subject_name),
+            subject_public_key_info: SubjectPublicKeyInfo::from(subject_public_key),
+            extensions: ApplicationTag3(extensions),
         };
 
         let tbs_der = picky_asn1_der::to_vec(&tbs_certificate)
@@ -891,13 +894,14 @@ impl<'a> CertificateBuilder<'a> {
     }
 }
 
-fn generate_serial_number() -> Vec<u8> {
+fn generate_serial_number() -> IntegerAsn1 {
     let x = rand::random::<u32>();
     let b1 = ((x >> 24) & 0xff) as u8;
     let b2 = ((x >> 16) & 0xff) as u8;
     let b3 = ((x >> 8) & 0xff) as u8;
     let b4 = (x & 0xff) as u8;
-    vec![b1, b2, b3, b4]
+    // serial number MUST be a positive integer
+    IntegerAsn1::from_bytes_be_unsigned(vec![b1, b2, b3, b4])
 }
 
 #[cfg(test)]
