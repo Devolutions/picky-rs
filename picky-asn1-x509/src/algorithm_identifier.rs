@@ -183,7 +183,11 @@ impl<'de> de::Deserialize<'de> for AlgorithmIdentifier {
                     | oids::SHA256_WITH_RSA_ENCRYPTION
                     | oids::SHA384_WITH_RSA_ENCRYPTION
                     | oids::SHA512_WITH_RSA_ENCRYPTION => {
-                        seq_next_element!(seq, AlgorithmIdentifier, "algorithm identifier parameters (null)");
+                        // Try to deserialize next element in sequence.
+                        // Error is ignored because some implementations just leave no parameter at all for
+                        // RSA encryption (ie: rsa-export-0.1.1 crate) but we still want to be able
+                        // to parse their output.
+                        let _ = seq.next_element::<()>();
                         AlgorithmIdentifierParameters::Null
                     }
                     oids::ECDSA_WITH_SHA384 | oids::ECDSA_WITH_SHA256 => AlgorithmIdentifierParameters::None,
@@ -568,5 +572,28 @@ mod tests {
         ];
 
         assert_eq!(digest, expected);
+    }
+
+    #[test]
+    fn rsa_encryption() {
+        let expected = [
+            0x30, 0x0D, 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x01, 0x01, 0x05, 0x00,
+        ];
+        let rsa_encryption = AlgorithmIdentifier::new_rsa_encryption();
+        check_serde!(rsa_encryption: AlgorithmIdentifier in expected);
+    }
+
+    #[test]
+    fn rsa_encryption_with_missing_params() {
+        let encoded = [
+            0x30, 0x0B, 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x01, 0x01,
+        ];
+        let deserialized: AlgorithmIdentifier =
+            picky_asn1_der::from_bytes(&encoded).expect("failed AlgorithmIdentifier deserialization");
+        pretty_assertions::assert_eq!(
+            deserialized,
+            AlgorithmIdentifier::new_rsa_encryption(),
+            concat!("deserialized ", stringify!($item), " doesn't match")
+        );
     }
 }
