@@ -13,6 +13,7 @@ use picky::{
 use picky_asn1::restricted_string::CharSetError;
 use thiserror::Error;
 
+const INITIAL_VALIDITY_MARGIN_MINUTES: i64 = 3650;
 const DEFAULT_ROOT_DURATION_DAYS: i64 = 3650;
 const DEFAULT_INTERMEDIATE_DURATION_DAYS: i64 = 1825;
 
@@ -122,7 +123,7 @@ impl Picky {
     ) -> Result<Cert, PickyError> {
         // validity
         let now = chrono::offset::Utc::now();
-        let valid_from = UTCDate::from(now);
+        let valid_from = UTCDate::from(now - chrono::Duration::minutes(INITIAL_VALIDITY_MARGIN_MINUTES));
         let valid_to = UTCDate::from(now + validity_duration);
 
         let mut key_usage = KeyUsage::default();
