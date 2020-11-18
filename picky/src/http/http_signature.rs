@@ -27,8 +27,8 @@ pub enum HttpSignatureError {
     #[error("signature is not yet valid (created: {created}, now: {now})")]
     NotYetValid { created: u64, now: u64 },
 
-    /// certificate expired
-    #[error("certificate expired (not after: {not_after}, now: {now})")]
+    /// signature expired
+    #[error("signature expired (not after: {not_after}, now: {now})")]
     Expired { not_after: u64, now: u64 },
 
     /// signature error occurred
