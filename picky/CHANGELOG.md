@@ -5,26 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- Fix `HttpSignatureError`'s Display trait implementation (`certificate expired` → `signature expired`).
+
 ## [6.1.0] 2020-10-21
 
-## Added
+### Added
 
 - `CertificateBuilder::serial_number` can be used to provide a custom serial number instead of generating one.
 
-## Fixed
+### Fixed
 
 - Bad generation for second exponent (`pq`) when generating PKCS#8 structure.
 - Serial number was sometimes generated as negative.
 
 ## [6.0.0] 2020-10-13
 
-## Added
+### Added
 
 - Implementation of `Jwe` (JSON Web Encryption) RFC.
 - Email attribute can be added to `DirectoryName` using `add_email` method.
 - `from_pem_str` method to `Cert`, `Csr`, `PrivateKey` and `PublicKey`.
 
-## Changed
+### Changed
 
 - Separate `SignatureHashType` into two separate enums `HashAlgorithm` and `SignatureAlgorithm`.
 - `KeyIdGenError` is now wrapping a `HashAlgorithm`.
@@ -37,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `Jwe` provides an API to encrypt any kind of data (binary). JSON claims are part of `Jwt` only.
 - Typo in `CertificateBuilder` API: `valididy` has been renamed to `validity`.
 
-## Fixed
+### Fixed
 
 - RSA private key generation ([#53](https://github.com/Devolutions/picky-rs/issues/53)).
 

@@ -9,9 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Set leaf certificates initial validity 10 minutes ahead current date
+
 ## [4.7.0] 2020-09-22
 
 ### Changed
+
 - Update saphir dependency to 2.7.6
 
 ## [4.6.0] 2020-09-14
