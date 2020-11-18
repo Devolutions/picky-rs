@@ -1070,7 +1070,7 @@ mod tests {
             .expect("verify");
         assert_eq!(
             err.to_string(),
-            "certificate expired (not after: 1402170705, now: 1402170710)"
+            "signature expired (not after: 1402170705, now: 1402170710)"
         );
 
         let err = http_signature
