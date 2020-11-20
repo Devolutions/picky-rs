@@ -307,6 +307,9 @@ impl TryFrom<&'_ PublicKey> for RSAPublicKey {
             InnerPublicKey::EC(_) => Err(KeyError::UnsupportedAlgorithm {
                 algorithm: "elliptic curves",
             }),
+            InnerPublicKey::Ed(_) => Err(KeyError::UnsupportedAlgorithm {
+                algorithm: "edwards curves",
+            }),
         }
     }
 }

@@ -231,6 +231,9 @@ impl Jwk {
             SerdePublicKey::EC(_) => Err(JwkError::UnsupportedAlgorithm {
                 algorithm: "elliptic curves",
             }),
+            SerdePublicKey::Ed(_) => Err(JwkError::UnsupportedAlgorithm {
+                algorithm: "edwards curves",
+            }),
         }
     }
 
