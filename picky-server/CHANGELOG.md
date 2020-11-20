@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+## [4.8.0] 2020-11-20
+
+### Changed
+
 - Set leaf certificates initial validity 10 minutes ahead current date
 
 ## [4.7.0] 2020-09-22
