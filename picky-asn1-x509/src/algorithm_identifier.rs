@@ -103,6 +103,13 @@ impl AlgorithmIdentifier {
         }
     }
 
+    pub fn new_ed25519() -> Self {
+        Self {
+            algorithm: oids::ed25519().into(),
+            parameters: AlgorithmIdentifierParameters::None,
+        }
+    }
+
     pub fn new_aes128(mode: AesMode, params: AESParameters) -> Self {
         Self {
             algorithm: mode.to_128bit_oid(),
@@ -190,7 +197,9 @@ impl<'de> de::Deserialize<'de> for AlgorithmIdentifier {
                         let _ = seq.next_element::<()>();
                         AlgorithmIdentifierParameters::Null
                     }
-                    oids::ECDSA_WITH_SHA384 | oids::ECDSA_WITH_SHA256 => AlgorithmIdentifierParameters::None,
+                    oids::ECDSA_WITH_SHA384 | oids::ECDSA_WITH_SHA256 | oids::ED25519 => {
+                        AlgorithmIdentifierParameters::None
+                    }
                     oids::EC_PUBLIC_KEY => AlgorithmIdentifierParameters::EC(seq_next_element!(
                         seq,
                         AlgorithmIdentifier,

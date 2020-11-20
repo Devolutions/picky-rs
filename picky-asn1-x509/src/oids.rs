@@ -70,6 +70,12 @@ define_oid! {
     // Certicom Object Identifiers
     SECP384R1 => secp384r1 => "1.3.132.0.34",
 
+    // RFC 8410
+    X25519 => x25519 => "1.3.101.110",
+    X448 => x448 => "1.3.101.111",
+    ED25519 => ed25519 => "1.3.101.112",
+    ED448 => ed448 => "1.3.101.113",
+
     // Extended key purpose OIDS
     KP_SERVER_AUTH => kp_server_auth => "1.3.6.1.5.5.7.3.1",
     KP_CLIENT_AUTH => kp_client_auth => "1.3.6.1.5.5.7.3.2",
