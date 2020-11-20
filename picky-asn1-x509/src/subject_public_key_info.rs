@@ -7,6 +7,7 @@ use std::fmt;
 pub enum PublicKey {
     RSA(EncapsulatedRSAPublicKey),
     EC(EncapsulatedECPoint),
+    Ed(EncapsulatedECPoint),
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -52,6 +53,7 @@ impl ser::Serialize for SubjectPublicKeyInfo {
         match &self.subject_public_key {
             PublicKey::RSA(key) => seq.serialize_element(key)?,
             PublicKey::EC(key) => seq.serialize_element(key)?,
+            PublicKey::Ed(key) => seq.serialize_element(key)?,
         }
         seq.end()
     }
@@ -82,6 +84,7 @@ impl<'de> de::Deserialize<'de> for SubjectPublicKeyInfo {
                     oids::EC_PUBLIC_KEY => {
                         PublicKey::EC(seq_next_element!(seq, SubjectPublicKeyInfo, "elliptic curves key"))
                     }
+                    oids::ED25519 => PublicKey::Ed(seq_next_element!(seq, SubjectPublicKeyInfo, "curve25519 key")),
                     _ => {
                         return Err(serde_invalid_value!(
                             SubjectPublicKeyInfo,
