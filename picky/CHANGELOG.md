@@ -5,11 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## Unrealesed
+
+## [6.1.1] 2020-12-11
 
 ### Fixed
 
 - Fix `HttpSignatureError`'s Display trait implementation (`certificate expired` → `signature expired`).
+- Fix certificate validity period that MUST be encoded as `UTCTime` through the year 2049 as per RFC 5280.
+  Previously, they were always encoded as `GeneralizedTime`.
 
 ## [6.1.0] 2020-10-21
 
