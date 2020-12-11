@@ -99,7 +99,18 @@ impl From<GeneralizedTime> for UTCDate {
 
 impl From<UTCDate> for Time {
     fn from(date: UTCDate) -> Self {
-        Self::Generalized(date.0.into())
+        // Time is used to encode validity period.
+        // As per RFC 5280,
+        // > CAs conforming to this profile MUST always encode certificate
+        // > validity dates through the year 2049 as UTCTime; certificate validity
+        // > dates in 2050 or later MUST be encoded as GeneralizedTime.
+        // > Conforming applications MUST be able to process validity dates that
+        // > are encoded in either UTCTime or GeneralizedTime.
+        if date.year() >= 2050 {
+            Self::Generalized(Into::<GeneralizedTime>::into(date).into())
+        } else {
+            Self::UTC(Into::<UTCTime>::into(date).into())
+        }
     }
 }
 

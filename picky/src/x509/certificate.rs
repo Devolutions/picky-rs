@@ -1305,4 +1305,25 @@ mod tests {
 
         assert_eq!(cert.serial_number().as_unsigned_bytes_be(), unsigned_integer_bytes);
     }
+
+    #[test]
+    fn validity_encoding() {
+        use picky_asn1_x509::validity::Time;
+
+        let root_key = parse_key(crate::test_files::RSA_2048_PK_1);
+
+        let cert = CertificateBuilder::new()
+            .validity(UTCDate::ymd(2045, 6, 15).unwrap(), UTCDate::ymd(2055, 6, 15).unwrap())
+            .self_signed(DirectoryName::new_common_name("Am I valid"), &root_key)
+            .ca(true)
+            .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA1))
+            .key_id_gen_method(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_224))
+            .build()
+            .expect("couldn't build root ca");
+
+        let validity = &cert.0.tbs_certificate.validity;
+
+        assert!(matches!(validity.not_before, Time::UTC(_)));
+        assert!(matches!(validity.not_after, Time::Generalized(_)));
+    }
 }
