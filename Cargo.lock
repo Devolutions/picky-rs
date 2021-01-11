@@ -1669,7 +1669,7 @@ checksum = "d4fd5641d01c8f18a23da7b6fe29298ff4b55afcccdf78973b24cf3175fee32e"
 
 [[package]]
 name = "picky"
-version = "6.1.1"
+version = "6.1.2"
 dependencies = [
  "aes-gcm",
  "base64 0.12.3",
@@ -1697,7 +1697,7 @@ dependencies = [
 
 [[package]]
 name = "picky-asn1"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "chrono",
  "oid",
