@@ -4,7 +4,6 @@
 //! ([Textual Encodings of PKIX, PKCS, and CMS Structures](https://tools.ietf.org/html/rfc7468)).
 
 use base64::DecodeError;
-use serde::export::Formatter;
 use std::{borrow::Cow, fmt, io::BufRead, str::FromStr};
 use thiserror::Error;
 
@@ -74,7 +73,7 @@ impl FromStr for Pem<'static> {
 }
 
 impl fmt::Display for Pem<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "{} {}-----", PEM_HEADER_START, self.label)?;
 
         let encoded = base64::encode(&self.data);
