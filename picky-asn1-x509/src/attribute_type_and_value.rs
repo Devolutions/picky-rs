@@ -15,6 +15,7 @@ pub enum AttributeTypeAndValueParameters {
     OrganizationName(DirectoryString),
     OrganizationalUnitName(DirectoryString),
     EmailAddress(IA5StringAsn1),
+    Custom(picky_asn1_der::Asn1RawDer),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -134,6 +135,9 @@ impl ser::Serialize for AttributeTypeAndValue {
             AttributeTypeAndValueParameters::EmailAddress(name) => {
                 seq.serialize_element(name)?;
             }
+            AttributeTypeAndValueParameters::Custom(der) => {
+                seq.serialize_element(der)?;
+            }
         }
         seq.end()
     }
@@ -205,13 +209,11 @@ impl<'de> de::Deserialize<'de> for AttributeTypeAndValue {
                             AttributeTypeAndValue,
                             "at email address"
                         )),
-                        _ => {
-                            return Err(serde_invalid_value!(
-                                AttributeTypeAndValue,
-                                "unsupported type (unknown oid)",
-                                "a supported type"
-                            ));
-                        }
+                        _ => AttributeTypeAndValueParameters::Custom(seq_next_element!(
+                            seq,
+                            AttributeTypeAndValue,
+                            "at custom value"
+                        )),
                     };
 
                 Ok(AttributeTypeAndValue { ty, value })

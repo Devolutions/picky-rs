@@ -156,6 +156,9 @@ impl fmt::Display for NamePrettyFormatter<'_> {
                     AttributeTypeAndValueParameters::EmailAddress(name) => {
                         write!(f, "EMAIL={}", String::from_utf8_lossy(name.as_bytes()))?;
                     }
+                    AttributeTypeAndValueParameters::Custom(der) => {
+                        write!(f, "{}={:?}", Into::<String>::into(&attr.ty.0), der)?;
+                    }
                 }
             }
         }
