@@ -1,6 +1,6 @@
-use crate::{AlgorithmIdentifier, Name, SubjectPublicKeyInfo};
-use picky_asn1::wrapper::{ApplicationTag0, BitStringAsn1, HeaderOnly, Implicit};
-use serde::{Deserialize, Serialize};
+use crate::{oids, AlgorithmIdentifier, Extension, Extensions, Name, SubjectPublicKeyInfo};
+use picky_asn1::wrapper::{ApplicationTag0, Asn1SetOf, BitStringAsn1, Implicit, ObjectIdentifierAsn1};
+use serde::{de, ser, Deserialize, Serialize};
 
 /// [RFC 2986 #4](https://tools.ietf.org/html/rfc2986#section-4)
 ///
@@ -17,8 +17,7 @@ pub struct CertificationRequestInfo {
     pub version: u8,
     pub subject: Name,
     pub subject_public_key_info: SubjectPublicKeyInfo,
-    /// Not yet supported
-    pub attributes: Implicit<Option<HeaderOnly<ApplicationTag0<()>>>>,
+    pub attributes: Implicit<Option<ApplicationTag0<Attribute>>>,
 }
 
 impl CertificationRequestInfo {
@@ -28,8 +27,98 @@ impl CertificationRequestInfo {
             version: 0,
             subject,
             subject_public_key_info,
-            attributes: Implicit(Some(HeaderOnly::<ApplicationTag0<()>>::default())),
+            attributes: Implicit(None),
         }
+    }
+
+    pub fn with_extensions(
+        subject: Name,
+        subject_public_key_info: SubjectPublicKeyInfo,
+        extensions: Vec<Extension>,
+    ) -> Self {
+        let values = AttributeValue::Extensions(Asn1SetOf(vec![Extensions(extensions)]));
+        let attribute = Attribute {
+            ty: oids::extension_request().into(),
+            values,
+        };
+        Self {
+            version: 0,
+            subject,
+            subject_public_key_info,
+            attributes: Implicit(Some(ApplicationTag0(attribute))),
+        }
+    }
+}
+
+/// [RFC 2985 page 15 and 16](https://tools.ietf.org/html/rfc2985#page-15)
+///
+/// Accepted attribute types are `challengePassword` and `extensionRequest`
+///
+#[derive(Clone, Debug, PartialEq)]
+pub enum AttributeValue {
+    /// `extensionRequest`
+    Extensions(Asn1SetOf<Extensions>), // the set will always have 1 element in this variant
+    // TODO: support for challenge password
+    // ChallengePassword(Asn1SetOf<ChallengePassword>))
+    Custom(picky_asn1_der::Asn1RawDer), // fallback
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Attribute {
+    pub ty: ObjectIdentifierAsn1,
+    pub values: AttributeValue,
+}
+
+impl ser::Serialize for Attribute {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
+    where
+        S: ser::Serializer,
+    {
+        use ser::SerializeSeq;
+        let mut seq = serializer.serialize_seq(Some(2))?;
+        seq.serialize_element(&self.ty)?;
+        match &self.values {
+            AttributeValue::Extensions(extensions) => seq.serialize_element(extensions)?,
+            AttributeValue::Custom(der) => seq.serialize_element(der)?,
+        }
+        seq.end()
+    }
+}
+
+impl<'de> de::Deserialize<'de> for Attribute {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        use std::fmt;
+
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = Attribute;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a valid DER-encoded attribute")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let ty: ObjectIdentifierAsn1 = seq_next_element!(seq, Attribute, "type oid");
+
+                let values = match Into::<String>::into(&ty.0).as_str() {
+                    oids::EXTENSION_REQ => {
+                        AttributeValue::Extensions(seq_next_element!(seq, Attribute, "at extension request"))
+                    }
+                    _ => AttributeValue::Custom(seq_next_element!(seq, Attribute, "at custom value")),
+                };
+
+                Ok(Attribute { ty, values })
+            }
+        }
+
+        deserializer.deserialize_seq(Visitor)
     }
 }
 
@@ -52,8 +141,12 @@ pub struct CertificationRequest {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::DirectoryName;
-    use picky_asn1::{bit_string::BitString, restricted_string::PrintableString, wrapper::IntegerAsn1};
+    use crate::{name::*, DirectoryName, GeneralName};
+    use picky_asn1::{
+        bit_string::BitString,
+        restricted_string::{IA5String, PrintableString, Utf8String},
+        wrapper::IntegerAsn1,
+    };
     use std::str::FromStr;
 
     #[test]
@@ -90,6 +183,69 @@ mod tests {
             signature_algorithm: AlgorithmIdentifier::new_sha256_with_rsa_encryption(),
             signature: BitString::with_bytes(&encoded[358..614]).into(),
         };
+
+        check_serde!(csr: CertificationRequest in encoded);
+    }
+
+    #[test]
+    fn deserialize_csr_with_extensions() {
+        let encoded = base64::decode(
+            "MIICjDCCAXQCAQAwIDELMAkGA1UEBhMCWFgxETAPBgNVBAMMCHNvbWV0ZXN0MIIB\
+            IjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvNELh212N4optYS7pqbtvjyv\
+            +t4fQjX/pwB88BUCEjBgh+DJ49EBPQg9oObADTcBi3EeXu4M5y6f/dzIhovayJ/y\
+            9j7Cj0Bw+VY+eRXywkVG/DqaiKG2mIQW+fho7/jhazhpeIxCzObPTwiQK7i96Vjq\
+            9S+o4QQejE2SYLOhQ4/cgUaT7JBm4yab7cvhFjKYjVmoP6ioIcHb9Cmv25Lttuvk\
+            n64bDiPKz6BkutRpbMipQjSA8xKEgjgFG/nxBynA8PXnZIunhTNyhXrqRoAe6SXn\
+            ZLZLmwOkeU5WTewVVTXlmqaZTPwtb/9EjjoRnO3+Ulb5zT5wPULc79xuY16kzwID\
+            AQABoCcwJQYJKoZIhvcNAQkOMRgwFjAUBgNVHREEDTALgglsb2NhbGhvc3QwDQYJ\
+            KoZIhvcNAQELBQADggEBAIm9lOhZG3XY4CNJ5b18Qu/OfFi+T0tgxt4bTqINQ1Iz\
+            SQFrsnheBrzmasfFliz10N96cOmNka1UpWqK7N5/TfkJHX3zKYRpc2jEkrFun48B\
+            3+bOJJPH48zmTGxBgU7iiorpaVt3CpgXNswhU3fpcT5gLy8Ys7DXC39Nn1lW0Lko\
+            cd6xK4oIJyoeiXyVBdn68gtPY6xjFxta67nyj39sSGhATxrDgxtLHEH2+HStywr0\
+            4/osg9vP/OH5iFYOiEimK6ErYNg8rM1A/OTe5p8emA6y3o5dHG8lKYwevyUXMSLv\
+            38CNeh0MS2KmyHz2085HlIIAXIu2xAUyWLsQik+eV6M=",
+        )
+        .expect("invalid base64");
+
+        // eprintln!("encoded");
+        // encoded.iter().for_each(|e| eprint!("{:02x} ", e));
+        // eprintln!();
+
+        let extensions = vec![Extension::new_subject_alt_name(vec![GeneralName::DNSName(
+            IA5String::from_string("localhost".into()).unwrap().into(),
+        )])
+        .into_non_critical()];
+
+        let mut dn = DirectoryName::new();
+        dn.add_attr(NameAttr::CountryName, PrintableString::from_str("XX").unwrap());
+        dn.add_attr(NameAttr::CommonName, Utf8String::from_str("sometest").unwrap());
+
+        let certification_request_info = CertificationRequestInfo::with_extensions(
+            dn.into(),
+            SubjectPublicKeyInfo::new_rsa_key(
+                IntegerAsn1::from(encoded[77..334].to_vec()),
+                IntegerAsn1::from(encoded[336..339].to_vec()),
+            ),
+            extensions,
+        );
+
+        // let ser = picky_asn1_der::to_vec(&certification_request_info).unwrap();
+        // eprintln!("ser");
+        // ser.iter().for_each(|e| eprint!("{:02x} ", e));
+        // eprintln!();
+
+        check_serde!(certification_request_info: CertificationRequestInfo in encoded[4..380]);
+
+        let csr = CertificationRequest {
+            certification_request_info,
+            signature_algorithm: AlgorithmIdentifier::new_sha256_with_rsa_encryption(),
+            signature: BitString::with_bytes(&encoded[400..656]).into(),
+        };
+
+        // let ser = picky_asn1_der::to_vec(&csr).unwrap();
+        // eprintln!("ser");
+        // ser.iter().for_each(|e| eprint!("{:02x} ", e));
+        // eprintln!();
 
         check_serde!(csr: CertificationRequest in encoded);
     }
