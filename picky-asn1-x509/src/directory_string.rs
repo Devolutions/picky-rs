@@ -1,5 +1,5 @@
 use picky_asn1::{
-    restricted_string::PrintableString,
+    restricted_string::{PrintableString, Utf8String},
     tag::{Tag, TagPeeker},
     wrapper::PrintableStringAsn1,
 };
@@ -64,6 +64,12 @@ impl From<String> for DirectoryString {
 impl From<PrintableString> for DirectoryString {
     fn from(string: PrintableString) -> Self {
         Self::PrintableString(string.into())
+    }
+}
+
+impl From<Utf8String> for DirectoryString {
+    fn from(string: Utf8String) -> Self {
+        Self::Utf8String(String::from_utf8_lossy(string.as_bytes()).to_string())
     }
 }
 
