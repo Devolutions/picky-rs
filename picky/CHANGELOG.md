@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [6.2.0] 2021-03-04
+
+### Added
+
+- `Csr::generate_with_attributes` to generate CSR with attributes.
+- `CertificateBuilder::inherit_extensions_from_csr_attributes` to allow certificate to inherit extensions requested by CSR attribute.
+- Various API additions to `GeneralNames` for improved ergonomics.
+
 ## [6.1.2] 2021-01-11
 
 ### Fixed

@@ -1,6 +1,6 @@
 [package]
 name = "picky"
-version = "6.1.2"
+version = "6.2.0"
 authors = [
     "Benoît CORTIER <benoit.cortier@fried-world.eu>",
     "Jonathan Trepanier <jtrepanier@devolutions.net>",
@@ -18,7 +18,7 @@ repository = "https://github.com/Devolutions/picky-rs"
 [dependencies]
 picky-asn1 = { version = "0.3", path = "../picky-asn1" }
 picky-asn1-der = { version = "0.2", path = "../picky-asn1-der" }
-picky-asn1-x509 = { version = "0.4", path = "../picky-asn1-x509", features = ["legacy"] }
+picky-asn1-x509 = { version = "0.5", path = "../picky-asn1-x509", features = ["legacy"] }
 serde = { version = "1.0", features = ["derive"] }
 oid = { version = "^0.1.1", features = ["serde_support"] }
 base64 = "0.12"
