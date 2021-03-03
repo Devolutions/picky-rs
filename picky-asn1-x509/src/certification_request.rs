@@ -54,7 +54,7 @@ impl ser::Serialize for Attributes {
     where
         S: ser::Serializer,
     {
-        let mut raw_der = picky_asn1_der::to_vec(&self.0).unwrap_or(Vec::new());
+        let mut raw_der = picky_asn1_der::to_vec(&self.0).unwrap_or_default();
         raw_der[0] = Tag::APP_0.number();
         picky_asn1_der::Asn1RawDer(raw_der).serialize(serializer)
     }
@@ -67,7 +67,7 @@ impl<'de> de::Deserialize<'de> for Attributes {
     {
         let mut raw_der = picky_asn1_der::Asn1RawDer::deserialize(deserializer)?.0;
         raw_der[0] = Tag::SEQUENCE.number();
-        let vec = picky_asn1_der::from_bytes(&raw_der).unwrap_or(Vec::new());
+        let vec = picky_asn1_der::from_bytes(&raw_der).unwrap_or_default();
         Ok(Attributes(vec))
     }
 }
