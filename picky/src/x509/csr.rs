@@ -6,7 +6,7 @@ use crate::{
 };
 use picky_asn1::bit_string::BitString;
 use picky_asn1_der::Asn1DerError;
-use picky_asn1_x509::{CertificationRequest, CertificationRequestInfo};
+use picky_asn1_x509::{Attribute, CertificationRequest, CertificationRequestInfo};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -48,7 +48,7 @@ const CSR_PEM_LABEL: &str = "CERTIFICATE REQUEST";
 
 /// Certificate Signing Request
 #[derive(Clone, Debug, PartialEq)]
-pub struct Csr(CertificationRequest);
+pub struct Csr(pub(crate) CertificationRequest);
 
 impl From<CertificationRequest> for Csr {
     fn from(certification_request: CertificationRequest) -> Self {
@@ -96,22 +96,21 @@ impl Csr {
         private_key: &PrivateKey,
         signature_hash_type: SignatureAlgorithm,
     ) -> Result<Self, CsrError> {
-        let info = CertificationRequestInfo::new(subject.into(), private_key.to_public_key().into());
-        let info_der = picky_asn1_der::to_vec(&info).map_err(|e| CsrError::Asn1Serialization {
-            source: e,
-            element: "certification request info",
-        })?;
-        let signature = BitString::with_bytes(
-            signature_hash_type
-                .sign(&info_der, private_key)
-                .map_err(|e| CsrError::Signature { source: e })?,
-        );
+        let cri = CertificationRequestInfo::new(subject.into(), private_key.to_public_key().into());
+        h_generate_from_cri(cri, private_key, signature_hash_type)
+    }
 
-        Ok(Self(CertificationRequest {
-            certification_request_info: info,
-            signature_algorithm: signature_hash_type.into(),
-            signature: signature.into(),
-        }))
+    pub fn generate_with_attributes(
+        subject: DirectoryName,
+        private_key: &PrivateKey,
+        signature_hash_type: SignatureAlgorithm,
+        attributes: Vec<Attribute>,
+    ) -> Result<Self, CsrError> {
+        let mut cri = CertificationRequestInfo::new(subject.into(), private_key.to_public_key().into());
+        for attr in attributes {
+            cri.add_attribute(attr);
+        }
+        h_generate_from_cri(cri, private_key, signature_hash_type)
     }
 
     pub fn subject_name(&self) -> DirectoryName {
@@ -147,4 +146,26 @@ impl Csr {
 
         Ok(())
     }
+}
+
+fn h_generate_from_cri(
+    cri: CertificationRequestInfo,
+    private_key: &PrivateKey,
+    signature_hash_type: SignatureAlgorithm,
+) -> Result<Csr, CsrError> {
+    let cri_der = picky_asn1_der::to_vec(&cri).map_err(|e| CsrError::Asn1Serialization {
+        source: e,
+        element: "certification request cri",
+    })?;
+    let signature = BitString::with_bytes(
+        signature_hash_type
+            .sign(&cri_der, private_key)
+            .map_err(|e| CsrError::Signature { source: e })?,
+    );
+
+    Ok(Csr(CertificationRequest {
+        certification_request_info: cri,
+        signature_algorithm: signature_hash_type.into(),
+        signature: signature.into(),
+    }))
 }
