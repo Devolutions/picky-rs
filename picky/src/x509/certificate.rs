@@ -606,6 +606,7 @@ struct CertificateBuilderInner<'a> {
     subject_alt_name: Option<GeneralNames>,
     issuer_alt_name: Option<GeneralNames>,
     serial_number: Option<Vec<u8>>,
+    inherit_extensions_from_csr_attributes: bool,
 }
 
 #[derive(Default, Clone, Debug)]
@@ -751,6 +752,16 @@ impl<'a> CertificateBuilder<'a> {
         self
     }
 
+    /// Optional
+    ///
+    /// Inherit extensions from the "extension request" attribute of the provided CSR if applicable
+    /// Extensions already present will be ignored.
+    #[inline]
+    pub fn inherit_extensions_from_csr_attributes(&self, inherit: bool) -> &Self {
+        self.inner.borrow_mut().inherit_extensions_from_csr_attributes = inherit;
+        self
+    }
+
     pub fn build(&self) -> Result<Cert, CertError> {
         let mut inner = self.inner.borrow_mut();
 
@@ -801,12 +812,29 @@ impl<'a> CertificateBuilder<'a> {
 
             (issuer_infos.name, issuer_infos.key, aki, subject_infos)
         };
-        let (subject_name, subject_public_key) = match subject_infos {
+        let (subject_name, subject_public_key, ext_req) = match subject_infos {
             SubjectInfos::Csr(csr) => {
                 csr.verify().map_err(|e| CertError::InvalidCsr { source: e })?;
-                csr.into_subject_infos()
+
+                let ext_req = csr
+                    .0
+                    .certification_request_info
+                    .attributes
+                    .0
+                    .into_iter()
+                    .find_map(|attr| match attr.value {
+                        picky_asn1_x509::AttributeValue::Extensions(set_of_extensions) => {
+                            set_of_extensions.0.into_iter().next()
+                        }
+                        _ => None,
+                    });
+
+                let subject_name = csr.0.certification_request_info.subject.into();
+                let subject_public_key = csr.0.certification_request_info.subject_public_key_info.into();
+
+                (subject_name, subject_public_key, ext_req)
             }
-            SubjectInfos::NameAndPublicKey { name, public_key } => (name, public_key),
+            SubjectInfos::NameAndPublicKey { name, public_key } => (name, public_key, None),
         };
 
         let ca = inner.ca.take().unwrap_or(false);
@@ -821,6 +849,8 @@ impl<'a> CertificateBuilder<'a> {
         } else {
             generate_serial_number()
         };
+
+        let inherit_extensions_from_csr_attributes = inner.inherit_extensions_from_csr_attributes;
 
         drop(inner);
 
@@ -872,6 +902,18 @@ impl<'a> CertificateBuilder<'a> {
                 None,
                 None,
             ));
+
+            // inherit extensions from csr "request extension" attribute if allowed to
+            match ext_req {
+                Some(requested_exts) if inherit_extensions_from_csr_attributes => {
+                    for requested_ext in requested_exts.0 {
+                        if !extensions.iter().any(|o| requested_ext.extn_id() == o.extn_id()) {
+                            extensions.push(requested_ext);
+                        }
+                    }
+                }
+                _ => {}
+            }
 
             Extensions(extensions)
         };
@@ -1325,5 +1367,57 @@ mod tests {
 
         assert!(matches!(validity.not_before, Time::UTC(_)));
         assert!(matches!(validity.not_after, Time::Generalized(_)));
+    }
+
+    #[test]
+    fn inherit_requested_extensions_by_csr() {
+        use picky_asn1::restricted_string::IA5String;
+        use picky_asn1_x509::GeneralName;
+
+        let root_key = parse_key(crate::test_files::RSA_2048_PK_1);
+        let leaf_key = parse_key(crate::test_files::RSA_2048_PK_3);
+
+        let root = CertificateBuilder::new()
+            .validity(UTCDate::ymd(2065, 6, 15).unwrap(), UTCDate::ymd(2070, 6, 15).unwrap())
+            .self_signed(DirectoryName::new_common_name("VerySafe Root CA"), &root_key)
+            .ca(true)
+            .pathlen(0)
+            .build()
+            .expect("couldn't build root ca");
+
+        let extensions = vec![Extension::new_subject_alt_name(vec![GeneralName::DNSName(
+            IA5String::from_string("localhost".into()).unwrap().into(),
+        )])
+        .into_non_critical()];
+        let attr = picky_asn1_x509::certification_request::Attribute::new_extension_request(extensions);
+        let csr = Csr::generate_with_attributes(
+            DirectoryName::new_common_name("I want more extensions"),
+            &leaf_key,
+            SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256),
+            vec![attr],
+        )
+        .unwrap();
+
+        let signed_leaf = CertificateBuilder::new()
+            .validity(UTCDate::ymd(2069, 1, 1).unwrap(), UTCDate::ymd(2072, 1, 1).unwrap())
+            .subject_from_csr(csr)
+            .issuer_cert(&root, &root_key)
+            .inherit_extensions_from_csr_attributes(true)
+            .build()
+            .expect("couldn't build signed leaf");
+
+        let subject_alt_name = signed_leaf
+            .extensions()
+            .iter()
+            .find_map(|ext| match ext.extn_value() {
+                ExtensionView::SubjectAltName(gn) => match gn.0.first().unwrap() {
+                    GeneralName::DNSName(name) => Some(name.to_string()),
+                    _ => None,
+                },
+                _ => None,
+            })
+            .unwrap();
+
+        assert_eq!(subject_alt_name, "localhost");
     }
 }

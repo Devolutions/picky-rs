@@ -34,13 +34,13 @@ impl CertificationRequestInfo {
         }
     }
 
-    pub fn with_extensions(mut self, extensions: Vec<Extension>) -> Self {
-        let attribute = Attribute {
-            ty: oids::extension_request().into(),
-            values: AttributeValue::Extensions(Asn1SetOf(vec![Extensions(extensions)])),
-        };
+    pub fn with_attribute(mut self, attribute: Attribute) -> Self {
         self.attributes.0.push(attribute);
         self
+    }
+
+    pub fn add_attribute(&mut self, attribute: Attribute) {
+        self.attributes.0.push(attribute);
     }
 }
 
@@ -88,7 +88,16 @@ pub enum AttributeValue {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Attribute {
     pub ty: ObjectIdentifierAsn1,
-    pub values: AttributeValue,
+    pub value: AttributeValue,
+}
+
+impl Attribute {
+    pub fn new_extension_request(extensions: Vec<Extension>) -> Self {
+        Self {
+            ty: oids::extension_request().into(),
+            value: AttributeValue::Extensions(Asn1SetOf(vec![Extensions(extensions)])),
+        }
+    }
 }
 
 impl ser::Serialize for Attribute {
@@ -99,7 +108,7 @@ impl ser::Serialize for Attribute {
         use ser::SerializeSeq;
         let mut seq = serializer.serialize_seq(Some(2))?;
         seq.serialize_element(&self.ty)?;
-        match &self.values {
+        match &self.value {
             AttributeValue::Extensions(extensions) => seq.serialize_element(extensions)?,
             AttributeValue::Custom(der) => seq.serialize_element(der)?,
         }
@@ -129,14 +138,14 @@ impl<'de> de::Deserialize<'de> for Attribute {
             {
                 let ty: ObjectIdentifierAsn1 = seq_next_element!(seq, Attribute, "type oid");
 
-                let values = match Into::<String>::into(&ty.0).as_str() {
+                let value = match Into::<String>::into(&ty.0).as_str() {
                     oids::EXTENSION_REQ => {
                         AttributeValue::Extensions(seq_next_element!(seq, Attribute, "at extension request"))
                     }
                     _ => AttributeValue::Custom(seq_next_element!(seq, Attribute, "at custom value")),
                 };
 
-                Ok(Attribute { ty, values })
+                Ok(Attribute { ty, value })
             }
         }
 
@@ -245,7 +254,7 @@ mod tests {
                 IntegerAsn1::from(encoded[336..339].to_vec()),
             ),
         )
-        .with_extensions(extensions);
+        .with_attribute(Attribute::new_extension_request(extensions));
 
         check_serde!(certification_request_info: CertificationRequestInfo in encoded[4..380]);
 
