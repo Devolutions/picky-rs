@@ -39,6 +39,7 @@ mod tests {
         };
         ($item:ident: $type:ident in $encoded:ident) => {
             let encoded = &$encoded[..];
+            let encoded_base64 = base64::encode(encoded);
 
             println!(concat!(stringify!($item), " check..."));
 
@@ -47,8 +48,9 @@ mod tests {
                 stringify!($item),
                 " serialization"
             ));
+            let serialized_base64 = base64::encode(&serialized);
             pretty_assertions::assert_eq!(
-                serialized, encoded,
+                serialized_base64, encoded_base64,
                 concat!("serialized ", stringify!($item), " doesn't match")
             );
 

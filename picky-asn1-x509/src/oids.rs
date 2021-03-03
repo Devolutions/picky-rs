@@ -55,6 +55,7 @@ define_oid! {
     SHA512_WITH_RSA_ENCRYPTION => sha512_with_rsa_encryption => "1.2.840.113549.1.1.13",
     SHA224_WITH_RSA_ENCRYPTION => sha224_with_rsa_encryption => "1.2.840.113549.1.1.14",
     EMAIL_ADDRESS => email_address => "1.2.840.113549.1.9.1", // deprecated
+    EXTENSION_REQ => extension_request => "1.2.840.113549.1.9.14",
 
     // NIST
     DSA_WITH_SHA224 => dsa_with_sha224 => "2.16.840.1.101.3.4.3.1",
@@ -107,7 +108,6 @@ define_oid! {
     BASIC_CONSTRAINTS => basic_constraints => "2.5.29.19",
     AUTHORITY_KEY_IDENTIFIER => authority_key_identifier => "2.5.29.35",
     EXTENDED_KEY_USAGE => extended_key_usage => "2.5.29.37",
-    EXTENSION_REQ => extension_request => "1.2.840.113549.1.9.14",
 
     // aes
     // aes-128

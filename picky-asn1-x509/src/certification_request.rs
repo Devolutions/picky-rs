@@ -1,5 +1,8 @@
 use crate::{oids, AlgorithmIdentifier, Extension, Extensions, Name, SubjectPublicKeyInfo};
-use picky_asn1::wrapper::{ApplicationTag0, Asn1SetOf, BitStringAsn1, Implicit, ObjectIdentifierAsn1};
+use picky_asn1::{
+    tag::Tag,
+    wrapper::{Asn1SetOf, BitStringAsn1, ObjectIdentifierAsn1},
+};
 use serde::{de, ser, Deserialize, Serialize};
 
 /// [RFC 2986 #4](https://tools.ietf.org/html/rfc2986#section-4)
@@ -17,7 +20,7 @@ pub struct CertificationRequestInfo {
     pub version: u8,
     pub subject: Name,
     pub subject_public_key_info: SubjectPublicKeyInfo,
-    pub attributes: Implicit<Option<ApplicationTag0<Attribute>>>,
+    pub attributes: Attributes,
 }
 
 impl CertificationRequestInfo {
@@ -27,26 +30,44 @@ impl CertificationRequestInfo {
             version: 0,
             subject,
             subject_public_key_info,
-            attributes: Implicit(None),
+            attributes: Attributes(Vec::new()),
         }
     }
 
-    pub fn with_extensions(
-        subject: Name,
-        subject_public_key_info: SubjectPublicKeyInfo,
-        extensions: Vec<Extension>,
-    ) -> Self {
-        let values = AttributeValue::Extensions(Asn1SetOf(vec![Extensions(extensions)]));
+    pub fn with_extensions(mut self, extensions: Vec<Extension>) -> Self {
         let attribute = Attribute {
             ty: oids::extension_request().into(),
-            values,
+            values: AttributeValue::Extensions(Asn1SetOf(vec![Extensions(extensions)])),
         };
-        Self {
-            version: 0,
-            subject,
-            subject_public_key_info,
-            attributes: Implicit(Some(ApplicationTag0(attribute))),
-        }
+        self.attributes.0.push(attribute);
+        self
+    }
+}
+
+// this type is a hack to workaround [this issue](https://github.com/Devolutions/picky-rs/pull/78#issuecomment-789904165).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Attributes(pub Vec<Attribute>);
+
+impl ser::Serialize for Attributes {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
+    where
+        S: ser::Serializer,
+    {
+        let mut raw_der = picky_asn1_der::to_vec(&self.0).unwrap_or(Vec::new());
+        raw_der[0] = Tag::APP_0.number();
+        picky_asn1_der::Asn1RawDer(raw_der).serialize(serializer)
+    }
+}
+
+impl<'de> de::Deserialize<'de> for Attributes {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        let mut raw_der = picky_asn1_der::Asn1RawDer::deserialize(deserializer)?.0;
+        raw_der[0] = Tag::SEQUENCE.number();
+        let vec = picky_asn1_der::from_bytes(&raw_der).unwrap_or(Vec::new());
+        Ok(Attributes(vec))
     }
 }
 
@@ -150,7 +171,7 @@ mod tests {
     use std::str::FromStr;
 
     #[test]
-    fn deserialize_csr() {
+    fn basic_csr() {
         let encoded = base64::decode(
             "MIICYjCCAUoCAQAwHTEbMBkGA1UEAxMSdGVzdC5jb250b3NvLmxvY2FsMIIBIjAN\
             BgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAym0At2TvEqP0mYVLJzGVpNXjugu/\
@@ -188,7 +209,7 @@ mod tests {
     }
 
     #[test]
-    fn deserialize_csr_with_extensions() {
+    fn csr_with_extensions_attribute() {
         let encoded = base64::decode(
             "MIICjDCCAXQCAQAwIDELMAkGA1UEBhMCWFgxETAPBgNVBAMMCHNvbWV0ZXN0MIIB\
             IjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvNELh212N4optYS7pqbtvjyv\
@@ -207,10 +228,6 @@ mod tests {
         )
         .expect("invalid base64");
 
-        // eprintln!("encoded");
-        // encoded.iter().for_each(|e| eprint!("{:02x} ", e));
-        // eprintln!();
-
         let extensions = vec![Extension::new_subject_alt_name(vec![GeneralName::DNSName(
             IA5String::from_string("localhost".into()).unwrap().into(),
         )])
@@ -220,19 +237,14 @@ mod tests {
         dn.add_attr(NameAttr::CountryName, PrintableString::from_str("XX").unwrap());
         dn.add_attr(NameAttr::CommonName, Utf8String::from_str("sometest").unwrap());
 
-        let certification_request_info = CertificationRequestInfo::with_extensions(
+        let certification_request_info = CertificationRequestInfo::new(
             dn.into(),
             SubjectPublicKeyInfo::new_rsa_key(
                 IntegerAsn1::from(encoded[77..334].to_vec()),
                 IntegerAsn1::from(encoded[336..339].to_vec()),
             ),
-            extensions,
-        );
-
-        // let ser = picky_asn1_der::to_vec(&certification_request_info).unwrap();
-        // eprintln!("ser");
-        // ser.iter().for_each(|e| eprint!("{:02x} ", e));
-        // eprintln!();
+        )
+        .with_extensions(extensions);
 
         check_serde!(certification_request_info: CertificationRequestInfo in encoded[4..380]);
 
@@ -241,11 +253,6 @@ mod tests {
             signature_algorithm: AlgorithmIdentifier::new_sha256_with_rsa_encryption(),
             signature: BitString::with_bytes(&encoded[400..656]).into(),
         };
-
-        // let ser = picky_asn1_der::to_vec(&csr).unwrap();
-        // eprintln!("ser");
-        // ser.iter().for_each(|e| eprint!("{:02x} ", e));
-        // eprintln!();
 
         check_serde!(csr: CertificationRequest in encoded);
     }
