@@ -373,7 +373,8 @@ impl PublicKey {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{hash::HashAlgorithm, signature::SignatureAlgorithm};
+    use crate::hash::HashAlgorithm;
+    use crate::signature::SignatureAlgorithm;
     use rsa::PublicKeyParts;
 
     cfg_if::cfg_if! { if #[cfg(feature = "x509")] {

@@ -1,9 +1,7 @@
 use crate::oids;
 use oid::ObjectIdentifier;
-use picky_asn1::{
-    tag::{Tag, TagPeeker},
-    wrapper::{IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1},
-};
+use picky_asn1::tag::{Tag, TagPeeker};
+use picky_asn1::wrapper::{IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1};
 use serde::{de, ser, Deserialize, Serialize};
 use std::fmt;
 

@@ -1,14 +1,12 @@
-use crate::{
-    addressing::{encode_to_alternative_addresses, encode_to_canonical_address},
-    config::Config,
-    db::{config::DatabaseConfig, CertificateEntry, PickyStorage, StorageError, SCHEMA_LAST_VERSION},
-};
-use futures::{future::BoxFuture, FutureExt};
-use std::{
-    fs::File,
-    io::{Read, Write},
-    path::{Path, PathBuf},
-};
+use crate::addressing::{encode_to_alternative_addresses, encode_to_canonical_address};
+use crate::config::Config;
+use crate::db::config::DatabaseConfig;
+use crate::db::{CertificateEntry, PickyStorage, StorageError, SCHEMA_LAST_VERSION};
+use futures::future::BoxFuture;
+use futures::FutureExt;
+use std::fs::File;
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 #[derive(Debug, Error)]

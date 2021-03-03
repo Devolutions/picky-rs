@@ -6,7 +6,8 @@ mod logging;
 mod picky_controller;
 mod utils;
 
-use crate::{config::Config, http::http_server::HttpServer};
+use crate::config::Config;
+use crate::http::http_server::HttpServer;
 
 #[tokio::main]
 async fn main() {

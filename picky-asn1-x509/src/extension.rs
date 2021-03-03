@@ -1,11 +1,9 @@
 use crate::{oids, GeneralName, GeneralNames};
 use core::slice::{Iter, IterMut};
-use picky_asn1::{
-    bit_string::BitString,
-    wrapper::{
-        ApplicationTag1, Asn1SequenceOf, BitStringAsn1, ContextTag0, ContextTag2, Implicit, IntegerAsn1,
-        ObjectIdentifierAsn1, OctetStringAsn1, OctetStringAsn1Container,
-    },
+use picky_asn1::bit_string::BitString;
+use picky_asn1::wrapper::{
+    ApplicationTag1, Asn1SequenceOf, BitStringAsn1, ContextTag0, ContextTag2, Implicit, IntegerAsn1,
+    ObjectIdentifierAsn1, OctetStringAsn1, OctetStringAsn1Container,
 };
 use serde::{de, ser, Deserialize, Serialize};
 use std::fmt;

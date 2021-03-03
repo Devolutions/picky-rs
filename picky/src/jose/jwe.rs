@@ -2,17 +2,17 @@
 //!
 //! See [RFC7516](https://tools.ietf.org/html/rfc7516).
 
-use crate::{
-    jose::jwk::Jwk,
-    key::{PrivateKey, PublicKey},
-};
-use aes_gcm::{aead::generic_array::typenum::Unsigned, AeadInPlace, Aes128Gcm, Aes256Gcm, NewAead};
+use crate::jose::jwk::Jwk;
+use crate::key::{PrivateKey, PublicKey};
+use aes_gcm::aead::generic_array::typenum::Unsigned;
+use aes_gcm::{AeadInPlace, Aes128Gcm, Aes256Gcm, NewAead};
 use base64::DecodeError;
 use digest::generic_array::GenericArray;
 use rand::RngCore;
 use rsa::{PaddingScheme, PublicKey as RsaPublicKeyInterface, RSAPrivateKey, RSAPublicKey};
 use serde::{Deserialize, Serialize};
-use std::{borrow::Cow, convert::TryFrom};
+use std::borrow::Cow;
+use std::convert::TryFrom;
 use thiserror::Error;
 
 type Aes192Gcm = aes_gcm::AesGcm<aes_gcm::aes::Aes192, aes_gcm::aead::generic_array::typenum::U12>;
@@ -579,7 +579,8 @@ fn decode_impl(encoded_token: &str, mode: DecoderMode<'_>) -> Result<Jwe, JweErr
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{key::PrivateKey, pem::Pem};
+    use crate::key::PrivateKey;
+    use crate::pem::Pem;
 
     fn get_private_key_1() -> PrivateKey {
         let pk_pem = crate::test_files::RSA_2048_PK_1.parse::<Pem>().unwrap();

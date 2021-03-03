@@ -1,22 +1,20 @@
 mod model;
 
-use crate::{
-    addressing::{encode_to_alternative_addresses, encode_to_canonical_address},
-    db::{CertificateEntry, PickyStorage, StorageError, SCHEMA_LAST_VERSION},
-};
-use futures::{future::BoxFuture, stream::StreamExt, FutureExt};
+use crate::addressing::{encode_to_alternative_addresses, encode_to_canonical_address};
+use crate::db::{CertificateEntry, PickyStorage, StorageError, SCHEMA_LAST_VERSION};
+use futures::future::BoxFuture;
+use futures::stream::StreamExt;
+use futures::FutureExt;
 use model::*;
-use mongodm::{
-    f,
-    mongo::{
-        bson::{doc, oid::ObjectId, spec::BinarySubtype, Binary, Bson},
-        options::{ClientOptions, ReadPreference, ReplaceOptions, SelectionCriteria},
-        Client, Database,
-    },
-    ToRepository,
-};
+use mongodm::mongo::bson::oid::ObjectId;
+use mongodm::mongo::bson::spec::BinarySubtype;
+use mongodm::mongo::bson::{doc, Binary, Bson};
+use mongodm::mongo::options::{ClientOptions, ReadPreference, ReplaceOptions, SelectionCriteria};
+use mongodm::mongo::{Client, Database};
+use mongodm::{f, ToRepository};
 use picky::x509::Cert;
-use std::{collections::HashMap, convert::TryFrom};
+use std::collections::HashMap;
+use std::convert::TryFrom;
 use thiserror::Error;
 
 const DB_CONNECTION_TIMEOUT_SECS: u64 = 15;

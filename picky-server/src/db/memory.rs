@@ -1,13 +1,10 @@
-use crate::{
-    addressing::{encode_to_alternative_addresses, encode_to_canonical_address},
-    db::{CertificateEntry, PickyStorage, StorageError},
-};
-use futures::{future::BoxFuture, FutureExt};
-use std::{
-    collections::HashMap,
-    hash::Hash,
-    sync::{RwLock, RwLockReadGuard},
-};
+use crate::addressing::{encode_to_alternative_addresses, encode_to_canonical_address};
+use crate::db::{CertificateEntry, PickyStorage, StorageError};
+use futures::future::BoxFuture;
+use futures::FutureExt;
+use std::collections::HashMap;
+use std::hash::Hash;
+use std::sync::{RwLock, RwLockReadGuard};
 use thiserror::Error;
 
 #[derive(Debug, Error)]

@@ -1,8 +1,6 @@
 use crate::{oids, AlgorithmIdentifier, Extension, Extensions, Name, SubjectPublicKeyInfo};
-use picky_asn1::{
-    tag::Tag,
-    wrapper::{Asn1SetOf, BitStringAsn1, ObjectIdentifierAsn1},
-};
+use picky_asn1::tag::Tag;
+use picky_asn1::wrapper::{Asn1SetOf, BitStringAsn1, ObjectIdentifierAsn1};
 use serde::{de, ser, Deserialize, Serialize};
 
 /// [RFC 2986 #4](https://tools.ietf.org/html/rfc2986#section-4)
@@ -172,12 +170,11 @@ pub struct CertificationRequest {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{name::*, DirectoryName, GeneralName};
-    use picky_asn1::{
-        bit_string::BitString,
-        restricted_string::{IA5String, PrintableString, Utf8String},
-        wrapper::IntegerAsn1,
-    };
+    use crate::name::*;
+    use crate::{DirectoryName, GeneralName};
+    use picky_asn1::bit_string::BitString;
+    use picky_asn1::restricted_string::{IA5String, PrintableString, Utf8String};
+    use picky_asn1::wrapper::IntegerAsn1;
     use std::str::FromStr;
 
     #[test]

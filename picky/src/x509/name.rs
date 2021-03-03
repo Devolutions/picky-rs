@@ -1,8 +1,6 @@
 use oid::ObjectIdentifier;
-use picky_asn1::{
-    restricted_string::{CharSetError, IA5String},
-    wrapper::{Asn1SequenceOf, IA5StringAsn1},
-};
+use picky_asn1::restricted_string::{CharSetError, IA5String};
+use picky_asn1::wrapper::{Asn1SequenceOf, IA5StringAsn1};
 use picky_asn1_x509::{
     DirectoryString, GeneralName as SerdeGeneralName, GeneralNames as SerdeGeneralNames, Name, NamePrettyFormatter,
 };

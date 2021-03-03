@@ -1,4 +1,5 @@
-use crate::{de::Deserializer, Asn1DerError, Result};
+use crate::de::Deserializer;
+use crate::{Asn1DerError, Result};
 use serde::de::{DeserializeSeed, SeqAccess};
 
 /// A deserializer for sequences

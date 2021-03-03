@@ -1,5 +1,9 @@
 use serde::{de, ser};
-use std::{error::Error, fmt, marker::PhantomData, ops::Deref, str::FromStr};
+use std::error::Error;
+use std::fmt;
+use std::marker::PhantomData;
+use std::ops::Deref;
+use std::str::FromStr;
 
 // === CharSetError === //
 

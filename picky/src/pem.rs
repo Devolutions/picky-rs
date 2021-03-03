@@ -4,7 +4,10 @@
 //! ([Textual Encodings of PKIX, PKCS, and CMS Structures](https://tools.ietf.org/html/rfc7468)).
 
 use base64::DecodeError;
-use std::{borrow::Cow, fmt, io::BufRead, str::FromStr};
+use std::borrow::Cow;
+use std::fmt;
+use std::io::BufRead;
+use std::str::FromStr;
 use thiserror::Error;
 
 const PEM_HEADER_START: &str = "-----BEGIN";

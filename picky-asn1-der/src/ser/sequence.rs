@@ -1,8 +1,6 @@
-use crate::{
-    misc::WriteExt,
-    ser::{to_writer, Serializer},
-    Asn1DerError, Result,
-};
+use crate::misc::WriteExt;
+use crate::ser::{to_writer, Serializer};
+use crate::{Asn1DerError, Result};
 use picky_asn1::tag::Tag;
 use serde::Serialize;
 use std::io::Cursor;

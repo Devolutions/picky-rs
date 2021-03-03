@@ -1,10 +1,9 @@
-use picky_asn1::{
-    restricted_string::{PrintableString, Utf8String},
-    tag::{Tag, TagPeeker},
-    wrapper::PrintableStringAsn1,
-};
+use picky_asn1::restricted_string::{PrintableString, Utf8String};
+use picky_asn1::tag::{Tag, TagPeeker};
+use picky_asn1::wrapper::PrintableStringAsn1;
 use serde::{de, ser};
-use std::{borrow::Cow, fmt};
+use std::borrow::Cow;
+use std::fmt;
 
 /// [RFC 5280 #4.1.2.4](https://tools.ietf.org/html/rfc5280#section-4.1.2.4)
 ///

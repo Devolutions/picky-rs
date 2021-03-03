@@ -1,13 +1,11 @@
-use crate::{
-    config::Config,
-    utils::{unix_epoch, PathOr},
-};
-use picky::{
-    jose::jwt::{JwtDate, JwtSig, JwtValidator},
-    key::PublicKey,
-    pem::Pem,
-};
-use saphir::{body::Body, http::header, request::Request};
+use crate::config::Config;
+use crate::utils::{unix_epoch, PathOr};
+use picky::jose::jwt::{JwtDate, JwtSig, JwtValidator};
+use picky::key::PublicKey;
+use picky::pem::Pem;
+use saphir::body::Body;
+use saphir::http::header;
+use saphir::request::Request;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
@@ -86,12 +84,11 @@ pub fn check_authorization(config: &Config, req: &Request<Body>) -> Result<JwtSi
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{config::BackendType, utils::unix_epoch};
-    use picky::{
-        jose::jws::JwsAlg,
-        key::{PrivateKey, PublicKey},
-        pem::Pem,
-    };
+    use crate::config::BackendType;
+    use crate::utils::unix_epoch;
+    use picky::jose::jws::JwsAlg;
+    use picky::key::{PrivateKey, PublicKey};
+    use picky::pem::Pem;
     use saphir::http::{request, Method};
 
     fn get_private_key_1() -> PrivateKey {

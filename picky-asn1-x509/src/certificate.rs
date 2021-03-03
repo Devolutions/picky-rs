@@ -144,7 +144,8 @@ mod tests {
     use super::*;
     use crate::{DirectoryName, Extension, KeyIdentifier, KeyUsage};
     use num_bigint_dig::BigInt;
-    use picky_asn1::{bit_string::BitString, date::UTCTime};
+    use picky_asn1::bit_string::BitString;
+    use picky_asn1::date::UTCTime;
 
     #[test]
     fn x509_v3_certificate() {

@@ -69,7 +69,8 @@ mod http_trait_impl {
     #[cfg(test)]
     mod tests {
         use super::*;
-        use http::{header, method::Method, request};
+        use http::method::Method;
+        use http::{header, request};
 
         #[test]
         fn http_request_parts() {

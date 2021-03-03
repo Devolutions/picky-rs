@@ -2,13 +2,9 @@
 //!
 //! See [RFC7517](https://tools.ietf.org/html/rfc7517).
 
-use crate::{
-    jose::{
-        jwe::{JweAlg, JweEnc},
-        jws::JwsAlg,
-    },
-    key::PublicKey,
-};
+use crate::jose::jwe::{JweAlg, JweEnc};
+use crate::jose::jws::JwsAlg;
+use crate::key::PublicKey;
 use base64::DecodeError;
 use picky_asn1_x509::SubjectPublicKeyInfo;
 use serde::{Deserialize, Serialize};

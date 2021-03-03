@@ -1,6 +1,7 @@
 use crate::config::Config as ServerConfig;
 use log::LevelFilter;
-use log4rs::{config::Config as LoggerConfig, Handle};
+use log4rs::config::Config as LoggerConfig;
+use log4rs::Handle;
 
 pub fn init_logs(config: &ServerConfig) -> Handle {
     let config = build_logger_config(config).expect("unable to configure logger");
@@ -8,10 +9,8 @@ pub fn init_logs(config: &ServerConfig) -> Handle {
 }
 
 pub fn build_logger_config(config: &ServerConfig) -> Result<LoggerConfig, log4rs::config::Errors> {
-    use log4rs::{
-        append::console::ConsoleAppender,
-        config::{Appender, Logger, Root},
-    };
+    use log4rs::append::console::ConsoleAppender;
+    use log4rs::config::{Appender, Logger, Root};
 
     LoggerConfig::builder()
         .appender(Appender::builder().build("stdout", Box::new(ConsoleAppender::builder().build())))

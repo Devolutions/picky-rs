@@ -3,14 +3,10 @@ mod file;
 mod memory;
 mod mongodb;
 
-use crate::{
-    config::{BackendType, Config},
-    db::{
-        file::{FileStorage, FileStorageError},
-        memory::{MemoryStorage, MemoryStorageError},
-        mongodb::{MongoStorage, MongoStorageError},
-    },
-};
+use crate::config::{BackendType, Config};
+use crate::db::file::{FileStorage, FileStorageError};
+use crate::db::memory::{MemoryStorage, MemoryStorageError};
+use crate::db::mongodb::{MongoStorage, MongoStorageError};
 use futures::future::BoxFuture;
 use thiserror::Error;
 

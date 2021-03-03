@@ -291,7 +291,8 @@ impl TimeRepr for GeneralizedTimeRepr {
 #[cfg(feature = "chrono_conversion")]
 mod chrono_conversion {
     use super::*;
-    use chrono::{naive::NaiveDateTime, DateTime, Datelike, Duration, NaiveDate, Timelike, Utc};
+    use chrono::naive::NaiveDateTime;
+    use chrono::{DateTime, Datelike, Duration, NaiveDate, Timelike, Utc};
     use std::convert::TryFrom;
 
     impl<TR: TimeRepr> TryFrom<Duration> for Date<TR> {

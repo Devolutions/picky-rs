@@ -1,17 +1,13 @@
-use crate::{
-    hash::HashAlgorithm,
-    http::http_request::{HttpRequest, HttpRequestError},
-    key::{PrivateKey, PublicKey},
-    signature::{SignatureAlgorithm, SignatureError},
-};
+use crate::hash::HashAlgorithm;
+use crate::http::http_request::{HttpRequest, HttpRequestError};
+use crate::key::{PrivateKey, PublicKey};
+use crate::signature::{SignatureAlgorithm, SignatureError};
 use base64::{DecodeError, URL_SAFE_NO_PAD};
-use std::{
-    borrow::Cow,
-    cell::RefCell,
-    collections::HashMap,
-    fmt::{self, Debug},
-    str::FromStr,
-};
+use std::borrow::Cow;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::fmt::{self, Debug};
+use std::str::FromStr;
 use thiserror::Error;
 
 // === error type === //
@@ -896,7 +892,8 @@ fn is_algo_compatible_with_key(algo: SignatureAlgorithm, key: &PublicKey) -> boo
 mod tests {
     use super::*;
     use crate::pem::Pem;
-    use http::{header, method::Method, request};
+    use http::method::Method;
+    use http::{header, request};
     use picky_asn1_x509::{AlgorithmIdentifier, SubjectPublicKeyInfo};
 
     const HTTP_SIGNATURE_EXAMPLE: &str = "Signature keyId=\"my-rsa-key\",algorithm=\"rsa-sha256\"\

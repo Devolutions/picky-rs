@@ -1,8 +1,6 @@
 use crate::Asn1DerError;
-use std::{
-    io::{self, Read, Write},
-    mem::size_of,
-};
+use std::io::{self, Read, Write};
+use std::mem::size_of;
 
 /// The byte size of an `usize`
 const USIZE_LEN: usize = size_of::<usize>();

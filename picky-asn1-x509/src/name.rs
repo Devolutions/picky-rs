@@ -1,11 +1,9 @@
 use crate::{AttributeTypeAndValue, AttributeTypeAndValueParameters, DirectoryString};
-use picky_asn1::{
-    tag::{Tag, TagPeeker},
-    wrapper::{
-        ApplicationTag1, ApplicationTag2, ApplicationTag4, ApplicationTag5, ApplicationTag6, ApplicationTag7,
-        ApplicationTag8, Asn1SequenceOf, Asn1SetOf, ContextTag0, ContextTag1, ContextTag2, ContextTag4, ContextTag5,
-        ContextTag6, ContextTag7, ContextTag8, IA5StringAsn1, Implicit, ObjectIdentifierAsn1, OctetStringAsn1,
-    },
+use picky_asn1::tag::{Tag, TagPeeker};
+use picky_asn1::wrapper::{
+    ApplicationTag1, ApplicationTag2, ApplicationTag4, ApplicationTag5, ApplicationTag6, ApplicationTag7,
+    ApplicationTag8, Asn1SequenceOf, Asn1SetOf, ContextTag0, ContextTag1, ContextTag2, ContextTag4, ContextTag5,
+    ContextTag6, ContextTag7, ContextTag8, IA5StringAsn1, Implicit, ObjectIdentifierAsn1, OctetStringAsn1,
 };
 use serde::{de, ser, Deserialize, Serialize};
 use std::fmt;

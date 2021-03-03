@@ -7,7 +7,9 @@ macro_rules! debug_log {
 #[cfg(feature = "debug_log")]
 #[macro_use]
 pub mod internal {
-    use std::{collections::HashMap, sync::Mutex, thread::ThreadId};
+    use std::collections::HashMap;
+    use std::sync::Mutex;
+    use std::thread::ThreadId;
 
     lazy_static::lazy_static! {
         pub static ref CTX: Mutex<HashMap<ThreadId, u8>> = Mutex::new(HashMap::new());

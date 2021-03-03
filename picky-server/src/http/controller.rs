@@ -1,23 +1,19 @@
-use crate::{
-    addressing::{convert_to_canonical_base, CANONICAL_HASH},
-    config::{CertKeyPair, Config},
-    db::{get_storage, BoxedPickyStorage, CertificateEntry, PickyStorage},
-    http::{
-        authorization::{check_authorization, ProviderClaims},
-        utils::{Format, StatusCodeResult},
-    },
-    logging::build_logger_config,
-    picky_controller::Picky,
-    utils::{GreedyError, PathOr},
-};
+use crate::addressing::{convert_to_canonical_base, CANONICAL_HASH};
+use crate::config::{CertKeyPair, Config};
+use crate::db::{get_storage, BoxedPickyStorage, CertificateEntry, PickyStorage};
+use crate::http::authorization::{check_authorization, ProviderClaims};
+use crate::http::utils::{Format, StatusCodeResult};
+use crate::logging::build_logger_config;
+use crate::picky_controller::Picky;
+use crate::utils::{GreedyError, PathOr};
 use log4rs::Handle;
-use picky::{
-    pem::{parse_pem, to_pem, Pem},
-    x509::{Cert, Csr},
-};
-use saphir::{prelude::*, response::Builder as ResponseBuilder};
+use picky::pem::{parse_pem, to_pem, Pem};
+use picky::x509::{Cert, Csr};
+use saphir::prelude::*;
+use saphir::response::Builder as ResponseBuilder;
 use serde_json::{self, Value};
-use std::{borrow::Cow, convert::TryFrom};
+use std::borrow::Cow;
+use std::convert::TryFrom;
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 pub struct ServerController {
@@ -646,11 +642,10 @@ async fn init_storage_from_config(storage: &dyn PickyStorage, config: &Config) -
 mod tests {
     use super::*;
     use crate::config::BackendType;
-    use picky::{
-        hash::HashAlgorithm,
-        signature::SignatureAlgorithm,
-        x509::{date::UTCDate, name::DirectoryName},
-    };
+    use picky::hash::HashAlgorithm;
+    use picky::signature::SignatureAlgorithm;
+    use picky::x509::date::UTCDate;
+    use picky::x509::name::DirectoryName;
     use tokio_test::block_on;
 
     fn config() -> Config {
