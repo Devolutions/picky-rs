@@ -6,6 +6,8 @@ authors = [
     "Jonathan Trepanier <jtrepanier@devolutions.net>",
     "François Dubois <fdubois@devolutions.net>",
     "Richard Markiewicz <rmarkiewicz@devolutions.net>",
+    "Ionut Mihalcea <ionut.mihalcea@arm.com>",
+    "Kim Altintop <kim@monadic.xyz>"
 ]
 description = "Portable X.509, PKI, JOSE and HTTP signature implementation."
 keywords = ["x509", "jwt", "signature", "jose", "pki"]
