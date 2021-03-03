@@ -44,7 +44,8 @@ impl CertificationRequestInfo {
     }
 }
 
-// this type is a hack to workaround [this issue](https://github.com/Devolutions/picky-rs/pull/78#issuecomment-789904165).
+// FIXME: this type is a hack to workaround [this issue](https://github.com/Devolutions/picky-rs/pull/78#issuecomment-789904165).
+// Further refactorings are required to clean this up (proper support for IMPLICIT / EXPLICIT tags, etc)
 #[derive(Clone, Debug, PartialEq)]
 pub struct Attributes(pub Vec<Attribute>);
 
