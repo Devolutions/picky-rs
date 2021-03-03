@@ -1,7 +1,14 @@
 [package]
 name = "picky-asn1-x509"
 version = "0.4.0"
-authors = ["Benoît CORTIER <benoit.cortier@fried-world.eu>"]
+authors = [
+    "Benoît CORTIER <benoit.cortier@fried-world.eu>",
+    "Sergey Noskov <snoskov@avito.ru>",
+    "Kim Altintop <kim@monadic.xyz>",
+    "Joe Ellis <joe.ellis@arm.com>",
+    "Hugues de Valon <hugues.devalon@arm.com>",
+    "Isode Ltd./Geobert Quach <geobert.quach@isode.com>"
+]
 description = "Provides ASN1 types defined by X.509 related RFCs"
 edition = "2018"
 license = "MIT OR Apache-2.0"
