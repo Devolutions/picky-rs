@@ -1,7 +1,6 @@
-use mongodm::{
-    mongo::bson::{oid::ObjectId, Bson},
-    Index, IndexOption, Indexes,
-};
+use mongodm::mongo::bson::oid::ObjectId;
+use mongodm::mongo::bson::Bson;
+use mongodm::{Index, IndexOption, Indexes};
 use serde::{Deserialize, Serialize};
 
 // == name == //

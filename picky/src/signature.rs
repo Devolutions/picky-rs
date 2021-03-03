@@ -1,9 +1,7 @@
 //! Signature algorithms supported by picky
 
-use crate::{
-    hash::HashAlgorithm,
-    key::{KeyError, PrivateKey, PublicKey},
-};
+use crate::hash::HashAlgorithm;
+use crate::key::{KeyError, PrivateKey, PublicKey};
 use core::convert::TryFrom;
 use picky_asn1_x509::{oids, AlgorithmIdentifier};
 use rsa::{PublicKey as RsaPublicKeyInterface, RSAPrivateKey, RSAPublicKey};

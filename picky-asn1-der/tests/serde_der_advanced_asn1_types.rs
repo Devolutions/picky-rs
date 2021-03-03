@@ -4,15 +4,16 @@ mod pki_tests;
 
 use num_bigint::ToBigInt;
 use oid::prelude::*;
-use picky_asn1::{
-    bit_string::BitString,
-    date::{Date, GeneralizedTime, UTCTime},
-    restricted_string::{IA5String, PrintableString, Utf8String},
-    wrapper::*,
-};
+use picky_asn1::bit_string::BitString;
+use picky_asn1::date::{Date, GeneralizedTime, UTCTime};
+use picky_asn1::restricted_string::{IA5String, PrintableString, Utf8String};
+use picky_asn1::wrapper::*;
 use pretty_assertions::assert_eq;
 use serde::{Deserialize, Serialize};
-use std::{borrow::Cow, convert::TryFrom, fmt::Debug, str::FromStr};
+use std::borrow::Cow;
+use std::convert::TryFrom;
+use std::fmt::Debug;
+use std::str::FromStr;
 
 fn check<'de, T>(buffer: &'de [u8], expected: T)
 where

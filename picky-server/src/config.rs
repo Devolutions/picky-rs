@@ -1,18 +1,14 @@
 use crate::utils::PathOr;
 use clap::App;
 use log::LevelFilter;
-use picky::{
-    hash::HashAlgorithm,
-    key::{PrivateKey, PublicKey},
-    pem::Pem,
-    signature::SignatureAlgorithm,
-    x509::Cert,
-};
+use picky::hash::HashAlgorithm;
+use picky::key::{PrivateKey, PublicKey};
+use picky::pem::Pem;
+use picky::signature::SignatureAlgorithm;
+use picky::x509::Cert;
 use serde::{Deserialize, Serialize};
-use std::{
-    env,
-    path::{Path, PathBuf},
-};
+use std::env;
+use std::path::{Path, PathBuf};
 
 const YAML_CONF_PATH: &str = "picky_server_conf.yaml";
 

@@ -2,12 +2,10 @@
 //!
 //! See [RFC7515](https://tools.ietf.org/html/rfc7515).
 
-use crate::{
-    hash::HashAlgorithm,
-    jose::jwk::Jwk,
-    key::{PrivateKey, PublicKey},
-    signature::{SignatureAlgorithm, SignatureError},
-};
+use crate::hash::HashAlgorithm;
+use crate::jose::jwk::Jwk;
+use crate::key::{PrivateKey, PublicKey};
+use crate::signature::{SignatureAlgorithm, SignatureError};
 use base64::DecodeError;
 use core::convert::TryFrom;
 use serde::{Deserialize, Serialize};

@@ -1,7 +1,5 @@
-use crate::{
-    hash::HashAlgorithm,
-    key::{KeyError, PublicKey},
-};
+use crate::hash::HashAlgorithm;
+use crate::key::{KeyError, PublicKey};
 use picky_asn1::wrapper::BitStringAsn1Container;
 use picky_asn1_der::Asn1DerError;
 use thiserror::Error;

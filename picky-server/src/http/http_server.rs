@@ -1,7 +1,6 @@
-use crate::{
-    config::Config,
-    http::{controller::ServerController, middleware},
-};
+use crate::config::Config;
+use crate::http::controller::ServerController;
+use crate::http::middleware;
 use log4rs::Handle;
 use saphir::server::Server as SaphirServer;
 

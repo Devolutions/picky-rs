@@ -1,16 +1,12 @@
-use crate::{
-    bit_string::BitString,
-    date::{GeneralizedTime, UTCTime},
-    restricted_string::{IA5String, NumericString, PrintableString, Utf8String},
-    tag::Tag,
-    Asn1Type,
-};
+use crate::bit_string::BitString;
+use crate::date::{GeneralizedTime, UTCTime};
+use crate::restricted_string::{IA5String, NumericString, PrintableString, Utf8String};
+use crate::tag::Tag;
+use crate::Asn1Type;
 use oid::ObjectIdentifier;
 use serde::{de, ser, Deserialize, Serialize};
-use std::{
-    fmt,
-    ops::{Deref, DerefMut},
-};
+use std::fmt;
+use std::ops::{Deref, DerefMut};
 
 /// Generate a thin ASN1 wrapper type with associated tag
 /// and name for serialization and deserialization purpose.

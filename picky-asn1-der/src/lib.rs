@@ -77,17 +77,13 @@ mod misc;
 mod raw_der;
 mod ser;
 
-pub use crate::{
-    de::{from_bytes, from_reader, from_reader_with_max_len, Deserializer},
-    raw_der::Asn1RawDer,
-    ser::{to_byte_buf, to_bytes, to_vec, to_writer, Serializer},
-};
+pub use crate::de::{from_bytes, from_reader, from_reader_with_max_len, Deserializer};
+pub use crate::raw_der::Asn1RawDer;
+pub use crate::ser::{to_byte_buf, to_bytes, to_vec, to_writer, Serializer};
 
-use std::{
-    error::Error,
-    fmt::{self, Display, Formatter},
-    io,
-};
+use std::error::Error;
+use std::fmt::{self, Display, Formatter};
+use std::io;
 
 /// A `picky_asn1_der`-related error
 #[derive(Debug)]

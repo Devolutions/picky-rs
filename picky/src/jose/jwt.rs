@@ -1,13 +1,10 @@
 use super::jwe::Jwe;
-use crate::{
-    jose::{
-        jwe::{JweAlg, JweEnc, JweError, JweHeader},
-        jws::{Jws, JwsAlg, JwsError, JwsHeader},
-    },
-    key::{PrivateKey, PublicKey},
-};
+use crate::jose::jwe::{JweAlg, JweEnc, JweError, JweHeader};
+use crate::jose::jws::{Jws, JwsAlg, JwsError, JwsHeader};
+use crate::key::{PrivateKey, PublicKey};
 use core::fmt;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 use thiserror::Error;
 
 // === error type === //

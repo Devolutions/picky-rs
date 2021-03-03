@@ -1,9 +1,7 @@
-use picky_asn1::{
-    date::{GeneralizedTime, UTCTime},
-    tag::TagPeeker,
-    wrapper::{GeneralizedTimeAsn1, UTCTimeAsn1},
-    Asn1Type,
-};
+use picky_asn1::date::{GeneralizedTime, UTCTime};
+use picky_asn1::tag::TagPeeker;
+use picky_asn1::wrapper::{GeneralizedTimeAsn1, UTCTimeAsn1};
+use picky_asn1::Asn1Type;
 use serde::{de, ser, Deserialize, Serialize};
 use std::fmt;
 

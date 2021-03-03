@@ -1,4 +1,5 @@
-use crate::{misc::WriteExt, Result, Serializer};
+use crate::misc::WriteExt;
+use crate::{Result, Serializer};
 use picky_asn1::tag::Tag;
 
 /// A trait that allows you to map all unsigned integers to a `u128`

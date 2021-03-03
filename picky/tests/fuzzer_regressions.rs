@@ -2,13 +2,17 @@
 #![cfg(feature = "jose")]
 //! This test run problematic artifacts found by fuzzing
 
-use picky::{
-    jose::{jwe::Jwe, jwk::Jwk, jws::Jws},
-    key::{PrivateKey, PublicKey},
-    pem::{parse_pem, Pem},
-    x509::{certificate::Cert, csr::Csr},
-};
-use std::{fs, io::Read, path::PathBuf, time::Instant};
+use picky::jose::jwe::Jwe;
+use picky::jose::jwk::Jwk;
+use picky::jose::jws::Jws;
+use picky::key::{PrivateKey, PublicKey};
+use picky::pem::{parse_pem, Pem};
+use picky::x509::certificate::Cert;
+use picky::x509::csr::Csr;
+use std::fs;
+use std::io::Read;
+use std::path::PathBuf;
+use std::time::Instant;
 
 fn read_vector() -> Vec<Vec<u8>> {
     let dir = PathBuf::from("tests/artifacts_vector");

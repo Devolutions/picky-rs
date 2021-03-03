@@ -1,4 +1,5 @@
-use saphir::{http::StatusCode, request::Request};
+use saphir::http::StatusCode;
+use saphir::request::Request;
 use std::fmt;
 
 // === result extension === //
