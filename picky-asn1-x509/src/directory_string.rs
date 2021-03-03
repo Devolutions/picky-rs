@@ -69,7 +69,7 @@ impl From<PrintableString> for DirectoryString {
 
 impl From<Utf8String> for DirectoryString {
     fn from(string: Utf8String) -> Self {
-        Self::Utf8String(String::from_utf8_lossy(string.as_bytes()).to_string())
+        Self::Utf8String(String::from_utf8(string.into_bytes()).expect("Utf8String has the right charset"))
     }
 }
 
