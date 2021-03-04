@@ -4,8 +4,10 @@ use crate::signature::{SignatureAlgorithm, SignatureError};
 use crate::x509::name::DirectoryName;
 use picky_asn1::bit_string::BitString;
 use picky_asn1_der::Asn1DerError;
-use picky_asn1_x509::{Attribute, CertificationRequest, CertificationRequestInfo};
+use picky_asn1_x509::{CertificationRequest, CertificationRequestInfo};
 use thiserror::Error;
+
+pub use picky_asn1_x509::Attribute;
 
 #[derive(Debug, Error)]
 pub enum CsrError {
