@@ -1365,8 +1365,7 @@ mod tests {
 
     #[test]
     fn inherit_requested_extensions_by_csr() {
-        use picky_asn1::restricted_string::IA5String;
-        use picky_asn1_x509::GeneralName;
+        use crate::x509::name::GeneralName;
 
         let root_key = parse_key(crate::test_files::RSA_2048_PK_1);
         let leaf_key = parse_key(crate::test_files::RSA_2048_PK_3);
@@ -1379,10 +1378,8 @@ mod tests {
             .build()
             .expect("couldn't build root ca");
 
-        let extensions = vec![Extension::new_subject_alt_name(vec![GeneralName::DNSName(
-            IA5String::from_string("localhost".into()).unwrap().into(),
-        )])
-        .into_non_critical()];
+        let extensions =
+            vec![Extension::new_subject_alt_name(GeneralName::new_dns_name("localhost").unwrap()).into_non_critical()];
         let attr = picky_asn1_x509::certification_request::Attribute::new_extension_request(extensions);
         let csr = Csr::generate_with_attributes(
             DirectoryName::new_common_name("I want more extensions"),
@@ -1405,7 +1402,7 @@ mod tests {
             .iter()
             .find_map(|ext| match ext.extn_value() {
                 ExtensionView::SubjectAltName(gn) => match gn.0.first().unwrap() {
-                    GeneralName::DNSName(name) => Some(name.to_string()),
+                    picky_asn1_x509::GeneralName::DNSName(name) => Some(name.to_string()),
                     _ => None,
                 },
                 _ => None,
