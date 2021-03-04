@@ -958,6 +958,7 @@ fn generate_serial_number() -> IntegerAsn1 {
 mod tests {
     use super::*;
     use crate::pem::{parse_pem, Pem};
+    use crate::x509::csr::Attribute;
 
     #[test]
     fn read_pem_and_parse_certificate() {
@@ -1380,7 +1381,7 @@ mod tests {
 
         let extensions =
             vec![Extension::new_subject_alt_name(GeneralName::new_dns_name("localhost").unwrap()).into_non_critical()];
-        let attr = picky_asn1_x509::certification_request::Attribute::new_extension_request(extensions);
+        let attr = Attribute::new_extension_request(extensions);
         let csr = Csr::generate_with_attributes(
             DirectoryName::new_common_name("I want more extensions"),
             &leaf_key,
