@@ -149,6 +149,12 @@ impl From<GeneralName> for SerdeGeneralName {
     }
 }
 
+impl From<GeneralName> for SerdeGeneralNames {
+    fn from(gn: GeneralName) -> Self {
+        GeneralNames::new(gn).into()
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct GeneralNames(SerdeGeneralNames);
 
