@@ -155,10 +155,29 @@ impl From<GeneralName> for SerdeGeneralNames {
     }
 }
 
+/// Wraps x509 `GeneralNames` into an easy to use API.
+///
+/// # Example
+///
+/// ```
+/// use picky::x509::name::{GeneralNames, GeneralName, DirectoryName};
+///
+/// let common_name = GeneralName::new_directory_name(DirectoryName::new_common_name("MyName"));
+/// let dns_name = GeneralName::new_dns_name("localhost").expect("invalid name string");
+/// let names = GeneralNames::from(vec![common_name, dns_name]);
+/// ```
 #[derive(Clone, Debug, PartialEq)]
 pub struct GeneralNames(SerdeGeneralNames);
 
 impl GeneralNames {
+    /// # Example
+    ///
+    /// ```
+    /// use picky::x509::name::{GeneralName, GeneralNames};
+    ///
+    /// let dns_name = GeneralName::new_dns_name("localhost").expect("invalid name string");
+    /// let names = GeneralNames::new(dns_name);
+    /// ```
     pub fn new<GN: Into<GeneralName>>(gn: GN) -> Self {
         let gn = gn.into();
         Self(Asn1SequenceOf(vec![gn.into()]))
@@ -167,6 +186,12 @@ impl GeneralNames {
     pub fn new_directory_name<DN: Into<DirectoryName>>(name: DN) -> Self {
         let gn = GeneralName::new_directory_name(name);
         Self::new(gn)
+    }
+
+    pub fn with_directory_name<DN: Into<DirectoryName>>(mut self, name: DN) -> Self {
+        let gn = GeneralName::new_directory_name(name);
+        (self.0).0.push(gn.into());
+        self
     }
 
     pub fn find_directory_name(&self) -> Option<DirectoryName> {
@@ -178,9 +203,32 @@ impl GeneralNames {
         None
     }
 
+    /// # Example
+    ///
+    /// ```
+    /// use picky::x509::name::GeneralNames;
+    /// use picky_asn1::restricted_string::IA5String;
+    ///
+    /// let names = GeneralNames::new_dns_name(IA5String::new("localhost").unwrap());
+    /// ```
     pub fn new_dns_name<IA5: Into<IA5String>>(dns_name: IA5) -> Self {
         let gn = GeneralName::DNSName(dns_name.into());
         Self::new(gn)
+    }
+
+    /// # Example
+    ///
+    /// ```
+    /// use picky::x509::name::{GeneralNames, DirectoryName};
+    /// use picky_asn1::restricted_string::IA5String;
+    ///
+    /// let names = GeneralNames::new_directory_name(DirectoryName::new_common_name("MyName"))
+    ///         .with_dns_name(IA5String::new("localhost").unwrap());
+    /// ```
+    pub fn with_dns_name<IA5: Into<IA5String>>(mut self, dns_name: IA5) -> Self {
+        let gn = GeneralName::DNSName(dns_name.into());
+        (self.0).0.push(gn.into());
+        self
     }
 
     pub fn find_dns_name(&self) -> Option<&IA5String> {
@@ -195,6 +243,21 @@ impl GeneralNames {
     pub fn add_name<GN: Into<GeneralName>>(&mut self, name: GN) {
         let gn = name.into();
         (self.0).0.push(gn.into());
+    }
+
+    /// # Example
+    ///
+    /// ```
+    /// use picky::x509::name::{GeneralNames, GeneralName, DirectoryName};
+    ///
+    /// let common_name = GeneralName::new_directory_name(DirectoryName::new_common_name("MyName"));
+    /// let dns_name = GeneralName::new_dns_name("localhost").expect("invalid name string");
+    /// let names = GeneralNames::new(common_name).with_name(dns_name);
+    /// ```
+    pub fn with_name<GN: Into<GeneralName>>(mut self, name: GN) -> Self {
+        let gn = name.into();
+        (self.0).0.push(gn.into());
+        self
     }
 
     pub fn into_general_names(self) -> Vec<GeneralName> {
@@ -215,6 +278,13 @@ impl From<SerdeGeneralNames> for GeneralNames {
 impl From<GeneralNames> for SerdeGeneralNames {
     fn from(gn: GeneralNames) -> Self {
         gn.0
+    }
+}
+
+impl From<Vec<GeneralName>> for GeneralNames {
+    fn from(names: Vec<GeneralName>) -> Self {
+        let serde_names = names.into_iter().map(|n| n.into()).collect();
+        Self(Asn1SequenceOf(serde_names))
     }
 }
 
