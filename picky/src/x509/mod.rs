@@ -132,6 +132,7 @@ pub mod csr;
 pub mod date;
 pub mod key_id_gen_method;
 pub mod name;
+pub mod pkcs7;
 
 pub use certificate::Cert;
 pub use csr::Csr;
