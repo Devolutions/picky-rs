@@ -1,6 +1,6 @@
 use crate::bit_string::BitString;
 use crate::date::{GeneralizedTime, UTCTime};
-use crate::restricted_string::{IA5String, NumericString, PrintableString, Utf8String};
+use crate::restricted_string::{BMPString, IA5String, NumericString, PrintableString, Utf8String};
 use crate::tag::Tag;
 use crate::Asn1Type;
 use oid::ObjectIdentifier;
@@ -191,6 +191,7 @@ asn1_wrapper! { auto struct Utf8StringAsn1(Utf8String),             Tag::UTF8_ST
 asn1_wrapper! { auto struct NumericStringAsn1(NumericString),       Tag::NUMERIC_STRING }
 asn1_wrapper! { auto struct PrintableStringAsn1(PrintableString),   Tag::PRINTABLE_STRING }
 asn1_wrapper! { auto struct IA5StringAsn1(IA5String),               Tag::IA5_STRING }
+asn1_wrapper! { auto struct BMPStringAsn1(BMPString),               Tag::BMP_STRING }
 asn1_wrapper! { auto struct UTCTimeAsn1(UTCTime),                   Tag::UTC_TIME }
 asn1_wrapper! { auto struct GeneralizedTimeAsn1(GeneralizedTime),   Tag::GENERALIZED_TIME }
 
@@ -230,6 +231,18 @@ define_special_tag! {
     ContextTag13     => Tag::CTX_13,
     ContextTag14     => Tag::CTX_14,
     ContextTag15     => Tag::CTX_15,
+}
+
+impl Default for IA5StringAsn1 {
+    fn default() -> Self {
+        IA5StringAsn1::from(IA5String::new(vec![]).unwrap())
+    }
+}
+
+impl Default for BMPStringAsn1 {
+    fn default() -> Self {
+        BMPStringAsn1::from(BMPString::new(vec![]).unwrap())
+    }
 }
 
 fn serialize_vec<S, T>(elems: &[T], serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
@@ -284,6 +297,12 @@ pub struct OctetStringAsn1(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 type VecU8 = Vec<u8>;
 impls! { OctetStringAsn1(VecU8), Tag::OCTET_STRING }
+
+impl Default for OctetStringAsn1 {
+    fn default() -> Self {
+        OctetStringAsn1(vec![])
+    }
+}
 
 /// A BigInt wrapper for Asn1 encoding.
 ///

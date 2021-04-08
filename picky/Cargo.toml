@@ -17,6 +17,7 @@ repository = "https://github.com/Devolutions/picky-rs"
 include = ["src/**/*", "README.md", "CHANGELOG.md"]
 
 [dependencies]
+byteorder = "1.4.3"
 picky-asn1 = { version = "0.3", path = "../picky-asn1" }
 picky-asn1-der = { version = "0.2", path = "../picky-asn1-der" }
 picky-asn1-x509 = { version = "0.5", path = "../picky-asn1-x509", features = ["legacy"] }
@@ -27,7 +28,6 @@ thiserror = "1"
 chrono = { version = "0.4", optional = true }
 serde_json = { version = "1.0", optional = true }
 http = { version = "0.2", optional = true }
-
 # /!\ ===== cryptography dependencies ===== /!\
 # These should be updated as soon as possible.
 # /!\ ===================================== /!\

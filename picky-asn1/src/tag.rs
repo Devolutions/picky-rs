@@ -19,6 +19,7 @@ impl Tag {
     pub const TELETEX_STRING: Self = Tag(0x14);
     pub const VIDEOTEX_STRING: Self = Tag(0x15);
     pub const IA5_STRING: Self = Tag(0x16);
+    pub const BMP_STRING: Self = Tag(0x1E);
     pub const UTC_TIME: Self = Tag(0x17);
     pub const GENERALIZED_TIME: Self = Tag(0x18);
     pub const SEQUENCE: Self = Tag(0x30);
@@ -105,6 +106,7 @@ impl fmt::Display for Tag {
             Tag::TELETEX_STRING => write!(f, "TeletexString"),
             Tag::VIDEOTEX_STRING => write!(f, "VideotexString"),
             Tag::IA5_STRING => write!(f, "IA5String"),
+            Tag::BMP_STRING => write!(f, "BMPString"),
             Tag::UTC_TIME => write!(f, "UTCTime"),
             Tag::GENERALIZED_TIME => write!(f, "GeneralizedTime"),
             Tag::SEQUENCE => write!(f, "SEQUENCE"),
