@@ -2,6 +2,7 @@
 mod macros;
 
 pub mod algorithm_identifier;
+pub mod attribute;
 pub mod attribute_type_and_value;
 pub mod certificate;
 pub mod certification_request;
@@ -16,6 +17,7 @@ pub mod validity;
 pub mod version;
 
 pub use algorithm_identifier::*;
+pub use attribute::*;
 pub use attribute_type_and_value::*;
 pub use certificate::*;
 pub use certification_request::*;

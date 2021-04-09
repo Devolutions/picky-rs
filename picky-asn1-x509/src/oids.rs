@@ -155,5 +155,7 @@ define_oid! {
     // authenticode
     SPC_PE_IMAGE_DATAOBJ => spc_pe_image_dataobj => "1.3.6.1.4.1.311.2.1.15",
     SPC_SP_OPUS_INFO_OBJID => spc_sp_opus_info_objid => "1.3.6.1.4.1.311.2.1.12",
+    SPC_INDIRECT_DATA_OBJID => spc_indirect_data_objid => "1.3.6.1.4.1.311.2.1.4",
     CONTENT_TYPE => content_type => "1.2.840.113549.1.9.3",
+    MESSAGE_DIGEST => message_digest => "1.2.840.113549.1.9.4",
 }

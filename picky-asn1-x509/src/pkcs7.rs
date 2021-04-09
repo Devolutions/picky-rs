@@ -1,30 +1,121 @@
-use crate::DigestInfo;
-use oid::ObjectIdentifier;
-use picky_asn1::{
-    restricted_string::BMPString,
-    wrapper::{
-        ApplicationTag0, ApplicationTag1, BMPStringAsn1, BitStringAsn1, IA5StringAsn1, Implicit, OctetStringAsn1,
-    },
+use crate::{oids, DigestInfo};
+use picky_asn1::restricted_string::BMPString;
+use picky_asn1::wrapper::{
+    ApplicationTag0, ApplicationTag1, BMPStringAsn1, BitStringAsn1, IA5StringAsn1, Implicit, ObjectIdentifierAsn1,
+    OctetStringAsn1,
 };
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, Serialize};
+use std::convert::Into;
 use widestring::U16String;
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct ContentInfo {
-    content_type: ObjectIdentifier,
-    content: SpcIndirectDataContent,
+    pub content_type: ObjectIdentifierAsn1,
+    pub content: SpcIndirectDataContent,
+}
+
+impl<'de> de::Deserialize<'de> for ContentInfo {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        use std::fmt;
+
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = ContentInfo;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a valid DER-encoded ContentInfo")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let oid: ObjectIdentifierAsn1 = seq_next_element!(seq, ContentInfo, "type oid");
+
+                let value = match Into::<String>::into(&oid.0).as_str() {
+                    oids::SPC_INDIRECT_DATA_OBJID => {
+                        seq_next_element!(seq, SpcIndirectDataContent, ContentInfo, "a SpcIndirectDataContent object")
+                    }
+                    _ => {
+                        return Err(serde_invalid_value!(
+                            ContentInfo,
+                            "unknown oid type",
+                            "a SPC_INDIRECT_DATA_OBJID oid"
+                        ))
+                    }
+                };
+
+                Ok(ContentInfo {
+                    content_type: oid,
+                    content: value,
+                })
+            }
+        }
+
+        deserializer.deserialize_seq(Visitor)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct SpcIndirectDataContent {
-    data: SpcAttributeAndOptionalValue,
-    message_digest: DigestInfo,
+    pub data: SpcAttributeAndOptionalValue,
+    pub message_digest: DigestInfo,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct SpcAttributeAndOptionalValue {
-    _type: ObjectIdentifier,
-    value: ApplicationTag0<SpcPeImageData>,
+    pub _type: ObjectIdentifierAsn1,
+    pub value: ApplicationTag0<SpcPeImageData>,
+}
+
+impl<'de> de::Deserialize<'de> for SpcAttributeAndOptionalValue {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        use std::fmt;
+
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = SpcAttributeAndOptionalValue;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a valid DER-encoded SpcAttributeAndOptionalValue")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let oid: ObjectIdentifierAsn1 = seq_next_element!(seq, SpcAttributeAndOptionalValue, "type oid");
+
+                let value = match Into::<String>::into(&oid.0).as_str() {
+                    oids::SPC_PE_IMAGE_DATAOBJ => seq_next_element!(
+                        seq,
+                        ApplicationTag0<SpcPeImageData>,
+                        SpcAttributeAndOptionalValue,
+                        "a SpcPeImageData object"
+                    ),
+                    _ => {
+                        return Err(serde_invalid_value!(
+                            SpcAttributeAndOptionalValue,
+                            "unknown oid type",
+                            "a SPC_PE_IMAGE_DATAOBJ oid"
+                        ))
+                    }
+                };
+
+                Ok(SpcAttributeAndOptionalValue { _type: oid, value })
+            }
+        }
+
+        deserializer.deserialize_seq(Visitor)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -32,8 +123,8 @@ pub struct SpcPeImageFlags(pub BitStringAsn1);
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct SpcPeImageData {
-    flags: SpcPeImageFlags,
-    file: SpcLink,
+    pub flags: SpcPeImageFlags,
+    pub file: SpcLink,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)] // https://stackoverflow.com/questions/36775864/use-default-trait-for-struct-as-enum-option
@@ -56,7 +147,7 @@ pub struct Url(pub Implicit<ApplicationTag0<IA5StringAsn1>>);
 pub struct Moniker(pub Implicit<ApplicationTag0<SpcSerialized>>);
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct File(SpcString);
+pub struct File(pub SpcString);
 
 impl Default for File {
     fn default() -> Self {
@@ -90,8 +181,8 @@ impl Default for SpcUuid {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
 pub struct SpcSerialized {
-    class_id: SpcUuid,
-    serialized_data: OctetStringAsn1,
+    pub class_id: SpcUuid,
+    pub serialized_data: OctetStringAsn1,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -101,7 +192,7 @@ pub enum SpcString {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-struct SpcSpOpusInfoImpl {
-    more_info: SpcLink,
-    program_name: SpcString,
+pub struct SpcSpOpusInfo {
+    pub more_info: SpcLink,
+    pub program_name: SpcString,
 }

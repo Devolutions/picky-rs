@@ -2,8 +2,9 @@
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use serde::{Deserialize, Serialize};
+use std::convert::TryFrom;
 use std::io::{self, BufReader, BufWriter};
-use std::{convert::TryFrom, error, mem};
+use std::{error, mem};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
