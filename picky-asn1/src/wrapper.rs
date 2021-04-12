@@ -235,13 +235,13 @@ define_special_tag! {
 
 impl Default for IA5StringAsn1 {
     fn default() -> Self {
-        IA5StringAsn1::from(IA5String::new(vec![]).unwrap())
+        IA5StringAsn1::from(IA5String::new(Vec::new()).unwrap())
     }
 }
 
 impl Default for BMPStringAsn1 {
     fn default() -> Self {
-        BMPStringAsn1::from(BMPString::new(vec![]).unwrap())
+        BMPStringAsn1::from(BMPString::new(Vec::new()).unwrap())
     }
 }
 

@@ -1,12 +1,135 @@
-use crate::{oids, DigestInfo};
-use picky_asn1::restricted_string::BMPString;
-use picky_asn1::wrapper::{
-    ApplicationTag0, ApplicationTag1, BMPStringAsn1, BitStringAsn1, IA5StringAsn1, Implicit, ObjectIdentifierAsn1,
-    OctetStringAsn1,
+use crate::{oids, AlgorithmIdentifier, AttributeValue, Attributes, DigestInfo, Name, Version};
+use picky_asn1::{
+    restricted_string::BMPString,
+    wrapper::{
+        ApplicationTag0, ApplicationTag1, BMPStringAsn1, BitStringAsn1, IA5StringAsn1, Implicit, IntegerAsn1,
+        ObjectIdentifierAsn1, OctetStringAsn1,
+    },
 };
 use serde::{de, Deserialize, Serialize};
-use std::convert::Into;
+use std::{borrow::Borrow, convert::Into};
 use widestring::U16String;
+
+#[derive(Serialize, Debug, PartialEq, Clone)]
+pub struct SignerInfo {
+    pub version: Version,
+    pub issuer_and_serial_number: IssuerAndSerialNumber,
+    pub digest_algorithm: AlgorithmIdentifier,
+    pub authenticode_attributes: Implicit<Attributes>,
+    // unauthenticated_attributes
+    pub digest_encryption_algorithms: DigestEncryptionAlgorithmIdentifier,
+    pub encrypted_digest: EncryptedDigest,
+}
+
+impl<'de> de::Deserialize<'de> for SignerInfo {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        use std::fmt;
+
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = SignerInfo;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a valid DER-encoded SignerInfo")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let version: Version = seq_next_element!(seq, SignerInfo, "Version");
+                if version as u8 != 1 {
+                    return Err(serde_invalid_value!(
+                        SignerInfo,
+                        "wrong version field",
+                        "Version equal to 1"
+                    ));
+                }
+
+                let issuer_and_serial_number: IssuerAndSerialNumber =
+                    seq_next_element!(seq, SignerInfo, "IssuerAndSerialNumber");
+
+                let digest_algorithm: AlgorithmIdentifier = seq_next_element!(seq, SignerInfo, "AlgorithmIdentifier");
+
+                let authenticode_attributes: Implicit<Attributes> =
+                    seq_next_element!(seq, SignerInfo, "Set of signed Attributes");
+
+                let attributes = authenticode_attributes.0.borrow();
+
+                if !attributes
+                    .0
+                    .iter()
+                    .any(|attr| matches!(attr.value, AttributeValue::ContentType(_)))
+                {
+                    return Err(serde_invalid_value!(
+                        SignerInfo,
+                        "ContentType attribute is missing",
+                        "ContentType attribute is present"
+                    ));
+                }
+
+                if !attributes
+                    .0
+                    .iter()
+                    .any(|attr| matches!(attr.value, AttributeValue::MessageDigest(_)))
+                {
+                    return Err(serde_invalid_value!(
+                        SignerInfo,
+                        "MessageDigest attribute is missing",
+                        "MessageDigest attribute is present"
+                    ));
+                }
+
+                if !attributes
+                    .0
+                    .iter()
+                    .any(|attr| matches!(attr.value, AttributeValue::SpcSpOpusInfo(_)))
+                {
+                    return Err(serde_invalid_value!(
+                        SignerInfo,
+                        "SpcSpOpusInfo attribute is missing",
+                        "SpcSpOpusInfo attribute is present"
+                    ));
+                }
+
+                let digest_encryption_algorithms: DigestEncryptionAlgorithmIdentifier =
+                    seq_next_element!(seq, SignerInfo, "DigestEncryptionAlgorithmIdentifier");
+
+                let encrypted_digest: EncryptedDigest = seq_next_element!(seq, SignerInfo, "EncryptedDigest");
+
+                Ok(SignerInfo {
+                    version,
+                    issuer_and_serial_number,
+                    digest_algorithm,
+                    authenticode_attributes,
+                    digest_encryption_algorithms,
+                    encrypted_digest,
+                })
+            }
+        }
+
+        deserializer.deserialize_seq(Visitor)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct DigestEncryptionAlgorithmIdentifier(pub AlgorithmIdentifier);
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct EncryptedDigest(pub OctetStringAsn1);
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct IssuerAndSerialNumber {
+    pub issuer: Name,
+    pub serial_number: CertificateSerialNumber,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct CertificateSerialNumber(pub IntegerAsn1);
 
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct ContentInfo {
@@ -38,7 +161,12 @@ impl<'de> de::Deserialize<'de> for ContentInfo {
 
                 let value = match Into::<String>::into(&oid.0).as_str() {
                     oids::SPC_INDIRECT_DATA_OBJID => {
-                        seq_next_element!(seq, SpcIndirectDataContent, ContentInfo, "a SpcIndirectDataContent object")
+                        seq_next_element!(
+                            seq,
+                            SpcIndirectDataContent,
+                            ContentInfo,
+                            "a SpcIndirectDataContent object"
+                        )
                     }
                     _ => {
                         return Err(serde_invalid_value!(
@@ -123,8 +251,13 @@ pub struct SpcPeImageFlags(pub BitStringAsn1);
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct SpcPeImageData {
+    #[serde(skip_serializing_if = "spc_pe_image_flags_is_default")]
     pub flags: SpcPeImageFlags,
     pub file: SpcLink,
+}
+
+fn spc_pe_image_flags_is_default(flags: &SpcPeImageFlags) -> bool {
+    flags.0.is_set(0) | !flags.0.is_set(1) | !flags.0.is_set(2)
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)] // https://stackoverflow.com/questions/36775864/use-default-trait-for-struct-as-enum-option

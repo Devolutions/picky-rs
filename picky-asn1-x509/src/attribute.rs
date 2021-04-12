@@ -32,6 +32,12 @@ impl<'de> de::Deserialize<'de> for Attributes {
     }
 }
 
+impl Default for Attributes {
+    fn default() -> Self {
+        Self(Vec::new())
+    }
+}
+
 /// [RFC 2985 page 15 and 16](https://tools.ietf.org/html/rfc2985#page-15)
 ///
 /// Accepted attribute types are `challengePassword` and `extensionRequest`
