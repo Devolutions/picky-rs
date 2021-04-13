@@ -245,6 +245,12 @@ impl Default for BMPStringAsn1 {
     }
 }
 
+impl<T> Default for Asn1SetOf<T> {
+    fn default() -> Asn1SetOf<T> {
+        Asn1SetOf(Vec::new())
+    }
+}
+
 fn serialize_vec<S, T>(elems: &[T], serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
 where
     S: ser::Serializer,

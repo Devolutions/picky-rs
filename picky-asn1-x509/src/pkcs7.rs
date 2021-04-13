@@ -1,14 +1,101 @@
-use crate::{oids, AlgorithmIdentifier, AttributeValue, Attributes, DigestInfo, Name, Version};
+use crate::{oids, AlgorithmIdentifier, AttributeValue, Attributes, Certificate, DigestInfo, Name, Version};
 use picky_asn1::{
     restricted_string::BMPString,
     wrapper::{
-        ApplicationTag0, ApplicationTag1, BMPStringAsn1, BitStringAsn1, IA5StringAsn1, Implicit, IntegerAsn1,
-        ObjectIdentifierAsn1, OctetStringAsn1,
+        ApplicationTag0, ApplicationTag1, Asn1SetOf, BMPStringAsn1, BitStringAsn1, IA5StringAsn1, Implicit,
+        IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1,
     },
 };
 use serde::{de, Deserialize, Serialize};
 use std::{borrow::Borrow, convert::Into};
 use widestring::U16String;
+
+#[derive(Serialize, Debug, PartialEq, Clone)]
+struct SignedData {
+    pub version: Version,
+    pub digest_algorithm: DigestAlgorithmIdentifiers,
+    pub content_info: ContentInfo,
+    pub certificates: Implicit<ApplicationTag0<ExtendedCertificatesAndCertificates>>,
+    pub singers_infos: SingersInfos,
+}
+
+impl<'de> Deserialize<'de> for SignedData {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        use std::fmt;
+
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = SignedData;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a valid DER-encoded SignedData")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let version: Version = seq_next_element!(seq, SignedData, "Version");
+
+                if version as u8 != 1 {
+                    return Err(serde_invalid_value!(
+                        SignedData,
+                        "wrong version field",
+                        "Version equal to 1"
+                    ));
+                }
+
+                let digest_algorithm: DigestAlgorithmIdentifiers =
+                    seq_next_element!(seq, SignedData, "DigestAlgorithmIdentifiers");
+
+                let content_info: ContentInfo = seq_next_element!(seq, SignedData, "ContentInfo");
+
+                let certificates: Implicit<ApplicationTag0<ExtendedCertificatesAndCertificates>> =
+                    seq_next_element!(seq, SignedData, "ExtendedCertificatesAndCertificates");
+
+                let singers_infos: SingersInfos = seq_next_element!(seq, SignedData, "SingesInfos");
+
+                if singers_infos.0 .0.len() != 1 {
+                    return Err(serde_invalid_value!(
+                        SignedData,
+                        "DigestAlgorithmIdentifiers of Signed does not match ",
+                        "SignersInfos contains exactly one SignerInfo structure"
+                    ));
+                }
+
+                if digest_algorithm.0 != singers_infos.0.0.first().unwrap().digest_algorithm {
+                    return Err(serde_invalid_value!(
+                        SignedData,
+                        "the digestAlgorithm of SignedData does not match the DigestAlgorithm in SingerInfo",
+                        "the digestAlgorithm of SignedData matches the DigestAlgorithm in SingerInfo"
+                    ));
+                }
+
+                Ok(SignedData {
+                    version,
+                    digest_algorithm,
+                    content_info,
+                    certificates,
+                    singers_infos,
+                })
+            }
+        }
+        deserializer.deserialize_seq(Visitor)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct DigestAlgorithmIdentifiers(pub AlgorithmIdentifier);
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+pub struct ExtendedCertificatesAndCertificates(pub Asn1SetOf<Certificate>);
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct SingersInfos(pub Asn1SetOf<SignerInfo>);
 
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct SignerInfo {
