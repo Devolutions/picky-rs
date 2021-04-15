@@ -62,7 +62,7 @@ pub struct CertificationRequest {
 mod tests {
     use super::*;
     use crate::name::*;
-    use crate::{DirectoryName, GeneralName};
+    use crate::{DirectoryName, Extension, GeneralName};
     use picky_asn1::bit_string::BitString;
     use picky_asn1::restricted_string::{IA5String, PrintableString, Utf8String};
     use picky_asn1::wrapper::IntegerAsn1;

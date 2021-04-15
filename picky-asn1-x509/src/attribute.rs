@@ -1,4 +1,4 @@
-use crate::pkcs7::SpcSpOpusInfo;
+use crate::pkcs7::content_info::SpcSpOpusInfo;
 use crate::{oids, Extension, Extensions};
 use picky_asn1::tag::Tag;
 use picky_asn1::wrapper::{Asn1SetOf, ObjectIdentifierAsn1, OctetStringAsn1};
