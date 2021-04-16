@@ -229,7 +229,7 @@ impl BitString {
     }
 }
 
-impl Into<Vec<u8>> for BitString {
+impl From<BitString> for Vec<u8> {
     /// Strips 'unused bits count' byte and returns payload.
     ///
     /// # Examples
@@ -243,8 +243,8 @@ impl Into<Vec<u8>> for BitString {
     /// let payload: Vec<u8> = b.into();
     /// assert_eq!(payload, vec![0x01, 0x02]);
     /// ```
-    fn into(mut self) -> Vec<u8> {
-        self.data.drain(1..).collect()
+    fn from(mut bs: BitString) -> Self {
+        bs.data.drain(1..).collect()
     }
 }
 

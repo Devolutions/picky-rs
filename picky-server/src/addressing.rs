@@ -9,8 +9,9 @@ pub fn encode_to_canonical_address(data: &[u8]) -> String {
     multibase::encode(CANONICAL_BASE, hash.as_bytes())
 }
 
-const ALTERNATIVE_HASHES: [Hash; 1] = [Hash::Sha1];
 pub fn encode_to_alternative_addresses(data: &[u8]) -> Result<Vec<String>, String> {
+    const ALTERNATIVE_HASHES: [Hash; 1] = [Hash::Sha1];
+
     let mut addresses = Vec::with_capacity(ALTERNATIVE_HASHES.len());
 
     for hash in ALTERNATIVE_HASHES.iter() {
