@@ -20,11 +20,11 @@ serde_bytes = "0.11"
 lazy_static = { version = "1.4", optional = true }
 
 [dev-dependencies]
-base64 = "0.12"
-pretty_assertions = "0.6"
+base64 = "0.13"
+pretty_assertions = "0.7"
 serde_bytes = "0.11"
-num-bigint-dig = "0.6"
-oid = { version = "^0.1.1", default-features = false, features = ["serde_support"] }
+num-bigint-dig = "0.7"
+oid = { version = "0.2", default-features = false, features = ["serde_support"] }
 
 [features]
 debug_log = ["lazy_static"]

@@ -153,6 +153,10 @@ impl<'a, 'se> serde::ser::Serializer for &'a mut Serializer<'se> {
     type SerializeStruct = Sequence<'a, 'se>;
     type SerializeStructVariant = Self;
 
+    fn is_human_readable(&self) -> bool {
+        false
+    }
+
     fn serialize_bool(self, v: bool) -> Result<Self::Ok> {
         debug_log!("serialize_bool: {}", v);
         Boolean::serialize(v, self)

@@ -8,7 +8,7 @@ pub fn init_logs(config: &ServerConfig) -> Handle {
     log4rs::init_config(config).expect("can't init log4rs")
 }
 
-pub fn build_logger_config(config: &ServerConfig) -> Result<LoggerConfig, log4rs::config::Errors> {
+pub fn build_logger_config(config: &ServerConfig) -> Result<LoggerConfig, log4rs::config::runtime::ConfigErrors> {
     use log4rs::append::console::ConsoleAppender;
     use log4rs::config::{Appender, Logger, Root};
 

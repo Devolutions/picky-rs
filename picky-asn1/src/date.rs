@@ -318,12 +318,12 @@ mod chrono_conversion {
         }
     }
 
-    impl<TR: TimeRepr> Into<NaiveDateTime> for Date<TR> {
-        fn into(self) -> NaiveDateTime {
-            NaiveDate::from_ymd(i32::from(self.year), u32::from(self.month), u32::from(self.day)).and_hms(
-                u32::from(self.hour),
-                u32::from(self.minute),
-                u32::from(self.second),
+    impl<TR: TimeRepr> From<Date<TR>> for NaiveDateTime {
+        fn from(date: Date<TR>) -> Self {
+            NaiveDate::from_ymd(i32::from(date.year), u32::from(date.month), u32::from(date.day)).and_hms(
+                u32::from(date.hour),
+                u32::from(date.minute),
+                u32::from(date.second),
             )
         }
     }
@@ -342,9 +342,9 @@ mod chrono_conversion {
         }
     }
 
-    impl<TR: TimeRepr> Into<DateTime<Utc>> for Date<TR> {
-        fn into(self) -> DateTime<Utc> {
-            DateTime::<Utc>::from_utc(self.into(), Utc)
+    impl<TR: TimeRepr> From<Date<TR>> for DateTime<Utc> {
+        fn from(date: Date<TR>) -> Self {
+            DateTime::<Utc>::from_utc(date.into(), Utc)
         }
     }
 }

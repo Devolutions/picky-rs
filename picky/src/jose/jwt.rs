@@ -616,7 +616,7 @@ mod tests {
             jet_ap: String,
             prx_usr: String,
             nbf: i64,
-        };
+        }
 
         let payload = core::str::from_utf8(&jwe.payload).unwrap();
         let jwk = JwtSig::<SomeJetClaims>::decode_dangerous(payload, &JwtValidator::no_check()).unwrap();

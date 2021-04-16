@@ -107,9 +107,9 @@ impl<C: CharSet> fmt::Display for RestrictedString<C> {
     }
 }
 
-impl<C: CharSet> Into<Vec<u8>> for RestrictedString<C> {
-    fn into(self) -> Vec<u8> {
-        self.into_bytes()
+impl<C: CharSet> From<RestrictedString<C>> for Vec<u8> {
+    fn from(rs: RestrictedString<C>) -> Self {
+        rs.into_bytes()
     }
 }
 

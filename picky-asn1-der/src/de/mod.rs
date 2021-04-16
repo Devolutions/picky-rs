@@ -200,6 +200,10 @@ impl<'de> Deserializer<'de> {
 impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
     type Error = Asn1DerError;
 
+    fn is_human_readable(&self) -> bool {
+        false
+    }
+
     fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         debug_log!("deserialize_any");
         match self.h_peek_object()? {

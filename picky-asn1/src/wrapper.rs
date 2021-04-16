@@ -61,9 +61,9 @@ macro_rules! impls {
             }
         }
 
-        impl Into<$wrapped_ty> for $wrapper_ty {
-            fn into(self) -> $wrapped_ty {
-                self.0
+        impl From<$wrapper_ty> for $wrapped_ty {
+            fn from(wrapper: $wrapper_ty) -> $wrapped_ty {
+                wrapper.0
             }
         }
 
@@ -145,9 +145,9 @@ macro_rules! impls {
             }
         }
 
-        impl<$generic> Into<$wrapped_ty<$generic>> for $wrapper_ty<$generic> {
-            fn into(self) -> $wrapped_ty<$generic> {
-                self.0
+        impl<$generic> From<$wrapper_ty<$generic>> for $wrapped_ty<$generic> {
+            fn from(wrapper: $wrapper_ty<$generic>) -> Self {
+                wrapper.0
             }
         }
 
