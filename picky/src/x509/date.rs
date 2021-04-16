@@ -55,16 +55,16 @@ impl UTCDate {
     }
 }
 
-impl Into<UTCTime> for UTCDate {
-    fn into(self) -> UTCTime {
+impl From<UTCDate> for UTCTime {
+    fn from(date: UTCDate) -> Self {
         unsafe {
             UTCTime::new_unchecked(
-                self.0.year(),
-                self.0.month(),
-                self.0.day(),
-                self.0.hour(),
-                self.0.minute(),
-                self.0.second(),
+                date.0.year(),
+                date.0.month(),
+                date.0.day(),
+                date.0.hour(),
+                date.0.minute(),
+                date.0.second(),
             )
         }
     }
@@ -85,9 +85,9 @@ impl From<UTCTime> for UTCDate {
     }
 }
 
-impl Into<GeneralizedTime> for UTCDate {
-    fn into(self) -> GeneralizedTime {
-        self.0
+impl From<UTCDate> for GeneralizedTime {
+    fn from(date: UTCDate) -> GeneralizedTime {
+        date.0
     }
 }
 

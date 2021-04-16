@@ -92,9 +92,9 @@ impl fmt::Display for Pem<'_> {
     }
 }
 
-impl Into<String> for Pem<'_> {
-    fn into(self) -> String {
-        self.to_string()
+impl From<Pem<'_>> for String {
+    fn from(pem: Pem<'_>) -> Self {
+        pem.to_string()
     }
 }
 

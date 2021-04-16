@@ -78,9 +78,9 @@ impl From<PrintableStringAsn1> for DirectoryString {
     }
 }
 
-impl Into<String> for DirectoryString {
-    fn into(self) -> String {
-        match self {
+impl From<DirectoryString> for String {
+    fn from(ds: DirectoryString) -> Self {
+        match ds {
             DirectoryString::PrintableString(string) => String::from_utf8_lossy(string.as_bytes()).into(),
             DirectoryString::Utf8String(string) => string,
         }

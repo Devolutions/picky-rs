@@ -165,7 +165,7 @@ impl Config {
     pub fn init_yaml() -> Result<Self, String> {
         let yaml_conf =
             std::fs::read_to_string(YAML_CONF_PATH).map_err(|e| format!("couldn't read yaml config: {}", e))?;
-        Ok(serde_yaml::from_str(&yaml_conf).map_err(|e| format!("invalid yaml conf: {}", e))?)
+        serde_yaml::from_str(&yaml_conf).map_err(|e| format!("invalid yaml conf: {}", e))
     }
 
     fn inject_cli(&mut self) {
