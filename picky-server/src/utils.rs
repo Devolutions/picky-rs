@@ -4,10 +4,10 @@ use picky::pem::{Pem, PemError};
 use picky::x509::certificate::CertError;
 use picky::x509::csr::CsrError;
 use picky::x509::Cert;
-use serde::export::fmt::Debug;
 use serde::{de, ser, Serialize};
 use std::error::Error;
 use std::fmt;
+use std::fmt::Debug;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
