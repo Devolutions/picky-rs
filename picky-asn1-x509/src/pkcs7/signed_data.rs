@@ -1,12 +1,13 @@
-use super::{content_info::ContentInfo, crls::RevocationInfoChoices, singer_info::SingersInfos};
-use crate::{AlgorithmIdentifier, Certificate, Version};
 use picky_asn1::{tag::Tag, wrapper::Asn1SetOf};
 use serde::{de, ser, Deserialize, Serialize};
 
+use super::{content_info::ContentInfo, crls::RevocationInfoChoices, singer_info::SingersInfos};
+use crate::{AlgorithmIdentifier, Certificate, Version};
+
 #[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
-struct SignedData {
+pub struct SignedData {
     pub version: Version,
-    pub digest_algorithm: DigestAlgorithmIdentifiers,
+    pub digest_algorithms: DigestAlgorithmIdentifiers,
     pub content_info: ContentInfo,
     pub certificates: ExtendedCertificatesAndCertificates,
     pub crls: RevocationInfoChoices,
@@ -174,7 +175,7 @@ mod tests {
 
         let signed_data = SignedData {
             version: Version::V2,
-            digest_algorithm: DigestAlgorithmIdentifiers(Vec::new().into()),
+            digest_algorithms: DigestAlgorithmIdentifiers(Vec::new().into()),
             content_info,
             certificates: ExtendedCertificatesAndCertificates(vec![full_certificate]),
             crls: RevocationInfoChoices(Vec::new()),

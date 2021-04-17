@@ -1,14 +1,17 @@
-use crate::{oids, DigestInfo};
+use std::convert::{Into, TryFrom};
+
 use picky_asn1::{
-    restricted_string::BMPString,
+    restricted_string::{BMPString, CharSetError},
     wrapper::{
         ApplicationTag0, ApplicationTag1, BMPStringAsn1, BitStringAsn1, IA5StringAsn1, Implicit, ObjectIdentifierAsn1,
         OctetStringAsn1,
     },
 };
 use serde::{de, Deserialize, Serialize};
-use std::convert::Into;
 use widestring::U16String;
+
+use crate::{oids, DigestInfo};
+use picky_asn1::bit_string::BitString;
 
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct ContentInfo {
@@ -36,21 +39,19 @@ impl<'de> de::Deserialize<'de> for ContentInfo {
             where
                 A: de::SeqAccess<'de>,
             {
-                let oid: ObjectIdentifierAsn1 = seq_next_element!(seq, ContentInfo, "type oid");
+                let oid: ObjectIdentifierAsn1 =
+                    seq.next_element()?.ok_or_else(|| de::Error::invalid_length(0, &self))?;
 
                 let value = match Into::<String>::into(&oid.0).as_str() {
-                    oids::SPC_INDIRECT_DATA_OBJID => Some(seq_next_element!(
-                        seq,
-                        SpcIndirectDataContent,
-                        ContentInfo,
-                        "a SpcIndirectDataContent object"
-                    )),
+                    oids::SPC_INDIRECT_DATA_OBJID => {
+                        Some(seq.next_element()?.ok_or_else(|| de::Error::invalid_length(0, &self))?)
+                    }
                     oids::PKCS7 => None,
                     _ => {
                         return Err(serde_invalid_value!(
                             ContentInfo,
                             "unknown oid type",
-                            "a SPC_INDIRECT_DATA_OBJID oid"
+                            "SPC_INDIRECT_DATA_OBJID or PKCS7 oid"
                         ))
                     }
                 };
@@ -125,13 +126,21 @@ impl<'de> de::Deserialize<'de> for SpcAttributeAndOptionalValue {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct SpcPeImageFlags(pub BitStringAsn1);
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct SpcPeImageData {
     #[serde(skip_serializing_if = "spc_pe_image_flags_is_default")]
     pub flags: SpcPeImageFlags,
     pub file: SpcLink,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct SpcPeImageFlags(pub BitStringAsn1);
+
+impl Default for SpcPeImageFlags {
+    fn default() -> Self {
+        let mut flags = BitString::with_len(3);
+        flags.set(0, true);
+        Self(flags.into())
+    }
 }
 
 fn spc_pe_image_flags_is_default(flags: &SpcPeImageFlags) -> bool {
@@ -200,6 +209,16 @@ pub struct SpcSerialized {
 pub enum SpcString {
     Unicode(Implicit<ApplicationTag0<BMPStringAsn1>>),
     Ancii(Implicit<ApplicationTag1<IA5StringAsn1>>),
+}
+
+impl TryFrom<String> for SpcString {
+    type Error = CharSetError;
+
+    fn try_from(string: String) -> Result<Self, Self::Error> {
+        Ok(SpcString::Unicode(Implicit(ApplicationTag0(
+            BMPString::new(string)?.into(),
+        ))))
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]

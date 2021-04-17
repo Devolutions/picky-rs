@@ -1,178 +1,168 @@
-#![allow(non_camel_case_types)]
+use std::convert::{Into, TryFrom};
 
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
-use std::io::{self, BufReader, BufWriter};
-use std::{error, mem};
 use thiserror::Error;
 
+use picky_asn1::restricted_string::CharSetError;
+use picky_asn1_x509::{
+    algorithm_identifier::AlgorithmIdentifier,
+    oids,
+    pkcs7::{
+        content_info::{
+            ContentInfo, SpcAttributeAndOptionalValue, SpcIndirectDataContent, SpcLink, SpcPeImageData,
+            SpcPeImageFlags, SpcSpOpusInfo, SpcString,
+        },
+        crls::RevocationInfoChoices,
+        signed_data::{DigestAlgorithmIdentifiers, SignedData},
+        singer_info::{
+            CertificateSerialNumber, DigestEncryptionAlgorithmIdentifier, EncryptedDigest, IssuerAndSerialNumber,
+            SingerInfo, SingersInfos,
+        },
+        Pkcs7Certificate,
+    },
+    Attribute, AttributeValue, Attributes, DigestInfo, SHAVariant, Version,
+};
+
+use super::{
+    certificate::CertError,
+    utils::{from_der, from_pem, from_pem_str, generate_serial_number, to_der, to_pem},
+    wincert::WinCertificate,
+};
+use crate::{key::PrivateKey, pem::Pem, signature::SignatureAlgorithm};
+
+type Pkcs7Result<T> = Result<T, Pkcs7Error>;
+
 #[derive(Debug, Error)]
-pub enum WinCertificateError {
-    #[error("Revision value is wrong(expected any of {expected}, but {got} got)")]
-    WrongRevisionValue { expected: String, got: u16 },
-    #[error("Certificate type is wrong(expected any of {expected}, but {got} got)")]
-    WrongCertificateType { expected: String, got: u16 },
-    #[error("Length is wrong({minimum} at least, but {got} got)")]
-    WrongLength { minimum: usize, got: usize },
-    #[error("Certificate data is empty")]
-    CertificateDataIsEmpty,
+enum Pkcs7Error {
     #[error(transparent)]
-    Io(#[from] io::Error),
-    #[error(transparent)]
-    Other(#[from] Box<dyn error::Error>),
+    Cert(#[from] CertError),
+    #[error("the program name has invalid charset")]
+    ProgramNameCharSet(#[from] CharSetError),
 }
 
-pub struct Pkcs7 {}
+#[derive(Clone, Debug, PartialEq)]
+pub struct Pkcs7(Pkcs7Certificate);
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-#[repr(align(8))]
-pub struct WinCertificate {
-    length: u32,
-    revision: RevisionType,
-    certificate_type: CertificateType,
-    certificate: Vec<u8>,
-}
-
-impl WinCertificate {
-    pub fn decode<V: ?Sized + AsRef<[u8]>>(data: &V) -> Result<Self, WinCertificateError> {
-        let align = mem::align_of::<WinCertificate>();
-        if data.as_ref().len() < 3 * align {
-            return Err(WinCertificateError::WrongLength {
-                minimum: 3 * align,
-                got: data.as_ref().len(),
-            });
-        }
-
-        let mut buffer = BufReader::new(data.as_ref());
-
-        let length = buffer.read_u64::<BigEndian>()? as _;
-
-        if length == 0 {
-            return Err(WinCertificateError::CertificateDataIsEmpty);
-        }
-
-        let revision = RevisionType::try_from(buffer.read_u64::<BigEndian>()? as u16)?;
-
-        let certificate_type = CertificateType::try_from(buffer.read_u64::<BigEndian>()? as u16)?;
-
-        let mut certificate = Vec::with_capacity(length as _);
-
-        for _ in 0..length {
-            certificate.push(buffer.read_u8()?);
-        }
-
-        Ok(Self {
-            length,
-            revision,
-            certificate_type,
-            certificate,
-        })
+impl Pkcs7 {
+    pub fn from_der<V: ?Sized + AsRef<[u8]>>(data: &V) -> Pkcs7Result<Self> {
+        from_der(data, "pkcs7 certificate")
+            .map(Self)
+            .map_err(|e| Pkcs7Error::Cert(e))
     }
 
-    pub fn encode(self) -> Result<Vec<u8>, WinCertificateError> {
-        let Self {
-            length,
-            revision,
-            certificate_type,
-            certificate,
-        } = self;
-
-        let mut buffer = BufWriter::new(Vec::new());
-        buffer.write_u64::<BigEndian>(length as u64)?;
-        buffer.write_u64::<BigEndian>(revision as u64)?;
-        buffer.write_u64::<BigEndian>(certificate_type as u64)?;
-
-        let count_of_needed_bytes_to_fill_align = (certificate.len() * 8 % 64) / 8;
-
-        for elem in certificate.into_iter() {
-            buffer.write_u8(elem)?;
-        }
-
-        for _ in 0..count_of_needed_bytes_to_fill_align {
-            buffer.write_u8(0)?;
-        }
-
-        buffer
-            .into_inner()
-            .map_err(|err| WinCertificateError::Other(Box::new(err) as Box<dyn error::Error>))
+    pub fn from_pem(pem: &Pem) -> Pkcs7Result<Self> {
+        from_pem(pem, "pkcs7 certificate")
+            .map(Self)
+            .map_err(|e| Pkcs7Error::Cert(e))
     }
 
-    pub fn set_certificate<V: Into<Vec<u8>>>(&mut self, certificate: V) {
-        let certificate = certificate.into();
-        self.length = certificate.len() as u32;
-        self.certificate = certificate;
+    pub fn from_pem_str(pem_str: &str) -> Pkcs7Result<Self> {
+        from_pem_str(pem_str, "pkcs7 certificate")
+            .map(Self)
+            .map_err(|e| Pkcs7Error::Cert(e))
     }
-}
 
-impl Default for WinCertificate {
-    fn default() -> Self {
-        WinCertificate {
-            length: 0,
-            revision: RevisionType::WIN_CERTIFICATE_REVISION_2_0,
-            certificate_type: CertificateType::WIN_CERT_TYPE_PKCS_SIGNED_DATA,
-            certificate: Vec::new(),
-        }
+    pub fn to_der(&self) -> Pkcs7Result<Vec<u8>> {
+        to_der(&self.0, "pkcs7 certificate").map_err(|e| Pkcs7Error::Cert(e))
     }
-}
 
-#[allow(clippy::upper_case_acronyms)]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-#[repr(u16)]
-pub enum RevisionType {
-    WIN_CERTIFICATE_REVISION_1_0 = 0x0100,
-    WIN_CERTIFICATE_REVISION_2_0 = 0x0200,
-}
+    pub fn to_pem(&self) -> Pkcs7Result<Pem> {
+        to_pem(&self.0, "pkcs7 certificate").map_err(|e| Pkcs7Error::Cert(e))
+    }
 
-impl TryFrom<u16> for RevisionType {
-    type Error = WinCertificateError;
-    fn try_from(value: u16) -> Result<Self, Self::Error> {
-        match value {
-            0x0100 => Ok(RevisionType::WIN_CERTIFICATE_REVISION_1_0),
-            0x0200 => Ok(RevisionType::WIN_CERTIFICATE_REVISION_2_0),
-            _ => Err(WinCertificateError::WrongRevisionValue {
-                expected: format!("{:?}", [0x0100, 0x0200]),
-                got: value,
+    pub fn into_wincertificate(
+        self,
+        file_hash: &[u8],
+        hash_type: SHAVariant,
+        private_key: &PrivateKey,
+        program_name: String,
+    ) -> Pkcs7Result<WinCertificate> {
+        let Pkcs7Certificate { oid, signed_data } = self.0;
+
+        let SignedData { certificates, .. } = signed_data.0;
+
+        let digest_algorithm = AlgorithmIdentifier::new_sha(hash_type);
+
+        let content_info = ContentInfo {
+            content_type: oids::spc_indirect_data_objid().into(),
+            content: Some(SpcIndirectDataContent {
+                data: SpcAttributeAndOptionalValue {
+                    _type: oids::spc_pe_image_dataobj().into(),
+                    value: SpcPeImageData {
+                        flags: SpcPeImageFlags::default(),
+                        file: Default::default(),
+                    }
+                    .into(),
+                },
+                message_digest: DigestInfo {
+                    oid: digest_algorithm.clone(),
+                    digest: file_hash.to_vec().into(),
+                },
             }),
-        }
+        };
+
+        let certificate = certificates.0.first().unwrap();
+        let tbs_certificate = &certificate.tbs_certificate;
+
+        let issuer_and_serial_number = IssuerAndSerialNumber {
+            issuer: tbs_certificate.issuer.clone(),
+            serial_number: CertificateSerialNumber(generate_serial_number()),
+        };
+
+        let mut authenticated_attributes: Vec<Attribute> = Vec::with_capacity(3);
+
+        authenticated_attributes.append(&mut vec![
+            Attribute {
+                ty: oids::content_type().into(),
+                value: AttributeValue::ContentType(oids::message_digest().into()),
+            },
+            Attribute {
+                ty: oids::message_digest().into(),
+                value: AttributeValue::MessageDigest(file_hash.to_vec().into()),
+            },
+            Attribute {
+                ty: oids::spc_sp_opus_info_objid().into(),
+                value: AttributeValue::SpcSpOpusInfo(SpcSpOpusInfo {
+                    more_info: SpcLink::default(),
+                    program_name: SpcString::try_from(program_name).map_err(Pkcs7Error::ProgramNameCharSet)?,
+                }),
+            },
+        ]);
+
+        let signature_algo =
+            SignatureAlgorithm::from_algorithm_identifier(&AlgorithmIdentifier::new_sha(SHAVariant::SHA2_256)).unwrap();
+        let digest_encryption_algorithm = AlgorithmIdentifier::new_sha256_with_rsa_encryption();
+
+        let encrypted_digest = EncryptedDigest(signature_algo.sign(file_hash, private_key).unwrap().into());
+
+        let singer_info = SingerInfo {
+            version: Version::V2,
+            issuer_and_serial_number,
+            digest_algorithm: digest_algorithm.clone(),
+            authenticode_attributes: Attributes(authenticated_attributes).into(),
+            digest_encryption_algorithm: DigestEncryptionAlgorithmIdentifier(digest_encryption_algorithm),
+            encrypted_digest,
+        };
+
+        let signed_data = SignedData {
+            version: Version::V2,
+            digest_algorithms: DigestAlgorithmIdentifiers(vec![digest_algorithm].into()),
+            content_info,
+            certificates,
+            crls: RevocationInfoChoices::default(),
+            singers_infos: SingersInfos(vec![singer_info].into()),
+        };
+
+        let pkcs7_certificate = Pkcs7Certificate {
+            oid,
+            signed_data: signed_data.into(),
+        };
+
+        let pkcs7_certificate = Pkcs7(pkcs7_certificate).to_der()?;
+
+        let mut win_cert = WinCertificate::default();
+
+        win_cert.set_certificate(pkcs7_certificate);
+
+        Ok(win_cert)
     }
-}
-
-#[allow(clippy::upper_case_acronyms)]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-#[repr(u16)]
-pub enum CertificateType {
-    WIN_CERT_TYPE_X509 = 0x0001,
-    WIN_CERT_TYPE_PKCS_SIGNED_DATA = 0x0002,
-    WIN_CERT_TYPE_RESERVED_1 = 0x0003,
-    WIN_CERT_TYPE_PKCS1_SIGN = 0x0009,
-}
-
-impl TryFrom<u16> for CertificateType {
-    type Error = WinCertificateError;
-
-    fn try_from(value: u16) -> Result<Self, Self::Error> {
-        match value {
-            0x0001 => Ok(CertificateType::WIN_CERT_TYPE_X509),
-            0x0002 => Ok(CertificateType::WIN_CERT_TYPE_PKCS_SIGNED_DATA),
-            0x0003 => Ok(CertificateType::WIN_CERT_TYPE_RESERVED_1),
-            0x0009 => Ok(CertificateType::WIN_CERT_TYPE_PKCS1_SIGN),
-            _ => Err(WinCertificateError::WrongCertificateType {
-                expected: format!("{:?}", [0x0001, 0x0002, 0x0003, 0x0009]),
-                got: value,
-            }),
-        }
-    }
-}
-
-#[test]
-fn encode_decode_test() {
-    let mut origin = WinCertificate::default();
-    origin.set_certificate(vec![1, 2, 3, 4, 5]);
-
-    let buffer: Vec<u8> = origin.clone().encode().unwrap();
-
-    let decoded: WinCertificate = WinCertificate::decode(&buffer).unwrap();
-
-    pretty_assertions::assert_eq!(origin, decoded);
 }

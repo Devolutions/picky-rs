@@ -1,14 +1,15 @@
-use super::singer_info::CertificateSerialNumber;
-use crate::{AlgorithmIdentifier, Extensions, Name, Time, Version};
 use picky_asn1::{
     tag::Tag,
     wrapper::{ApplicationTag0, Asn1SequenceOf},
 };
 use serde::{de, ser, Deserialize, Serialize};
 
+use super::singer_info::CertificateSerialNumber;
+use crate::{AlgorithmIdentifier, Extensions, Name, Time, Version};
+
 // TODO: Code in this file is sub optional and need to be finished, it may serialize and deserialize properly, but some checks are missing
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Default)]
 pub struct RevocationInfoChoices(pub Vec<RevocationInfoChoice>);
 
 // FIXME: This is a workaround, related to https://github.com/Devolutions/picky-rs/pull/78#issuecomment-789904165

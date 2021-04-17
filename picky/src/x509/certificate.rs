@@ -1,6 +1,7 @@
+use super::utils::{from_der, from_pem, from_pem_str, generate_serial_number, to_der, to_pem};
 use crate::hash::HashAlgorithm;
 use crate::key::{PrivateKey, PublicKey};
-use crate::pem::{parse_pem, Pem, PemError};
+use crate::pem::{Pem, PemError};
 use crate::signature::{SignatureAlgorithm, SignatureError};
 use crate::x509::csr::{Csr, CsrError};
 use crate::x509::date::UTCDate;
@@ -120,8 +121,6 @@ pub enum CertType {
     Unknown,
 }
 
-const CERT_PEM_LABEL: &str = "CERTIFICATE";
-
 #[derive(Clone, Debug, PartialEq)]
 pub struct Cert(Certificate);
 
@@ -150,37 +149,23 @@ macro_rules! find_ext {
 
 impl Cert {
     pub fn from_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, CertError> {
-        Ok(Self(picky_asn1_der::from_bytes(der.as_ref()).map_err(|e| {
-            CertError::Asn1Deserialization {
-                source: e,
-                element: "certificate",
-            }
-        })?))
+        from_der(der, "x509 certificate").map(Self)
     }
 
     pub fn from_pem(pem: &Pem) -> Result<Self, CertError> {
-        match pem.label() {
-            CERT_PEM_LABEL => Self::from_der(pem.data()),
-            _ => Err(CertError::InvalidPemLabel {
-                label: pem.label().to_owned(),
-            }),
-        }
+        from_pem(pem, "x509 certificate").map(Self)
     }
 
     pub fn from_pem_str(pem_str: &str) -> Result<Self, CertError> {
-        let pem = parse_pem(pem_str)?;
-        Self::from_pem(&pem)
+        from_pem_str(pem_str, "x509 certificate").map(Self)
     }
 
     pub fn to_der(&self) -> Result<Vec<u8>, CertError> {
-        picky_asn1_der::to_vec(&self.0).map_err(|e| CertError::Asn1Serialization {
-            source: e,
-            element: "certificate",
-        })
+        to_der(&self.0, "x509 certificate")
     }
 
     pub fn to_pem(&self) -> Result<Pem<'static>, CertError> {
-        Ok(Pem::new(CERT_PEM_LABEL, self.to_der()?))
+        to_pem(&self.0, "x509 certificate")
     }
 
     pub fn ty(&self) -> CertType {
@@ -942,16 +927,6 @@ impl<'a> CertificateBuilder<'a> {
             signature_value: signature_value.into(),
         }))
     }
-}
-
-fn generate_serial_number() -> IntegerAsn1 {
-    let x = rand::random::<u32>();
-    let b1 = ((x >> 24) & 0xff) as u8;
-    let b2 = ((x >> 16) & 0xff) as u8;
-    let b3 = ((x >> 8) & 0xff) as u8;
-    let b4 = (x & 0xff) as u8;
-    // serial number MUST be a positive integer
-    IntegerAsn1::from_bytes_be_unsigned(vec![b1, b2, b3, b4])
 }
 
 #[cfg(test)]
