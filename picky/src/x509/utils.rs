@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use super::certificate::CertError;
 use crate::pem::{parse_pem, Pem};
 use picky_asn1::wrapper::IntegerAsn1;
-use std::borrow::{Borrow, BorrowMut};
 
 const CERT_PEM_LABEL: &str = "CERTIFICATE";
 
@@ -17,19 +16,20 @@ where
     ))
 }
 
-pub(super) fn from_pem<'a, T: Deserialize<'a>>(pem: &'a Pem<'a>, element: &'static str) -> Result<T, CertError> {
+pub(super) fn from_pem<'a, T: Deserialize<'a>>(pem: &'a Pem, element: &'static str) -> Result<T, CertError> {
     match pem.label() {
-        CERT_PEM_LABEL => {
-            from_der(pem.data(), element)
-        },
+        CERT_PEM_LABEL => from_der(pem.data(), element),
         _ => Err(CertError::InvalidPemLabel {
             label: pem.label().to_owned(),
         }),
     }
 }
 
-pub(super) fn from_pem_str<'a, T: Deserialize<'a>>(pem_str: &'a str, element: &'static str) -> Result<T, CertError> {
-    let pem: Pem<'static> = parse_pem(pem_str)?;
+pub(super) fn from_pem_str<T>(pem_str: &str, element: &'static str) -> Result<T, CertError>
+where
+    for<'a> T: Deserialize<'a>,
+{
+    let pem = parse_pem(pem_str)?;
     from_pem(&pem, element)
 }
 

@@ -32,7 +32,7 @@ use crate::{key::PrivateKey, pem::Pem, signature::SignatureAlgorithm};
 type Pkcs7Result<T> = Result<T, Pkcs7Error>;
 
 #[derive(Debug, Error)]
-enum Pkcs7Error {
+pub enum Pkcs7Error {
     #[error(transparent)]
     Cert(#[from] CertError),
     #[error("the program name has invalid charset")]
