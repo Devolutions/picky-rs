@@ -5,7 +5,9 @@ use picky_asn1::wrapper::IntegerAsn1;
 use super::certificate::CertError;
 use crate::pem::{parse_pem, Pem};
 
-pub(super) fn from_der<'a, T, V>(data: &'a V, element: &'static str) -> Result<T, CertError>
+pub type UtilsResult<T> = Result<T, CertError>;
+
+pub(super) fn from_der<'a, T, V>(data: &'a V, element: &'static str) -> UtilsResult<T>
 where
     T: Deserialize<'a>,
     V: ?Sized + AsRef<[u8]>,
@@ -19,7 +21,7 @@ pub(super) fn from_pem<'a, T: Deserialize<'a>>(
     pem: &'a Pem,
     _pem_label: &'a str,
     element: &'static str,
-) -> Result<T, CertError> {
+) -> UtilsResult<T> {
     match pem.label() {
         _pem_label => from_der(pem.data(), element),
         _ => Err(CertError::InvalidPemLabel {
@@ -28,7 +30,7 @@ pub(super) fn from_pem<'a, T: Deserialize<'a>>(
     }
 }
 
-pub(super) fn from_pem_str<T>(pem_str: &str, pem_label: &str, element: &'static str) -> Result<T, CertError>
+pub(super) fn from_pem_str<T>(pem_str: &str, pem_label: &str, element: &'static str) -> UtilsResult<T>
 where
     for<'a> T: Deserialize<'a>,
 {
@@ -36,11 +38,11 @@ where
     from_pem(&pem, pem_label, element)
 }
 
-pub(super) fn to_der<T: Serialize>(val: &T, element: &'static str) -> Result<Vec<u8>, CertError> {
+pub(super) fn to_der<T: Serialize>(val: &T, element: &'static str) -> UtilsResult<Vec<u8>> {
     picky_asn1_der::to_vec(val).map_err(|e| CertError::Asn1Serialization { source: e, element })
 }
 
-pub(super) fn to_pem<T: Serialize>(val: &T, pem_label: &str, element: &'static str) -> Result<Pem<'static>, CertError> {
+pub(super) fn to_pem<T: Serialize>(val: &T, pem_label: &str, element: &'static str) -> UtilsResult<Pem<'static>> {
     Ok(Pem::new(pem_label, to_der(val, element)?))
 }
 

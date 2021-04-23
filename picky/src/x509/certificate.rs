@@ -17,6 +17,8 @@ use picky_asn1_x509::{
 use std::cell::RefCell;
 use thiserror::Error;
 
+const ELEMENT_NAME: &str = "x509 certificate";
+
 #[derive(Debug, Error)]
 pub enum CertError {
     /// couldn't generate certificate
@@ -151,23 +153,23 @@ macro_rules! find_ext {
 
 impl Cert {
     pub fn from_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, CertError> {
-        from_der(der, "x509 certificate").map(Self)
+        from_der(der, ELEMENT_NAME).map(Self)
     }
 
     pub fn from_pem(pem: &Pem) -> Result<Self, CertError> {
-        from_pem(pem, CERT_PEM_LABEL, "x509 certificate").map(Self)
+        from_pem(pem, CERT_PEM_LABEL, ELEMENT_NAME).map(Self)
     }
 
     pub fn from_pem_str(pem_str: &str) -> Result<Self, CertError> {
-        from_pem_str(pem_str, CERT_PEM_LABEL, "x509 certificate").map(Self)
+        from_pem_str(pem_str, CERT_PEM_LABEL, ELEMENT_NAME).map(Self)
     }
 
     pub fn to_der(&self) -> Result<Vec<u8>, CertError> {
-        to_der(&self.0, "x509 certificate")
+        to_der(&self.0, ELEMENT_NAME)
     }
 
     pub fn to_pem(&self) -> Result<Pem<'static>, CertError> {
-        to_pem(&self.0, CERT_PEM_LABEL, "x509 certificate")
+        to_pem(&self.0, CERT_PEM_LABEL, ELEMENT_NAME)
     }
 
     pub fn ty(&self) -> CertType {

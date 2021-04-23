@@ -65,41 +65,41 @@ mod tests {
     #[test]
     fn decode_test() {
         let pkcs7 = base64::decode(
-            "MIIGQgYJKoZIhvcNAQcCoIIGMzCCBi8CAQExADALBgkqhkiG9w0BBwGgggYVMIIG\
-                ETCCA/mgAwIBAgIUGWNpoUt5l2nRwfsGDY8Ta+nccpIwDQYJKoZIhvcNAQELBQAw\
-                gZcxCzAJBgNVBAYTAlVBMQ8wDQYDVQQIDAZEbmlwcm8xDzANBgNVBAcMBkRuaXBy\
-                bzERMA8GA1UECgwIQXByaW9yaXQxFzAVBgNVBAsMDklubm92YXRpb25UZWFtMQ0w\
-                CwYDVQQDDARBbGV4MSswKQYJKoZIhvcNAQkBFhxhbGVrc2FuZHIueXVzdWtAYXBy\
-                aW9yaXQuY29tMB4XDTIxMDQxMzA5MDM0M1oXDTIyMDQxMzA5MDM0M1owgZcxCzAJ\
-                BgNVBAYTAlVBMQ8wDQYDVQQIDAZEbmlwcm8xDzANBgNVBAcMBkRuaXBybzERMA8G\
-                A1UECgwIQXByaW9yaXQxFzAVBgNVBAsMDklubm92YXRpb25UZWFtMQ0wCwYDVQQD\
-                DARBbGV4MSswKQYJKoZIhvcNAQkBFhxhbGVrc2FuZHIueXVzdWtAYXByaW9yaXQu\
-                Y29tMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA4jYGtPkGlMXGGZGI\
-                2zE65KrqVxWlRGdOU7281RFnkzh/sGMeWb5EIbLBqfrzAorCFjLy7xDkuU9L5A59\
-                hN2AkuQeEYMeNoCTkgXy3CzyvtgYPvBnJi+Gnutu2R5gyeHGVssgJFNHhPKxPz+d\
-                sXV04WnMArGdemYMU58GtvK98Xk6xrlJPatGuULv1UTsEFmU0oBSPjc20+BYKXhd\
-                VvrY+Po6J5G6WttS+YPyqkkP8py3ckEW2GmpjcoRvkkhS5tWQfYD2pIHX6S4ZM4M\
-                w4sIsDTHB+yfplqVESpLqSAtZycbcc3KW8k9sooh2YpOi1U+EsbC1kK1/CH8v9cp\
-                k1h49Yc5DyrxWsmKWSkOTvNy60FKHEc8GR3MqmUdlB0uZt3WnQwfbq6lxj7eOOkV\
-                qax6cUSoO5idSDldCZAn15l5kqUvfGMaqWH/JsPTXaTXFoADxh4uwIynAsUYSxWG\
-                /uvR5GsZOy4DFOqKxd1vkfS6EtMq52VOO8Pwisax7m+9HtjybttbQSIBJE37jckx\
-                e2aN5+gPrGNLYvL3NAHUzizrkMI6c9kWUw7AynAVuDSU/bea5znDV+RzZEagcGAU\
-                ZysgD3x8Cn8UkDrpbDnhJM2OIzC5xvvVexvlrJ0fSZCyV6Ecj2mgopnV5uFpVIih\
-                oCDWLDuAtpBfNinPxiMsX7VOxPcCAwEAAaNTMFEwHQYDVR0OBBYEFFNl9vm07mLu\
-                MrLbz++XncV9NU2hMB8GA1UdIwQYMBaAFFNl9vm07mLuMrLbz++XncV9NU2hMA8G\
-                A1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggIBAC07+hvXzVLbD6wxr40j\
-                A2p1flTNDmccNmrkX0gxW8K0ZywNFM3z93w0ZZvTTGj6DwbhPFSDSG+6pqI+gtPw\
-                uvBG/Wc32QhSBtWuFyTLNAgTM+uRwhGNowgoS4Rr/LdUOCzNE9/6ZqRNuLPy7uNE\
-                maTZFcgJsGHGrGrvLY/An0SlGVjbDanJn4v5pCeAZvru3QMsqKveKpPqe0tdSTHm\
-                O7aADBnOfeA2y9Q4nTaIs1ozwZjUUAbnAwMWic1U84DohgNAcf4WEgX+AAemvwmS\
-                kpjZUu1gAEFd6AtIGjXvFQ1wCec+sdoCcQDIFHZHaipRC6oJRLxF6XSSL+mISntS\
-                LoIWnwixCZLqRB1JOlwa9ppUihA2d5y2uUFAIpd2DUeC4Fhce3hvOUR5crHiV/We\
-                ffNprfZWEPBj3YwFXdGrfgLSqDySSfcjPZW+EqrREauL8ZZPNvZN+Al4cyE9J7YW\
-                qmSKgOfA4Vpda2+aQnT3B2TNmZiZZJ9c1LzTCxCOMS7fG6VUPqhd8eiqRV8eev0i\
-                4tB3coLBJtQlAew9wQnd9Nw9h/b7ODF76JEyrPs4tQvQ25lVNxKOkxfYUMG/QPdk\
-                6NmQ1uDSLknZfV9Gz9YV55v+Lz1jfe3+/Y4riuitT854fQnuj7xbRmqGJ5uWTOp9\
-                ZjHKF8y7QKjT1anRDivi9gkvoQAxAA==",
-        )
+            "MIIGOgYJKoZIhvcNAQcCoIIGKzCCBicCAQExADALBgkqhkiG9w0BBwGgggYNMIIG\
+                CTCCA/GgAwIBAgIUOnS/zC1zk2aJttmSVNtzX8rhMXwwDQYJKoZIhvcNAQELBQAw\
+                gZMxCzAJBgNVBAYTAlVBMRIwEAYDVQQIDAlIdW1ibGVHdXkxETAPBgNVBAcMCFNv\
+                bWVDaXR5MRkwFwYDVQQKDBBTb21lT3JnYW5pemF0aW9uMREwDwYDVQQLDAhTb21l\
+                VW5pdDEMMAoGA1UEAwwDR3V5MSEwHwYJKoZIhvcNAQkBFhJzb21lZW1haWxAbWFp\
+                bC5jb20wHhcNMjEwNDIzMTQzMzQzWhcNMjIwNDIzMTQzMzQzWjCBkzELMAkGA1UE\
+                BhMCVUExEjAQBgNVBAgMCUh1bWJsZUd1eTERMA8GA1UEBwwIU29tZUNpdHkxGTAX\
+                BgNVBAoMEFNvbWVPcmdhbml6YXRpb24xETAPBgNVBAsMCFNvbWVVbml0MQwwCgYD\
+                VQQDDANHdXkxITAfBgkqhkiG9w0BCQEWEnNvbWVlbWFpbEBtYWlsLmNvbTCCAiIw\
+                DQYJKoZIhvcNAQEBBQADggIPADCCAgoCggIBAM6JtTiGxVFdQr0r5hpBioObluoZ\
+                UW/u4RMPLlb4xwuIVM+q7Xk968c8FKoxMsTGPfjfF6CBHhvcZTojYRLqFdHaYRzl\
+                +m5gnR6ZJRYGOtH7dyFX+2UgTIuLxsBPoXoY/DICpUp2sch8eXmi+lwL1A8Kk9pM\
+                CB0s0+nVwNLqpa6aZg5kFkverZzn8tdV8z2yg/BV1fx7FGIDYFuoqc10azEg9aa8\
+                bq1psf4c4IrymFEBvuXlvi/vukY/hUPFLHDAjt6vQeDNT0GjsPIj7Fb5ISLEVbBb\
+                qMKq0Atr6Af2avtIMudTVm+BT9QlX1gUr83GLiIhsPbS/WBPJcdeWLxvjWIUIJNo\
+                hIJkL6YhYhkeniNN5Pq0zrhkSGNt5ai2ZeW/D4npEeCbR7gjsQm8LPJDrnDH3Iax\
+                KvPgxen/rCMfssgw6UUWUEGn3n6QPtBp7HcWe+oBQOEuL6zIJKG8XzEypn6EZm+x\
+                p7TjCcUgRm1X5OtDnc8E8yHsrs9dKLhzLARs6XDgcw1KhfhzryLY6VsjZD9mm5iu\
+                PVgw0Hg+v4cxekWYcjJWCf6EjsCV9iax4UwGb1G7yD5XsYULajZOYqRYNak2Jruu\
+                18daA66TQ8HNas25YFFQQQtQG/1RrL1u853DBlrxaNcZQfR6mkE1D7O5MUADqjoM\
+                pgoL7k2XqkJMjs/PAgMBAAGjUzBRMB0GA1UdDgQWBBQAX8F1PgwVwxbjCDdpvYKI\
+                0YW9DTAfBgNVHSMEGDAWgBQAX8F1PgwVwxbjCDdpvYKI0YW9DTAPBgNVHRMBAf8E\
+                BTADAQH/MA0GCSqGSIb3DQEBCwUAA4ICAQAH3Qweqt8+PnQoAKTPXTUMp+lE01a0\
+                2vzoc7EPWiclyuQPatlUIyUEH5nbBiXu8v9X5wHIrfzkV7tO+clVy9w6a4Fhnejv\
+                2zurSHf6vP/UEq2gPuBJ1jc1BDpE4TtlZdrO6GYBQwETRBbw44lFvyk6sjnCHPgz\
+                nl5dryWIyNSALFpSzUJ9xSdtzWEKnWe9NaxBc6b0RxJSsRl33Fx25WkKMuhY4j26\
+                wZvWMSj86eRdI7BP31UGEt8GdfQscz5JtMlY+eJbilAMTZt4iAEJFv9OI7/asVJv\
+                u8oNZJewGstWqRyRrJcHeEINjxeKL0quKJQF38fCd6pqRI7PlPBaGfVCSHTggpKO\
+                yD0ACcE13kcjnOwa8J/DFFZVpI3oofGUE+hajJT09vGJv4NJKUfdJIuieEFeJe8B\
+                TPkVjCHp6j6Vj56EdGqvkYtVsuzHUNlIsEcpXGEiODbwbps7GxPCiurVIldun2Gu\
+                1mq8Q6aU+yh5Fs5ZsSXozzXyWqwPkT5WbJEOAUMd2+JSRHN83MOSqq+igpDBKQZQ\
+                t5vcoqFzuspOVIvdPLFY3pPZY9dxVNdDi4T6qJNZCq++Ukyc0LQOUkshF9HaHB3I\
+                xUDGjR5n4X0lkjgM5IvL+OaZREqWkD/tiCu4V/5Z86mZi6VwCcgYrp/Q4bFjsWBw\
+                p0mAUFZ9UjurAaEAMQA=",
+                        )
         .unwrap();
 
         assert_eq!(Version::V2, Version::from_u8(*pkcs7.get(25).unwrap()).unwrap());
@@ -120,43 +120,43 @@ mod tests {
             NameAttr::CountryName,
             PrintableStringAsn1::from(PrintableString::new("UA".as_bytes()).unwrap()),
         );
-        issuer.add_attr(NameAttr::StateOrProvinceName, "Dnipro");
-        issuer.add_attr(NameAttr::LocalityName, "Dnipro");
-        issuer.add_attr(NameAttr::OrganizationName, "Apriorit");
-        issuer.add_attr(NameAttr::OrganizationalUnitName, "InnovationTeam");
-        issuer.add_attr(NameAttr::CommonName, "Alex");
-        issuer.add_email(IA5String::new("aleksandr.yusuk@apriorit.com".as_bytes()).unwrap());
+        issuer.add_attr(NameAttr::StateOrProvinceName, "HumbleGuy");
+        issuer.add_attr(NameAttr::LocalityName, "SomeCity");
+        issuer.add_attr(NameAttr::OrganizationName, "SomeOrganization");
+        issuer.add_attr(NameAttr::OrganizationalUnitName, "SomeUnit");
+        issuer.add_attr(NameAttr::CommonName, "Guy");
+        issuer.add_email(IA5String::new("someemail@mail.com".as_bytes()).unwrap());
 
-        check_serde!(issuer: Name in pkcs7[95..249]);
+        check_serde!(issuer: Name in pkcs7[95..245]);
 
         let validity = Validity {
-            not_before: UTCTime::new(2021, 4, 13, 9, 3, 43).unwrap().into(),
-            not_after: UTCTime::new(2022, 4, 13, 9, 3, 43).unwrap().into(),
+            not_before: UTCTime::new(2021, 4, 23, 14, 33, 43).unwrap().into(),
+            not_after: UTCTime::new(2022, 4, 23, 14, 33, 43).unwrap().into(),
         };
 
-        check_serde!(validity: Validity in pkcs7[249..281]);
+        check_serde!(validity: Validity in pkcs7[245..277]);
 
         let subject = issuer.clone();
 
-        check_serde!(subject: Name in pkcs7[281..435]);
+        check_serde!(subject: Name in pkcs7[277..427]);
 
         let subject_public_key_info = SubjectPublicKeyInfo {
             algorithm: AlgorithmIdentifier::new_rsa_encryption(),
             subject_public_key: PublicKey::RSA(EncapsulatedRSAPublicKey::from(RSAPublicKey {
-                modulus: IntegerAsn1::from(pkcs7[467..980].to_vec()),
-                public_exponent: IntegerAsn1::from(pkcs7[982..985].to_vec()),
+                modulus: IntegerAsn1::from(pkcs7[459..972].to_vec()),
+                public_exponent: IntegerAsn1::from(pkcs7[974..977].to_vec()),
             })),
         };
 
-        check_serde!(subject_public_key_info: SubjectPublicKeyInfo in pkcs7[435..985]);
+        check_serde!(subject_public_key_info: SubjectPublicKeyInfo in pkcs7[427..977]);
 
         let extensions = Extensions(vec![
-            Extension::new_subject_key_identifier(pkcs7[1000..1020].to_vec()),
-            Extension::new_authority_key_identifier(KeyIdentifier::from(pkcs7[1033..1053].to_vec()), None, None),
-            Extension::new_basic_constraints(*pkcs7.get(1060).unwrap() != 0, None),
+            Extension::new_subject_key_identifier(pkcs7[992..1012].to_vec()),
+            Extension::new_authority_key_identifier(KeyIdentifier::from(pkcs7[1025..1045].to_vec()), None, None),
+            Extension::new_basic_constraints(*pkcs7.get(1054).unwrap() != 0, None),
         ]);
 
-        check_serde!(extensions: Extensions in  pkcs7[987..1070]);
+        check_serde!(extensions: Extensions in  pkcs7[979..1062]);
 
         let full_certificate = Certificate {
             tbs_certificate: TBSCertificate {
@@ -170,9 +170,9 @@ mod tests {
                 extensions: ApplicationTag3(extensions),
             },
             signature_algorithm: AlgorithmIdentifier::new_sha256_with_rsa_encryption(),
-            signature_value: BitString::with_bytes(&pkcs7[1090..1602]).into(),
+            signature_value: BitString::with_bytes(&pkcs7[1082..1594]).into(),
         };
-        check_serde!(full_certificate: Certificate in pkcs7[45..1602]);
+        check_serde!(full_certificate: Certificate in pkcs7[45..1594]);
 
         let signed_data = SignedData {
             version: Version::V2,
@@ -183,7 +183,7 @@ mod tests {
             singers_infos: SingersInfos(Vec::new().into()),
         };
 
-        check_serde!(signed_data: SignedData in pkcs7[19..1606]);
+        check_serde!(signed_data: SignedData in pkcs7[19..1598]);
     }
 
     #[test]

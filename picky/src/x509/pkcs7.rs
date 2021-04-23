@@ -32,6 +32,10 @@ use crate::{key::PrivateKey, pem::Pem, signature::SignatureAlgorithm};
 
 type Pkcs7Result<T> = Result<T, Pkcs7Error>;
 
+pub const AUTHENTICODE_ATTRIBUTES_COUNT: usize = 3;
+
+const ELEMENT_NAME: &str = "pkcs7 certificate";
+
 #[derive(Debug, Error)]
 pub enum Pkcs7Error {
     #[error(transparent)]
@@ -48,26 +52,26 @@ pub struct Pkcs7(Pkcs7Certificate);
 
 impl Pkcs7 {
     pub fn from_der<V: ?Sized + AsRef<[u8]>>(data: &V) -> Pkcs7Result<Self> {
-        Ok(from_der(data, "pkcs7 certificate").map(Self)?)
+        Ok(from_der(data, ELEMENT_NAME).map(Self)?)
     }
 
     pub fn from_pem(pem: &Pem) -> Pkcs7Result<Self> {
-        Ok(from_pem(pem, PKCS7_PEM_LABEL, "pkcs7 certificate").map(Self)?)
+        Ok(from_pem(pem, PKCS7_PEM_LABEL, ELEMENT_NAME).map(Self)?)
     }
 
     pub fn from_pem_str(pem_str: &str) -> Pkcs7Result<Self> {
-        Ok(from_pem_str(pem_str, PKCS7_PEM_LABEL, "pkcs7 certificate").map(Self)?)
+        Ok(from_pem_str(pem_str, PKCS7_PEM_LABEL, ELEMENT_NAME).map(Self)?)
     }
 
     pub fn to_der(&self) -> Pkcs7Result<Vec<u8>> {
-        Ok(to_der(&self.0, "pkcs7 certificate")?)
+        Ok(to_der(&self.0, ELEMENT_NAME)?)
     }
 
     pub fn to_pem(&self) -> Pkcs7Result<Pem> {
-        Ok(to_pem(&self.0, PKCS7_PEM_LABEL, "pkcs7 certificate")?)
+        Ok(to_pem(&self.0, PKCS7_PEM_LABEL, ELEMENT_NAME)?)
     }
 
-    pub fn into_wincertificate(
+    pub fn into_win_certificate(
         self,
         file_hash: &[u8],
         hash_type: SHAVariant,
@@ -80,22 +84,25 @@ impl Pkcs7 {
 
         let digest_algorithm = AlgorithmIdentifier::new_sha(hash_type);
 
+        let data = SpcAttributeAndOptionalValue {
+            _type: oids::spc_pe_image_dataobj().into(),
+            value: SpcPeImageData {
+                flags: SpcPeImageFlags::default(),
+                file: Default::default(),
+            }
+            .into(),
+        };
+
+        let message_digest = DigestInfo {
+            oid: digest_algorithm.clone(),
+            digest: file_hash.to_vec().into(),
+        };
+
+        let content = SpcIndirectDataContent { data, message_digest };
+
         let content_info = ContentInfo {
             content_type: oids::spc_indirect_data_objid().into(),
-            content: Some(SpcIndirectDataContent {
-                data: SpcAttributeAndOptionalValue {
-                    _type: oids::spc_pe_image_dataobj().into(),
-                    value: SpcPeImageData {
-                        flags: SpcPeImageFlags::default(),
-                        file: Default::default(),
-                    }
-                    .into(),
-                },
-                message_digest: DigestInfo {
-                    oid: digest_algorithm.clone(),
-                    digest: file_hash.to_vec().into(),
-                },
-            }),
+            content: Some(content),
         };
 
         let certificate = certificates.0.first().unwrap();
@@ -105,7 +112,7 @@ impl Pkcs7 {
             serial_number: CertificateSerialNumber(generate_serial_number()),
         };
 
-        let mut authenticated_attributes: Vec<Attribute> = Vec::with_capacity(3);
+        let mut authenticated_attributes: Vec<Attribute> = Vec::with_capacity(AUTHENTICODE_ATTRIBUTES_COUNT);
 
         authenticated_attributes.append(&mut vec![
             Attribute {
@@ -195,7 +202,7 @@ mod tests {
         let program_name = "decoding_into_win_certificate_test".to_string();
 
         let win_cert = pkcs7
-            .into_wincertificate(file_hash.as_ref(), hash_type, &private_key, program_name)
+            .into_win_certificate(file_hash.as_ref(), hash_type, &private_key, program_name)
             .unwrap();
 
         let pkcs7 = win_cert.get_certificate();

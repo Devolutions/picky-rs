@@ -8,6 +8,8 @@ use std::{
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use thiserror::Error;
 
+const MINIMUM_DECODED_FIELDS_COUNT: usize = 3;
+
 #[derive(Debug, Error)]
 pub enum WinCertificateError {
     #[error("Revision value is wrong(expected any of {expected}, but {got} got)")]
@@ -36,16 +38,16 @@ pub struct WinCertificate {
 impl WinCertificate {
     pub fn decode<V: ?Sized + AsRef<[u8]>>(data: &V) -> Result<Self, WinCertificateError> {
         let align = mem::align_of::<WinCertificate>();
-        if data.as_ref().len() < 3 * align {
+        if data.as_ref().len() < MINIMUM_DECODED_FIELDS_COUNT * align {
             return Err(WinCertificateError::WrongLength {
-                minimum: 3 * align,
+                minimum: MINIMUM_DECODED_FIELDS_COUNT * align,
                 got: data.as_ref().len(),
             });
         }
 
         let mut buffer = BufReader::new(data.as_ref());
 
-        let length = buffer.read_u64::<BigEndian>()? as _;
+        let length = buffer.read_u64::<BigEndian>()? as u32;
 
         if length == 0 {
             return Err(WinCertificateError::CertificateDataIsEmpty);
@@ -55,7 +57,7 @@ impl WinCertificate {
 
         let certificate_type = CertificateType::try_from(buffer.read_u64::<BigEndian>()? as u16)?;
 
-        let mut certificate = Vec::with_capacity(length as _);
+        let mut certificate = Vec::with_capacity(length as usize);
 
         for _ in 0..length {
             certificate.push(buffer.read_u8()?);

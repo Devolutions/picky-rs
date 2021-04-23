@@ -10,6 +10,8 @@ use thiserror::Error;
 
 pub use picky_asn1_x509::Attribute;
 
+const ELEMENT_NAME: &str = "certification request";
+
 #[derive(Debug, Error)]
 pub enum CsrError {
     /// ASN1 serialization error
@@ -65,23 +67,23 @@ impl From<CertificationRequest> for Csr {
 
 impl Csr {
     pub fn from_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, CsrError> {
-        Ok(from_der(der, "certification request").map(Self)?)
+        Ok(from_der(der, ELEMENT_NAME).map(Self)?)
     }
 
     pub fn from_pem_str(pem_str: &str) -> Result<Self, CsrError> {
-        Ok(from_pem_str(pem_str, CSR_PEM_LABEL, "certification request").map(Self)?)
+        Ok(from_pem_str(pem_str, CSR_PEM_LABEL, ELEMENT_NAME).map(Self)?)
     }
 
     pub fn from_pem(pem: &Pem) -> Result<Self, CsrError> {
-        Ok(from_pem(pem, CSR_PEM_LABEL, "certification request").map(Self)?)
+        Ok(from_pem(pem, CSR_PEM_LABEL, ELEMENT_NAME).map(Self)?)
     }
 
     pub fn to_der(&self) -> Result<Vec<u8>, CsrError> {
-        Ok(to_der(&self.0, "certification request")?)
+        Ok(to_der(&self.0, ELEMENT_NAME)?)
     }
 
     pub fn to_pem(&self) -> Result<Pem<'static>, CsrError> {
-        Ok(to_pem(&self.0, CSR_PEM_LABEL, "certification request")?)
+        Ok(to_pem(&self.0, CSR_PEM_LABEL, ELEMENT_NAME)?)
     }
 
     pub fn generate(
