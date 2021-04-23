@@ -253,6 +253,10 @@ pub type BMPString = RestrictedString<BMPCharSet>;
 
 impl CharSet for BMPCharSet {
     fn check(data: &[u8]) -> bool {
+        if data.len() % 2 != 0 {
+            return false;
+        }
+
         let buffer = data
             .chunks_exact(2)
             .into_iter()
@@ -309,6 +313,6 @@ mod tests {
 
     #[test]
     fn invalid_unicode_string() {
-        assert!(BMPString::new(vec![0xbe, 0xed, 0x8a, 0x00, 0x59, 0x04, 0x08, 0x00, 0x20]).is_err());
+        assert!(BMPString::from_str("1224na÷日本語はむずかちー−×—«BUeisuteurnt").is_err())
     }
 }

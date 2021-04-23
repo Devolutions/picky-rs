@@ -111,16 +111,23 @@ impl<'de> de::Deserialize<'de> for TBSCertificate {
             where
                 V: de::SeqAccess<'de>,
             {
-                let version: ApplicationTag0<Version> =
-                    seq.next_element()?.ok_or_else(|| de::Error::invalid_length(0, &self))?;
-
-                if version.0 != Version::V3 {
-                    return Err(de::Error::invalid_value(
-                        de::Unexpected::Other(
-                            "[TBSCertificate] V1 certificates unsupported. Only V3 certificates \
+                let version: ApplicationTag0<Version> = seq
+                    .next_element()
+                    .map_err(|_| {
+                        de::Error::invalid_value(
+                            de::Unexpected::Other(
+                                "[TBSCertificate] V1 certificates unsupported. Only V3 certificates \
                                      are supported",
-                        ),
-                        &"a supported certificate",
+                            ),
+                            &"a supported certificate",
+                        )
+                    })?
+                    .ok_or_else(|| de::Error::invalid_length(0, &self))?;
+
+                if version != Version::V3 {
+                    return Err(de::Error::invalid_value(
+                        de::Unexpected::Other("unsupported certificate version"),
+                        &"only V3 certificate are supported",
                     ));
                 }
 

@@ -1,5 +1,6 @@
-use picky_asn1::wrapper::{Asn1SetOf, Implicit, IntegerAsn1, OctetStringAsn1};
 use serde::{de, Deserialize, Serialize};
+
+use picky_asn1::wrapper::{Asn1SetOf, Implicit, IntegerAsn1, OctetStringAsn1};
 
 use crate::{AlgorithmIdentifier, Attributes, Name, Version};
 

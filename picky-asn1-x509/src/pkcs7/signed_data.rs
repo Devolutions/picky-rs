@@ -27,7 +27,7 @@ impl ser::Serialize for ExtendedCertificatesAndCertificates {
     where
         S: ser::Serializer,
     {
-        let mut raw_der = picky_asn1_der::to_vec(&self.0).unwrap_or_default();
+        let mut raw_der = picky_asn1_der::to_vec(&self.0).unwrap_or_else(|_| vec![0]);
         raw_der[0] = Tag::APP_0.number();
         picky_asn1_der::Asn1RawDer(raw_der).serialize(serializer)
     }
@@ -49,15 +49,16 @@ impl<'de> de::Deserialize<'de> for ExtendedCertificatesAndCertificates {
 mod tests {
     use super::*;
     use crate::{
-        oids, EncapsulatedRSAPublicKey, Extension, Extensions, KeyIdentifier, Name, NameAttr, PublicKey, RSAPublicKey,
-        SubjectPublicKeyInfo, TBSCertificate, Validity,
+        crls::*, oids, EncapsulatedRSAPublicKey, Extension, Extensions, KeyIdentifier, Name, NameAttr, PublicKey,
+        RSAPublicKey, SubjectPublicKeyInfo, TBSCertificate, Validity,
     };
     use picky_asn1::{
         bit_string::BitString,
         date::UTCTime,
         restricted_string::{IA5String, PrintableString},
         wrapper::{
-            ApplicationTag0, ApplicationTag1, ApplicationTag3, IntegerAsn1, ObjectIdentifierAsn1, PrintableStringAsn1,
+            ApplicationTag0, ApplicationTag3, IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1Container,
+            PrintableStringAsn1,
         },
     };
 
@@ -183,5 +184,90 @@ mod tests {
         };
 
         check_serde!(signed_data: SignedData in pkcs7[19..1606]);
+    }
+
+    #[test]
+    fn decode_with_crl() {
+        let decoded = base64::decode(
+            "MIIIxwYJKoZIhvcNAQcCoIIIuDCCCLQCAQExADALBgkqhkiG9w0BBwGgggXJMIIF\
+                xTCCA62gAwIBAgIUFYedpm34R9SrNONqEn43NrNlDHMwDQYJKoZIhvcNAQELBQAw\
+                cjELMAkGA1UEBhMCZmYxCzAJBgNVBAgMAmZmMQswCQYDVQQHDAJmZjELMAkGA1UE\
+                CgwCZmYxCzAJBgNVBAsMAmZmMQ8wDQYDVQQDDAZDQU5hbWUxHjAcBgkqhkiG9w0B\
+                CQEWD2NhbWFpbEBtYWlsLmNvbTAeFw0yMTA0MTkxNTQxNDlaFw0yNjA0MTkxNTQx\
+                NDlaMHIxCzAJBgNVBAYTAmZmMQswCQYDVQQIDAJmZjELMAkGA1UEBwwCZmYxCzAJ\
+                BgNVBAoMAmZmMQswCQYDVQQLDAJmZjEPMA0GA1UEAwwGQ0FOYW1lMR4wHAYJKoZI\
+                hvcNAQkBFg9jYW1haWxAbWFpbC5jb20wggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAw\
+                ggIKAoICAQCwVfg08dBZyObLkyZufYCZ396B17ICMAjYUWjk2pfK3Q/3C0vCjppd\
+                F5VW0g49D/ULV7tzRc3AZecw9RxHuwkeXioIZ6NQ92qdg8CnkOPLrSyDlMyDZgYU\
+                NSFdpz81Bu0v17sUHfREz41Wi5CvdK9qSS/IiuZhEpKYx1trGAc22YwXLBGs6Dcb\
+                jf3C8zRnG1FCsOYukaG6wUdzUtwkrgOIIMERTqZ1U5s0rXehg4Kb3chAsA31xvKT\
+                UhMNfovjI+5FDB/ZjZOOPMobnN6E7DLFjBzpa11eFywPFvimNxWjN26HkEceIh7y\
+                Hm/9GrlSvpXnZQRFNNKIIQBkHt6jbpByxIhU9Yq0uWSZNWk+c34H6sksWZtJpVvM\
+                YWIGziatkr2Rjskn9xjSNFNHacj5u3j2KKGxCtkxrCXiLY9Chf1CfbhmLpdECTPW\
+                fgOOzXu/GIFXaxsh0+NqodEChaA5GDztweqt7Ep3/V9c/ITWONzj8SOj97R5OYy8\
+                rtu24YY+ft2PkRYRSwsJzHs4KfDaf1yN0WCBZSl1itVW7qsEKQ60pp4qOna8XbyN\
+                6VY3ce/qhKYPZKs9pFWX5vBTtAFcA4HjmT/EkHJ2ISJU0ueU0E6iH9Q01ENk1dso\
+                dDMKP354kqmuHW4I0Wc39tJsXdUsGaisVyfOZdJQpqc2sle6LR8WpQIDAQABo1Mw\
+                UTAdBgNVHQ4EFgQUxy69gEp87JxLsLZKmjYUObTIei4wHwYDVR0jBBgwFoAUxy69\
+                gEp87JxLsLZKmjYUObTIei4wDwYDVR0TAQH/BAUwAwEB/zANBgkqhkiG9w0BAQsF\
+                AAOCAgEAZzl2JCK3+5lm5vkcidD4swafCkE+kKuS27Ta7RVjfvEmZQmE69meMxuS\
+                PZ/xcB2EVF+zTMw5qmtOiCFrN90sR5lGHhdkqFDMAhQtu7aGz9rJ8s9R4Hx8NWXk\
+                d9H6USqWd6O3OIVl4cB7HZEdn4Y+oVgtSd48EAK4C/a2a9NLsrpPgGAB2m3wGRBY\
+                l9ynvaR9hMXc0qQ/s/BseA/UvEaVVd1mxKcTeL4dGQpBJ9bKYbesJGHJssRnSlDb\
+                AMI5tgoIYPadumNEqmDZL+eH798lfnyXCLokSZk/I7a4TLgtTnlubbFnapu8M645\
+                qOS2VWzKnqRYC31DDWy5PcI/eDfLNCzrben9I6nSAx5AFOfi8z7znAwXw1fGcUEw\
+                BPSzK91KHZkqsOaK/kExja32xeSSy7SW1dBHmwaDbA0kv7COPYCHIWmFsrxFkB9E\
+                O5P1hSnFMZmdAO2jm/k0cZQxlaYZuio0XCQEJZMvfsGL8qWV5uRdUx8D5zZQem/R\
+                OHEe1tMTIqJ3BoGgX15atokFY++iVLjk/2eKv1k5Sw5m/4cxxDgcK89UH4Y1UR3u\
+                ah3emGU6zySj/Y3HpFfKslewb59FZXS/RKgRHhIw1TfauuTNtT5D2LpXPYfLuTrs\
+                aCpH/QGsSBGiMTmrdXukRCIsz663TKiLVYOdvY4Y+cBcJlk/YMChggLPMIICyzCB\
+                tAIBATANBgkqhkiG9w0BAQUFADByMQswCQYDVQQGEwJmZjELMAkGA1UECAwCZmYx\
+                CzAJBgNVBAcMAmZmMQswCQYDVQQKDAJmZjELMAkGA1UECwwCZmYxDzANBgNVBAMM\
+                BkNBTmFtZTEeMBwGCSqGSIb3DQEJARYPY2FtYWlsQG1haWwuY29tFw0yMTA0MjAw\
+                NjUyMjRaFw0yMzA0MjAwNjUyMjRaoA4wDDAKBgNVHRQEAwIBAzANBgkqhkiG9w0B\
+                AQUFAAOCAgEAW/+H6pzGp6cRUssck1a5pAJo2V98gpLX5gnPoorEIE2nkcLChiWc\
+                RCdJuc5PtOisM/FRl9IxQWpePISB3I15jaL1u1ol5ISNn69f3eWwvVEw3kJSEeb/\
+                TYvqW0+k1CgMr84oP38K4/434FwfotULX36FdU04MSzMirAszjZ0kLMsb3mNSSaH\
+                VC0kZs7AnvzwKBXsB143ouNAH5mmLom1EyRAWU1ZP/pFZXDGE1ct2jB+oOdZebQj\
+                /4VjfGDyvzUd9cNu9i6ZqNf49E9vhemrCdkZHc94QkwO92FhBROZhQ9fKelV8CRs\
+                jf2oyToe+2NN2eXj+DY/s13Knoeqb7FcD3BFObtrILvE/rrCxZa0JeHfdg79nIiG\
+                BCfQloA+cZdQsCQ1H1Qd3kwqo6ZLQpeTyW0UeIJNLQiSMATvpMAtunwT/OgxSP/Q\
+                eTXV+221Eu2tDhXYMVkFtjgFdp0O5XqPU5fNPF/5XL3DlgAaWe9ULl4ZwBNPSkOm\
+                LiFMcN1hzGQQo00ycuU6eF+Iz+H/olJyrpdJxf0jh2Sok71LX6YlALvfvZjW5eYc\
+                8AvDttigOLiDwm8eYAxsC8Ku4cMiMSkgs71vvmz0U/LHypZiNJsEEaR76NH9OLiz\
+                XCIYfP7WudYgfGBRRiw4WeB7jZNtVzFzkyiwliZLqocBuM8f1O2pv/QxAA==",
+        )
+        .unwrap();
+
+        let mut issuer = Name::new();
+        issuer.add_attr(NameAttr::CountryName, PrintableString::new("ff").unwrap());
+        issuer.add_attr(NameAttr::StateOrProvinceName, "ff");
+        issuer.add_attr(NameAttr::LocalityName, "ff");
+        issuer.add_attr(NameAttr::OrganizationName, "ff");
+        issuer.add_attr(NameAttr::OrganizationalUnitName, "ff");
+        issuer.add_attr(NameAttr::CommonName, "CAName");
+        issuer.add_email(IA5String::new("camail@mail.com").unwrap());
+
+        let tbs_cert_list = TBSCertList {
+            version: Some(Version::V2),
+            signature: AlgorithmIdentifier::new_sha1_with_rsa_encryption().into(),
+            issuer,
+            this_update: UTCTime::new(2021, 4, 20, 6, 52, 24).unwrap().into(),
+            next_update: Some(UTCTime::new(2023, 4, 20, 6, 52, 24).unwrap().into()),
+            revoked_certificates: None,
+            crl_extension: ApplicationTag0(Some(Extensions(vec![Extension::new_crl_number(
+                OctetStringAsn1Container(IntegerAsn1::from(decoded[1716..1717].to_vec())),
+            )]))),
+        };
+
+        check_serde!(tbs_cert_list: TBSCertList in decoded[1534..1717]);
+
+        let crl = RevocationInfoChoices(vec![RevocationInfoChoice::Crl(CertificateList {
+            tbs_cert_list,
+            signature_algorithm: AlgorithmIdentifier::new_sha1_with_rsa_encryption(),
+            signature_value: BitString::with_bytes(&decoded[1737..2249]).into(),
+        })]);
+
+        check_serde!(crl: RevocationInfoChoices in decoded[1526..2249]);
     }
 }

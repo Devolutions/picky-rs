@@ -1,13 +1,12 @@
-use picky_asn1::{
-    tag::Tag,
-    wrapper::{ApplicationTag0, Asn1SequenceOf},
-};
 use serde::{de, ser, Deserialize, Serialize};
+
+use picky_asn1::{
+    tag::{Tag, TagPeeker},
+    wrapper::{ApplicationTag0, ApplicationTag1, Asn1SequenceOf, BitStringAsn1, ObjectIdentifierAsn1},
+};
 
 use super::singer_info::CertificateSerialNumber;
 use crate::{AlgorithmIdentifier, Extensions, Name, Time, Version};
-
-// TODO: Code in this file is sub optional and need to be finished, it may serialize and deserialize properly, but some checks are missing
 
 #[derive(Debug, PartialEq, Clone, Default)]
 pub struct RevocationInfoChoices(pub Vec<RevocationInfoChoice>);
@@ -19,7 +18,7 @@ impl ser::Serialize for RevocationInfoChoices {
     where
         S: ser::Serializer,
     {
-        let mut raw_der = picky_asn1_der::to_vec(&self.0).unwrap_or_default();
+        let mut raw_der = picky_asn1_der::to_vec(&self.0).unwrap_or_else(|_| vec![0]);
         raw_der[0] = Tag::APP_1.number();
         picky_asn1_der::Asn1RawDer(raw_der).serialize(serializer)
     }
@@ -37,37 +36,172 @@ impl<'de> de::Deserialize<'de> for RevocationInfoChoices {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum RevocationInfoChoice {
     Crl(CertificateList),
-    // Other(Implicit<ApplicationTag1<OtherRevocationInfoFormat>>),
+    Other(ApplicationTag1<OtherRevocationInfoFormat>),
+}
+
+impl ser::Serialize for RevocationInfoChoice {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
+    where
+        S: ser::Serializer,
+    {
+        match &self {
+            RevocationInfoChoice::Crl(certificate_list) => certificate_list.serialize(serializer),
+            RevocationInfoChoice::Other(other_revocation_info_format) => {
+                other_revocation_info_format.serialize(serializer)
+            }
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for RevocationInfoChoice {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        use std::fmt;
+
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = RevocationInfoChoice;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a valid DER-encoded RevocationInfoChoice")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let tag_peeker: TagPeeker = seq_next_element!(seq, RevocationInfoChoice, "choice tag");
+
+                let revocation_info_choice = match tag_peeker.next_tag {
+                    Tag::APP_1 => RevocationInfoChoice::Other(seq_next_element!(
+                        seq,
+                        RevocationInfoChoice,
+                        "OtherRevocationInfoFormat "
+                    )),
+                    _ => RevocationInfoChoice::Crl(seq_next_element!(seq, RevocationInfoChoice, "CertificateList")),
+                };
+
+                Ok(revocation_info_choice)
+            }
+        }
+
+        deserializer.deserialize_enum("RevocationInfoChoice", &["Crl", "Other"], Visitor)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct CertificateList {
-    version: Option<Version>,
-    signature: AlgorithmIdentifier,
-    issuer: Name,
-    this_update: Time,
-    next_update: Time,
-    revoked_certificates: RevokedCertificates,
+    pub tbs_cert_list: TBSCertList,
+    pub signature_algorithm: AlgorithmIdentifier,
+    pub signature_value: BitStringAsn1,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Debug, PartialEq, Clone)]
+pub struct TBSCertList {
+    pub version: Option<Version>,
+    pub signature: AlgorithmIdentifier,
+    pub issuer: Name,
+    pub this_update: Time,
+    pub next_update: Option<Time>,
+    pub revoked_certificates: Option<RevokedCertificates>,
+    pub crl_extension: ApplicationTag0<Option<Extensions>>,
+}
+
+impl<'de> de::Deserialize<'de> for TBSCertList {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        use std::fmt;
+
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = TBSCertList;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a valid DER-encoded TBSCertList")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let version = seq.next_element().unwrap_or(Some(None)).unwrap_or(None);
+                if version.is_some() && !version.eq(&Some(Version::V2)) {
+                    return Err(serde_invalid_value!(
+                        TBSCertList,
+                        "Version of TBSCertList doesn't equal to v2",
+                        "Version of TBSCertList equals to v2"
+                    ));
+                }
+
+                Ok(TBSCertList {
+                    version,
+                    signature: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(1, &self))?,
+                    issuer: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(2, &self))?,
+                    this_update: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(3, &self))?,
+                    next_update: seq.next_element().unwrap_or(Some(None)).unwrap_or(None),
+                    revoked_certificates: seq.next_element().unwrap_or(Some(None)).unwrap_or(None),
+                    crl_extension: ApplicationTag0(seq.next_element().unwrap_or(Some(None)).unwrap_or(None)),
+                })
+            }
+        }
+
+        deserializer.deserialize_seq(Visitor)
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
 pub struct RevokedCertificates(pub Asn1SequenceOf<RevokedCertificate>);
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct RevokedCertificate {
-    user_certificate: CertificateSerialNumber,
-    revocation_data: Time,
-    crl_entry_extensions: Option<Extensions>,
-    crl_extensions: Option<ApplicationTag0<Extensions>>,
+    pub user_certificate: CertificateSerialNumber,
+    pub revocation_data: Time,
+    pub crl_entry_extensions: Option<Extensions>,
 }
 
-/*
+impl<'de> de::Deserialize<'de> for RevokedCertificate {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        use std::fmt;
+
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = RevokedCertificate;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a valid DER-decoded TBSCertList")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                Ok(RevokedCertificate {
+                    user_certificate: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(1, &self))?,
+                    revocation_data: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(2, &self))?,
+                    crl_entry_extensions: seq.next_element().unwrap_or(Some(None)).unwrap_or(None),
+                })
+            }
+        }
+
+        deserializer.deserialize_seq(Visitor)
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct OtherRevocationInfoFormat {
     other_rev_info_format: ObjectIdentifierAsn1,
     other_rev_info: (),
 }
-*/

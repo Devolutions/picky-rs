@@ -1,17 +1,19 @@
 use std::convert::{Into, TryFrom};
 
-use picky_asn1::{
-    restricted_string::{BMPString, CharSetError},
-    wrapper::{
-        ApplicationTag0, ApplicationTag1, BMPStringAsn1, BitStringAsn1, IA5StringAsn1, Implicit, ObjectIdentifierAsn1,
-        OctetStringAsn1,
-    },
-};
-use serde::{de, Deserialize, Serialize};
+use serde::{de, ser, Deserialize, Serialize};
 use widestring::U16String;
 
+use picky_asn1::{
+    bit_string::BitString,
+    restricted_string::{BMPString, CharSetError},
+    tag::{Tag, TagPeeker},
+    wrapper::{
+        ApplicationTag0, ApplicationTag1, ApplicationTag2, BMPStringAsn1, BitStringAsn1, ContextTag0, ContextTag1,
+        IA5StringAsn1, Implicit, ObjectIdentifierAsn1, OctetStringAsn1,
+    },
+};
+
 use crate::{oids, DigestInfo};
-use picky_asn1::bit_string::BitString;
 
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct ContentInfo {
@@ -125,11 +127,41 @@ impl<'de> de::Deserialize<'de> for SpcAttributeAndOptionalValue {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct SpcPeImageData {
-    #[serde(skip_serializing_if = "spc_pe_image_flags_is_default")]
     pub flags: SpcPeImageFlags,
     pub file: SpcLink,
+}
+
+impl<'de> de::Deserialize<'de> for SpcPeImageData {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        use std::fmt;
+
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = SpcPeImageData;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a valid DER-encoded SpcPeImageData")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                Ok(SpcPeImageData {
+                    flags: seq.next_element()?.unwrap_or_default(),
+                    file: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(1, &self))?,
+                })
+            }
+        }
+
+        deserializer.deserialize_seq(Visitor)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -138,20 +170,88 @@ pub struct SpcPeImageFlags(pub BitStringAsn1);
 impl Default for SpcPeImageFlags {
     fn default() -> Self {
         let mut flags = BitString::with_len(3);
-        flags.set(0, true);
+        flags.set(0, true); // includeResources
+        flags.set(1, false); // includeDebugInfo
+        flags.set(2, false); // includeImportAddressTable
         Self(flags.into())
     }
 }
 
-fn spc_pe_image_flags_is_default(flags: &SpcPeImageFlags) -> bool {
-    flags.0.is_set(0) | !flags.0.is_set(1) | !flags.0.is_set(2)
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)] // https://stackoverflow.com/questions/36775864/use-default-trait-for-struct-as-enum-option
+#[derive(Debug, PartialEq, Clone)]
 pub enum SpcLink {
     Url(Url),
     Moniker(Moniker),
     File(File),
+}
+
+impl Serialize for SpcLink {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
+    where
+        S: ser::Serializer,
+    {
+        match &self {
+            SpcLink::Url(url) => url.serialize(serializer),
+            SpcLink::Moniker(moniker) => moniker.serialize(serializer),
+            SpcLink::File(file) => file.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for SpcLink {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        use std::fmt;
+
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = SpcLink;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a valid DER-encoded SpcLink")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let tag_peeker: TagPeeker = seq_next_element!(seq, SpcLink, "choice tag");
+                let spc_link = match tag_peeker.next_tag {
+                    Tag::APP_0 => SpcLink::Url(Url(seq_next_element!(
+                        seq,
+                        Implicit<ApplicationTag0<IA5StringAsn1>>,
+                        SpcLink,
+                        "Url"
+                    ))),
+                    Tag::APP_1 => SpcLink::Moniker(Moniker(seq_next_element!(
+                        seq,
+                        Implicit<ApplicationTag1<SpcSerialized>>,
+                        SpcLink,
+                        "Moniker"
+                    ))),
+                    Tag::APP_2 => SpcLink::File(File(seq_next_element!(
+                        seq,
+                        ApplicationTag2<SpcString>,
+                        SpcLink,
+                        "File"
+                    ))),
+                    _ => {
+                        return Err(serde_invalid_value!(
+                            SpcString,
+                            "unknown choice value",
+                            "a supported SpcString choice"
+                        ))
+                    }
+                };
+
+                Ok(spc_link)
+            }
+        }
+
+        deserializer.deserialize_enum("SpcLink", &["Url", "Moniker", "File"], Visitor)
+    }
 }
 
 impl Default for SpcLink {
@@ -164,10 +264,10 @@ impl Default for SpcLink {
 pub struct Url(pub Implicit<ApplicationTag0<IA5StringAsn1>>);
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct Moniker(pub Implicit<ApplicationTag0<SpcSerialized>>);
+pub struct Moniker(pub Implicit<ApplicationTag1<SpcSerialized>>);
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct File(pub SpcString);
+pub struct File(pub ApplicationTag2<SpcString>);
 
 impl Default for File {
     fn default() -> Self {
@@ -182,8 +282,8 @@ impl Default for File {
             buffer.push(bytes[1]);
         }
 
-        File(SpcString::Unicode(Implicit(ApplicationTag0(BMPStringAsn1::from(
-            BMPString::new(buffer).unwrap(),
+        File(ApplicationTag2(SpcString::Unicode(Implicit(ContextTag0(
+            BMPStringAsn1::from(BMPString::new(buffer).unwrap()),
         )))))
     }
 }
@@ -205,17 +305,82 @@ pub struct SpcSerialized {
     pub serialized_data: OctetStringAsn1,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum SpcString {
-    Unicode(Implicit<ApplicationTag0<BMPStringAsn1>>),
-    Ancii(Implicit<ApplicationTag1<IA5StringAsn1>>),
+    Unicode(Implicit<ContextTag0<BMPStringAsn1>>),
+    Ancii(Implicit<ContextTag1<IA5StringAsn1>>),
+}
+
+impl Serialize for SpcString {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
+    where
+        S: ser::Serializer,
+    {
+        match &self {
+            SpcString::Unicode(unicode) => unicode.serialize(serializer),
+            SpcString::Ancii(ancii) => ancii.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for SpcString {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        use std::fmt;
+
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = SpcString;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a valid DER-encoded SpcString")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let tag_peeker: TagPeeker = seq_next_element!(seq, SpcString, "choice tag");
+
+                let spc_string = match tag_peeker.next_tag {
+                    Tag::CTX_0 => SpcString::Unicode(seq_next_element!(
+                        seq,
+                        Implicit<ContextTag0<BMPStringAsn1>>,
+                        SpcString,
+                        "BMPStringAsn1"
+                    )),
+                    Tag::CTX_1 => SpcString::Ancii(seq_next_element!(
+                        seq,
+                        Implicit<ContextTag1<IA5StringAsn1>>,
+                        SpcString,
+                        "IA5StringAsn1"
+                    )),
+                    _ => {
+                        println!("unknown tag");
+                        return Err(serde_invalid_value!(
+                            SpcString,
+                            "unknown choice value",
+                            "a supported SpcString choice"
+                        ));
+                    }
+                };
+
+                Ok(spc_string)
+            }
+        }
+
+        deserializer.deserialize_enum("SpcString", &["Unicode, Ancii"], Visitor)
+    }
 }
 
 impl TryFrom<String> for SpcString {
     type Error = CharSetError;
 
     fn try_from(string: String) -> Result<Self, Self::Error> {
-        Ok(SpcString::Unicode(Implicit(ApplicationTag0(
+        Ok(SpcString::Unicode(Implicit(ContextTag0(
             BMPString::new(string)?.into(),
         ))))
     }

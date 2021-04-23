@@ -121,6 +121,8 @@ pub enum CertType {
     Unknown,
 }
 
+const CERT_PEM_LABEL: &str = "CERTIFICATE";
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Cert(Certificate);
 
@@ -153,11 +155,11 @@ impl Cert {
     }
 
     pub fn from_pem(pem: &Pem) -> Result<Self, CertError> {
-        from_pem(pem, "x509 certificate").map(Self)
+        from_pem(pem, CERT_PEM_LABEL, "x509 certificate").map(Self)
     }
 
     pub fn from_pem_str(pem_str: &str) -> Result<Self, CertError> {
-        from_pem_str(pem_str, "x509 certificate").map(Self)
+        from_pem_str(pem_str, CERT_PEM_LABEL, "x509 certificate").map(Self)
     }
 
     pub fn to_der(&self) -> Result<Vec<u8>, CertError> {
@@ -165,7 +167,7 @@ impl Cert {
     }
 
     pub fn to_pem(&self) -> Result<Pem<'static>, CertError> {
-        to_pem(&self.0, "x509 certificate")
+        to_pem(&self.0, CERT_PEM_LABEL, "x509 certificate")
     }
 
     pub fn ty(&self) -> CertType {
