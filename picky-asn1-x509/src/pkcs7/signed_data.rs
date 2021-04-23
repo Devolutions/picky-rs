@@ -1,7 +1,10 @@
-use picky_asn1::{tag::Tag, wrapper::Asn1SetOf};
+use picky_asn1::tag::Tag;
+use picky_asn1::wrapper::Asn1SetOf;
 use serde::{de, ser, Deserialize, Serialize};
 
-use super::{content_info::ContentInfo, crls::RevocationInfoChoices, singer_info::SingersInfos};
+use super::content_info::ContentInfo;
+use super::crls::RevocationInfoChoices;
+use super::singer_info::SingersInfos;
 use crate::{AlgorithmIdentifier, Certificate, Version};
 
 #[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
@@ -48,18 +51,17 @@ impl<'de> de::Deserialize<'de> for ExtendedCertificatesAndCertificates {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::crls::*;
     use crate::{
-        crls::*, oids, EncapsulatedRSAPublicKey, Extension, Extensions, KeyIdentifier, Name, NameAttr, PublicKey,
-        RSAPublicKey, SubjectPublicKeyInfo, TBSCertificate, Validity,
+        oids, EncapsulatedRSAPublicKey, Extension, Extensions, KeyIdentifier, Name, NameAttr, PublicKey, RSAPublicKey,
+        SubjectPublicKeyInfo, TBSCertificate, Validity,
     };
-    use picky_asn1::{
-        bit_string::BitString,
-        date::UTCTime,
-        restricted_string::{IA5String, PrintableString},
-        wrapper::{
-            ApplicationTag0, ApplicationTag3, IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1Container,
-            PrintableStringAsn1,
-        },
+    use picky_asn1::bit_string::BitString;
+    use picky_asn1::date::UTCTime;
+    use picky_asn1::restricted_string::{IA5String, PrintableString};
+    use picky_asn1::wrapper::{
+        ApplicationTag0, ApplicationTag3, IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1Container,
+        PrintableStringAsn1,
     };
 
     #[test]
@@ -99,7 +101,7 @@ mod tests {
                 t5vcoqFzuspOVIvdPLFY3pPZY9dxVNdDi4T6qJNZCq++Ukyc0LQOUkshF9HaHB3I\
                 xUDGjR5n4X0lkjgM5IvL+OaZREqWkD/tiCu4V/5Z86mZi6VwCcgYrp/Q4bFjsWBw\
                 p0mAUFZ9UjurAaEAMQA=",
-                        )
+        )
         .unwrap();
 
         assert_eq!(Version::V2, Version::from_u8(*pkcs7.get(25).unwrap()).unwrap());

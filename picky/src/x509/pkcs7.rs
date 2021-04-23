@@ -4,31 +4,26 @@ use thiserror::Error;
 
 use picky_asn1::restricted_string::CharSetError;
 use picky_asn1_der::Asn1DerError;
-use picky_asn1_x509::{
-    algorithm_identifier::AlgorithmIdentifier,
-    oids,
-    pkcs7::{
-        content_info::{
-            ContentInfo, SpcAttributeAndOptionalValue, SpcIndirectDataContent, SpcLink, SpcPeImageData,
-            SpcPeImageFlags, SpcSpOpusInfo, SpcString,
-        },
-        crls::RevocationInfoChoices,
-        signed_data::{DigestAlgorithmIdentifiers, SignedData},
-        singer_info::{
-            CertificateSerialNumber, DigestEncryptionAlgorithmIdentifier, EncryptedDigest, IssuerAndSerialNumber,
-            SingerInfo, SingersInfos,
-        },
-        Pkcs7Certificate,
-    },
-    Attribute, AttributeValue, Attributes, DigestInfo, SHAVariant, Version,
+use picky_asn1_x509::algorithm_identifier::AlgorithmIdentifier;
+use picky_asn1_x509::pkcs7::content_info::{
+    ContentInfo, SpcAttributeAndOptionalValue, SpcIndirectDataContent, SpcLink, SpcPeImageData, SpcPeImageFlags,
+    SpcSpOpusInfo, SpcString,
 };
+use picky_asn1_x509::pkcs7::crls::RevocationInfoChoices;
+use picky_asn1_x509::pkcs7::signed_data::{DigestAlgorithmIdentifiers, SignedData};
+use picky_asn1_x509::pkcs7::singer_info::{
+    CertificateSerialNumber, DigestEncryptionAlgorithmIdentifier, EncryptedDigest, IssuerAndSerialNumber, SingerInfo,
+    SingersInfos,
+};
+use picky_asn1_x509::pkcs7::Pkcs7Certificate;
+use picky_asn1_x509::{oids, Attribute, AttributeValue, Attributes, DigestInfo, SHAVariant, Version};
 
-use super::{
-    certificate::CertError,
-    utils::{from_der, from_pem, from_pem_str, generate_serial_number, to_der, to_pem},
-    wincert::WinCertificate,
-};
-use crate::{key::PrivateKey, pem::Pem, signature::SignatureAlgorithm};
+use super::certificate::CertError;
+use super::utils::{from_der, from_pem, from_pem_str, generate_serial_number, to_der, to_pem};
+use super::wincert::WinCertificate;
+use crate::key::PrivateKey;
+use crate::pem::Pem;
+use crate::signature::SignatureAlgorithm;
 
 type Pkcs7Result<T> = Result<T, Pkcs7Error>;
 
@@ -175,7 +170,8 @@ impl Pkcs7 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{pem::parse_pem, x509::pkcs7::Pkcs7};
+    use crate::pem::parse_pem;
+    use crate::x509::pkcs7::Pkcs7;
     use picky_asn1_x509::SHAVariant::SHA2_256;
 
     #[test]

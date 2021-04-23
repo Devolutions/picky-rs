@@ -3,14 +3,12 @@ use std::convert::{Into, TryFrom};
 use serde::{de, ser, Deserialize, Serialize};
 use widestring::U16String;
 
-use picky_asn1::{
-    bit_string::BitString,
-    restricted_string::{BMPString, CharSetError},
-    tag::{Tag, TagPeeker},
-    wrapper::{
-        ApplicationTag0, ApplicationTag1, ApplicationTag2, BMPStringAsn1, BitStringAsn1, ContextTag0, ContextTag1,
-        IA5StringAsn1, Implicit, ObjectIdentifierAsn1, OctetStringAsn1,
-    },
+use picky_asn1::bit_string::BitString;
+use picky_asn1::restricted_string::{BMPString, CharSetError};
+use picky_asn1::tag::{Tag, TagPeeker};
+use picky_asn1::wrapper::{
+    ApplicationTag0, ApplicationTag1, ApplicationTag2, BMPStringAsn1, BitStringAsn1, ContextTag0, ContextTag1,
+    IA5StringAsn1, Implicit, ObjectIdentifierAsn1, OctetStringAsn1,
 };
 
 use crate::{oids, DigestInfo};

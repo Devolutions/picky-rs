@@ -1,9 +1,7 @@
 use serde::{de, ser, Deserialize, Serialize};
 
-use picky_asn1::{
-    tag::{Tag, TagPeeker},
-    wrapper::{ApplicationTag0, ApplicationTag1, Asn1SequenceOf, BitStringAsn1, ObjectIdentifierAsn1},
-};
+use picky_asn1::tag::{Tag, TagPeeker};
+use picky_asn1::wrapper::{ApplicationTag0, ApplicationTag1, Asn1SequenceOf, BitStringAsn1, ObjectIdentifierAsn1};
 
 use super::singer_info::CertificateSerialNumber;
 use crate::{AlgorithmIdentifier, Extensions, Name, Time, Version};

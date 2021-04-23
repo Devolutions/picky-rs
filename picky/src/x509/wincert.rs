@@ -1,9 +1,6 @@
-use std::{
-    convert::TryFrom,
-    error,
-    io::{self, BufReader, BufWriter},
-    mem,
-};
+use std::convert::TryFrom;
+use std::io::{self, BufReader, BufWriter};
+use std::{error, mem};
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use thiserror::Error;
