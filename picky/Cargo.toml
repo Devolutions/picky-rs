@@ -17,7 +17,7 @@ repository = "https://github.com/Devolutions/picky-rs"
 include = ["src/**/*", "README.md", "CHANGELOG.md"]
 
 [dependencies]
-byteorder = "1.4.3"
+byteorder = "1.4.2"
 picky-asn1 = { version = "0.3", path = "../picky-asn1" }
 picky-asn1-der = { version = "0.2", path = "../picky-asn1-der" }
 picky-asn1-x509 = { version = "0.5", path = "../picky-asn1-x509", features = ["legacy"] }
