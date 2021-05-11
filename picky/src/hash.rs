@@ -1,6 +1,7 @@
 //! Hash algorithms supported by picky
 
 use digest::Digest;
+use picky_asn1_x509::SHAVariant;
 use serde::{Deserialize, Serialize};
 
 /// Supported hash algorithms
@@ -26,6 +27,31 @@ impl From<HashAlgorithm> for rsa::Hash {
             HashAlgorithm::SHA2_512 => rsa::Hash::SHA2_512,
             HashAlgorithm::SHA3_384 => rsa::Hash::SHA3_384,
             HashAlgorithm::SHA3_512 => rsa::Hash::SHA3_512,
+        }
+    }
+}
+impl From<HashAlgorithm> for SHAVariant {
+    fn from(v: HashAlgorithm) -> SHAVariant {
+        match v {
+            HashAlgorithm::SHA2_256 => SHAVariant::SHA2_256,
+            HashAlgorithm::SHA2_384 => SHAVariant::SHA2_384,
+            HashAlgorithm::SHA2_512 => SHAVariant::SHA2_512,
+            HashAlgorithm::SHA3_384 => SHAVariant::SHA3_384,
+            HashAlgorithm::SHA3_512 => SHAVariant::SHA3_512,
+            _ => SHAVariant::SHA2_256,
+        }
+    }
+}
+
+impl From<SHAVariant> for HashAlgorithm {
+    fn from(v: SHAVariant) -> HashAlgorithm {
+        match v {
+            SHAVariant::SHA2_256 => HashAlgorithm::SHA2_256,
+            SHAVariant::SHA2_384 => HashAlgorithm::SHA2_384,
+            SHAVariant::SHA2_512 => HashAlgorithm::SHA2_512,
+            SHAVariant::SHA3_384 => HashAlgorithm::SHA3_384,
+            SHAVariant::SHA3_512 => HashAlgorithm::SHA3_512,
+            _ => HashAlgorithm::SHA2_256,
         }
     }
 }

@@ -88,6 +88,7 @@ pub struct TBSCertificate {
     pub subject_public_key_info: SubjectPublicKeyInfo,
     // issuer_unique_id
     // subject_unique_id
+    #[serde(skip_serializing_if = "extensions_are_empty")]
     pub extensions: ApplicationTag3<Extensions>,
 }
 
@@ -113,16 +114,8 @@ impl<'de> de::Deserialize<'de> for TBSCertificate {
             {
                 let version: ApplicationTag0<Version> = seq
                     .next_element()
-                    .map_err(|_| {
-                        de::Error::invalid_value(
-                            de::Unexpected::Other(
-                                "[TBSCertificate] V1 certificates unsupported. Only V3 certificates \
-                                     are supported",
-                            ),
-                            &"a supported certificate",
-                        )
-                    })?
-                    .ok_or_else(|| de::Error::invalid_length(0, &self))?;
+                    .unwrap_or_else(|_| Some(Version::V3.into()))
+                    .unwrap_or_else(|| Version::V3.into());
 
                 if version != Version::V3 {
                     return Err(de::Error::invalid_value(
@@ -139,13 +132,20 @@ impl<'de> de::Deserialize<'de> for TBSCertificate {
                     validity: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(4, &self))?,
                     subject: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(5, &self))?,
                     subject_public_key_info: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(6, &self))?,
-                    extensions: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(7, &self))?,
+                    extensions: seq
+                        .next_element()?
+                        .unwrap_or_else(|| Some(Extensions(Vec::new()).into()))
+                        .unwrap_or_else(|| Extensions(Vec::new()).into()),
                 })
             }
         }
 
         deserializer.deserialize_seq(Visitor)
     }
+}
+
+fn extensions_are_empty(extensions: &Extensions) -> bool {
+    extensions.0.is_empty()
 }
 
 #[cfg(test)]

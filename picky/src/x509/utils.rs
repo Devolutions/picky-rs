@@ -1,7 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-use picky_asn1::wrapper::IntegerAsn1;
-
 use super::certificate::CertError;
 use crate::pem::{parse_pem, Pem};
 
@@ -44,14 +42,4 @@ pub(super) fn to_der<T: Serialize>(val: &T, element: &'static str) -> UtilsResul
 
 pub(super) fn to_pem<T: Serialize>(val: &T, pem_label: &str, element: &'static str) -> UtilsResult<Pem<'static>> {
     Ok(Pem::new(pem_label, to_der(val, element)?))
-}
-
-pub(super) fn generate_serial_number() -> IntegerAsn1 {
-    let x = rand::random::<u32>();
-    let b1 = ((x >> 24) & 0xff) as u8;
-    let b2 = ((x >> 16) & 0xff) as u8;
-    let b3 = ((x >> 8) & 0xff) as u8;
-    let b4 = (x & 0xff) as u8;
-    // serial number MUST be a positive integer
-    IntegerAsn1::from_bytes_be_unsigned(vec![b1, b2, b3, b4])
 }

@@ -16,7 +16,8 @@ use crate::{oids, DigestInfo};
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct ContentInfo {
     pub content_type: ObjectIdentifierAsn1,
-    pub content: Option<SpcIndirectDataContent>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<ApplicationTag0<SpcIndirectDataContent>>,
 }
 
 impl<'de> de::Deserialize<'de> for ContentInfo {
@@ -44,7 +45,7 @@ impl<'de> de::Deserialize<'de> for ContentInfo {
 
                 let value = match Into::<String>::into(&oid.0).as_str() {
                     oids::SPC_INDIRECT_DATA_OBJID => {
-                        Some(seq.next_element()?.ok_or_else(|| de::Error::invalid_length(0, &self))?)
+                        seq.next_element()?.ok_or_else(|| de::Error::invalid_length(1, &self))?
                     }
                     oids::PKCS7 => None,
                     _ => {
@@ -75,8 +76,8 @@ pub struct SpcIndirectDataContent {
 
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct SpcAttributeAndOptionalValue {
-    pub _type: ObjectIdentifierAsn1,
-    pub value: ApplicationTag0<SpcPeImageData>,
+    pub ty: ObjectIdentifierAsn1,
+    pub value: SpcPeImageData,
 }
 
 impl<'de> de::Deserialize<'de> for SpcAttributeAndOptionalValue {
@@ -104,7 +105,7 @@ impl<'de> de::Deserialize<'de> for SpcAttributeAndOptionalValue {
                 let value = match Into::<String>::into(&oid.0).as_str() {
                     oids::SPC_PE_IMAGE_DATAOBJ => seq_next_element!(
                         seq,
-                        ApplicationTag0<SpcPeImageData>,
+                        SpcPeImageData,
                         SpcAttributeAndOptionalValue,
                         "a SpcPeImageData object"
                     ),
@@ -117,7 +118,7 @@ impl<'de> de::Deserialize<'de> for SpcAttributeAndOptionalValue {
                     }
                 };
 
-                Ok(SpcAttributeAndOptionalValue { _type: oid, value })
+                Ok(SpcAttributeAndOptionalValue { ty: oid, value })
             }
         }
 
@@ -188,9 +189,9 @@ impl Serialize for SpcLink {
         S: ser::Serializer,
     {
         match &self {
-            SpcLink::Url(url) => url.serialize(serializer),
-            SpcLink::Moniker(moniker) => moniker.serialize(serializer),
-            SpcLink::File(file) => file.serialize(serializer),
+            SpcLink::Url(url) => url.0.serialize(serializer),
+            SpcLink::Moniker(moniker) => moniker.0.serialize(serializer),
+            SpcLink::File(file) => file.0.serialize(serializer),
         }
     }
 }
@@ -217,15 +218,15 @@ impl<'de> Deserialize<'de> for SpcLink {
             {
                 let tag_peeker: TagPeeker = seq_next_element!(seq, SpcLink, "choice tag");
                 let spc_link = match tag_peeker.next_tag {
-                    Tag::APP_0 => SpcLink::Url(Url(seq_next_element!(
+                    Tag::CTX_0 => SpcLink::Url(Url(seq_next_element!(
                         seq,
-                        Implicit<ApplicationTag0<IA5StringAsn1>>,
+                        Implicit<ContextTag0<IA5StringAsn1>>,
                         SpcLink,
                         "Url"
                     ))),
-                    Tag::APP_1 => SpcLink::Moniker(Moniker(seq_next_element!(
+                    Tag::CTX_1 => SpcLink::Moniker(Moniker(seq_next_element!(
                         seq,
-                        Implicit<ApplicationTag1<SpcSerialized>>,
+                        Implicit<ContextTag1<SpcSerialized>>,
                         SpcLink,
                         "Moniker"
                     ))),
@@ -259,30 +260,19 @@ impl Default for SpcLink {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct Url(pub Implicit<ApplicationTag0<IA5StringAsn1>>);
+pub struct Url(pub Implicit<ContextTag0<IA5StringAsn1>>);
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct Moniker(pub Implicit<ApplicationTag1<SpcSerialized>>);
+pub struct Moniker(pub Implicit<ContextTag1<SpcSerialized>>);
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct File(pub ApplicationTag2<SpcString>);
 
 impl Default for File {
     fn default() -> Self {
-        let unicode_string = U16String::from_str("<<<Obsolete>>>");
+        let buffer = unicode_string_into_u8_vec(U16String::from_str("<<<Obsolete>>>"));
 
-        let buffer_size = unicode_string.len() * 2;
-        let mut buffer = Vec::with_capacity(buffer_size);
-
-        for elem in unicode_string.into_vec().into_iter() {
-            let bytes = elem.to_be_bytes();
-            buffer.push(bytes[0]);
-            buffer.push(bytes[1]);
-        }
-
-        File(ApplicationTag2(SpcString::Unicode(Implicit(ContextTag0(
-            BMPStringAsn1::from(BMPString::new(buffer).unwrap()),
-        )))))
+        File(SpcString::Unicode(Implicit(ContextTag0(BMPString::new(buffer).unwrap().into()))).into())
     }
 }
 
@@ -357,7 +347,6 @@ impl<'de> Deserialize<'de> for SpcString {
                         "IA5StringAsn1"
                     )),
                     _ => {
-                        println!("unknown tag");
                         return Err(serde_invalid_value!(
                             SpcString,
                             "unknown choice value",
@@ -378,14 +367,60 @@ impl TryFrom<String> for SpcString {
     type Error = CharSetError;
 
     fn try_from(string: String) -> Result<Self, Self::Error> {
+        let buffer = unicode_string_into_u8_vec(U16String::from_str(&string));
+
         Ok(SpcString::Unicode(Implicit(ContextTag0(
-            BMPString::new(string)?.into(),
+            BMPString::new(buffer)?.into(),
         ))))
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct SpcSpOpusInfo {
-    pub more_info: SpcLink,
-    pub program_name: SpcString,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub program_name: Option<ApplicationTag0<SpcString>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub more_info: Option<ApplicationTag1<SpcLink>>,
+}
+
+impl<'de> Deserialize<'de> for SpcSpOpusInfo {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        use std::fmt;
+
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = SpcSpOpusInfo;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a valid DER-encoded SpcSpOpusInfo")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                Ok(SpcSpOpusInfo {
+                    program_name: seq.next_element().unwrap_or(Some(None)).unwrap_or(None),
+                    more_info: seq.next_element().unwrap_or(Some(None)).unwrap_or(None),
+                })
+            }
+        }
+
+        deserializer.deserialize_seq(Visitor)
+    }
+}
+
+fn unicode_string_into_u8_vec(unicode_string: U16String) -> Vec<u8> {
+    let mut buffer = Vec::with_capacity(unicode_string.len() * 2);
+
+    for elem in unicode_string.into_vec().into_iter() {
+        let bytes = elem.to_be_bytes();
+        buffer.push(bytes[0]);
+        buffer.push(bytes[1]);
+    }
+    buffer
 }

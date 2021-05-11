@@ -59,10 +59,7 @@ mod tests {
     use picky_asn1::bit_string::BitString;
     use picky_asn1::date::UTCTime;
     use picky_asn1::restricted_string::{IA5String, PrintableString};
-    use picky_asn1::wrapper::{
-        ApplicationTag0, ApplicationTag3, IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1Container,
-        PrintableStringAsn1,
-    };
+    use picky_asn1::wrapper::{IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1Container, PrintableStringAsn1};
 
     #[test]
     fn decode_test() {
@@ -162,14 +159,14 @@ mod tests {
 
         let full_certificate = Certificate {
             tbs_certificate: TBSCertificate {
-                version: ApplicationTag0(Version::V3),
+                version: Version::V3.into(),
                 serial_number: IntegerAsn1(pkcs7[60..80].to_vec()),
                 signature: AlgorithmIdentifier::new_sha256_with_rsa_encryption(),
                 issuer,
                 validity,
                 subject,
                 subject_public_key_info,
-                extensions: ApplicationTag3(extensions),
+                extensions: extensions.into(),
             },
             signature_algorithm: AlgorithmIdentifier::new_sha256_with_rsa_encryption(),
             signature_value: BitString::with_bytes(&pkcs7[1082..1594]).into(),
@@ -252,14 +249,15 @@ mod tests {
 
         let tbs_cert_list = TBSCertList {
             version: Some(Version::V2),
-            signature: AlgorithmIdentifier::new_sha1_with_rsa_encryption().into(),
+            signature: AlgorithmIdentifier::new_sha1_with_rsa_encryption(),
             issuer,
             this_update: UTCTime::new(2021, 4, 20, 6, 52, 24).unwrap().into(),
             next_update: Some(UTCTime::new(2023, 4, 20, 6, 52, 24).unwrap().into()),
             revoked_certificates: None,
-            crl_extension: ApplicationTag0(Some(Extensions(vec![Extension::new_crl_number(
-                OctetStringAsn1Container(IntegerAsn1::from(decoded[1716..1717].to_vec())),
-            )]))),
+            crl_extension: Some(Extensions(vec![Extension::new_crl_number(OctetStringAsn1Container(
+                IntegerAsn1::from(decoded[1716..1717].to_vec()),
+            ))]))
+            .into(),
         };
 
         check_serde!(tbs_cert_list: TBSCertList in decoded[1534..1717]);

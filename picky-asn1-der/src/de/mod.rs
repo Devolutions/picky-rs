@@ -216,7 +216,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Tag::OCTET_STRING => self.deserialize_byte_buf(visitor),
             Tag::SEQUENCE => self.deserialize_seq(visitor),
             Tag::UTF8_STRING => self.deserialize_string(visitor),
-            Tag::BMP_STRING => self.deserialize_string(visitor),
+            Tag::BMP_STRING => self.deserialize_byte_buf(visitor),
             Tag::OID => self.deserialize_bytes(visitor),
             Tag::BIT_STRING => self.deserialize_byte_buf(visitor),
             Tag::UTC_TIME => self.deserialize_bytes(visitor),

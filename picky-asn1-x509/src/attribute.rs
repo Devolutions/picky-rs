@@ -43,28 +43,28 @@ impl Default for Attributes {
 /// Accepted attribute types are `challengePassword` and `extensionRequest`
 ///
 #[derive(Clone, Debug, PartialEq)]
-pub enum AttributeValue {
+pub enum AttributeValues {
     /// `extensionRequest`
     Extensions(Asn1SetOf<Extensions>), // the set will always have 1 element in this variant
     // TODO: support for challenge password
     // ChallengePassword(Asn1SetOf<ChallengePassword>))
     Custom(picky_asn1_der::Asn1RawDer), // fallback
-    ContentType(ObjectIdentifierAsn1),
-    MessageDigest(OctetStringAsn1),
-    SpcSpOpusInfo(SpcSpOpusInfo),
+    ContentType(Asn1SetOf<ObjectIdentifierAsn1>),
+    MessageDigest(Asn1SetOf<OctetStringAsn1>),
+    SpcSpOpusInfo(Asn1SetOf<SpcSpOpusInfo>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Attribute {
     pub ty: ObjectIdentifierAsn1,
-    pub value: AttributeValue,
+    pub value: AttributeValues,
 }
 
 impl Attribute {
     pub fn new_extension_request(extensions: Vec<Extension>) -> Self {
         Self {
             ty: oids::extension_request().into(),
-            value: AttributeValue::Extensions(Asn1SetOf(vec![Extensions(extensions)])),
+            value: AttributeValues::Extensions(Asn1SetOf(vec![Extensions(extensions)])),
         }
     }
 }
@@ -78,11 +78,11 @@ impl ser::Serialize for Attribute {
         let mut seq = serializer.serialize_seq(Some(2))?;
         seq.serialize_element(&self.ty)?;
         match &self.value {
-            AttributeValue::Extensions(extensions) => seq.serialize_element(extensions)?,
-            AttributeValue::Custom(der) => seq.serialize_element(der)?,
-            AttributeValue::ContentType(oid) => seq.serialize_element(oid)?,
-            AttributeValue::MessageDigest(octet_string) => seq.serialize_element(octet_string)?,
-            AttributeValue::SpcSpOpusInfo(spc_sp_opus_info) => seq.serialize_element(spc_sp_opus_info)?,
+            AttributeValues::Extensions(extensions) => seq.serialize_element(extensions)?,
+            AttributeValues::Custom(der) => seq.serialize_element(der)?,
+            AttributeValues::ContentType(oid) => seq.serialize_element(oid)?,
+            AttributeValues::MessageDigest(octet_string) => seq.serialize_element(octet_string)?,
+            AttributeValues::SpcSpOpusInfo(spc_sp_opus_info) => seq.serialize_element(spc_sp_opus_info)?,
         }
         seq.end()
     }
@@ -112,18 +112,18 @@ impl<'de> de::Deserialize<'de> for Attribute {
 
                 let value = match Into::<String>::into(&ty.0).as_str() {
                     oids::EXTENSION_REQ => {
-                        AttributeValue::Extensions(seq_next_element!(seq, Attribute, "at extension request"))
+                        AttributeValues::Extensions(seq_next_element!(seq, Attribute, "at extension request"))
                     }
                     oids::CONTENT_TYPE => {
-                        AttributeValue::ContentType(seq_next_element!(seq, Attribute, "message digest oid"))
+                        AttributeValues::ContentType(seq_next_element!(seq, Attribute, "message digest oid"))
                     }
                     oids::MESSAGE_DIGEST => {
-                        AttributeValue::MessageDigest(seq_next_element!(seq, Attribute, "an octet string"))
+                        AttributeValues::MessageDigest(seq_next_element!(seq, Attribute, "an octet string"))
                     }
                     oids::SPC_SP_OPUS_INFO_OBJID => {
-                        AttributeValue::SpcSpOpusInfo(seq_next_element!(seq, Attribute, "an SpcSpOpusInfo object"))
+                        AttributeValues::SpcSpOpusInfo(seq_next_element!(seq, Attribute, "an SpcSpOpusInfo object"))
                     }
-                    _ => AttributeValue::Custom(seq_next_element!(seq, Attribute, "at custom value")),
+                    _ => AttributeValues::Custom(seq_next_element!(seq, Attribute, "at custom value")),
                 };
 
                 Ok(Attribute { ty, value })

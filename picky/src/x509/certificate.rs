@@ -1,4 +1,4 @@
-use super::utils::{from_der, from_pem, from_pem_str, generate_serial_number, to_der, to_pem};
+use super::utils::{from_der, from_pem, from_pem_str, to_der, to_pem};
 use crate::hash::HashAlgorithm;
 use crate::key::{PrivateKey, PublicKey};
 use crate::pem::{Pem, PemError};
@@ -806,7 +806,7 @@ impl<'a> CertificateBuilder<'a> {
                     .0
                     .into_iter()
                     .find_map(|attr| match attr.value {
-                        picky_asn1_x509::AttributeValue::Extensions(set_of_extensions) => {
+                        picky_asn1_x509::AttributeValues::Extensions(set_of_extensions) => {
                             set_of_extensions.0.into_iter().next()
                         }
                         _ => None,
@@ -931,6 +931,16 @@ impl<'a> CertificateBuilder<'a> {
             signature_value: signature_value.into(),
         }))
     }
+}
+
+pub fn generate_serial_number() -> IntegerAsn1 {
+    let x = rand::random::<u32>();
+    let b1 = ((x >> 24) & 0xff) as u8;
+    let b2 = ((x >> 16) & 0xff) as u8;
+    let b3 = ((x >> 8) & 0xff) as u8;
+    let b4 = (x & 0xff) as u8;
+    // serial number MUST be a positive integer
+    IntegerAsn1::from_bytes_be_unsigned(vec![b1, b2, b3, b4])
 }
 
 #[cfg(test)]
