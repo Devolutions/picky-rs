@@ -8,19 +8,21 @@ use picky_asn1::wrapper::{ApplicationTag0, Asn1SetOf};
 
 use picky_asn1_der::Asn1DerError;
 
-use picky_asn1_x509::algorithm_identifier::AlgorithmIdentifier;
+use picky_asn1_x509::algorithm_identifier::{AlgorithmIdentifier, UnsupportedAlgorithmError};
 use picky_asn1_x509::pkcs7::content_info::{
     ContentInfo, SpcAttributeAndOptionalValue, SpcIndirectDataContent, SpcLink, SpcPeImageData, SpcPeImageFlags,
     SpcSpOpusInfo, SpcString,
 };
 use picky_asn1_x509::pkcs7::crls::RevocationInfoChoices;
-use picky_asn1_x509::pkcs7::signed_data::{DigestAlgorithmIdentifiers, SignedData};
+use picky_asn1_x509::pkcs7::signed_data::{
+    DigestAlgorithmIdentifiers, ExtendedCertificatesAndCertificates, SignedData,
+};
 use picky_asn1_x509::pkcs7::singer_info::{
     CertificateSerialNumber, DigestEncryptionAlgorithmIdentifier, EncryptedDigest, IssuerAndSerialNumber, SingerInfo,
     SingersInfos,
 };
 use picky_asn1_x509::pkcs7::Pkcs7Certificate;
-use picky_asn1_x509::{oids, Attribute, AttributeValues, Attributes, DigestInfo, SHAVariant, Version};
+use picky_asn1_x509::{oids, extension::ExtensionView,  Attribute, AttributeValues, Attributes, Certificate, DigestInfo, SHAVariant, Version};
 
 use super::certificate::CertError;
 use super::utils::{from_der, from_pem, from_pem_str, to_der, to_pem};
@@ -29,7 +31,8 @@ use crate::hash::HashAlgorithm;
 use crate::key::PrivateKey;
 use crate::pem::Pem;
 use crate::signature::SignatureAlgorithm;
-use crate::x509::Extension;
+use crate::x509::{Extension, Cert};
+use crate::x509::certificate::CertType;
 
 type Pkcs7Result<T> = Result<T, Pkcs7Error>;
 
@@ -47,6 +50,8 @@ pub enum Pkcs7Error {
     SignatureError(#[from] crate::signature::SignatureError),
     #[error("the program name has invalid charset")]
     ProgramNameCharSet(#[from] CharSetError),
+    #[error(transparent)]
+    UnsupportedAlgorithmError(UnsupportedAlgorithmError),
 }
 const PKCS7_PEM_LABEL: &str = "PKCS7";
 
@@ -85,7 +90,8 @@ impl Pkcs7 {
 
         let SignedData { mut certificates, .. } = signed_data.0;
 
-        let digest_algorithm = AlgorithmIdentifier::new_sha(SHAVariant::from(hash_algo));
+        let sha_algo  = SHAVariant::from(hash_algo);
+        let digest_algorithm = AlgorithmIdentifier::new_sha(sha_algo);
 
         let data = SpcAttributeAndOptionalValue {
             ty: oids::spc_pe_image_dataobj().into(),
@@ -144,39 +150,36 @@ impl Pkcs7 {
             let certificates = &mut certificates.0;
             let code_signing_ext_key_usage = Extension::new_extended_key_usage(vec![oids::kp_code_signing()]);
 
-            if certificates
+            if  certificates
                 .iter()
                 .map(|cert| cert.tbs_certificate.extensions.0 .0.iter())
                 .flatten()
-                .any(|extension| matches!(extension, _code_signing_ext_key_usage))
+                .any(|extension| matches!(extension.extn_value(), ExtensionView::ExtendedKeyUsage(_)))
             {
-                let leaf_cert = certificates
-                    .first_mut()
+                let intermediate_cert = certificates.get_mut(1)
                     .expect("Certificates must contain at least leaf and intermediate certificates");
-                let extensions = &mut leaf_cert.tbs_certificate.extensions.0 .0;
+
+                let extensions = &mut intermediate_cert.tbs_certificate.extensions.0 .0;
 
                 if !extensions
                     .iter()
-                    .any(|extension| matches!(extension, _code_signing_ext_key_usage))
+                    .any(|extension| extension == &code_signing_ext_key_usage)
                 {
                     extensions.push(code_signing_ext_key_usage);
                 }
             }
         }
 
-        let certificate = certificates
-            .0
-            .first()
-            .expect("Certificates must contain at least Leaf and Intermediate certificates");
+        let leaf_cert = certificates.0.get(0).expect("Certificates must contain at least Leaf and Intermediate certificates");
 
         let issuer_and_serial_number = IssuerAndSerialNumber {
-            issuer: certificate.tbs_certificate.issuer.clone(),
-            serial_number: CertificateSerialNumber(certificate.tbs_certificate.serial_number.clone()),
+            issuer: leaf_cert.tbs_certificate.issuer.clone(),
+            serial_number: CertificateSerialNumber(leaf_cert.tbs_certificate.serial_number.clone()),
         };
 
-        let digest_encryption_algorithm = AlgorithmIdentifier::new_sha256_with_rsa_encryption();
+        let digest_encryption_algorithm = AlgorithmIdentifier::new_rsa_encryption_with_sha(sha_algo).map_err(Pkcs7Error::UnsupportedAlgorithmError)?;
 
-        let signature_algo = SignatureAlgorithm::from_algorithm_identifier(&digest_encryption_algorithm).unwrap();
+        let signature_algo = SignatureAlgorithm::from_algorithm_identifier(&digest_encryption_algorithm)?;
 
         let mut auth_raw_data = picky_asn1_der::to_vec(&authenticated_attributes)?;
         // According to the RFC:
@@ -192,9 +195,18 @@ impl Pkcs7 {
             issuer_and_serial_number,
             digest_algorithm: digest_algorithm.clone(),
             authenticode_attributes: Attributes(authenticated_attributes).into(),
-            digest_encryption_algorithm: DigestEncryptionAlgorithmIdentifier(digest_encryption_algorithm),
+            digest_encryption_algorithm: DigestEncryptionAlgorithmIdentifier(AlgorithmIdentifier::new_rsa_encryption()),
             encrypted_digest,
         };
+
+        // certificates contains the signer certificate and any intermediate certificates,
+        // but typically does not contain the root certificate
+        let certificates = ExtendedCertificatesAndCertificates(certificates.0.into_iter().map(Cert::from).filter_map(|cert|
+           if matches!(cert.ty(), CertType::Leaf | CertType::Intermediate | CertType::Unknown) {
+               Some(Certificate::from(cert))
+           } else {
+               None
+           }).collect::<Vec<Certificate>>());
 
         let signed_data = SignedData {
             version: Version::V2,
@@ -229,33 +241,33 @@ mod tests {
         0xc9, 0x94, 0x31, 0x7f, 0x4c, 0x59, 0xd7, 0xed, 0xbe, 0xa5, 0xcc, 0x78, 0x6d, 0x80,
     ];
 
-    const RSA_PRIVATE_KEY: &str = "-----BEGIN RSA PRIVATE KEY-----\n\
-                                   MIIEogIBAAKCAQEAoAHqJ0RudJ4e3StnnhSBfivE/v1xDw6B+/FJiQDDL1ZE1JKH\n\
-                                   kfgeLqcmbZQ1y8LlkmjH4CS9PhunDgwb4No8EssT3qZNhNANCMgWK9RkohGKPiA1\n\
-                                   54dFwpN84Ujg5xuOJ8KrOLwXdcUAoVO/tmSC2DhnOduOPwP7hYbfK16CpkRjqvLU\n\
-                                   mL3+hYMxKGScka4bT7BhejtjV3q6bWHv2kHDHvZ3BytGJh1PupRIt2uK20ZN3HbD\n\
-                                   s7SciKxi/rOFBlhGU0gVfblXwo+Unspw8aVPAIvGYSirfy1Co7IU1mTZm36sdNTJ\n\
-                                   XdEYwZG3bo9EGDgPYhM1QcnGMgHmIWhE0m0+KwIDAQABAoIBAG4K4w6+cXiihnd1\n\
-                                   Mn31fFlZoNH9W5QPVjX/a6Ndct9LZWsMm1A4ZAmRy0vxck4AbAKVLWFp4vyj5/Ax\n\
-                                   Q7sQW+BQ6glmNknxDAXOFfFu0QblKT4wyOHClqeK54fIp2RJ/yo5J6iNM1U7d4N8\n\
-                                   JY068wHhSJzx8pJEGudqKnGZPiE6MPxfVYxR9AEPaHPVnFVh+ziIrfCE8wkhQHtS\n\
-                                   anq6RIJTOA5mDAX0FhLTep7r0/ymKEj0c4ZkPiEonclkaXXf/1dN7qtJnU9b+dpR\n\
-                                   ESM3QYvh9SnwlZaptt8tYAmAMVTkc4Jjf9Lx7G2Ve091mj6wS/Vl+uI/e7KIMGxn\n\
-                                   E0a0GoECgYEA0iZIk/oVzeBHMPi23KWENN6cP9Wq5RR0/iWfzE88L9IwG0yNplzi\n\
-                                   zK91yAVAtQfOVYH7B4b6Uwy9C5Nx/B0GIbv+v/7Batpis4HTeewlvB5RKQLHtrLA\n\
-                                   EeHmpQsQseOgSaBAVaWnEYOEROOtO0DGk/kH3/ypbQUHOIpy9LWtLicCgYEAwur9\n\
-                                   k1ejvDcSgcIXnsfp1B2hrkSVBFDm9upSDgV/LEPTNDA4mc+W3YR58HX4YdGvMfly\n\
-                                   B/7Kb/w29Vn6FuS5KukulQ6wRAG/9ON38eh2ATC6BKDG7DcHbCPTnr0PTMRgeVQ4\n\
-                                   1euucHsFIIsmgCNygxo+OPXp7L+KnDTEyVrG9l0CgYARRux4nfrk7idsM0Z1ZXY1\n\
-                                   EoguB1cBdmkX6+fzWCBOni0uUWDj6IcM5O/9/dCQEZA5H3KP79zsrwNrzDd2zrwO\n\
-                                   UfJjvoIQUtwCfg3w3CVODgAGKyBYOOHplnTr5Lj+pwQqiW5AnFnb6sAZGc7ILE8n\n\
-                                   IzYuiAs110/8qgVBcR5HyQKBgCmmdRDrBT3OttGrW8i+ByUgP9AxL3aAoxnX8Di2\n\
-                                   y/n1dEgOlcmoJiCnkjbjvnOIjtsq5kb3FuLfDg9Xbq09qqOUuDN5tAiUJyR5BsRW\n\
-                                   XADdHKKoiFkpWRiufyXIWGCbBdJnQM3VUq0OXIYbtdpjuLBzByC8y4OfWksOq44r\n\
-                                   K6CxAoGAH70deZnnp+6LGNS3Zv6X3WvzmrRYwoRXNVz7xSUhDFsz0UeFOyAfHNl3\n\
-                                   U2pDsAQtWZkejsdWXha5kwLeQdF7NkLxGDdsO0w+fhP9SkBA/HiUIg/BLY1Vz1DU\n\
-                                   XWVhD37ATsWx7xpW4GrAwBQlgBHXoDVJksYJ7mUNpqxf35yh5DQ=\n\
-                                   -----END RSA PRIVATE KEY-----";
+    const RSA_PRIVATE_KEY: &str = "-----BEGIN RSA PRIVATE KEY-----\n
+MIIEpAIBAAKCAQEA0vg4PmmJdy1W/ayyuP3ovRBbggAZ98dEY5uzEU23ENaN3jsx\n
+R9zEAAmQ9OZbbJXN33l+PMKY7+5izgI/RlGSNF2s0mdyWEhoRMTxuwpJoFgBkYEE\n
+Jwr40xoLCbw9TpBooJgdYg/n/Fu4NGM7YJdcfKjf3/le7kNTZYPBx09wBkHvkuTD\n
+gpdDDnb5R6sTouD0bCPjC/gZCoRAAlzfuAmAAHVb+i8fkTV32OzokLYcneuLZU/+\n
+FBpR2w9UprfDLWFbPxuOBf+mIGp4WWVN82+3SdEkp/5BRQ//MhGhj7NhEYp+KyWJ\n
+Hm+1iGvrxsgQH+4MQTJGdp838sl+w77QGFZU9QIDAQABAoIBAEBWNkDCSouvpgHC\n
+ctZ7iEhv/pgMk96+RBrkVp2GR7e41pbZElRJ/PPN9wjYXzUkEh5+nILHDYDOAA+3\n
+G7jEE4QotRWNOo+1tSaTsOxLXNyrOf83ix6k9/DY1ljnsQKOg3nGKd/H3gVVqz0+\n
+rdLtFeVmUq+pCsw6d+pTXfr8PLuLPfe8r9fu/BGU2wtINAEuQ4x3/S/JPTm6XnsV\n
+NUW62K/lB7RjXlEqnKMwxcVCu/m0C1HdlwTlHyzktIydjL9Bk1GjGQVt0zC/rfvA\n
+zrlsTPg4UTL6zs4D9B5PPaZMJeBieXaQ0JdqKdJkRm+mPCOEGf+BLz1zHVAVZaSZ\n
+PK8E7NkCgYEA+e7WUOlr4nR6fqvte0ZTewIeG/j2m5gSVjjy8Olh2D3v8q4hZj5s\n
+2jaFJJ7RUGXZdiySodlEpLR2nrrUURC6fGukvbFCW2j/0SotBl53Wa2zJdrU3AZc\n
+b9j7MOyJbJDKJYqdivYJXp7ra4vCs0xAMXfuQD1AWaKlCQxbeyrKWxcCgYEA2BdA\n
+fB7IL0ec3WOsLyGGhcCrGDWIiOlXzk5Fuus+NOEp70/bYCqGpu+tNAxtbY4e+zHp\n
+5gXApKU6PSQ/I/eG/o0WGQCZazfhIGpwORrWHAVxDlxJ+/hlZd6DmTjaIJw1k2gr\n
+D849l1WIEr2Ps8Bv3Y7XeLpnUAQFv1ekfMKxZ9MCgYEA2vtNYfUypmZh0Uy4NZNn\n
+n1Y6pU2cXLWAE3WwPi5toTabXuj8sIWvf/3W6EASqzuhri3dh9tCjoDjka2mSyS6\n
+EDuMSvvdZRP5V/15F6R7M+LCHT+/0svr/7+ATtxgh/PQedYatN9fVD0vjboVrFz5\n
+vZ4T7Mr978tWiDgAi0jxpZ8CgYA/AOiIR+FOB68wzXLSew/hx38bG+CnKoGzYRbr\n
+nNMST+QOJlZr/3orCg6R8l2lZ56Y1sC/lEXKu3HzibHvJqhxZ2ld+NLCdBRrgx0d\n
+STnMCbog2b+oe4/015+++NiAUYs9Y03K2fMTQJjf/ez8F8uF6bPhO1gL+GBEnaUT\n
+yyA2iQKBgQD1KfqZeJtPCwmfdPokblKgorstuMKjMegD/6ztjIFw4c9XkvUAvlD5\n
+MvS4rPuhVYrvouZHJ50bcwccByJ8aCOJxLdH7+bjojMSAgV2kGq+FNh7F1wRcwx8\n
+8Z+DBbeVaCpYSQa5bCr5jG6nIX5v/KbS3HCmAkUzwqGoEsk53yFmKw==\n
+-----END RSA PRIVATE KEY-----";
 
     #[test]
     fn read_pem_and_parse_certificate() {
@@ -331,14 +343,30 @@ mod tests {
 
         assert_eq!(
             singer_info.digest_encryption_algorithm,
-            DigestEncryptionAlgorithmIdentifier(AlgorithmIdentifier::new_sha256_with_rsa_encryption())
+            DigestEncryptionAlgorithmIdentifier(AlgorithmIdentifier::new_rsa_encryption())
         );
 
         let signature_algo =
             SignatureAlgorithm::from_algorithm_identifier(&AlgorithmIdentifier::new_sha256_with_rsa_encryption())
                 .unwrap();
 
-        let certificate = signed_data.0.certificates.0.first().unwrap();
+        let certificate = signed_data.certificates
+            .0
+            .clone()
+            .into_iter()
+            .map(Cert::from)
+            .find(|certificate| matches!(certificate.ty(), CertType::Intermediate))
+            .map(Certificate::from).unwrap();
+
+        let code_signing_ext_key_usage = Extension::new_extended_key_usage(vec![oids::kp_code_signing()]);
+        assert!(!certificate
+            .tbs_certificate
+            .extensions
+            .0
+             .0
+            .iter()
+            .any(|extension| extension == &code_signing_ext_key_usage));
+
         let public_key = certificate.tbs_certificate.subject_public_key_info.clone();
         let encrypted_digest = singer_info.encrypted_digest.0 .0.as_ref();
 

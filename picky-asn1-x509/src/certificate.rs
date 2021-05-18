@@ -79,6 +79,7 @@ impl Certificate {
 /// ```
 #[derive(Serialize, Clone, Debug, PartialEq)]
 pub struct TBSCertificate {
+    #[serde(skip_serializing_if = "version_is_default")]
     pub version: ApplicationTag0<Version>,
     pub serial_number: IntegerAsn1,
     pub signature: AlgorithmIdentifier,
@@ -90,6 +91,10 @@ pub struct TBSCertificate {
     // subject_unique_id
     #[serde(skip_serializing_if = "extensions_are_empty")]
     pub extensions: ApplicationTag3<Extensions>,
+}
+
+fn version_is_default(version: &Version) -> bool {
+    version == &Version::default()
 }
 
 // Implement Deserialize manually to return an easy to understand error on V1 certificates
@@ -112,17 +117,10 @@ impl<'de> de::Deserialize<'de> for TBSCertificate {
             where
                 V: de::SeqAccess<'de>,
             {
-                let version: ApplicationTag0<Version> = seq
+                let version = seq
                     .next_element()
-                    .unwrap_or_else(|_| Some(Version::V3.into()))
-                    .unwrap_or_else(|| Version::V3.into());
-
-                if version != Version::V3 {
-                    return Err(de::Error::invalid_value(
-                        de::Unexpected::Other("unsupported certificate version"),
-                        &"only V3 certificate are supported",
-                    ));
-                }
+                    .unwrap_or_default()
+                    .unwrap_or_default();
 
                 Ok(TBSCertificate {
                     version,

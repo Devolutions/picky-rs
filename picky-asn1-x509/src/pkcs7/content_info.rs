@@ -6,10 +6,7 @@ use widestring::U16String;
 use picky_asn1::bit_string::BitString;
 use picky_asn1::restricted_string::{BMPString, CharSetError};
 use picky_asn1::tag::{Tag, TagPeeker};
-use picky_asn1::wrapper::{
-    ApplicationTag0, ApplicationTag1, ApplicationTag2, BMPStringAsn1, BitStringAsn1, ContextTag0, ContextTag1,
-    IA5StringAsn1, Implicit, ObjectIdentifierAsn1, OctetStringAsn1,
-};
+use picky_asn1::wrapper::{ApplicationTag0, ApplicationTag1, ApplicationTag2, BMPStringAsn1, BitStringAsn1, ContextTag0, ContextTag1, IA5StringAsn1, Implicit, ObjectIdentifierAsn1, OctetStringAsn1, ContextTag2};
 
 use crate::{oids, DigestInfo};
 
@@ -230,9 +227,9 @@ impl<'de> Deserialize<'de> for SpcLink {
                         SpcLink,
                         "Moniker"
                     ))),
-                    Tag::APP_2 => SpcLink::File(File(seq_next_element!(
+                    Tag::CTX_2 => SpcLink::File(File(seq_next_element!(
                         seq,
-                        ApplicationTag2<SpcString>,
+                        ContextTag2<SpcString>,
                         SpcLink,
                         "File"
                     ))),
@@ -266,7 +263,7 @@ pub struct Url(pub Implicit<ContextTag0<IA5StringAsn1>>);
 pub struct Moniker(pub Implicit<ContextTag1<SpcSerialized>>);
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct File(pub ApplicationTag2<SpcString>);
+pub struct File(pub ContextTag2<SpcString>);
 
 impl Default for File {
     fn default() -> Self {
