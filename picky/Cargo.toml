@@ -14,6 +14,7 @@ keywords = ["x509", "jwt", "signature", "jose", "pki"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Devolutions/picky-rs"
+include = ["src/**/*", "README.md", "CHANGELOG.md"]
 
 [dependencies]
 picky-asn1 = { version = "0.3", path = "../picky-asn1" }
