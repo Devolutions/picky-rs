@@ -13,8 +13,8 @@ use picky_asn1_x509::{oids, Attribute, AttributeValues, Attributes, Certificate,
 
 use picky_asn1_x509::pkcs7::cmsversion::CMSVersion;
 use picky_asn1_x509::pkcs7::content_info::{
-    EncapsulatedContentInfo, ContentValue, SpcAttributeAndOptionalValue, SpcIndirectDataContent, SpcLink, SpcPeImageData,
-    SpcPeImageFlags, SpcSpOpusInfo, SpcString,
+    ContentValue, EncapsulatedContentInfo, SpcAttributeAndOptionalValue, SpcIndirectDataContent, SpcLink,
+    SpcPeImageData, SpcPeImageFlags, SpcSpOpusInfo, SpcString,
 };
 use picky_asn1_x509::pkcs7::crls::RevocationInfoChoices;
 use picky_asn1_x509::pkcs7::signed_data::{CertificateSet, DigestAlgorithmIdentifiers, SignedData, SingersInfos};
