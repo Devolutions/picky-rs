@@ -5,7 +5,7 @@ use std::io::{self, BufReader, BufWriter};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use thiserror::Error;
 
-const MINIMUM_BYTES_TO_DECODE: usize = 4 /* WinCertificate::length */ + 2 /* WinCertificate::revision */ + 2 /* WinCertificate::certificate*/;
+const MINIMUM_BYTES_TO_DECODE: usize = 4 /* WinCertificate::length */ + 2 /* WinCertificate::revision */ + 2 /* WinCertificate::certificate */;
 
 #[derive(Debug, Error)]
 pub enum WinCertificateError {
@@ -75,12 +75,19 @@ impl WinCertificate {
         } = self;
 
         let mut buffer = BufWriter::new(Vec::new());
-        buffer.write_u32::<LittleEndian>(length)?;
+
+        let padding = (8 - (certificate.len() % 8)) % 8;
+
+        buffer.write_u32::<LittleEndian>(length + padding as u32)?;
         buffer.write_u16::<LittleEndian>(revision as u16)?;
         buffer.write_u16::<LittleEndian>(certificate_type as u16)?;
 
         for elem in certificate.into_iter() {
             buffer.write_u8(elem)?;
+        }
+
+        for _ in 0..padding {
+            buffer.write_u8(0)?;
         }
 
         buffer
@@ -170,19 +177,20 @@ mod tests {
               // empty WIN_CERTIFICATE::bCertificate field
     ];
 
-    const WINCERT_WITH_ONE_BYTE_CERTIFICATE: [u8; 9] = [
-        0x01, 0x00, 0x00, 0x00, // -> WIN_CERTIFICATE::dwLength = 0x01 = 1
+    const WINCERT_WITH_ONE_BYTE_CERTIFICATE: [u8; 16] = [
+        0x08, 0x00, 0x00, 0x00, // -> WIN_CERTIFICATE::dwLength = 0x08 = 8
         0x00, 0x01, // -> WIN_CERTIFICATE::wRevision = 0x0100 = WIN_CERT_REVISION_1_0
         0x01, 0x00, // -> WIN_CERTIFICATE::wCertificateType = 0x01 = WIN_CERTIFICATE::WIN_CERT_TYPE_X509
         0x01, // -> WIN_CERTIFICATE::bCertificate = bCertificate[0] = 1
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // padding
     ];
 
-    const WINCERT_WITH_TEN_BYTES_CERTIFICATE: [u8; 18] = [
-        0x0A, 0x00, 0x00, 0x00, // -> WIN_CERTIFICATE::dwLength = 0x0A = 10
+    const WINCERT_WITH_TEN_BYTES_CERTIFICATE: [u8; 24] = [
+        0x10, 0x00, 0x00, 0x00, // -> WIN_CERTIFICATE::dwLength = 0x10 = 16
         0x00, 0x02, // -> WIN_CERTIFICATE::wRevision = 0x0200 = WIN_CERT_REVISION_2_0
         0x09, 0x00, // -> WIN_CERTIFICATE::wCertificateType = 0x09 = WIN_CERTIFICATE::WinCertTypePkcs1Sign
         0x01, 0x20, 0x03, 0x40, 0x05, 0x60, 0x70, 0x08, // -> WIN_CERTIFICATE::bCertificate = bCertificate[10]
-        0x90, 0x01,
+        0x90, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // padding
     ];
 
     const WINCERT_WITH_INVALID_REVISION: [u8; 9] = [
@@ -217,10 +225,10 @@ mod tests {
     fn decode_wincert_with_one_byte_certificate() {
         let decoded = WinCertificate::decode(WINCERT_WITH_ONE_BYTE_CERTIFICATE.as_ref()).unwrap();
 
-        pretty_assertions::assert_eq!(decoded.length, 1);
+        pretty_assertions::assert_eq!(decoded.length, 8);
         pretty_assertions::assert_eq!(decoded.revision, RevisionType::WinCertificateRevision10);
         pretty_assertions::assert_eq!(decoded.certificate_type, CertificateType::WinCertTypeX509);
-        pretty_assertions::assert_eq!(decoded.certificate, vec![1]);
+        pretty_assertions::assert_eq!(decoded.certificate, vec![1, 0, 0, 0, 0, 0, 0, 0]);
     }
 
     #[test]
@@ -240,10 +248,13 @@ mod tests {
     fn decode_wincert_with_ten_bytes_certificate() {
         let decoded = WinCertificate::decode(WINCERT_WITH_TEN_BYTES_CERTIFICATE.as_ref()).unwrap();
 
-        pretty_assertions::assert_eq!(decoded.length, 10);
+        pretty_assertions::assert_eq!(decoded.length, 16);
         pretty_assertions::assert_eq!(decoded.revision, RevisionType::WinCertificateRevision20);
         pretty_assertions::assert_eq!(decoded.certificate_type, CertificateType::WinCertTypePkcs1Sign);
-        pretty_assertions::assert_eq!(decoded.certificate, vec![1, 32, 3, 64, 5, 96, 112, 8, 144, 1]);
+        pretty_assertions::assert_eq!(
+            decoded.certificate,
+            vec![1, 32, 3, 64, 5, 96, 112, 8, 144, 1, 0, 0, 0, 0, 0, 0]
+        );
     }
 
     #[test]

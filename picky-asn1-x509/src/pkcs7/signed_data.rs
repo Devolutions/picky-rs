@@ -2,17 +2,32 @@ use picky_asn1::tag::Tag;
 use picky_asn1::wrapper::Asn1SetOf;
 use serde::{de, ser, Deserialize, Serialize};
 
-use super::content_info::ContentInfo;
+use super::content_info::EncapsulatedContentInfo;
 use super::crls::RevocationInfoChoices;
-use super::singer_info::SingersInfos;
-use crate::{AlgorithmIdentifier, Certificate, Version};
+use super::singer_info::SignerInfo;
+use crate::cmsversion::CMSVersion;
+use crate::{AlgorithmIdentifier, Certificate};
 
+/// [RFC 5652 #5.1](https://datatracker.ietf.org/doc/html/rfc5652#section-5.1)
+/// ``` not_rust
+/// SignedData ::= SEQUENCE {
+///         version CMSVersion,
+///         digestAlgorithms DigestAlgorithmIdentifiers,
+///         encapContentInfo EncapsulatedContentInfo,
+///         certificates [0] IMPLICIT CertificateSet OPTIONAL,
+///         crls [1] IMPLICIT RevocationInfoChoices OPTIONAL,
+///         signerInfos SignerInfos }
+///
+///       DigestAlgorithmIdentifiers ::= SET OF DigestAlgorithmIdentifier
+///
+///       SignerInfos ::= SET OF SignerInfo
+/// ```
 #[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
 pub struct SignedData {
-    pub version: Version,
+    pub version: CMSVersion,
     pub digest_algorithms: DigestAlgorithmIdentifiers,
-    pub content_info: ContentInfo,
-    pub certificates: ExtendedCertificatesAndCertificates,
+    pub content_info: EncapsulatedContentInfo,
+    pub certificates: CertificateSet,
     pub crls: RevocationInfoChoices,
     pub singers_infos: SingersInfos,
 }
@@ -20,12 +35,18 @@ pub struct SignedData {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct DigestAlgorithmIdentifiers(pub Asn1SetOf<AlgorithmIdentifier>);
 
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct SingersInfos(pub Asn1SetOf<SignerInfo>);
+
+/// [RFC 5652 #10.2.3](https://datatracker.ietf.org/doc/html/rfc5652#section-10.2.3)
+/// ``` not_rust
+/// CertificateSet ::= SET OF CertificateChoices
+/// ```
 #[derive(Debug, PartialEq, Clone)]
-pub struct ExtendedCertificatesAndCertificates(pub Vec<Certificate>);
+pub struct CertificateSet(pub Vec<Certificate>);
 
 // FIXME: This is a workaround, related to https://github.com/Devolutions/picky-rs/pull/78#issuecomment-789904165
-
-impl ser::Serialize for ExtendedCertificatesAndCertificates {
+impl ser::Serialize for CertificateSet {
     fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
     where
         S: ser::Serializer,
@@ -36,7 +57,7 @@ impl ser::Serialize for ExtendedCertificatesAndCertificates {
     }
 }
 
-impl<'de> de::Deserialize<'de> for ExtendedCertificatesAndCertificates {
+impl<'de> de::Deserialize<'de> for CertificateSet {
     fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
     where
         D: de::Deserializer<'de>,
@@ -44,7 +65,7 @@ impl<'de> de::Deserialize<'de> for ExtendedCertificatesAndCertificates {
         let mut raw_der = picky_asn1_der::Asn1RawDer::deserialize(deserializer)?.0;
         raw_der[0] = Tag::SEQUENCE.number();
         let vec = picky_asn1_der::from_bytes(&raw_der).unwrap_or_default();
-        Ok(ExtendedCertificatesAndCertificates(vec))
+        Ok(CertificateSet(vec))
     }
 }
 
@@ -54,7 +75,7 @@ mod tests {
     use crate::crls::*;
     use crate::{
         oids, EncapsulatedRSAPublicKey, Extension, Extensions, KeyIdentifier, Name, NameAttr, PublicKey, RSAPublicKey,
-        SubjectPublicKeyInfo, TBSCertificate, Validity,
+        SubjectPublicKeyInfo, TBSCertificate, Validity, Version,
     };
     use picky_asn1::bit_string::BitString;
     use picky_asn1::date::UTCTime;
@@ -101,18 +122,18 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(Version::V2, Version::from_u8(*pkcs7.get(25).unwrap()).unwrap());
+        assert_eq!(CMSVersion::V1, CMSVersion::from_u8(*pkcs7.get(25).unwrap()).unwrap());
 
         let digest_algorithm_identifiers = DigestAlgorithmIdentifiers(vec![].into());
 
         check_serde!(digest_algorithm_identifiers: DigestAlgorithmIdentifiers in pkcs7[26..28]);
 
-        let content_info = ContentInfo {
+        let content_info = EncapsulatedContentInfo {
             content_type: ObjectIdentifierAsn1::from(oids::pkcs7()),
             content: None,
         };
 
-        check_serde!(content_info: ContentInfo in pkcs7[28..41]);
+        check_serde!(content_info: EncapsulatedContentInfo in pkcs7[28..41]);
 
         let mut issuer = Name::new();
         issuer.add_attr(
@@ -174,10 +195,10 @@ mod tests {
         check_serde!(full_certificate: Certificate in pkcs7[45..1594]);
 
         let signed_data = SignedData {
-            version: Version::V2,
+            version: CMSVersion::V1,
             digest_algorithms: DigestAlgorithmIdentifiers(Vec::new().into()),
             content_info,
-            certificates: ExtendedCertificatesAndCertificates(vec![full_certificate]),
+            certificates: CertificateSet(vec![full_certificate]),
             crls: RevocationInfoChoices(Vec::new()),
             singers_infos: SingersInfos(Vec::new().into()),
         };

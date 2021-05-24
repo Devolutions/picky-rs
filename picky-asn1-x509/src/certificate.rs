@@ -97,8 +97,7 @@ fn version_is_default(version: &Version) -> bool {
     version == &Version::default()
 }
 
-// Implement Deserialize manually to return an easy to understand error on V1 certificates
-// (aka ApplicationTag0 not present).
+// Implement Deserialize manually to support missing version field aka Version V1(Default)
 impl<'de> de::Deserialize<'de> for TBSCertificate {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -117,10 +116,7 @@ impl<'de> de::Deserialize<'de> for TBSCertificate {
             where
                 V: de::SeqAccess<'de>,
             {
-                let version = seq
-                    .next_element()
-                    .unwrap_or_default()
-                    .unwrap_or_default();
+                let version = seq.next_element().unwrap_or_default().unwrap_or_default();
 
                 Ok(TBSCertificate {
                     version,

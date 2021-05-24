@@ -42,6 +42,9 @@ impl Default for Attributes {
 ///
 /// Accepted attribute types are `challengePassword` and `extensionRequest`
 ///
+/// [Authenticode_PE.docx](http://download.microsoft.com/download/9/c/5/9c5b2167-8017-4bae-9fde-d599bac8184a/Authenticode_PE.docx)
+///
+/// Accepted attribute types are `contentType`, `messageDigest` and `spcSpOpusInfo`
 #[derive(Clone, Debug, PartialEq)]
 pub enum AttributeValues {
     /// `extensionRequest`

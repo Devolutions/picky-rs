@@ -6,18 +6,49 @@ use widestring::U16String;
 use picky_asn1::bit_string::BitString;
 use picky_asn1::restricted_string::{BMPString, CharSetError};
 use picky_asn1::tag::{Tag, TagPeeker};
-use picky_asn1::wrapper::{ApplicationTag0, ApplicationTag1, ApplicationTag2, BMPStringAsn1, BitStringAsn1, ContextTag0, ContextTag1, IA5StringAsn1, Implicit, ObjectIdentifierAsn1, OctetStringAsn1, ContextTag2};
+use picky_asn1::wrapper::{
+    ApplicationTag0, ApplicationTag1, ApplicationTag2, BMPStringAsn1, BitStringAsn1, ContextTag0, ContextTag1,
+    IA5StringAsn1, Implicit, ObjectIdentifierAsn1, OctetStringAsn1,
+};
 
 use crate::{oids, DigestInfo};
 
-#[derive(Serialize, Debug, PartialEq, Clone)]
-pub struct ContentInfo {
-    pub content_type: ObjectIdentifierAsn1,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub content: Option<ApplicationTag0<SpcIndirectDataContent>>,
+/// ``` not_rust
+/// [RFC 5652 #5.2](https://datatracker.ietf.org/doc/html/rfc5652#section-5.2)
+/// EncapsulatedContentInfo ::= SEQUENCE {
+///         eContentType ContentType,
+///         eContent [0] EXPLICIT OCTET STRING OPTIONAL }
+///
+///  ContentType ::= OBJECT IDENTIFIER
+/// ```
+#[derive(Debug, PartialEq, Clone)]
+pub enum ContentValue {
+    SpcIndirectDataContent(SpcIndirectDataContent),
+    OctetString(OctetStringAsn1),
 }
 
-impl<'de> de::Deserialize<'de> for ContentInfo {
+impl Serialize for ContentValue {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
+    where
+        S: ser::Serializer,
+    {
+        match &self {
+            ContentValue::SpcIndirectDataContent(spc_indirect_data_content) => {
+                spc_indirect_data_content.serialize(serializer)
+            }
+            ContentValue::OctetString(octet_string) => octet_string.serialize(serializer),
+        }
+    }
+}
+
+#[derive(Serialize, Debug, PartialEq, Clone)]
+pub struct EncapsulatedContentInfo {
+    pub content_type: ObjectIdentifierAsn1,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<ApplicationTag0<ContentValue>>,
+}
+
+impl<'de> de::Deserialize<'de> for EncapsulatedContentInfo {
     fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
     where
         D: de::Deserializer<'de>,
@@ -27,7 +58,7 @@ impl<'de> de::Deserialize<'de> for ContentInfo {
         struct Visitor;
 
         impl<'de> de::Visitor<'de> for Visitor {
-            type Value = ContentInfo;
+            type Value = EncapsulatedContentInfo;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("a valid DER-encoded ContentInfo")
@@ -41,20 +72,46 @@ impl<'de> de::Deserialize<'de> for ContentInfo {
                     seq.next_element()?.ok_or_else(|| de::Error::invalid_length(0, &self))?;
 
                 let value = match Into::<String>::into(&oid.0).as_str() {
-                    oids::SPC_INDIRECT_DATA_OBJID => {
-                        seq.next_element()?.ok_or_else(|| de::Error::invalid_length(1, &self))?
-                    }
+                    oids::SPC_INDIRECT_DATA_OBJID => Some(
+                        ContentValue::SpcIndirectDataContent(
+                            seq_next_element!(
+                                seq,
+                                ApplicationTag0<SpcIndirectDataContent>,
+                                EncapsulatedContentInfo,
+                                "SpcIndirectDataContent"
+                            )
+                            .0,
+                        )
+                        .into(),
+                    ),
                     oids::PKCS7 => None,
                     _ => {
-                        return Err(serde_invalid_value!(
-                            ContentInfo,
-                            "unknown oid type",
-                            "SPC_INDIRECT_DATA_OBJID or PKCS7 oid"
-                        ))
+                        let tag_peeker: TagPeeker = seq_next_element!(seq, EncapsulatedContentInfo, "OctetString");
+                        match tag_peeker.next_tag {
+                            Tag::OCTET_STRING => Some(
+                                ContentValue::OctetString(
+                                    seq_next_element!(
+                                        seq,
+                                        ApplicationTag0<OctetStringAsn1>,
+                                        EncapsulatedContentInfo,
+                                        "OctetStringAsn1"
+                                    )
+                                    .0,
+                                )
+                                .into(),
+                            ),
+                            _ => {
+                                return Err(serde_invalid_value!(
+                                    EncapsulatedContentInfo,
+                                    "unknown oid type",
+                                    "SPC_INDIRECT_DATA_OBJID or PKCS7 oid"
+                                ))
+                            }
+                        }
                     }
                 };
 
-                Ok(ContentInfo {
+                Ok(EncapsulatedContentInfo {
                     content_type: oid,
                     content: value,
                 })
@@ -65,6 +122,18 @@ impl<'de> de::Deserialize<'de> for ContentInfo {
     }
 }
 
+/// [Authenticode_PE.docx](http://download.microsoft.com/download/9/c/5/9c5b2167-8017-4bae-9fde-d599bac8184a/Authenticode_PE.docx)
+/// ``` not_rust
+/// SpcIndirectDataContent ::= SEQUENCE {
+///     data                    SpcAttributeTypeAndOptionalValue,
+///     messageDigest           DigestInfo
+/// }
+///
+/// SpcAttributeTypeAndOptionalValue ::= SEQUENCE {
+///     type                    ObjectID,
+///     value                   [0] EXPLICIT ANY OPTIONAL
+/// }
+/// ```
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct SpcIndirectDataContent {
     pub data: SpcAttributeAndOptionalValue,
@@ -123,10 +192,33 @@ impl<'de> de::Deserialize<'de> for SpcAttributeAndOptionalValue {
     }
 }
 
+/// [Authenticode_PE.docx](http://download.microsoft.com/download/9/c/5/9c5b2167-8017-4bae-9fde-d599bac8184a/Authenticode_PE.docx)
+/// ``` not_rust
+/// SpcPeImageData ::= SEQUENCE {
+///    flags                   SpcPeImageFlags DEFAULT { includeResources },
+///    file                    SpcLink
+/// }
+/// SpcPeImageFlags ::= BIT STRING {
+///     includeResources            (0),
+///     includeDebugInfo            (1),
+///     includeImportAddressTable   (2)
+/// }
+///
+/// SpcLink ::= CHOICE {
+///     url                     [0] IMPLICIT IA5STRING,
+///     moniker                 [1] IMPLICIT SpcSerializedObject,
+///     file                    [2] EXPLICIT SpcString
+/// } --#public--
+///
+/// SpcString ::= CHOICE {
+///     unicode                 [0] IMPLICIT BMPSTRING,
+///     ascii                   [1] IMPLICIT IA5STRING
+/// }
+/// ```
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct SpcPeImageData {
     pub flags: SpcPeImageFlags,
-    pub file: SpcLink,
+    pub file: ApplicationTag0<SpcLink>, // According to Authenticode_PE.docx, there is  no ApplicationTag0, but otherwise created Authenticode signature won't be valid
 }
 
 impl<'de> de::Deserialize<'de> for SpcPeImageData {
@@ -223,13 +315,13 @@ impl<'de> Deserialize<'de> for SpcLink {
                     ))),
                     Tag::CTX_1 => SpcLink::Moniker(Moniker(seq_next_element!(
                         seq,
-                        Implicit<ContextTag1<SpcSerialized>>,
+                        Implicit<ContextTag1<SpcSerializedObject>>,
                         SpcLink,
                         "Moniker"
                     ))),
-                    Tag::CTX_2 => SpcLink::File(File(seq_next_element!(
+                    Tag::APP_2 => SpcLink::File(File(seq_next_element!(
                         seq,
-                        ContextTag2<SpcString>,
+                        ApplicationTag2<SpcString>,
                         SpcLink,
                         "File"
                     ))),
@@ -260,10 +352,10 @@ impl Default for SpcLink {
 pub struct Url(pub Implicit<ContextTag0<IA5StringAsn1>>);
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct Moniker(pub Implicit<ContextTag1<SpcSerialized>>);
+pub struct Moniker(pub Implicit<ContextTag1<SpcSerializedObject>>);
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct File(pub ContextTag2<SpcString>);
+pub struct File(pub ApplicationTag2<SpcString>);
 
 impl Default for File {
     fn default() -> Self {
@@ -284,8 +376,17 @@ impl Default for SpcUuid {
     }
 }
 
+/// [Authenticode_PE.docx](http://download.microsoft.com/download/9/c/5/9c5b2167-8017-4bae-9fde-d599bac8184a/Authenticode_PE.docx)
+/// ``` not_rust
+/// SpcSerializedObject ::= SEQUENCE {
+///     classId             SpcUuid,
+///     serializedData      OCTETSTRING
+/// }
+///
+/// SpcUuid ::= OCTETSTRING
+/// ```
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
-pub struct SpcSerialized {
+pub struct SpcSerializedObject {
     pub class_id: SpcUuid,
     pub serialized_data: OctetStringAsn1,
 }
@@ -372,6 +473,13 @@ impl TryFrom<String> for SpcString {
     }
 }
 
+/// [Authenticode_PE.docx](http://download.microsoft.com/download/9/c/5/9c5b2167-8017-4bae-9fde-d599bac8184a/Authenticode_PE.docx)
+/// ``` not_rust
+/// SpcSpOpusInfo ::= SEQUENCE {
+///     programName             [0] EXPLICIT SpcString OPTIONAL,
+///     moreInfo                [1] EXPLICIT SpcLink OPTIONAL,
+/// }
+/// ```
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct SpcSpOpusInfo {
     #[serde(skip_serializing_if = "Option::is_none")]

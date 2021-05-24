@@ -4,25 +4,25 @@ use thiserror::Error;
 
 use picky_asn1::restricted_string::CharSetError;
 use picky_asn1::tag::Tag;
-use picky_asn1::wrapper::{ApplicationTag0, Asn1SetOf};
+use picky_asn1::wrapper::{ApplicationTag0, ApplicationTag1, Asn1SetOf};
 
 use picky_asn1_der::Asn1DerError;
 
 use picky_asn1_x509::algorithm_identifier::{AlgorithmIdentifier, UnsupportedAlgorithmError};
+use picky_asn1_x509::{oids, Attribute, AttributeValues, Attributes, Certificate, DigestInfo, SHAVariant};
+
+use picky_asn1_x509::pkcs7::cmsversion::CMSVersion;
 use picky_asn1_x509::pkcs7::content_info::{
-    ContentInfo, SpcAttributeAndOptionalValue, SpcIndirectDataContent, SpcLink, SpcPeImageData, SpcPeImageFlags,
-    SpcSpOpusInfo, SpcString,
+    EncapsulatedContentInfo, ContentValue, SpcAttributeAndOptionalValue, SpcIndirectDataContent, SpcLink, SpcPeImageData,
+    SpcPeImageFlags, SpcSpOpusInfo, SpcString,
 };
 use picky_asn1_x509::pkcs7::crls::RevocationInfoChoices;
-use picky_asn1_x509::pkcs7::signed_data::{
-    DigestAlgorithmIdentifiers, ExtendedCertificatesAndCertificates, SignedData,
-};
+use picky_asn1_x509::pkcs7::signed_data::{CertificateSet, DigestAlgorithmIdentifiers, SignedData, SingersInfos};
 use picky_asn1_x509::pkcs7::singer_info::{
-    CertificateSerialNumber, DigestEncryptionAlgorithmIdentifier, EncryptedDigest, IssuerAndSerialNumber, SingerInfo,
-    SingersInfos,
+    CertificateSerialNumber, DigestAlgorithmIdentifier, IssuerAndSerialNumber, SignatureAlgorithmIdentifier,
+    SignatureValue, SignerIdentifier, SignerInfo,
 };
 use picky_asn1_x509::pkcs7::Pkcs7Certificate;
-use picky_asn1_x509::{oids, extension::ExtensionView,  Attribute, AttributeValues, Attributes, Certificate, DigestInfo, SHAVariant, Version};
 
 use super::certificate::CertError;
 use super::utils::{from_der, from_pem, from_pem_str, to_der, to_pem};
@@ -31,8 +31,7 @@ use crate::hash::HashAlgorithm;
 use crate::key::PrivateKey;
 use crate::pem::Pem;
 use crate::signature::SignatureAlgorithm;
-use crate::x509::{Extension, Cert};
-use crate::x509::certificate::CertType;
+use crate::x509::extension::{ExtendedKeyUsage, ExtensionView};
 
 type Pkcs7Result<T> = Result<T, Pkcs7Error>;
 
@@ -52,6 +51,8 @@ pub enum Pkcs7Error {
     ProgramNameCharSet(#[from] CharSetError),
     #[error(transparent)]
     UnsupportedAlgorithmError(UnsupportedAlgorithmError),
+    #[error("The signing certificate must contain the extended key usage (EKU) value for code signing")]
+    NoEKUCodeSigning,
 }
 const PKCS7_PEM_LABEL: &str = "PKCS7";
 
@@ -88,9 +89,9 @@ impl Pkcs7 {
     ) -> Pkcs7Result<WinCertificate> {
         let Pkcs7Certificate { oid, signed_data } = self.0;
 
-        let SignedData { mut certificates, .. } = signed_data.0;
+        let SignedData { certificates, .. } = signed_data.0;
 
-        let sha_algo  = SHAVariant::from(hash_algo);
+        let sha_algo = SHAVariant::from(hash_algo);
         let digest_algorithm = AlgorithmIdentifier::new_sha(sha_algo);
 
         let data = SpcAttributeAndOptionalValue {
@@ -120,7 +121,14 @@ impl Pkcs7 {
         authenticated_attributes.append(&mut vec![
             Attribute {
                 ty: oids::content_type().into(),
-                value: AttributeValues::ContentType(Asn1SetOf(vec![oids::message_digest().into()])),
+                value: AttributeValues::ContentType(Asn1SetOf(vec![oids::spc_indirect_data_objid().into()])),
+            },
+            Attribute {
+                ty: oids::spc_sp_opus_info_objid().into(),
+                value: AttributeValues::SpcSpOpusInfo(Asn1SetOf(vec![SpcSpOpusInfo {
+                    program_name,
+                    more_info: Some(ApplicationTag1(SpcLink::default())),
+                }])),
             },
             Attribute {
                 ty: oids::message_digest().into(),
@@ -128,56 +136,51 @@ impl Pkcs7 {
                     .digest(raw_spc_indirect_data_content.as_ref())
                     .into()])),
             },
-            Attribute {
-                ty: oids::spc_sp_opus_info_objid().into(),
-                value: AttributeValues::SpcSpOpusInfo(Asn1SetOf(vec![SpcSpOpusInfo {
-                    program_name,
-                    more_info: Some(SpcLink::default().into()),
-                }])),
-            },
         ]);
 
         let content = SpcIndirectDataContent { data, message_digest };
 
-        let content_info = ContentInfo {
+        let content_info = EncapsulatedContentInfo {
             content_type: oids::spc_indirect_data_objid().into(),
-            content: Some(content.into()),
+            content: Some(ContentValue::SpcIndirectDataContent(content).into()),
         };
 
         // The signing certificate must contain either the extended key usage (EKU) value for code signing,
         // or the entire certificate chain must contain no EKUs
         {
-            let certificates = &mut certificates.0;
-            let code_signing_ext_key_usage = Extension::new_extended_key_usage(vec![oids::kp_code_signing()]);
+            let certificates = &certificates.0;
+            let code_signing_ext_key_usage: ExtendedKeyUsage = vec![oids::kp_code_signing()].into();
 
-            if  certificates
+            if certificates
                 .iter()
                 .map(|cert| cert.tbs_certificate.extensions.0 .0.iter())
                 .flatten()
                 .any(|extension| matches!(extension.extn_value(), ExtensionView::ExtendedKeyUsage(_)))
             {
-                let intermediate_cert = certificates.get_mut(1)
+                let signing_cert = certificates
+                    .get(0)
                     .expect("Certificates must contain at least leaf and intermediate certificates");
 
-                let extensions = &mut intermediate_cert.tbs_certificate.extensions.0 .0;
-
-                if !extensions
-                    .iter()
-                    .any(|extension| extension == &code_signing_ext_key_usage)
-                {
-                    extensions.push(code_signing_ext_key_usage);
+                if !signing_cert.tbs_certificate.extensions.0 .0.iter().any(|extension| {
+                    extension.extn_value() == ExtensionView::ExtendedKeyUsage(&code_signing_ext_key_usage)
+                }) {
+                    return Err(Pkcs7Error::NoEKUCodeSigning);
                 }
             }
         }
 
-        let leaf_cert = certificates.0.get(0).expect("Certificates must contain at least Leaf and Intermediate certificates");
+        let signing_cert = certificates
+            .0
+            .get(0)
+            .expect("Certificates must contain at least Leaf and Intermediate certificates");
 
         let issuer_and_serial_number = IssuerAndSerialNumber {
-            issuer: leaf_cert.tbs_certificate.issuer.clone(),
-            serial_number: CertificateSerialNumber(leaf_cert.tbs_certificate.serial_number.clone()),
+            issuer: signing_cert.tbs_certificate.issuer.clone(),
+            serial_number: CertificateSerialNumber(signing_cert.tbs_certificate.serial_number.clone()),
         };
 
-        let digest_encryption_algorithm = AlgorithmIdentifier::new_rsa_encryption_with_sha(sha_algo).map_err(Pkcs7Error::UnsupportedAlgorithmError)?;
+        let digest_encryption_algorithm = AlgorithmIdentifier::new_rsa_encryption_with_sha(sha_algo)
+            .map_err(Pkcs7Error::UnsupportedAlgorithmError)?;
 
         let signature_algo = SignatureAlgorithm::from_algorithm_identifier(&digest_encryption_algorithm)?;
 
@@ -188,28 +191,24 @@ impl Pkcs7 {
         // the SET OF tag, rather than of the IMPLICIT [0] tag [...]"
         auth_raw_data[0] = Tag::SET.number();
 
-        let encrypted_digest = EncryptedDigest(signature_algo.sign(auth_raw_data.as_ref(), private_key)?.into());
+        let encrypted_digest = SignatureValue(signature_algo.sign(auth_raw_data.as_ref(), private_key)?.into());
 
-        let singer_info = SingerInfo {
-            version: Version::V2,
-            issuer_and_serial_number,
-            digest_algorithm: digest_algorithm.clone(),
-            authenticode_attributes: Attributes(authenticated_attributes).into(),
-            digest_encryption_algorithm: DigestEncryptionAlgorithmIdentifier(AlgorithmIdentifier::new_rsa_encryption()),
-            encrypted_digest,
+        let singer_info = SignerInfo {
+            version: CMSVersion::V1,
+            sid: SignerIdentifier::IssuerAndSerialNumber(issuer_and_serial_number),
+            digest_algorithm: DigestAlgorithmIdentifier(digest_algorithm.clone()),
+            signed_attrs: Attributes(authenticated_attributes).into(),
+            signature_algorithm: SignatureAlgorithmIdentifier(AlgorithmIdentifier::new_rsa_encryption()),
+            signature: encrypted_digest,
         };
 
         // certificates contains the signer certificate and any intermediate certificates,
         // but typically does not contain the root certificate
-        let certificates = ExtendedCertificatesAndCertificates(certificates.0.into_iter().map(Cert::from).filter_map(|cert|
-           if matches!(cert.ty(), CertType::Leaf | CertType::Intermediate | CertType::Unknown) {
-               Some(Certificate::from(cert))
-           } else {
-               None
-           }).collect::<Vec<Certificate>>());
+
+        let certificates = CertificateSet(certificates.0.into_iter().take(2).collect::<Vec<Certificate>>());
 
         let signed_data = SignedData {
-            version: Version::V2,
+            version: CMSVersion::V1,
             digest_algorithms: DigestAlgorithmIdentifiers(vec![digest_algorithm].into()),
             content_info,
             certificates,
@@ -235,6 +234,8 @@ impl Pkcs7 {
 mod tests {
     use super::*;
     use crate::pem::parse_pem;
+    use crate::x509::certificate::{Cert, CertType};
+    use crate::x509::Extension;
 
     const FILE_HASH: [u8; 32] = [
         0xa7, 0x38, 0xda, 0x44, 0x46, 0xa4, 0xe7, 0x8a, 0xb6, 0x47, 0xdb, 0x7e, 0x53, 0x42, 0x7e, 0xb0, 0x79, 0x61,
@@ -301,7 +302,13 @@ MvS4rPuhVYrvouZHJ50bcwccByJ8aCOJxLdH7+bjojMSAgV2kGq+FNh7F1wRcwx8\n
         );
 
         let spc_indirect_data_content = content_info.content.as_ref().unwrap();
-        let message_digest = &spc_indirect_data_content.message_digest;
+        let message_digest = match &spc_indirect_data_content.0 {
+            ContentValue::SpcIndirectDataContent(SpcIndirectDataContent {
+                data: _,
+                message_digest,
+            }) => message_digest.clone(),
+            _ => panic!("Expected ContentValue with SpcIndirectDataContent, but got something else"),
+        };
 
         assert_eq!(
             message_digest.oid,
@@ -314,11 +321,11 @@ MvS4rPuhVYrvouZHJ50bcwccByJ8aCOJxLdH7+bjojMSAgV2kGq+FNh7F1wRcwx8\n
 
         let singer_info = signed_data.singers_infos.0 .0.first().unwrap();
         assert_eq!(
-            singer_info.digest_algorithm,
+            singer_info.digest_algorithm.0,
             AlgorithmIdentifier::new_sha(SHAVariant::from(hash_type))
         );
 
-        let authenticated_attributes = &singer_info.authenticode_attributes.0 .0;
+        let authenticated_attributes = &singer_info.signed_attrs.0 .0;
 
         if !authenticated_attributes
             .iter()
@@ -342,21 +349,23 @@ MvS4rPuhVYrvouZHJ50bcwccByJ8aCOJxLdH7+bjojMSAgV2kGq+FNh7F1wRcwx8\n
         }
 
         assert_eq!(
-            singer_info.digest_encryption_algorithm,
-            DigestEncryptionAlgorithmIdentifier(AlgorithmIdentifier::new_rsa_encryption())
+            singer_info.signature_algorithm,
+            SignatureAlgorithmIdentifier(AlgorithmIdentifier::new_rsa_encryption())
         );
 
         let signature_algo =
             SignatureAlgorithm::from_algorithm_identifier(&AlgorithmIdentifier::new_sha256_with_rsa_encryption())
                 .unwrap();
 
-        let certificate = signed_data.certificates
+        let certificate = signed_data
+            .certificates
             .0
             .clone()
             .into_iter()
             .map(Cert::from)
             .find(|certificate| matches!(certificate.ty(), CertType::Intermediate))
-            .map(Certificate::from).unwrap();
+            .map(Certificate::from)
+            .unwrap();
 
         let code_signing_ext_key_usage = Extension::new_extended_key_usage(vec![oids::kp_code_signing()]);
         assert!(!certificate
@@ -367,8 +376,8 @@ MvS4rPuhVYrvouZHJ50bcwccByJ8aCOJxLdH7+bjojMSAgV2kGq+FNh7F1wRcwx8\n
             .iter()
             .any(|extension| extension == &code_signing_ext_key_usage));
 
-        let public_key = certificate.tbs_certificate.subject_public_key_info.clone();
-        let encrypted_digest = singer_info.encrypted_digest.0 .0.as_ref();
+        let public_key = certificate.tbs_certificate.subject_public_key_info;
+        let encrypted_digest = singer_info.signature.0 .0.as_ref();
 
         let mut auth_raw_data = picky_asn1_der::to_vec(&authenticated_attributes).unwrap();
         auth_raw_data[0] = Tag::SET.number();

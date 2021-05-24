@@ -1,3 +1,4 @@
+pub mod cmsversion;
 pub mod content_info;
 pub mod crls;
 pub mod signed_data;

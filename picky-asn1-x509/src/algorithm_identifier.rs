@@ -3,9 +3,8 @@ use oid::ObjectIdentifier;
 use picky_asn1::tag::{Tag, TagPeeker};
 use picky_asn1::wrapper::{IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1};
 use serde::{de, ser, Deserialize, Serialize};
-use std::fmt;
 use std::error::Error;
-
+use std::fmt;
 
 /// unsupported algorithm
 #[derive(Debug)]
@@ -19,9 +18,7 @@ impl fmt::Display for UnsupportedAlgorithmError {
     }
 }
 
-impl Error for UnsupportedAlgorithmError {
-
-}
+impl Error for UnsupportedAlgorithmError {}
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct AlgorithmIdentifier {
@@ -106,7 +103,11 @@ impl AlgorithmIdentifier {
             SHAVariant::SHA2_512 => oids::sha512_with_rsa_encryption(),
             SHAVariant::SHA3_384 => oids::id_rsassa_pkcs1_v1_5_with_sha3_384(),
             SHAVariant::SHA3_512 => oids::id_rsassa_pkcs1_v1_5_with_sha3_512(),
-            _ => return Err(UnsupportedAlgorithmError { algorithm: format!("{:?}", variant)} ),
+            _ => {
+                return Err(UnsupportedAlgorithmError {
+                    algorithm: format!("{:?}", variant),
+                })
+            }
         };
 
         Ok(Self {

@@ -1,11 +1,23 @@
 use serde::{de, ser, Deserialize, Serialize};
 
 use picky_asn1::tag::{Tag, TagPeeker};
-use picky_asn1::wrapper::{ApplicationTag0, ApplicationTag1, Asn1SequenceOf, BitStringAsn1, ObjectIdentifierAsn1};
+use picky_asn1::wrapper::{ApplicationTag0, Asn1SequenceOf, BitStringAsn1, ContextTag1, ObjectIdentifierAsn1};
 
 use super::singer_info::CertificateSerialNumber;
 use crate::{AlgorithmIdentifier, Extensions, Name, Time, Version};
 
+/// [RFC 5652 #10.2.1](https://datatracker.ietf.org/doc/html/rfc5652#section-10.2.1)
+/// ``` not_rust
+/// RevocationInfoChoices ::= SET OF RevocationInfoChoice
+///
+/// RevocationInfoChoice ::= CHOICE {
+///    crl CertificateList,
+///    other [1] IMPLICIT OtherRevocationInfoFormat }
+///
+/// OtherRevocationInfoFormat ::= SEQUENCE {
+///    otherRevInfoFormat OBJECT IDENTIFIER,
+///    otherRevInfo ANY DEFINED BY otherRevInfoFormat }
+/// ```
 #[derive(Debug, PartialEq, Clone, Default)]
 pub struct RevocationInfoChoices(pub Vec<RevocationInfoChoice>);
 
@@ -37,7 +49,7 @@ impl<'de> de::Deserialize<'de> for RevocationInfoChoices {
 #[derive(Debug, PartialEq, Clone)]
 pub enum RevocationInfoChoice {
     Crl(CertificateList),
-    Other(ApplicationTag1<OtherRevocationInfoFormat>),
+    Other(ContextTag1<OtherRevocationInfoFormat>),
 }
 
 impl ser::Serialize for RevocationInfoChoice {
@@ -77,7 +89,7 @@ impl<'de> Deserialize<'de> for RevocationInfoChoice {
                 let tag_peeker: TagPeeker = seq_next_element!(seq, RevocationInfoChoice, "choice tag");
 
                 let revocation_info_choice = match tag_peeker.next_tag {
-                    Tag::APP_1 => RevocationInfoChoice::Other(seq_next_element!(
+                    Tag::CTX_1 => RevocationInfoChoice::Other(seq_next_element!(
                         seq,
                         RevocationInfoChoice,
                         "OtherRevocationInfoFormat "
@@ -93,6 +105,31 @@ impl<'de> Deserialize<'de> for RevocationInfoChoice {
     }
 }
 
+/// CRLs are specified in X.509
+/// ``` not_rust
+/// [RFC 5280 #5.1](https://datatracker.ietf.org/doc/html/rfc5280#section-5.1)
+/// CertificateList  ::=  SEQUENCE  {
+///         tbsCertList          TBSCertList,
+///         signatureAlgorithm   AlgorithmIdentifier,
+///         signatureValue       BIT STRING  }
+///
+///  TBSCertList  ::=  SEQUENCE  {
+///         version                 Version OPTIONAL,
+///                                      -- if present, MUST be v2
+///         signature               AlgorithmIdentifier,
+///         issuer                  Name,
+///         thisUpdate              Time,
+///         nextUpdate              Time OPTIONAL,
+///         revokedCertificates     SEQUENCE OF SEQUENCE  {
+///              userCertificate         CertificateSerialNumber,
+///              revocationDate          Time,
+///              crlEntryExtensions      Extensions OPTIONAL
+///                                       -- if present, version MUST be v2
+///                                   }  OPTIONAL,
+///         crlExtensions           [0]  EXPLICIT Extensions OPTIONAL
+///                                       -- if present, version MUST be v2
+///                                 }
+/// ```
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct CertificateList {
     pub tbs_cert_list: TBSCertList,
