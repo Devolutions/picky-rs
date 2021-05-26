@@ -128,11 +128,6 @@ impl<'de> de::Deserialize<'de> for EncapsulatedContentInfo {
 ///     data                    SpcAttributeTypeAndOptionalValue,
 ///     messageDigest           DigestInfo
 /// }
-///
-/// SpcAttributeTypeAndOptionalValue ::= SEQUENCE {
-///     type                    ObjectID,
-///     value                   [0] EXPLICIT ANY OPTIONAL
-/// }
 /// ```
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct SpcIndirectDataContent {
@@ -140,6 +135,13 @@ pub struct SpcIndirectDataContent {
     pub message_digest: DigestInfo,
 }
 
+// [Authenticode_PE.docx](http://download.microsoft.com/download/9/c/5/9c5b2167-8017-4bae-9fde-d599bac8184a/Authenticode_PE.docx)
+/// ``` not_rust
+/// SpcAttributeTypeAndOptionalValue ::= SEQUENCE {
+///     type                    ObjectID,
+///     value                   [0] EXPLICIT ANY OPTIONAL
+/// }
+/// ```
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct SpcAttributeAndOptionalValue {
     pub ty: ObjectIdentifierAsn1,
@@ -198,22 +200,6 @@ impl<'de> de::Deserialize<'de> for SpcAttributeAndOptionalValue {
 ///    flags                   SpcPeImageFlags DEFAULT { includeResources },
 ///    file                    SpcLink
 /// }
-/// SpcPeImageFlags ::= BIT STRING {
-///     includeResources            (0),
-///     includeDebugInfo            (1),
-///     includeImportAddressTable   (2)
-/// }
-///
-/// SpcLink ::= CHOICE {
-///     url                     [0] IMPLICIT IA5STRING,
-///     moniker                 [1] IMPLICIT SpcSerializedObject,
-///     file                    [2] EXPLICIT SpcString
-/// } --#public--
-///
-/// SpcString ::= CHOICE {
-///     unicode                 [0] IMPLICIT BMPSTRING,
-///     ascii                   [1] IMPLICIT IA5STRING
-/// }
 /// ```
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct SpcPeImageData {
@@ -252,6 +238,14 @@ impl<'de> de::Deserialize<'de> for SpcPeImageData {
     }
 }
 
+/// [Authenticode_PE.docx](http://download.microsoft.com/download/9/c/5/9c5b2167-8017-4bae-9fde-d599bac8184a/Authenticode_PE.docx)
+/// ``` not_rust
+/// SpcPeImageFlags ::= BIT STRING {
+///     includeResources            (0),
+///     includeDebugInfo            (1),
+///     includeImportAddressTable   (2)
+/// }
+/// ```
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct SpcPeImageFlags(pub BitStringAsn1);
 
@@ -265,6 +259,14 @@ impl Default for SpcPeImageFlags {
     }
 }
 
+/// [Authenticode_PE.docx](http://download.microsoft.com/download/9/c/5/9c5b2167-8017-4bae-9fde-d599bac8184a/Authenticode_PE.docx)
+/// ``` not_rust
+/// SpcLink ::= CHOICE {
+///     url                     [0] IMPLICIT IA5STRING,
+///     moniker                 [1] IMPLICIT SpcSerializedObject,
+///     file                    [2] EXPLICIT SpcString
+/// }
+/// ```
 #[derive(Debug, PartialEq, Clone)]
 pub enum SpcLink {
     Url(Url),
@@ -391,6 +393,13 @@ pub struct SpcSerializedObject {
     pub serialized_data: OctetStringAsn1,
 }
 
+/// [Authenticode_PE.docx](http://download.microsoft.com/download/9/c/5/9c5b2167-8017-4bae-9fde-d599bac8184a/Authenticode_PE.docx)
+/// ``` not_rust
+/// SpcString ::= CHOICE {
+///     unicode                 [0] IMPLICIT BMPSTRING,
+///     ascii                   [1] IMPLICIT IA5STRING
+/// }
+/// ```
 #[derive(Debug, PartialEq, Clone)]
 pub enum SpcString {
     Unicode(Implicit<ContextTag0<BMPStringAsn1>>),

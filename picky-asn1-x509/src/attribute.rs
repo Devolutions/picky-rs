@@ -40,11 +40,11 @@ impl Default for Attributes {
 
 /// [RFC 2985 page 15 and 16](https://tools.ietf.org/html/rfc2985#page-15)
 ///
-/// Accepted attribute types are `challengePassword` and `extensionRequest`
+/// Accepted attribute types are `challengePassword` (TODO), `extensionRequest`,
+/// `contentType`, `messageDigest` and `spcSpOpusInfo`
 ///
-/// [Authenticode_PE.docx](http://download.microsoft.com/download/9/c/5/9c5b2167-8017-4bae-9fde-d599bac8184a/Authenticode_PE.docx)
-///
-/// Accepted attribute types are `contentType`, `messageDigest` and `spcSpOpusInfo`
+/// `contentType`, `messageDigest` and `spcSpOpusInfo` are used for [microsoft authenticode]
+/// (http://download.microsoft.com/download/9/c/5/9c5b2167-8017-4bae-9fde-d599bac8184a/Authenticode_PE.docx)
 #[derive(Clone, Debug, PartialEq)]
 pub enum AttributeValues {
     /// `extensionRequest`

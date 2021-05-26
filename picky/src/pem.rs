@@ -257,7 +257,7 @@ mod tests {
     }
 
     #[cfg(not(windows))]
-    // The test should not be ran on Windows. writeln! add `/r` ending character to Pem in String format on Windows targets.
+    // This test should not run on Windows. writeln! add `/r` ending character to Pem in String format on Windows targets.
     #[test]
     fn to_string() {
         let pem = PEM_STR.parse::<Pem>().unwrap();

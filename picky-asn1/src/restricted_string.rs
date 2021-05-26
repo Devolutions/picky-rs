@@ -257,13 +257,12 @@ impl CharSet for BMPCharSet {
             return false;
         }
 
-        let buffer = data
+        let u16_it = data
             .chunks_exact(2)
             .into_iter()
-            .map(|elem| u16::from_be_bytes([elem[1], elem[0]]))
-            .collect::<Vec<u16>>();
+            .map(|elem| u16::from_be_bytes([elem[1], elem[0]]));
 
-        String::from_utf16(buffer.as_ref()).is_ok()
+        char::decode_utf16(u16_it).all(|c| matches!(c, Ok(_)))
     }
 }
 
@@ -307,12 +306,12 @@ mod tests {
     }
 
     #[test]
-    fn valid_unicode_string() {
+    fn valid_bmp_string() {
         BMPString::from_str("语言处理").expect("valid unicode string");
     }
 
     #[test]
-    fn invalid_unicode_string() {
+    fn invalid_bmp_string() {
         assert!(BMPString::from_str("1224na÷日本語はむずかちー−×—«BUeisuteurnt").is_err())
     }
 }

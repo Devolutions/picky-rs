@@ -933,7 +933,7 @@ impl<'a> CertificateBuilder<'a> {
     }
 }
 
-pub fn generate_serial_number() -> IntegerAsn1 {
+fn generate_serial_number() -> IntegerAsn1 {
     let x = rand::random::<u32>();
     let b1 = ((x >> 24) & 0xff) as u8;
     let b2 = ((x >> 16) & 0xff) as u8;

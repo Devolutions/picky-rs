@@ -2,7 +2,7 @@ pub mod cmsversion;
 pub mod content_info;
 pub mod crls;
 pub mod signed_data;
-pub mod singer_info;
+pub mod signer_info;
 
 use crate::oids;
 use signed_data::SignedData;

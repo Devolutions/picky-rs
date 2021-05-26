@@ -97,7 +97,7 @@ fn version_is_default(version: &Version) -> bool {
     version == &Version::default()
 }
 
-// Implement Deserialize manually to support missing version field aka Version V1(Default)
+// Implement Deserialize manually to support missing version field (i.e.: fallback as V1)
 impl<'de> de::Deserialize<'de> for TBSCertificate {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -116,20 +116,35 @@ impl<'de> de::Deserialize<'de> for TBSCertificate {
             where
                 V: de::SeqAccess<'de>,
             {
-                let version = seq.next_element().unwrap_or_default().unwrap_or_default();
+                let version: ApplicationTag0<Version> = seq.next_element().unwrap_or_default().unwrap_or_default();
+                let serial_number = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(1, &self))?;
+                let signature = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(2, &self))?;
+                let issuer = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(3, &self))?;
+                let validity = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(4, &self))?;
+                let subject = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(5, &self))?;
+                let subject_public_key_info = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(6, &self))?;
+                let extensions: ApplicationTag3<Extensions> = seq
+                    .next_element()?
+                    .unwrap_or_else(|| Some(Extensions(Vec::new()).into()))
+                    .unwrap_or_else(|| Extensions(Vec::new()).into());
+
+                if version.0 != Version::V3 && !extensions.0 .0.is_empty() {
+                    return Err(serde_invalid_value!(
+                        TBSCertificate,
+                        "Version is not V3, but Extensions are present",
+                        "no Extensions"
+                    ));
+                }
 
                 Ok(TBSCertificate {
                     version,
-                    serial_number: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(1, &self))?,
-                    signature: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(2, &self))?,
-                    issuer: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(3, &self))?,
-                    validity: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(4, &self))?,
-                    subject: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(5, &self))?,
-                    subject_public_key_info: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(6, &self))?,
-                    extensions: seq
-                        .next_element()?
-                        .unwrap_or_else(|| Some(Extensions(Vec::new()).into()))
-                        .unwrap_or_else(|| Extensions(Vec::new()).into()),
+                    serial_number,
+                    signature,
+                    issuer,
+                    validity,
+                    subject,
+                    subject_public_key_info,
+                    extensions,
                 })
             }
         }

@@ -61,7 +61,7 @@ impl<'de> Deserialize<'de> for CMSVersion {
                 let cms_version = CMSVersion::from_u8(v).ok_or_else(|| {
                     E::invalid_value(
                         de::Unexpected::Other("invalid cms version number"),
-                        &"a valid integer representing a supported cms version number (0, 1, 2, 3, 4 ,or 5)",
+                        &"a valid integer representing a supported cms version number (0, 1, 2, 3, 4 or 5)",
                     )
                 })?;
 

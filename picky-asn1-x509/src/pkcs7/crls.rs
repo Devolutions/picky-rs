@@ -3,7 +3,7 @@ use serde::{de, ser, Deserialize, Serialize};
 use picky_asn1::tag::{Tag, TagPeeker};
 use picky_asn1::wrapper::{ApplicationTag0, Asn1SequenceOf, BitStringAsn1, ContextTag1, ObjectIdentifierAsn1};
 
-use super::singer_info::CertificateSerialNumber;
+use super::signer_info::CertificateSerialNumber;
 use crate::{AlgorithmIdentifier, Extensions, Name, Time, Version};
 
 /// [RFC 5652 #10.2.1](https://datatracker.ietf.org/doc/html/rfc5652#section-10.2.1)
@@ -14,9 +14,6 @@ use crate::{AlgorithmIdentifier, Extensions, Name, Time, Version};
 ///    crl CertificateList,
 ///    other [1] IMPLICIT OtherRevocationInfoFormat }
 ///
-/// OtherRevocationInfoFormat ::= SEQUENCE {
-///    otherRevInfoFormat OBJECT IDENTIFIER,
-///    otherRevInfo ANY DEFINED BY otherRevInfoFormat }
 /// ```
 #[derive(Debug, PartialEq, Clone, Default)]
 pub struct RevocationInfoChoices(pub Vec<RevocationInfoChoice>);
@@ -235,6 +232,12 @@ impl<'de> de::Deserialize<'de> for RevokedCertificate {
     }
 }
 
+/// [RFC 5652 #10.2.1](https://datatracker.ietf.org/doc/html/rfc5652#section-10.2.1)
+/// ``` not_rust
+/// OtherRevocationInfoFormat ::= SEQUENCE {
+///    otherRevInfoFormat OBJECT IDENTIFIER,
+///    otherRevInfo ANY DEFINED BY otherRevInfoFormat }
+/// ```
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct OtherRevocationInfoFormat {
     other_rev_info_format: ObjectIdentifierAsn1,

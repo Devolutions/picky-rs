@@ -4,7 +4,7 @@ use serde::{de, ser, Deserialize, Serialize};
 
 use super::content_info::EncapsulatedContentInfo;
 use super::crls::RevocationInfoChoices;
-use super::singer_info::SignerInfo;
+use super::signer_info::SignerInfo;
 use crate::cmsversion::CMSVersion;
 use crate::{AlgorithmIdentifier, Certificate};
 
@@ -29,14 +29,14 @@ pub struct SignedData {
     pub content_info: EncapsulatedContentInfo,
     pub certificates: CertificateSet,
     pub crls: RevocationInfoChoices,
-    pub singers_infos: SingersInfos,
+    pub signers_infos: SignersInfos,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct DigestAlgorithmIdentifiers(pub Asn1SetOf<AlgorithmIdentifier>);
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct SingersInfos(pub Asn1SetOf<SignerInfo>);
+pub struct SignersInfos(pub Asn1SetOf<SignerInfo>);
 
 /// [RFC 5652 #10.2.3](https://datatracker.ietf.org/doc/html/rfc5652#section-10.2.3)
 /// ``` not_rust
@@ -200,7 +200,7 @@ mod tests {
             content_info,
             certificates: CertificateSet(vec![full_certificate]),
             crls: RevocationInfoChoices(Vec::new()),
-            singers_infos: SingersInfos(Vec::new().into()),
+            signers_infos: SignersInfos(Vec::new().into()),
         };
 
         check_serde!(signed_data: SignedData in pkcs7[19..1598]);

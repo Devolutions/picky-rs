@@ -126,15 +126,17 @@
 //!# Ok(())
 //!# }
 //! ```
+#[cfg(feature = "pkcs7")]
+pub mod pkcs7;
+
+#[cfg(feature = "wincert")]
+pub mod wincert;
 
 pub mod certificate;
 pub mod csr;
 pub mod date;
 pub mod key_id_gen_method;
 pub mod name;
-pub mod pkcs7;
-pub mod utils;
-pub mod wincert;
 
 pub use certificate::Cert;
 pub use csr::Csr;
@@ -144,3 +146,5 @@ pub use picky_asn1_x509::{DirectoryString, Extension, Extensions};
 pub mod extension {
     pub use picky_asn1_x509::extension::*;
 }
+
+mod utils;
