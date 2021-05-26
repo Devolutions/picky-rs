@@ -110,6 +110,16 @@ impl<'de> Deserialize<'de> for RevocationInfoChoice {
 ///         signatureAlgorithm   AlgorithmIdentifier,
 ///         signatureValue       BIT STRING  }
 ///
+/// ```
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct CertificateList {
+    pub tbs_cert_list: TBSCertList,
+    pub signature_algorithm: AlgorithmIdentifier,
+    pub signature_value: BitStringAsn1,
+}
+
+/// ``` not_rust
+/// [RFC 5280 #5.1](https://datatracker.ietf.org/doc/html/rfc5280#section-5.1)
 ///  TBSCertList  ::=  SEQUENCE  {
 ///         version                 Version OPTIONAL,
 ///                                      -- if present, MUST be v2
@@ -127,13 +137,6 @@ impl<'de> Deserialize<'de> for RevocationInfoChoice {
 ///                                       -- if present, version MUST be v2
 ///                                 }
 /// ```
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct CertificateList {
-    pub tbs_cert_list: TBSCertList,
-    pub signature_algorithm: AlgorithmIdentifier,
-    pub signature_value: BitStringAsn1,
-}
-
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct TBSCertList {
     pub version: Option<Version>,

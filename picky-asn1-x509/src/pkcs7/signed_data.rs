@@ -17,10 +17,6 @@ use crate::{AlgorithmIdentifier, Certificate};
 ///         certificates [0] IMPLICIT CertificateSet OPTIONAL,
 ///         crls [1] IMPLICIT RevocationInfoChoices OPTIONAL,
 ///         signerInfos SignerInfos }
-///
-///       DigestAlgorithmIdentifiers ::= SET OF DigestAlgorithmIdentifier
-///
-///       SignerInfos ::= SET OF SignerInfo
 /// ```
 #[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
 pub struct SignedData {
@@ -32,9 +28,17 @@ pub struct SignedData {
     pub signers_infos: SignersInfos,
 }
 
+/// [RFC 5652 #5.1](https://datatracker.ietf.org/doc/html/rfc5652#section-5.1)
+/// ``` not_rust
+/// DigestAlgorithmIdentifiers ::= SET OF DigestAlgorithmIdentifier
+/// ```
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct DigestAlgorithmIdentifiers(pub Asn1SetOf<AlgorithmIdentifier>);
 
+/// [RFC 5652 #5.1](https://datatracker.ietf.org/doc/html/rfc5652#section-5.1)
+/// ``` not_rust
+/// SignerInfos ::= SET OF SignerInfo
+/// ```
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct SignersInfos(pub Asn1SetOf<SignerInfo>);
 

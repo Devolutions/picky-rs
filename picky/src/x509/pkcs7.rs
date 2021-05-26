@@ -11,8 +11,6 @@ use thiserror::Error;
 
 type Pkcs7Result<T> = Result<T, Pkcs7Error>;
 
-pub const AUTHENTICODE_ATTRIBUTES_COUNT: usize = 3;
-
 const ELEMENT_NAME: &str = "pkcs7 certificate";
 
 #[derive(Debug, Error)]
@@ -34,6 +32,7 @@ pub enum Pkcs7Error {
     #[error("Certificates must contain at least Leaf and Intermediate certificates, but got no certificates")]
     NoCertificates,
 }
+
 const PKCS7_PEM_LABEL: &str = "PKCS7";
 
 #[derive(Clone, Debug, PartialEq)]

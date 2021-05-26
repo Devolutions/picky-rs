@@ -126,6 +126,7 @@
 //!# Ok(())
 //!# }
 //! ```
+
 #[cfg(feature = "pkcs7")]
 pub mod pkcs7;
 

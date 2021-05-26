@@ -17,15 +17,9 @@ use picky_asn1::tag::{Tag, TagPeeker};
 ///         signature SignatureValue,
 ///         unsignedAttrs [1] IMPLICIT UnsignedAttributes OPTIONAL }
 ///
-/// SignerIdentifier ::= CHOICE {
-///          issuerAndSerialNumber IssuerAndSerialNumber,
-///          subjectKeyIdentifier [0] SubjectKeyIdentifier }
-///
 /// SignedAttributes ::= SET SIZE (1..MAX) OF Attribute
 ///
 /// UnsignedAttributes ::= SET SIZE (1..MAX) OF Attribute
-///
-/// SignatureValue ::= OCTET STRING
 /// ```
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct SignerInfo {
@@ -82,6 +76,12 @@ impl<'de> de::Deserialize<'de> for SignerInfo {
     }
 }
 
+/// [RFC 5652 #5.3](https://datatracker.ietf.org/doc/html/rfc5652#section-5.3)
+/// ``` not_rust
+/// SignerIdentifier ::= CHOICE {
+///          issuerAndSerialNumber IssuerAndSerialNumber,
+///          subjectKeyIdentifier [0] SubjectKeyIdentifier }
+/// ```
 #[derive(Debug, PartialEq, Clone)]
 pub enum SignerIdentifier {
     IssuerAndSerialNumber(IssuerAndSerialNumber),
@@ -152,6 +152,10 @@ impl<'de> Deserialize<'de> for SignerIdentifier {
     }
 }
 
+/// [RFC 5652 #5.3](https://datatracker.ietf.org/doc/html/rfc5652#section-5.3)
+/// ``` not_rust
+/// SignatureValue ::= OCTET STRING
+/// ```
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct SignatureValue(pub OctetStringAsn1);
 
@@ -174,8 +178,6 @@ pub struct SignatureAlgorithmIdentifier(pub AlgorithmIdentifier);
 /// IssuerAndSerialNumber ::= SEQUENCE {
 ///      issuer Name,
 ///      serialNumber CertificateSerialNumber }
-///
-/// CertificateSerialNumber ::= INTEGER
 /// ```
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct IssuerAndSerialNumber {
@@ -183,5 +185,9 @@ pub struct IssuerAndSerialNumber {
     pub serial_number: CertificateSerialNumber,
 }
 
+/// [RFC 5652 #10.2.4](https://datatracker.ietf.org/doc/html/rfc5652#section-10.2.4)
+/// ``` not_rust
+/// CertificateSerialNumber ::= INTEGER
+/// ```
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct CertificateSerialNumber(pub IntegerAsn1);

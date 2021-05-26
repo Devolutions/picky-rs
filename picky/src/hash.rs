@@ -47,6 +47,7 @@ impl From<HashAlgorithm> for rsa::Hash {
         }
     }
 }
+
 impl TryFrom<HashAlgorithm> for SHAVariant {
     type Error = UnsupportedHashAlgorithmError;
 
