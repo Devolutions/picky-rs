@@ -235,13 +235,13 @@ define_special_tag! {
 
 impl Default for IA5StringAsn1 {
     fn default() -> Self {
-        unsafe { IA5StringAsn1::from(IA5String::new_unchecked(Vec::new())) }
+        IA5StringAsn1::from(IA5String::default())
     }
 }
 
 impl Default for BMPStringAsn1 {
     fn default() -> Self {
-        unsafe { BMPStringAsn1::from(BMPString::new_unchecked(Vec::new())) }
+        BMPStringAsn1::from(BMPString::default())
     }
 }
 
