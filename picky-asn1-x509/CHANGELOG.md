@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6] 2021-05-27
+
+### Added
+
+- Support for V1 and V2 X509 certificates
+- Support for `CrlNumber` extension
+- PKCS7 implementation behind `pkcs7` feature
+
+### Changed
+
+- More supported attribute values: `ContentType`, `MessageDigest` and `SpcSpOpusInfo`
+- Fix clippy upper case acronyms warning in a few places
+
+### Removed
+
+- Remove `ImplicitCurve` from `EcParameters` enum
+
 ## [0.5.0] 2021-03-04
 
 ### Added
