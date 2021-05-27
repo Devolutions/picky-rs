@@ -1,3 +1,4 @@
+#[cfg(feature = "pkcs7")]
 use crate::pkcs7::content_info::SpcSpOpusInfo;
 use crate::{oids, Extension, Extensions};
 use picky_asn1::tag::Tag;
@@ -43,6 +44,8 @@ impl Default for Attributes {
 /// Accepted attribute types are `challengePassword` (TODO), `extensionRequest`,
 /// `contentType`, `messageDigest` and `spcSpOpusInfo`
 ///
+/// `spcSpOpusInfo` is behind the `pkcs7` feature.
+///
 /// `contentType`, `messageDigest` and `spcSpOpusInfo` are used for [microsoft authenticode]
 /// (http://download.microsoft.com/download/9/c/5/9c5b2167-8017-4bae-9fde-d599bac8184a/Authenticode_PE.docx)
 #[derive(Clone, Debug, PartialEq)]
@@ -54,6 +57,7 @@ pub enum AttributeValues {
     Custom(picky_asn1_der::Asn1RawDer), // fallback
     ContentType(Asn1SetOf<ObjectIdentifierAsn1>),
     MessageDigest(Asn1SetOf<OctetStringAsn1>),
+    #[cfg(feature = "pkcs7")]
     SpcSpOpusInfo(Asn1SetOf<SpcSpOpusInfo>),
 }
 
@@ -85,6 +89,7 @@ impl ser::Serialize for Attribute {
             AttributeValues::Custom(der) => seq.serialize_element(der)?,
             AttributeValues::ContentType(oid) => seq.serialize_element(oid)?,
             AttributeValues::MessageDigest(octet_string) => seq.serialize_element(octet_string)?,
+            #[cfg(feature = "pkcs7")]
             AttributeValues::SpcSpOpusInfo(spc_sp_opus_info) => seq.serialize_element(spc_sp_opus_info)?,
         }
         seq.end()
@@ -123,6 +128,7 @@ impl<'de> de::Deserialize<'de> for Attribute {
                     oids::MESSAGE_DIGEST => {
                         AttributeValues::MessageDigest(seq_next_element!(seq, Attribute, "an octet string"))
                     }
+                    #[cfg(feature = "pkcs7")]
                     oids::SPC_SP_OPUS_INFO_OBJID => {
                         AttributeValues::SpcSpOpusInfo(seq_next_element!(seq, Attribute, "an SpcSpOpusInfo object"))
                     }
