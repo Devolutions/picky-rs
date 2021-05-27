@@ -402,32 +402,32 @@ mod tests {
         0xc9, 0x94, 0x31, 0x7f, 0x4c, 0x59, 0xd7, 0xed, 0xbe, 0xa5, 0xcc, 0x78, 0x6d, 0x80,
     ];
 
-    const RSA_PRIVATE_KEY: &str = "-----BEGIN RSA PRIVATE KEY-----\n
-                                   MIIEpAIBAAKCAQEA0vg4PmmJdy1W/ayyuP3ovRBbggAZ98dEY5uzEU23ENaN3jsx\n
-                                   R9zEAAmQ9OZbbJXN33l+PMKY7+5izgI/RlGSNF2s0mdyWEhoRMTxuwpJoFgBkYEE\n
-                                   Jwr40xoLCbw9TpBooJgdYg/n/Fu4NGM7YJdcfKjf3/le7kNTZYPBx09wBkHvkuTD\n
-                                   gpdDDnb5R6sTouD0bCPjC/gZCoRAAlzfuAmAAHVb+i8fkTV32OzokLYcneuLZU/+\n
-                                   FBpR2w9UprfDLWFbPxuOBf+mIGp4WWVN82+3SdEkp/5BRQ//MhGhj7NhEYp+KyWJ\n
-                                   Hm+1iGvrxsgQH+4MQTJGdp838sl+w77QGFZU9QIDAQABAoIBAEBWNkDCSouvpgHC\n
-                                   ctZ7iEhv/pgMk96+RBrkVp2GR7e41pbZElRJ/PPN9wjYXzUkEh5+nILHDYDOAA+3\n
-                                   G7jEE4QotRWNOo+1tSaTsOxLXNyrOf83ix6k9/DY1ljnsQKOg3nGKd/H3gVVqz0+\n
-                                   rdLtFeVmUq+pCsw6d+pTXfr8PLuLPfe8r9fu/BGU2wtINAEuQ4x3/S/JPTm6XnsV\n
-                                   NUW62K/lB7RjXlEqnKMwxcVCu/m0C1HdlwTlHyzktIydjL9Bk1GjGQVt0zC/rfvA\n
-                                   zrlsTPg4UTL6zs4D9B5PPaZMJeBieXaQ0JdqKdJkRm+mPCOEGf+BLz1zHVAVZaSZ\n
-                                   PK8E7NkCgYEA+e7WUOlr4nR6fqvte0ZTewIeG/j2m5gSVjjy8Olh2D3v8q4hZj5s\n
-                                   2jaFJJ7RUGXZdiySodlEpLR2nrrUURC6fGukvbFCW2j/0SotBl53Wa2zJdrU3AZc\n
-                                   b9j7MOyJbJDKJYqdivYJXp7ra4vCs0xAMXfuQD1AWaKlCQxbeyrKWxcCgYEA2BdA\n
-                                   fB7IL0ec3WOsLyGGhcCrGDWIiOlXzk5Fuus+NOEp70/bYCqGpu+tNAxtbY4e+zHp\n
-                                   5gXApKU6PSQ/I/eG/o0WGQCZazfhIGpwORrWHAVxDlxJ+/hlZd6DmTjaIJw1k2gr\n
-                                   D849l1WIEr2Ps8Bv3Y7XeLpnUAQFv1ekfMKxZ9MCgYEA2vtNYfUypmZh0Uy4NZNn\n
-                                   n1Y6pU2cXLWAE3WwPi5toTabXuj8sIWvf/3W6EASqzuhri3dh9tCjoDjka2mSyS6\n
-                                   EDuMSvvdZRP5V/15F6R7M+LCHT+/0svr/7+ATtxgh/PQedYatN9fVD0vjboVrFz5\n
-                                   vZ4T7Mr978tWiDgAi0jxpZ8CgYA/AOiIR+FOB68wzXLSew/hx38bG+CnKoGzYRbr\n
-                                   nNMST+QOJlZr/3orCg6R8l2lZ56Y1sC/lEXKu3HzibHvJqhxZ2ld+NLCdBRrgx0d\n
-                                   STnMCbog2b+oe4/015+++NiAUYs9Y03K2fMTQJjf/ez8F8uF6bPhO1gL+GBEnaUT\n
-                                   yyA2iQKBgQD1KfqZeJtPCwmfdPokblKgorstuMKjMegD/6ztjIFw4c9XkvUAvlD5\n
-                                   MvS4rPuhVYrvouZHJ50bcwccByJ8aCOJxLdH7+bjojMSAgV2kGq+FNh7F1wRcwx8\n
-                                   8Z+DBbeVaCpYSQa5bCr5jG6nIX5v/KbS3HCmAkUzwqGoEsk53yFmKw==\n
+    const RSA_PRIVATE_KEY: &str = "-----BEGIN RSA PRIVATE KEY-----\n\
+                                   MIIEpAIBAAKCAQEA0vg4PmmJdy1W/ayyuP3ovRBbggAZ98dEY5uzEU23ENaN3jsx\n\
+                                   R9zEAAmQ9OZbbJXN33l+PMKY7+5izgI/RlGSNF2s0mdyWEhoRMTxuwpJoFgBkYEE\n\
+                                   Jwr40xoLCbw9TpBooJgdYg/n/Fu4NGM7YJdcfKjf3/le7kNTZYPBx09wBkHvkuTD\n\
+                                   gpdDDnb5R6sTouD0bCPjC/gZCoRAAlzfuAmAAHVb+i8fkTV32OzokLYcneuLZU/+\n\
+                                   FBpR2w9UprfDLWFbPxuOBf+mIGp4WWVN82+3SdEkp/5BRQ//MhGhj7NhEYp+KyWJ\n\
+                                   Hm+1iGvrxsgQH+4MQTJGdp838sl+w77QGFZU9QIDAQABAoIBAEBWNkDCSouvpgHC\n\
+                                   ctZ7iEhv/pgMk96+RBrkVp2GR7e41pbZElRJ/PPN9wjYXzUkEh5+nILHDYDOAA+3\n\
+                                   G7jEE4QotRWNOo+1tSaTsOxLXNyrOf83ix6k9/DY1ljnsQKOg3nGKd/H3gVVqz0+\n\
+                                   rdLtFeVmUq+pCsw6d+pTXfr8PLuLPfe8r9fu/BGU2wtINAEuQ4x3/S/JPTm6XnsV\n\
+                                   NUW62K/lB7RjXlEqnKMwxcVCu/m0C1HdlwTlHyzktIydjL9Bk1GjGQVt0zC/rfvA\n\
+                                   zrlsTPg4UTL6zs4D9B5PPaZMJeBieXaQ0JdqKdJkRm+mPCOEGf+BLz1zHVAVZaSZ\n\
+                                   PK8E7NkCgYEA+e7WUOlr4nR6fqvte0ZTewIeG/j2m5gSVjjy8Olh2D3v8q4hZj5s\n\
+                                   2jaFJJ7RUGXZdiySodlEpLR2nrrUURC6fGukvbFCW2j/0SotBl53Wa2zJdrU3AZc\n\
+                                   b9j7MOyJbJDKJYqdivYJXp7ra4vCs0xAMXfuQD1AWaKlCQxbeyrKWxcCgYEA2BdA\n\
+                                   fB7IL0ec3WOsLyGGhcCrGDWIiOlXzk5Fuus+NOEp70/bYCqGpu+tNAxtbY4e+zHp\n\
+                                   5gXApKU6PSQ/I/eG/o0WGQCZazfhIGpwORrWHAVxDlxJ+/hlZd6DmTjaIJw1k2gr\n\
+                                   D849l1WIEr2Ps8Bv3Y7XeLpnUAQFv1ekfMKxZ9MCgYEA2vtNYfUypmZh0Uy4NZNn\n\
+                                   n1Y6pU2cXLWAE3WwPi5toTabXuj8sIWvf/3W6EASqzuhri3dh9tCjoDjka2mSyS6\n\
+                                   EDuMSvvdZRP5V/15F6R7M+LCHT+/0svr/7+ATtxgh/PQedYatN9fVD0vjboVrFz5\n\
+                                   vZ4T7Mr978tWiDgAi0jxpZ8CgYA/AOiIR+FOB68wzXLSew/hx38bG+CnKoGzYRbr\n\
+                                   nNMST+QOJlZr/3orCg6R8l2lZ56Y1sC/lEXKu3HzibHvJqhxZ2ld+NLCdBRrgx0d\n\
+                                   STnMCbog2b+oe4/015+++NiAUYs9Y03K2fMTQJjf/ez8F8uF6bPhO1gL+GBEnaUT\n\
+                                   yyA2iQKBgQD1KfqZeJtPCwmfdPokblKgorstuMKjMegD/6ztjIFw4c9XkvUAvlD5\n\
+                                   MvS4rPuhVYrvouZHJ50bcwccByJ8aCOJxLdH7+bjojMSAgV2kGq+FNh7F1wRcwx8\n\
+                                   8Z+DBbeVaCpYSQa5bCr5jG6nIX5v/KbS3HCmAkUzwqGoEsk53yFmKw==\n\
                                    -----END RSA PRIVATE KEY-----";
 
     #[test]
@@ -518,9 +518,8 @@ mod tests {
         let private_key = PrivateKey::from_pem_str(RSA_PRIVATE_KEY).unwrap();
         let program_name = "decoding_into_win_certificate_test".to_string();
 
-        let win_cert = pkcs7
-            .into_win_certificate(FILE_HASH.as_ref(), hash_type, &private_key, Some(program_name))
-            .unwrap();
+        let win_cert =
+            WinCertificate::new(pkcs7, FILE_HASH.as_ref(), hash_type, &private_key, Some(program_name)).unwrap();
 
         let pkcs7certificate: Pkcs7Certificate = picky_asn1_der::from_bytes(win_cert.get_certificate()).unwrap();
 
@@ -676,7 +675,8 @@ mod tests {
         let pkcs7 = Pkcs7::from_pem_str(pem).unwrap();
         let private_key = PrivateKey::from_pem_str(RSA_PRIVATE_KEY).unwrap();
 
-        let win_cert = pkcs7.into_win_certificate(
+        let win_cert = WinCertificate::new(
+            pkcs7,
             FILE_HASH.as_ref(),
             SHAVariant::SHA2_256,
             &private_key,

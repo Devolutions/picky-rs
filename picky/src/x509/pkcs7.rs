@@ -36,7 +36,7 @@ pub enum Pkcs7Error {
 const PKCS7_PEM_LABEL: &str = "PKCS7";
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Pkcs7(pub(super) Pkcs7Certificate);
+pub struct Pkcs7(pub(crate) Pkcs7Certificate);
 
 impl Pkcs7 {
     pub fn from_der<V: ?Sized + AsRef<[u8]>>(data: &V) -> Pkcs7Result<Self> {
@@ -69,7 +69,6 @@ mod tests {
     fn read_pem_and_parse_certificate() {
         let pem = parse_pem(crate::test_files::PKCS7.as_bytes()).unwrap();
         let decoded = Pkcs7::from_pem(&pem);
-
         assert!(decoded.is_ok());
     }
 }
