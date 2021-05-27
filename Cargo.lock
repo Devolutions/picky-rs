@@ -1746,7 +1746,7 @@ checksum = "d4fd5641d01c8f18a23da7b6fe29298ff4b55afcccdf78973b24cf3175fee32e"
 
 [[package]]
 name = "picky"
-version = "6.2.0"
+version = "6.3.0"
 dependencies = [
  "aes-gcm",
  "base64 0.13.0",
@@ -1775,7 +1775,7 @@ dependencies = [
 
 [[package]]
 name = "picky-asn1"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "chrono",
  "oid",
@@ -1786,7 +1786,7 @@ dependencies = [
 
 [[package]]
 name = "picky-asn1-der"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "base64 0.13.0",
  "lazy_static",
@@ -1800,7 +1800,7 @@ dependencies = [
 
 [[package]]
 name = "picky-asn1-x509"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "base64 0.13.0",
  "hex",

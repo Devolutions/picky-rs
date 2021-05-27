@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [6.3.0] 2021-05-27
+
+### Added
+
+- PKCS7 implementation behind `pkcs7` feature
+- `WinCertificate` for authenticode behind `wincert` feature
+
+### Changed
+
+- Update `aes-gcm` dependency to `0.9`
+
 ## [6.2.0] 2021-03-04
 
 ### Added

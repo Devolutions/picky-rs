@@ -1,6 +1,6 @@
 [package]
 name = "picky-asn1-der"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2018"
 authors = [
     "KizzyCode Software Labs./Keziah Biermann <development@kizzycode.de>",

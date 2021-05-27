@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.3.2] 2021-05-27
+
+### Added
+
+- Support for `BMPString`
+- Implement `Default` for `IA5StringAsn1`, `Asn1SetOf`, `Utf8String`, `IA5String`
+
 ## [0.3.1] 2021-01-11
 
 ### Fixed
