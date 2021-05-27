@@ -7,13 +7,9 @@ use super::signer_info::CertificateSerialNumber;
 use crate::{AlgorithmIdentifier, Extensions, Name, Time, Version};
 
 /// [RFC 5652 #10.2.1](https://datatracker.ietf.org/doc/html/rfc5652#section-10.2.1)
-/// ``` not_rust
+///
+/// ```not_rust
 /// RevocationInfoChoices ::= SET OF RevocationInfoChoice
-///
-/// RevocationInfoChoice ::= CHOICE {
-///    crl CertificateList,
-///    other [1] IMPLICIT OtherRevocationInfoFormat }
-///
 /// ```
 #[derive(Debug, PartialEq, Clone, Default)]
 pub struct RevocationInfoChoices(pub Vec<RevocationInfoChoice>);
@@ -43,6 +39,14 @@ impl<'de> de::Deserialize<'de> for RevocationInfoChoices {
     }
 }
 
+/// [RFC 5652 #10.2.1](https://datatracker.ietf.org/doc/html/rfc5652#section-10.2.1)
+///
+/// ```not_rust
+/// RevocationInfoChoice ::= CHOICE {
+///    crl CertificateList,
+///    other [1] IMPLICIT OtherRevocationInfoFormat }
+///
+/// ```
 #[derive(Debug, PartialEq, Clone)]
 pub enum RevocationInfoChoice {
     Crl(CertificateList),
