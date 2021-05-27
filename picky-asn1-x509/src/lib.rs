@@ -10,6 +10,7 @@ pub mod directory_string;
 pub mod extension;
 pub mod name;
 pub mod oids;
+#[cfg(feature = "pkcs7")]
 pub mod pkcs7;
 pub mod private_key_info;
 pub mod subject_public_key_info;
@@ -24,6 +25,7 @@ pub use certification_request::*;
 pub use directory_string::*;
 pub use extension::*;
 pub use name::*;
+#[cfg(feature = "pkcs7")]
 pub use pkcs7::*;
 pub use private_key_info::*;
 pub use subject_public_key_info::*;

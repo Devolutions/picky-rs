@@ -21,7 +21,7 @@ serde = { version = "1.0", features = ["derive"] }
 oid = { version = "0.2", features = ["serde_support"] }
 base64 = "0.13"
 num-bigint-dig = { version = "0.7", optional = true }
-widestring = { version = "0.4", default-features = false, features = ["alloc"] }
+widestring = { version = "0.4", default-features = false, features = ["alloc"], optional = true }
 
 [dev-dependencies]
 num-bigint-dig = "0.7"
@@ -30,3 +30,5 @@ hex = "0.4"
 
 [features]
 legacy = ["num-bigint-dig"]
+pkcs7 = ["widestring"]
+
