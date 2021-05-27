@@ -162,6 +162,14 @@ impl Extension {
             extn_value: ExtensionValue::IssuerAltName(name.into()),
         }
     }
+
+    pub fn new_crl_number<N: Into<OctetStringAsn1Container<IntegerAsn1>>>(number: N) -> Self {
+        Self {
+            extn_id: oids::crl_number().into(),
+            critical: false.into(),
+            extn_value: ExtensionValue::CrlNumber(number.into()),
+        }
+    }
 }
 
 impl ser::Serialize for Extension {
@@ -225,6 +233,7 @@ impl<'de> de::Deserialize<'de> for Extension {
                     oids::EXTENDED_KEY_USAGE => {
                         ExtensionValue::ExtendedKeyUsage(seq_next_element!(seq, Extension, "ExtendedKeyUsage"))
                     }
+                    oids::CRL_NUMBER => ExtensionValue::CrlNumber(seq_next_element!(seq, Extension, "CrlNumber")),
                     _ => ExtensionValue::Generic(seq_next_element!(seq, Extension, "Generic")),
                 };
 
@@ -251,6 +260,7 @@ pub enum ExtensionView<'a> {
     BasicConstraints(&'a BasicConstraints),
     ExtendedKeyUsage(&'a ExtendedKeyUsage),
     Generic(&'a OctetStringAsn1),
+    CrlNumber(&'a OctetStringAsn1Container<IntegerAsn1>),
 }
 
 impl<'a> From<&'a ExtensionValue> for ExtensionView<'a> {
@@ -264,6 +274,7 @@ impl<'a> From<&'a ExtensionValue> for ExtensionView<'a> {
             ExtensionValue::BasicConstraints(OctetStringAsn1Container(val)) => Self::BasicConstraints(val),
             ExtensionValue::ExtendedKeyUsage(OctetStringAsn1Container(val)) => Self::ExtendedKeyUsage(val),
             ExtensionValue::Generic(val) => Self::Generic(val),
+            ExtensionValue::CrlNumber(val) => Self::CrlNumber(val),
         }
     }
 }
@@ -286,6 +297,7 @@ enum ExtensionValue {
     //InhibitAnyPolicy(…),
     //FreshestCRL(…),
     Generic(OctetStringAsn1),
+    CrlNumber(OctetStringAsn1Container<IntegerAsn1>),
 }
 
 impl ser::Serialize for ExtensionValue {
@@ -302,6 +314,7 @@ impl ser::Serialize for ExtensionValue {
             ExtensionValue::BasicConstraints(basic_constraints) => basic_constraints.serialize(serializer),
             ExtensionValue::ExtendedKeyUsage(eku) => eku.serialize(serializer),
             ExtensionValue::Generic(octet_string) => octet_string.serialize(serializer),
+            ExtensionValue::CrlNumber(integer) => integer.serialize(serializer),
         }
     }
 }

@@ -216,6 +216,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Tag::OCTET_STRING => self.deserialize_byte_buf(visitor),
             Tag::SEQUENCE => self.deserialize_seq(visitor),
             Tag::UTF8_STRING => self.deserialize_string(visitor),
+            Tag::BMP_STRING => self.deserialize_string(visitor),
             Tag::OID => self.deserialize_bytes(visitor),
             Tag::BIT_STRING => self.deserialize_byte_buf(visitor),
             Tag::UTC_TIME => self.deserialize_bytes(visitor),
@@ -385,6 +386,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
         debug_log!("deserialize_char");
         match self.h_peek_object()? {
             Tag::UTF8_STRING => {}
+            Tag::BMP_STRING => {}
             tag if tag.is_context_specific() => {}
             _tag => {
                 debug_log!("deserialize_char: INVALID (found {})", _tag);
@@ -403,6 +405,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
         debug_log!("deserialize_str");
         match self.h_peek_object()? {
             Tag::UTF8_STRING => {}
+            Tag::BMP_STRING => {}
             tag if tag.is_context_specific() => {}
             _tag => {
                 debug_log!("deserialize_str: INVALID (found {})", _tag);
@@ -417,6 +420,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
         debug_log!("deserialize_string");
         match self.h_peek_object()? {
             Tag::UTF8_STRING => {}
+            Tag::BMP_STRING => {}
             tag if tag.is_context_specific() => {}
             _tag => {
                 debug_log!("deserialize_string: INVALID (found {})", _tag);
@@ -461,6 +465,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Tag::BIT_STRING => {}
             Tag::INTEGER => {}
             Tag::UTF8_STRING => {}
+            Tag::BMP_STRING => {}
             Tag::PRINTABLE_STRING => {}
             Tag::NUMERIC_STRING => {}
             Tag::IA5_STRING => {}

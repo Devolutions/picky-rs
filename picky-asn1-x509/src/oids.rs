@@ -57,6 +57,12 @@ define_oid! {
     EMAIL_ADDRESS => email_address => "1.2.840.113549.1.9.1", // deprecated
     EXTENSION_REQ => extension_request => "1.2.840.113549.1.9.14",
 
+    // pkcs7
+    PKCS7 => pkcs7 => "1.2.840.113549.1.7.1",
+    SIGNED_DATA => signed_data => "1.2.840.113549.1.7.2",
+    CONTENT_TYPE => content_type => "1.2.840.113549.1.9.3",
+    MESSAGE_DIGEST => message_digest => "1.2.840.113549.1.9.4",
+
     // NIST
     DSA_WITH_SHA224 => dsa_with_sha224 => "2.16.840.1.101.3.4.3.1",
     DSA_WITH_SHA256 => dsa_with_sha256 => "2.16.840.1.101.3.4.3.2",
@@ -106,6 +112,7 @@ define_oid! {
     SUBJECT_ALTERNATIVE_NAME => subject_alternative_name => "2.5.29.17",
     ISSUER_ALTERNATIVE_NAME => issuer_alternative_name => "2.5.29.18",
     BASIC_CONSTRAINTS => basic_constraints => "2.5.29.19",
+    CRL_NUMBER => crl_number => "2.5.29.20",
     AUTHORITY_KEY_IDENTIFIER => authority_key_identifier => "2.5.29.35",
     EXTENDED_KEY_USAGE => extended_key_usage => "2.5.29.37",
 
@@ -151,4 +158,9 @@ define_oid! {
     SHA3_512 => sha3_512 => "2.16.840.1.101.3.4.2.10",
     SHAKE128 => shake128 => "2.16.840.1.101.3.4.2.11",
     SHAKE256 => shake256 => "2.16.840.1.101.3.4.2.12",
+
+    // authenticode
+    SPC_INDIRECT_DATA_OBJID => spc_indirect_data_objid => "1.3.6.1.4.1.311.2.1.4",
+    SPC_SP_OPUS_INFO_OBJID => spc_sp_opus_info_objid => "1.3.6.1.4.1.311.2.1.12",
+    SPC_PE_IMAGE_DATAOBJ => spc_pe_image_dataobj => "1.3.6.1.4.1.311.2.1.15",
 }

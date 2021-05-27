@@ -247,6 +247,25 @@ impl CharSet for IA5CharSet {
     }
 }
 
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct BMPCharSet;
+pub type BMPString = RestrictedString<BMPCharSet>;
+
+impl CharSet for BMPCharSet {
+    fn check(data: &[u8]) -> bool {
+        if data.len() % 2 != 0 {
+            return false;
+        }
+
+        let u16_it = data
+            .chunks_exact(2)
+            .into_iter()
+            .map(|elem| u16::from_be_bytes([elem[1], elem[0]]));
+
+        char::decode_utf16(u16_it).all(|c| matches!(c, Ok(_)))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -284,5 +303,15 @@ mod tests {
     #[test]
     fn valid_utf8_string() {
         Utf8String::from_str("1224na÷日本語はむずかちー−×—«BUeisuteurnt").expect("invalid string");
+    }
+
+    #[test]
+    fn valid_bmp_string() {
+        BMPString::from_str("语言处理").expect("valid unicode string");
+    }
+
+    #[test]
+    fn invalid_bmp_string() {
+        assert!(BMPString::from_str("1224na÷日本語はむずかちー−×—«BUeisuteurnt").is_err())
     }
 }

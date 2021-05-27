@@ -256,6 +256,8 @@ mod tests {
         pretty_assertions::assert_eq!(pem_from_reader, pem_from_str);
     }
 
+    // This test should not run on Windows. writeln! add `/r` ending character to Pem in String format on Windows targets.
+    #[cfg(not(windows))]
     #[test]
     fn to_string() {
         let pem = PEM_STR.parse::<Pem>().unwrap();

@@ -1,6 +1,7 @@
+use super::utils::{from_der, from_pem, from_pem_str, to_der, to_pem};
 use crate::hash::HashAlgorithm;
 use crate::key::{PrivateKey, PublicKey};
-use crate::pem::{parse_pem, Pem, PemError};
+use crate::pem::{Pem, PemError};
 use crate::signature::{SignatureAlgorithm, SignatureError};
 use crate::x509::csr::{Csr, CsrError};
 use crate::x509::date::UTCDate;
@@ -15,6 +16,8 @@ use picky_asn1_x509::{
 };
 use std::cell::RefCell;
 use thiserror::Error;
+
+const ELEMENT_NAME: &str = "x509 certificate";
 
 #[derive(Debug, Error)]
 pub enum CertError {
@@ -150,37 +153,23 @@ macro_rules! find_ext {
 
 impl Cert {
     pub fn from_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, CertError> {
-        Ok(Self(picky_asn1_der::from_bytes(der.as_ref()).map_err(|e| {
-            CertError::Asn1Deserialization {
-                source: e,
-                element: "certificate",
-            }
-        })?))
+        from_der(der, ELEMENT_NAME).map(Self)
     }
 
     pub fn from_pem(pem: &Pem) -> Result<Self, CertError> {
-        match pem.label() {
-            CERT_PEM_LABEL => Self::from_der(pem.data()),
-            _ => Err(CertError::InvalidPemLabel {
-                label: pem.label().to_owned(),
-            }),
-        }
+        from_pem(pem, CERT_PEM_LABEL, ELEMENT_NAME).map(Self)
     }
 
     pub fn from_pem_str(pem_str: &str) -> Result<Self, CertError> {
-        let pem = parse_pem(pem_str)?;
-        Self::from_pem(&pem)
+        from_pem_str(pem_str, CERT_PEM_LABEL, ELEMENT_NAME).map(Self)
     }
 
     pub fn to_der(&self) -> Result<Vec<u8>, CertError> {
-        picky_asn1_der::to_vec(&self.0).map_err(|e| CertError::Asn1Serialization {
-            source: e,
-            element: "certificate",
-        })
+        to_der(&self.0, ELEMENT_NAME)
     }
 
     pub fn to_pem(&self) -> Result<Pem<'static>, CertError> {
-        Ok(Pem::new(CERT_PEM_LABEL, self.to_der()?))
+        to_pem(&self.0, CERT_PEM_LABEL, ELEMENT_NAME)
     }
 
     pub fn ty(&self) -> CertType {
@@ -817,7 +806,7 @@ impl<'a> CertificateBuilder<'a> {
                     .0
                     .into_iter()
                     .find_map(|attr| match attr.value {
-                        picky_asn1_x509::AttributeValue::Extensions(set_of_extensions) => {
+                        picky_asn1_x509::AttributeValues::Extensions(set_of_extensions) => {
                             set_of_extensions.0.into_iter().next()
                         }
                         _ => None,

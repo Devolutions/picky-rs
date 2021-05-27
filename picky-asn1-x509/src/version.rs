@@ -60,13 +60,6 @@ impl<'de> Deserialize<'de> for Version {
                     )
                 })?;
 
-                if version != Version::V3 {
-                    return Err(E::invalid_value(
-                        de::Unexpected::Other("unsupported certificate version"),
-                        &"only V3 certificate are supported",
-                    ));
-                }
-
                 Ok(version)
             }
         }

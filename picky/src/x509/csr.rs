@@ -1,6 +1,8 @@
+use super::utils::{from_der, from_pem, from_pem_str, to_der, to_pem};
 use crate::key::{PrivateKey, PublicKey};
-use crate::pem::{parse_pem, Pem, PemError};
+use crate::pem::{Pem, PemError};
 use crate::signature::{SignatureAlgorithm, SignatureError};
+use crate::x509::certificate::CertError;
 use crate::x509::name::DirectoryName;
 use picky_asn1::bit_string::BitString;
 use picky_asn1_der::Asn1DerError;
@@ -8,6 +10,8 @@ use picky_asn1_x509::{CertificationRequest, CertificationRequestInfo};
 use thiserror::Error;
 
 pub use picky_asn1_x509::Attribute;
+
+const ELEMENT_NAME: &str = "certification request";
 
 #[derive(Debug, Error)]
 pub enum CsrError {
@@ -38,9 +42,15 @@ pub enum CsrError {
     Pem { source: PemError },
 }
 
-impl From<PemError> for CsrError {
-    fn from(e: PemError) -> Self {
-        Self::Pem { source: e }
+impl From<CertError> for CsrError {
+    fn from(e: CertError) -> Self {
+        match e {
+            CertError::Asn1Deserialization { element, source } => CsrError::Asn1Deserialization { element, source },
+            CertError::Asn1Serialization { element, source } => CsrError::Asn1Serialization { element, source },
+            CertError::Pem { source } => CsrError::Pem { source },
+            CertError::InvalidPemLabel { label } => CsrError::InvalidPemLabel { label },
+            _ => unreachable!(),
+        }
     }
 }
 
@@ -58,37 +68,23 @@ impl From<CertificationRequest> for Csr {
 
 impl Csr {
     pub fn from_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, CsrError> {
-        Ok(Self(picky_asn1_der::from_bytes(der.as_ref()).map_err(|e| {
-            CsrError::Asn1Deserialization {
-                source: e,
-                element: "certification request",
-            }
-        })?))
+        Ok(from_der(der, ELEMENT_NAME).map(Self)?)
     }
 
     pub fn from_pem_str(pem_str: &str) -> Result<Self, CsrError> {
-        let pem = parse_pem(pem_str)?;
-        Self::from_pem(&pem)
+        Ok(from_pem_str(pem_str, CSR_PEM_LABEL, ELEMENT_NAME).map(Self)?)
     }
 
     pub fn from_pem(pem: &Pem) -> Result<Self, CsrError> {
-        match pem.label() {
-            CSR_PEM_LABEL => Self::from_der(pem.data()),
-            _ => Err(CsrError::InvalidPemLabel {
-                label: pem.label().to_owned(),
-            }),
-        }
+        Ok(from_pem(pem, CSR_PEM_LABEL, ELEMENT_NAME).map(Self)?)
     }
 
     pub fn to_der(&self) -> Result<Vec<u8>, CsrError> {
-        picky_asn1_der::to_vec(&self.0).map_err(|e| CsrError::Asn1Serialization {
-            source: e,
-            element: "certification request",
-        })
+        Ok(to_der(&self.0, ELEMENT_NAME)?)
     }
 
     pub fn to_pem(&self) -> Result<Pem<'static>, CsrError> {
-        Ok(Pem::new(CSR_PEM_LABEL, self.to_der()?))
+        Ok(to_pem(&self.0, CSR_PEM_LABEL, ELEMENT_NAME)?)
     }
 
     pub fn generate(

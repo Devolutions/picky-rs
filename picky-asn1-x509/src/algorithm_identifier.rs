@@ -3,7 +3,22 @@ use oid::ObjectIdentifier;
 use picky_asn1::tag::{Tag, TagPeeker};
 use picky_asn1::wrapper::{IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1};
 use serde::{de, ser, Deserialize, Serialize};
+use std::error::Error;
 use std::fmt;
+
+/// unsupported algorithm
+#[derive(Debug)]
+pub struct UnsupportedAlgorithmError {
+    pub algorithm: String,
+}
+
+impl fmt::Display for UnsupportedAlgorithmError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "unsupported algorithm:  {}", self.algorithm)
+    }
+}
+
+impl Error for UnsupportedAlgorithmError {}
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct AlgorithmIdentifier {
@@ -78,6 +93,27 @@ impl AlgorithmIdentifier {
             algorithm: oids::rsa_encryption().into(),
             parameters: AlgorithmIdentifierParameters::Null,
         }
+    }
+
+    pub fn new_rsa_encryption_with_sha(variant: SHAVariant) -> Result<Self, UnsupportedAlgorithmError> {
+        let algorithm = match variant {
+            SHAVariant::SHA2_224 => oids::sha224_with_rsa_encryption(),
+            SHAVariant::SHA2_256 => oids::sha256_with_rsa_encryption(),
+            SHAVariant::SHA2_384 => oids::sha384_with_rsa_encryption(),
+            SHAVariant::SHA2_512 => oids::sha512_with_rsa_encryption(),
+            SHAVariant::SHA3_384 => oids::id_rsassa_pkcs1_v1_5_with_sha3_384(),
+            SHAVariant::SHA3_512 => oids::id_rsassa_pkcs1_v1_5_with_sha3_512(),
+            _ => {
+                return Err(UnsupportedAlgorithmError {
+                    algorithm: format!("{:?}", variant),
+                })
+            }
+        };
+
+        Ok(Self {
+            algorithm: algorithm.into(),
+            parameters: AlgorithmIdentifierParameters::Null,
+        })
     }
 
     pub fn new_ecdsa_with_sha384() -> Self {

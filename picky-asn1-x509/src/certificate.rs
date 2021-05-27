@@ -79,6 +79,7 @@ impl Certificate {
 /// ```
 #[derive(Serialize, Clone, Debug, PartialEq)]
 pub struct TBSCertificate {
+    #[serde(skip_serializing_if = "version_is_default")]
     pub version: ApplicationTag0<Version>,
     pub serial_number: IntegerAsn1,
     pub signature: AlgorithmIdentifier,
@@ -88,11 +89,15 @@ pub struct TBSCertificate {
     pub subject_public_key_info: SubjectPublicKeyInfo,
     // issuer_unique_id
     // subject_unique_id
+    #[serde(skip_serializing_if = "extensions_are_empty")]
     pub extensions: ApplicationTag3<Extensions>,
 }
 
-// Implement Deserialize manually to return an easy to understand error on V1 certificates
-// (aka ApplicationTag0 not present).
+fn version_is_default(version: &Version) -> bool {
+    version == &Version::default()
+}
+
+// Implement Deserialize manually to support missing version field (i.e.: fallback as V1)
 impl<'de> de::Deserialize<'de> for TBSCertificate {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -111,32 +116,45 @@ impl<'de> de::Deserialize<'de> for TBSCertificate {
             where
                 V: de::SeqAccess<'de>,
             {
+                let version: ApplicationTag0<Version> = seq.next_element().unwrap_or_default().unwrap_or_default();
+                let serial_number = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(1, &self))?;
+                let signature = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(2, &self))?;
+                let issuer = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(3, &self))?;
+                let validity = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(4, &self))?;
+                let subject = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(5, &self))?;
+                let subject_public_key_info = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(6, &self))?;
+                let extensions: ApplicationTag3<Extensions> = seq
+                    .next_element()?
+                    .unwrap_or_else(|| Some(Extensions(Vec::new()).into()))
+                    .unwrap_or_else(|| Extensions(Vec::new()).into());
+
+                if version.0 != Version::V3 && !extensions.0 .0.is_empty() {
+                    return Err(serde_invalid_value!(
+                        TBSCertificate,
+                        "Version is not V3, but Extensions are present",
+                        "no Extensions"
+                    ));
+                }
+
                 Ok(TBSCertificate {
-                    version: seq
-                        .next_element()
-                        .map_err(|_| {
-                            de::Error::invalid_value(
-                                de::Unexpected::Other(
-                                    "[TBSCertificate] V1 certificates unsupported. Only V3 certificates \
-                                     are supported",
-                                ),
-                                &"a supported certificate",
-                            )
-                        })?
-                        .ok_or_else(|| de::Error::invalid_length(0, &self))?,
-                    serial_number: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(1, &self))?,
-                    signature: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(2, &self))?,
-                    issuer: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(3, &self))?,
-                    validity: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(4, &self))?,
-                    subject: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(5, &self))?,
-                    subject_public_key_info: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(6, &self))?,
-                    extensions: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(7, &self))?,
+                    version,
+                    serial_number,
+                    signature,
+                    issuer,
+                    validity,
+                    subject,
+                    subject_public_key_info,
+                    extensions,
                 })
             }
         }
 
         deserializer.deserialize_seq(Visitor)
     }
+}
+
+fn extensions_are_empty(extensions: &Extensions) -> bool {
+    extensions.0.is_empty()
 }
 
 #[cfg(test)]
