@@ -1,12 +1,11 @@
-use picky_asn1::tag::Tag;
-use picky_asn1::wrapper::Asn1SetOf;
-use serde::{de, ser, Deserialize, Serialize};
-
 use super::content_info::EncapsulatedContentInfo;
 use super::crls::RevocationInfoChoices;
 use super::signer_info::SignerInfo;
-use crate::cmsversion::CMSVersion;
+use crate::cmsversion::CmsVersion;
 use crate::{AlgorithmIdentifier, Certificate};
+use picky_asn1::tag::Tag;
+use picky_asn1::wrapper::Asn1SetOf;
+use serde::{de, ser, Deserialize, Serialize};
 
 /// [RFC 5652 #5.1](https://datatracker.ietf.org/doc/html/rfc5652#section-5.1)
 /// ``` not_rust
@@ -20,7 +19,7 @@ use crate::{AlgorithmIdentifier, Certificate};
 /// ```
 #[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
 pub struct SignedData {
-    pub version: CMSVersion,
+    pub version: CmsVersion,
     pub digest_algorithms: DigestAlgorithmIdentifiers,
     pub content_info: EncapsulatedContentInfo,
     pub certificates: CertificateSet,
@@ -78,8 +77,8 @@ mod tests {
     use super::*;
     use crate::crls::*;
     use crate::{
-        oids, EncapsulatedRSAPublicKey, Extension, Extensions, KeyIdentifier, Name, NameAttr, PublicKey, RSAPublicKey,
-        SubjectPublicKeyInfo, TBSCertificate, Validity, Version,
+        oids, EncapsulatedRsaPublicKey, Extension, Extensions, KeyIdentifier, Name, NameAttr, PublicKey, RsaPublicKey,
+        SubjectPublicKeyInfo, TbsCertificate, Validity, Version,
     };
     use picky_asn1::bit_string::BitString;
     use picky_asn1::date::UTCTime;
@@ -126,7 +125,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(CMSVersion::V1, CMSVersion::from_u8(*pkcs7.get(25).unwrap()).unwrap());
+        assert_eq!(CmsVersion::V1, CmsVersion::from_u8(*pkcs7.get(25).unwrap()).unwrap());
 
         let digest_algorithm_identifiers = DigestAlgorithmIdentifiers(vec![].into());
 
@@ -166,7 +165,7 @@ mod tests {
 
         let subject_public_key_info = SubjectPublicKeyInfo {
             algorithm: AlgorithmIdentifier::new_rsa_encryption(),
-            subject_public_key: PublicKey::RSA(EncapsulatedRSAPublicKey::from(RSAPublicKey {
+            subject_public_key: PublicKey::Rsa(EncapsulatedRsaPublicKey::from(RsaPublicKey {
                 modulus: IntegerAsn1::from(pkcs7[459..972].to_vec()),
                 public_exponent: IntegerAsn1::from(pkcs7[974..977].to_vec()),
             })),
@@ -183,7 +182,7 @@ mod tests {
         check_serde!(extensions: Extensions in  pkcs7[979..1062]);
 
         let full_certificate = Certificate {
-            tbs_certificate: TBSCertificate {
+            tbs_certificate: TbsCertificate {
                 version: Version::V3.into(),
                 serial_number: IntegerAsn1(pkcs7[60..80].to_vec()),
                 signature: AlgorithmIdentifier::new_sha256_with_rsa_encryption(),
@@ -199,7 +198,7 @@ mod tests {
         check_serde!(full_certificate: Certificate in pkcs7[45..1594]);
 
         let signed_data = SignedData {
-            version: CMSVersion::V1,
+            version: CmsVersion::V1,
             digest_algorithms: DigestAlgorithmIdentifiers(Vec::new().into()),
             content_info,
             certificates: CertificateSet(vec![full_certificate]),
@@ -272,7 +271,7 @@ mod tests {
         issuer.add_attr(NameAttr::CommonName, "CAName");
         issuer.add_email(IA5String::new("camail@mail.com").unwrap());
 
-        let tbs_cert_list = TBSCertList {
+        let tbs_cert_list = TbsCertList {
             version: Some(Version::V2),
             signature: AlgorithmIdentifier::new_sha1_with_rsa_encryption(),
             issuer,
@@ -285,7 +284,7 @@ mod tests {
             .into(),
         };
 
-        check_serde!(tbs_cert_list: TBSCertList in decoded[1534..1717]);
+        check_serde!(tbs_cert_list: TbsCertList in decoded[1534..1717]);
 
         let crl = RevocationInfoChoices(vec![RevocationInfoChoice::Crl(CertificateList {
             tbs_cert_list,

@@ -142,10 +142,10 @@ impl PrivateKey {
     }
 
     pub fn from_rsa_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, KeyError> {
-        use picky_asn1_x509::{AlgorithmIdentifier, RSAPrivateKey};
+        use picky_asn1_x509::{AlgorithmIdentifier, RsaPrivateKey};
 
         let private_key =
-            picky_asn1_der::from_bytes::<RSAPrivateKey>(der.as_ref()).map_err(|e| KeyError::Asn1Deserialization {
+            picky_asn1_der::from_bytes::<RsaPrivateKey>(der.as_ref()).map_err(|e| KeyError::Asn1Deserialization {
                 source: e,
                 element: "rsa private key",
             })?;
@@ -300,11 +300,11 @@ impl TryFrom<&'_ PublicKey> for RSAPublicKey {
         use picky_asn1_x509::PublicKey as InnerPublicKey;
 
         match &v.as_inner().subject_public_key {
-            InnerPublicKey::RSA(BitStringAsn1Container(key)) => Ok(RSAPublicKey::new(
+            InnerPublicKey::Rsa(BitStringAsn1Container(key)) => Ok(RSAPublicKey::new(
                 BigUint::from_bytes_be(key.modulus.as_unsigned_bytes_be()),
                 BigUint::from_bytes_be(key.public_exponent.as_unsigned_bytes_be()),
             )?),
-            InnerPublicKey::EC(_) => Err(KeyError::UnsupportedAlgorithm {
+            InnerPublicKey::Ec(_) => Err(KeyError::UnsupportedAlgorithm {
                 algorithm: "elliptic curves",
             }),
             InnerPublicKey::Ed(_) => Err(KeyError::UnsupportedAlgorithm {
@@ -351,17 +351,17 @@ impl PublicKey {
     }
 
     pub fn from_rsa_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, KeyError> {
-        use picky_asn1_x509::{AlgorithmIdentifier, PublicKey, RSAPublicKey};
+        use picky_asn1_x509::{AlgorithmIdentifier, PublicKey, RsaPublicKey};
 
         let public_key =
-            picky_asn1_der::from_bytes::<RSAPublicKey>(der.as_ref()).map_err(|e| KeyError::Asn1Deserialization {
+            picky_asn1_der::from_bytes::<RsaPublicKey>(der.as_ref()).map_err(|e| KeyError::Asn1Deserialization {
                 source: e,
                 element: "rsa public key",
             })?;
 
         Ok(Self(SubjectPublicKeyInfo {
             algorithm: AlgorithmIdentifier::new_rsa_encryption(),
-            subject_public_key: PublicKey::RSA(public_key.into()),
+            subject_public_key: PublicKey::Rsa(public_key.into()),
         }))
     }
 

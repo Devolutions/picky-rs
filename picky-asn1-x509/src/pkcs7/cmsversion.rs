@@ -3,12 +3,12 @@ use std::fmt;
 
 /// [RFC 5682 #10.2.5](https://datatracker.ietf.org/doc/html/rfc5652#section-10.2.5)
 /// ``` not_rust
-/// CMSVersion ::= INTEGER
+/// CmsVersion ::= INTEGER
 ///                      { v0(0), v1(1), v2(2), v3(3), v4(4), v5(5) }
 /// ```
 #[derive(Debug, PartialEq, Clone, Copy)]
 #[repr(u8)]
-pub enum CMSVersion {
+pub enum CmsVersion {
     V0 = 0x00,
     V1 = 0x01,
     V2 = 0x02,
@@ -17,7 +17,7 @@ pub enum CMSVersion {
     V5 = 0x05,
 }
 
-impl CMSVersion {
+impl CmsVersion {
     pub fn from_u8(v: u8) -> Option<Self> {
         match v {
             0x00 => Some(Self::V0),
@@ -31,7 +31,7 @@ impl CMSVersion {
     }
 }
 
-impl Serialize for CMSVersion {
+impl Serialize for CmsVersion {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: ser::Serializer,
@@ -40,7 +40,7 @@ impl Serialize for CMSVersion {
     }
 }
 
-impl<'de> Deserialize<'de> for CMSVersion {
+impl<'de> Deserialize<'de> for CmsVersion {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: de::Deserializer<'de>,
@@ -48,7 +48,7 @@ impl<'de> Deserialize<'de> for CMSVersion {
         struct Visitor;
 
         impl<'de> de::Visitor<'de> for Visitor {
-            type Value = CMSVersion;
+            type Value = CmsVersion;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 write!(formatter, "a valid cms version number")
@@ -58,7 +58,7 @@ impl<'de> Deserialize<'de> for CMSVersion {
             where
                 E: de::Error,
             {
-                let cms_version = CMSVersion::from_u8(v).ok_or_else(|| {
+                let cms_version = CmsVersion::from_u8(v).ok_or_else(|| {
                     E::invalid_value(
                         de::Unexpected::Other("invalid cms version number"),
                         &"a valid integer representing a supported cms version number (0, 1, 2, 3, 4 or 5)",

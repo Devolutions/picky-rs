@@ -12,7 +12,7 @@ use picky_asn1::wrapper::{ApplicationTag0, ApplicationTag3, IntegerAsn1};
 use picky_asn1_der::Asn1DerError;
 use picky_asn1_x509::{
     oids, AlgorithmIdentifier, AuthorityKeyIdentifier, BasicConstraints, Certificate, ExtendedKeyUsage, Extension,
-    ExtensionView, Extensions, KeyIdentifier, KeyUsage, Name, SubjectPublicKeyInfo, TBSCertificate, Validity, Version,
+    ExtensionView, Extensions, KeyIdentifier, KeyUsage, Name, SubjectPublicKeyInfo, TbsCertificate, Validity, Version,
 };
 use std::cell::RefCell;
 use thiserror::Error;
@@ -901,7 +901,7 @@ impl<'a> CertificateBuilder<'a> {
             Extensions(extensions)
         };
 
-        let tbs_certificate = TBSCertificate {
+        let tbs_certificate = TbsCertificate {
             version: ApplicationTag0(Version::V3),
             serial_number,
             signature: AlgorithmIdentifier::from(signature_hash_type),
@@ -1349,7 +1349,7 @@ mod tests {
 
         let validity = &cert.0.tbs_certificate.validity;
 
-        assert!(matches!(validity.not_before, Time::UTC(_)));
+        assert!(matches!(validity.not_before, Time::Utc(_)));
         assert!(matches!(validity.not_after, Time::Generalized(_)));
     }
 
@@ -1392,7 +1392,7 @@ mod tests {
             .iter()
             .find_map(|ext| match ext.extn_value() {
                 ExtensionView::SubjectAltName(gn) => match gn.0.first().unwrap() {
-                    picky_asn1_x509::GeneralName::DNSName(name) => Some(name.to_string()),
+                    picky_asn1_x509::GeneralName::DnsName(name) => Some(name.to_string()),
                     _ => None,
                 },
                 _ => None,

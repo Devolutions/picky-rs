@@ -220,11 +220,11 @@ impl Jwk {
         use picky_asn1_x509::PublicKey as SerdePublicKey;
 
         match &public_key.as_inner().subject_public_key {
-            SerdePublicKey::RSA(BitStringAsn1Container(rsa)) => Ok(Self::new(JwkKeyType::new_rsa_key(
+            SerdePublicKey::Rsa(BitStringAsn1Container(rsa)) => Ok(Self::new(JwkKeyType::new_rsa_key(
                 rsa.modulus.as_signed_bytes_be(),
                 rsa.public_exponent.as_signed_bytes_be(),
             ))),
-            SerdePublicKey::EC(_) => Err(JwkError::UnsupportedAlgorithm {
+            SerdePublicKey::Ec(_) => Err(JwkError::UnsupportedAlgorithm {
                 algorithm: "elliptic curves",
             }),
             SerdePublicKey::Ed(_) => Err(JwkError::UnsupportedAlgorithm {

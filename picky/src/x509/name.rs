@@ -118,14 +118,14 @@ impl GeneralName {
 impl From<SerdeGeneralName> for GeneralName {
     fn from(gn: SerdeGeneralName) -> Self {
         match gn {
-            SerdeGeneralName::RFC822Name(name) => Self::RFC822Name(name.0),
-            SerdeGeneralName::DNSName(name) => Self::DNSName(name.0),
+            SerdeGeneralName::Rfc822Name(name) => Self::RFC822Name(name.0),
+            SerdeGeneralName::DnsName(name) => Self::DNSName(name.0),
             SerdeGeneralName::DirectoryName(name) => Self::DirectoryName(name.into()),
-            SerdeGeneralName::EDIPartyName(edi_pn) => Self::EDIPartyName {
+            SerdeGeneralName::EdiPartyName(edi_pn) => Self::EDIPartyName {
                 name_assigner: edi_pn.name_assigner.0.map(|na| na.0),
                 party_name: edi_pn.party_name.0,
             },
-            SerdeGeneralName::URI(uri) => Self::URI(uri.0),
+            SerdeGeneralName::Uri(uri) => Self::URI(uri.0),
             SerdeGeneralName::IpAddress(ip_addr) => Self::IpAddress(ip_addr.0),
             SerdeGeneralName::RegisteredId(id) => Self::RegisteredId(id.0),
         }
@@ -135,14 +135,14 @@ impl From<SerdeGeneralName> for GeneralName {
 impl From<GeneralName> for SerdeGeneralName {
     fn from(gn: GeneralName) -> Self {
         match gn {
-            GeneralName::RFC822Name(name) => SerdeGeneralName::RFC822Name(name.into()),
-            GeneralName::DNSName(name) => SerdeGeneralName::DNSName(name.into()),
+            GeneralName::RFC822Name(name) => SerdeGeneralName::Rfc822Name(name.into()),
+            GeneralName::DNSName(name) => SerdeGeneralName::DnsName(name.into()),
             GeneralName::DirectoryName(name) => SerdeGeneralName::DirectoryName(name.into()),
             GeneralName::EDIPartyName {
                 name_assigner,
                 party_name,
             } => SerdeGeneralName::new_edi_party_name(party_name, name_assigner),
-            GeneralName::URI(uri) => SerdeGeneralName::URI(uri.into()),
+            GeneralName::URI(uri) => SerdeGeneralName::Uri(uri.into()),
             GeneralName::IpAddress(ip_addr) => SerdeGeneralName::IpAddress(ip_addr.into()),
             GeneralName::RegisteredId(id) => SerdeGeneralName::RegisteredId(id.into()),
         }
@@ -233,7 +233,7 @@ impl GeneralNames {
 
     pub fn find_dns_name(&self) -> Option<&IA5String> {
         for name in &(self.0).0 {
-            if let SerdeGeneralName::DNSName(name) = name {
+            if let SerdeGeneralName::DnsName(name) = name {
                 return Some(&name.0);
             }
         }

@@ -117,7 +117,7 @@ impl<'de> Deserialize<'de> for RevocationInfoChoice {
 /// ```
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct CertificateList {
-    pub tbs_cert_list: TBSCertList,
+    pub tbs_cert_list: TbsCertList,
     pub signature_algorithm: AlgorithmIdentifier,
     pub signature_value: BitStringAsn1,
 }
@@ -142,7 +142,7 @@ pub struct CertificateList {
 ///                                 }
 /// ```
 #[derive(Serialize, Debug, PartialEq, Clone)]
-pub struct TBSCertList {
+pub struct TbsCertList {
     pub version: Option<Version>,
     pub signature: AlgorithmIdentifier,
     pub issuer: Name,
@@ -152,7 +152,7 @@ pub struct TBSCertList {
     pub crl_extension: ApplicationTag0<Option<Extensions>>,
 }
 
-impl<'de> de::Deserialize<'de> for TBSCertList {
+impl<'de> de::Deserialize<'de> for TbsCertList {
     fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
     where
         D: de::Deserializer<'de>,
@@ -162,10 +162,10 @@ impl<'de> de::Deserialize<'de> for TBSCertList {
         struct Visitor;
 
         impl<'de> de::Visitor<'de> for Visitor {
-            type Value = TBSCertList;
+            type Value = TbsCertList;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a valid DER-encoded TBSCertList")
+                formatter.write_str("a valid DER-encoded TbsCertList")
             }
 
             fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
@@ -175,13 +175,13 @@ impl<'de> de::Deserialize<'de> for TBSCertList {
                 let version = seq.next_element().unwrap_or(Some(None)).unwrap_or(None);
                 if version.is_some() && !version.eq(&Some(Version::V2)) {
                     return Err(serde_invalid_value!(
-                        TBSCertList,
-                        "Version of TBSCertList doesn't equal to v2",
-                        "Version of TBSCertList equals to v2"
+                        TbsCertList,
+                        "Version of TbsCertList doesn't equal to v2",
+                        "Version of TbsCertList equals to v2"
                     ));
                 }
 
-                Ok(TBSCertList {
+                Ok(TbsCertList {
                     version,
                     signature: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(1, &self))?,
                     issuer: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(2, &self))?,
@@ -220,7 +220,7 @@ impl<'de> de::Deserialize<'de> for RevokedCertificate {
             type Value = RevokedCertificate;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a valid DER-decoded TBSCertList")
+                formatter.write_str("a valid DER-decoded TbsCertList")
             }
 
             fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>

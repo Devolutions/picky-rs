@@ -38,14 +38,14 @@ impl KeyIdGenMethod {
 
         match self {
             KeyIdGenMethod::SPKValueHashedLeftmost160(hash_algo) => match &public_key.as_inner().subject_public_key {
-                InnerPublicKey::RSA(BitStringAsn1Container(rsa_pk)) => {
+                InnerPublicKey::Rsa(BitStringAsn1Container(rsa_pk)) => {
                     let der = picky_asn1_der::to_vec(rsa_pk).map_err(|e| KeyIdGenError::Asn1Serialization {
                         source: e,
                         element: "RSA private key",
                     })?;
                     Ok(hash_algo.digest(&der)[..20].to_vec())
                 }
-                InnerPublicKey::EC(bitstring) => {
+                InnerPublicKey::Ec(bitstring) => {
                     let der = bitstring.0.payload_view();
                     Ok(hash_algo.digest(&der)[..20].to_vec())
                 }

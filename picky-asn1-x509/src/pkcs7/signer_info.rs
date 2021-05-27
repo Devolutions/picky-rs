@@ -1,10 +1,8 @@
-use serde::{de, ser, Deserialize, Serialize};
-
-use picky_asn1::wrapper::{ContextTag0, Implicit, IntegerAsn1, OctetStringAsn1};
-
-use crate::cmsversion::CMSVersion;
+use crate::cmsversion::CmsVersion;
 use crate::{AlgorithmIdentifier, Attributes, Name, SubjectKeyIdentifier};
 use picky_asn1::tag::{Tag, TagPeeker};
+use picky_asn1::wrapper::{ContextTag0, Implicit, IntegerAsn1, OctetStringAsn1};
+use serde::{de, ser, Deserialize, Serialize};
 
 /// [RFC 5652 #5.3](https://datatracker.ietf.org/doc/html/rfc5652#section-5.3)
 /// ``` not_rust
@@ -23,7 +21,7 @@ use picky_asn1::tag::{Tag, TagPeeker};
 /// ```
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct SignerInfo {
-    pub version: CMSVersion,
+    pub version: CmsVersion,
     pub sid: SignerIdentifier,
     pub digest_algorithm: DigestAlgorithmIdentifier,
     pub signed_attrs: Implicit<Attributes>,
@@ -53,7 +51,7 @@ impl<'de> de::Deserialize<'de> for SignerInfo {
                 A: de::SeqAccess<'de>,
             {
                 let version = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(0, &self))?;
-                if version != CMSVersion::V1 {
+                if version != CmsVersion::V1 {
                     return Err(serde_invalid_value!(
                         SignerInfo,
                         "wrong version field",

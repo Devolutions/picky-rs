@@ -26,7 +26,7 @@ pub enum NameAttr {
 /// ```not_rust
 /// RDNSequence ::= SEQUENCE OF RelativeDistinguishedName
 /// ```
-pub type RDNSequence = Asn1SequenceOf<RelativeDistinguishedName>;
+pub type RdnSequence = Asn1SequenceOf<RelativeDistinguishedName>;
 
 /// [RFC 5280 #4.1.2.4](https://tools.ietf.org/html/rfc5280#section-4.1.2.4)
 ///
@@ -49,7 +49,7 @@ pub type DirectoryName = Name;
 ///       rdnSequence  RDNSequence }
 /// ```
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
-pub struct Name(pub RDNSequence);
+pub struct Name(pub RdnSequence);
 
 impl Default for Name {
     fn default() -> Self {
@@ -188,12 +188,12 @@ pub type GeneralNames = Asn1SequenceOf<GeneralName>;
 #[derive(Debug, PartialEq, Clone)]
 pub enum GeneralName {
     //OtherName(OtherName),
-    RFC822Name(IA5StringAsn1),
-    DNSName(IA5StringAsn1),
+    Rfc822Name(IA5StringAsn1),
+    DnsName(IA5StringAsn1),
     //X400Address(ORAddress),
     DirectoryName(Name),
-    EDIPartyName(EDIPartyName),
-    URI(IA5StringAsn1),
+    EdiPartyName(EdiPartyName),
+    Uri(IA5StringAsn1),
     IpAddress(OctetStringAsn1),
     RegisteredId(ObjectIdentifierAsn1),
 }
@@ -204,7 +204,7 @@ impl GeneralName {
         PN: Into<DirectoryString>,
         NA: Into<DirectoryString>,
     {
-        Self::EDIPartyName(EDIPartyName {
+        Self::EdiPartyName(EdiPartyName {
             name_assigner: Implicit(name_assigner.map(Into::into).map(ContextTag0)),
             party_name: ContextTag1(party_name.into()),
         })
@@ -223,11 +223,11 @@ impl ser::Serialize for GeneralName {
         S: ser::Serializer,
     {
         match &self {
-            GeneralName::RFC822Name(name) => ContextTag1(name).serialize(serializer),
-            GeneralName::DNSName(name) => ContextTag2(name).serialize(serializer),
+            GeneralName::Rfc822Name(name) => ContextTag1(name).serialize(serializer),
+            GeneralName::DnsName(name) => ContextTag2(name).serialize(serializer),
             GeneralName::DirectoryName(name) => ContextTag4(name).serialize(serializer),
-            GeneralName::EDIPartyName(name) => ContextTag5(name).serialize(serializer),
-            GeneralName::URI(name) => ContextTag6(name).serialize(serializer),
+            GeneralName::EdiPartyName(name) => ContextTag5(name).serialize(serializer),
+            GeneralName::Uri(name) => ContextTag6(name).serialize(serializer),
             GeneralName::IpAddress(name) => ContextTag7(name).serialize(serializer),
             GeneralName::RegisteredId(name) => ContextTag8(name).serialize(serializer),
         }
@@ -259,16 +259,16 @@ impl<'de> de::Deserialize<'de> for GeneralName {
                         "OtherName not supported",
                         "a supported choice"
                     )),
-                    Tag::CTX_1 => Ok(GeneralName::RFC822Name(
+                    Tag::CTX_1 => Ok(GeneralName::Rfc822Name(
                         seq_next_element!(seq, ContextTag1<IA5StringAsn1>, GeneralName, "RFC822Name").0,
                     )),
-                    Tag::APP_1 => Ok(GeneralName::RFC822Name(
+                    Tag::APP_1 => Ok(GeneralName::Rfc822Name(
                         seq_next_element!(seq, ApplicationTag1<IA5StringAsn1>, GeneralName, "RFC822Name").0,
                     )),
-                    Tag::CTX_2 => Ok(GeneralName::DNSName(
+                    Tag::CTX_2 => Ok(GeneralName::DnsName(
                         seq_next_element!(seq, ContextTag2<IA5StringAsn1>, GeneralName, "DNSName").0,
                     )),
-                    Tag::APP_2 => Ok(GeneralName::DNSName(
+                    Tag::APP_2 => Ok(GeneralName::DnsName(
                         seq_next_element!(seq, ApplicationTag2<IA5StringAsn1>, GeneralName, "DNSName").0,
                     )),
                     Tag::CTX_3 | Tag::APP_3 => Err(serde_invalid_value!(
@@ -282,16 +282,16 @@ impl<'de> de::Deserialize<'de> for GeneralName {
                     Tag::APP_4 => Ok(GeneralName::DirectoryName(
                         seq_next_element!(seq, ApplicationTag4<Name>, GeneralName, "DirectoryName").0,
                     )),
-                    Tag::CTX_5 => Ok(GeneralName::EDIPartyName(
-                        seq_next_element!(seq, ContextTag5<EDIPartyName>, GeneralName, "EDIPartyName").0,
+                    Tag::CTX_5 => Ok(GeneralName::EdiPartyName(
+                        seq_next_element!(seq, ContextTag5<EdiPartyName>, GeneralName, "EDIPartyName").0,
                     )),
-                    Tag::APP_5 => Ok(GeneralName::EDIPartyName(
-                        seq_next_element!(seq, ApplicationTag5<EDIPartyName>, GeneralName, "EDIPartyName").0,
+                    Tag::APP_5 => Ok(GeneralName::EdiPartyName(
+                        seq_next_element!(seq, ApplicationTag5<EdiPartyName>, GeneralName, "EDIPartyName").0,
                     )),
-                    Tag::CTX_6 => Ok(GeneralName::URI(
+                    Tag::CTX_6 => Ok(GeneralName::Uri(
                         seq_next_element!(seq, ContextTag6<IA5StringAsn1>, GeneralName, "URI").0,
                     )),
-                    Tag::APP_6 => Ok(GeneralName::URI(
+                    Tag::APP_6 => Ok(GeneralName::Uri(
                         seq_next_element!(seq, ApplicationTag6<IA5StringAsn1>, GeneralName, "URI").0,
                     )),
                     Tag::CTX_7 => Ok(GeneralName::IpAddress(
@@ -344,7 +344,7 @@ impl<'de> de::Deserialize<'de> for GeneralName {
 ///      partyName               [1]     DirectoryString }
 /// ```
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct EDIPartyName {
+pub struct EdiPartyName {
     pub name_assigner: Implicit<Option<ContextTag0<DirectoryString>>>,
     pub party_name: ContextTag1<DirectoryString>,
 }
@@ -412,7 +412,7 @@ mod tests {
             0x82, 0x11,
             0x64, 0x65, 0x76, 0x65, 0x6C, 0x2E, 0x65, 0x78, 0x61, 0x6D, 0x70, 0x6C, 0x65, 0x2E, 0x63, 0x6F, 0x6D,
         ];
-        let expected = GeneralName::DNSName(IA5String::from_string("devel.example.com".into()).unwrap().into());
+        let expected = GeneralName::DnsName(IA5String::from_string("devel.example.com".into()).unwrap().into());
         check_serde!(expected: GeneralName in encoded);
     }
 }

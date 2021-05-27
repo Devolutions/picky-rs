@@ -16,7 +16,7 @@ use std::fmt;
 /// ```
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Certificate {
-    pub tbs_certificate: TBSCertificate,
+    pub tbs_certificate: TbsCertificate,
     pub signature_algorithm: AlgorithmIdentifier,
     pub signature_value: BitStringAsn1,
 }
@@ -78,7 +78,7 @@ impl Certificate {
 ///      }
 /// ```
 #[derive(Serialize, Clone, Debug, PartialEq)]
-pub struct TBSCertificate {
+pub struct TbsCertificate {
     #[serde(skip_serializing_if = "version_is_default")]
     pub version: ApplicationTag0<Version>,
     pub serial_number: IntegerAsn1,
@@ -98,7 +98,7 @@ fn version_is_default(version: &Version) -> bool {
 }
 
 // Implement Deserialize manually to support missing version field (i.e.: fallback as V1)
-impl<'de> de::Deserialize<'de> for TBSCertificate {
+impl<'de> de::Deserialize<'de> for TbsCertificate {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: de::Deserializer<'de>,
@@ -106,7 +106,7 @@ impl<'de> de::Deserialize<'de> for TBSCertificate {
         struct Visitor;
 
         impl<'de> de::Visitor<'de> for Visitor {
-            type Value = TBSCertificate;
+            type Value = TbsCertificate;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("struct TBSCertificate")
@@ -130,13 +130,13 @@ impl<'de> de::Deserialize<'de> for TBSCertificate {
 
                 if version.0 != Version::V3 && !extensions.0 .0.is_empty() {
                     return Err(serde_invalid_value!(
-                        TBSCertificate,
+                        TbsCertificate,
                         "Version is not V3, but Extensions are present",
                         "no Extensions"
                     ));
                 }
 
-                Ok(TBSCertificate {
+                Ok(TbsCertificate {
                     version,
                     serial_number,
                     signature,
@@ -238,9 +238,9 @@ mod tests {
         let signature_algorithm = AlgorithmIdentifier::new_sha256_with_rsa_encryption();
         check_serde!(signature_algorithm: AlgorithmIdentifier in encoded[522..537]);
 
-        // TBSCertificate
+        // TbsCertificate
 
-        let tbs_certificate = TBSCertificate {
+        let tbs_certificate = TbsCertificate {
             version: ApplicationTag0(Version::V3).into(),
             serial_number: BigInt::from(935548868).to_signed_bytes_be().into(),
             signature: signature_algorithm.clone(),
@@ -250,7 +250,7 @@ mod tests {
             subject_public_key_info,
             extensions: extensions.into(),
         };
-        check_serde!(tbs_certificate: TBSCertificate in encoded[4..522]);
+        check_serde!(tbs_certificate: TbsCertificate in encoded[4..522]);
 
         // Full certificate
 

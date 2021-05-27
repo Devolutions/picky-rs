@@ -1,7 +1,7 @@
 //! Hash algorithms supported by picky
 
 use digest::Digest;
-use picky_asn1_x509::SHAVariant;
+use picky_asn1_x509::ShaVariant;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 use std::error::Error;
@@ -48,16 +48,16 @@ impl From<HashAlgorithm> for rsa::Hash {
     }
 }
 
-impl TryFrom<HashAlgorithm> for SHAVariant {
+impl TryFrom<HashAlgorithm> for ShaVariant {
     type Error = UnsupportedHashAlgorithmError;
 
-    fn try_from(v: HashAlgorithm) -> Result<SHAVariant, UnsupportedHashAlgorithmError> {
+    fn try_from(v: HashAlgorithm) -> Result<ShaVariant, UnsupportedHashAlgorithmError> {
         match v {
-            HashAlgorithm::SHA2_256 => Ok(SHAVariant::SHA2_256),
-            HashAlgorithm::SHA2_384 => Ok(SHAVariant::SHA2_384),
-            HashAlgorithm::SHA2_512 => Ok(SHAVariant::SHA2_512),
-            HashAlgorithm::SHA3_384 => Ok(SHAVariant::SHA3_384),
-            HashAlgorithm::SHA3_512 => Ok(SHAVariant::SHA3_512),
+            HashAlgorithm::SHA2_256 => Ok(ShaVariant::SHA2_256),
+            HashAlgorithm::SHA2_384 => Ok(ShaVariant::SHA2_384),
+            HashAlgorithm::SHA2_512 => Ok(ShaVariant::SHA2_512),
+            HashAlgorithm::SHA3_384 => Ok(ShaVariant::SHA3_384),
+            HashAlgorithm::SHA3_512 => Ok(ShaVariant::SHA3_512),
             _ => Err(UnsupportedHashAlgorithmError {
                 algorithm: format!("{:?}", v),
             }),
@@ -65,16 +65,16 @@ impl TryFrom<HashAlgorithm> for SHAVariant {
     }
 }
 
-impl TryFrom<SHAVariant> for HashAlgorithm {
+impl TryFrom<ShaVariant> for HashAlgorithm {
     type Error = UnsupportedHashAlgorithmError;
 
-    fn try_from(v: SHAVariant) -> Result<HashAlgorithm, UnsupportedHashAlgorithmError> {
+    fn try_from(v: ShaVariant) -> Result<HashAlgorithm, UnsupportedHashAlgorithmError> {
         match v {
-            SHAVariant::SHA2_256 => Ok(HashAlgorithm::SHA2_256),
-            SHAVariant::SHA2_384 => Ok(HashAlgorithm::SHA2_384),
-            SHAVariant::SHA2_512 => Ok(HashAlgorithm::SHA2_512),
-            SHAVariant::SHA3_384 => Ok(HashAlgorithm::SHA3_384),
-            SHAVariant::SHA3_512 => Ok(HashAlgorithm::SHA3_512),
+            ShaVariant::SHA2_256 => Ok(HashAlgorithm::SHA2_256),
+            ShaVariant::SHA2_384 => Ok(HashAlgorithm::SHA2_384),
+            ShaVariant::SHA2_512 => Ok(HashAlgorithm::SHA2_512),
+            ShaVariant::SHA3_384 => Ok(HashAlgorithm::SHA3_384),
+            ShaVariant::SHA3_512 => Ok(HashAlgorithm::SHA3_512),
             _ => Err(UnsupportedHashAlgorithmError {
                 algorithm: format!("{:?}", v),
             }),
