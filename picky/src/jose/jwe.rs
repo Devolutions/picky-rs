@@ -5,7 +5,7 @@
 use crate::jose::jwk::Jwk;
 use crate::key::{PrivateKey, PublicKey};
 use aes_gcm::aead::generic_array::typenum::Unsigned;
-use aes_gcm::{AeadInPlace, Aes128Gcm, Aes256Gcm, NewAead};
+use aes_gcm::{AeadCore, AeadInPlace, Aes128Gcm, Aes256Gcm, NewAead};
 use base64::DecodeError;
 use digest::generic_array::GenericArray;
 use rand::RngCore;
@@ -219,17 +219,17 @@ impl JweEnc {
 
     pub fn nonce_size(self) -> usize {
         match self {
-            Self::Aes128CbcHmacSha256 | Self::Aes128Gcm => <Aes128Gcm as AeadInPlace>::NonceSize::to_usize(),
-            Self::Aes192CbcHmacSha384 | Self::Aes192Gcm => <Aes192Gcm as AeadInPlace>::NonceSize::to_usize(),
-            Self::Aes256CbcHmacSha512 | Self::Aes256Gcm => <Aes256Gcm as AeadInPlace>::NonceSize::to_usize(),
+            Self::Aes128CbcHmacSha256 | Self::Aes128Gcm => <Aes128Gcm as AeadCore>::NonceSize::to_usize(),
+            Self::Aes192CbcHmacSha384 | Self::Aes192Gcm => <Aes192Gcm as AeadCore>::NonceSize::to_usize(),
+            Self::Aes256CbcHmacSha512 | Self::Aes256Gcm => <Aes256Gcm as AeadCore>::NonceSize::to_usize(),
         }
     }
 
     pub fn tag_size(self) -> usize {
         match self {
-            Self::Aes128CbcHmacSha256 | Self::Aes128Gcm => <Aes128Gcm as AeadInPlace>::TagSize::to_usize(),
-            Self::Aes192CbcHmacSha384 | Self::Aes192Gcm => <Aes192Gcm as AeadInPlace>::TagSize::to_usize(),
-            Self::Aes256CbcHmacSha512 | Self::Aes256Gcm => <Aes256Gcm as AeadInPlace>::TagSize::to_usize(),
+            Self::Aes128CbcHmacSha256 | Self::Aes128Gcm => <Aes128Gcm as AeadCore>::TagSize::to_usize(),
+            Self::Aes192CbcHmacSha384 | Self::Aes192Gcm => <Aes192Gcm as AeadCore>::TagSize::to_usize(),
+            Self::Aes256CbcHmacSha512 | Self::Aes256Gcm => <Aes256Gcm as AeadCore>::TagSize::to_usize(),
         }
     }
 }
@@ -423,7 +423,7 @@ fn encode_impl(jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
     };
 
     let mut buffer = jwe.payload;
-    let nonce = <aes_gcm::aead::Nonce<_> as From<[u8; 12]>>::from(rand::random()); // 96-bits nonce for AES-GCM
+    let nonce = <aes_gcm::aead::Nonce<Aes128Gcm> as From<[u8; 12]>>::from(rand::random()); // 96-bits nonce for all AES-GCM variants
     let aad = protected_header_base64.as_bytes(); // The Additional Authenticated Data value used for AES-GCM.
     let authentication_tag = match header.enc {
         JweEnc::Aes128Gcm => {
