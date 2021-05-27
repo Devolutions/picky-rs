@@ -17,17 +17,18 @@ repository = "https://github.com/Devolutions/picky-rs"
 include = ["src/**/*", "README.md", "CHANGELOG.md"]
 
 [dependencies]
-byteorder = { version = "1.4", optional = true }
 picky-asn1 = { version = "0.3", path = "../picky-asn1" }
 picky-asn1-der = { version = "0.2", path = "../picky-asn1-der" }
-picky-asn1-x509 = { version = "0.5", path = "../picky-asn1-x509", features = ["legacy"] }
+picky-asn1-x509 = { version = "0.6", path = "../picky-asn1-x509", features = ["legacy"] }
 serde = { version = "1.0", features = ["derive"] }
 oid = { version = "0.2", features = ["serde_support"] }
 base64 = "0.13"
 thiserror = "1"
+byteorder = { version = "1.4", optional = true }
 chrono = { version = "0.4", optional = true }
 serde_json = { version = "1.0", optional = true }
 http = { version = "0.2", optional = true }
+
 # /!\ ===== cryptography dependencies ===== /!\
 # These should be updated as soon as possible.
 # /!\ ===================================== /!\
@@ -37,8 +38,8 @@ sha3 = "0.9"
 digest = "0.9"
 rsa = "0.4"
 rand = "0.8"
-aes-gcm = { version = "0.8", optional = true }
 num-bigint-dig = "0.7"
+aes-gcm = { version = "0.9", optional = true }
 
 [dev-dependencies]
 pretty_assertions = "0.7"
@@ -55,7 +56,7 @@ jose = ["serde_json", "aes-gcm"]
 http_signature = []
 
 # secondary features
-pkcs7 = ["x509"]
-wincert = ["pkcs7", "byteorder/default"]
+pkcs7 = ["x509", "picky-asn1-x509/pkcs7"]
+wincert = ["pkcs7", "byteorder"]
 http_trait_impl = ["http"]
 chrono_conversion = ["chrono", "picky-asn1/chrono_conversion"]
