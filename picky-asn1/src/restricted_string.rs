@@ -28,7 +28,7 @@ pub trait CharSet {
 // === RestrictedString === //
 
 /// A generic restricted character string.
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct RestrictedString<C> {
     data: Vec<u8>,
     marker: PhantomData<C>,
@@ -218,8 +218,9 @@ impl CharSet for PrintableCharSet {
 // === Utf8String === //
 
 /// any character from a recognized alphabet (including ASCII control characters)
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct Utf8CharSet;
+
 pub type Utf8String = RestrictedString<Utf8CharSet>;
 
 impl CharSet for Utf8CharSet {
@@ -232,8 +233,9 @@ impl CharSet for Utf8CharSet {
 
 /// First 128 ASCII characters (values from `0x00` to `0x7F`)
 /// Used to represent ISO 646 (IA5) characters.
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct IA5CharSet;
+
 pub type IA5String = RestrictedString<IA5CharSet>;
 
 impl CharSet for IA5CharSet {
@@ -247,8 +249,9 @@ impl CharSet for IA5CharSet {
     }
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct BMPCharSet;
+
 pub type BMPString = RestrictedString<BMPCharSet>;
 
 impl CharSet for BMPCharSet {
