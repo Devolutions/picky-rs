@@ -44,7 +44,7 @@ jobs:
               exit 1
           fi
 
-          cargo test --release
+          cargo test --release --features "wincert"
           if ! [ $? -eq 0 ] ; then
               echo "Unit tests failed"
               exit 1
