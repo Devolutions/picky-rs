@@ -44,22 +44,22 @@ use picky_asn1::wrapper::{ObjectIdentifierAsn1, OctetStringAsn1};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct OCSPRequest {
-    pub tbs_request: TBSRequest,
+pub struct OcspRequest {
+    pub tbs_request: TbsRequest,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct TBSRequest {
+pub struct TbsRequest {
     pub request_list: Vec<Request>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct Request {
-    pub req_cert: CertID,
+    pub req_cert: CertId,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct CertID {
+pub struct CertId {
     pub algorithm: AlgorithmIdentifier,
     pub issuer_name_hash: OctetStringAsn1,
     pub issuer_key_hash: OctetStringAsn1,
@@ -81,10 +81,10 @@ fn ocsp_request() {
     .expect("invalid base64");
 
     let sha1_oid = ObjectIdentifier::try_from("1.3.14.3.2.26").unwrap();
-    let ocsp_request = OCSPRequest {
-        tbs_request: TBSRequest {
+    let ocsp_request = OcspRequest {
+        tbs_request: TbsRequest {
             request_list: vec![Request {
-                req_cert: CertID {
+                req_cert: CertId {
                     algorithm: AlgorithmIdentifier {
                         algorithm: sha1_oid.into(),
                         parameters: (),
@@ -105,5 +105,5 @@ fn ocsp_request() {
         },
     };
 
-    check!(ocsp_request: OCSPRequest in encoded_ocsp_request);
+    check!(ocsp_request: OcspRequest in encoded_ocsp_request);
 }

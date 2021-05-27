@@ -69,13 +69,13 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 struct Certificate {
-    pub tbs_certificate: TBSCertificate,
+    pub tbs_certificate: TbsCertificate,
     pub signature_algorithm: AlgorithmIdentifier,
     pub signature_value: BitStringAsn1,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
-struct TBSCertificate {
+struct TbsCertificate {
     #[serde(skip_serializing_if = "implicit_app0_version_is_default")]
     pub version: Implicit<ApplicationTag0<Version>>,
     pub serial_number: u128,
@@ -209,9 +209,9 @@ fn x509_v3_certificate() {
     ]);
     check!(extensions: Extensions in encoded[429..522]);
 
-    // TBSCertificate
+    // TbsCertificate
 
-    let tbs_certificate = TBSCertificate {
+    let tbs_certificate = TbsCertificate {
         version: ApplicationTag0(Version::V3).into(),
         serial_number: 935548868,
         signature: AlgorithmIdentifier {
@@ -224,7 +224,7 @@ fn x509_v3_certificate() {
         subject_public_key_info,
         extensions: ApplicationTag3(extensions),
     };
-    check!(tbs_certificate: TBSCertificate in encoded[4..522]);
+    check!(tbs_certificate: TbsCertificate in encoded[4..522]);
 
     // SignatureAlgorithm
 

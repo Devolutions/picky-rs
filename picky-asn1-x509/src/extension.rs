@@ -581,11 +581,11 @@ mod tests {
             ])
             .into_non_critical(),
             Extension::new_subject_alt_name(vec![
-                GeneralName::DNSName(IA5String::from_string("devel.example.com".into()).unwrap().into()),
-                GeneralName::DNSName(IA5String::from_string("ipv6.example.com".into()).unwrap().into()),
-                GeneralName::DNSName(IA5String::from_string("ipv4.example.com".into()).unwrap().into()),
-                GeneralName::DNSName(IA5String::from_string("test.example.com".into()).unwrap().into()),
-                GeneralName::DNSName(IA5String::from_string("party.example.com".into()).unwrap().into()),
+                GeneralName::DnsName(IA5String::from_string("devel.example.com".into()).unwrap().into()),
+                GeneralName::DnsName(IA5String::from_string("ipv6.example.com".into()).unwrap().into()),
+                GeneralName::DnsName(IA5String::from_string("ipv4.example.com".into()).unwrap().into()),
+                GeneralName::DnsName(IA5String::from_string("test.example.com".into()).unwrap().into()),
+                GeneralName::DnsName(IA5String::from_string("party.example.com".into()).unwrap().into()),
             ])
             .into_non_critical(),
         ]);

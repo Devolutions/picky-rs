@@ -95,14 +95,14 @@ impl AlgorithmIdentifier {
         }
     }
 
-    pub fn new_rsa_encryption_with_sha(variant: SHAVariant) -> Result<Self, UnsupportedAlgorithmError> {
+    pub fn new_rsa_encryption_with_sha(variant: ShaVariant) -> Result<Self, UnsupportedAlgorithmError> {
         let algorithm = match variant {
-            SHAVariant::SHA2_224 => oids::sha224_with_rsa_encryption(),
-            SHAVariant::SHA2_256 => oids::sha256_with_rsa_encryption(),
-            SHAVariant::SHA2_384 => oids::sha384_with_rsa_encryption(),
-            SHAVariant::SHA2_512 => oids::sha512_with_rsa_encryption(),
-            SHAVariant::SHA3_384 => oids::id_rsassa_pkcs1_v1_5_with_sha3_384(),
-            SHAVariant::SHA3_512 => oids::id_rsassa_pkcs1_v1_5_with_sha3_512(),
+            ShaVariant::SHA2_224 => oids::sha224_with_rsa_encryption(),
+            ShaVariant::SHA2_256 => oids::sha256_with_rsa_encryption(),
+            ShaVariant::SHA2_384 => oids::sha384_with_rsa_encryption(),
+            ShaVariant::SHA2_512 => oids::sha512_with_rsa_encryption(),
+            ShaVariant::SHA3_384 => oids::id_rsassa_pkcs1_v1_5_with_sha3_384(),
+            ShaVariant::SHA3_512 => oids::id_rsassa_pkcs1_v1_5_with_sha3_512(),
             _ => {
                 return Err(UnsupportedAlgorithmError {
                     algorithm: format!("{:?}", variant),
@@ -130,10 +130,10 @@ impl AlgorithmIdentifier {
         }
     }
 
-    pub fn new_elliptic_curve<P: Into<ECParameters>>(ec_params: P) -> Self {
+    pub fn new_elliptic_curve<P: Into<EcParameters>>(ec_params: P) -> Self {
         Self {
             algorithm: oids::ec_public_key().into(),
-            parameters: AlgorithmIdentifierParameters::EC(ec_params.into()),
+            parameters: AlgorithmIdentifierParameters::Ec(ec_params.into()),
         }
     }
 
@@ -144,28 +144,28 @@ impl AlgorithmIdentifier {
         }
     }
 
-    pub fn new_aes128(mode: AesMode, params: AESParameters) -> Self {
+    pub fn new_aes128(mode: AesMode, params: AesParameters) -> Self {
         Self {
             algorithm: mode.to_128bit_oid(),
-            parameters: AlgorithmIdentifierParameters::AES(params),
+            parameters: AlgorithmIdentifierParameters::Aes(params),
         }
     }
 
-    pub fn new_aes192(mode: AesMode, params: AESParameters) -> Self {
+    pub fn new_aes192(mode: AesMode, params: AesParameters) -> Self {
         Self {
             algorithm: mode.to_192bit_oid(),
-            parameters: AlgorithmIdentifierParameters::AES(params),
+            parameters: AlgorithmIdentifierParameters::Aes(params),
         }
     }
 
-    pub fn new_aes256(mode: AesMode, params: AESParameters) -> Self {
+    pub fn new_aes256(mode: AesMode, params: AesParameters) -> Self {
         Self {
             algorithm: mode.to_256bit_oid(),
-            parameters: AlgorithmIdentifierParameters::AES(params),
+            parameters: AlgorithmIdentifierParameters::Aes(params),
         }
     }
 
-    pub fn new_sha(variant: SHAVariant) -> Self {
+    pub fn new_sha(variant: ShaVariant) -> Self {
         Self {
             algorithm: variant.into(),
             parameters: AlgorithmIdentifierParameters::Null,
@@ -186,10 +186,10 @@ impl ser::Serialize for AlgorithmIdentifier {
             AlgorithmIdentifierParameters::Null => {
                 seq.serialize_element(&())?;
             }
-            AlgorithmIdentifierParameters::EC(ec_params) => {
+            AlgorithmIdentifierParameters::Ec(ec_params) => {
                 seq.serialize_element(ec_params)?;
             }
-            AlgorithmIdentifierParameters::AES(aes_params) => {
+            AlgorithmIdentifierParameters::Aes(aes_params) => {
                 seq.serialize_element(aes_params)?;
             }
         }
@@ -234,13 +234,13 @@ impl<'de> de::Deserialize<'de> for AlgorithmIdentifier {
                     oids::ECDSA_WITH_SHA384 | oids::ECDSA_WITH_SHA256 | oids::ED25519 => {
                         AlgorithmIdentifierParameters::None
                     }
-                    oids::EC_PUBLIC_KEY => AlgorithmIdentifierParameters::EC(seq_next_element!(
+                    oids::EC_PUBLIC_KEY => AlgorithmIdentifierParameters::Ec(seq_next_element!(
                         seq,
                         AlgorithmIdentifier,
                         "elliptic curves parameters"
                     )),
                     // AES
-                    x if x.starts_with("2.16.840.1.101.3.4.1.") => AlgorithmIdentifierParameters::AES(
+                    x if x.starts_with("2.16.840.1.101.3.4.1.") => AlgorithmIdentifierParameters::Aes(
                         seq_next_element!(seq, AlgorithmIdentifier, "aes algorithm identifier"),
                     ),
                     // SHA
@@ -272,48 +272,42 @@ impl<'de> de::Deserialize<'de> for AlgorithmIdentifier {
 pub enum AlgorithmIdentifierParameters {
     None,
     Null,
-    AES(AESParameters),
-    EC(ECParameters),
+    Aes(AesParameters),
+    Ec(EcParameters),
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum ECParameters {
+pub enum EcParameters {
     NamedCurve(ObjectIdentifierAsn1),
-    ImplicitCurve,
-    //SpecifiedCurve(SpecifiedECDomain) // see [X9.62]
+    // -- implicitCurve and specifiedCurve MUST NOT be used in PKIX.
+    //ImplicitCurve,
+    //SpecifiedCurve(SpecifiedECDomain)
 }
 
-impl From<ObjectIdentifierAsn1> for ECParameters {
+impl From<ObjectIdentifierAsn1> for EcParameters {
     fn from(oid: ObjectIdentifierAsn1) -> Self {
         Self::NamedCurve(oid)
     }
 }
 
-impl From<ObjectIdentifier> for ECParameters {
+impl From<ObjectIdentifier> for EcParameters {
     fn from(oid: ObjectIdentifier) -> Self {
         Self::NamedCurve(oid.into())
     }
 }
 
-impl From<()> for ECParameters {
-    fn from(_: ()) -> Self {
-        Self::ImplicitCurve
-    }
-}
-
-impl ser::Serialize for ECParameters {
+impl ser::Serialize for EcParameters {
     fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
     where
         S: ser::Serializer,
     {
         match &self {
-            ECParameters::NamedCurve(oid) => oid.serialize(serializer),
-            ECParameters::ImplicitCurve => ().serialize(serializer),
+            EcParameters::NamedCurve(oid) => oid.serialize(serializer),
         }
     }
 }
 
-impl<'de> de::Deserialize<'de> for ECParameters {
+impl<'de> de::Deserialize<'de> for EcParameters {
     fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
     where
         D: de::Deserializer<'de>,
@@ -321,7 +315,7 @@ impl<'de> de::Deserialize<'de> for ECParameters {
         struct Visitor;
 
         impl<'de> de::Visitor<'de> for Visitor {
-            type Value = ECParameters;
+            type Value = EcParameters;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("a valid DER-encoded DirectoryString")
@@ -331,19 +325,15 @@ impl<'de> de::Deserialize<'de> for ECParameters {
             where
                 A: de::SeqAccess<'de>,
             {
-                let tag_peeker: TagPeeker = seq_next_element!(seq, ECParameters, "choice tag");
+                let tag_peeker: TagPeeker = seq_next_element!(seq, EcParameters, "choice tag");
                 match tag_peeker.next_tag {
-                    Tag::OID => Ok(ECParameters::NamedCurve(seq_next_element!(
+                    Tag::OID => Ok(EcParameters::NamedCurve(seq_next_element!(
                         seq,
-                        ECParameters,
+                        EcParameters,
                         "Object Identifier"
                     ))),
-                    Tag::NULL => {
-                        seq.next_element::<()>()?.expect("should not panic");
-                        Ok(ECParameters::ImplicitCurve)
-                    }
                     _ => Err(serde_invalid_value!(
-                        ECParameters,
+                        EcParameters,
                         "unsupported or unknown elliptic curve parameter",
                         "a supported elliptic curve parameter"
                     )),
@@ -357,18 +347,18 @@ impl<'de> de::Deserialize<'de> for ECParameters {
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum AesMode {
-    ECB,
-    CBC,
-    OFB,
-    CFB,
+    Ecb,
+    Cbc,
+    Ofb,
+    Cfb,
     Wrap,
-    GCM,
-    CCM,
+    Gcm,
+    Ccm,
     WrapPad,
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum AESParameters {
+pub enum AesParameters {
     Null,
     InitializationVector(OctetStringAsn1),
     AuthenticatedEncryptionParameters(AesAuthEncParams),
@@ -383,58 +373,58 @@ pub struct AesAuthEncParams {
 impl AesMode {
     fn to_128bit_oid(self) -> ObjectIdentifierAsn1 {
         match self {
-            AesMode::ECB => oids::aes128_ecb().into(),
-            AesMode::CBC => oids::aes128_cbc().into(),
-            AesMode::OFB => oids::aes128_ofb().into(),
-            AesMode::CFB => oids::aes128_cfb().into(),
+            AesMode::Ecb => oids::aes128_ecb().into(),
+            AesMode::Cbc => oids::aes128_cbc().into(),
+            AesMode::Ofb => oids::aes128_ofb().into(),
+            AesMode::Cfb => oids::aes128_cfb().into(),
             AesMode::Wrap => oids::aes128_wrap().into(),
-            AesMode::GCM => oids::aes128_gcm().into(),
-            AesMode::CCM => oids::aes128_ccm().into(),
+            AesMode::Gcm => oids::aes128_gcm().into(),
+            AesMode::Ccm => oids::aes128_ccm().into(),
             AesMode::WrapPad => oids::aes128_wrap_pad().into(),
         }
     }
 
     fn to_192bit_oid(self) -> ObjectIdentifierAsn1 {
         match self {
-            AesMode::ECB => oids::aes192_ecb().into(),
-            AesMode::CBC => oids::aes192_cbc().into(),
-            AesMode::OFB => oids::aes192_ofb().into(),
-            AesMode::CFB => oids::aes192_cfb().into(),
+            AesMode::Ecb => oids::aes192_ecb().into(),
+            AesMode::Cbc => oids::aes192_cbc().into(),
+            AesMode::Ofb => oids::aes192_ofb().into(),
+            AesMode::Cfb => oids::aes192_cfb().into(),
             AesMode::Wrap => oids::aes192_wrap().into(),
-            AesMode::GCM => oids::aes192_gcm().into(),
-            AesMode::CCM => oids::aes192_ccm().into(),
+            AesMode::Gcm => oids::aes192_gcm().into(),
+            AesMode::Ccm => oids::aes192_ccm().into(),
             AesMode::WrapPad => oids::aes192_wrap_pad().into(),
         }
     }
 
     fn to_256bit_oid(self) -> ObjectIdentifierAsn1 {
         match self {
-            AesMode::ECB => oids::aes256_ecb().into(),
-            AesMode::CBC => oids::aes256_cbc().into(),
-            AesMode::OFB => oids::aes256_ofb().into(),
-            AesMode::CFB => oids::aes256_cfb().into(),
+            AesMode::Ecb => oids::aes256_ecb().into(),
+            AesMode::Cbc => oids::aes256_cbc().into(),
+            AesMode::Ofb => oids::aes256_ofb().into(),
+            AesMode::Cfb => oids::aes256_cfb().into(),
             AesMode::Wrap => oids::aes256_wrap().into(),
-            AesMode::GCM => oids::aes256_gcm().into(),
-            AesMode::CCM => oids::aes256_ccm().into(),
+            AesMode::Gcm => oids::aes256_gcm().into(),
+            AesMode::Ccm => oids::aes256_ccm().into(),
             AesMode::WrapPad => oids::aes256_wrap_pad().into(),
         }
     }
 }
 
-impl ser::Serialize for AESParameters {
+impl ser::Serialize for AesParameters {
     fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
     where
         S: ser::Serializer,
     {
         match self {
-            AESParameters::Null => ().serialize(serializer),
-            AESParameters::InitializationVector(iv) => iv.serialize(serializer),
-            AESParameters::AuthenticatedEncryptionParameters(params) => params.serialize(serializer),
+            AesParameters::Null => ().serialize(serializer),
+            AesParameters::InitializationVector(iv) => iv.serialize(serializer),
+            AesParameters::AuthenticatedEncryptionParameters(params) => params.serialize(serializer),
         }
     }
 }
 
-impl<'de> de::Deserialize<'de> for AESParameters {
+impl<'de> de::Deserialize<'de> for AesParameters {
     fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
     where
         D: de::Deserializer<'de>,
@@ -442,7 +432,7 @@ impl<'de> de::Deserialize<'de> for AESParameters {
         struct Visitor;
 
         impl<'de> de::Visitor<'de> for Visitor {
-            type Value = AESParameters;
+            type Value = AesParameters;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("a valid DER-encoded DirectoryString")
@@ -452,24 +442,24 @@ impl<'de> de::Deserialize<'de> for AESParameters {
             where
                 A: de::SeqAccess<'de>,
             {
-                let tag_peeker: TagPeeker = seq_next_element!(seq, AESParameters, "choice tag");
+                let tag_peeker: TagPeeker = seq_next_element!(seq, AesParameters, "choice tag");
                 match tag_peeker.next_tag {
-                    Tag::OCTET_STRING => Ok(AESParameters::InitializationVector(seq_next_element!(
+                    Tag::OCTET_STRING => Ok(AesParameters::InitializationVector(seq_next_element!(
                         seq,
-                        AESParameters,
+                        AesParameters,
                         "Object Identifier"
                     ))),
                     Tag::NULL => {
                         seq.next_element::<()>()?.expect("should not panic");
-                        Ok(AESParameters::Null)
+                        Ok(AesParameters::Null)
                     }
-                    Tag::SEQUENCE => Ok(AESParameters::AuthenticatedEncryptionParameters(seq_next_element!(
+                    Tag::SEQUENCE => Ok(AesParameters::AuthenticatedEncryptionParameters(seq_next_element!(
                         seq,
                         AesAuthEncParams,
                         "AES Authenticated Encryption parameters"
                     ))),
                     _ => Err(serde_invalid_value!(
-                        AESParameters,
+                        AesParameters,
                         "unsupported or unknown AES parameter",
                         "a supported AES parameter"
                     )),
@@ -487,7 +477,7 @@ impl<'de> de::Deserialize<'de> for AESParameters {
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[allow(non_camel_case_types)] // 'SHA2_512_224' is clearer than 'SHA2512224' or 'Sha2512224' imo
-pub enum SHAVariant {
+pub enum ShaVariant {
     SHA2_224,
     SHA2_256,
     SHA2_384,
@@ -502,21 +492,21 @@ pub enum SHAVariant {
     SHAKE256,
 }
 
-impl From<SHAVariant> for ObjectIdentifierAsn1 {
-    fn from(variant: SHAVariant) -> Self {
+impl From<ShaVariant> for ObjectIdentifierAsn1 {
+    fn from(variant: ShaVariant) -> Self {
         match variant {
-            SHAVariant::SHA2_224 => oids::sha224().into(),
-            SHAVariant::SHA2_256 => oids::sha256().into(),
-            SHAVariant::SHA2_384 => oids::sha384().into(),
-            SHAVariant::SHA2_512 => oids::sha512().into(),
-            SHAVariant::SHA2_512_224 => oids::sha512_224().into(),
-            SHAVariant::SHA2_512_256 => oids::sha512_256().into(),
-            SHAVariant::SHA3_224 => oids::sha3_224().into(),
-            SHAVariant::SHA3_256 => oids::sha3_256().into(),
-            SHAVariant::SHA3_384 => oids::sha3_384().into(),
-            SHAVariant::SHA3_512 => oids::sha3_512().into(),
-            SHAVariant::SHAKE128 => oids::shake128().into(),
-            SHAVariant::SHAKE256 => oids::shake256().into(),
+            ShaVariant::SHA2_224 => oids::sha224().into(),
+            ShaVariant::SHA2_256 => oids::sha256().into(),
+            ShaVariant::SHA2_384 => oids::sha384().into(),
+            ShaVariant::SHA2_512 => oids::sha512().into(),
+            ShaVariant::SHA2_512_224 => oids::sha512_224().into(),
+            ShaVariant::SHA2_512_256 => oids::sha512_256().into(),
+            ShaVariant::SHA3_224 => oids::sha3_224().into(),
+            ShaVariant::SHA3_256 => oids::sha3_256().into(),
+            ShaVariant::SHA3_384 => oids::sha3_384().into(),
+            ShaVariant::SHA3_512 => oids::sha3_512().into(),
+            ShaVariant::SHAKE128 => oids::shake128().into(),
+            ShaVariant::SHAKE256 => oids::shake256().into(),
         }
     }
 }
@@ -547,7 +537,7 @@ mod tests {
     #[test]
     fn aes_null_params() {
         let expected = [48, 13, 6, 9, 96, 134, 72, 1, 101, 3, 4, 1, 1, 5, 0];
-        let aes_id = AlgorithmIdentifier::new_aes128(AesMode::ECB, AESParameters::Null);
+        let aes_id = AlgorithmIdentifier::new_aes128(AesMode::Ecb, AesParameters::Null);
         check_serde!(aes_id: AlgorithmIdentifier in expected);
     }
 
@@ -558,7 +548,7 @@ mod tests {
             165, 165,
         ];
         let aes_id =
-            AlgorithmIdentifier::new_aes128(AesMode::ECB, AESParameters::InitializationVector(vec![0xA5; 12].into()));
+            AlgorithmIdentifier::new_aes128(AesMode::Ecb, AesParameters::InitializationVector(vec![0xA5; 12].into()));
         check_serde!(aes_id: AlgorithmIdentifier in expected);
     }
 
@@ -569,8 +559,8 @@ mod tests {
             255, 255, 255, 2, 1, 12,
         ];
         let aes_id = AlgorithmIdentifier::new_aes128(
-            AesMode::ECB,
-            AESParameters::AuthenticatedEncryptionParameters(AesAuthEncParams {
+            AesMode::Ecb,
+            AesParameters::AuthenticatedEncryptionParameters(AesAuthEncParams {
                 nonce: vec![0xff; 12].into(),
                 icv_len: vec![12].into(),
             }),
@@ -581,7 +571,7 @@ mod tests {
     #[test]
     fn sha256() {
         let expected = [48, 13, 6, 9, 96, 134, 72, 1, 101, 3, 4, 2, 1, 5, 0];
-        let sha = AlgorithmIdentifier::new_sha(SHAVariant::SHA2_256);
+        let sha = AlgorithmIdentifier::new_sha(ShaVariant::SHA2_256);
         check_serde!(sha: AlgorithmIdentifier in expected);
     }
 
@@ -591,14 +581,14 @@ mod tests {
             48, 19, 6, 7, 42, 134, 72, 206, 61, 2, 1, 6, 8, 42, 134, 72, 206, 61, 4, 3, 2,
         ];
         let ec_params =
-            AlgorithmIdentifier::new_elliptic_curve(ECParameters::NamedCurve(oids::ecdsa_with_sha256().into()));
+            AlgorithmIdentifier::new_elliptic_curve(EcParameters::NamedCurve(oids::ecdsa_with_sha256().into()));
         check_serde!(ec_params: AlgorithmIdentifier in expected);
     }
 
     #[test]
     fn digest_info() {
         let digest = picky_asn1_der::to_vec(&DigestInfo {
-            oid: AlgorithmIdentifier::new_sha(SHAVariant::SHA2_256),
+            oid: AlgorithmIdentifier::new_sha(ShaVariant::SHA2_256),
             // Random 32 bytes generated for a SHA256 hash
             digest: vec![
                 0xf4, 0x12, 0x6b, 0x55, 0xbf, 0xcf, 0x8c, 0xc4, 0xe9, 0xe0, 0xbe, 0x5a, 0x9c, 0x16, 0x88, 0x55, 0x0f,

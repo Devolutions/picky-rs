@@ -109,7 +109,7 @@ impl From<UTCDate> for Time {
         if date.year() >= 2050 {
             Self::Generalized(Into::<GeneralizedTime>::into(date).into())
         } else {
-            Self::UTC(Into::<UTCTime>::into(date).into())
+            Self::Utc(Into::<UTCTime>::into(date).into())
         }
     }
 }
@@ -117,7 +117,7 @@ impl From<UTCDate> for Time {
 impl From<Time> for UTCDate {
     fn from(time: Time) -> Self {
         match time {
-            Time::UTC(utc) => utc.0.into(),
+            Time::Utc(utc) => utc.0.into(),
             Time::Generalized(gen_time) => gen_time.0.into(),
         }
     }

@@ -126,7 +126,7 @@ mod tests {
         )
         .expect("invalid base64");
 
-        let extensions = vec![Extension::new_subject_alt_name(vec![GeneralName::DNSName(
+        let extensions = vec![Extension::new_subject_alt_name(vec![GeneralName::DnsName(
             IA5String::from_string("localhost".into()).unwrap().into(),
         )])
         .into_non_critical()];

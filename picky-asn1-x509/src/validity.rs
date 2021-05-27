@@ -13,19 +13,19 @@ pub struct Validity {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Time {
-    UTC(UTCTimeAsn1),
+    Utc(UTCTimeAsn1),
     Generalized(GeneralizedTimeAsn1),
 }
 
 impl From<UTCTimeAsn1> for Time {
     fn from(time: UTCTimeAsn1) -> Self {
-        Self::UTC(time)
+        Self::Utc(time)
     }
 }
 
 impl From<UTCTime> for Time {
     fn from(time: UTCTime) -> Self {
-        Self::UTC(time.into())
+        Self::Utc(time.into())
     }
 }
 
@@ -47,7 +47,7 @@ impl ser::Serialize for Time {
         S: ser::Serializer,
     {
         match &self {
-            Time::UTC(time) => time.serialize(serializer),
+            Time::Utc(time) => time.serialize(serializer),
             Time::Generalized(time) => time.serialize(serializer),
         }
     }
@@ -73,7 +73,7 @@ impl<'de> de::Deserialize<'de> for Time {
             {
                 let tag_peeker: TagPeeker = seq_next_element!(seq, Time, "choice tag");
                 match tag_peeker.next_tag {
-                    UTCTimeAsn1::TAG => Ok(Time::UTC(seq_next_element!(seq, Time, "UTCTime"))),
+                    UTCTimeAsn1::TAG => Ok(Time::Utc(seq_next_element!(seq, Time, "UTCTime"))),
                     GeneralizedTimeAsn1::TAG => Ok(Time::Generalized(seq_next_element!(seq, Time, "GeneralizedTime"))),
                     _ => Err(serde_invalid_value!(
                         Time,

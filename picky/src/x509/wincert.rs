@@ -7,7 +7,7 @@ use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use picky_asn1::tag::Tag;
 use picky_asn1::wrapper::{ApplicationTag0, ApplicationTag1, Asn1SetOf};
 use picky_asn1_x509::algorithm_identifier::AlgorithmIdentifier;
-use picky_asn1_x509::pkcs7::cmsversion::CMSVersion;
+use picky_asn1_x509::pkcs7::cmsversion::CmsVersion;
 use picky_asn1_x509::pkcs7::content_info::{
     ContentValue, EncapsulatedContentInfo, SpcAttributeAndOptionalValue, SpcIndirectDataContent, SpcLink,
     SpcPeImageData, SpcPeImageFlags, SpcSpOpusInfo, SpcString,
@@ -25,7 +25,7 @@ use std::error;
 use std::io::{self, BufReader, BufWriter};
 use thiserror::Error;
 
-pub use picky_asn1_x509::SHAVariant;
+pub use picky_asn1_x509::ShaVariant;
 
 const MINIMUM_BYTES_TO_DECODE: usize = 4 /* WinCertificate::length */ + 2 /* WinCertificate::revision */ + 2 /* WinCertificate::certificate */;
 
@@ -61,7 +61,7 @@ impl WinCertificate {
     pub fn new(
         pkcs7: Pkcs7,
         file_hash: &[u8],
-        hash_algo: SHAVariant,
+        hash_algo: ShaVariant,
         private_key: &PrivateKey,
         program_name: Option<String>,
     ) -> WinCertificateResult<Self> {
@@ -183,7 +183,7 @@ impl WinCertificate {
         );
 
         let singer_info = SignerInfo {
-            version: CMSVersion::V1,
+            version: CmsVersion::V1,
             sid: SignerIdentifier::IssuerAndSerialNumber(issuer_and_serial_number),
             digest_algorithm: DigestAlgorithmIdentifier(digest_algorithm.clone()),
             signed_attrs: Attributes(authenticated_attributes).into(),
@@ -196,7 +196,7 @@ impl WinCertificate {
         let certificates = CertificateSet(certificates.0.into_iter().take(2).collect::<Vec<Certificate>>());
 
         let signed_data = SignedData {
-            version: CMSVersion::V1,
+            version: CmsVersion::V1,
             digest_algorithms: DigestAlgorithmIdentifiers(vec![digest_algorithm].into()),
             content_info,
             certificates,
@@ -514,7 +514,7 @@ mod tests {
     fn decoding_into_win_certificate() {
         let pem = parse_pem(crate::test_files::PKCS7.as_bytes()).unwrap();
         let pkcs7 = Pkcs7::from_pem(&pem).unwrap();
-        let hash_type = SHAVariant::SHA2_256;
+        let hash_type = ShaVariant::SHA2_256;
         let private_key = PrivateKey::from_pem_str(RSA_PRIVATE_KEY).unwrap();
         let program_name = "decoding_into_win_certificate_test".to_string();
 
@@ -678,7 +678,7 @@ mod tests {
         let win_cert = WinCertificate::new(
             pkcs7,
             FILE_HASH.as_ref(),
-            SHAVariant::SHA2_256,
+            ShaVariant::SHA2_256,
             &private_key,
             Some("into_win_cert_from_pkcs7_with_x509_root_chain".to_string()),
         );

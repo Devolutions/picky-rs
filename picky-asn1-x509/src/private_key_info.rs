@@ -63,7 +63,7 @@ impl PrivateKeyInfo {
         coefficient: IntegerAsn1,
     ) -> Self {
         let private_key = PrivateKeyValue::RSA(
-            RSAPrivateKey {
+            RsaPrivateKey {
                 version: vec![0].into(),
                 modulus,
                 public_exponent,
@@ -138,7 +138,7 @@ impl<'de> de::Deserialize<'de> for PrivateKeyInfo {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum PrivateKeyValue {
-    RSA(OctetStringAsn1Container<RSAPrivateKey>),
+    RSA(OctetStringAsn1Container<RsaPrivateKey>),
 }
 
 impl ser::Serialize for PrivateKeyValue {
@@ -174,7 +174,7 @@ impl ser::Serialize for PrivateKeyValue {
 /// ```
 #[derive(Serialize, Debug, Clone, PartialEq)]
 #[cfg_attr(not(feature = "legacy"), derive(Deserialize))]
-pub struct RSAPrivateKey {
+pub struct RsaPrivateKey {
     pub version: IntegerAsn1,
     pub modulus: IntegerAsn1,
     pub public_exponent: IntegerAsn1,
@@ -187,7 +187,7 @@ pub struct RSAPrivateKey {
 }
 
 #[cfg(feature = "legacy")]
-impl<'de> de::Deserialize<'de> for RSAPrivateKey {
+impl<'de> de::Deserialize<'de> for RsaPrivateKey {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: de::Deserializer<'de>,
@@ -195,7 +195,7 @@ impl<'de> de::Deserialize<'de> for RSAPrivateKey {
         struct Visitor;
 
         impl<'de> de::Visitor<'de> for Visitor {
-            type Value = RSAPrivateKey;
+            type Value = RsaPrivateKey;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("struct RSAPrivateKey with 6 or 9 elements")
@@ -253,7 +253,7 @@ impl<'de> de::Deserialize<'de> for RSAPrivateKey {
                     (exponent_1, exponent_2, coefficient)
                 };
 
-                Ok(RSAPrivateKey {
+                Ok(RsaPrivateKey {
                     version,
                     modulus,
                     public_exponent,
@@ -271,7 +271,7 @@ impl<'de> de::Deserialize<'de> for RSAPrivateKey {
     }
 }
 
-impl RSAPrivateKey {
+impl RsaPrivateKey {
     #[deprecated(note = "field is now public")]
     pub fn modulus(&self) -> &IntegerAsn1 {
         &self.modulus

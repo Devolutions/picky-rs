@@ -5,21 +5,21 @@ use std::fmt;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum PublicKey {
-    RSA(EncapsulatedRSAPublicKey),
-    EC(EncapsulatedECPoint),
-    Ed(EncapsulatedECPoint),
+    Rsa(EncapsulatedRsaPublicKey),
+    Ec(EncapsulatedEcPoint),
+    Ed(EncapsulatedEcPoint),
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct RSAPublicKey {
+pub struct RsaPublicKey {
     pub modulus: IntegerAsn1,         // n
     pub public_exponent: IntegerAsn1, // e
 }
-pub type EncapsulatedRSAPublicKey = BitStringAsn1Container<RSAPublicKey>;
+pub type EncapsulatedRsaPublicKey = BitStringAsn1Container<RsaPublicKey>;
 
-pub type ECPoint = OctetStringAsn1;
+pub type EcPoint = OctetStringAsn1;
 
-pub type EncapsulatedECPoint = BitStringAsn1;
+pub type EncapsulatedEcPoint = BitStringAsn1;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct SubjectPublicKeyInfo {
@@ -31,8 +31,8 @@ impl SubjectPublicKeyInfo {
     pub fn new_rsa_key(modulus: IntegerAsn1, public_exponent: IntegerAsn1) -> Self {
         Self {
             algorithm: AlgorithmIdentifier::new_rsa_encryption(),
-            subject_public_key: PublicKey::RSA(
-                RSAPublicKey {
+            subject_public_key: PublicKey::Rsa(
+                RsaPublicKey {
                     modulus,
                     public_exponent,
                 }
@@ -51,8 +51,8 @@ impl ser::Serialize for SubjectPublicKeyInfo {
         let mut seq = serializer.serialize_seq(Some(2))?;
         seq.serialize_element(&self.algorithm)?;
         match &self.subject_public_key {
-            PublicKey::RSA(key) => seq.serialize_element(key)?,
-            PublicKey::EC(key) => seq.serialize_element(key)?,
+            PublicKey::Rsa(key) => seq.serialize_element(key)?,
+            PublicKey::Ec(key) => seq.serialize_element(key)?,
             PublicKey::Ed(key) => seq.serialize_element(key)?,
         }
         seq.end()
@@ -80,9 +80,9 @@ impl<'de> de::Deserialize<'de> for SubjectPublicKeyInfo {
                 let algorithm: AlgorithmIdentifier = seq_next_element!(seq, AlgorithmIdentifier, "algorithm oid");
 
                 let subject_public_key = match Into::<String>::into(algorithm.oid()).as_str() {
-                    oids::RSA_ENCRYPTION => PublicKey::RSA(seq_next_element!(seq, SubjectPublicKeyInfo, "rsa key")),
+                    oids::RSA_ENCRYPTION => PublicKey::Rsa(seq_next_element!(seq, SubjectPublicKeyInfo, "rsa key")),
                     oids::EC_PUBLIC_KEY => {
-                        PublicKey::EC(seq_next_element!(seq, SubjectPublicKeyInfo, "elliptic curves key"))
+                        PublicKey::Ec(seq_next_element!(seq, SubjectPublicKeyInfo, "elliptic curves key"))
                     }
                     oids::ED25519 => PublicKey::Ed(seq_next_element!(seq, SubjectPublicKeyInfo, "curve25519 key")),
                     _ => {
@@ -154,18 +154,18 @@ mod tests {
 
         // RSA public key
 
-        let subject_public_key: EncapsulatedRSAPublicKey = RSAPublicKey {
+        let subject_public_key: EncapsulatedRsaPublicKey = RsaPublicKey {
             modulus,
             public_exponent,
         }
         .into();
-        check_serde!(subject_public_key: EncapsulatedRSAPublicKey in encoded[19..294]);
+        check_serde!(subject_public_key: EncapsulatedRsaPublicKey in encoded[19..294]);
 
         // full encode / decode
 
         let info = SubjectPublicKeyInfo {
             algorithm,
-            subject_public_key: PublicKey::RSA(subject_public_key),
+            subject_public_key: PublicKey::Rsa(subject_public_key),
         };
         check_serde!(info: SubjectPublicKeyInfo in encoded);
     }
