@@ -1,0 +1,16 @@
+[package]
+name = "picky-signtool"
+version = "0.1.0"
+authors = [ "Alexandr Yusuk <aleksandr.yusuk@apriorit.com>" ]
+edition = "2018"
+description = "A signtool like Authenticode sign and verify tool based on picky and lief-rs"
+
+[dependencies]
+anyhow = "1.0"
+clap = "2.33"
+lief-rs = { git = "https://github.com/Devolutions/lief-rs.git", rev = "c487e1" }
+
+[dependencies.picky]
+path = "../picky"
+default-features = false
+features = ["wincert"]

@@ -5,6 +5,7 @@ members = [
     "picky-asn1",
     "picky-asn1-der",
     "picky-asn1-x509",
+    "picky-signtool"
 ]
 
 [patch.crates-io]
