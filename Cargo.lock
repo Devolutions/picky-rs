@@ -3,6 +3,12 @@
 version = 3
 
 [[package]]
+name = "adler32"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aae1277d39aeec15cb388266ecc24b11c80469deae6067e17a1a7aa9e5c1f234"
+
+[[package]]
 name = "aead"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -263,6 +269,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3b5ca7a04898ad4bcd41c90c5285445ff5b791899bb1b0abdd2a2aa791211d7"
 
 [[package]]
+name = "bytemuck"
+version = "1.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bed57e2090563b83ba8f83366628ce535a7584c9afa4c9fc0612a03925c6df58"
+
+[[package]]
 name = "byteorder"
 version = "1.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -346,6 +358,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "cmake"
+version = "0.1.45"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb6210b637171dfba4cda12e579ac6dc73f5165ad56133e5d72ef3131f320855"
+dependencies = [
+ "cc",
+]
+
+[[package]]
+name = "color_quant"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3d7b894f5411737b7867f4827955924d7c254fc9f4d91a6aad6b097804b1018b"
+
+[[package]]
 name = "constant_time_eq"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -381,6 +408,15 @@ name = "cpuid-bool"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8aebca1129a03dc6dc2b127edd729435bbc4a37e1d5f4d7513165089ceb02634"
+
+[[package]]
+name = "crc32fast"
+version = "1.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "81156fece84ab6a9f2afdb109ce3ae577e42b1228441eded99bd77f627953b1a"
+dependencies = [
+ "cfg-if 1.0.0",
+]
 
 [[package]]
 name = "criterion"
@@ -573,6 +609,16 @@ checksum = "f0f83e699727abca3c56e187945f303389590305ab2f0185ea445aa66e8d5f2a"
 dependencies = [
  "data-encoding",
  "syn",
+]
+
+[[package]]
+name = "deflate"
+version = "0.8.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "73770f8e1fe7d64df17ca66ad28994a0a623ea497fa69486e14984e715c5d174"
+dependencies = [
+ "adler32",
+ "byteorder",
 ]
 
 [[package]]
@@ -1094,6 +1140,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "image"
+version = "0.23.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "24ffcb7e7244a9bf19d35bf2883b9c080c4ced3c07a9895572178cdb8f13f6a1"
+dependencies = [
+ "bytemuck",
+ "byteorder",
+ "color_quant",
+ "num-iter",
+ "num-rational",
+ "num-traits",
+ "png",
+]
+
+[[package]]
 name = "indexmap"
 version = "1.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1208,6 +1269,27 @@ name = "libm"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c7d73b3f436185384286bd8098d17ec07c9a7d2388a6599f824d8502b529702a"
+
+[[package]]
+name = "lief-rs"
+version = "0.1.0"
+source = "git+https://github.com/Devolutions/lief-rs.git?rev=c487e1#c487e152a684cfa9c5a0225d958372add5fcd382"
+dependencies = [
+ "bitflags",
+ "image",
+ "lief-sys",
+ "picky 6.2.0",
+ "thiserror",
+ "widestring",
+]
+
+[[package]]
+name = "lief-sys"
+version = "0.1.0"
+source = "git+https://github.com/Devolutions/lief-rs.git?rev=c487e1#c487e152a684cfa9c5a0225d958372add5fcd382"
+dependencies = [
+ "cmake",
+]
 
 [[package]]
 name = "linked-hash-map"
@@ -1328,6 +1410,15 @@ checksum = "2684d4c2e97d99848d30b324b00c8fcc7e5c897b7cbb5819b09e7c90e8baf212"
 dependencies = [
  "mime",
  "unicase",
+]
+
+[[package]]
+name = "miniz_oxide"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "791daaae1ed6889560f8c4359194f56648355540573244a5448a83ba1ecc7435"
+dependencies = [
+ "adler32",
 ]
 
 [[package]]
@@ -1579,6 +1670,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "num-rational"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "12ac428b1cb17fce6f731001d307d351ec70a6d202fc2e60f7d4c5e42d8f4f07"
+dependencies = [
+ "autocfg 1.0.1",
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
 name = "num-traits"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1746,6 +1848,28 @@ checksum = "d4fd5641d01c8f18a23da7b6fe29298ff4b55afcccdf78973b24cf3175fee32e"
 
 [[package]]
 name = "picky"
+version = "6.2.0"
+source = "git+https://github.com/Devolutions/picky-rs.git?rev=3834f9#3834f9346e214ca6529a4303d87cc9ce35b775f1"
+dependencies = [
+ "base64 0.13.0",
+ "byteorder",
+ "digest 0.9.0",
+ "num-bigint-dig",
+ "oid",
+ "picky-asn1 0.3.1",
+ "picky-asn1-der 0.2.4",
+ "picky-asn1-x509 0.5.0",
+ "rand 0.8.3",
+ "rsa",
+ "serde",
+ "sha-1 0.9.4",
+ "sha2 0.9.3",
+ "sha3",
+ "thiserror",
+]
+
+[[package]]
+name = "picky"
 version = "6.3.0"
 dependencies = [
  "aes-gcm",
@@ -1758,9 +1882,9 @@ dependencies = [
  "http",
  "num-bigint-dig",
  "oid",
- "picky-asn1",
- "picky-asn1-der",
- "picky-asn1-x509",
+ "picky-asn1 0.3.2",
+ "picky-asn1-der 0.2.5",
+ "picky-asn1-x509 0.6.0",
  "pretty_assertions",
  "rand 0.8.3",
  "ring",
@@ -1775,11 +1899,31 @@ dependencies = [
 
 [[package]]
 name = "picky-asn1"
+version = "0.3.1"
+source = "git+https://github.com/Devolutions/picky-rs.git?rev=3834f9#3834f9346e214ca6529a4303d87cc9ce35b775f1"
+dependencies = [
+ "oid",
+ "serde",
+ "serde_bytes",
+]
+
+[[package]]
+name = "picky-asn1"
 version = "0.3.2"
 dependencies = [
  "chrono",
  "oid",
- "picky-asn1-der",
+ "picky-asn1-der 0.2.5",
+ "serde",
+ "serde_bytes",
+]
+
+[[package]]
+name = "picky-asn1-der"
+version = "0.2.4"
+source = "git+https://github.com/Devolutions/picky-rs.git?rev=3834f9#3834f9346e214ca6529a4303d87cc9ce35b775f1"
+dependencies = [
+ "picky-asn1 0.3.1",
  "serde",
  "serde_bytes",
 ]
@@ -1792,10 +1936,24 @@ dependencies = [
  "lazy_static",
  "num-bigint-dig",
  "oid",
- "picky-asn1",
+ "picky-asn1 0.3.2",
  "pretty_assertions",
  "serde",
  "serde_bytes",
+]
+
+[[package]]
+name = "picky-asn1-x509"
+version = "0.5.0"
+source = "git+https://github.com/Devolutions/picky-rs.git?rev=3834f9#3834f9346e214ca6529a4303d87cc9ce35b775f1"
+dependencies = [
+ "base64 0.13.0",
+ "num-bigint-dig",
+ "oid",
+ "picky-asn1 0.3.1",
+ "picky-asn1-der 0.2.4",
+ "serde",
+ "widestring",
 ]
 
 [[package]]
@@ -1806,8 +1964,8 @@ dependencies = [
  "hex",
  "num-bigint-dig",
  "oid",
- "picky-asn1",
- "picky-asn1-der",
+ "picky-asn1 0.3.2",
+ "picky-asn1-der 0.2.5",
  "pretty_assertions",
  "serde",
  "widestring",
@@ -1828,8 +1986,8 @@ dependencies = [
  "mongodm",
  "multibase",
  "multihash",
- "picky",
- "picky-asn1",
+ "picky 6.3.0",
+ "picky-asn1 0.3.2",
  "rand 0.8.3",
  "reqwest 0.11.3",
  "saphir",
@@ -1840,6 +1998,16 @@ dependencies = [
  "tokio 0.2.25",
  "tokio-test",
  "unicase",
+]
+
+[[package]]
+name = "picky-signtool"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "lief-rs",
+ "picky 6.3.0",
 ]
 
 [[package]]
@@ -1912,6 +2080,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b38a02e23bd9604b842a812063aec4ef702b57989c37b655254bb61c471ad211"
 dependencies = [
  "plotters-backend",
+]
+
+[[package]]
+name = "png"
+version = "0.16.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3c3287920cb847dee3de33d301c463fba14dda99db24214ddf93f83d3021f4c6"
+dependencies = [
+ "bitflags",
+ "crc32fast",
+ "deflate",
+ "miniz_oxide",
 ]
 
 [[package]]
