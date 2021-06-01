@@ -4,6 +4,7 @@ version = "0.3.2"
 edition = "2018"
 authors = [
     "Benoît CORTIER <benoit.cortier@fried-world.eu>",
+    "Alexandr Yusuk <aleksandr.yusuk@apriorit.com>",
 ]
 keywords = ["serde", "asn1", "serialize", "deserialize"]
 categories = ["encoding"]
