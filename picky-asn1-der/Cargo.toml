@@ -5,6 +5,7 @@ edition = "2018"
 authors = [
     "KizzyCode Software Labs./Keziah Biermann <development@kizzycode.de>",
     "Benoît CORTIER <benoit.cortier@fried-world.eu>",
+    "Alexandr Yusuk <aleksandr.yusuk@apriorit.com>",
 ]
 keywords = ["serde", "asn1", "asn1-der", "serialize", "deserialize"]
 categories = ["encoding"]

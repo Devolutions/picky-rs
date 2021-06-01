@@ -7,7 +7,8 @@ authors = [
     "Kim Altintop <kim@monadic.xyz>",
     "Joe Ellis <joe.ellis@arm.com>",
     "Hugues de Valon <hugues.devalon@arm.com>",
-    "Isode Ltd./Geobert Quach <geobert.quach@isode.com>"
+    "Isode Ltd./Geobert Quach <geobert.quach@isode.com>",
+    "Alexandr Yusuk <aleksandr.yusuk@apriorit.com>",
 ]
 description = "Provides ASN1 types defined by X.509 related RFCs"
 edition = "2018"
