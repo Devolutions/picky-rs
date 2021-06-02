@@ -5,22 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.6] 2021-05-27
+## [0.6.1] 2021-06-02
 
 ### Added
 
-- Support for V1 and V2 X509 certificates
-- Support for `CrlNumber` extension
-- PKCS7 implementation behind `pkcs7` feature
+- More ECC OIDs ([#87](https://github.com/Devolutions/picky-rs/pull/87))
+
+## [0.6.0] 2021-05-27
+
+### Added
+
+- Support for V1 and V2 X509 certificates ([#83](https://github.com/Devolutions/picky-rs/pull/83))
+- Support for `CrlNumber` extension ([#83](https://github.com/Devolutions/picky-rs/pull/83))
+- PKCS7 implementation behind `pkcs7` feature ([#83](https://github.com/Devolutions/picky-rs/pull/83))
 
 ### Changed
 
-- More supported attribute values: `ContentType`, `MessageDigest` and `SpcSpOpusInfo`
-- Fix clippy upper case acronyms warning in a few places
+- More supported attribute values: `ContentType`, `MessageDigest` and `SpcSpOpusInfo` ([#83](https://github.com/Devolutions/picky-rs/pull/83))
+- Fix clippy upper case acronyms warning in a few places ([#85](https://github.com/Devolutions/picky-rs/pull/85))
 
 ### Removed
 
-- Remove `ImplicitCurve` from `EcParameters` enum
+- Remove `ImplicitCurve` from `EcParameters` enum ([#85](https://github.com/Devolutions/picky-rs/pull/85))
 
 ## [0.5.0] 2021-03-04
 

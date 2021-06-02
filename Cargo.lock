@@ -1884,7 +1884,7 @@ dependencies = [
  "oid",
  "picky-asn1 0.3.2",
  "picky-asn1-der 0.2.5",
- "picky-asn1-x509 0.6.0",
+ "picky-asn1-x509 0.6.1",
  "pretty_assertions",
  "rand 0.8.3",
  "ring",
@@ -1958,7 +1958,7 @@ dependencies = [
 
 [[package]]
 name = "picky-asn1-x509"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "base64 0.13.0",
  "hex",
