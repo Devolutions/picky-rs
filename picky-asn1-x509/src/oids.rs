@@ -46,6 +46,8 @@ define_oid! {
     EC_PUBLIC_KEY => ec_public_key => "1.2.840.10045.2.1",
     ECDSA_WITH_SHA256 => ecdsa_with_sha256 => "1.2.840.10045.4.3.2",
     ECDSA_WITH_SHA384 => ecdsa_with_sha384 => "1.2.840.10045.4.3.3",
+    SECP192R1 => secp192r1 => "1.2.840.10045.3.1.1",
+    SECP256R1 => secp256r1 => "1.2.840.10045.3.1.7",
 
     // RSADSI
     RSA_ENCRYPTION => rsa_encryption => "1.2.840.113549.1.1.1",
@@ -76,6 +78,18 @@ define_oid! {
 
     // Certicom Object Identifiers
     SECP384R1 => secp384r1 => "1.3.132.0.34",
+    SECT163K1 => sect163k1 => "1.3.132.0.1",
+    SECT163R2 => sect163r2 => "1.3.132.0.15",
+    SECP224R1 => secp224r1 => "1.3.132.0.33",
+    SECT233K1 => sect233k1 => "1.3.132.0.26",
+    SECT233R1 => sect233r1 => "1.3.132.0.27",
+    SECT283K1 => sect283k1 => "1.3.132.0.16",
+    SECT283R1 => sect283r1 => "1.3.132.0.17",
+    SECT409K1 => sect409k1 => "1.3.132.0.36",
+    SECT409R1 => sect409r1 => "1.3.132.0.37",
+    SECP521R1 => secp521r1 => "1.3.132.0.35",
+    SECT571K1 => sect571k1 => "1.3.132.0.38",
+    SECT571R1 => sect571r1 => "1.3.132.0.39",
 
     // RFC 8410
     X25519 => x25519 => "1.3.101.110",
