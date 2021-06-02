@@ -141,7 +141,7 @@ impl WinCertificate {
             {
                 let signing_cert = certificates
                     .get(0)
-                    .ok_or_else(|| WinCertificateError::Pkcs7Error(Pkcs7Error::NoCertificates))?;
+                    .ok_or(WinCertificateError::Pkcs7Error(Pkcs7Error::NoCertificates))?;
 
                 if !signing_cert.tbs_certificate.extensions.0 .0.iter().any(|extension| {
                     extension.extn_value() == ExtensionView::ExtendedKeyUsage(&code_signing_ext_key_usage)
@@ -154,7 +154,7 @@ impl WinCertificate {
         let signing_cert = certificates
             .0
             .get(0)
-            .ok_or_else(|| WinCertificateError::Pkcs7Error(Pkcs7Error::NoCertificates))?;
+            .ok_or(WinCertificateError::Pkcs7Error(Pkcs7Error::NoCertificates))?;
 
         let issuer_and_serial_number = IssuerAndSerialNumber {
             issuer: signing_cert.tbs_certificate.issuer.clone(),
