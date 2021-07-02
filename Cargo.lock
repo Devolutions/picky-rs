@@ -1882,7 +1882,7 @@ dependencies = [
  "http",
  "num-bigint-dig",
  "oid",
- "picky-asn1 0.3.2",
+ "picky-asn1 0.3.3",
  "picky-asn1-der 0.2.5",
  "picky-asn1-x509 0.6.1",
  "pretty_assertions",
@@ -1909,7 +1909,7 @@ dependencies = [
 
 [[package]]
 name = "picky-asn1"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "chrono",
  "oid",
@@ -1936,7 +1936,7 @@ dependencies = [
  "lazy_static",
  "num-bigint-dig",
  "oid",
- "picky-asn1 0.3.2",
+ "picky-asn1 0.3.3",
  "pretty_assertions",
  "serde",
  "serde_bytes",
@@ -1964,7 +1964,7 @@ dependencies = [
  "hex",
  "num-bigint-dig",
  "oid",
- "picky-asn1 0.3.2",
+ "picky-asn1 0.3.3",
  "picky-asn1-der 0.2.5",
  "pretty_assertions",
  "serde",
@@ -1987,7 +1987,7 @@ dependencies = [
  "multibase",
  "multihash",
  "picky 6.3.0",
- "picky-asn1 0.3.2",
+ "picky-asn1 0.3.3",
  "rand 0.8.3",
  "reqwest 0.11.3",
  "saphir",
