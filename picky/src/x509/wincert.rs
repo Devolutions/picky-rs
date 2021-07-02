@@ -201,7 +201,7 @@ impl WinCertificate {
             digest_algorithms: DigestAlgorithmIdentifiers(vec![digest_algorithm].into()),
             content_info,
             certificates,
-            crls: RevocationInfoChoices::default(),
+            crls: Some(RevocationInfoChoices::default()),
             signers_infos: SignersInfos(vec![singer_info].into()),
         };
 

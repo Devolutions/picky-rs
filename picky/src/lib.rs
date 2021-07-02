@@ -27,8 +27,10 @@ mod test_files {
     pub const RSA_2048_PK_7: &str = include_str!("../../test_assets/private_keys/rsa-2048-pk_7.key");
     pub const RSA_4096_PK_3: &str = include_str!("../../test_assets/private_keys/rsa-4096-pk_3.key");
 
-    #[cfg(feature = "pkcs7")]
-    pub const PKCS7: &str = include_str!("../../test_assets/pkcs7.p7b");
+    cfg_if::cfg_if! { if  #[cfg(feature = "pkcs7")]  {
+        pub const PKCS7: &str = include_str!("../../test_assets/pkcs7.p7b");
+        pub const CERTIFICATE_TRUST_LIST: &[u8] = include_bytes!("../../test_assets/authroot.stl");
+    }}
 
     cfg_if::cfg_if! { if #[cfg(feature = "x509")] {
         pub const RSA_2048_PK_2: &str =

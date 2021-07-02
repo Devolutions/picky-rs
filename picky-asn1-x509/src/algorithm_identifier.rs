@@ -244,7 +244,7 @@ impl<'de> de::Deserialize<'de> for AlgorithmIdentifier {
                         seq_next_element!(seq, AlgorithmIdentifier, "aes algorithm identifier"),
                     ),
                     // SHA
-                    x if x.starts_with("2.16.840.1.101.3.4.2.") => {
+                    x if x.starts_with("2.16.840.1.101.3.4.2.") || x == oids::SHA1 => {
                         seq_next_element!(seq, AlgorithmIdentifier, "sha algorithm identifier");
                         AlgorithmIdentifierParameters::Null
                     }
@@ -478,6 +478,7 @@ impl<'de> de::Deserialize<'de> for AesParameters {
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[allow(non_camel_case_types)] // 'SHA2_512_224' is clearer than 'SHA2512224' or 'Sha2512224' imo
 pub enum ShaVariant {
+    SHA1,
     SHA2_224,
     SHA2_256,
     SHA2_384,
@@ -495,6 +496,7 @@ pub enum ShaVariant {
 impl From<ShaVariant> for ObjectIdentifierAsn1 {
     fn from(variant: ShaVariant) -> Self {
         match variant {
+            ShaVariant::SHA1 => oids::sha1().into(),
             ShaVariant::SHA2_224 => oids::sha224().into(),
             ShaVariant::SHA2_256 => oids::sha256().into(),
             ShaVariant::SHA2_384 => oids::sha384().into(),

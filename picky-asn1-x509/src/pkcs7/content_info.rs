@@ -11,7 +11,7 @@ use picky_asn1::wrapper::{
     ImplicitContextTag0, ImplicitContextTag1, ObjectIdentifierAsn1, OctetStringAsn1, Optional,
 };
 
-use crate::{oids, DigestInfo};
+use crate::{ctl::Ctl, oids, DigestInfo};
 
 /// ``` not_rust
 /// [RFC 5652 #5.2](https://datatracker.ietf.org/doc/html/rfc5652#section-5.2)
@@ -25,6 +25,7 @@ use crate::{oids, DigestInfo};
 pub enum ContentValue {
     SpcIndirectDataContent(SpcIndirectDataContent),
     OctetString(OctetStringAsn1),
+    CertificateTrustList(Ctl),
 }
 
 impl Serialize for ContentValue {
@@ -37,6 +38,7 @@ impl Serialize for ContentValue {
                 spc_indirect_data_content.serialize(serializer)
             }
             ContentValue::OctetString(octet_string) => octet_string.serialize(serializer),
+            ContentValue::CertificateTrustList(ctl) => ctl.serialize(serializer),
         }
     }
 }
@@ -85,6 +87,18 @@ impl<'de> de::Deserialize<'de> for EncapsulatedContentInfo {
                         .into(),
                     ),
                     oids::PKCS7 => None,
+                    oids::CERT_TRUST_LIST => Some(
+                        ContentValue::CertificateTrustList(
+                            seq_next_element!(
+                                seq,
+                                ApplicationTag0<Ctl>,
+                                EncapsulatedContentInfo,
+                                "CertificateTrustList"
+                            )
+                            .0,
+                        )
+                        .into(),
+                    ),
                     _ => {
                         let tag_peeker: TagPeeker = seq_next_element!(seq, EncapsulatedContentInfo, "OctetString");
                         match tag_peeker.next_tag {

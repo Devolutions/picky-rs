@@ -218,3 +218,34 @@ pub struct IssuerAndSerialNumber {
 /// ```
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct CertificateSerialNumber(pub IntegerAsn1);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use picky_asn1_der::Asn1DerError;
+
+    #[test]
+    fn decode_certificate_trust_list_signer_info() {
+        let signer_info = base64::decode(
+            "MIICngIBATCBmTCBgTELMAkGA1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24x\
+            EDAOBgNVBAcTB1JlZG1vbmQxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlv\
+            bjErMCkGA1UEAxMiTWljcm9zb2Z0IENlcnRpZmljYXRlIExpc3QgQ0EgMjAxMQIT\
+            MwAAAFajs3kCOFJzBAAAAAAAVjANBglghkgBZQMEAgEFAKCB2jAYBgkqhkiG9w0B\
+            CQMxCwYJKwYBBAGCNwoBMC8GCSqGSIb3DQEJBDEiBCDKbAY82LhZRyLtnnizMz42\
+            OJp0yEyTg/jBC9lXDMyatTCBjAYKKwYBBAGCNwIBDDF+MHygVoBUAE0AaQBjAHIA\
+            bwBzAG8AZgB0ACAAQwBlAHIAdABpAGYAaQBjAGEAdABlACAAVAByAHUAcwB0ACAA\
+            TABpAHMAdAAgAFAAdQBiAGwAaQBzAGgAZQByoSKAIGh0dHA6Ly93d3cubWljcm9z\
+            b2Z0LmNvbS93aW5kb3dzMA0GCSqGSIb3DQEBAQUABIIBAJolH27b3wLNu+E2Gh+B\
+            9FFUsp5eiF1AGyUQb6hcjoYJIUjQgqW1shr+P4z9MI0ziTVWc1qVYh8LgXBAcuzN\
+            pGu7spEFIckf40eITNeB5KUZFtHWym+MUIQERfs/C+iqCiSgtSiWxUIci7h/VF39\
+            vhRTABMyZQddozLldJMsawRIhlceaOCTrp9tLQLLHHkEVDHSMOkbd4S9IOhw/YY9\
+            cwcGic2ebDrpSZe0VVEgF9Blqk49W+JRwADVNdWFcDZbiAQv63vSy+VdFzKZer07\
+            JAVDdVamvS5pk4MvNkszAG2KHsij6J3M97KcJY0FKuhPsfb9pnR61nmfDaFzoHOY\
+            pkw=",
+        )
+        .unwrap();
+
+        let signer_info: Result<SignerInfo, Asn1DerError> = picky_asn1_der::from_bytes(&signer_info);
+        assert!(signer_info.is_ok());
+    }
+}

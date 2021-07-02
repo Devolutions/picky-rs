@@ -159,6 +159,7 @@ define_oid! {
     AES256_WRAP_PAD => aes256_wrap_pad => "2.16.840.1.101.3.4.1.48",
 
     // hash algorithm
+    SHA1 => sha1 => "1.3.14.3.2.26",
     SHA256 => sha256 => "2.16.840.1.101.3.4.2.1",
     SHA384 => sha384 => "2.16.840.1.101.3.4.2.2",
     SHA512 => sha512 => "2.16.840.1.101.3.4.2.3",
@@ -176,4 +177,22 @@ define_oid! {
     SPC_INDIRECT_DATA_OBJID => spc_indirect_data_objid => "1.3.6.1.4.1.311.2.1.4",
     SPC_SP_OPUS_INFO_OBJID => spc_sp_opus_info_objid => "1.3.6.1.4.1.311.2.1.12",
     SPC_PE_IMAGE_DATAOBJ => spc_pe_image_dataobj => "1.3.6.1.4.1.311.2.1.15",
+
+    // CTL
+    CERT_TRUST_LIST => cert_trust_list => "1.3.6.1.4.1.311.10.1",
+    ROOT_LIST_SIGNER => root_list_signer => "1.3.6.1.4.1.311.10.3.9",
+
+    CERT_ENHKEY_USAGE_PROP_ID => cert_enhkey_usage_prop_id => "1.3.6.1.4.1.311.10.11.9",
+    CERT_FRIENDLY_NAME_PROP_ID => cert_friendly_name_prop_id => "1.3.6.1.4.1.311.10.11.11",
+    CERT_KEY_IDENTIFIER_PROP_ID => cert_key_identifier_prop_id => "1.3.6.1.4.1.311.10.11.20",
+    CERT_SUBJECT_NAME_MD5_HASH_PROP_ID => cert_subject_name_md5_hash_prop_id => "1.3.6.1.4.1.311.10.11.29",
+    CERT_ROOT_PROGRAM_CERT_POLICIES_PROP_ID => cert_root_program_cert_policies_prop_id => "1.3.6.1.4.1.311.10.11.83",
+    CERT_AUTH_ROOT_SHA256_HASH_PROP_ID => cert_auto_root_sha256_hash_prop_id => "1.3.6.1.4.1.311.10.11.98",
+    CERT_DISALLOWED_FILETIME_PROP_ID => cert_disallowed_filetime_prop_id => "1.3.6.1.4.1.311.10.11.104",
+    CERT_ROOT_PROGRAM_CHAIN_POLICIES_PROP_ID => cert_root_program_chain_policies_prop_id => "1.3.6.1.4.1.311.10.11.105",
+    DISALLOWED_ENHKEY_USAGE => disallowed_enhkey_usage => "1.3.6.1.4.1.311.10.11.122",
+    UNKNOWN_RESERVED_PROP_ID_126 => unknown_reserved_prop_id_126 => "1.3.6.1.4.1.311.10.11.126",
+    UNKNOWN_RESERVED_PROP_ID_127 => unknown_reserved_prop_id_127 => "1.3.6.1.4.1.311.10.11.127",
+
+    AUTO_UPDATE_END_REVOCATION => auto_update_end_revocation => "1.3.6.1.4.1.311.60.3.2",
 }
