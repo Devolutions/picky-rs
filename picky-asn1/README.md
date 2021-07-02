@@ -2,6 +2,9 @@
 [![docs.rs](https://docs.rs/picky-asn1/badge.svg)](https://docs.rs/picky-asn1)
 ![Crates.io](https://img.shields.io/crates/l/picky-asn1)
 
+Compatible with rustc 1.43.
+Minimal rustc version bumps happen [only with minor number bumps in this project](https://github.com/Devolutions/picky-rs/issues/89#issuecomment-868303478).
+
 # picky-asn1
 
 Defines wrappers for ASN.1 types:
