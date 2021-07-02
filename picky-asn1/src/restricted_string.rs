@@ -265,7 +265,7 @@ impl CharSet for BMPCharSet {
             .into_iter()
             .map(|elem| u16::from_be_bytes([elem[1], elem[0]]));
 
-        char::decode_utf16(u16_it).all(|c| matches!(c, Ok(_)))
+        core::char::decode_utf16(u16_it).all(|c| matches!(c, Ok(_)))
     }
 }
 
