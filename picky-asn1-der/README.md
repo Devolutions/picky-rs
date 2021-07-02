@@ -2,6 +2,9 @@
 [![docs.rs](https://docs.rs/picky-asn1-der/badge.svg)](https://docs.rs/picky-asn1-der)
 ![Crates.io](https://img.shields.io/crates/l/picky-asn1-der)
 
+Compatible with rustc 1.43.
+Minimal rustc version bumps happen [only with minor number bumps in this project](https://github.com/Devolutions/picky-rs/issues/89#issuecomment-868303478).
+
 # picky-asn1-der
 
 Portions of project [serde_asn1_der](https://github.com/KizzyCode/serde_asn1_der) are held by
