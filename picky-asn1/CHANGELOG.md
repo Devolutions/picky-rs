@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.3.3] 2021-07-02
+
+### Fixed
+
+- Support for rustc 1.43 (accidently bumped in 0.3.2). See [#89](https://github.com/Devolutions/picky-rs/issues/89).
+
 ## [0.3.2] 2021-05-27
 
 ### Added
