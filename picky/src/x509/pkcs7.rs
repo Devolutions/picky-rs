@@ -71,4 +71,10 @@ mod tests {
         let decoded = Pkcs7::from_pem(&pem);
         assert!(decoded.is_ok());
     }
+
+    #[test]
+    fn parse_certificate_trust_list_in_der() {
+        let pkcs7 = Pkcs7::from_der(crate::test_files::CERTIFICATE_TRUST_LIST);
+        assert!(pkcs7.is_ok());
+    }
 }
