@@ -1,8 +1,8 @@
 use crate::hash::HashAlgorithm;
 use crate::key::PrivateKey;
 use crate::signature::SignatureAlgorithm;
-use crate::x509::extension::{ExtendedKeyUsage, ExtensionView};
-use crate::x509::pkcs7::{Pkcs7, Pkcs7Error};
+use crate::x509::pkcs7::{self, check_eku_code_signing, Pkcs7, Pkcs7Error};
+use crate::x509::Cert;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use picky_asn1::tag::Tag;
 use picky_asn1::wrapper::{Asn1SetOf, ExplicitContextTag0, ExplicitContextTag1, Optional};
@@ -42,6 +42,8 @@ pub enum WinCertificateError {
     CertificateDataIsEmpty,
     #[error(transparent)]
     Pkcs7Error(Pkcs7Error),
+    #[error(transparent)]
+    AuthenticodeError(pkcs7::AuthenticodeError),
     #[error(transparent)]
     Io(#[from] io::Error),
     #[error(transparent)]
@@ -130,30 +132,15 @@ impl WinCertificate {
 
         // The signing certificate must contain either the extended key usage (EKU) value for code signing,
         // or the entire certificate chain must contain no EKUs
-        {
-            let certificates = &certificates.0;
-            let code_signing_ext_key_usage: ExtendedKeyUsage = vec![oids::kp_code_signing()].into();
+        let certificates = certificates.0.into_iter().map(Cert::from).collect::<Vec<Cert>>();
+        check_eku_code_signing(&certificates).map_err(WinCertificateError::AuthenticodeError)?;
 
-            if certificates
-                .iter()
-                .map(|cert| cert.tbs_certificate.extensions.0 .0.iter())
-                .flatten()
-                .any(|extension| matches!(extension.extn_value(), ExtensionView::ExtendedKeyUsage(_)))
-            {
-                let signing_cert = certificates
-                    .get(0)
-                    .ok_or(WinCertificateError::Pkcs7Error(Pkcs7Error::NoCertificates))?;
-
-                if !signing_cert.tbs_certificate.extensions.0 .0.iter().any(|extension| {
-                    extension.extn_value() == ExtensionView::ExtendedKeyUsage(&code_signing_ext_key_usage)
-                }) {
-                    return Err(WinCertificateError::Pkcs7Error(Pkcs7Error::NoEKUCodeSigning));
-                }
-            }
-        }
+        let certificates = certificates
+            .into_iter()
+            .map(Certificate::from)
+            .collect::<Vec<Certificate>>();
 
         let signing_cert = certificates
-            .0
             .get(0)
             .ok_or(WinCertificateError::Pkcs7Error(Pkcs7Error::NoCertificates))?;
 
@@ -194,7 +181,7 @@ impl WinCertificate {
 
         // certificates contains the signer certificate and any intermediate certificates,
         // but typically does not contain the root certificate
-        let certificates = CertificateSet(certificates.0.into_iter().take(2).collect::<Vec<Certificate>>());
+        let certificates = CertificateSet(certificates.into_iter().take(2).collect::<Vec<Certificate>>());
 
         let signed_data = SignedData {
             version: CmsVersion::V1,

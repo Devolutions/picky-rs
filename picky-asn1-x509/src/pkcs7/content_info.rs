@@ -11,7 +11,8 @@ use picky_asn1::wrapper::{
     ImplicitContextTag0, ImplicitContextTag1, ObjectIdentifierAsn1, OctetStringAsn1, Optional,
 };
 
-use crate::{ctl::Ctl, oids, DigestInfo};
+use crate::ctl::Ctl;
+use crate::{oids, DigestInfo};
 
 /// ``` not_rust
 /// [RFC 5652 #5.2](https://datatracker.ietf.org/doc/html/rfc5652#section-5.2)

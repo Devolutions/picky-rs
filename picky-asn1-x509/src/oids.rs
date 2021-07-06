@@ -50,6 +50,7 @@ define_oid! {
 
     // RSADSI
     RSA_ENCRYPTION => rsa_encryption => "1.2.840.113549.1.1.1",
+    MD5_WITH_RSA_ENCRYPTHION => md5_with_rsa_encryption => "1.2.840.113549.1.1.4",
     SHA1_WITH_RSA_ENCRYPTION => sha1_with_rsa_encryption => "1.2.840.113549.1.1.5",
     SHA256_WITH_RSA_ENCRYPTION => sha256_with_rsa_encryption => "1.2.840.113549.1.1.11",
     SHA384_WITH_RSA_ENCRYPTION => sha384_with_rsa_encryption => "1.2.840.113549.1.1.12",
@@ -159,6 +160,7 @@ define_oid! {
     AES256_WRAP_PAD => aes256_wrap_pad => "2.16.840.1.101.3.4.1.48",
 
     // hash algorithm
+    MD5 => md5 => "1.2.840.113549.2.5",
     SHA1 => sha1 => "1.3.14.3.2.26",
     SHA256 => sha256 => "2.16.840.1.101.3.4.2.1",
     SHA384 => sha384 => "2.16.840.1.101.3.4.2.2",

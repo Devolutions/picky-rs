@@ -39,6 +39,13 @@ impl AlgorithmIdentifier {
         algorithm.eq(&self.algorithm.0)
     }
 
+    pub fn new_md5_with_rsa_encrypion() -> Self {
+        Self {
+            algorithm: oids::md5_with_rsa_encryption().into(),
+            parameters: AlgorithmIdentifierParameters::Null,
+        }
+    }
+
     pub fn new_sha1_with_rsa_encryption() -> Self {
         Self {
             algorithm: oids::sha1_with_rsa_encryption().into(),
@@ -478,6 +485,7 @@ impl<'de> de::Deserialize<'de> for AesParameters {
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[allow(non_camel_case_types)] // 'SHA2_512_224' is clearer than 'SHA2512224' or 'Sha2512224' imo
 pub enum ShaVariant {
+    MD5,
     SHA1,
     SHA2_224,
     SHA2_256,
@@ -496,6 +504,7 @@ pub enum ShaVariant {
 impl From<ShaVariant> for ObjectIdentifierAsn1 {
     fn from(variant: ShaVariant) -> Self {
         match variant {
+            ShaVariant::MD5 => oids::md5().into(),
             ShaVariant::SHA1 => oids::sha1().into(),
             ShaVariant::SHA2_224 => oids::sha224().into(),
             ShaVariant::SHA2_256 => oids::sha256().into(),

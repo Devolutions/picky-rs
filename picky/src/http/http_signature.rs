@@ -814,7 +814,7 @@ impl<'a> HttpSignatureVerifier<'a> {
 }
 
 // === http signature algorithms === //
-
+const HTTP_SIG_ALGO_RSA_MD5: &str = "rsa-md5";
 const HTTP_SIG_ALGO_RSA_SHA_1: &str = "rsa-sha1";
 
 const HTTP_SIG_ALGO_RSA_SHA_224: &str = "rsa-sha224";
@@ -831,6 +831,7 @@ const HTTP_SIG_ALGO_RSA_SHA3_512: &str = "rsa-sha3-512";
 
 fn to_http_sig_algo_str(algo: SignatureAlgorithm) -> &'static str {
     match algo {
+        SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::MD5) => HTTP_SIG_ALGO_RSA_MD5,
         SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA1) => HTTP_SIG_ALGO_RSA_SHA_1,
         SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_224) => HTTP_SIG_ALGO_RSA_SHA_224,
         SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256) => HTTP_SIG_ALGO_RSA_SHA_256,
@@ -843,6 +844,7 @@ fn to_http_sig_algo_str(algo: SignatureAlgorithm) -> &'static str {
 
 fn from_http_sig_algo_str(s: &str) -> Option<SignatureAlgorithm> {
     match s {
+        HTTP_SIG_ALGO_RSA_MD5 => Some(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::MD5)),
         HTTP_SIG_ALGO_RSA_SHA_1 => Some(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA1)),
         HTTP_SIG_ALGO_RSA_SHA_224 | HTTP_SIG_ALGO_RSA_SHA2_224 => {
             Some(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_224))

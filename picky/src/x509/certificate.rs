@@ -349,7 +349,7 @@ impl Cert {
 // === certificate verifier === /
 
 #[derive(Debug, Clone)]
-enum ValidityCheck<'a> {
+pub(super) enum ValidityCheck<'a> {
     Interval { lower: &'a UTCDate, upper: &'a UTCDate },
     Exact(&'a UTCDate),
 }
