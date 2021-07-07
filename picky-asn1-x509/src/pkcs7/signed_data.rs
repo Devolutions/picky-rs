@@ -3,7 +3,7 @@ use super::crls::RevocationInfoChoices;
 use super::signer_info::SignerInfo;
 use crate::cmsversion::CmsVersion;
 use crate::{AlgorithmIdentifier, Certificate};
-use picky_asn1::tag::{Tag, TagPeeker};
+use picky_asn1::tag::{Tag, TagClass, TagPeeker};
 use picky_asn1::wrapper::Asn1SetOf;
 use serde::{de, ser, Deserialize, Serialize};
 
@@ -55,10 +55,12 @@ impl<'de> de::Deserialize<'de> for SignedData {
                 let certificates = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(3, &self))?;
 
                 let tag_peeker: TagPeeker = seq_next_element!(seq, SignedData, "ApplicationTag1");
-                let crls = match tag_peeker.next_tag {
-                    Tag::APP_1 => seq.next_element()?.ok_or_else(|| de::Error::invalid_length(4, &self))?,
-                    _ => None,
-                };
+                let crls =
+                    if tag_peeker.next_tag.class() == TagClass::ContextSpecific && tag_peeker.next_tag.number() == 1 {
+                        seq.next_element()?.ok_or_else(|| de::Error::invalid_length(4, &self))?
+                    } else {
+                        None
+                    };
 
                 let signers_infos = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(5, &self))?;
 

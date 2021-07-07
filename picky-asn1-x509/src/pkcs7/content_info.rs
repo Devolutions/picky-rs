@@ -11,7 +11,9 @@ use picky_asn1::wrapper::{
     ImplicitContextTag0, ImplicitContextTag1, ObjectIdentifierAsn1, OctetStringAsn1, Optional,
 };
 
-use crate::ctl::Ctl;
+#[cfg(feature = "ctl")]
+use super::ctl::Ctl;
+
 use crate::{oids, DigestInfo};
 
 /// ``` not_rust
@@ -26,6 +28,7 @@ use crate::{oids, DigestInfo};
 pub enum ContentValue {
     SpcIndirectDataContent(SpcIndirectDataContent),
     OctetString(OctetStringAsn1),
+    #[cfg(feature = "ctl")]
     CertificateTrustList(Ctl),
 }
 
@@ -39,6 +42,7 @@ impl Serialize for ContentValue {
                 spc_indirect_data_content.serialize(serializer)
             }
             ContentValue::OctetString(octet_string) => octet_string.serialize(serializer),
+            #[cfg(feature = "ctl")]
             ContentValue::CertificateTrustList(ctl) => ctl.serialize(serializer),
         }
     }
@@ -88,11 +92,12 @@ impl<'de> de::Deserialize<'de> for EncapsulatedContentInfo {
                         .into(),
                     ),
                     oids::PKCS7 => None,
+                    #[cfg(feature = "ctl")]
                     oids::CERT_TRUST_LIST => Some(
                         ContentValue::CertificateTrustList(
                             seq_next_element!(
                                 seq,
-                                ApplicationTag0<Ctl>,
+                                ExplicitContextTag0<Ctl>,
                                 EncapsulatedContentInfo,
                                 "CertificateTrustList"
                             )

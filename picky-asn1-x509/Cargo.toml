@@ -32,4 +32,5 @@ hex = "0.4"
 [features]
 legacy = ["num-bigint-dig"]
 pkcs7 = ["widestring"]
+ctl = ["pkcs7"]
 

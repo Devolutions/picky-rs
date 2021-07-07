@@ -29,6 +29,9 @@ mod test_files {
 
     cfg_if::cfg_if! { if  #[cfg(feature = "pkcs7")]  {
         pub const PKCS7: &str = include_str!("../../test_assets/pkcs7.p7b");
+    }}
+
+    cfg_if::cfg_if! { if #[cfg(feature = "ctl")] {
         pub const CERTIFICATE_TRUST_LIST: &[u8] = include_bytes!("../../test_assets/authroot.stl");
     }}
 
