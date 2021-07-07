@@ -60,6 +60,7 @@ http_signature = []
 
 # secondary features
 pkcs7 = ["x509", "picky-asn1-x509/pkcs7", "reqwest", "cab"]
+ctl = ["picky-asn1-x509/ctl", "pkcs7", "chrono", "reqwest", "cab"]
 wincert = ["pkcs7", "byteorder"]
 http_trait_impl = ["http"]
 chrono_conversion = ["chrono", "picky-asn1/chrono_conversion"]

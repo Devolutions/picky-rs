@@ -1,6 +1,7 @@
 pub mod cmsversion;
 pub mod content_info;
 pub mod crls;
+#[cfg(feature = "ctl")]
 pub mod ctl;
 pub mod signed_data;
 pub mod signer_info;
