@@ -5,6 +5,8 @@ use std::io::{self, Cursor, Read};
 use crate::x509::pkcs7::{Pkcs7, Pkcs7Error};
 use thiserror::Error;
 
+pub use picky_asn1_x509::pkcs7::ctl::CTLEntryAttributeValues;
+
 #[derive(Debug, Error)]
 pub enum CtlError {
     #[error("Failed to download CTL:  {description}")]

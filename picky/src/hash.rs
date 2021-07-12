@@ -74,13 +74,13 @@ impl TryFrom<ShaVariant> for HashAlgorithm {
 
     fn try_from(v: ShaVariant) -> Result<HashAlgorithm, UnsupportedHashAlgorithmError> {
         match v {
+            ShaVariant::MD5 => Ok(HashAlgorithm::MD5),
             ShaVariant::SHA1 => Ok(HashAlgorithm::SHA1),
             ShaVariant::SHA2_256 => Ok(HashAlgorithm::SHA2_256),
             ShaVariant::SHA2_384 => Ok(HashAlgorithm::SHA2_384),
             ShaVariant::SHA2_512 => Ok(HashAlgorithm::SHA2_512),
             ShaVariant::SHA3_384 => Ok(HashAlgorithm::SHA3_384),
             ShaVariant::SHA3_512 => Ok(HashAlgorithm::SHA3_512),
-            ShaVariant::MD5 => Ok(HashAlgorithm::MD5),
             _ => Err(UnsupportedHashAlgorithmError {
                 algorithm: format!("{:?}", v),
             }),
