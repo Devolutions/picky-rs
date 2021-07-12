@@ -2,21 +2,23 @@ use crate::hash::{HashAlgorithm, UnsupportedHashAlgorithmError};
 use crate::key::PrivateKey;
 use crate::pem::Pem;
 use crate::signature::{SignatureAlgorithm, SignatureError};
-use crate::x509::certificate::{Cert, CertError, ValidityCheck};
+use crate::x509::certificate::{Cert, CertError, CertValidator, ValidityCheck};
 use crate::x509::date::UTCDate;
-use crate::x509::extension::ExtendedKeyUsage;
-use crate::x509::pkcs7::{self, Pkcs7, PKCS7_PEM_LABEL};
-use crate::x509::utils::{from_der, from_pem, to_der, to_pem};
+use crate::x509::name::DirectoryName;
+#[cfg(feature = "ctl")]
+use crate::x509::pkcs7::ctl::{self, CTLEntryAttributeValues, CertificateTrustList};
+use crate::x509::pkcs7::{self, Pkcs7};
+use crate::x509::utils::{from_der, from_pem, from_pem_str, to_der, to_pem};
 use picky_asn1::restricted_string::CharSetError;
 use picky_asn1::tag::Tag;
-use picky_asn1::wrapper::{Asn1SetOf, ExplicitContextTag0, ExplicitContextTag1};
+use picky_asn1::wrapper::{Asn1SetOf, ExplicitContextTag0, ExplicitContextTag1, ObjectIdentifierAsn1};
 use picky_asn1_der::Asn1DerError;
 use picky_asn1_x509::algorithm_identifier::{AlgorithmIdentifier, UnsupportedAlgorithmError};
 use picky_asn1_x509::cmsversion::CmsVersion;
 use picky_asn1_x509::extension::ExtensionView;
 use picky_asn1_x509::pkcs7::content_info::{
-    ContentValue, EncapsulatedContentInfo, SpcAttributeAndOptionalValue, SpcIndirectDataContent, SpcLink,
-    SpcPeImageData, SpcPeImageFlags, SpcSpOpusInfo, SpcString,
+    ContentValue, EncapsulatedContentInfo, SpcAttributeAndOptionalValue, SpcAttributeAndOptionalValueValue,
+    SpcIndirectDataContent, SpcLink, SpcPeImageData, SpcPeImageFlags, SpcSpOpusInfo, SpcString,
 };
 use picky_asn1_x509::pkcs7::crls::RevocationInfoChoices;
 use picky_asn1_x509::pkcs7::signed_data::{CertificateSet, DigestAlgorithmIdentifiers, SignedData, SignersInfos};
@@ -30,11 +32,6 @@ use picky_asn1_x509::{oids, Attribute, AttributeValues, Certificate, DigestInfo,
 use std::cell::RefCell;
 use std::convert::TryFrom;
 use thiserror::Error;
-
-#[cfg(feature = "ctl")]
-use crate::x509::pkcs7::ctl::{self, CertificateTrustList};
-#[cfg(feature = "ctl")]
-use picky_asn1_x509::pkcs7::ctl::CTLEntryAttributeValues;
 
 #[derive(Debug, Error)]
 pub enum AuthenticodeError {
@@ -52,7 +49,7 @@ pub enum AuthenticodeError {
     CertError(#[from] CertError),
     #[error("Digest algorithm mismatch: {description}")]
     DigestAlgorithmMismatch { description: String },
-    #[error("SignerInfo encrypted_digest does not match hash of authenticated attributes of ContentInfo")]
+    #[error("PKCS9_MESSAGE_DIGEST does not match hash of ContentInfo")]
     HashMismatch,
     #[error("Authenticode signatures support only one signer, digestAlgorithms must contain only one digestAlgorithmIdentifier, but {incorrect_count} entries present")]
     IncorrectDigestAlgorithmsCount { incorrect_count: usize },
@@ -76,7 +73,7 @@ pub enum AuthenticodeError {
     NoEKUCodeSigning,
     #[error("PKCS9_MESSAGE_DIGEST attribute is absent")]
     NoMessageDigest,
-    #[error("Can't find certificate which the issuer is {issuer:?} and serial_number is {serial_number:?}")]
+    #[error("Can't find certificate which issuer is {issuer} and serial_number is {serial_number:#?}")]
     NoCertificatesAssociatedWithIssuerAndSerialNumber { issuer: Name, serial_number: Vec<u8> },
     #[error(transparent)]
     SignatureError(#[from] SignatureError),
@@ -112,10 +109,10 @@ impl AuthenticodeSignature {
 
         let data = SpcAttributeAndOptionalValue {
             ty: oids::spc_pe_image_dataobj().into(),
-            value: SpcPeImageData {
+            value: SpcAttributeAndOptionalValueValue::SpcPeImageData(SpcPeImageData {
                 flags: SpcPeImageFlags::default(),
                 file: Default::default(),
-            },
+            }),
         };
 
         let message_digest = DigestInfo {
@@ -205,6 +202,7 @@ impl AuthenticodeSignature {
             signed_attrs: Attributes(authenticated_attributes).into(),
             signature_algorithm: SignatureAlgorithmIdentifier(AlgorithmIdentifier::new_rsa_encryption()),
             signature: encrypted_digest,
+            unsigned_attrs: None,
         };
 
         // certificates contains the signer certificate and any intermediate certificates,
@@ -233,9 +231,19 @@ impl AuthenticodeSignature {
     }
 
     pub fn from_pem(pem: &Pem) -> AuthenticodeResult<Self> {
-        Ok(from_pem::<Pkcs7Certificate>(pem, PKCS7_PEM_LABEL, pkcs7::ELEMENT_NAME)
-            .map(Pkcs7::from)
-            .map(Self)?)
+        Ok(
+            from_pem::<Pkcs7Certificate>(pem, pkcs7::PKCS7_PEM_LABEL, pkcs7::ELEMENT_NAME)
+                .map(Pkcs7::from)
+                .map(Self)?,
+        )
+    }
+
+    pub fn from_pem_str(pem_str: &str) -> AuthenticodeResult<Self> {
+        Ok(
+            from_pem_str::<Pkcs7Certificate>(pem_str, pkcs7::PKCS7_PEM_LABEL, pkcs7::ELEMENT_NAME)
+                .map(Pkcs7::from)
+                .map(Self)?,
+        )
     }
 
     pub fn to_der(&self) -> AuthenticodeResult<Vec<u8>> {
@@ -243,7 +251,7 @@ impl AuthenticodeSignature {
     }
 
     pub fn to_pem(&self) -> AuthenticodeResult<Pem> {
-        Ok(to_pem(&self.0 .0, PKCS7_PEM_LABEL, pkcs7::ELEMENT_NAME)?)
+        Ok(to_pem(&self.0 .0, pkcs7::PKCS7_PEM_LABEL, pkcs7::ELEMENT_NAME)?)
     }
 
     pub fn signing_certificate(&self) -> Result<Cert, AuthenticodeError> {
@@ -260,12 +268,11 @@ impl AuthenticodeSignature {
 
         self.0
             .certificates()
-            .iter()
-            .find(|&cert| {
+            .into_iter()
+            .find(|cert| {
                 Name::from(cert.issuer_name()) == issuer_and_serial_number.issuer
                     && cert.serial_number() == &issuer_and_serial_number.serial_number.0
             })
-            .cloned()
             .ok_or_else(
                 || AuthenticodeError::NoCertificatesAssociatedWithIssuerAndSerialNumber {
                     issuer: issuer_and_serial_number.issuer.clone(),
@@ -279,8 +286,8 @@ impl AuthenticodeSignature {
             authenticode_signature: self,
             inner: RefCell::new(AuthenticodeValidatorInner {
                 strictness: Default::default(),
-                excluded_cert_authorities: Vec::new(),
                 now: None,
+                excluded_cert_authorities: vec![],
             }),
         }
     }
@@ -302,11 +309,10 @@ impl From<AuthenticodeSignature> for Pkcs7 {
 struct AuthenticodeStrictness {
     require_basic_authenticode_validation: bool,
     require_signing_certificate_check: bool,
-    require_chain_check: bool,
     require_not_before_check: bool,
     require_not_after_check: bool,
     require_ca_verification_against_ctl: bool,
-    exclude_specific_cert_authorities: bool,
+    exclude_specific_cert_authorities_from_ctl_check: bool,
 }
 
 impl Default for AuthenticodeStrictness {
@@ -316,17 +322,16 @@ impl Default for AuthenticodeStrictness {
             require_signing_certificate_check: false,
             require_not_before_check: false,
             require_not_after_check: false,
-            require_chain_check: false,
             require_ca_verification_against_ctl: false,
-            exclude_specific_cert_authorities: false,
+            exclude_specific_cert_authorities_from_ctl_check: false,
         }
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct AuthenticodeValidatorInner<'a> {
+struct AuthenticodeValidatorInner<'a> {
     strictness: AuthenticodeStrictness,
-    excluded_cert_authorities: Vec<Name>,
+    excluded_cert_authorities: Vec<DirectoryName>,
     now: Option<ValidityCheck<'a>>,
 }
 
@@ -379,8 +384,8 @@ impl<'a> AuthenticodeValidator<'a> {
     }
 
     #[inline]
-    pub fn require_certificates_chain_check(&self) -> &Self {
-        self.inner.borrow_mut().strictness.require_chain_check = true;
+    pub fn require_basic_authenticode_validation(&self) -> &Self {
+        self.inner.borrow_mut().strictness.require_basic_authenticode_validation = true;
         self
     }
 
@@ -391,9 +396,13 @@ impl<'a> AuthenticodeValidator<'a> {
         self
     }
 
+    #[cfg(feature = "ctl")]
     #[inline]
-    pub fn exclude_cert_authorities(&self, excluded_cert_authorities: &'a [Name]) -> &Self {
-        self.inner.borrow_mut().strictness.exclude_specific_cert_authorities = true;
+    pub fn exclude_cert_authorities(&self, excluded_cert_authorities: &'a [DirectoryName]) -> &Self {
+        self.inner
+            .borrow_mut()
+            .strictness
+            .exclude_specific_cert_authorities_from_ctl_check = true;
         self.inner
             .borrow_mut()
             .excluded_cert_authorities
@@ -405,7 +414,7 @@ impl<'a> AuthenticodeValidator<'a> {
     fn verify_authenticode_basic(&self) -> AuthenticodeResult<()> {
         // 1. SignedData version field must be set to 1.
         let version = self.authenticode_signature.0 .0.signed_data.version;
-        if version != CmsVersion::V2 {
+        if version != CmsVersion::V1 {
             return Err(AuthenticodeError::IncorrectVersion {
                 expected: 1,
                 got: version as u32,
@@ -420,21 +429,7 @@ impl<'a> AuthenticodeValidator<'a> {
             });
         }
 
-        // 3. Signature::digest_algorithm must match ContentInfo::digest_algorithm and SignerInfo::digest_algorithm.
-        let content_info = self.authenticode_signature.0.encapsulated_content_info();
-        let message_digest = match &content_info.content {
-            Some(content_value) => match &content_value.0 {
-                ContentValue::SpcIndirectDataContent(spc_indirect_data_content) => {
-                    &spc_indirect_data_content.message_digest
-                }
-                _ => return Err(AuthenticodeError::NoSpcIndirectDataContent),
-            },
-            None => return Err(AuthenticodeError::NoEncapsulatedContentInfo),
-        };
-
-        let signing_certificate = self.authenticode_signature.signing_certificate()?;
-
-        // 5. Authenticode signatures support only one signer, digestAlgorithms must contain only one digestAlgorithmIdentifier.
+        // 3. Authenticode signatures support only one signer, digestAlgorithms must contain only one digestAlgorithmIdentifier.
         let digest_algorithms = self.authenticode_signature.0.digest_algorithms();
         if digest_algorithms.len() != 1 {
             return Err(AuthenticodeError::IncorrectDigestAlgorithmsCount {
@@ -442,10 +437,21 @@ impl<'a> AuthenticodeValidator<'a> {
             });
         }
 
-        // 6. Given the x509 certificate, compare SignerInfo::encrypted_digest against hash of authenticated attributes and hash of ContentInfo
+        // 4. Signature::digest_algorithm must match ContentInfo::digest_algorithm and SignerInfo::digest_algorithm.
+        let content_info = self.authenticode_signature.0.encapsulated_content_info();
+        let spc_indirect_data_content = match &content_info.content {
+            Some(content_value) => match &content_value.0 {
+                ContentValue::SpcIndirectDataContent(spc_indirect_data_content) => spc_indirect_data_content,
+                _ => return Err(AuthenticodeError::NoSpcIndirectDataContent),
+            },
+            None => return Err(AuthenticodeError::NoEncapsulatedContentInfo),
+        };
+
         let digest_algorithm = digest_algorithms
             .first()
             .expect("One digest algorithm should exists at this point");
+
+        let message_digest = &spc_indirect_data_content.message_digest;
         if digest_algorithm != &message_digest.oid {
             return Err(AuthenticodeError::DigestAlgorithmMismatch {
                 description: "Signature digest algorithm does not match EncapsulatedContentInfo digest algorithm"
@@ -462,12 +468,27 @@ impl<'a> AuthenticodeValidator<'a> {
             });
         }
 
+        // 5.The x509 certificate specified by SignerInfo::serial_number and SignerInfo::issuer must exist within Signature::certificates
+        let signing_certificate = self.authenticode_signature.signing_certificate()?;
+        // 6. Given the x509 certificate, compare SignerInfo::encrypted_digest against hash of authenticated attributes and hash of ContentInfo
         let public_key = signing_certificate.public_key();
 
-        let authenticated_attributes = &signer_info.signed_attrs.0 .0;
-        let raw_attributes = picky_asn1_der::to_vec(&authenticated_attributes)?;
+        let hash_algo = ShaVariant::try_from(Into::<ObjectIdentifierAsn1>::into(digest_algorithm.oid().clone()))
+            .map_err(AuthenticodeError::UnsupportedAlgorithmError)?;
 
-        let signature_algorithm = SignatureAlgorithm::from_algorithm_identifier(digest_algorithm)?;
+        let authenticated_attributes = &signer_info.signed_attrs.0 .0;
+        let mut raw_attributes = picky_asn1_der::to_vec(authenticated_attributes)?;
+        // According to the RFC:
+        //
+        // "[...] The Attributes value's tag is SET OF, and the DER encoding ofs
+        // the SET OF tag, rather than of the IMPLICIT [0] tag [...]"
+        raw_attributes[0] = Tag::SET.number();
+
+        let signature_algorithm_identifier = AlgorithmIdentifier::new_rsa_encryption_with_sha(hash_algo)
+            .map_err(AuthenticodeError::UnsupportedAlgorithmError)?;
+
+        let signature_algorithm = SignatureAlgorithm::from_algorithm_identifier(&signature_algorithm_identifier)?;
+
         signature_algorithm
             .verify(public_key, &raw_attributes, &signer_info.signature.0 .0)
             .map_err(AuthenticodeError::SignatureError)?;
@@ -478,12 +499,20 @@ impl<'a> AuthenticodeValidator<'a> {
             .find(|attr| matches!(attr.value, AttributeValues::MessageDigest(_)))
             .ok_or(AuthenticodeError::NoMessageDigest)?;
 
+        let hash_algo = HashAlgorithm::try_from(hash_algo).map_err(AuthenticodeError::UnsupportedHashAlgorithmError)?;
+
+        let mut raw_spc_indirect_data_content = picky_asn1_der::to_vec(&spc_indirect_data_content.data)?;
+        let mut raw_message_digest = picky_asn1_der::to_vec(&spc_indirect_data_content.message_digest)?;
+        raw_spc_indirect_data_content.append(&mut raw_message_digest);
+
+        let content_info_hash = hash_algo.digest(&raw_spc_indirect_data_content);
+
         if let AttributeValues::MessageDigest(message_digest_attr_val) = &message_digest_attr.value {
             if message_digest_attr_val
                 .0
                 .first()
                 .expect("At least one element is always present in Asn1SetOf AttributeValues")
-                != &message_digest.digest.0
+                != &content_info_hash
             {
                 return Err(AuthenticodeError::HashMismatch);
             }
@@ -500,35 +529,28 @@ impl<'a> AuthenticodeValidator<'a> {
     fn verify_certificates_chain(&self) -> AuthenticodeResult<()> {
         let signing_certificate = self.authenticode_signature.signing_certificate()?;
 
-        let mut certificates = self.authenticode_signature.0.certificates();
-        if let Some(pos) = certificates.iter().position(|cert| cert == &signing_certificate) {
-            certificates.remove(pos);
-        }
+        // Box<dyn Iterator<Item = &'a Cert> just to satisfy CertValidator bounds
+        let cert_validator: CertValidator<Box<dyn Iterator<Item = &'a Cert>>> = signing_certificate.verifier();
 
-        let cert_validator = signing_certificate.verifier();
+        cert_validator.ignore_chain_check();
         let inner = self.inner.borrow_mut();
-        let cert_validator = if inner.strictness.require_chain_check {
-            cert_validator.require_chain_check().chain(certificates.iter())
-        } else {
-            &cert_validator
-        };
 
         let cert_validator = match inner.now {
             Some(ValidityCheck::Exact(exact)) => cert_validator.exact_date(exact),
             Some(ValidityCheck::Interval { lower, upper }) => cert_validator.interval_date(lower, upper),
-            None => cert_validator,
+            None => &cert_validator,
         };
 
         let cert_validator = if inner.strictness.require_not_after_check {
             cert_validator.require_not_after_check()
         } else {
-            cert_validator
+            cert_validator.ignore_not_after_check()
         };
 
         let cert_validator = if inner.strictness.require_not_before_check {
             cert_validator.require_not_before_check()
         } else {
-            cert_validator
+            cert_validator.ignore_not_before_check()
         };
 
         cert_validator.verify()?;
@@ -537,7 +559,7 @@ impl<'a> AuthenticodeValidator<'a> {
     }
 
     #[cfg(feature = "ctl")]
-    fn verify_ca_certificate_against_ctl(&self, ca_name: &Name) -> AuthenticodeResult<()> {
+    fn verify_ca_certificate_against_ctl(&self, ca_name: &DirectoryName) -> AuthenticodeResult<()> {
         use chrono::{DateTime, Duration, NaiveDate, Utc};
         use picky_asn1::wrapper::OctetStringAsn1;
         use std::ops::Add;
@@ -552,7 +574,7 @@ impl<'a> AuthenticodeValidator<'a> {
             ))
         };
 
-        let raw_ca_name = picky_asn1_der::to_vec(ca_name)?;
+        let raw_ca_name = picky_asn1_der::to_vec(&Name::from(ca_name.clone()))?;
         let ca_name_md5_digest = HashAlgorithm::MD5.digest(&raw_ca_name);
 
         let ctl = CertificateTrustList::new()?;
@@ -658,18 +680,17 @@ impl<'a> AuthenticodeValidator<'a> {
     }
 
     pub fn verify(&self) -> AuthenticodeResult<()> {
-        let inner = self.inner.borrow();
-        if inner.strictness.require_basic_authenticode_validation {
+        if self.inner.borrow().strictness.require_basic_authenticode_validation {
             self.verify_authenticode_basic()?;
         }
 
-        if inner.strictness.require_signing_certificate_check {
+        if self.inner.borrow().strictness.require_signing_certificate_check {
             self.verify_certificates_chain()?;
         }
 
         #[cfg(feature = "ctl")]
-        if inner.strictness.require_ca_verification_against_ctl {
-            let directory_name = match (
+        if self.inner.borrow().strictness.require_ca_verification_against_ctl {
+            let ca_name = match (
                 self.authenticode_signature.0.root_certificate(),
                 self.authenticode_signature.0.intermediate_certificate(),
             ) {
@@ -681,13 +702,15 @@ impl<'a> AuthenticodeValidator<'a> {
                 }
             };
 
-            let ca_name = Name::from(directory_name);
-
             match self.verify_ca_certificate_against_ctl(&ca_name) {
                 Ok(()) => {}
                 Err(err) => {
-                    if !inner.strictness.exclude_specific_cert_authorities
-                        || !inner.excluded_cert_authorities.contains(&ca_name)
+                    if !self
+                        .inner
+                        .borrow()
+                        .strictness
+                        .exclude_specific_cert_authorities_from_ctl_check
+                        || !self.inner.borrow().excluded_cert_authorities.contains(&ca_name)
                     {
                         return Err(err);
                     }
@@ -699,20 +722,20 @@ impl<'a> AuthenticodeValidator<'a> {
     }
 }
 
-pub(crate) fn check_eku_code_signing(certificates: &[Cert]) -> AuthenticodeResult<()> {
-    let code_signing_ext_key_usage: ExtendedKeyUsage = vec![oids::kp_code_signing()].into();
-
+fn check_eku_code_signing(certificates: &[Cert]) -> AuthenticodeResult<()> {
     if certificates
         .iter()
         .flat_map(|cert| cert.extensions().iter())
         .any(|extension| matches!(extension.extn_value(), ExtensionView::ExtendedKeyUsage(_)))
     {
         let signing_cert = certificates.first().ok_or(AuthenticodeError::NoCertificates)?;
-
         if !signing_cert
             .extensions()
             .iter()
-            .any(|extension| extension.extn_value() == ExtensionView::ExtendedKeyUsage(&code_signing_ext_key_usage))
+            .any(|extension| match extension.extn_value() {
+                ExtensionView::ExtendedKeyUsage(eku) => eku.contains(oids::kp_code_signing()),
+                _ => false,
+            })
         {
             return Err(AuthenticodeError::NoEKUCodeSigning);
         }
@@ -755,6 +778,96 @@ mod test {
                                    MvS4rPuhVYrvouZHJ50bcwccByJ8aCOJxLdH7+bjojMSAgV2kGq+FNh7F1wRcwx8\n\
                                    8Z+DBbeVaCpYSQa5bCr5jG6nIX5v/KbS3HCmAkUzwqGoEsk53yFmKw==\n\
                                    -----END RSA PRIVATE KEY-----";
+
+    const SELF_SIGNED_PKCS7: &str = "-----BEGIN PKCS7-----\
+                                                                MIIKvwYJKoZIhvcNAQcCoIIKsDCCCqwCAQExADALBgkqhkiG9w0BBwGgggqSMIID\n\
+                                                                QjCCAioCAQMwDQYJKoZIhvcNAQELBQAwYTELMAkGA1UEBhMCSW4xCzAJBgNVBAgM\n\
+                                                                AkluMQswCQYDVQQHDAJJbjELMAkGA1UECgwCSW4xCzAJBgNVBAsMAkluMQswCQYD\n\
+                                                                VQQDDAJJbjERMA8GCSqGSIb3DQEJARYCSW4wHhcNMjEwNzA4MTE1NjQ5WhcNMjIw\n\
+                                                                NzA4MTE1NjQ5WjBtMQswCQYDVQQGEwJMZjENMAsGA1UECAwETGVhZjENMAsGA1UE\n\
+                                                                BwwETGVhZjENMAsGA1UECgwETGVhZjENMAsGA1UECwwETGVhZjENMAsGA1UEAwwE\n\
+                                                                TGVhZjETMBEGCSqGSIb3DQEJARYETGVhZjCCASIwDQYJKoZIhvcNAQEBBQADggEP\n\
+                                                                ADCCAQoCggEBANdMZ/MHsDoW4K1G3TB8z0TDbKQeBTYv7//rlPv81OMLhkMJgcQb\n\
+                                                                XkhHkSoyynw/wUAvWH3U8ZN4vYc4jWuw/j4pTjsf2lf1MQFoVZJehaqYoTfsYaIi\n\
+                                                                89AwHxDlkQitumuWs24VrPCe2PO+fNM04V/4FgI1RniOsAFTlSfNyG2cIZCYbAVk\n\
+                                                                pBCmci5LbAlm2zC6zZBoGpp1GqjFnwR7JJQcgOKHr9inJmjFM0D0ZIiadDKHSuKm\n\
+                                                                U9c6vdAQHWrIXHaxvZspLg2YUWH9dDZVe+ddSuGEM7772N9/FdaMe+7r/r5uim4E\n\
+                                                                imhdjn+PPa3Qhr6eD3nkNd+s3wtVekyYQIUCAwEAATANBgkqhkiG9w0BAQsFAAOC\n\
+                                                                AQEAT0Bzl3U+fxhAEAGgU1gp0og7J9VM1diprUOl3C1RHUZtovlTBctltqDdSc7o\n\
+                                                                YY4r3ubo25mkvJ0PH8d3pGJDOvE9SnmgP4BRschCu2LOjXgbV3pBk6ejgvPPTcMo\n\
+                                                                rwiNJxf5exX35Ju1AzcpI71twP9Ty8YBOg3aAhqwu8MdcXbXbPESg5X8wpb30qVi\n\
+                                                                RH7PzyAJlQynqCWMxTECXgtwLISHp/Ae2x3MUT2CKBZC65Z17UdYHN7uR0zavKwb\n\
+                                                                3A2jzIPySFJL/KSy9WZLwmQdMUU3tcFRHDpaoMmJpPNBBbcXuhFoP9MLWTmm9+ma\n\
+                                                                yaK7vOyltAK3MVuCpmccl7SNjDCCA5wwggKEoAMCAQICAQIwDQYJKoZIhvcNAQEL\n\
+                                                                BQAwbTELMAkGA1UEBhMCUnQxDTALBgNVBAgMBFJvb3QxDTALBgNVBAcMBFJvb3Qx\n\
+                                                                DTALBgNVBAoMBFJvb3QxDTALBgNVBAsMBFJvb3QxDTALBgNVBAMMBFJvb3QxEzAR\n\
+                                                                BgkqhkiG9w0BCQEWBFJvb3QwHhcNMjEwNzA4MDkwMzMxWhcNMjIwNzA4MDkwMzMx\n\
+                                                                WjBhMQswCQYDVQQGEwJJbjELMAkGA1UECAwCSW4xCzAJBgNVBAcMAkluMQswCQYD\n\
+                                                                VQQKDAJJbjELMAkGA1UECwwCSW4xCzAJBgNVBAMMAkluMREwDwYJKoZIhvcNAQkB\n\
+                                                                FgJJbjCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAN4llgeaEesdTv+L\n\
+                                                                mWhrMmluN1LnveWuQsRBV7dySd1d/3gRWwFMxXfaBjh1y/mDhGe1Kb8zz0buSOyn\n\
+                                                                WMhT3xppsumF9y6aOGupSUij+nC+VFkcbZzWxJKBRJGJWcmPMNm+eEumY0ZrS21e\n\
+                                                                EvVmKPlZSCZUkJgx3ogEsKaUQrHymx9+AUvjGGsIbmOB07cEcVjxz3eexOr7cMVw\n\
+                                                                XXdnujdsgLYiR5rkxTP4pKkB4CdPEfy+q6cwO5KtO5pkgMcIhHCC/P+9pfwS5CVF\n\
+                                                                5mUb0xj+yZGQ85fezRKy7mGSMhRvNvIhmnoVWyuvkoYdFUWzEDZqj4YJpJMHT2RN\n\
+                                                                hTIdx0cCAwEAAaNTMFEwHQYDVR0OBBYEFHmBQGjcx/fnNFj4UxGyeCHFb/aaMB8G\n\
+                                                                A1UdIwQYMBaAFEcLWYRko86McWZbVwnLHJXW/B1SMA8GA1UdEwEB/wQFMAMBAf8w\n\
+                                                                DQYJKoZIhvcNAQELBQADggEBAI3oKESkfFQ/0B3xLFYvXMCuWv224wxGdw0TWi64\n\
+                                                                8OwmCrNgYEXmkQPz4SZ0oQJjazllAflF+5Kc49zSdrCOPPz6bhw9O4Pcn875jCYl\n\
+                                                                CD23+OexKGyfXFgc7/bzKTjN2tXA/Slo9ol1xvvY9HnhpL2UFf0jkecz41rP+TRl\n\
+                                                                sxG7LwEF24P3xgZLlaySCp2S9WcBtIf7p1Z+6ekLl4KwihD/Q4uhibhFQqqOPuj8\n\
+                                                                Fc4Jy8eyZ+0vEoVTQMrFahUrKjbfuxtYZ+8y5S4QbL6O5Ox7mYmTrloDUd0UIzMF\n\
+                                                                iprHKnwHFjVAYDJkq6t5xt1o2kJ0EVSZkyUaD4U/zoSNHBIwggOoMIICkKADAgEC\n\
+                                                                AgEBMA0GCSqGSIb3DQEBCwUAMG0xCzAJBgNVBAYTAlJ0MQ0wCwYDVQQIDARSb290\n\
+                                                                MQ0wCwYDVQQHDARSb290MQ0wCwYDVQQKDARSb290MQ0wCwYDVQQLDARSb290MQ0w\n\
+                                                                CwYDVQQDDARSb290MRMwEQYJKoZIhvcNAQkBFgRSb290MB4XDTIxMDcwODA5MDI1\n\
+                                                                M1oXDTIyMDcwODA5MDI1M1owbTELMAkGA1UEBhMCUnQxDTALBgNVBAgMBFJvb3Qx\n\
+                                                                DTALBgNVBAcMBFJvb3QxDTALBgNVBAoMBFJvb3QxDTALBgNVBAsMBFJvb3QxDTAL\n\
+                                                                BgNVBAMMBFJvb3QxEzARBgkqhkiG9w0BCQEWBFJvb3QwggEiMA0GCSqGSIb3DQEB\n\
+                                                                AQUAA4IBDwAwggEKAoIBAQC8dV0AD30BbZdBr9laj5sKb+PIzW2P/gir7VXXCz+q\n\
+                                                                UHoZvK6ZqDW1K+jn4iTEx+HUGH9JYhB3syYOrMpi7CjXjz2x0lVJKvx5qSieGrQr\n\
+                                                                yJaWePwhDWfVUjHVfbcFfdJLAH3pZjfNKHmm68n37Acc/mFZXTG3xN0yfQgbPwbO\n\
+                                                                NGcfUze1u2kcpVjHJ1yOk9wwdO252HhJJx1Hd5wKWgeTkBQ73/vtZCQuLN3MZ+d4\n\
+                                                                ModaTtCj/dA88p4PMyw2POiCpFrgxPxVrjfjPb6V7HmNP/1xzFEFkJvTfWlTmlCX\n\
+                                                                rYG8BL3jHqfVw5gM1o1f1nClOpX/fmjqHvzT1AZ17IGVAgMBAAGjUzBRMB0GA1Ud\n\
+                                                                DgQWBBRHC1mEZKPOjHFmW1cJyxyV1vwdUjAfBgNVHSMEGDAWgBRHC1mEZKPOjHFm\n\
+                                                                W1cJyxyV1vwdUjAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQCL\n\
+                                                                KgLbBc2R5oB0al9ce68zIRpdyoNVR2TTTqwzD5K0m4HhI93dG+1e4Mbtr970Q8DM\n\
+                                                                KQvjvT0nf/jJjjoUKVG0dszTNPg5qlHPL+OgAj44dHzf7jBgEGJAez3Pk4zC4zvi\n\
+                                                                0BusfObVryc0j3oZ2JFIRaBdon4MPI2HcTMLzPFMcprzMnDx7aQbDlkQLksL1Z2E\n\
+                                                                5VvopUG5rTMMWItwWAVHwT/J9x0MPYs+LFc3Yeg7l3hsV03gC1jsh6pd0MR3p5vr\n\
+                                                                WrOnUvpo7YFFGlKamwRpxIlYAgSEQFnD3LOjx+NGdGP1H0PQd9DA4xCwtPKkoCSw\n\
+                                                                bOrBNDoLzSPaN6jy3JNeoQAxAA==\n\
+                                                                -----END PKCS7-----";
+
+    const SELF_SIGNED_PKCS7_RSA_PRIVATE_KEY: &str = "-----BEGIN PRIVATE KEY-----\n\
+                                                                                MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDXTGfzB7A6FuCt\n\
+                                                                                Rt0wfM9Ew2ykHgU2L+//65T7/NTjC4ZDCYHEG15IR5EqMsp8P8FAL1h91PGTeL2H\n\
+                                                                                OI1rsP4+KU47H9pX9TEBaFWSXoWqmKE37GGiIvPQMB8Q5ZEIrbprlrNuFazwntjz\n\
+                                                                                vnzTNOFf+BYCNUZ4jrABU5UnzchtnCGQmGwFZKQQpnIuS2wJZtswus2QaBqadRqo\n\
+                                                                                xZ8EeySUHIDih6/YpyZoxTNA9GSImnQyh0riplPXOr3QEB1qyFx2sb2bKS4NmFFh\n\
+                                                                                /XQ2VXvnXUrhhDO++9jffxXWjHvu6/6+bopuBIpoXY5/jz2t0Ia+ng955DXfrN8L\n\
+                                                                                VXpMmECFAgMBAAECggEAWa5fAnHqa1gKQMNq8X6by9XnlDlZDGhNfXoBNjHr76Nm\n\
+                                                                                SthT8H9B97Ov+Tbs93KLKhROtSOVeUtrDz90US6JyRTlnGU5Szg8MIzoUC8FWLl5\n\
+                                                                                NlVFmgcbLlZNKnmlv0q2g4hjt3BZ+GUClA1963B0jMhHSqYsc51kHTlWwRzL5zPF\n\
+                                                                                ekddpixpkE8fogE5+OTRtTlU6grWM0cMN/pNZK03A9H7APzUDZMxr51ues+cC2MH\n\
+                                                                                OLiw2mjRgXCjK+IXutcCJToicp1JRWAuA0WjMTzjfMXUfm25bwcCMmyznMJiDTU2\n\
+                                                                                JJ1OVYzTgQbsyftFs8E+05L5n2E/bAAH3/9OOFMxoQKBgQDvy6NLjoCk9OR1EQf5\n\
+                                                                                0aCvUH3ZtGk/JBtM61F81Z6he0bSOFwKKGH8cv9f4TLqpIZWRoaD+SCWBTs+9iCp\n\
+                                                                                kQHdfTe7/ElmUloxQRQVA7UXeoPA/JgX021YQFjLASNnBHSP5hMDnMGbDox9uuSn\n\
+                                                                                1MEPzP5gljnECHko/rDh+Ab2SQKBgQDl2PrxDjBS0z5TymKgg5zsRFzanuJDOYjW\n\
+                                                                                VGju4zmduqof9Mo2loRR33/xUu0jxrKhdHUx5pJRU/rlDaG7/lKNE4ZoF6RMh//C\n\
+                                                                                traUCFLB55TMUEaAWPiBTVvbZRg4W5iIYc+HRz1uBnk+5c5rlShPVZwlXO3fKaom\n\
+                                                                                3K8dXWqIXQKBgQDDpZNrDy6Y6BIKDcZDJq0CvRqhaJhCYxQ/MvP+dVCDElDbLg6y\n\
+                                                                                XvZrgewob1YaqffNJqeTv8y9ejE3kptdnik2bHbv0syURna+Hwnih27WZChhafYx\n\
+                                                                                4lghnAaWQyx+Xd04lxBGbzxrZXhtEPKEmIqYeLnHVmp1LjCkqQDqrXIIuQKBgHVe\n\
+                                                                                ubYCotaInJk5DegdjTJxLmFNJQljBec8r2Ddk3xh56Ht5Jy/e847LSBUUlgkjO85\n\
+                                                                                gub6cNkq40G4FlDja9Aymj3pZLLX99i8aLtrDKeL1EYI8Bd2V1/f2vpLw3R0AY4T\n\
+                                                                                NGBGFq5qi9t8ik4RmsX4V4YU0DtXEVZK9vktzMrZAoGAHy698y0i0L4AIGlpIuW7\n\
+                                                                                YZcLE0RSUfCdPA8HQad98GSKP8aipONwLbVT9KmTEmUA02g0Nb2caFirW3OYKZ8l\n\
+                                                                                qOuqrRK+/evcuQixBSTPbAdNWyhbwYgSLUtR6q8erOmfdjjt5MD9SoS/luDV89NF\n\
+                                                                                ocqmQTrEqWzH7mmVUFXY5GA=\n\
+                                                                                -----END PRIVATE KEY-----";
 
     const FILE_HASH: [u8; 32] = [
         0xa7, 0x38, 0xda, 0x44, 0x46, 0xa4, 0xe7, 0x8a, 0xb6, 0x47, 0xdb, 0x7e, 0x53, 0x42, 0x7e, 0xb0, 0x79, 0x61,
@@ -935,5 +1048,563 @@ mod test {
         );
 
         assert!(authenticode_signature.is_ok());
+    }
+
+    #[test]
+    fn self_signed_authenticode_signature_basic_validation() {
+        let pkcs7 = Pkcs7::from_pem_str(SELF_SIGNED_PKCS7).unwrap();
+        let private_key = PrivateKey::from_pem_str(SELF_SIGNED_PKCS7_RSA_PRIVATE_KEY).unwrap();
+
+        let authenticode_signature = AuthenticodeSignature::new(
+            pkcs7,
+            FILE_HASH.as_ref(),
+            ShaVariant::SHA2_256,
+            &private_key,
+            Some("self_signed_authenticode_signature_basic_validation".to_string()),
+        )
+        .unwrap();
+
+        let validator = authenticode_signature.authenticode_verifier();
+        let validator = validator.require_basic_authenticode_validation();
+
+        assert!(validator.verify().is_ok());
+    }
+
+    #[test]
+    fn self_signed_authenticate_signature_with_basic_and_signing_certificate_validation() {
+        let pkcs7 = Pkcs7::from_pem_str(SELF_SIGNED_PKCS7).unwrap();
+        let private_key = PrivateKey::from_pem_str(SELF_SIGNED_PKCS7_RSA_PRIVATE_KEY).unwrap();
+
+        let authenticode_signature = AuthenticodeSignature::new(
+            pkcs7,
+            FILE_HASH.as_ref(),
+            ShaVariant::SHA2_256,
+            &private_key,
+            Some("self_signed_authenticate_signature_with_basic_and_signing_certificate_validation".to_string()),
+        )
+        .unwrap();
+
+        let validator = authenticode_signature.authenticode_verifier();
+        let validator_result = validator
+            .require_basic_authenticode_validation()
+            .require_signing_certificate_check()
+            .exact_date(&UTCDate::new(2021, 8, 7, 0, 0, 0).unwrap())
+            .verify();
+
+        assert!(validator_result.is_ok())
+    }
+
+    #[cfg(feature = "ctl")]
+    #[test]
+    fn self_signed_authenticode_signature_validation_against_ctl() {
+        let pkcs7 = Pkcs7::from_pem_str(SELF_SIGNED_PKCS7).unwrap();
+        let private_key = PrivateKey::from_pem_str(SELF_SIGNED_PKCS7_RSA_PRIVATE_KEY).unwrap();
+
+        let authenticode_signature = AuthenticodeSignature::new(
+            pkcs7,
+            FILE_HASH.as_ref(),
+            ShaVariant::SHA2_256,
+            &private_key,
+            Some("self_signed_authenticode_signature_validation_against_ctl".to_string()),
+        )
+        .unwrap();
+
+        let validator = authenticode_signature.authenticode_verifier();
+        let validator = validator.require_ca_against_ctl_check();
+        let err = validator.verify().unwrap_err();
+        assert_eq!(err.to_string(), "The Authenticode signature CA is not trusted");
+    }
+
+    #[cfg(feature = "ctl")]
+    #[test]
+    fn self_signed_authenticode_signature_validation_against_ctl_with_excluded_ca_certificate() {
+        let pkcs7 = Pkcs7::from_pem_str(SELF_SIGNED_PKCS7).unwrap();
+        let private_key = PrivateKey::from_pem_str(SELF_SIGNED_PKCS7_RSA_PRIVATE_KEY).unwrap();
+
+        let authenticode_signature = AuthenticodeSignature::new(
+            pkcs7,
+            FILE_HASH.as_ref(),
+            ShaVariant::SHA2_256,
+            &private_key,
+            Some("self_signed_authenticode_signature_validation_against_ctl_with_excluded_ca_certificate".to_string()),
+        )
+        .unwrap();
+
+        let validator = authenticode_signature.authenticode_verifier();
+        let ca_name = authenticode_signature
+            .0
+            .intermediate_certificate()
+            .unwrap()
+            .issuer_name();
+
+        let validation_result = validator
+            .require_ca_against_ctl_check()
+            .exclude_cert_authorities(&[ca_name])
+            .verify();
+
+        assert!(validation_result.is_ok());
+    }
+
+    #[cfg(feature = "ctl")]
+    #[test]
+    fn self_signed_authenticode_signature_validation_against_ctl_with_excluded_not_existing_ca_certificate() {
+        use crate::x509::name::NameAttr;
+
+        let pkcs7 = Pkcs7::from_pem_str(SELF_SIGNED_PKCS7).unwrap();
+        let private_key = PrivateKey::from_pem_str(SELF_SIGNED_PKCS7_RSA_PRIVATE_KEY).unwrap();
+
+        let authenticode_signature = AuthenticodeSignature::new(
+            pkcs7,
+            FILE_HASH.as_ref(),
+            ShaVariant::SHA2_256,
+            &private_key,
+            Some(
+                "self_signed_authenticode_signature_validation_against_ctl_with_excluded_not_existing_ca_certificate"
+                    .to_string(),
+            ),
+        )
+        .unwrap();
+
+        let validator = authenticode_signature.authenticode_verifier();
+        let mut ca_name = DirectoryName::new_common_name("A Not existing CA");
+        ca_name.add_attr(NameAttr::LocalityName, "The Place that nobody knows");
+        ca_name.add_attr(NameAttr::OrganizationName, "A Bad known organization");
+        ca_name.add_attr(NameAttr::StateOrProvinceName, "The first state of Mars");
+
+        let err = validator
+            .require_ca_against_ctl_check()
+            .exclude_cert_authorities(&[ca_name])
+            .verify()
+            .unwrap_err();
+
+        assert_eq!(err.to_string(), "The Authenticode signature CA is not trusted");
+    }
+
+    #[cfg(feature = "ctl")]
+    #[test]
+    fn full_validation_self_signed_authenticode_signature() {
+        let pkcs7 = Pkcs7::from_pem_str(SELF_SIGNED_PKCS7).unwrap();
+        let private_key = PrivateKey::from_pem_str(SELF_SIGNED_PKCS7_RSA_PRIVATE_KEY).unwrap();
+
+        let authenticode_signature = AuthenticodeSignature::new(
+            pkcs7,
+            FILE_HASH.as_ref(),
+            ShaVariant::SHA2_256,
+            &private_key,
+            Some("self_signed_authenticode_signature_validation_against_ctl_with_excluded_ca_certificate".to_string()),
+        )
+        .unwrap();
+
+        let validator = authenticode_signature.authenticode_verifier();
+
+        let ca_name = authenticode_signature
+            .0
+            .intermediate_certificate()
+            .unwrap()
+            .issuer_name();
+
+        let validation_result = validator
+            .require_basic_authenticode_validation()
+            .require_signing_certificate_check()
+            .interval_date(
+                &UTCDate::new(2021, 7, 8, 11, 56, 49).unwrap(),
+                &UTCDate::new(2022, 7, 8, 11, 56, 49).unwrap(),
+            )
+            .require_not_before_check()
+            .require_not_after_check()
+            .require_ca_against_ctl_check()
+            .exclude_cert_authorities(&[ca_name])
+            .verify();
+
+        assert!(validation_result.is_ok());
+    }
+
+    #[cfg(feature = "ctl")]
+    #[test]
+    fn full_validation_authenticode_signature_with_well_known_ca() {
+        let pkcs7 = "-----BEGIN PKCS7-----\
+                        MIIjkgYJKoZIhvcNAQcCoIIjgzCCI38CAQExDzANBglghkgBZQMEAgEFADB5Bgor\
+                        BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG\
+                        KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCBOlmcSb72K+wH5\
+                        7rgEoyM/xepQH0ZFeACdfeWgW6yh06CCDYEwggX/MIID56ADAgECAhMzAAABh3IX\
+                        chVZQMcJAAAAAAGHMA0GCSqGSIb3DQEBCwUAMH4xCzAJBgNVBAYTAlVTMRMwEQYD\
+                        VQQIEwpXYXNoaW5ndG9uMRAwDgYDVQQHEwdSZWRtb25kMR4wHAYDVQQKExVNaWNy\
+                        b3NvZnQgQ29ycG9yYXRpb24xKDAmBgNVBAMTH01pY3Jvc29mdCBDb2RlIFNpZ25p\
+                        bmcgUENBIDIwMTEwHhcNMjAwMzA0MTgzOTQ3WhcNMjEwMzAzMTgzOTQ3WjB0MQsw\
+                        CQYDVQQGEwJVUzETMBEGA1UECBMKV2FzaGluZ3RvbjEQMA4GA1UEBxMHUmVkbW9u\
+                        ZDEeMBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMR4wHAYDVQQDExVNaWNy\
+                        b3NvZnQgQ29ycG9yYXRpb24wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIB\
+                        AQDOt8kLc7P3T7MKIhouYHewMFmnq8Ayu7FOhZCQabVwBp2VS4WyB2Qe4TQBT8aB\
+                        znANDEPjHKNdPT8Xz5cNali6XHefS8i/WXtF0vSsP8NEv6mBHuA2p1fw2wB/F0dH\
+                        sJ3GfZ5c0sPJjklsiYqPw59xJ54kM91IOgiO2OUzjNAljPibjCWfH7UzQ1TPHc4d\
+                        weils8GEIrbBRb7IWwiObL12jWT4Yh71NQgvJ9Fn6+UhD9x2uk3dLj84vwt1NuFQ\
+                        itKJxIV0fVsRNR3abQVOLqpDugbr0SzNL6o8xzOHL5OXiGGwg6ekiXA1/2XXY7yV\
+                        Fc39tledDtZjSjNbex1zzwSXAgMBAAGjggF+MIIBejAfBgNVHSUEGDAWBgorBgEE\
+                        AYI3TAgBBggrBgEFBQcDAzAdBgNVHQ4EFgQUhov4ZyO96axkJdMjpzu2zVXOJcsw\
+                        UAYDVR0RBEkwR6RFMEMxKTAnBgNVBAsTIE1pY3Jvc29mdCBPcGVyYXRpb25zIFB1\
+                        ZXJ0byBSaWNvMRYwFAYDVQQFEw0yMzAwMTIrNDU4Mzg1MB8GA1UdIwQYMBaAFEhu\
+                        ZOVQBdOCqhc3NyK1bajKdQKVMFQGA1UdHwRNMEswSaBHoEWGQ2h0dHA6Ly93d3cu\
+                        bWljcm9zb2Z0LmNvbS9wa2lvcHMvY3JsL01pY0NvZFNpZ1BDQTIwMTFfMjAxMS0w\
+                        Ny0wOC5jcmwwYQYIKwYBBQUHAQEEVTBTMFEGCCsGAQUFBzAChkVodHRwOi8vd3d3\
+                        Lm1pY3Jvc29mdC5jb20vcGtpb3BzL2NlcnRzL01pY0NvZFNpZ1BDQTIwMTFfMjAx\
+                        MS0wNy0wOC5jcnQwDAYDVR0TAQH/BAIwADANBgkqhkiG9w0BAQsFAAOCAgEAixmy\
+                        S6E6vprWD9KFNIB9G5zyMuIjZAOuUJ1EK/Vlg6Fb3ZHXjjUwATKIcXbFuFC6Wr4K\
+                        NrU4DY/sBVqmab5AC/je3bpUpjtxpEyqUqtPc30wEg/rO9vmKmqKoLPT37svc2NV\
+                        BmGNl+85qO4fV/w7Cx7J0Bbqk19KcRNdjt6eKoTnTPHBHlVHQIHZpMxacbFOAkJr\
+                        qAVkYZdz7ikNXTxV+GRb36tC4ByMNxE2DF7vFdvaiZP0CVZ5ByJ2gAhXMdK9+usx\
+                        zVk913qKde1OAuWdv+rndqkAIm8fUlRnr4saSCg7cIbUwCCf116wUJ7EuJDg0vHe\
+                        yhnCeHnBbyH3RZkHEi2ofmfgnFISJZDdMAeVZGVOh20Jp50XBzqokpPzeZ6zc1/g\
+                        yILNyiVgE+RPkjnUQshd1f1PMgn3tns2Cz7bJiVUaqEO3n9qRFgy5JuLae6UweGf\
+                        AeOo3dgLZxikKzYs3hDMaEtJq8IP71cX7QXe6lnMmXU/Hdfz2p897Zd+kU+vZvKI\
+                        3cwLfuVQgK2RZ2z+Kc3K3dRPz2rXycK5XCuRZmvGab/WbrZiC7wJQapgBodltMI5\
+                        GMdFrBg9IeF7/rP4EqVQXeKtevTlZXjpuNhhjuR+2DMt/dWufjXpiW91bo3aH6Ea\
+                        jOALXmoxgltCp1K7hrS6gmsvj94cLRf50QQ4U8Qwggd6MIIFYqADAgECAgphDpDS\
+                        AAAAAAADMA0GCSqGSIb3DQEBCwUAMIGIMQswCQYDVQQGEwJVUzETMBEGA1UECBMK\
+                        V2FzaGluZ3RvbjEQMA4GA1UEBxMHUmVkbW9uZDEeMBwGA1UEChMVTWljcm9zb2Z0\
+                        IENvcnBvcmF0aW9uMTIwMAYDVQQDEylNaWNyb3NvZnQgUm9vdCBDZXJ0aWZpY2F0\
+                        ZSBBdXRob3JpdHkgMjAxMTAeFw0xMTA3MDgyMDU5MDlaFw0yNjA3MDgyMTA5MDla\
+                        MH4xCzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpXYXNoaW5ndG9uMRAwDgYDVQQHEwdS\
+                        ZWRtb25kMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xKDAmBgNVBAMT\
+                        H01pY3Jvc29mdCBDb2RlIFNpZ25pbmcgUENBIDIwMTEwggIiMA0GCSqGSIb3DQEB\
+                        AQUAA4ICDwAwggIKAoICAQCr8PpyEBwurdhuqoIQTTS68rZYIZ9CGypr6VpQqrgG\
+                        OBoESbp/wwwe3TdrxhLYC/A4wpkGsMg51QEUMULTiQ15ZId+lGAkbK+eSZzpaF7S\
+                        35tTsgosw6/ZqSuuegmv15ZZymAaBelmdugyUiYSL+erCFDPs0S3XdjELgN1q2jz\
+                        y23zOlyhFvRGuuA4ZKxuZDV4pqBjDy3TQJP4494HDdVceaVJKecNvqATd76UPe/7\
+                        4ytaEB9NViiienLgEjq3SV7Y7e1DkYPZe7J7hhvZPrGMXeiJT4Qa8qEvWeSQOy2u\
+                        M1jFtz7+MtOzAz2xsq+SOH7SnYAs9U5WkSE1JcM5bmR/U7qcD60ZI4TL9LoDho33\
+                        X/DQUr+MlIe8wCF0JV8YKLbMJyg4JZg5SjbPfLGSrhwjp6lm7GEfauEoSZ1fiOIl\
+                        XdMhSz5SxLVXPyQD8NF6Wy/VI+NwXQ9RRnez+ADhvKwCgl/bwBWzvRvUVUvnOaEP\
+                        6SNJvBi4RHxF5MHDcnrgcuck379GmcXvwhxX24ON7E1JMKerjt/sW5+v/N2wZuLB\
+                        l4F77dbtS+dJKacTKKanfWeA5opieF+yL4TXV5xcv3coKPHtbcMojyyPQDdPweGF\
+                        RInECUzF1KVDL3SV9274eCBYLBNdYJWaPk8zhNqwiBfenk70lrC8RqBsmNLg1oiM\
+                        CwIDAQABo4IB7TCCAekwEAYJKwYBBAGCNxUBBAMCAQAwHQYDVR0OBBYEFEhuZOVQ\
+                        BdOCqhc3NyK1bajKdQKVMBkGCSsGAQQBgjcUAgQMHgoAUwB1AGIAQwBBMAsGA1Ud\
+                        DwQEAwIBhjAPBgNVHRMBAf8EBTADAQH/MB8GA1UdIwQYMBaAFHItOgIxkEO5FAVO\
+                        4eqnxzHRI4k0MFoGA1UdHwRTMFEwT6BNoEuGSWh0dHA6Ly9jcmwubWljcm9zb2Z0\
+                        LmNvbS9wa2kvY3JsL3Byb2R1Y3RzL01pY1Jvb0NlckF1dDIwMTFfMjAxMV8wM18y\
+                        Mi5jcmwwXgYIKwYBBQUHAQEEUjBQME4GCCsGAQUFBzAChkJodHRwOi8vd3d3Lm1p\
+                        Y3Jvc29mdC5jb20vcGtpL2NlcnRzL01pY1Jvb0NlckF1dDIwMTFfMjAxMV8wM18y\
+                        Mi5jcnQwgZ8GA1UdIASBlzCBlDCBkQYJKwYBBAGCNy4DMIGDMD8GCCsGAQUFBwIB\
+                        FjNodHRwOi8vd3d3Lm1pY3Jvc29mdC5jb20vcGtpb3BzL2RvY3MvcHJpbWFyeWNw\
+                        cy5odG0wQAYIKwYBBQUHAgIwNB4yIB0ATABlAGcAYQBsAF8AcABvAGwAaQBjAHkA\
+                        XwBzAHQAYQB0AGUAbQBlAG4AdAAuIB0wDQYJKoZIhvcNAQELBQADggIBAGfyhqWY\
+                        4FR5Gi7T2HRnIpsLlhHhY5KZQpZ90nkMkMFlXy4sPvjDctFtg/6+P+gKyju/R6mj\
+                        82nbY78iNaWXXWWEkH2LRlBV2AySfNIaSxzzPEKLUtCw/WvjPgcuKZvmPRul1LUd\
+                        d5Q54ulkyUQ9eHoj8xN9ppB0g430yyYCRirCihC7pKkFDJvtaPpoLpWgKj8qa1hJ\
+                        Yx8JaW5amJbkg/TAj/NGK978O9C9Ne9uJa7lryft0N3zDq+ZKJeYTQ49C/IIidYf\
+                        wzIY4vDFLc5bnrRJOQrGCsLGra7lstnbFYhRRVg4MnEnGn+x9Cf43iw6IGmYslmJ\
+                        aG5vp7d0w0AFBqYBKig+gj8TTWYLwLNN9eGPfxxvFX1Fp3blQCplo8NdUmKGwx1j\
+                        NpeG39rz+PIWoZon4c2ll9DuXWNB41sHnIc+BncG0QaxdR8UvmFhtfDcxhsEvt9B\
+                        xw4o7t5lL+yX9qFcltgA1qFGvVnzl6UJS0gQmYAf0AApxbGbpT9Fdx41xtKiop96\
+                        eiL6SJUfq/tHI4D1nvi/a7dLl+LrdXga7Oo3mXkYS//WsyNodeav+vyL6wuA6mk7\
+                        r/ww7QRMjt/fdW1jkT3RnVZOT7+AVyKheBEyIXrvQQqxP/uozKRdwaGIm1dxVk5I\
+                        RcBCyZt2WwqASGv9eZ/BvW1taslScxMNelDNMYIVZzCCFWMCAQEwgZUwfjELMAkG\
+                        A1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1vbmQx\
+                        HjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjEoMCYGA1UEAxMfTWljcm9z\
+                        b2Z0IENvZGUgU2lnbmluZyBQQ0EgMjAxMQITMwAAAYdyF3IVWUDHCQAAAAABhzAN\
+                        BglghkgBZQMEAgEFAKCBrjAZBgkqhkiG9w0BCQMxDAYKKwYBBAGCNwIBBDAcBgor\
+                        BgEEAYI3AgELMQ4wDAYKKwYBBAGCNwIBFTAvBgkqhkiG9w0BCQQxIgQgSI3mmyEc\
+                        XjWLEpbhWFEEl6gPBJhjiWhxF4WcneiXnlYwQgYKKwYBBAGCNwIBDDE0MDKgFIAS\
+                        AE0AaQBjAHIAbwBzAG8AZgB0oRqAGGh0dHA6Ly93d3cubWljcm9zb2Z0LmNvbTAN\
+                        BgkqhkiG9w0BAQEFAASCAQCyr15gPEMGURRpVeQjtCEpn9waDuDlkW11PiBt2A/j\
+                        PdbhN4JupkncXgZtKt29s1usM8p+bSTkao5bpeIEV5UEMxgbsaxUCipxNki+z7LW\
+                        KmFzviTsUU1/CqSJ2EKZdhQENUtpmgOr0D/CHTbbAVSpiVcfQuZI8hWulziFVqRE\
+                        4xGCR/sKOfQ1DT2DiOwlbf6tmceD04QaDlioZ8SVXTEvlP36a5rv8tmyw9lkkBgV\
+                        B824Xh0H8CrqajF+x9zR9CjBox4Y/bf3Oe1Pir6k5IT7ZEkSQ9XRJfaNNm42i/9h\
+                        IUPesYs9gr0zXJdxlri7Y2PPkphB9JQ+k+wa20nxBBIDoYIS8TCCEu0GCisGAQQB\
+                        gjcDAwExghLdMIIS2QYJKoZIhvcNAQcCoIISyjCCEsYCAQMxDzANBglghkgBZQME\
+                        AgEFADCCAVUGCyqGSIb3DQEJEAEEoIIBRASCAUAwggE8AgEBBgorBgEEAYRZCgMB\
+                        MDEwDQYJYIZIAWUDBAIBBQAEIPeHx1THLsARquah0ml1x5Wutabkis4dsFKSE3WJ\
+                        HwZlAgZfYPphXw0YEzIwMjAwOTIyMjIxOTUzLjI1NVowBIACAfSggdSkgdEwgc4x\
+                        CzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpXYXNoaW5ndG9uMRAwDgYDVQQHEwdSZWRt\
+                        b25kMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xKTAnBgNVBAsTIE1p\
+                        Y3Jvc29mdCBPcGVyYXRpb25zIFB1ZXJ0byBSaWNvMSYwJAYDVQQLEx1UaGFsZXMg\
+                        VFNTIEVTTjowQTU2LUUzMjktNEQ0RDElMCMGA1UEAxMcTWljcm9zb2Z0IFRpbWUt\
+                        U3RhbXAgU2VydmljZaCCDkQwggT1MIID3aADAgECAhMzAAABJy9uo++RqBmoAAAA\
+                        AAEnMA0GCSqGSIb3DQEBCwUAMHwxCzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpXYXNo\
+                        aW5ndG9uMRAwDgYDVQQHEwdSZWRtb25kMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29y\
+                        cG9yYXRpb24xJjAkBgNVBAMTHU1pY3Jvc29mdCBUaW1lLVN0YW1wIFBDQSAyMDEw\
+                        MB4XDTE5MTIxOTAxMTQ1OVoXDTIxMDMxNzAxMTQ1OVowgc4xCzAJBgNVBAYTAlVT\
+                        MRMwEQYDVQQIEwpXYXNoaW5ndG9uMRAwDgYDVQQHEwdSZWRtb25kMR4wHAYDVQQK\
+                        ExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xKTAnBgNVBAsTIE1pY3Jvc29mdCBPcGVy\
+                        YXRpb25zIFB1ZXJ0byBSaWNvMSYwJAYDVQQLEx1UaGFsZXMgVFNTIEVTTjowQTU2\
+                        LUUzMjktNEQ0RDElMCMGA1UEAxMcTWljcm9zb2Z0IFRpbWUtU3RhbXAgU2Vydmlj\
+                        ZTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAPgB3nERnk6fS40vvWeD\
+                        3HCgM9Ep4xTIQiPnJXE9E+HkZVtTsPemoOyhfNAyF95E/rUvXOVTUcJFL7Xb16jT\
+                        KPXONsCWY8DCixSDIiid6xa30TiEWVcIZRwiDlcx29D467OTav5rA1G6TwAEY5rQ\
+                        jhUHLrOoJgfJfakZq6IHjd+slI0/qlys7QIGakFk2OB6mh/ln/nS8G4kNRK6Do4g\
+                        xDtnBSFLNfhsSZlRSMDJwFvrZ2FCkaoexd7rKlUNOAAScY411IEqQeI1PwfRm3aW\
+                        bS8IvAfJPC2Ah2LrtP8sKn5faaU8epexje7vZfcZif/cbxgUKStJzqbdvTBNc93n\
+                        /Z8CAwEAAaOCARswggEXMB0GA1UdDgQWBBTl9JZVgF85MSRbYlOJXbhY022V8jAf\
+                        BgNVHSMEGDAWgBTVYzpcijGQ80N7fEYbxTNoWoVtVTBWBgNVHR8ETzBNMEugSaBH\
+                        hkVodHRwOi8vY3JsLm1pY3Jvc29mdC5jb20vcGtpL2NybC9wcm9kdWN0cy9NaWNU\
+                        aW1TdGFQQ0FfMjAxMC0wNy0wMS5jcmwwWgYIKwYBBQUHAQEETjBMMEoGCCsGAQUF\
+                        BzAChj5odHRwOi8vd3d3Lm1pY3Jvc29mdC5jb20vcGtpL2NlcnRzL01pY1RpbVN0\
+                        YVBDQV8yMDEwLTA3LTAxLmNydDAMBgNVHRMBAf8EAjAAMBMGA1UdJQQMMAoGCCsG\
+                        AQUFBwMIMA0GCSqGSIb3DQEBCwUAA4IBAQAKyo180VXHBqVnjZwQy7NlzXbo2+W5\
+                        qfHxR7ANV5RBkRkdGamkwUcDNL+DpHObFPJHa0oTeYKE0Zbl1MvvfS8RtGGdhGYG\
+                        CJf+BPd/gBCs4+dkZdjvOzNyuVuDPGlqQ5f7HS7iuQ/cCyGHcHYJ0nXVewF2Lk+J\
+                        lrWykHpTlLwPXmCpNR+gieItPi/UMF2RYTGwojW+yIVwNyMYnjFGUxEX5/DtJjRZ\
+                        mg7PBHMrENN2DgO6wBelp4ptyH2KK2EsWT+8jFCuoKv+eJby0QD55LN5f8SrUPRn\
+                        K86fh7aVOfCglQofo5ABZIGiDIrg4JsV4k6p0oBSIFOAcqRAhiH+1spCMIIGcTCC\
+                        BFmgAwIBAgIKYQmBKgAAAAAAAjANBgkqhkiG9w0BAQsFADCBiDELMAkGA1UEBhMC\
+                        VVMxEzARBgNVBAgTCldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1vbmQxHjAcBgNV\
+                        BAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjEyMDAGA1UEAxMpTWljcm9zb2Z0IFJv\
+                        b3QgQ2VydGlmaWNhdGUgQXV0aG9yaXR5IDIwMTAwHhcNMTAwNzAxMjEzNjU1WhcN\
+                        MjUwNzAxMjE0NjU1WjB8MQswCQYDVQQGEwJVUzETMBEGA1UECBMKV2FzaGluZ3Rv\
+                        bjEQMA4GA1UEBxMHUmVkbW9uZDEeMBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0\
+                        aW9uMSYwJAYDVQQDEx1NaWNyb3NvZnQgVGltZS1TdGFtcCBQQ0EgMjAxMDCCASIw\
+                        DQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAKkdDbx3EYo6IOz8E5f1+n9plGt0\
+                        VBDVpQoAgoX77XxoSyxfxcPlYcJ2tz5mK1vwFVMnBDEfQRsalR3OCROOfGEwWbEw\
+                        RA/xYIiEVEMM1024OAizQt2TrNZzMFcmgqNFDdDq9UeBzb8kYDJYYEbyWEeGMoQe\
+                        dGFnkV+BVLHPk0ySwcSmXdFhE24oxhr5hoC732H8RsEnHSRnEnIaIYqvS2SJUGKx\
+                        Xf13Hz3wV3WsvYpCTUBR0Q+cBj5nf/VmwAOWRH7v0Ev9buWayrGo8noqCjHw2k4G\
+                        kbaICDXoeByw6ZnNPOcvRLqn9NxkvaQBwSAJk3jN/LzAyURdXhacAQVPIk0CAwEA\
+                        AaOCAeYwggHiMBAGCSsGAQQBgjcVAQQDAgEAMB0GA1UdDgQWBBTVYzpcijGQ80N7\
+                        fEYbxTNoWoVtVTAZBgkrBgEEAYI3FAIEDB4KAFMAdQBiAEMAQTALBgNVHQ8EBAMC\
+                        AYYwDwYDVR0TAQH/BAUwAwEB/zAfBgNVHSMEGDAWgBTV9lbLj+iiXGJo0T2UkFvX\
+                        zpoYxDBWBgNVHR8ETzBNMEugSaBHhkVodHRwOi8vY3JsLm1pY3Jvc29mdC5jb20v\
+                        cGtpL2NybC9wcm9kdWN0cy9NaWNSb29DZXJBdXRfMjAxMC0wNi0yMy5jcmwwWgYI\
+                        KwYBBQUHAQEETjBMMEoGCCsGAQUFBzAChj5odHRwOi8vd3d3Lm1pY3Jvc29mdC5j\
+                        b20vcGtpL2NlcnRzL01pY1Jvb0NlckF1dF8yMDEwLTA2LTIzLmNydDCBoAYDVR0g\
+                        AQH/BIGVMIGSMIGPBgkrBgEEAYI3LgMwgYEwPQYIKwYBBQUHAgEWMWh0dHA6Ly93\
+                        d3cubWljcm9zb2Z0LmNvbS9QS0kvZG9jcy9DUFMvZGVmYXVsdC5odG0wQAYIKwYB\
+                        BQUHAgIwNB4yIB0ATABlAGcAYQBsAF8AUABvAGwAaQBjAHkAXwBTAHQAYQB0AGUA\
+                        bQBlAG4AdAAuIB0wDQYJKoZIhvcNAQELBQADggIBAAfmiFEN4sbgmD+BcQM9naOh\
+                        IW+z66bM9TG+zwXiqf76V20ZMLPCxWbJat/15/B4vceoniXj+bzta1RXCCtRgkQS\
+                        +7lTjMz0YBKKdsxAQEGb3FwX/1z5Xhc1mCRWS3TvQhDIr79/xn/yN31aPxzymXlK\
+                        kVIArzgPF/UveYFl2am1a+THzvbKegBvSzBEJCI8z+0DpZaPWSm8tv0E4XCfMkon\
+                        /VWvL/625Y4zu2JfmttXQOnxzplmkIz/amJ/3cVKC5Em4jnsGUpxY517IW3DnKOi\
+                        PPp/fZZqkHimbdLhnPkd/DjYlPTGpQqWhqS9nhquBEKDuLWAmyI4ILUl5WTs9/S/\
+                        fmNZJQ96LjlXdqJxqgaKD4kWumGnEcua2A5HmoDF0M2n0O99g/DhO3EJ3110mCII\
+                        YdqwUB5vvfHhAN/nMQekkzr3ZUd46PioSKv33nJ+YWtvd6mBy6cJrDm77MbL2IK0\
+                        cs0d9LiFAR6A+xuJKlQ5slvayA1VmXqHczsI5pgt6o3gMy4SKfXAL1QnIffIrE7a\
+                        KLixqduWsqdCosnPGUFN4Ib5KpqjEWYw07t0MkvfY3v1mYovG8chr1m1rtxEPJdQ\
+                        cdeh0sVV42neV8HR3jDA/czmTfsNv11P6Z0eGTgvvM9YBS7vDaBQNdrvCScc1bN+\
+                        NR4Iuto229Nfj950iEkSoYIC0jCCAjsCAQEwgfyhgdSkgdEwgc4xCzAJBgNVBAYT\
+                        AlVTMRMwEQYDVQQIEwpXYXNoaW5ndG9uMRAwDgYDVQQHEwdSZWRtb25kMR4wHAYD\
+                        VQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xKTAnBgNVBAsTIE1pY3Jvc29mdCBP\
+                        cGVyYXRpb25zIFB1ZXJ0byBSaWNvMSYwJAYDVQQLEx1UaGFsZXMgVFNTIEVTTjow\
+                        QTU2LUUzMjktNEQ0RDElMCMGA1UEAxMcTWljcm9zb2Z0IFRpbWUtU3RhbXAgU2Vy\
+                        dmljZaIjCgEBMAcGBSsOAwIaAxUAs5W4TmyDHMRM7iz6mgGojqvXHzOggYMwgYCk\
+                        fjB8MQswCQYDVQQGEwJVUzETMBEGA1UECBMKV2FzaGluZ3RvbjEQMA4GA1UEBxMH\
+                        UmVkbW9uZDEeMBwGA1UEChMVTWljcm9zb2Z0IENvcnBvcmF0aW9uMSYwJAYDVQQD\
+                        Ex1NaWNyb3NvZnQgVGltZS1TdGFtcCBQQ0EgMjAxMDANBgkqhkiG9w0BAQUFAAIF\
+                        AOMUsu8wIhgPMjAyMDA5MjIyMTI5MTlaGA8yMDIwMDkyMzIxMjkxOVowdzA9Bgor\
+                        BgEEAYRZCgQBMS8wLTAKAgUA4xSy7wIBADAKAgEAAgIVPgIB/zAHAgEAAgIRtjAK\
+                        AgUA4xYEbwIBADA2BgorBgEEAYRZCgQCMSgwJjAMBgorBgEEAYRZCgMCoAowCAIB\
+                        AAIDB6EgoQowCAIBAAIDAYagMA0GCSqGSIb3DQEBBQUAA4GBAEMD4esQRMLwQdhk\
+                        Co1zgvmclcwl3lYYpk1oMh1ndsU3+97Rt6FV3adS4Hezc/K94oQKjcxtMVzLzQhG\
+                        agM6XlqB31VD8n2nxVuaWD1yp2jm/0IvfL9nFMHJRhgANMiBdHqvqNrd86c/Kryq\
+                        sI0Ch0sOx9wg3BozzqQhmdNjf9c6MYIDDTCCAwkCAQEwgZMwfDELMAkGA1UEBhMC\
+                        VVMxEzARBgNVBAgTCldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1vbmQxHjAcBgNV\
+                        BAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlvbjEmMCQGA1UEAxMdTWljcm9zb2Z0IFRp\
+                        bWUtU3RhbXAgUENBIDIwMTACEzMAAAEnL26j75GoGagAAAAAAScwDQYJYIZIAWUD\
+                        BAIBBQCgggFKMBoGCSqGSIb3DQEJAzENBgsqhkiG9w0BCRABBDAvBgkqhkiG9w0B\
+                        CQQxIgQgcyC5Zi6T5dXlcj+V9kHGOarq/wFRtxNkp+J8JwTtAV0wgfoGCyqGSIb3\
+                        DQEJEAIvMYHqMIHnMIHkMIG9BCAbkuhLEoYdahb/BUyVszO2VDi6kB3MSaof/+8u\
+                        7SM+IjCBmDCBgKR+MHwxCzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpXYXNoaW5ndG9u\
+                        MRAwDgYDVQQHEwdSZWRtb25kMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRp\
+                        b24xJjAkBgNVBAMTHU1pY3Jvc29mdCBUaW1lLVN0YW1wIFBDQSAyMDEwAhMzAAAB\
+                        Jy9uo++RqBmoAAAAAAEnMCIEIK4r6N3NISekswMCG1kSBJCCCePrlLDQWbMKz0wt\
+                        Lj6CMA0GCSqGSIb3DQEBCwUABIIBAASNHnbCvOgFNv5zwj0UKuGscSrC0R2GxT2p\
+                        H6E/QlYix36uklxd1YSqolAA30q/2BQg23N75wfA8chIgOMnaRslF9uk/oKxKHAK\
+                        WezF5wx3Qoc08MJmgBQ+f/vkMUr05JIoSjgCVhlnQbO7S+aqV9ZFPDcO6IzlrmiA\
+                        okZONeswosfnv1puWHRUhFJx6v3L1y+YKrRfhytDIIw1biSQ/VTO8Wnf06H0miJC\
+                        1VLKNa5p8Uwx4tsWz6RvIhztN/wvOo5yUoXR55DLKUMAp283TM4A3n6exf7iEb5N\
+                        4jvlHkA6au1Uan+buR92YRqCvyUjqSzSJZo7w3NwLUM6GdFUIY0=\
+                        -----END PKCS7-----";
+
+        let authenticode_signature = AuthenticodeSignature::from_pem_str(pkcs7).unwrap();
+        let validation_result = authenticode_signature
+            .authenticode_verifier()
+            .require_basic_authenticode_validation()
+            .require_signing_certificate_check()
+            .exact_date(&UTCDate::new(2021, 3, 3, 18, 39, 47).unwrap())
+            .require_not_after_check()
+            .require_not_before_check()
+            .require_ca_against_ctl_check()
+            .verify()
+            .unwrap();
+
+        assert!(true)
+    }
+
+    #[cfg(feature = "ctl")]
+    #[test]
+    fn full_validatiom_self_signed_authenticode_signature_with_only_leaf_certificate() {
+        let pkcs7 = "-----BEGIN PKCS7-----\
+                            MIIDpQYJKoZIhvcNAQcCoIIDljCCA5ICAQExADALBgkqhkiG9w0BBwGgggN4MIID\
+                            dDCCAlygAwIBAgIUcSw2pEU1K7Rx7HKPuFsl13pPmqswDQYJKoZIhvcNAQELBQAw\
+                            YTELMAkGA1UEBhMCTGYxCzAJBgNVBAgMAkxmMQswCQYDVQQHDAJMZjELMAkGA1UE\
+                            CgwCTGYxCzAJBgNVBAsMAkxmMQswCQYDVQQDDAJMZjERMA8GCSqGSIb3DQEJARYC\
+                            TGYwHhcNMjEwNzA5MDc0ODAzWhcNMjIwNzA5MDc0ODAzWjBhMQswCQYDVQQGEwJM\
+                            ZjELMAkGA1UECAwCTGYxCzAJBgNVBAcMAkxmMQswCQYDVQQKDAJMZjELMAkGA1UE\
+                            CwwCTGYxCzAJBgNVBAMMAkxmMREwDwYJKoZIhvcNAQkBFgJMZjCCASIwDQYJKoZI\
+                            hvcNAQEBBQADggEPADCCAQoCggEBAL3QP2wc675k7OgE/hvPuXebUThBha9LWKyw\
+                            3n9tdVEWDbFR7jmmE5W4AHOoqp6ha6YspGY+muP0cprfuIIts4/A7BS/3y7B+a1M\
+                            BjAa1mOqlR4WPluKSGQIjbaiyexv2ApazXeurcf2Zg+enFhZBi0WnPDKOp8e8jJv\
+                            DUBOBSplrPCVBTmZGaYclzxlBlkuMAlHgEuektG3keaPTCPwuCBEwaClBOH6PV1Z\
+                            EUBHUv075vISgr0XOdRblZDd5p+71+XMany2+SxKyNLUnDlUgjFoZOWvlTpi/MX8\
+                            VRV47AzsTRUTqPzPNZNpeyzUW9/LAtZ8zRE3z+4h2bLQ8uJTeoECAwEAAaMkMCIw\
+                            CwYDVR0PBAQDAgG2MBMGA1UdJQQMMAoGCCsGAQUFBwMDMA0GCSqGSIb3DQEBCwUA\
+                            A4IBAQChcBmq/tk4rQOaRprgAORssL9JiZ1Gn4QcKHgeZBhif1I6vebtmjVIneMc\
+                            a9wWMavWohlUbTHF4GrMbUIyos31XJz0V03Uhdrssm4BZIZuSzv+P3/Vl3w4KNaA\
+                            QKSKxKN9dBf4Vok/k4K2tXWuccyI4GzmMAjgvhhSGYuICsHDr2ra8hYZWE8TLGDD\
+                            d3V21Ep/DwQt2dZacmkv1ElUbTWBkucY+jF3Icatri/LccADIbtFta80ImTP+9rR\
+                            uH/s5ZIoC65hhTv5KmYMqrlmnbuh/UcRe7+z7bV4ccZFkaxh/CbWvmcvvWOQGcUk\
+                            25zo8SQ4e71ceN4HQ8x8anHoAT23oQAxAA==\
+                            -----END PKCS7-----";
+
+        let private_key = "-----BEGIN RSA PRIVATE KEY-----\
+                                MIIEowIBAAKCAQEAvdA/bBzrvmTs6AT+G8+5d5tROEGFr0tYrLDef211URYNsVHu\
+                                OaYTlbgAc6iqnqFrpiykZj6a4/Rymt+4gi2zj8DsFL/fLsH5rUwGMBrWY6qVHhY+\
+                                W4pIZAiNtqLJ7G/YClrNd66tx/ZmD56cWFkGLRac8Mo6nx7yMm8NQE4FKmWs8JUF\
+                                OZkZphyXPGUGWS4wCUeAS56S0beR5o9MI/C4IETBoKUE4fo9XVkRQEdS/Tvm8hKC\
+                                vRc51FuVkN3mn7vX5cxqfLb5LErI0tScOVSCMWhk5a+VOmL8xfxVFXjsDOxNFROo\
+                                /M81k2l7LNRb38sC1nzNETfP7iHZstDy4lN6gQIDAQABAoIBAFHFSd1AZEqkXe7i\
+                                X7oJdePR9F5g07+dnPjgRSnuNLEW6BUwr4kEQ8GnAALTcZVfAuoWp0goxj9Xyptv\
+                                r6PdHlLakJmrwvD4vZ/rdWr51Mwg65aHjJuQ6fi2Op6oaIbD8/UaAxQBG3pear9l\
+                                3AKvb1qzOC7/X9u20C3r63B9a/pEDxVHLiZ64EEX0io2P81byOzs0LEdD7/6BaFK\
+                                md8IWUuzm2KMmV2fNqPMi0B0r1ipPXGewuLhonpcfcLGh/tWflKgeiTYPjQC+tcS\
+                                7/qzSXckrfF3PzeAJQs+7FUqvsmvwtt35mOBiFo6GBEBtItkIQ7CVgtt6RupXDRZ\
+                                q3qWhcECgYEA4Bm6KsfGnyq5a0Jzyi9420+IBIoP8lLjlu1YFrg6aGuybgc089CH\
+                                OCPFzYV5faPHUGbBHdUaHXeCslBnFk8xwm5lhXtlykQQyOHTjIKm9mKGRqMDCeAz\
+                                ecL4GCk0bdTmSAT4Wl+1WVeZ2Wo+EZejENIvlFKvVUIMcrMQ8afzmZkCgYEA2NUX\
+                                6xrBuWtKxOExkW+0DxcuTLS6n4sB9KaSwG+6Hd7V7FtDQZ9CG8Qv3gL2h5o1odNI\
+                                uJxTWPzE8DTrLYv9c5XAmbcwBfcrAO3lYx5suxc7E+UkWtW8GM+Rgw73wYpXbAe/\
+                                rFb5dGVallDt4qZOS+KFobqSMc94LL5bZ0wliSkCgYAT5dTk1YYqPcXm4yiazCpD\
+                                9sTR+lw+HOP+U6adpc/x05YtNNCb0WkgL/TxMae+4xrgZa9B8dj2wtTE9mSg03lM\
+                                lTbIalN4aSDAZWS+Nh+TAt5/SRwM9W48onYa1xXDpsKnpGFUzOiyPRf4+Pj34Onm\
+                                pXL6DXlp7YpjaMjZXBtCCQKBgFVj7exveBUeNK6+BHhC5kT/GwOoNMp5wsZnBunz\
+                                1fbHd7WB50WjgzROGY+z2QRj7XUSMNRK8+Paf3AdVvRz6dcoBVZDtwzSXsQZ67kS\
+                                FT3Ek0ZtedivzUh0Ddjv/w/f/DeWAZzMD6cP9xG1Q0l7tt/ZkEi1obct/iSYvoQ6\
+                                j5mpAoGBAJFJkvjT4AYdgNvM150EyQmunujN7/pftL3gemexNYMMaDJC+xGBWr0o\
+                                xWsUrwNtiE7tqvOYYzPEdQ+cYt43aoWSe8w/WuveFVd/Cc0yX22PdyvZbJMBFsn/\
+                                y+mdkJ6H9jzIzXBDWTwRR8qCy2CPYMtPmnuE9x8UMv7m3uHoXnda\
+                                -----END RSA PRIVATE KEY-----";
+
+        let pkcs7 = Pkcs7::from_pem_str(pkcs7).unwrap();
+        let private_key = PrivateKey::from_pem_str(private_key).unwrap();
+
+        let authenticode_signature = AuthenticodeSignature::new(
+            pkcs7,
+            FILE_HASH.as_ref(),
+            ShaVariant::SHA2_256,
+            &private_key,
+            Some("validate_self_signed_authenticode_signature_with_only_leaf_certificate".to_string()),
+        )
+        .unwrap();
+
+        let ca_name = authenticode_signature.signing_certificate().unwrap().issuer_name();
+
+        let validator = authenticode_signature.authenticode_verifier();
+        let validation_result = validator
+            .require_basic_authenticode_validation()
+            .require_signing_certificate_check()
+            .interval_date(
+                &UTCDate::new(2020, 3, 4, 18, 39, 47).unwrap(),
+                &UTCDate::new(2021, 3, 3, 18, 39, 47).unwrap(),
+            )
+            .require_not_before_check()
+            .require_ca_against_ctl_check()
+            .exclude_cert_authorities(&[ca_name])
+            .verify();
+
+        assert!(validation_result.is_ok());
+    }
+
+    #[cfg(feature = "ctl")]
+    #[test]
+    fn full_validation_self_signed_authenticode_signature_with_root_and_leaf_certificate() {
+        let pkcs7 = "-----BEGIN PKCS7-----\
+                          MIIG6wYJKoZIhvcNAQcCoIIG3DCCBtgCAQExADALBgkqhkiG9w0BBwGggga+MIID\
+                          VTCCAj0CFCjdwv1V0L2iCEmXLgUMcYo5o9d2MA0GCSqGSIb3DQEBCwUAMG0xCzAJ\
+                          BgNVBAYTAlJ0MQ0wCwYDVQQIDARSb290MQ0wCwYDVQQHDARSb290MQ0wCwYDVQQK\
+                          DARSb290MQ0wCwYDVQQLDARSb290MQ0wCwYDVQQDDARSb290MRMwEQYJKoZIhvcN\
+                          AQkBFgRSb290MB4XDTIxMDcwOTA5NDIyNloXDTMxMDcwNzA5NDIyNlowYTELMAkG\
+                          A1UEBhMCTGYxCzAJBgNVBAgMAkxmMQswCQYDVQQHDAJMZjELMAkGA1UECgwCTGYx\
+                          CzAJBgNVBAsMAkxmMQswCQYDVQQDDAJMZjERMA8GCSqGSIb3DQEJARYCTGYwggEi\
+                          MA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDjyUE74hwG4xhqw8g13ARxMY2t\
+                          2e9js4kSQGBWkRbs+qLPPl1XYe8Wj54WsFNi4sqH8V0jJaLAXs2heLf+JLWW2/y3\
+                          dcA6tgyNO3rCD8CXIuHhisf5qspHJny0wVOt+7ZaGJmFwA27X+E0eDf74lj+WnUe\
+                          Bk6uIckvvoPj81N8mFkfF4r5FRjVA4Pvj8+PJvqJlE952386PSIMdwQpLTAX/REq\
+                          617SDfBdsVt0L7bG05ayJ8JOMrOIZZccMV4FsTzmo8QtiyGmNJnvyfFdxKsZj7//\
+                          lsLO3j7PKyQLGhepf2SfJf5/GxUThbu4H3Q2adfCH86n9gWUNqBVmB+b/fzvAgMB\
+                          AAEwDQYJKoZIhvcNAQELBQADggEBAAVmpeUsWP1OpBRXROmCwGsKuoLCE00aaJ2P\
+                          8dlbg0De6NVqRlHY6UNgEri75AAC/JiNNmrDVrJefASCsPQkrQRz3/bcVqJ2F8dz\
+                          cm7SktKC1jExPxUa9WbrzYIkNP4JIC9gvhBi5zw4IbocHJkVm8F6xL5XPxubsx0v\
+                          uw5yvkoimij7gNyp92aBda3VeAfBpLg6ZEo24O42x3vCnxvkMSUCAipXX8cVmjOP\
+                          8R75NFhtkyMnxkW3wSJjv3uFmBRI7ngRvuFxBaXImrGL/ekBf1lFnTvPdrXG2NWs\
+                          x9QKqzkKS51AaJFeLc9E0aLcBlYOlpvBBZjIQAgkpzMjUDaSXhswggNhMIICSQIU\
+                          SYIrOYeD84KqPtPl2sHKzaRitRUwDQYJKoZIhvcNAQELBQAwbTELMAkGA1UEBhMC\
+                          UnQxDTALBgNVBAgMBFJvb3QxDTALBgNVBAcMBFJvb3QxDTALBgNVBAoMBFJvb3Qx\
+                          DTALBgNVBAsMBFJvb3QxDTALBgNVBAMMBFJvb3QxEzARBgkqhkiG9w0BCQEWBFJv\
+                          b3QwHhcNMjEwNzA5MDk0MTU2WhcNNDgxMTI0MDk0MTU2WjBtMQswCQYDVQQGEwJS\
+                          dDENMAsGA1UECAwEUm9vdDENMAsGA1UEBwwEUm9vdDENMAsGA1UECgwEUm9vdDEN\
+                          MAsGA1UECwwEUm9vdDENMAsGA1UEAwwEUm9vdDETMBEGCSqGSIb3DQEJARYEUm9v\
+                          dDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBANzVvKN47S4eTbOBLZ3F\
+                          a5OlnjGmUxcITrCwyI4xjH6zHr0bES+70UuSA0oIpSF7NFHlBEO0sDuZHYH+5PpO\
+                          XvR+LCYWNsDtm6AbycKY0c2Wer02UcWa7nT7HgcLPvaujh4bztBq/lEXoo/TSLmQ\
+                          nq/WOl/683bgvq1EL9E3eFl4oP1h27h32Zm8HYOZa3trkiD05HuPynzljSDvx2KD\
+                          YZRtItJPdGr99NN8cfrL1vLh+7Q6tBRrrykxBtozy8QoHMjPjSxHhK9FFHxHK/pZ\
+                          tVGLe4tvXPwXw652xt36QC8N6sdDccWtpNYj/6LSPPhKeLzcuXUQa2jv9dKMpRjd\
+                          u6ECAwEAATANBgkqhkiG9w0BAQsFAAOCAQEAH9lovsbJSYRUOPg7CzaRbtfQi1pw\
+                          JOuUVNPK4FPElyrtwSl3WYveRcfeIk8UE8mbG31X4j6GJr05l/nk+9QJTVCzteOV\
+                          fdods3zP6R5kwinD6ceNX0bb8rjiaoisoBma1sja0ZtKL/bne+8ftaLCnV6swdtW\
+                          BkTdh/lYbNLmFEhHrhbRDxMbIpZUdaXPbL572hgy3SN/31KRVTQu34X8aXvzbyoL\
+                          hKaaOIlUSmd8PLCDSyqMdgtO+REqGk9zfzsLfTetJc3aB+V396zG1fSU2/wQ9V60\
+                          j7JgC7NMr5Tf1k4B9kepkd/dMWc5Ht/hZKmURAUvsIhkuux5ybfMaFlVn6EAMQA=\
+                          -----END PKCS7-----";
+
+        let private_key = "-----BEGIN PRIVATE KEY-----\
+                                MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDjyUE74hwG4xhq\
+                                w8g13ARxMY2t2e9js4kSQGBWkRbs+qLPPl1XYe8Wj54WsFNi4sqH8V0jJaLAXs2h\
+                                eLf+JLWW2/y3dcA6tgyNO3rCD8CXIuHhisf5qspHJny0wVOt+7ZaGJmFwA27X+E0\
+                                eDf74lj+WnUeBk6uIckvvoPj81N8mFkfF4r5FRjVA4Pvj8+PJvqJlE952386PSIM\
+                                dwQpLTAX/REq617SDfBdsVt0L7bG05ayJ8JOMrOIZZccMV4FsTzmo8QtiyGmNJnv\
+                                yfFdxKsZj7//lsLO3j7PKyQLGhepf2SfJf5/GxUThbu4H3Q2adfCH86n9gWUNqBV\
+                                mB+b/fzvAgMBAAECggEAdCWlrqwvkE9xntbvmo7ycOlMjc4nY5YjGXxb4ygeIX33\
+                                UGdDXxAfwkg+2uDT1ANCNCkdTZOeNirg/Sm538vGEANiDAXtm8JCCi2+/X7cu/Pc\
+                                a43BRAwTEk6MnfpJ+df0dmI+vdVc6yMLiR6XpUcYC7ICL+oVanLty/t/8taaxldO\
+                                BDcGw800d4oghU6Y7FNc+owq5qBiWCIAIrJmAWxbAAKFRrynMwOzZK8gb6+LC8Ta\
+                                m1o5Sp/Ns7zSQpem0xZLWzjeVC+1WBRNhAjdcU2Kd8bf1l9T/yvYe0+S7nboEy40\
+                                p1G/R53Gmasd2JubRcxjPTjqMV57SPHbwXiL5G1NAQKBgQD6fuszVHnqk6YD3yY1\
+                                R/IWm+wW+DMSdnSl0Wup7+/pgiX8ztmtooQbmytgFVghidcD4cqIZ1b+dS20x4lS\
+                                xH1FGkZm251Pj1o96bAfIPiDkji95CVdGtnNlrl60DCRFSPMC6othwF8fSJq12gm\
+                                KR1Ia1VuhvMzENFtyBhO/JaBgQKBgQDoypcv8jmwCdXdpwW6N2xYJo1zV8BVmDqg\
+                                83c18YwOTH/l035QkBxg5y8P12w+Bo6+7E3mUu2R2rdSMKqy9WoA7wM9LsQI5WPb\
+                                rDTaOfSY7bsrCWxuJjHXuGymKGml4XoEqGzVuzohMtahLCXvXJkq1yFYVfUFL52y\
+                                rTZqD3rWbwKBgQCQnugR6Yq9yOLHR3Vau5/kN781f7SUyzkLZv4ezb0YdqCR9aat\
+                                Xa+h9JM1VP1d16QAxMJWwDr0jBiIT89TrseYNtRAnDiVb3EtX5bkUffIlooV7/s2\
+                                ZsMqtAOACWSQzsCtFGr6///2rJRLVPP3XDNg1T8sodMVP3d6R1TpfWEzgQKBgHR5\
+                                wVHNGc4Z7bcctcHprz0f9RBsLKDnLRaRGumTtScGYcwFmSMIKBrYMXT0rYUPVOb0\
+                                ZznB7npW+/iUvyQRpPtYm79GIfHtjJxCOqOh8d9+u3KaIXWviKrN7RbqC4pjGeEw\
+                                wFvkdP5daIR2CXkNVNnZkCaZw6HXpEjdX+eLXUPjAoGAZKWs+nC6UXKFum9uAOmt\
+                                XthnLdKXQ0z4xodnu97c47Lu2yEB3JItBErLzMiiOOxJrX8zb0OkhbZinz58U6/K\
+                                oeKJRUzTxZKls3pWue14bXDvMHuPbkvDWDbFIfe4CpMNY1oJRwETxwLUBN9cmIMT\
+                                WdxXlTuB2WQxCuahLyJwWpw=\
+                                -----END PRIVATE KEY-----";
+
+        let pkcs7 = Pkcs7::from_pem_str(pkcs7).unwrap();
+        let private_key = PrivateKey::from_pem_str(private_key).unwrap();
+
+        let authenticate_signature =
+            AuthenticodeSignature::new(pkcs7, &FILE_HASH, ShaVariant::SHA2_256, &private_key, None).unwrap();
+
+        let ca_name = authenticate_signature.signing_certificate().unwrap().issuer_name();
+
+        let validator = authenticate_signature.authenticode_verifier();
+        let validator_result = validator
+            .require_basic_authenticode_validation()
+            .require_signing_certificate_check()
+            .exact_date(&UTCDate::new(2021, 9, 7, 12, 50, 40).unwrap())
+            .require_not_before_check()
+            .require_not_after_check()
+            .require_ca_against_ctl_check()
+            .exclude_cert_authorities(&[ca_name])
+            .verify();
+
+        assert!(validator_result.is_ok());
     }
 }

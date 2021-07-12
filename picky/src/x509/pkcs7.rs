@@ -81,10 +81,7 @@ impl Pkcs7 {
     }
 
     pub fn root_certificate(&self) -> Option<Cert> {
-        self.certificates()
-            .into_iter()
-            .map(Cert::from)
-            .find(|cert| cert.ty() == CertType::Root)
+        self.certificates().into_iter().find(|cert| cert.ty() == CertType::Root)
     }
 }
 

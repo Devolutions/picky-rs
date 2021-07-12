@@ -1,4 +1,5 @@
 use crate::oids;
+use oid::prelude::TryFrom;
 use oid::ObjectIdentifier;
 use picky_asn1::tag::{Tag, TagPeeker};
 use picky_asn1::wrapper::{IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1};
@@ -39,7 +40,7 @@ impl AlgorithmIdentifier {
         algorithm.eq(&self.algorithm.0)
     }
 
-    pub fn new_md5_with_rsa_encrypion() -> Self {
+    pub fn new_md5_with_rsa_encryption() -> Self {
         Self {
             algorithm: oids::md5_with_rsa_encryption().into(),
             parameters: AlgorithmIdentifierParameters::Null,
@@ -518,6 +519,32 @@ impl From<ShaVariant> for ObjectIdentifierAsn1 {
             ShaVariant::SHA3_512 => oids::sha3_512().into(),
             ShaVariant::SHAKE128 => oids::shake128().into(),
             ShaVariant::SHAKE256 => oids::shake256().into(),
+        }
+    }
+}
+
+impl TryFrom<ObjectIdentifierAsn1> for ShaVariant {
+    type Error = UnsupportedAlgorithmError;
+
+    fn try_from(oid: ObjectIdentifierAsn1) -> Result<Self, Self::Error> {
+        match Into::<String>::into(oid.0).as_str() {
+            oids::MD5 => Ok(ShaVariant::MD5),
+            oids::SHA1 => Ok(ShaVariant::SHA1),
+            oids::SHA224 => Ok(ShaVariant::SHA2_224),
+            oids::SHA256 => Ok(ShaVariant::SHA2_256),
+            oids::SHA384 => Ok(ShaVariant::SHA2_384),
+            oids::SHA512 => Ok(ShaVariant::SHA2_512),
+            oids::SHA512_224 => Ok(ShaVariant::SHA2_512_224),
+            oids::SHA512_256 => Ok(ShaVariant::SHA2_512_256),
+            oids::SHA3_224 => Ok(ShaVariant::SHA3_224),
+            oids::SHA3_256 => Ok(ShaVariant::SHA3_256),
+            oids::SHA3_384 => Ok(ShaVariant::SHA3_384),
+            oids::SHA3_512 => Ok(ShaVariant::SHA3_512),
+            oids::SHAKE128 => Ok(ShaVariant::SHAKE128),
+            oids::SHAKE256 => Ok(ShaVariant::SHAKE256),
+            unsupported => Err(UnsupportedAlgorithmError {
+                algorithm: unsupported.to_string(),
+            }),
         }
     }
 }

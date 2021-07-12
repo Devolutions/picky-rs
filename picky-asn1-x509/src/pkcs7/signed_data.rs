@@ -256,7 +256,7 @@ mod tests {
             digest_algorithms: DigestAlgorithmIdentifiers(Vec::new().into()),
             content_info,
             certificates: CertificateSet(vec![full_certificate]),
-            crls: Some(RevocationInfoChoices(Vec::new().into())),
+            crls: Some(RevocationInfoChoices(Vec::new())),
             signers_infos: SignersInfos(Vec::new().into()),
         };
 

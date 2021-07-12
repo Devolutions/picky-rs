@@ -69,7 +69,7 @@ impl TryFrom<&'_ AlgorithmIdentifier> for SignatureAlgorithm {
 impl From<SignatureAlgorithm> for AlgorithmIdentifier {
     fn from(ty: SignatureAlgorithm) -> Self {
         match ty {
-            SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::MD5) => AlgorithmIdentifier::new_md5_with_rsa_encrypion(),
+            SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::MD5) => AlgorithmIdentifier::new_md5_with_rsa_encryption(),
             SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA1) => AlgorithmIdentifier::new_sha1_with_rsa_encryption(),
             SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_224) => {
                 AlgorithmIdentifier::new_sha224_with_rsa_encryption()

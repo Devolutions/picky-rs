@@ -1,7 +1,7 @@
 use crate::cmsversion::CmsVersion;
 use crate::{AlgorithmIdentifier, Attribute, Name, SubjectKeyIdentifier};
 use picky_asn1::tag::{Tag, TagClass, TagPeeker};
-use picky_asn1::wrapper::{ImplicitContextTag0, IntegerAsn1, OctetStringAsn1, Optional};
+use picky_asn1::wrapper::{ExplicitContextTag1, ImplicitContextTag0, IntegerAsn1, OctetStringAsn1, Optional};
 use serde::{de, ser, Deserialize, Serialize};
 
 /// [RFC 5652 #5.3](https://datatracker.ietf.org/doc/html/rfc5652#section-5.3)
@@ -27,7 +27,8 @@ pub struct SignerInfo {
     pub signed_attrs: Optional<Attributes>,
     pub signature_algorithm: SignatureAlgorithmIdentifier,
     pub signature: SignatureValue,
-    // unsigned_attrs
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unsigned_attrs: Option<ExplicitContextTag1<Attributes>>,
 }
 
 impl<'de> de::Deserialize<'de> for SignerInfo {
@@ -66,6 +67,10 @@ impl<'de> de::Deserialize<'de> for SignerInfo {
                     signed_attrs: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(3, &self))?,
                     signature_algorithm: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(4, &self))?,
                     signature: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(5, &self))?,
+                    // Unsigned attributes serialization and deserialization is not implemented yet.
+                    // It is just a stub to stop parsing when encountering the attributes.
+                    // TODO: Proper implementation should be added.
+                    unsigned_attrs: seq.next_element().unwrap_or(Some(None)).unwrap_or(None),
                 })
             }
         }

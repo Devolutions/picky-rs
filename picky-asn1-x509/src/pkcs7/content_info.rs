@@ -8,7 +8,7 @@ use picky_asn1::restricted_string::{BMPString, CharSetError};
 use picky_asn1::tag::{Tag, TagClass, TagPeeker};
 use picky_asn1::wrapper::{
     BMPStringAsn1, BitStringAsn1, ExplicitContextTag0, ExplicitContextTag1, ExplicitContextTag2, IA5StringAsn1,
-    ImplicitContextTag0, ImplicitContextTag1, ObjectIdentifierAsn1, OctetStringAsn1, Optional,
+    ImplicitContextTag0, ImplicitContextTag1, IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1, Optional,
 };
 
 #[cfg(feature = "ctl")]
@@ -142,6 +142,18 @@ impl<'de> de::Deserialize<'de> for EncapsulatedContentInfo {
     }
 }
 
+// https://github.com/sassoftware/relic/blob/master/lib/authenticode/structs.go#L46
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct SpcSipInfo {
+    pub version: IntegerAsn1,
+    pub uuid: OctetStringAsn1,
+    reserved1: IntegerAsn1,
+    reserved2: IntegerAsn1,
+    reserved3: IntegerAsn1,
+    reserved4: IntegerAsn1,
+    reserved5: IntegerAsn1,
+}
+
 /// [Authenticode_PE.docx](http://download.microsoft.com/download/9/c/5/9c5b2167-8017-4bae-9fde-d599bac8184a/Authenticode_PE.docx)
 /// ``` not_rust
 /// SpcIndirectDataContent ::= SEQUENCE {
@@ -162,10 +174,30 @@ pub struct SpcIndirectDataContent {
 ///     value                   [0] EXPLICIT ANY OPTIONAL
 /// }
 /// ```
+#[derive(Debug, PartialEq, Clone)]
+pub enum SpcAttributeAndOptionalValueValue {
+    SpcPeImageData(SpcPeImageData),
+    SpcSipInfo(SpcSipInfo),
+}
+
+impl Serialize for SpcAttributeAndOptionalValueValue {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
+    where
+        S: ser::Serializer,
+    {
+        match &self {
+            SpcAttributeAndOptionalValueValue::SpcPeImageData(spc_pe_image_data) => {
+                spc_pe_image_data.serialize(serializer)
+            }
+            SpcAttributeAndOptionalValueValue::SpcSipInfo(spc_sip_info) => spc_sip_info.serialize(serializer),
+        }
+    }
+}
+
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct SpcAttributeAndOptionalValue {
     pub ty: ObjectIdentifierAsn1,
-    pub value: SpcPeImageData,
+    pub value: SpcAttributeAndOptionalValueValue,
 }
 
 impl<'de> de::Deserialize<'de> for SpcAttributeAndOptionalValue {
@@ -191,18 +223,24 @@ impl<'de> de::Deserialize<'de> for SpcAttributeAndOptionalValue {
                 let oid: ObjectIdentifierAsn1 = seq_next_element!(seq, SpcAttributeAndOptionalValue, "type oid");
 
                 let value = match Into::<String>::into(&oid.0).as_str() {
-                    oids::SPC_PE_IMAGE_DATAOBJ => seq_next_element!(
+                    oids::SPC_PE_IMAGE_DATAOBJ => SpcAttributeAndOptionalValueValue::SpcPeImageData(seq_next_element!(
                         seq,
                         SpcPeImageData,
                         SpcAttributeAndOptionalValue,
                         "a SpcPeImageData object"
-                    ),
-                    _ => {
+                    )),
+                    oids::SPC_SIPINFO_OBJID => SpcAttributeAndOptionalValueValue::SpcSipInfo(seq_next_element!(
+                        seq,
+                        SpcSipInfo,
+                        "a SpcSipInfo object"
+                    )),
+                    oid => {
+                        println!("{}", oid);
                         return Err(serde_invalid_value!(
                             SpcAttributeAndOptionalValue,
                             "unknown oid type",
                             "a SPC_PE_IMAGE_DATAOBJ oid"
-                        ))
+                        ));
                     }
                 };
 

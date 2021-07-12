@@ -179,6 +179,7 @@ define_oid! {
     SPC_INDIRECT_DATA_OBJID => spc_indirect_data_objid => "1.3.6.1.4.1.311.2.1.4",
     SPC_SP_OPUS_INFO_OBJID => spc_sp_opus_info_objid => "1.3.6.1.4.1.311.2.1.12",
     SPC_PE_IMAGE_DATAOBJ => spc_pe_image_dataobj => "1.3.6.1.4.1.311.2.1.15",
+    SPC_SIPINFO_OBJID => spc_sip_info_objid => "1.3.6.1.4.1.311.2.1.30",
 
     // CTL
     CERT_TRUST_LIST => cert_trust_list => "1.3.6.1.4.1.311.10.1",
