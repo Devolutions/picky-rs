@@ -27,11 +27,13 @@ use picky_asn1_x509::pkcs7::signer_info::{
     SignatureAlgorithmIdentifier, SignatureValue, SignerIdentifier, SignerInfo,
 };
 use picky_asn1_x509::pkcs7::Pkcs7Certificate;
-use picky_asn1_x509::{oids, Attribute, AttributeValues, Certificate, DigestInfo, Name, ShaVariant};
+use picky_asn1_x509::{oids, Attribute, AttributeValues, Certificate, DigestInfo, Name};
 
 use std::cell::RefCell;
 use std::convert::TryFrom;
 use thiserror::Error;
+
+pub use picky_asn1_x509::ShaVariant;
 
 #[derive(Debug, Error)]
 pub enum AuthenticodeError {
@@ -95,16 +97,13 @@ pub struct AuthenticodeSignature(pub Pkcs7);
 
 impl AuthenticodeSignature {
     pub fn new(
-        pkcs7: Pkcs7,
+        pkcs7: &Pkcs7,
         file_hash: &[u8],
         hash_algo: ShaVariant,
         private_key: &PrivateKey,
         program_name: Option<String>,
     ) -> Result<Self, AuthenticodeError> {
-        let Pkcs7Certificate { oid, signed_data } = pkcs7.0;
-
-        let SignedData { certificates, .. } = signed_data.0;
-
+        let certificates = pkcs7.0.signed_data.certificates.clone();
         let digest_algorithm = AlgorithmIdentifier::new_sha(hash_algo);
 
         let data = SpcAttributeAndOptionalValue {
@@ -219,7 +218,7 @@ impl AuthenticodeSignature {
         };
 
         Ok(AuthenticodeSignature(Pkcs7::from(Pkcs7Certificate {
-            oid,
+            oid: oids::signed_data().into(),
             signed_data: signed_data.into(),
         })))
     }
@@ -526,7 +525,7 @@ impl<'a> AuthenticodeValidator<'a> {
         Ok(())
     }
 
-    fn verify_certificates_chain(&self) -> AuthenticodeResult<()> {
+    fn verify_signing_certificate(&self) -> AuthenticodeResult<()> {
         let signing_certificate = self.authenticode_signature.signing_certificate()?;
 
         // Box<dyn Iterator<Item = &'a Cert> just to satisfy CertValidator bounds
@@ -685,7 +684,7 @@ impl<'a> AuthenticodeValidator<'a> {
         }
 
         if self.inner.borrow().strictness.require_signing_certificate_check {
-            self.verify_certificates_chain()?;
+            self.verify_signing_certificate()?;
         }
 
         #[cfg(feature = "ctl")]
@@ -883,7 +882,8 @@ mod test {
         let program_name = "decoding_into_authenticode_signature".to_string();
 
         let authenticode_signature =
-            AuthenticodeSignature::new(pkcs7, FILE_HASH.as_ref(), hash_type, &private_key, Some(program_name)).unwrap();
+            AuthenticodeSignature::new(&pkcs7, FILE_HASH.as_ref(), hash_type, &private_key, Some(program_name))
+                .unwrap();
 
         let pkcs7certificate = authenticode_signature.0 .0;
 
@@ -1040,7 +1040,7 @@ mod test {
         let private_key = PrivateKey::from_pem_str(RSA_PRIVATE_KEY).unwrap();
 
         let authenticode_signature = AuthenticodeSignature::new(
-            pkcs7,
+            &pkcs7,
             FILE_HASH.as_ref(),
             ShaVariant::SHA2_256,
             &private_key,
@@ -1056,7 +1056,7 @@ mod test {
         let private_key = PrivateKey::from_pem_str(SELF_SIGNED_PKCS7_RSA_PRIVATE_KEY).unwrap();
 
         let authenticode_signature = AuthenticodeSignature::new(
-            pkcs7,
+            &pkcs7,
             FILE_HASH.as_ref(),
             ShaVariant::SHA2_256,
             &private_key,
@@ -1076,7 +1076,7 @@ mod test {
         let private_key = PrivateKey::from_pem_str(SELF_SIGNED_PKCS7_RSA_PRIVATE_KEY).unwrap();
 
         let authenticode_signature = AuthenticodeSignature::new(
-            pkcs7,
+            &pkcs7,
             FILE_HASH.as_ref(),
             ShaVariant::SHA2_256,
             &private_key,
@@ -1101,7 +1101,7 @@ mod test {
         let private_key = PrivateKey::from_pem_str(SELF_SIGNED_PKCS7_RSA_PRIVATE_KEY).unwrap();
 
         let authenticode_signature = AuthenticodeSignature::new(
-            pkcs7,
+            &pkcs7,
             FILE_HASH.as_ref(),
             ShaVariant::SHA2_256,
             &private_key,
@@ -1122,7 +1122,7 @@ mod test {
         let private_key = PrivateKey::from_pem_str(SELF_SIGNED_PKCS7_RSA_PRIVATE_KEY).unwrap();
 
         let authenticode_signature = AuthenticodeSignature::new(
-            pkcs7,
+            &pkcs7,
             FILE_HASH.as_ref(),
             ShaVariant::SHA2_256,
             &private_key,
@@ -1154,7 +1154,7 @@ mod test {
         let private_key = PrivateKey::from_pem_str(SELF_SIGNED_PKCS7_RSA_PRIVATE_KEY).unwrap();
 
         let authenticode_signature = AuthenticodeSignature::new(
-            pkcs7,
+            &pkcs7,
             FILE_HASH.as_ref(),
             ShaVariant::SHA2_256,
             &private_key,
@@ -1187,7 +1187,7 @@ mod test {
         let private_key = PrivateKey::from_pem_str(SELF_SIGNED_PKCS7_RSA_PRIVATE_KEY).unwrap();
 
         let authenticode_signature = AuthenticodeSignature::new(
-            pkcs7,
+            &pkcs7,
             FILE_HASH.as_ref(),
             ShaVariant::SHA2_256,
             &private_key,
@@ -1424,10 +1424,9 @@ mod test {
             .require_not_after_check()
             .require_not_before_check()
             .require_ca_against_ctl_check()
-            .verify()
-            .unwrap();
+            .verify();
 
-        assert!(true)
+        assert!(validation_result.is_ok());
     }
 
     #[cfg(feature = "ctl")]
@@ -1488,7 +1487,7 @@ mod test {
         let private_key = PrivateKey::from_pem_str(private_key).unwrap();
 
         let authenticode_signature = AuthenticodeSignature::new(
-            pkcs7,
+            &pkcs7,
             FILE_HASH.as_ref(),
             ShaVariant::SHA2_256,
             &private_key,
@@ -1503,8 +1502,8 @@ mod test {
             .require_basic_authenticode_validation()
             .require_signing_certificate_check()
             .interval_date(
-                &UTCDate::new(2020, 3, 4, 18, 39, 47).unwrap(),
-                &UTCDate::new(2021, 3, 3, 18, 39, 47).unwrap(),
+                &UTCDate::new(2021, 7, 9, 7, 48, 3).unwrap(),
+                &UTCDate::new(2022, 7, 9, 7, 48, 3).unwrap(),
             )
             .require_not_before_check()
             .require_ca_against_ctl_check()
@@ -1590,7 +1589,7 @@ mod test {
         let private_key = PrivateKey::from_pem_str(private_key).unwrap();
 
         let authenticate_signature =
-            AuthenticodeSignature::new(pkcs7, &FILE_HASH, ShaVariant::SHA2_256, &private_key, None).unwrap();
+            AuthenticodeSignature::new(&pkcs7, &FILE_HASH, ShaVariant::SHA2_256, &private_key, None).unwrap();
 
         let ca_name = authenticate_signature.signing_certificate().unwrap().issuer_name();
 

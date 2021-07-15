@@ -1,10 +1,8 @@
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::convert::TryFrom;
 use std::error;
-use std::io::{self, BufReader, BufWriter};
+use std::io::{self, BufReader, BufWriter, Write};
 use thiserror::Error;
-
-pub use picky_asn1_x509::ShaVariant;
 
 const MINIMUM_BYTES_TO_DECODE: usize = 4 /* WinCertificate::length */ + 2 /* WinCertificate::revision */ + 2 /* WinCertificate::certificate */;
 
@@ -43,7 +41,7 @@ impl WinCertificate {
             });
         }
 
-        let mut buffer = BufReader::new(data.as_ref());
+        let mut buffer = BufReader::with_capacity(data.as_ref().len(), data.as_ref());
 
         let length = buffer.read_u32::<LittleEndian>()?;
 
@@ -77,21 +75,16 @@ impl WinCertificate {
             certificate,
         } = self;
 
-        let mut buffer = BufWriter::new(Vec::new());
-
         let padding = (8 - (certificate.len() % 8)) % 8;
+
+        let mut buffer = BufWriter::with_capacity(length as usize + padding, Vec::new());
 
         buffer.write_u32::<LittleEndian>(length + padding as u32)?;
         buffer.write_u16::<LittleEndian>(revision as u16)?;
         buffer.write_u16::<LittleEndian>(certificate_type as u16)?;
 
-        for elem in certificate.into_iter() {
-            buffer.write_u8(elem)?;
-        }
-
-        for _ in 0..padding {
-            buffer.write_u8(0)?;
-        }
+        buffer.write_all(&certificate)?;
+        buffer.write_all(&vec![0; padding as usize])?;
 
         buffer
             .into_inner()
@@ -101,7 +94,7 @@ impl WinCertificate {
     pub fn from_certificate<V: Into<Vec<u8>>>(certificate: V, certificate_type: CertificateType) -> Self {
         let certificate = certificate.into();
         Self {
-            length: (MINIMUM_BYTES_TO_DECODE + certificate.len()) as u32,
+            length: certificate.len() as u32,
             revision: RevisionType::WinCertificateRevision20,
             certificate_type,
             certificate,
@@ -228,7 +221,7 @@ mod tests {
     }
 
     #[test]
-    fn encode_into_decode_wincert_with_one_byte_certificate() {
+    fn encode_into_wincert_with_one_byte_certificate() {
         let wincert = WinCertificate {
             length: 1,
             revision: RevisionType::WinCertificateRevision10,
@@ -254,7 +247,7 @@ mod tests {
     }
 
     #[test]
-    fn encode_into_decode_wincert_with_ten_bytes_certificate() {
+    fn encode_into_wincert_with_ten_bytes_certificate() {
         let wincert = WinCertificate {
             length: 10,
             revision: RevisionType::WinCertificateRevision20,
