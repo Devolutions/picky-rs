@@ -5,7 +5,7 @@ use widestring::U16String;
 
 use picky_asn1::bit_string::BitString;
 use picky_asn1::restricted_string::{BMPString, CharSetError};
-use picky_asn1::tag::{Tag, TagClass, TagPeeker};
+use picky_asn1::tag::{TagClass, TagPeeker};
 use picky_asn1::wrapper::{
     BMPStringAsn1, BitStringAsn1, ExplicitContextTag0, ExplicitContextTag1, ExplicitContextTag2, IA5StringAsn1,
     ImplicitContextTag0, ImplicitContextTag1, IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1, Optional,
@@ -105,30 +105,15 @@ impl<'de> de::Deserialize<'de> for EncapsulatedContentInfo {
                         )
                         .into(),
                     ),
-                    _ => {
-                        let tag_peeker: TagPeeker = seq_next_element!(seq, EncapsulatedContentInfo, "OctetString");
-                        match tag_peeker.next_tag {
-                            Tag::OCTET_STRING => Some(
-                                ContentValue::OctetString(
-                                    seq_next_element!(
-                                        seq,
-                                        ExplicitContextTag0<OctetStringAsn1>,
-                                        EncapsulatedContentInfo,
-                                        "OctetStringAsn1"
-                                    )
-                                    .0,
-                                )
-                                .into(),
-                            ),
-                            _ => {
-                                return Err(serde_invalid_value!(
-                                    EncapsulatedContentInfo,
-                                    "unknown oid type",
-                                    "SPC_INDIRECT_DATA_OBJID or PKCS7 oid"
-                                ))
-                            }
-                        }
-                    }
+                    _ => Some(ExplicitContextTag0::from(ContentValue::OctetString(
+                        seq_next_element!(
+                            seq,
+                            ExplicitContextTag0<OctetStringAsn1>,
+                            EncapsulatedContentInfo,
+                            "OctetStringAsn1"
+                        )
+                        .0,
+                    ))),
                 };
 
                 Ok(EncapsulatedContentInfo {

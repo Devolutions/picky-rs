@@ -1,38 +1,60 @@
-use std::fs::OpenOptions;
-use std::io::{Read, Write};
+use std::fs::{File, OpenOptions};
+use std::io::{BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Context};
+use clap::ArgMatches;
+use encoding::DecoderTrap;
 use lief::{Binary, LogLevel};
-use picky::key::PrivateKey;
-use picky::x509::pkcs7::{authenticode::AuthenticodeSignature, Pkcs7};
 
 use picky::hash::HashAlgorithm;
+use picky::key::PrivateKey;
+use picky::x509::pkcs7::{
+    authenticode::{AuthenticodeSignature, ShaVariant},
+    Pkcs7,
+};
+use picky::x509::wincert::{CertificateType, WinCertificate};
 
 use crate::config::{
     ARG_BINARY, ARG_LOGGING, ARG_LOGGING_CRITICAL, ARG_LOGGING_DEBUG, ARG_LOGGING_ERR, ARG_LOGGING_INFO,
     ARG_LOGGING_TRACE, ARG_LOGGING_WARN, ARG_OUTPUT, ARG_PS_SCRIPT, CRLF, PS_AUTHENTICODE_FOOTER,
     PS_AUTHENTICODE_HEADER, PS_AUTHENTICODE_LINES_SPLITTER,
 };
-use clap::ArgMatches;
+use crate::file_name_from_path;
+use crate::verify::extract_signed_ps_file_content;
+use picky::pem::Pem;
 
-use picky::x509::pkcs7::authenticode::ShaVariant;
-use picky::x509::wincert::{CertificateType, WinCertificate};
+const UTF8_BOM: [u8; 3] = [0xEF, 0xBB, 0xBF];
+const UTF16_BE_BOM: [u8; 2] = [0xFE, 0xFF];
+const UTF16_LE_BOM: [u8; 2] = [0xFF, 0xFE];
 
-pub fn sign(matches: &ArgMatches, certfile: PathBuf, private_key: PathBuf, files: &[PathBuf]) -> anyhow::Result<()> {
-    let certfile = read_file_into_vec(certfile)?;
-    let private_key = read_file_into_vec(private_key)?;
+pub fn sign(
+    matches: &ArgMatches,
+    certfile_path: PathBuf,
+    private_key_path: PathBuf,
+    files: &[PathBuf],
+) -> anyhow::Result<()> {
+    let certfile = Pem::read_from(&mut BufReader::new(
+        File::open(certfile_path.as_path())
+            .with_context(|| format!("Failed to open: {:?}", certfile_path.as_path()))?,
+    ))
+    .context("Failed to read the certificate")?;
 
-    let private_key = PrivateKey::from_rsa_der(&private_key).context("Failed to parse RSA Private key")?;
-    let pkcs7 = Pkcs7::from_der(&certfile).context("Failed to parse Pkcs7 certificate")?;
+    let private_key = Pem::read_from(&mut BufReader::new(
+        File::open(private_key_path.as_path())
+            .with_context(|| format!("Failed to open: {:?}", private_key_path.as_path()))?,
+    ))
+    .context("Failed to read the private key")?;
+
+    let private_key = PrivateKey::from_pem(&private_key).context("Failed to parse RSA Private key")?;
+    let pkcs7 = Pkcs7::from_pem(&certfile).context("Failed to parse Pkcs7 certificate")?;
 
     if matches.is_present(ARG_PS_SCRIPT) {
         for ps_file in files.iter() {
-            println!("Signing {:?}...", ps_file.as_path());
-
             sign_script(&pkcs7, &private_key, ps_file.as_path())?;
 
-            println!("Signed {:?} successfully", ps_file.as_path());
+            let file_name = file_name_from_path(ps_file.as_path())?;
+            println!("Signed {} successfully", file_name);
         }
 
         return Ok(());
@@ -44,13 +66,7 @@ pub fn sign(matches: &ArgMatches, certfile: PathBuf, private_key: PathBuf, files
             .value_of(ARG_OUTPUT)
             .context("Output path for signed binary is not specified")?;
 
-        let binary_name = file
-            .as_path()
-            .file_name()
-            .map(|name| name.to_str())
-            .flatten()
-            .map(|name| name.to_owned())
-            .expect("Binary file name should be present");
+        let binary_name = file_name_from_path(file.as_path())?;
 
         match matches.value_of(ARG_LOGGING) {
             Some(log_level) => {
@@ -68,8 +84,6 @@ pub fn sign(matches: &ArgMatches, certfile: PathBuf, private_key: PathBuf, files
             None => lief::disable_logging(),
         }
 
-        println!("Signing {:?} ...", binary_name);
-
         sign_binary(
             &pkcs7,
             &private_key,
@@ -84,9 +98,15 @@ pub fn sign(matches: &ArgMatches, certfile: PathBuf, private_key: PathBuf, files
     Ok(())
 }
 
-fn sign_script(pkcs7: &Pkcs7, private_key: &PrivateKey, file: &Path) -> anyhow::Result<()> {
-    let checksum =
-        compute_ps_file_checksum(file).with_context(|| format!("Failed to compute checksum for {:?}", file))?;
+fn sign_script(pkcs7: &Pkcs7, private_key: &PrivateKey, file_path: &Path) -> anyhow::Result<()> {
+    let mut file = OpenOptions::new()
+        .append(true)
+        .read(true)
+        .open(file_path)
+        .with_context(|| format!("Failed to open {:?}", file_path))?;
+
+    let checksum = compute_ps_file_checksum_from_content(file_path, HashAlgorithm::SHA2_256)
+        .with_context(|| format!("Failed to compute checksum for {:?}", file))?;
 
     let authenticode_signature =
         AuthenticodeSignature::new(&pkcs7, &checksum, ShaVariant::SHA2_256, &private_key, None)
@@ -96,25 +116,23 @@ fn sign_script(pkcs7: &Pkcs7, private_key: &PrivateKey, file: &Path) -> anyhow::
             .to_string();
 
     let mut ps_authenticode_signature = String::new();
+    ps_authenticode_signature.push_str(CRLF);
     ps_authenticode_signature.push_str(PS_AUTHENTICODE_HEADER);
     ps_authenticode_signature.push_str(CRLF);
 
-    for line in authenticode_signature.lines() {
-        ps_authenticode_signature.push_str(PS_AUTHENTICODE_LINES_SPLITTER);
-        ps_authenticode_signature.push_str(line);
-        ps_authenticode_signature.push_str(CRLF);
+    for line in authenticode_signature.lines().skip(1) {
+        // skip(1) to skip PKCS7 header
+        if line != "-----END PKCS7-----" {
+            ps_authenticode_signature.push_str(PS_AUTHENTICODE_LINES_SPLITTER);
+            ps_authenticode_signature.push_str(line);
+            ps_authenticode_signature.push_str(CRLF);
+        }
     }
 
     ps_authenticode_signature.push_str(PS_AUTHENTICODE_FOOTER);
-    ps_authenticode_signature.push_str(CRLF);
-
-    let mut file = OpenOptions::new()
-        .append(true)
-        .open(file)
-        .with_context(|| format!("Failed to open {:?}", file))?;
 
     writeln!(file, "{}", ps_authenticode_signature)
-        .with_context(|| format!("Failed to write PowerShell Authenticode signature to {:?}", file))
+        .with_context(|| format!("Failed to write PowerShell Authenticode signature to {:?}", file_path))
 }
 
 fn sign_binary(
@@ -154,35 +172,42 @@ fn sign_binary(
         .map_err(|err| anyhow!("Failed to build the signed executable, {}", err))
 }
 
-pub fn compute_ps_file_checksum<T: AsRef<Path>>(file_path: T) -> anyhow::Result<Vec<u8>> {
+// PowerShell file checksum is encoded in Utf16-Le encoding
+pub fn compute_ps_file_checksum_from_content(path: &Path, hash: HashAlgorithm) -> anyhow::Result<Vec<u8>> {
     let mut file = OpenOptions::new()
         .read(true)
-        .open(file_path.as_ref())
-        .with_context(|| format!("Failed to open {:?}", file_path.as_ref()))?;
+        .open(path)
+        .with_context(|| format!("Failed to open {:?} for reading", path))?;
 
-    let mut contents = String::new();
-    file.read_to_string(&mut contents)
-        .with_context(|| format!("Failed to read {:?} contents", file_path.as_ref()))?;
+    let mut content_buffer = Vec::new();
+    file.read_to_end(&mut content_buffer).unwrap();
 
-    let mut buffer = Vec::with_capacity(contents.len() * 2);
-    contents.as_str().encode_utf16().for_each(|word| {
+    let (decoded, _) = encoding::decode(
+        &content_buffer,
+        DecoderTrap::Strict,
+        encoding::all::UTF_8 as encoding::EncodingRef,
+    );
+
+    let raw_content = decoded.map_err(|err| anyhow!("Failed to decoded {:?} ps file: {}", path, err))?;
+
+    let content = extract_signed_ps_file_content(raw_content);
+
+    let mut buffer = Vec::with_capacity(content.len() * 2);
+
+    // We need to add Utf16-Le BOM([0xFF, 0xFE]) to the target buffer to produce right PowerShell file checksum
+    // if the file has a BOM
+    if content_buffer.starts_with(&UTF16_LE_BOM)
+        || content_buffer.starts_with(&UTF8_BOM)
+        || content_buffer.starts_with(&UTF16_BE_BOM)
+    {
+        buffer.extend_from_slice(&UTF16_LE_BOM);
+    }
+
+    content.as_str().encode_utf16().for_each(|word| {
         let bytes = word.to_le_bytes();
         buffer.push(bytes[0]);
         buffer.push(bytes[1]);
     });
 
-    Ok(HashAlgorithm::SHA2_256.digest(&buffer))
-}
-
-pub fn read_file_into_vec<T: AsRef<Path>>(file_path: T) -> anyhow::Result<Vec<u8>> {
-    let mut file = OpenOptions::new()
-        .read(true)
-        .open(file_path.as_ref())
-        .with_context(|| format!("Failed to open {:?}", file_path.as_ref()))?;
-    let mut data = Vec::new();
-
-    file.read_to_end(&mut data)
-        .with_context(|| format!("Failed to read {:?}", file_path.as_ref()))?;
-
-    Ok(data)
+    Ok(hash.digest(&buffer))
 }

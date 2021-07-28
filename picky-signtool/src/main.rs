@@ -1,8 +1,9 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::bail;
-use picky_signtool::{config::*, sign::sign, verify::verify};
 use walkdir::{DirEntry, WalkDir};
+
+use picky_signtool::{config::*, sign::sign, verify::verify};
 
 fn main() -> anyhow::Result<()> {
     let matches = config();
@@ -16,31 +17,41 @@ fn main() -> anyhow::Result<()> {
             vec![PathBuf::from(binary_path)]
         }
         (false, true) => {
-            let ps_file = matches
-                .value_of(ARG_SCRIPT_PATH)
+            let folder = matches
+                .value_of(ARG_SCRIPTS_PATH)
                 .expect("The PowerShell file path was not specified");
 
-            let ps_file = Path::new(ps_file);
-            match ps_file.extension().map(|ext| ext.to_str()).flatten() {
-                Some("ps1") => {
-                    vec![ps_file.to_path_buf()]
-                }
-                Some("psm1") => {
-                    let is_ps_file = |entry: &DirEntry| -> bool {
-                        entry
-                            .file_name()
-                            .to_str()
-                            .map(|s| s.ends_with(".ps1") || s.ends_with(".psm1") || s.ends_with(".psd1"))
-                            .unwrap_or(false)
-                    };
+            if Path::new(folder).is_file() {
+                vec![PathBuf::from(folder)]
+            } else {
+                let is_ps_file = |entry: &DirEntry| -> bool {
+                    entry
+                        .path()
+                        .extension()
+                        .map(|ext| {
+                            ext.to_str()
+                                .map(|ext| matches!(ext, "ps1" | "psm1" | "psd1"))
+                                .unwrap_or(false)
+                        })
+                        .unwrap_or(false)
+                };
 
-                    WalkDir::new(ps_file)
-                        .into_iter()
-                        .filter_entry(|entry| !is_ps_file(entry))
-                        .filter_map(|entry| entry.ok().map(|entry| entry.into_path()))
-                        .collect::<Vec<PathBuf>>()
-                }
-                _ => bail!("Unexpected PowerShell file type was specified"),
+                WalkDir::new(PathBuf::from(folder))
+                    .contents_first(true)
+                    .into_iter()
+                    .filter_map(|entry| {
+                        entry
+                            .ok()
+                            .map(|entry| {
+                                if is_ps_file(&entry) {
+                                    Some(entry.into_path())
+                                } else {
+                                    None
+                                }
+                            })
+                            .flatten()
+                    })
+                    .collect::<Vec<PathBuf>>()
             }
         }
         (true, true) => bail!("Do not know what to process exactly(`binary` and `script` both are specified)"),

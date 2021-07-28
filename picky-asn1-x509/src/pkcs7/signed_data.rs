@@ -98,7 +98,7 @@ pub struct SignersInfos(pub Asn1SetOf<SignerInfo>);
 /// CertificateSet ::= SET OF CertificateChoices
 /// ```
 #[derive(Debug, PartialEq, Clone)]
-pub struct CertificateSet(pub Vec<Certificate>);
+pub struct CertificateSet(pub Vec<CertificateChoices>);
 
 // This is a workaround for constructed encoding as implicit
 
@@ -122,6 +122,65 @@ impl<'de> de::Deserialize<'de> for CertificateSet {
         raw_der[0] = Tag::SEQUENCE.inner();
         let vec = picky_asn1_der::from_bytes(&raw_der).unwrap_or_default();
         Ok(CertificateSet(vec))
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum CertificateChoices {
+    Certificate(Certificate),
+    Other(picky_asn1_der::Asn1RawDer),
+}
+
+impl Serialize for CertificateChoices {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
+    where
+        S: ser::Serializer,
+    {
+        match &self {
+            CertificateChoices::Certificate(certificate) => certificate.serialize(serializer),
+            CertificateChoices::Other(other) => other.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> de::Deserialize<'de> for CertificateChoices {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        use std::fmt;
+
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = CertificateChoices;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a valid DER-encoded CertificateChoices")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let tag_peeker: TagPeeker = seq_next_element!(seq, CertificateChoices, "Any tag");
+                let certificate_choice = match tag_peeker.next_tag {
+                    Tag::SEQUENCE => CertificateChoices::Certificate(seq_next_element!(
+                        seq,
+                        Certificate,
+                        CertificateChoices,
+                        "Certificate"
+                    )),
+                    _ => {
+                        CertificateChoices::Other(seq_next_element!(seq, CertificateChoices, "Other certificate type"))
+                    }
+                };
+
+                Ok(certificate_choice)
+            }
+        }
+
+        deserializer.deserialize_enum("CertificateChoices", &["Certificate, Other"], Visitor)
     }
 }
 
@@ -255,7 +314,7 @@ mod tests {
             version: CmsVersion::V1,
             digest_algorithms: DigestAlgorithmIdentifiers(Vec::new().into()),
             content_info,
-            certificates: CertificateSet(vec![full_certificate]),
+            certificates: CertificateSet(vec![CertificateChoices::Certificate(full_certificate)]),
             crls: Some(RevocationInfoChoices(Vec::new())),
             signers_infos: SignersInfos(Vec::new().into()),
         };

@@ -9,10 +9,11 @@ pub const CRLF: &str = "\r\n";
 pub const ARG_BINARY: &str = "binary";
 pub const ARG_PS_SCRIPT: &str = "script";
 
-pub const ARG_SCRIPT_PATH: &str = "script-path";
+pub const ARG_SCRIPTS_PATH: &str = "scripts-path";
 pub const ARG_INPUT: &str = "input";
 pub const ARG_OUTPUT: &str = "output";
 pub const ARG_SIGN: &str = "sign";
+
 pub const ARG_CERTFILE: &str = "certfile";
 pub const ARG_PRIVATE_KEY: &str = "rsa-private-key";
 
@@ -36,11 +37,23 @@ pub fn config() -> ArgMatches<'static> {
             _ => Err(format!("`{}` is not a Windows executable", file)),
         };
 
-    let validate_ps_postfix =
-        |file: String| match Path::new(file.as_str()).extension().map(|ext| ext.to_str()).flatten() {
-            Some("ps1" | "psm1") => Ok(()),
-            _ => Err(format!("{} is neither PowerShell script nor module", file)),
-        };
+    let validate_ps_path = |file: String| {
+        let path = Path::new(file.as_str());
+        let is_ps_file = path
+            .extension()
+            .map(|ext| {
+                ext.to_str()
+                    .map(|ext| matches!(ext, "ps1" | "psm1" | "psd1"))
+                    .unwrap_or(false)
+            })
+            .unwrap_or(false);
+
+        if !path.is_file() || is_ps_file {
+            Ok(())
+        } else {
+            Err(format!("{} is not a folder not a PowerShell file", file))
+        }
+    };
 
     App::new(crate_name!())
         .version(crate_version!())
@@ -60,8 +73,8 @@ pub fn config() -> ArgMatches<'static> {
                 .value_name("EXECUTABLE")
                 .help("Path to a Windows executable")
                 .takes_value(true)
-                .required(true)
-                .requires(ARG_BINARY)
+                .required(false)
+                .requires_all(&[ARG_BINARY, ARG_OUTPUT])
                 .validator(validate_executable_postfix)
                 .display_order(1),
         )
@@ -72,31 +85,32 @@ pub fn config() -> ArgMatches<'static> {
                 .value_name("EXECUTABLE")
                 .help("Path where to save the signed binary")
                 .takes_value(true)
-                .requires(ARG_BINARY)
+                .requires_all(&[ARG_BINARY, ARG_INPUT])
                 .validator(validate_executable_postfix)
                 .display_order(2),
         )
         .arg(
             Arg::with_name(ARG_PS_SCRIPT)
                 .long(ARG_PS_SCRIPT)
-                .help("Specify to sign a PowerShell script or module")
+                .help("Specify to sign or verify a PowerShell script or module")
                 .display_order(3),
         )
         .arg(
-            Arg::with_name(ARG_SCRIPT_PATH)
-                .long(ARG_SCRIPT_PATH)
-                .value_name("PowerShell SCRIPT/MODULE")
+            Arg::with_name(ARG_SCRIPTS_PATH)
+                .long(ARG_SCRIPTS_PATH)
+                .value_name("FOLDER")
+                .help("A path to a folder with PowerShell files or a PowerShell file path to process")
                 .takes_value(true)
                 .requires(ARG_PS_SCRIPT)
-                .validator(validate_ps_postfix)
+                .validator(validate_ps_path)
                 .display_order(4),
         )
         .arg(
             Arg::with_name(ARG_SIGN)
                 .short(ARG_SIGN)
                 .long("sign")
-                .help("Sign the input file")
-                .requires_all(&[ARG_CERTFILE, ARG_PRIVATE_KEY, ARG_OUTPUT])
+                .help("Specify to sing input file(files)")
+                .requires_all(&[ARG_CERTFILE, ARG_PRIVATE_KEY])
                 .display_order(5),
         )
         .arg(
@@ -106,6 +120,7 @@ pub fn config() -> ArgMatches<'static> {
                 .value_name("CERTIFICATE")
                 .help("Path to a PKCS7 certificate to use in signing")
                 .takes_value(true)
+                .requires_all(&[ARG_SIGN, ARG_PRIVATE_KEY])
                 .display_order(6),
         )
         .arg(
@@ -115,6 +130,7 @@ pub fn config() -> ArgMatches<'static> {
                 .value_name("RSA PRIVATE_KEY")
                 .help("The rsa private key associated with the certificate")
                 .takes_value(true)
+                .requires_all(&[ARG_SIGN, ARG_CERTFILE])
                 .display_order(7),
         )
         .arg(

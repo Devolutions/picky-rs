@@ -32,6 +32,10 @@ impl AlgorithmIdentifier {
         &self.algorithm.0
     }
 
+    pub fn oid_asn1(&self) -> &ObjectIdentifierAsn1 {
+        &self.algorithm
+    }
+
     pub fn parameters(&self) -> &AlgorithmIdentifierParameters {
         &self.parameters
     }

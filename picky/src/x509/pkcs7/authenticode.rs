@@ -21,10 +21,13 @@ use picky_asn1_x509::pkcs7::content_info::{
     SpcIndirectDataContent, SpcLink, SpcPeImageData, SpcPeImageFlags, SpcSpOpusInfo, SpcString,
 };
 use picky_asn1_x509::pkcs7::crls::RevocationInfoChoices;
-use picky_asn1_x509::pkcs7::signed_data::{CertificateSet, DigestAlgorithmIdentifiers, SignedData, SignersInfos};
+use picky_asn1_x509::pkcs7::signed_data::{
+    CertificateChoices, CertificateSet, DigestAlgorithmIdentifiers, SignedData, SignersInfos,
+};
 use picky_asn1_x509::pkcs7::signer_info::{
     Attributes, CertificateSerialNumber, DigestAlgorithmIdentifier, IssuerAndSerialNumber,
-    SignatureAlgorithmIdentifier, SignatureValue, SignerIdentifier, SignerInfo,
+    SignatureAlgorithmIdentifier, SignatureValue, SignerIdentifier, SignerInfo, UnsignedAttribute,
+    UnsignedAttributeValue, UnsignedAttributes,
 };
 use picky_asn1_x509::pkcs7::Pkcs7Certificate;
 use picky_asn1_x509::{oids, Attribute, AttributeValues, Certificate, DigestInfo, Name};
@@ -53,6 +56,8 @@ pub enum AuthenticodeError {
     DigestAlgorithmMismatch { description: String },
     #[error("PKCS9_MESSAGE_DIGEST does not match hash of ContentInfo")]
     HashMismatch,
+    #[error("Actual file hash is {actual:?}, but expected {expected:?}")]
+    FileHashMismatch { actual: Vec<u8>, expected: Vec<u8> },
     #[error("Authenticode signatures support only one signer, digestAlgorithms must contain only one digestAlgorithmIdentifier, but {incorrect_count} entries present")]
     IncorrectDigestAlgorithmsCount { incorrect_count: usize },
     #[error(
@@ -164,8 +169,12 @@ impl AuthenticodeSignature {
         let certificates = certificates
             .0
             .into_iter()
-            .filter_map(|cert| Cert::try_from(cert).ok())
+            .filter_map(|cert| match cert {
+                CertificateChoices::Certificate(certificate) => Cert::try_from(certificate).ok(),
+                CertificateChoices::Other(_) => None,
+            })
             .collect::<Vec<Cert>>();
+
         check_eku_code_signing(&certificates)?;
 
         let certificates = certificates
@@ -201,12 +210,18 @@ impl AuthenticodeSignature {
             signed_attrs: Attributes(authenticated_attributes).into(),
             signature_algorithm: SignatureAlgorithmIdentifier(AlgorithmIdentifier::new_rsa_encryption()),
             signature: encrypted_digest,
-            unsigned_attrs: None,
+            unsigned_attrs: UnsignedAttributes::default().into(),
         };
 
         // certificates contains the signer certificate and any intermediate certificates,
         // but typically does not contain the root certificate
-        let certificates = CertificateSet(certificates.into_iter().take(2).collect::<Vec<Certificate>>());
+        let certificates = CertificateSet(
+            certificates
+                .into_iter()
+                .take(2)
+                .map(CertificateChoices::Certificate)
+                .collect::<Vec<CertificateChoices>>(),
+        );
 
         let signed_data = SignedData {
             version: CmsVersion::V1,
@@ -253,7 +268,7 @@ impl AuthenticodeSignature {
         Ok(to_pem(&self.0 .0, pkcs7::PKCS7_PEM_LABEL, pkcs7::ELEMENT_NAME)?)
     }
 
-    pub fn signing_certificate(&self) -> Result<Cert, AuthenticodeError> {
+    pub fn signing_certificate(&self) -> AuthenticodeResult<Cert> {
         let signer_infos = &self.0 .0.signed_data.signers_infos.0;
 
         let signer_info = signer_infos.first().ok_or(AuthenticodeError::MultipleSingerInfo {
@@ -287,8 +302,47 @@ impl AuthenticodeSignature {
                 strictness: Default::default(),
                 now: None,
                 excluded_cert_authorities: vec![],
+                expected_file_hash: None,
             }),
         }
+    }
+
+    pub fn file_hash(&self) -> Option<Vec<u8>> {
+        let spc_indirect_data_content = match &self.0 .0.signed_data.content_info.content {
+            Some(content_value) => match &content_value.0 {
+                ContentValue::SpcIndirectDataContent(spc_indirect_data_content) => spc_indirect_data_content,
+                _ => return None,
+            },
+            None => return None,
+        };
+
+        Some(spc_indirect_data_content.message_digest.digest.0.clone())
+    }
+
+    pub fn authenticated_attributes(&self) -> &[Attribute] {
+        &self
+            .0
+            .singer_infos()
+            .first()
+            .expect("Exactly one SignerInfo should be present")
+            .signed_attrs
+            .0
+             .0
+    }
+
+    pub fn unauthenticated_attributes(&self) -> &[UnsignedAttribute] {
+        &self
+            .0
+             .0
+            .signed_data
+            .signers_infos
+            .0
+             .0
+            .first()
+            .expect("Exactly one SignerInfo should be present")
+            .unsigned_attrs
+            .0
+             .0
     }
 }
 
@@ -317,7 +371,7 @@ struct AuthenticodeStrictness {
 impl Default for AuthenticodeStrictness {
     fn default() -> Self {
         AuthenticodeStrictness {
-            require_basic_authenticode_validation: true,
+            require_basic_authenticode_validation: false,
             require_signing_certificate_check: false,
             require_not_before_check: false,
             require_not_after_check: false,
@@ -332,6 +386,7 @@ struct AuthenticodeValidatorInner<'a> {
     strictness: AuthenticodeStrictness,
     excluded_cert_authorities: Vec<DirectoryName>,
     now: Option<ValidityCheck<'a>>,
+    expected_file_hash: Option<Vec<u8>>,
 }
 
 pub struct AuthenticodeValidator<'a> {
@@ -383,8 +438,9 @@ impl<'a> AuthenticodeValidator<'a> {
     }
 
     #[inline]
-    pub fn require_basic_authenticode_validation(&self) -> &Self {
+    pub fn require_basic_authenticode_validation(&self, expected_file_hash: Vec<u8>) -> &Self {
         self.inner.borrow_mut().strictness.require_basic_authenticode_validation = true;
+        self.inner.borrow_mut().expected_file_hash = Some(expected_file_hash);
         self
     }
 
@@ -467,9 +523,25 @@ impl<'a> AuthenticodeValidator<'a> {
             });
         }
 
-        // 5.The x509 certificate specified by SignerInfo::serial_number and SignerInfo::issuer must exist within Signature::certificates
+        // 5. Check file hash
+        let actual_file_hash = &message_digest.digest.0;
+        let expected_file_hash = self
+            .inner
+            .borrow()
+            .expected_file_hash
+            .clone()
+            .expect("Expected file hash should be present for Authenticode basic validation");
+        if actual_file_hash != &expected_file_hash {
+            return Err(AuthenticodeError::FileHashMismatch {
+                actual: actual_file_hash.clone(),
+                expected: expected_file_hash,
+            });
+        }
+
+        // 6.The x509 certificate specified by SignerInfo::serial_number and SignerInfo::issuer must exist within Signature::certificates
         let signing_certificate = self.authenticode_signature.signing_certificate()?;
-        // 6. Given the x509 certificate, compare SignerInfo::encrypted_digest against hash of authenticated attributes and hash of ContentInfo
+
+        // 7. Given the x509 certificate, compare SignerInfo::encrypted_digest against hash of authenticated attributes and hash of ContentInfo
         let public_key = signing_certificate.public_key();
 
         let hash_algo = ShaVariant::try_from(Into::<ObjectIdentifierAsn1>::into(digest_algorithm.oid().clone()))
@@ -492,7 +564,7 @@ impl<'a> AuthenticodeValidator<'a> {
             .verify(public_key, &raw_attributes, &signer_info.signature.0 .0)
             .map_err(AuthenticodeError::SignatureError)?;
 
-        // 7. PKCS9_MESSAGE_DIGEST attribute exists and that its value matches hash of ContentInfo.
+        // 8. PKCS9_MESSAGE_DIGEST attribute exists and that its value matches hash of ContentInfo.
         let message_digest_attr = authenticated_attributes
             .iter()
             .find(|attr| matches!(attr.value, AttributeValues::MessageDigest(_)))
@@ -517,7 +589,7 @@ impl<'a> AuthenticodeValidator<'a> {
             }
         }
 
-        // 8. The signing certificate must contain either the extended key usage (EKU) value for code signing,
+        // 9. The signing certificate must contain either the extended key usage (EKU) value for code signing,
         // or the entire certificate chain must contain no EKUs
         let certificates = self.authenticode_signature.0.certificates();
         check_eku_code_signing(&certificates)?;
@@ -552,9 +624,86 @@ impl<'a> AuthenticodeValidator<'a> {
             cert_validator.ignore_not_before_check()
         };
 
-        cert_validator.verify()?;
+        match cert_validator.verify() {
+            Ok(()) => Ok(()),
+            Err(err) => {
+                // By default, timestamping an Authenticode signature extends the lifetime of the signature
+                // indefinitely, as long as that signature was timestamped, both:
+                // •	During the validity period of the signing certificate.
+                // •	Before the certificate revocation date, if applicable.
 
-        Ok(())
+                // If the publisher’s signing certificate contains the lifetime signer OID in addition to the PKIX code signing OID,
+                // the signature becomes invalid when the publisher’s signing certificate expires, even
+                // if the signature is timestamped
+
+                if let CertError::InvalidCertificate { source, id } = &err {
+                    if id == &signing_certificate.subject_name().to_string()
+                        && matches!(source.as_ref(), CertError::CertificateExpired { .. })
+                    {
+                        let kp_lifetime_signing_is_present =
+                            signing_certificate
+                                .extensions()
+                                .iter()
+                                .any(|extension| match extension.extn_value() {
+                                    ExtensionView::ExtendedKeyUsage(eku) => eku.contains(oids::kp_lifetime_signing()),
+                                    _ => false,
+                                });
+
+                        let check_if_kp_time_stamping_present = |certificates: Vec<Cert>| -> bool {
+                            certificates
+                                .iter()
+                                .flat_map(|cert| cert.extensions().iter())
+                                .any(|extension| match extension.extn_value() {
+                                    ExtensionView::ExtendedKeyUsage(eku) => eku.contains(oids::kp_time_stamping()),
+                                    _ => false,
+                                })
+                        };
+
+                        if check_if_kp_time_stamping_present(self.authenticode_signature.0.certificates())
+                            && !kp_lifetime_signing_is_present
+                        {
+                            return Ok(());
+                        }
+
+                        let unsigned_attributes = self.authenticode_signature.unauthenticated_attributes();
+
+                        if let Some(unsigned_attribute) = unsigned_attributes.first() {
+                            match &unsigned_attribute.value {
+                                UnsignedAttributeValue::MsCounterSign(mc_counter_sign) => {
+                                    let pkcs7_certificate = mc_counter_sign
+                                        .0
+                                        .first()
+                                        .expect("MsCounterSign should contain exactly one Pkcs7Certificate");
+
+                                    let certificates = pkcs7_certificate
+                                        .signed_data
+                                        .certificates
+                                        .0
+                                        .iter()
+                                        .cloned()
+                                        .filter_map(|cert| match cert {
+                                            CertificateChoices::Certificate(certificate) => {
+                                                Cert::try_from(certificate).ok()
+                                            }
+                                            CertificateChoices::Other(_) => None,
+                                        })
+                                        .collect::<Vec<Cert>>();
+
+                                    if check_if_kp_time_stamping_present(certificates)
+                                        && !kp_lifetime_signing_is_present
+                                    {
+                                        return Ok(());
+                                    }
+                                }
+                                UnsignedAttributeValue::CounterSign(_) => {}
+                            };
+                        }
+                    }
+                }
+
+                Err(AuthenticodeError::CertError(err))
+            }
+        }
     }
 
     #[cfg(feature = "ctl")]
@@ -952,7 +1101,10 @@ mod test {
             .0
             .clone()
             .into_iter()
-            .filter_map(|cert| Cert::try_from(cert).ok())
+            .filter_map(|cert| match cert {
+                CertificateChoices::Certificate(certificate) => Cert::try_from(certificate).ok(),
+                CertificateChoices::Other(_) => None,
+            })
             .find(|certificate| matches!(certificate.ty(), CertType::Intermediate))
             .map(Certificate::from)
             .unwrap();
@@ -1063,9 +1215,10 @@ mod test {
             Some("self_signed_authenticode_signature_basic_validation".to_string()),
         )
         .unwrap();
+        let file_hash = authenticode_signature.file_hash().expect("File hash should be present");
 
         let validator = authenticode_signature.authenticode_verifier();
-        let validator = validator.require_basic_authenticode_validation();
+        let validator = validator.require_basic_authenticode_validation(file_hash);
 
         assert!(validator.verify().is_ok());
     }
@@ -1084,9 +1237,10 @@ mod test {
         )
         .unwrap();
 
+        let file_hash = authenticode_signature.file_hash().expect("File hash should be present");
         let validator = authenticode_signature.authenticode_verifier();
         let validator_result = validator
-            .require_basic_authenticode_validation()
+            .require_basic_authenticode_validation(file_hash)
             .require_signing_certificate_check()
             .exact_date(&UTCDate::new(2021, 8, 7, 0, 0, 0).unwrap())
             .verify();
@@ -1194,6 +1348,7 @@ mod test {
             Some("self_signed_authenticode_signature_validation_against_ctl_with_excluded_ca_certificate".to_string()),
         )
         .unwrap();
+        let file_hash = authenticode_signature.file_hash().expect("File hash should be present");
 
         let validator = authenticode_signature.authenticode_verifier();
 
@@ -1204,7 +1359,7 @@ mod test {
             .issuer_name();
 
         let validation_result = validator
-            .require_basic_authenticode_validation()
+            .require_basic_authenticode_validation(file_hash)
             .require_signing_certificate_check()
             .interval_date(
                 &UTCDate::new(2021, 7, 8, 11, 56, 49).unwrap(),
@@ -1416,22 +1571,25 @@ mod test {
                         -----END PKCS7-----";
 
         let authenticode_signature = AuthenticodeSignature::from_pem_str(pkcs7).unwrap();
+        let file_hash = authenticode_signature.file_hash().expect("File hash should be present");
+
         let validation_result = authenticode_signature
             .authenticode_verifier()
-            .require_basic_authenticode_validation()
+            .require_basic_authenticode_validation(file_hash)
             .require_signing_certificate_check()
             .exact_date(&UTCDate::new(2021, 3, 3, 18, 39, 47).unwrap())
             .require_not_after_check()
             .require_not_before_check()
             .require_ca_against_ctl_check()
-            .verify();
+            .verify()
+            .unwrap();
 
-        assert!(validation_result.is_ok());
+        assert!(true);
     }
 
     #[cfg(feature = "ctl")]
     #[test]
-    fn full_validatiom_self_signed_authenticode_signature_with_only_leaf_certificate() {
+    fn full_validation_self_signed_authenticode_signature_with_only_leaf_certificate() {
         let pkcs7 = "-----BEGIN PKCS7-----\
                             MIIDpQYJKoZIhvcNAQcCoIIDljCCA5ICAQExADALBgkqhkiG9w0BBwGgggN4MIID\
                             dDCCAlygAwIBAgIUcSw2pEU1K7Rx7HKPuFsl13pPmqswDQYJKoZIhvcNAQELBQAw\
@@ -1494,12 +1652,12 @@ mod test {
             Some("validate_self_signed_authenticode_signature_with_only_leaf_certificate".to_string()),
         )
         .unwrap();
-
+        let file_hash = authenticode_signature.file_hash().expect("File hash should be present");
         let ca_name = authenticode_signature.signing_certificate().unwrap().issuer_name();
 
         let validator = authenticode_signature.authenticode_verifier();
         let validation_result = validator
-            .require_basic_authenticode_validation()
+            .require_basic_authenticode_validation(file_hash)
             .require_signing_certificate_check()
             .interval_date(
                 &UTCDate::new(2021, 7, 9, 7, 48, 3).unwrap(),
@@ -1588,14 +1746,15 @@ mod test {
         let pkcs7 = Pkcs7::from_pem_str(pkcs7).unwrap();
         let private_key = PrivateKey::from_pem_str(private_key).unwrap();
 
-        let authenticate_signature =
+        let authenticode_signature =
             AuthenticodeSignature::new(&pkcs7, &FILE_HASH, ShaVariant::SHA2_256, &private_key, None).unwrap();
+        let file_hash = authenticode_signature.file_hash().expect("File hash should be present");
 
-        let ca_name = authenticate_signature.signing_certificate().unwrap().issuer_name();
+        let ca_name = authenticode_signature.signing_certificate().unwrap().issuer_name();
 
-        let validator = authenticate_signature.authenticode_verifier();
+        let validator = authenticode_signature.authenticode_verifier();
         let validator_result = validator
-            .require_basic_authenticode_validation()
+            .require_basic_authenticode_validation(file_hash)
             .require_signing_certificate_check()
             .exact_date(&UTCDate::new(2021, 9, 7, 12, 50, 40).unwrap())
             .require_not_before_check()

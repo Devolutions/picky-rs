@@ -1,7 +1,9 @@
 use crate::cmsversion::CmsVersion;
-use crate::{AlgorithmIdentifier, Attribute, Name, SubjectKeyIdentifier};
+use crate::{oids, pkcs7::Pkcs7Certificate, AlgorithmIdentifier, Attribute, Name, SubjectKeyIdentifier};
 use picky_asn1::tag::{Tag, TagClass, TagPeeker};
-use picky_asn1::wrapper::{ExplicitContextTag1, ImplicitContextTag0, IntegerAsn1, OctetStringAsn1, Optional};
+use picky_asn1::wrapper::{
+    Asn1SetOf, ImplicitContextTag0, IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1, Optional,
+};
 use serde::{de, ser, Deserialize, Serialize};
 
 /// [RFC 5652 #5.3](https://datatracker.ietf.org/doc/html/rfc5652#section-5.3)
@@ -27,8 +29,7 @@ pub struct SignerInfo {
     pub signed_attrs: Optional<Attributes>,
     pub signature_algorithm: SignatureAlgorithmIdentifier,
     pub signature: SignatureValue,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub unsigned_attrs: Option<ExplicitContextTag1<Attributes>>,
+    pub unsigned_attrs: Optional<UnsignedAttributes>,
 }
 
 impl<'de> de::Deserialize<'de> for SignerInfo {
@@ -67,10 +68,10 @@ impl<'de> de::Deserialize<'de> for SignerInfo {
                     signed_attrs: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(3, &self))?,
                     signature_algorithm: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(4, &self))?,
                     signature: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(5, &self))?,
-                    // Unsigned attributes serialization and deserialization is not implemented yet.
-                    // It is just a stub to stop parsing when encountering the attributes.
-                    // TODO: Proper implementation should be added.
-                    unsigned_attrs: seq.next_element().unwrap_or(Some(None)).unwrap_or(None),
+                    unsigned_attrs: seq
+                        .next_element()
+                        .unwrap_or_default()
+                        .unwrap_or_else(|| Optional::from(UnsignedAttributes::default())),
                 })
             }
         }
@@ -223,6 +224,116 @@ pub struct IssuerAndSerialNumber {
 /// ```
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct CertificateSerialNumber(pub IntegerAsn1);
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct UnsignedAttributes(pub Vec<UnsignedAttribute>);
+
+// FIXME: This is a workaround, related to https://github.com/Devolutions/picky-rs/pull/78#issuecomment-789904165
+impl ser::Serialize for UnsignedAttributes {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
+    where
+        S: ser::Serializer,
+    {
+        let mut raw_der = picky_asn1_der::to_vec(&self.0).unwrap_or_else(|_| vec![0]);
+        raw_der[0] = Tag::context_specific_constructed(1).inner();
+        picky_asn1_der::Asn1RawDer(raw_der).serialize(serializer)
+    }
+}
+
+impl<'de> de::Deserialize<'de> for UnsignedAttributes {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        let mut raw_der = picky_asn1_der::Asn1RawDer::deserialize(deserializer)?.0;
+        raw_der[0] = Tag::SEQUENCE.number();
+        let vec = picky_asn1_der::from_bytes(&raw_der).unwrap_or_default();
+        Ok(UnsignedAttributes(vec))
+    }
+}
+
+impl Default for UnsignedAttributes {
+    fn default() -> Self {
+        UnsignedAttributes(Vec::new())
+    }
+}
+
+#[derive(Serialize, Debug, PartialEq, Clone)]
+pub struct UnsignedAttribute {
+    pub ty: ObjectIdentifierAsn1,
+    pub value: UnsignedAttributeValue,
+}
+
+impl<'de> de::Deserialize<'de> for UnsignedAttribute {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        use std::fmt;
+
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = UnsignedAttribute;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a valid DER-encoded ContentInfo")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let ty: ObjectIdentifierAsn1 =
+                    seq.next_element()?.ok_or_else(|| de::Error::invalid_length(0, &self))?;
+
+                let value = match Into::<String>::into(&ty.0).as_str() {
+                    oids::MS_COUNTER_SIGN => UnsignedAttributeValue::MsCounterSign(seq_next_element!(
+                        seq,
+                        Asn1SetOf<Pkcs7Certificate>,
+                        UnsignedAttributeValue,
+                        "McCounterSign"
+                    )),
+                    oids::COUNTER_SIGN => UnsignedAttributeValue::CounterSign(seq_next_element!(
+                        seq,
+                        Asn1SetOf<SignerInfo>,
+                        UnsignedAttributeValue,
+                        "CounterSign"
+                    )),
+                    _ => {
+                        return Err(serde_invalid_value!(
+                            UnsignedAttributeValue,
+                            "unknown oid type",
+                            "MS_COUNTER_SIGN or CounterSign oid"
+                        ))
+                    }
+                };
+
+                Ok(UnsignedAttribute { ty, value })
+            }
+        }
+
+        deserializer.deserialize_seq(Visitor)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum UnsignedAttributeValue {
+    MsCounterSign(Asn1SetOf<Pkcs7Certificate>),
+    CounterSign(Asn1SetOf<SignerInfo>),
+}
+
+impl Serialize for UnsignedAttributeValue {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
+    where
+        S: ser::Serializer,
+    {
+        match &self {
+            UnsignedAttributeValue::MsCounterSign(ms_counter_sign) => ms_counter_sign.serialize(serializer),
+            UnsignedAttributeValue::CounterSign(counter_sign) => counter_sign.serialize(serializer),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {

@@ -108,6 +108,7 @@ define_oid! {
     KP_TIME_STAMPING => kp_time_stamping => "1.3.6.1.5.5.7.3.8",
     KP_OCSP_SIGNING => kp_ocsp_signing => "1.3.6.1.5.5.7.3.9",
     KP_ANY_EXTENDED_KEY_USAGE => kp_any_extended_key_usage => "2.5.29.37.0",
+    KP_LIFETIME_SIGNING  => kp_lifetime_signing => "1.3.6.1.4.1.311.10.3.13",
 
     // attribute types
     AT_COMMON_NAME => at_common_name => "2.5.4.3",
@@ -176,10 +177,12 @@ define_oid! {
     SHAKE256 => shake256 => "2.16.840.1.101.3.4.2.12",
 
     // authenticode
+    COUNTER_SIGN => counter_sign => "1.2.840.113549.1.9.6",
     SPC_INDIRECT_DATA_OBJID => spc_indirect_data_objid => "1.3.6.1.4.1.311.2.1.4",
     SPC_SP_OPUS_INFO_OBJID => spc_sp_opus_info_objid => "1.3.6.1.4.1.311.2.1.12",
     SPC_PE_IMAGE_DATAOBJ => spc_pe_image_dataobj => "1.3.6.1.4.1.311.2.1.15",
     SPC_SIPINFO_OBJID => spc_sip_info_objid => "1.3.6.1.4.1.311.2.1.30",
+    MS_COUNTER_SIGN => ms_counter_signature => "1.3.6.1.4.1.311.3.3.1",
 
     // CTL
     CERT_TRUST_LIST => cert_trust_list => "1.3.6.1.4.1.311.10.1",
