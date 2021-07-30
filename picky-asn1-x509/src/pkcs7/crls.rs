@@ -1,10 +1,8 @@
-use serde::{de, ser, Deserialize, Serialize};
-
-use picky_asn1::tag::{Tag, TagPeeker};
-use picky_asn1::wrapper::{ApplicationTag0, Asn1SequenceOf, BitStringAsn1, ContextTag1, ObjectIdentifierAsn1};
-
 use super::signer_info::CertificateSerialNumber;
 use crate::{AlgorithmIdentifier, Extensions, Name, Time, Version};
+use picky_asn1::tag::{Tag, TagClass, TagPeeker};
+use picky_asn1::wrapper::{ExplicitContextTag0, Asn1SequenceOf, BitStringAsn1, ImplicitContextTag1, ObjectIdentifierAsn1};
+use serde::{de, ser, Deserialize, Serialize};
 
 /// [RFC 5652 #10.2.1](https://datatracker.ietf.org/doc/html/rfc5652#section-10.2.1)
 ///
@@ -14,7 +12,7 @@ use crate::{AlgorithmIdentifier, Extensions, Name, Time, Version};
 #[derive(Debug, PartialEq, Clone, Default)]
 pub struct RevocationInfoChoices(pub Vec<RevocationInfoChoice>);
 
-// FIXME: This is a workaround, related to https://github.com/Devolutions/picky-rs/pull/78#issuecomment-789904165
+// This is a workaround for consturcted encoding as implicit
 
 impl ser::Serialize for RevocationInfoChoices {
     fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
@@ -22,7 +20,7 @@ impl ser::Serialize for RevocationInfoChoices {
         S: ser::Serializer,
     {
         let mut raw_der = picky_asn1_der::to_vec(&self.0).unwrap_or_else(|_| vec![0]);
-        raw_der[0] = Tag::APP_1.number();
+        raw_der[0] = Tag::context_specific_constructed(1).inner();
         picky_asn1_der::Asn1RawDer(raw_der).serialize(serializer)
     }
 }
@@ -33,7 +31,7 @@ impl<'de> de::Deserialize<'de> for RevocationInfoChoices {
         D: de::Deserializer<'de>,
     {
         let mut raw_der = picky_asn1_der::Asn1RawDer::deserialize(deserializer)?.0;
-        raw_der[0] = Tag::SEQUENCE.number();
+        raw_der[0] = Tag::SEQUENCE.inner();
         let vec = picky_asn1_der::from_bytes(&raw_der).unwrap_or_default();
         Ok(RevocationInfoChoices(vec))
     }
@@ -50,7 +48,7 @@ impl<'de> de::Deserialize<'de> for RevocationInfoChoices {
 #[derive(Debug, PartialEq, Clone)]
 pub enum RevocationInfoChoice {
     Crl(CertificateList),
-    Other(ContextTag1<OtherRevocationInfoFormat>),
+    Other(ImplicitContextTag1<OtherRevocationInfoFormat>),
 }
 
 impl ser::Serialize for RevocationInfoChoice {
@@ -89,14 +87,16 @@ impl<'de> Deserialize<'de> for RevocationInfoChoice {
             {
                 let tag_peeker: TagPeeker = seq_next_element!(seq, RevocationInfoChoice, "choice tag");
 
-                let revocation_info_choice = match tag_peeker.next_tag {
-                    Tag::CTX_1 => RevocationInfoChoice::Other(seq_next_element!(
-                        seq,
-                        RevocationInfoChoice,
-                        "OtherRevocationInfoFormat "
-                    )),
-                    _ => RevocationInfoChoice::Crl(seq_next_element!(seq, RevocationInfoChoice, "CertificateList")),
-                };
+                let revocation_info_choice =
+                    if tag_peeker.next_tag.class() == TagClass::ContextSpecific && tag_peeker.next_tag.number() == 1 {
+                        RevocationInfoChoice::Other(seq_next_element!(
+                            seq,
+                            RevocationInfoChoice,
+                            "OtherRevocationInfoFormat "
+                        ))
+                    } else {
+                        RevocationInfoChoice::Crl(seq_next_element!(seq, RevocationInfoChoice, "CertificateList"))
+                    };
 
                 Ok(revocation_info_choice)
             }
@@ -149,7 +149,7 @@ pub struct TbsCertList {
     pub this_update: Time,
     pub next_update: Option<Time>,
     pub revoked_certificates: Option<RevokedCertificates>,
-    pub crl_extension: ApplicationTag0<Option<Extensions>>,
+    pub crl_extension: ExplicitContextTag0<Option<Extensions>>,
 }
 
 impl<'de> de::Deserialize<'de> for TbsCertList {
@@ -188,7 +188,7 @@ impl<'de> de::Deserialize<'de> for TbsCertList {
                     this_update: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(3, &self))?,
                     next_update: seq.next_element().unwrap_or(Some(None)).unwrap_or(None),
                     revoked_certificates: seq.next_element().unwrap_or(Some(None)).unwrap_or(None),
-                    crl_extension: ApplicationTag0(seq.next_element().unwrap_or(Some(None)).unwrap_or(None)),
+                    crl_extension: ExplicitContextTag0(seq.next_element().unwrap_or(Some(None)).unwrap_or(None)),
                 })
             }
         }

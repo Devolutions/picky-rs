@@ -5,7 +5,9 @@ use crate::x509::extension::{ExtendedKeyUsage, ExtensionView};
 use crate::x509::pkcs7::{Pkcs7, Pkcs7Error};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use picky_asn1::tag::Tag;
-use picky_asn1::wrapper::{ApplicationTag0, ApplicationTag1, Asn1SetOf};
+use picky_asn1::wrapper::{
+    Asn1SequenceOf, Asn1SetOf, ExplicitContextTag0, ExplicitContextTag1, ImplicitContextTag0, Optional,
+};
 use picky_asn1_x509::algorithm_identifier::AlgorithmIdentifier;
 use picky_asn1_x509::pkcs7::cmsversion::CmsVersion;
 use picky_asn1_x509::pkcs7::content_info::{
@@ -19,7 +21,7 @@ use picky_asn1_x509::pkcs7::signer_info::{
     SignatureValue, SignerIdentifier, SignerInfo,
 };
 use picky_asn1_x509::pkcs7::Pkcs7Certificate;
-use picky_asn1_x509::{oids, Attribute, AttributeValues, Attributes, Certificate, DigestInfo};
+use picky_asn1_x509::{oids, Attribute, AttributeValues, Certificate, DigestInfo};
 use std::convert::TryFrom;
 use std::error;
 use std::io::{self, BufReader, BufWriter};
@@ -88,7 +90,7 @@ impl WinCertificate {
             .map(SpcString::try_from)
             .transpose()
             .map_err(|err| WinCertificateError::Pkcs7Error(Pkcs7Error::ProgramNameCharSet(err)))?
-            .map(ApplicationTag0);
+            .map(ExplicitContextTag0);
 
         let mut raw_spc_indirect_data_content = picky_asn1_der::to_vec(&data)
             .map_err(|err| WinCertificateError::Pkcs7Error(Pkcs7Error::Asn1DerError(err)))?;
@@ -111,7 +113,7 @@ impl WinCertificate {
                 ty: oids::spc_sp_opus_info_objid().into(),
                 value: AttributeValues::SpcSpOpusInfo(Asn1SetOf(vec![SpcSpOpusInfo {
                     program_name,
-                    more_info: Some(ApplicationTag1(SpcLink::default())),
+                    more_info: Some(ExplicitContextTag1(SpcLink::default())),
                 }])),
             },
             Attribute {
@@ -186,7 +188,7 @@ impl WinCertificate {
             version: CmsVersion::V1,
             sid: SignerIdentifier::IssuerAndSerialNumber(issuer_and_serial_number),
             digest_algorithm: DigestAlgorithmIdentifier(digest_algorithm.clone()),
-            signed_attrs: Attributes(authenticated_attributes).into(),
+            signed_attrs: Optional(ImplicitContextTag0(Asn1SequenceOf(authenticated_attributes))),
             signature_algorithm: SignatureAlgorithmIdentifier(AlgorithmIdentifier::new_rsa_encryption()),
             signature: encrypted_digest,
         };

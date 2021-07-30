@@ -5,10 +5,10 @@ use widestring::U16String;
 
 use picky_asn1::bit_string::BitString;
 use picky_asn1::restricted_string::{BMPString, CharSetError};
-use picky_asn1::tag::{Tag, TagPeeker};
+use picky_asn1::tag::{Tag, TagClass, TagPeeker};
 use picky_asn1::wrapper::{
-    ApplicationTag0, ApplicationTag1, ApplicationTag2, BMPStringAsn1, BitStringAsn1, ContextTag0, ContextTag1,
-    IA5StringAsn1, Implicit, ObjectIdentifierAsn1, OctetStringAsn1,
+    BMPStringAsn1, BitStringAsn1, ExplicitContextTag0, ExplicitContextTag1, ExplicitContextTag2, IA5StringAsn1,
+    ImplicitContextTag0, ImplicitContextTag1, ObjectIdentifierAsn1, OctetStringAsn1, Optional,
 };
 
 use crate::{oids, DigestInfo};
@@ -45,7 +45,7 @@ impl Serialize for ContentValue {
 pub struct EncapsulatedContentInfo {
     pub content_type: ObjectIdentifierAsn1,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub content: Option<ApplicationTag0<ContentValue>>,
+    pub content: Option<ExplicitContextTag0<ContentValue>>,
 }
 
 impl<'de> de::Deserialize<'de> for EncapsulatedContentInfo {
@@ -76,7 +76,7 @@ impl<'de> de::Deserialize<'de> for EncapsulatedContentInfo {
                         ContentValue::SpcIndirectDataContent(
                             seq_next_element!(
                                 seq,
-                                ApplicationTag0<SpcIndirectDataContent>,
+                                ExplicitContextTag0<SpcIndirectDataContent>,
                                 EncapsulatedContentInfo,
                                 "SpcIndirectDataContent"
                             )
@@ -92,7 +92,7 @@ impl<'de> de::Deserialize<'de> for EncapsulatedContentInfo {
                                 ContentValue::OctetString(
                                     seq_next_element!(
                                         seq,
-                                        ApplicationTag0<OctetStringAsn1>,
+                                        ExplicitContextTag0<OctetStringAsn1>,
                                         EncapsulatedContentInfo,
                                         "OctetStringAsn1"
                                     )
@@ -204,7 +204,7 @@ impl<'de> de::Deserialize<'de> for SpcAttributeAndOptionalValue {
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct SpcPeImageData {
     pub flags: SpcPeImageFlags,
-    pub file: ApplicationTag0<SpcLink>, // According to Authenticode_PE.docx, there is  no ApplicationTag0, but otherwise created Authenticode signature won't be valid
+    pub file: ExplicitContextTag0<SpcLink>, // According to Authenticode_PE.docx, there is  no ApplicationTag0, but otherwise created Authenticode signature won't be valid
 }
 
 impl<'de> de::Deserialize<'de> for SpcPeImageData {
@@ -308,22 +308,22 @@ impl<'de> Deserialize<'de> for SpcLink {
                 A: de::SeqAccess<'de>,
             {
                 let tag_peeker: TagPeeker = seq_next_element!(seq, SpcLink, "choice tag");
-                let spc_link = match tag_peeker.next_tag {
-                    Tag::CTX_0 => SpcLink::Url(Url(seq_next_element!(
+                let spc_link = match tag_peeker.next_tag.class_and_number() {
+                    (TagClass::ContextSpecific, 0) => SpcLink::Url(Url(seq_next_element!(
                         seq,
-                        Implicit<ContextTag0<IA5StringAsn1>>,
+                        Optional<ImplicitContextTag0<IA5StringAsn1>>,
                         SpcLink,
                         "Url"
                     ))),
-                    Tag::CTX_1 => SpcLink::Moniker(Moniker(seq_next_element!(
+                    (TagClass::ContextSpecific, 1) => SpcLink::Moniker(Moniker(seq_next_element!(
                         seq,
-                        Implicit<ContextTag1<SpcSerializedObject>>,
+                        Optional<ImplicitContextTag1<SpcSerializedObject>>,
                         SpcLink,
                         "Moniker"
                     ))),
-                    Tag::APP_2 => SpcLink::File(File(seq_next_element!(
+                    (TagClass::ContextSpecific, 2) => SpcLink::File(File(seq_next_element!(
                         seq,
-                        ApplicationTag2<SpcString>,
+                        ExplicitContextTag2<SpcString>,
                         SpcLink,
                         "File"
                     ))),
@@ -351,19 +351,19 @@ impl Default for SpcLink {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct Url(pub Implicit<ContextTag0<IA5StringAsn1>>);
+pub struct Url(pub Optional<ImplicitContextTag0<IA5StringAsn1>>);
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct Moniker(pub Implicit<ContextTag1<SpcSerializedObject>>);
+pub struct Moniker(pub Optional<ImplicitContextTag1<SpcSerializedObject>>);
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct File(pub ApplicationTag2<SpcString>);
+pub struct File(pub ExplicitContextTag2<SpcString>);
 
 impl Default for File {
     fn default() -> Self {
         let buffer = unicode_string_into_u8_vec(U16String::from_str("<<<Obsolete>>>"));
 
-        File(SpcString::Unicode(Implicit(ContextTag0(BMPString::new(buffer).unwrap().into()))).into())
+        File(SpcString::Unicode(Optional(ImplicitContextTag0(BMPString::new(buffer).unwrap().into()))).into())
     }
 }
 
@@ -402,8 +402,8 @@ pub struct SpcSerializedObject {
 /// ```
 #[derive(Debug, PartialEq, Clone)]
 pub enum SpcString {
-    Unicode(Implicit<ContextTag0<BMPStringAsn1>>),
-    Ancii(Implicit<ContextTag1<IA5StringAsn1>>),
+    Unicode(Optional<ImplicitContextTag0<BMPStringAsn1>>),
+    Ancii(Optional<ImplicitContextTag1<IA5StringAsn1>>),
 }
 
 impl Serialize for SpcString {
@@ -440,16 +440,16 @@ impl<'de> Deserialize<'de> for SpcString {
             {
                 let tag_peeker: TagPeeker = seq_next_element!(seq, SpcString, "choice tag");
 
-                let spc_string = match tag_peeker.next_tag {
-                    Tag::CTX_0 => SpcString::Unicode(seq_next_element!(
+                let spc_string = match tag_peeker.next_tag.class_and_number() {
+                    (TagClass::ContextSpecific, 0) => SpcString::Unicode(seq_next_element!(
                         seq,
-                        Implicit<ContextTag0<BMPStringAsn1>>,
+                        Optional<ImplicitContextTag0<BMPStringAsn1>>,
                         SpcString,
                         "BMPStringAsn1"
                     )),
-                    Tag::CTX_1 => SpcString::Ancii(seq_next_element!(
+                    (TagClass::ContextSpecific, 1) => SpcString::Ancii(seq_next_element!(
                         seq,
-                        Implicit<ContextTag1<IA5StringAsn1>>,
+                        Optional<ImplicitContextTag1<IA5StringAsn1>>,
                         SpcString,
                         "IA5StringAsn1"
                     )),
@@ -476,7 +476,7 @@ impl TryFrom<String> for SpcString {
     fn try_from(string: String) -> Result<Self, Self::Error> {
         let buffer = unicode_string_into_u8_vec(U16String::from_str(&string));
 
-        Ok(SpcString::Unicode(Implicit(ContextTag0(
+        Ok(SpcString::Unicode(Optional(ImplicitContextTag0(
             BMPString::new(buffer)?.into(),
         ))))
     }
@@ -492,9 +492,9 @@ impl TryFrom<String> for SpcString {
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct SpcSpOpusInfo {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub program_name: Option<ApplicationTag0<SpcString>>,
+    pub program_name: Option<ExplicitContextTag0<SpcString>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub more_info: Option<ApplicationTag1<SpcLink>>,
+    pub more_info: Option<ExplicitContextTag1<SpcLink>>,
 }
 
 impl<'de> Deserialize<'de> for SpcSpOpusInfo {

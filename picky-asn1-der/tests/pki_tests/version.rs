@@ -1,4 +1,4 @@
-use picky_asn1::wrapper::{ApplicationTag0, Implicit};
+use picky_asn1::wrapper::{ExplicitContextTag0, Optional};
 use serde::{de, ser, Deserialize, Serialize};
 use std::fmt;
 
@@ -74,11 +74,11 @@ impl<'de> Deserialize<'de> for Version {
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 struct OptionalVersionTestStruct {
     #[serde(skip_serializing_if = "implicit_app0_version_is_default")]
-    version: Implicit<ApplicationTag0<Version>>,
+    version: Optional<ExplicitContextTag0<Version>>,
     other_non_optional_integer: u8,
 }
 
-pub fn implicit_app0_version_is_default(version: &Implicit<ApplicationTag0<Version>>) -> bool {
+pub fn implicit_app0_version_is_default(version: &Optional<ExplicitContextTag0<Version>>) -> bool {
     version.is_default()
 }
 
@@ -87,7 +87,7 @@ fn optional_version() {
     let buffer_with_version: [u8; 10] = [0x30, 0x08, 0xA0, 0x03, 0x02, 0x01, 0x02, 0x02, 0x01, 0x6E];
 
     let non_default = OptionalVersionTestStruct {
-        version: ApplicationTag0(Version::V3).into(),
+        version: ExplicitContextTag0(Version::V3).into(),
         other_non_optional_integer: 0x6E,
     };
 
@@ -96,7 +96,7 @@ fn optional_version() {
     let buffer_without_version: [u8; 5] = [0x30, 0x03, 0x02, 0x01, 0x6E];
 
     let default = OptionalVersionTestStruct {
-        version: ApplicationTag0(Version::default()).into(),
+        version: ExplicitContextTag0(Version::default()).into(),
         other_non_optional_integer: 0x6E,
     };
 

@@ -2,8 +2,8 @@ use crate::{oids, GeneralName, GeneralNames};
 use core::slice::{Iter, IterMut};
 use picky_asn1::bit_string::BitString;
 use picky_asn1::wrapper::{
-    ApplicationTag1, Asn1SequenceOf, BitStringAsn1, ContextTag0, ContextTag2, Implicit, IntegerAsn1,
-    ObjectIdentifierAsn1, OctetStringAsn1, OctetStringAsn1Container,
+    Asn1SequenceOf, BitStringAsn1, ExplicitContextTag1, ImplicitContextTag0, ImplicitContextTag2, IntegerAsn1,
+    ObjectIdentifierAsn1, OctetStringAsn1, OctetStringAsn1Container, Optional,
 };
 use serde::{de, ser, Deserialize, Serialize};
 use std::fmt;
@@ -16,7 +16,7 @@ pub struct Extensions(pub Vec<Extension>);
 #[derive(Debug, PartialEq, Clone)]
 pub struct Extension {
     extn_id: ObjectIdentifierAsn1,
-    critical: Implicit<bool>,
+    critical: Optional<bool>,
     extn_value: ExtensionValue,
 }
 
@@ -87,9 +87,9 @@ impl Extension {
             critical: false.into(),
             extn_value: ExtensionValue::AuthorityKeyIdentifier(
                 AuthorityKeyIdentifier {
-                    key_identifier: key_identifier.into().map(ContextTag0),
-                    authority_cert_issuer: authority_cert_issuer.into().map(ApplicationTag1),
-                    authority_cert_serial_number: authority_cert_serial_number.into().map(ContextTag2),
+                    key_identifier: key_identifier.into().map(ImplicitContextTag0),
+                    authority_cert_issuer: authority_cert_issuer.into().map(ExplicitContextTag1),
+                    authority_cert_serial_number: authority_cert_serial_number.into().map(ImplicitContextTag2),
                 }
                 .into(),
             ),
@@ -110,8 +110,8 @@ impl Extension {
             critical: true.into(),
             extn_value: ExtensionValue::BasicConstraints(
                 BasicConstraints {
-                    ca: Implicit(ca.into()),
-                    path_len_constraint: Implicit(path_len_constraints.into()),
+                    ca: Optional(ca.into()),
+                    path_len_constraint: Optional(path_len_constraints.into()),
                 }
                 .into(),
             ),
@@ -130,7 +130,7 @@ impl Extension {
         let eku = extended_key_usage.into();
         Self {
             extn_id: oids::extended_key_usage().into(),
-            critical: Implicit(!eku.contains(oids::kp_any_extended_key_usage())),
+            critical: Optional(!eku.contains(oids::kp_any_extended_key_usage())),
             extn_value: ExtensionValue::ExtendedKeyUsage(eku.into()),
         }
     }
@@ -181,7 +181,7 @@ impl ser::Serialize for Extension {
         let mut seq = serializer.serialize_seq(Some(3))?;
         seq.serialize_element(&self.extn_id)?;
 
-        if self.critical.0 != bool::default() {
+        if self.critical != bool::default() {
             seq.serialize_element(&self.critical)?;
         }
 
@@ -210,7 +210,7 @@ impl<'de> de::Deserialize<'de> for Extension {
                 A: de::SeqAccess<'de>,
             {
                 let id: ObjectIdentifierAsn1 = seq_next_element!(seq, Extension, "id");
-                let critical: Implicit<bool> = seq_next_element!(seq, Extension, "critical");
+                let critical: Optional<bool> = seq_next_element!(seq, Extension, "critical");
                 let value = match Into::<String>::into(&id.0).as_str() {
                     oids::AUTHORITY_KEY_IDENTIFIER => ExtensionValue::AuthorityKeyIdentifier(seq_next_element!(
                         seq,
@@ -329,9 +329,9 @@ impl ser::Serialize for ExtensionValue {
 /// ```
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct AuthorityKeyIdentifier {
-    key_identifier: Option<ContextTag0<KeyIdentifier>>,
-    authority_cert_issuer: Option<ApplicationTag1<GeneralName>>,
-    authority_cert_serial_number: Option<ContextTag2<IntegerAsn1>>,
+    key_identifier: Option<ImplicitContextTag0<KeyIdentifier>>,
+    authority_cert_issuer: Option<ExplicitContextTag1<GeneralName>>,
+    authority_cert_serial_number: Option<ImplicitContextTag2<IntegerAsn1>>,
 }
 
 impl AuthorityKeyIdentifier {
@@ -448,8 +448,8 @@ type IssuerAltName = GeneralNames;
 /// ```
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct BasicConstraints {
-    ca: Implicit<Option<bool>>, // default is false
-    path_len_constraint: Implicit<Option<u8>>,
+    ca: Optional<Option<bool>>, // default is false
+    path_len_constraint: Optional<Option<u8>>,
 }
 
 impl BasicConstraints {
@@ -481,8 +481,8 @@ impl<'de> de::Deserialize<'de> for BasicConstraints {
                 A: de::SeqAccess<'de>,
             {
                 Ok(BasicConstraints {
-                    ca: Implicit(seq.next_element().unwrap_or(Some(None)).unwrap_or(None)),
-                    path_len_constraint: Implicit(seq.next_element().unwrap_or(Some(None)).unwrap_or(None)),
+                    ca: Optional(seq.next_element().unwrap_or(Some(None)).unwrap_or(None)),
+                    path_len_constraint: Optional(seq.next_element().unwrap_or(Some(None)).unwrap_or(None)),
                 })
             }
         }

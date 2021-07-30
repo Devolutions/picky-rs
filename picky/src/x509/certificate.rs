@@ -8,7 +8,7 @@ use crate::x509::date::UTCDate;
 use crate::x509::key_id_gen_method::{KeyIdGenError, KeyIdGenMethod};
 use crate::x509::name::{DirectoryName, GeneralNames};
 use picky_asn1::bit_string::BitString;
-use picky_asn1::wrapper::{ApplicationTag0, ApplicationTag3, IntegerAsn1};
+use picky_asn1::wrapper::{ExplicitContextTag0, ExplicitContextTag3, IntegerAsn1};
 use picky_asn1_der::Asn1DerError;
 use picky_asn1_x509::{
     oids, AlgorithmIdentifier, AuthorityKeyIdentifier, BasicConstraints, Certificate, ExtendedKeyUsage, Extension,
@@ -799,11 +799,7 @@ impl<'a> CertificateBuilder<'a> {
             SubjectInfos::Csr(csr) => {
                 csr.verify().map_err(|e| CertError::InvalidCsr { source: e })?;
 
-                let ext_req = csr
-                    .0
-                    .certification_request_info
-                    .attributes
-                    .0
+                let ext_req = ((csr.0.certification_request_info.attributes.0).0)
                     .into_iter()
                     .find_map(|attr| match attr.value {
                         picky_asn1_x509::AttributeValues::Extensions(set_of_extensions) => {
@@ -902,14 +898,14 @@ impl<'a> CertificateBuilder<'a> {
         };
 
         let tbs_certificate = TbsCertificate {
-            version: ApplicationTag0(Version::V3),
+            version: ExplicitContextTag0(Version::V3),
             serial_number,
             signature: AlgorithmIdentifier::from(signature_hash_type),
             issuer: Name::from(issuer_name),
             validity,
             subject: Name::from(subject_name),
             subject_public_key_info: SubjectPublicKeyInfo::from(subject_public_key),
-            extensions: ApplicationTag3(extensions),
+            extensions: ExplicitContextTag3(extensions),
         };
 
         let tbs_der = picky_asn1_der::to_vec(&tbs_certificate)

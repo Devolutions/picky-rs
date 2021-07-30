@@ -71,17 +71,17 @@ impl<'de> Deserialize<'de> for Version {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use picky_asn1::wrapper::{ApplicationTag9, Implicit};
+    use picky_asn1::wrapper::{ExplicitContextTag9, Optional};
     use picky_asn1_der::Asn1DerError;
 
     #[derive(Serialize, Deserialize, Debug, PartialEq)]
     struct OptionalVersionTestStruct {
         #[serde(skip_serializing_if = "version_is_default")]
-        version: Implicit<ApplicationTag9<Version>>,
+        version: Optional<ExplicitContextTag9<Version>>,
         other_non_optional_integer: u8,
     }
 
-    fn version_is_default(version: &Implicit<ApplicationTag9<Version>>) -> bool {
+    fn version_is_default(version: &Optional<ExplicitContextTag9<Version>>) -> bool {
         (version.0).0 == Version::V1
     }
 
@@ -90,7 +90,7 @@ mod tests {
         let buffer_with_version: [u8; 10] = [0x30, 0x08, 0xA9, 0x03, 0x02, 0x01, 0x02, 0x02, 0x01, 0x6E];
 
         let non_default = OptionalVersionTestStruct {
-            version: ApplicationTag9(Version::V3).into(),
+            version: ExplicitContextTag9(Version::V3).into(),
             other_non_optional_integer: 0x6E,
         };
 
@@ -99,7 +99,7 @@ mod tests {
         let buffer_without_version: [u8; 5] = [0x30, 0x03, 0x02, 0x01, 0x6E];
 
         let default = OptionalVersionTestStruct {
-            version: ApplicationTag9(Version::default()).into(),
+            version: ExplicitContextTag9(Version::default()).into(),
             other_non_optional_integer: 0x6E,
         };
 

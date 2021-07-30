@@ -44,6 +44,12 @@ macro_rules! asn1_wrapper {
             pub Vec<T>,
         );
 
+        impl<T> Default for $wrapper_ty<T> {
+            fn default() -> Self {
+                Self(Vec::new())
+            }
+        }
+
         impls! { $wrapper_ty ( Vec < T > ), $tag }
     };
 }
@@ -199,38 +205,38 @@ asn1_wrapper! { auto collection struct Asn1SequenceOf<T>, Tag::SEQUENCE }
 asn1_wrapper! { auto collection struct Asn1SetOf<T>,      Tag::SET }
 
 define_special_tag! {
-    ApplicationTag0  => Tag::APP_0,
-    ApplicationTag1  => Tag::APP_1,
-    ApplicationTag2  => Tag::APP_2,
-    ApplicationTag3  => Tag::APP_3,
-    ApplicationTag4  => Tag::APP_4,
-    ApplicationTag5  => Tag::APP_5,
-    ApplicationTag6  => Tag::APP_6,
-    ApplicationTag7  => Tag::APP_7,
-    ApplicationTag8  => Tag::APP_8,
-    ApplicationTag9  => Tag::APP_9,
-    ApplicationTag10 => Tag::APP_10,
-    ApplicationTag11 => Tag::APP_11,
-    ApplicationTag12 => Tag::APP_12,
-    ApplicationTag13 => Tag::APP_13,
-    ApplicationTag14 => Tag::APP_14,
-    ApplicationTag15 => Tag::APP_15,
-    ContextTag0      => Tag::CTX_0,
-    ContextTag1      => Tag::CTX_1,
-    ContextTag2      => Tag::CTX_2,
-    ContextTag3      => Tag::CTX_3,
-    ContextTag4      => Tag::CTX_4,
-    ContextTag5      => Tag::CTX_5,
-    ContextTag6      => Tag::CTX_6,
-    ContextTag7      => Tag::CTX_7,
-    ContextTag8      => Tag::CTX_8,
-    ContextTag9      => Tag::CTX_9,
-    ContextTag10     => Tag::CTX_10,
-    ContextTag11     => Tag::CTX_11,
-    ContextTag12     => Tag::CTX_12,
-    ContextTag13     => Tag::CTX_13,
-    ContextTag14     => Tag::CTX_14,
-    ContextTag15     => Tag::CTX_15,
+    ExplicitContextTag0  => Tag::context_specific_constructed(0),
+    ExplicitContextTag1  => Tag::context_specific_constructed(1),
+    ExplicitContextTag2  => Tag::context_specific_constructed(2),
+    ExplicitContextTag3  => Tag::context_specific_constructed(3),
+    ExplicitContextTag4  => Tag::context_specific_constructed(4),
+    ExplicitContextTag5  => Tag::context_specific_constructed(5),
+    ExplicitContextTag6  => Tag::context_specific_constructed(6),
+    ExplicitContextTag7  => Tag::context_specific_constructed(7),
+    ExplicitContextTag8  => Tag::context_specific_constructed(8),
+    ExplicitContextTag9  => Tag::context_specific_constructed(9),
+    ExplicitContextTag10 => Tag::context_specific_constructed(10),
+    ExplicitContextTag11 => Tag::context_specific_constructed(11),
+    ExplicitContextTag12 => Tag::context_specific_constructed(12),
+    ExplicitContextTag13 => Tag::context_specific_constructed(13),
+    ExplicitContextTag14 => Tag::context_specific_constructed(14),
+    ExplicitContextTag15 => Tag::context_specific_constructed(15),
+    ImplicitContextTag0  => Tag::context_specific_primitive(0),
+    ImplicitContextTag1  => Tag::context_specific_primitive(1),
+    ImplicitContextTag2  => Tag::context_specific_primitive(2),
+    ImplicitContextTag3  => Tag::context_specific_primitive(3),
+    ImplicitContextTag4  => Tag::context_specific_primitive(4),
+    ImplicitContextTag5  => Tag::context_specific_primitive(5),
+    ImplicitContextTag6  => Tag::context_specific_primitive(6),
+    ImplicitContextTag7  => Tag::context_specific_primitive(7),
+    ImplicitContextTag8  => Tag::context_specific_primitive(8),
+    ImplicitContextTag9  => Tag::context_specific_primitive(9),
+    ImplicitContextTag10 => Tag::context_specific_primitive(10),
+    ImplicitContextTag11 => Tag::context_specific_primitive(11),
+    ImplicitContextTag12 => Tag::context_specific_primitive(12),
+    ImplicitContextTag13 => Tag::context_specific_primitive(13),
+    ImplicitContextTag14 => Tag::context_specific_primitive(14),
+    ImplicitContextTag15 => Tag::context_specific_primitive(15),
 }
 
 impl Default for IA5StringAsn1 {
@@ -242,12 +248,6 @@ impl Default for IA5StringAsn1 {
 impl Default for BMPStringAsn1 {
     fn default() -> Self {
         BMPStringAsn1::from(BMPString::default())
-    }
-}
-
-impl<T> Default for Asn1SetOf<T> {
-    fn default() -> Asn1SetOf<T> {
-        Asn1SetOf(Vec::new())
     }
 }
 
@@ -384,10 +384,10 @@ impl IntegerAsn1 {
 ///
 /// Examples:
 /// ```
-/// use picky_asn1::wrapper::{ApplicationTag0, HeaderOnly};
+/// use picky_asn1::wrapper::{ExplicitContextTag0, HeaderOnly};
 /// use serde::{Serialize, Deserialize};
 ///
-/// let tag_only = HeaderOnly::<ApplicationTag0<()>>::default();
+/// let tag_only = HeaderOnly::<ExplicitContextTag0<()>>::default();
 /// let buffer = [0xA0, 0x00];
 ///
 /// let encoded = picky_asn1_der::to_vec(&tag_only).expect("couldn't serialize");
@@ -396,7 +396,7 @@ impl IntegerAsn1 {
 ///     buffer,
 /// );
 ///
-/// let decoded: HeaderOnly<ApplicationTag0<()>> = picky_asn1_der::from_bytes(&buffer).expect("couldn't deserialize");
+/// let decoded: HeaderOnly<ExplicitContextTag0<()>> = picky_asn1_der::from_bytes(&buffer).expect("couldn't deserialize");
 /// assert_eq!(
 ///     decoded,
 ///     tag_only,
@@ -426,7 +426,7 @@ where
     S: ser::Serializer,
     Phantom: Asn1Type,
 {
-    serializer.serialize_bytes(&[Phantom::TAG.number(), 0x00][..])
+    serializer.serialize_bytes(&[Phantom::TAG.inner(), 0x00][..])
 }
 
 fn deserialize_header_only<'de, D, Phantom>(deserializer: D) -> Result<std::marker::PhantomData<Phantom>, D::Error>
@@ -457,7 +457,7 @@ where
                 ));
             }
 
-            if v[0] != T::TAG.number() {
+            if v[0] != T::TAG.inner() {
                 return Err(E::invalid_value(
                     de::Unexpected::Other("invalid ASN.1 header: wrong tag"),
                     &"a valid buffer representing an empty ASN.1 header (two bytes) with the expected tag",
@@ -582,14 +582,14 @@ pub struct OctetStringAsn1Container<Encapsulated>(pub Encapsulated);
 
 impls! { OctetStringAsn1Container<Encapsulated>, Tag::OCTET_STRING }
 
-/// Wrapper for ASN.1 implicits (optionals) fields
+/// Wrapper for ASN.1 optionals fields
 ///
 /// Wrapped type has to implement the Default trait to be deserializable (on deserialization failure
 /// a default value is returned).
 ///
 /// Examples:
 /// ```
-/// use picky_asn1::wrapper::{Implicit, ApplicationTag0};
+/// use picky_asn1::wrapper::{Optional, ExplicitContextTag0};
 /// use serde::{Serialize, Deserialize};
 ///
 /// #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -604,13 +604,13 @@ impls! { OctetStringAsn1Container<Encapsulated>, Tag::OCTET_STRING }
 /// #[derive(Serialize, Deserialize, Debug, PartialEq)]
 /// struct ComplexType {
 ///     // skip if default to reduce encoded size
-///     #[serde(skip_serializing_if = "implicit_field_is_default")]
-///     optional_field: Implicit<MyWrapper>,
+///     #[serde(skip_serializing_if = "optional_field_is_default")]
+///     optional_field: Optional<MyWrapper>,
 ///     // behind application tag 0 to distinguish from optional_field that is a ASN.1 integer too.
-///     explicit_field: ApplicationTag0<u8>,
+///     explicit_field: ExplicitContextTag0<u8>,
 /// }
 ///
-/// fn implicit_field_is_default(wrapper: &Implicit<MyWrapper>) -> bool {
+/// fn optional_field_is_default(wrapper: &Optional<MyWrapper>) -> bool {
 ///     wrapper.0 == MyWrapper::default()
 /// }
 ///
@@ -638,15 +638,15 @@ impls! { OctetStringAsn1Container<Encapsulated>, Tag::OCTET_STRING }
 /// );
 /// ```
 #[derive(Debug, PartialEq, PartialOrd, Hash, Clone)]
-pub struct Implicit<T>(pub T);
+pub struct Optional<T>(pub T);
 
-impl<T> From<T> for Implicit<T> {
+impl<T> From<T> for Optional<T> {
     fn from(wrapped: T) -> Self {
         Self(wrapped)
     }
 }
 
-impl<T> Deref for Implicit<T> {
+impl<T> Deref for Optional<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -654,13 +654,13 @@ impl<T> Deref for Implicit<T> {
     }
 }
 
-impl<T> DerefMut for Implicit<T> {
+impl<T> DerefMut for Optional<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl<T> PartialEq<T> for Implicit<T>
+impl<T> PartialEq<T> for Optional<T>
 where
     T: PartialEq,
 {
@@ -669,7 +669,7 @@ where
     }
 }
 
-impl<T> Serialize for Implicit<T>
+impl<T> Serialize for Optional<T>
 where
     T: Serialize,
 {
@@ -681,7 +681,7 @@ where
     }
 }
 
-impl<'de, T> Deserialize<'de> for Implicit<T>
+impl<'de, T> Deserialize<'de> for Optional<T>
 where
     T: Deserialize<'de> + Default,
 {
@@ -695,7 +695,7 @@ where
         where
             T: Deserialize<'de>,
         {
-            type Value = Implicit<T>;
+            type Value = Optional<T>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 write!(formatter, "nothing or a valid DER-encoded T")
@@ -705,11 +705,11 @@ where
             where
                 D: de::Deserializer<'de>,
             {
-                T::deserialize(deserializer).map(Implicit::from)
+                T::deserialize(deserializer).map(Optional::from)
             }
         }
 
-        match deserializer.deserialize_newtype_struct("Implicit", Visitor(std::marker::PhantomData)) {
+        match deserializer.deserialize_newtype_struct("Optional", Visitor(std::marker::PhantomData)) {
             Err(_) => Ok(Self(T::default())),
             result => result,
         }

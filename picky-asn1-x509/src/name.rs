@@ -1,10 +1,6 @@
 use crate::{AttributeTypeAndValue, AttributeTypeAndValueParameters, DirectoryString};
-use picky_asn1::tag::{Tag, TagPeeker};
-use picky_asn1::wrapper::{
-    ApplicationTag1, ApplicationTag2, ApplicationTag4, ApplicationTag5, ApplicationTag6, ApplicationTag7,
-    ApplicationTag8, Asn1SequenceOf, Asn1SetOf, ContextTag0, ContextTag1, ContextTag2, ContextTag4, ContextTag5,
-    ContextTag6, ContextTag7, ContextTag8, IA5StringAsn1, Implicit, ObjectIdentifierAsn1, OctetStringAsn1,
-};
+use picky_asn1::tag::{Encoding, TagClass, TagPeeker};
+use picky_asn1::wrapper::*;
 use serde::{de, ser, Deserialize, Serialize};
 use std::fmt;
 
@@ -205,8 +201,8 @@ impl GeneralName {
         NA: Into<DirectoryString>,
     {
         Self::EdiPartyName(EdiPartyName {
-            name_assigner: Implicit(name_assigner.map(Into::into).map(ContextTag0)),
-            party_name: ContextTag1(party_name.into()),
+            name_assigner: Optional(name_assigner.map(Into::into).map(ImplicitContextTag0)),
+            party_name: ImplicitContextTag1(party_name.into()),
         })
     }
 }
@@ -223,13 +219,13 @@ impl ser::Serialize for GeneralName {
         S: ser::Serializer,
     {
         match &self {
-            GeneralName::Rfc822Name(name) => ContextTag1(name).serialize(serializer),
-            GeneralName::DnsName(name) => ContextTag2(name).serialize(serializer),
-            GeneralName::DirectoryName(name) => ContextTag4(name).serialize(serializer),
-            GeneralName::EdiPartyName(name) => ContextTag5(name).serialize(serializer),
-            GeneralName::Uri(name) => ContextTag6(name).serialize(serializer),
-            GeneralName::IpAddress(name) => ContextTag7(name).serialize(serializer),
-            GeneralName::RegisteredId(name) => ContextTag8(name).serialize(serializer),
+            GeneralName::Rfc822Name(name) => ImplicitContextTag1(name).serialize(serializer),
+            GeneralName::DnsName(name) => ImplicitContextTag2(name).serialize(serializer),
+            GeneralName::DirectoryName(name) => ImplicitContextTag4(name).serialize(serializer),
+            GeneralName::EdiPartyName(name) => ImplicitContextTag5(name).serialize(serializer),
+            GeneralName::Uri(name) => ImplicitContextTag6(name).serialize(serializer),
+            GeneralName::IpAddress(name) => ImplicitContextTag7(name).serialize(serializer),
+            GeneralName::RegisteredId(name) => ImplicitContextTag8(name).serialize(serializer),
         }
     }
 }
@@ -253,58 +249,70 @@ impl<'de> de::Deserialize<'de> for GeneralName {
                 A: de::SeqAccess<'de>,
             {
                 let tag_peeker: TagPeeker = seq_next_element!(seq, DirectoryString, "choice tag");
-                match tag_peeker.next_tag {
-                    Tag::CTX_0 | Tag::APP_0 => Err(serde_invalid_value!(
+                match tag_peeker.next_tag.components() {
+                    (TagClass::ContextSpecific, _, 0) => Err(serde_invalid_value!(
                         GeneralName,
                         "OtherName not supported",
                         "a supported choice"
                     )),
-                    Tag::CTX_1 => Ok(GeneralName::Rfc822Name(
-                        seq_next_element!(seq, ContextTag1<IA5StringAsn1>, GeneralName, "RFC822Name").0,
+                    (TagClass::ContextSpecific, Encoding::Primitive, 1) => Ok(GeneralName::Rfc822Name(
+                        seq_next_element!(seq, ImplicitContextTag1<IA5StringAsn1>, GeneralName, "RFC822Name").0,
                     )),
-                    Tag::APP_1 => Ok(GeneralName::Rfc822Name(
-                        seq_next_element!(seq, ApplicationTag1<IA5StringAsn1>, GeneralName, "RFC822Name").0,
+                    (TagClass::ContextSpecific, Encoding::Constructed, 1) => Ok(GeneralName::Rfc822Name(
+                        seq_next_element!(seq, ExplicitContextTag1<IA5StringAsn1>, GeneralName, "RFC822Name").0,
                     )),
-                    Tag::CTX_2 => Ok(GeneralName::DnsName(
-                        seq_next_element!(seq, ContextTag2<IA5StringAsn1>, GeneralName, "DNSName").0,
+                    (TagClass::ContextSpecific, Encoding::Primitive, 2) => Ok(GeneralName::DnsName(
+                        seq_next_element!(seq, ImplicitContextTag2<IA5StringAsn1>, GeneralName, "DNSName").0,
                     )),
-                    Tag::APP_2 => Ok(GeneralName::DnsName(
-                        seq_next_element!(seq, ApplicationTag2<IA5StringAsn1>, GeneralName, "DNSName").0,
+                    (TagClass::ContextSpecific, Encoding::Constructed, 2) => Ok(GeneralName::DnsName(
+                        seq_next_element!(seq, ExplicitContextTag2<IA5StringAsn1>, GeneralName, "DNSName").0,
                     )),
-                    Tag::CTX_3 | Tag::APP_3 => Err(serde_invalid_value!(
+                    (TagClass::ContextSpecific, _, 3) => Err(serde_invalid_value!(
                         GeneralName,
                         "X400Address not supported",
                         "a supported choice"
                     )),
-                    Tag::CTX_4 => Ok(GeneralName::DirectoryName(
-                        seq_next_element!(seq, ContextTag4<Name>, GeneralName, "DirectoryName").0,
+                    (TagClass::ContextSpecific, Encoding::Primitive, 4) => Ok(GeneralName::DirectoryName(
+                        seq_next_element!(seq, ImplicitContextTag4<Name>, GeneralName, "DirectoryName").0,
                     )),
-                    Tag::APP_4 => Ok(GeneralName::DirectoryName(
-                        seq_next_element!(seq, ApplicationTag4<Name>, GeneralName, "DirectoryName").0,
+                    (TagClass::ContextSpecific, Encoding::Constructed, 4) => Ok(GeneralName::DirectoryName(
+                        seq_next_element!(seq, ExplicitContextTag4<Name>, GeneralName, "DirectoryName").0,
                     )),
-                    Tag::CTX_5 => Ok(GeneralName::EdiPartyName(
-                        seq_next_element!(seq, ContextTag5<EdiPartyName>, GeneralName, "EDIPartyName").0,
+                    (TagClass::ContextSpecific, Encoding::Primitive, 5) => Ok(GeneralName::EdiPartyName(
+                        seq_next_element!(seq, ImplicitContextTag5<EdiPartyName>, GeneralName, "EDIPartyName").0,
                     )),
-                    Tag::APP_5 => Ok(GeneralName::EdiPartyName(
-                        seq_next_element!(seq, ApplicationTag5<EdiPartyName>, GeneralName, "EDIPartyName").0,
+                    (TagClass::ContextSpecific, Encoding::Constructed, 5) => Ok(GeneralName::EdiPartyName(
+                        seq_next_element!(seq, ExplicitContextTag5<EdiPartyName>, GeneralName, "EDIPartyName").0,
                     )),
-                    Tag::CTX_6 => Ok(GeneralName::Uri(
-                        seq_next_element!(seq, ContextTag6<IA5StringAsn1>, GeneralName, "URI").0,
+                    (TagClass::ContextSpecific, Encoding::Primitive, 6) => Ok(GeneralName::Uri(
+                        seq_next_element!(seq, ImplicitContextTag6<IA5StringAsn1>, GeneralName, "URI").0,
                     )),
-                    Tag::APP_6 => Ok(GeneralName::Uri(
-                        seq_next_element!(seq, ApplicationTag6<IA5StringAsn1>, GeneralName, "URI").0,
+                    (TagClass::ContextSpecific, Encoding::Constructed, 6) => Ok(GeneralName::Uri(
+                        seq_next_element!(seq, ExplicitContextTag6<IA5StringAsn1>, GeneralName, "URI").0,
                     )),
-                    Tag::CTX_7 => Ok(GeneralName::IpAddress(
-                        seq_next_element!(seq, ContextTag7<OctetStringAsn1>, GeneralName, "IpAddress").0,
+                    (TagClass::ContextSpecific, Encoding::Primitive, 7) => Ok(GeneralName::IpAddress(
+                        seq_next_element!(seq, ImplicitContextTag7<OctetStringAsn1>, GeneralName, "IpAddress").0,
                     )),
-                    Tag::APP_7 => Ok(GeneralName::IpAddress(
-                        seq_next_element!(seq, ApplicationTag7<OctetStringAsn1>, GeneralName, "IpAddress").0,
+                    (TagClass::ContextSpecific, Encoding::Constructed, 7) => Ok(GeneralName::IpAddress(
+                        seq_next_element!(seq, ExplicitContextTag7<OctetStringAsn1>, GeneralName, "IpAddress").0,
                     )),
-                    Tag::CTX_8 => Ok(GeneralName::RegisteredId(
-                        seq_next_element!(seq, ContextTag8<ObjectIdentifierAsn1>, GeneralName, "RegisteredId").0,
+                    (TagClass::ContextSpecific, Encoding::Primitive, 8) => Ok(GeneralName::RegisteredId(
+                        seq_next_element!(
+                            seq,
+                            ImplicitContextTag8<ObjectIdentifierAsn1>,
+                            GeneralName,
+                            "RegisteredId"
+                        )
+                        .0,
                     )),
-                    Tag::APP_8 => Ok(GeneralName::RegisteredId(
-                        seq_next_element!(seq, ApplicationTag8<ObjectIdentifierAsn1>, GeneralName, "RegisteredId").0,
+                    (TagClass::ContextSpecific, Encoding::Constructed, 8) => Ok(GeneralName::RegisteredId(
+                        seq_next_element!(
+                            seq,
+                            ExplicitContextTag8<ObjectIdentifierAsn1>,
+                            GeneralName,
+                            "RegisteredId"
+                        )
+                        .0,
                     )),
                     _ => Err(serde_invalid_value!(
                         GeneralName,
@@ -345,8 +353,8 @@ impl<'de> de::Deserialize<'de> for GeneralName {
 /// ```
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct EdiPartyName {
-    pub name_assigner: Implicit<Option<ContextTag0<DirectoryString>>>,
-    pub party_name: ContextTag1<DirectoryString>,
+    pub name_assigner: Optional<Option<ImplicitContextTag0<DirectoryString>>>,
+    pub party_name: ImplicitContextTag1<DirectoryString>,
 }
 
 #[cfg(test)]
