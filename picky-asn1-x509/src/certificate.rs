@@ -2,7 +2,7 @@ use crate::{
     AlgorithmIdentifier, AuthorityKeyIdentifier, BasicConstraints, Extension, ExtensionView, Extensions, Name,
     SubjectPublicKeyInfo, Validity, Version,
 };
-use picky_asn1::wrapper::{ApplicationTag0, ApplicationTag3, BitStringAsn1, IntegerAsn1};
+use picky_asn1::wrapper::{BitStringAsn1, ExplicitContextTag0, ExplicitContextTag3, IntegerAsn1};
 use serde::{de, Deserialize, Serialize};
 use std::fmt;
 
@@ -80,7 +80,7 @@ impl Certificate {
 #[derive(Serialize, Clone, Debug, PartialEq)]
 pub struct TbsCertificate {
     #[serde(skip_serializing_if = "version_is_default")]
-    pub version: ApplicationTag0<Version>,
+    pub version: ExplicitContextTag0<Version>,
     pub serial_number: IntegerAsn1,
     pub signature: AlgorithmIdentifier,
     pub issuer: Name,
@@ -90,7 +90,7 @@ pub struct TbsCertificate {
     // issuer_unique_id
     // subject_unique_id
     #[serde(skip_serializing_if = "extensions_are_empty")]
-    pub extensions: ApplicationTag3<Extensions>,
+    pub extensions: ExplicitContextTag3<Extensions>,
 }
 
 fn version_is_default(version: &Version) -> bool {
@@ -116,19 +116,19 @@ impl<'de> de::Deserialize<'de> for TbsCertificate {
             where
                 V: de::SeqAccess<'de>,
             {
-                let version: ApplicationTag0<Version> = seq.next_element().unwrap_or_default().unwrap_or_default();
+                let version: ExplicitContextTag0<Version> = seq.next_element().unwrap_or_default().unwrap_or_default();
                 let serial_number = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(1, &self))?;
                 let signature = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(2, &self))?;
                 let issuer = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(3, &self))?;
                 let validity = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(4, &self))?;
                 let subject = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(5, &self))?;
                 let subject_public_key_info = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(6, &self))?;
-                let extensions: ApplicationTag3<Extensions> = seq
+                let extensions: ExplicitContextTag3<Extensions> = seq
                     .next_element()?
                     .unwrap_or_else(|| Some(Extensions(Vec::new()).into()))
                     .unwrap_or_else(|| Extensions(Vec::new()).into());
 
-                if version.0 != Version::V3 && !extensions.0 .0.is_empty() {
+                if version.0 != Version::V3 && !(extensions.0).0.is_empty() {
                     return Err(serde_invalid_value!(
                         TbsCertificate,
                         "Version is not V3, but Extensions are present",
@@ -241,7 +241,7 @@ mod tests {
         // TbsCertificate
 
         let tbs_certificate = TbsCertificate {
-            version: ApplicationTag0(Version::V3).into(),
+            version: ExplicitContextTag0(Version::V3).into(),
             serial_number: BigInt::from(935548868).to_signed_bytes_be().into(),
             signature: signature_algorithm.clone(),
             issuer,

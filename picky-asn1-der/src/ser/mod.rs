@@ -84,7 +84,7 @@ impl<'se> Serializer<'se> {
         let mut written = 0;
 
         for (i, encapsulator_tag) in self.encapsulators.iter().copied().enumerate() {
-            written += self.writer.write_one(encapsulator_tag.number())?;
+            written += self.writer.write_one(encapsulator_tag.inner())?;
 
             let encapsulated_len = {
                 let mut encapsulated_len = payload_len;
@@ -114,7 +114,7 @@ impl<'se> Serializer<'se> {
     fn h_write_header(&mut self, tag: Tag, len: usize) -> Result<usize> {
         let mut written;
         match self.encapsulators.last() {
-            Some(last_encapsulator_tag) if last_encapsulator_tag.is_context_specific() => {
+            Some(last_encapsulator_tag) if last_encapsulator_tag.is_context_specific() && last_encapsulator_tag.is_primitive() => {
                 written = self.h_write_encapsulator(len)?;
             }
             _ => {
@@ -122,7 +122,7 @@ impl<'se> Serializer<'se> {
                     written = self.h_write_encapsulator(len)?;
                 } else {
                     written = self.h_write_encapsulator(Length::encoded_len(len) + len + 1)?;
-                    written += self.writer.write_one(tag.number())?;
+                    written += self.writer.write_one(tag.inner())?;
                     written += Length::serialize(len, &mut self.writer)?;
                 }
             }
@@ -286,38 +286,38 @@ impl<'a, 'se> serde::ser::Serializer for &'a mut Serializer<'se> {
             Asn1SequenceOf::<()>::NAME => self.tag_for_next_seq = Tag::SEQUENCE,
             BitStringAsn1Container::<()>::NAME => self.h_encapsulate(Tag::BIT_STRING),
             OctetStringAsn1Container::<()>::NAME => self.h_encapsulate(Tag::OCTET_STRING),
-            ApplicationTag0::<()>::NAME => self.h_encapsulate(Tag::APP_0),
-            ApplicationTag1::<()>::NAME => self.h_encapsulate(Tag::APP_1),
-            ApplicationTag2::<()>::NAME => self.h_encapsulate(Tag::APP_2),
-            ApplicationTag3::<()>::NAME => self.h_encapsulate(Tag::APP_3),
-            ApplicationTag4::<()>::NAME => self.h_encapsulate(Tag::APP_4),
-            ApplicationTag5::<()>::NAME => self.h_encapsulate(Tag::APP_5),
-            ApplicationTag6::<()>::NAME => self.h_encapsulate(Tag::APP_6),
-            ApplicationTag7::<()>::NAME => self.h_encapsulate(Tag::APP_7),
-            ApplicationTag8::<()>::NAME => self.h_encapsulate(Tag::APP_8),
-            ApplicationTag9::<()>::NAME => self.h_encapsulate(Tag::APP_9),
-            ApplicationTag10::<()>::NAME => self.h_encapsulate(Tag::APP_10),
-            ApplicationTag11::<()>::NAME => self.h_encapsulate(Tag::APP_11),
-            ApplicationTag12::<()>::NAME => self.h_encapsulate(Tag::APP_12),
-            ApplicationTag13::<()>::NAME => self.h_encapsulate(Tag::APP_13),
-            ApplicationTag14::<()>::NAME => self.h_encapsulate(Tag::APP_14),
-            ApplicationTag15::<()>::NAME => self.h_encapsulate(Tag::APP_15),
-            ContextTag0::<()>::NAME => self.h_encapsulate(Tag::CTX_0),
-            ContextTag1::<()>::NAME => self.h_encapsulate(Tag::CTX_1),
-            ContextTag2::<()>::NAME => self.h_encapsulate(Tag::CTX_2),
-            ContextTag3::<()>::NAME => self.h_encapsulate(Tag::CTX_3),
-            ContextTag4::<()>::NAME => self.h_encapsulate(Tag::CTX_4),
-            ContextTag5::<()>::NAME => self.h_encapsulate(Tag::CTX_5),
-            ContextTag6::<()>::NAME => self.h_encapsulate(Tag::CTX_6),
-            ContextTag7::<()>::NAME => self.h_encapsulate(Tag::CTX_7),
-            ContextTag8::<()>::NAME => self.h_encapsulate(Tag::CTX_8),
-            ContextTag9::<()>::NAME => self.h_encapsulate(Tag::CTX_9),
-            ContextTag10::<()>::NAME => self.h_encapsulate(Tag::CTX_10),
-            ContextTag11::<()>::NAME => self.h_encapsulate(Tag::CTX_11),
-            ContextTag12::<()>::NAME => self.h_encapsulate(Tag::CTX_12),
-            ContextTag13::<()>::NAME => self.h_encapsulate(Tag::CTX_13),
-            ContextTag14::<()>::NAME => self.h_encapsulate(Tag::CTX_14),
-            ContextTag15::<()>::NAME => self.h_encapsulate(Tag::CTX_15),
+            ExplicitContextTag0::<()>::NAME => self.h_encapsulate(ExplicitContextTag0::<()>::TAG),
+            ExplicitContextTag1::<()>::NAME => self.h_encapsulate(ExplicitContextTag1::<()>::TAG),
+            ExplicitContextTag2::<()>::NAME => self.h_encapsulate(ExplicitContextTag2::<()>::TAG),
+            ExplicitContextTag3::<()>::NAME => self.h_encapsulate(ExplicitContextTag3::<()>::TAG),
+            ExplicitContextTag4::<()>::NAME => self.h_encapsulate(ExplicitContextTag4::<()>::TAG),
+            ExplicitContextTag5::<()>::NAME => self.h_encapsulate(ExplicitContextTag5::<()>::TAG),
+            ExplicitContextTag6::<()>::NAME => self.h_encapsulate(ExplicitContextTag6::<()>::TAG),
+            ExplicitContextTag7::<()>::NAME => self.h_encapsulate(ExplicitContextTag7::<()>::TAG),
+            ExplicitContextTag8::<()>::NAME => self.h_encapsulate(ExplicitContextTag8::<()>::TAG),
+            ExplicitContextTag9::<()>::NAME => self.h_encapsulate(ExplicitContextTag9::<()>::TAG),
+            ExplicitContextTag10::<()>::NAME => self.h_encapsulate(ExplicitContextTag10::<()>::TAG),
+            ExplicitContextTag11::<()>::NAME => self.h_encapsulate(ExplicitContextTag11::<()>::TAG),
+            ExplicitContextTag12::<()>::NAME => self.h_encapsulate(ExplicitContextTag12::<()>::TAG),
+            ExplicitContextTag13::<()>::NAME => self.h_encapsulate(ExplicitContextTag13::<()>::TAG),
+            ExplicitContextTag14::<()>::NAME => self.h_encapsulate(ExplicitContextTag14::<()>::TAG),
+            ExplicitContextTag15::<()>::NAME => self.h_encapsulate(ExplicitContextTag15::<()>::TAG),
+            ImplicitContextTag0::<()>::NAME => self.h_encapsulate(ImplicitContextTag0::<()>::TAG),
+            ImplicitContextTag1::<()>::NAME => self.h_encapsulate(ImplicitContextTag1::<()>::TAG),
+            ImplicitContextTag2::<()>::NAME => self.h_encapsulate(ImplicitContextTag2::<()>::TAG),
+            ImplicitContextTag3::<()>::NAME => self.h_encapsulate(ImplicitContextTag3::<()>::TAG),
+            ImplicitContextTag4::<()>::NAME => self.h_encapsulate(ImplicitContextTag4::<()>::TAG),
+            ImplicitContextTag5::<()>::NAME => self.h_encapsulate(ImplicitContextTag5::<()>::TAG),
+            ImplicitContextTag6::<()>::NAME => self.h_encapsulate(ImplicitContextTag6::<()>::TAG),
+            ImplicitContextTag7::<()>::NAME => self.h_encapsulate(ImplicitContextTag7::<()>::TAG),
+            ImplicitContextTag8::<()>::NAME => self.h_encapsulate(ImplicitContextTag8::<()>::TAG),
+            ImplicitContextTag9::<()>::NAME => self.h_encapsulate(ImplicitContextTag9::<()>::TAG),
+            ImplicitContextTag10::<()>::NAME => self.h_encapsulate(ImplicitContextTag10::<()>::TAG),
+            ImplicitContextTag11::<()>::NAME => self.h_encapsulate(ImplicitContextTag11::<()>::TAG),
+            ImplicitContextTag12::<()>::NAME => self.h_encapsulate(ImplicitContextTag12::<()>::TAG),
+            ImplicitContextTag13::<()>::NAME => self.h_encapsulate(ImplicitContextTag13::<()>::TAG),
+            ImplicitContextTag14::<()>::NAME => self.h_encapsulate(ImplicitContextTag14::<()>::TAG),
+            ImplicitContextTag15::<()>::NAME => self.h_encapsulate(ImplicitContextTag15::<()>::TAG),
             HeaderOnly::<()>::NAME => self.no_header = true,
             Asn1RawDer::NAME => self.no_header = true,
             _ => {}

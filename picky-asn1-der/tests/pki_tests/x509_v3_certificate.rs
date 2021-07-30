@@ -62,7 +62,7 @@ use oid::prelude::*;
 use picky_asn1::bit_string::BitString;
 use picky_asn1::date::Date;
 use picky_asn1::wrapper::{
-    ApplicationTag0, ApplicationTag3, Asn1SequenceOf, Asn1SetOf, BitStringAsn1, Implicit, IntegerAsn1,
+    ExplicitContextTag0, ExplicitContextTag3, Asn1SequenceOf, Asn1SetOf, BitStringAsn1, Optional, IntegerAsn1,
     ObjectIdentifierAsn1, OctetStringAsn1, UTCTimeAsn1,
 };
 use serde::{Deserialize, Serialize};
@@ -77,14 +77,14 @@ struct Certificate {
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 struct TbsCertificate {
     #[serde(skip_serializing_if = "implicit_app0_version_is_default")]
-    pub version: Implicit<ApplicationTag0<Version>>,
+    pub version: Optional<ExplicitContextTag0<Version>>,
     pub serial_number: u128,
     pub signature: AlgorithmIdentifier,
     pub issuer: Name,
     pub validity: Validity,
     pub subject: Name,
     pub subject_public_key_info: SubjectPublicKeyInfoRsa,
-    pub extensions: ApplicationTag3<Extensions>,
+    pub extensions: ExplicitContextTag3<Extensions>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -107,7 +107,7 @@ pub struct Extensions(Vec<Extension>);
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 struct Extension {
     extn_id: ObjectIdentifierAsn1,
-    critical: Implicit<Option<bool>>,
+    critical: Optional<Option<bool>>,
     extn_value: OctetStringAsn1,
 }
 
@@ -212,7 +212,7 @@ fn x509_v3_certificate() {
     // TbsCertificate
 
     let tbs_certificate = TbsCertificate {
-        version: ApplicationTag0(Version::V3).into(),
+        version: ExplicitContextTag0(Version::V3).into(),
         serial_number: 935548868,
         signature: AlgorithmIdentifier {
             algorithm: ObjectIdentifier::try_from("1.2.840.113549.1.1.11").unwrap().into(), // sha256
@@ -222,7 +222,7 @@ fn x509_v3_certificate() {
         validity,
         subject,
         subject_public_key_info,
-        extensions: ApplicationTag3(extensions),
+        extensions: ExplicitContextTag3(extensions),
     };
     check!(tbs_certificate: TbsCertificate in encoded[4..522]);
 

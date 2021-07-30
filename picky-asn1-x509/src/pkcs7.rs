@@ -7,13 +7,13 @@ pub mod signer_info;
 use crate::oids;
 use signed_data::SignedData;
 
-use picky_asn1::wrapper::{ApplicationTag0, ObjectIdentifierAsn1};
+use picky_asn1::wrapper::{ExplicitContextTag0, ObjectIdentifierAsn1};
 use serde::{de, Serialize};
 
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct Pkcs7Certificate {
     pub oid: ObjectIdentifierAsn1,
-    pub signed_data: ApplicationTag0<SignedData>,
+    pub signed_data: ExplicitContextTag0<SignedData>,
 }
 
 impl<'de> de::Deserialize<'de> for Pkcs7Certificate {
@@ -39,7 +39,7 @@ impl<'de> de::Deserialize<'de> for Pkcs7Certificate {
                 let oid: ObjectIdentifierAsn1 =
                     seq.next_element()?.ok_or_else(|| de::Error::invalid_length(0, &self))?;
 
-                let signed_data: ApplicationTag0<SignedData> = match Into::<String>::into(&oid.0).as_str() {
+                let signed_data: ExplicitContextTag0<SignedData> = match Into::<String>::into(&oid.0).as_str() {
                     oids::SIGNED_DATA => seq.next_element()?.ok_or_else(|| de::Error::invalid_length(1, &self))?,
                     _ => {
                         return Err(serde_invalid_value!(

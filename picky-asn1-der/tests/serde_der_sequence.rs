@@ -39,7 +39,7 @@ fn test() {
 #[test]
 fn test_err() {
     // Invalid tag
-    let der = b"\xFF\x15\x02\x01\x07\x04\x09\x54\x65\x73\x74\x6f\x6c\x6f\x70\x65\x30\x05\x02\x01\x04\x05\x00";
+    let der = b"\x1F\x15\x02\x01\x07\x04\x09\x54\x65\x73\x74\x6f\x6c\x6f\x70\x65\x30\x05\x02\x01\x04\x05\x00";
     match from_bytes::<TestStruct>(der) {
         Err(Asn1DerError::InvalidData) => (),
         result => panic!("invalid tag => invalid result: {:?}", result),

@@ -1,7 +1,7 @@
 use crate::cmsversion::CmsVersion;
 use crate::{AlgorithmIdentifier, Attributes, Name, SubjectKeyIdentifier};
-use picky_asn1::tag::{Tag, TagPeeker};
-use picky_asn1::wrapper::{ContextTag0, Implicit, IntegerAsn1, OctetStringAsn1};
+use picky_asn1::tag::{TagClass, TagPeeker};
+use picky_asn1::wrapper::{ImplicitContextTag0, IntegerAsn1, OctetStringAsn1, Optional};
 use serde::{de, ser, Deserialize, Serialize};
 
 /// [RFC 5652 #5.3](https://datatracker.ietf.org/doc/html/rfc5652#section-5.3)
@@ -24,7 +24,7 @@ pub struct SignerInfo {
     pub version: CmsVersion,
     pub sid: SignerIdentifier,
     pub digest_algorithm: DigestAlgorithmIdentifier,
-    pub signed_attrs: Implicit<Attributes>,
+    pub signed_attrs: Optional<ImplicitContextTag0<Attributes>>,
     pub signature_algorithm: SignatureAlgorithmIdentifier,
     pub signature: SignatureValue,
     // unsigned_attrs
@@ -83,7 +83,7 @@ impl<'de> de::Deserialize<'de> for SignerInfo {
 #[derive(Debug, PartialEq, Clone)]
 pub enum SignerIdentifier {
     IssuerAndSerialNumber(IssuerAndSerialNumber),
-    SubjectKeyIdentifier(ContextTag0<SubjectKeyIdentifier>),
+    SubjectKeyIdentifier(ImplicitContextTag0<SubjectKeyIdentifier>),
 }
 
 impl Serialize for SignerIdentifier {
@@ -124,19 +124,21 @@ impl<'de> Deserialize<'de> for SignerIdentifier {
             {
                 let tag_peeker: TagPeeker = seq_next_element!(seq, SignerIdentifier, "a choice tag");
 
-                let singer_identifier = match tag_peeker.next_tag {
-                    Tag::CTX_0 => SignerIdentifier::SubjectKeyIdentifier(seq_next_element!(
-                        seq,
-                        ContextTag0<SubjectKeyIdentifier>,
-                        SignerIdentifier,
-                        "SubjectKeyIdentifier"
-                    )),
-                    _ => SignerIdentifier::IssuerAndSerialNumber(seq_next_element!(
-                        seq,
-                        IssuerAndSerialNumber,
-                        "IssuerAndSerialNumber"
-                    )),
-                };
+                let singer_identifier =
+                    if tag_peeker.next_tag.class() == TagClass::ContextSpecific && tag_peeker.next_tag.number() == 0 {
+                        SignerIdentifier::SubjectKeyIdentifier(seq_next_element!(
+                            seq,
+                            ImplicitContextTag0<SubjectKeyIdentifier>,
+                            SignerIdentifier,
+                            "SubjectKeyIdentifier"
+                        ))
+                    } else {
+                        SignerIdentifier::IssuerAndSerialNumber(seq_next_element!(
+                            seq,
+                            IssuerAndSerialNumber,
+                            "IssuerAndSerialNumber"
+                        ))
+                    };
 
                 Ok(singer_identifier)
             }

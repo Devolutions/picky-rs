@@ -1,6 +1,8 @@
 use crate::attribute::{Attribute, Attributes};
 use crate::{AlgorithmIdentifier, Name, SubjectPublicKeyInfo};
-use picky_asn1::wrapper::BitStringAsn1;
+use picky_asn1::tag::Tag;
+use picky_asn1::wrapper::{Asn1SequenceOf, BitStringAsn1};
+use serde::{de, ser};
 use serde::{Deserialize, Serialize};
 
 /// [RFC 2986 #4](https://tools.ietf.org/html/rfc2986#section-4)
@@ -18,7 +20,57 @@ pub struct CertificationRequestInfo {
     pub version: u8,
     pub subject: Name,
     pub subject_public_key_info: SubjectPublicKeyInfo,
-    pub attributes: Attributes,
+    pub attributes: OpenSslAttributes,
+}
+
+/// OpenSSL compatible CRI `attributes` type
+///
+/// For some reason, openssl is producing an "implicit context tag" but with coding `0xA0`
+///
+/// In appendix A of the RFC (https://datatracker.ietf.org/doc/html/rfc2986#appendix-A)
+/// ```not_rust
+/// DEFINITIONS IMPLICIT TAGS ::=
+/// ```
+/// states that context tags are implicit unless stated otherwise.
+/// This type implements a workaround to imitate this.
+#[derive(Clone, Debug, PartialEq)]
+pub struct OpenSslAttributes(pub Attributes);
+
+impl std::ops::Deref for OpenSslAttributes {
+    type Target = Attributes;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for OpenSslAttributes {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl ser::Serialize for OpenSslAttributes {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
+    where
+        S: ser::Serializer,
+    {
+        let mut raw_der = picky_asn1_der::to_vec(&self.0).unwrap();
+        raw_der[0] = Tag::context_specific_constructed(0).inner();
+        picky_asn1_der::Asn1RawDer(raw_der).serialize(serializer)
+    }
+}
+
+impl<'de> de::Deserialize<'de> for OpenSslAttributes {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        let mut raw_der = picky_asn1_der::Asn1RawDer::deserialize(deserializer)?.0;
+        raw_der[0] = Tag::SEQUENCE.inner();
+        let attrs = picky_asn1_der::from_bytes(&raw_der).unwrap_or_default();
+        Ok(Self(attrs))
+    }
 }
 
 impl CertificationRequestInfo {
@@ -28,7 +80,7 @@ impl CertificationRequestInfo {
             version: 0,
             subject,
             subject_public_key_info,
-            attributes: Attributes(Vec::new()),
+            attributes: OpenSslAttributes(Asn1SequenceOf(Vec::new())),
         }
     }
 

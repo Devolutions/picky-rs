@@ -48,14 +48,15 @@ pub struct SignersInfos(pub Asn1SetOf<SignerInfo>);
 #[derive(Debug, PartialEq, Clone)]
 pub struct CertificateSet(pub Vec<Certificate>);
 
-// FIXME: This is a workaround, related to https://github.com/Devolutions/picky-rs/pull/78#issuecomment-789904165
+// This is a workaround for consturcted encoding as implicit
+
 impl ser::Serialize for CertificateSet {
     fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
     where
         S: ser::Serializer,
     {
         let mut raw_der = picky_asn1_der::to_vec(&self.0).unwrap_or_else(|_| vec![0]);
-        raw_der[0] = Tag::APP_0.number();
+        raw_der[0] = Tag::context_specific_constructed(0).inner();
         picky_asn1_der::Asn1RawDer(raw_der).serialize(serializer)
     }
 }
@@ -66,7 +67,7 @@ impl<'de> de::Deserialize<'de> for CertificateSet {
         D: de::Deserializer<'de>,
     {
         let mut raw_der = picky_asn1_der::Asn1RawDer::deserialize(deserializer)?.0;
-        raw_der[0] = Tag::SEQUENCE.number();
+        raw_der[0] = Tag::SEQUENCE.inner();
         let vec = picky_asn1_der::from_bytes(&raw_der).unwrap_or_default();
         Ok(CertificateSet(vec))
     }

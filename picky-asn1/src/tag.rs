@@ -1,6 +1,40 @@
 use serde::de;
 use std::fmt;
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum Encoding {
+    Primitive,
+    Constructed,
+}
+
+impl fmt::Display for Encoding {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Primitive => write!(f, "PRIMITIVE"),
+            Self::Constructed => write!(f, "CONSTRUCTED"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum TagClass {
+    Universal,
+    Application,
+    ContextSpecific,
+    Private,
+}
+
+impl fmt::Display for TagClass {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Universal => write!(f, "UNIVERSAL"),
+            Self::Application => write!(f, "APPLICATION"),
+            Self::ContextSpecific => write!(f, "CONTEXT_SPECIFIC"),
+            Self::Private => write!(f, "PRIVATE"),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Tag(u8);
 
@@ -24,62 +58,97 @@ impl Tag {
     pub const GENERALIZED_TIME: Self = Tag(0x18);
     pub const SEQUENCE: Self = Tag(0x30);
     pub const SET: Self = Tag(0x31);
-    pub const APP_0: Self = Tag::application(0);
-    pub const APP_1: Self = Tag::application(1);
-    pub const APP_2: Self = Tag::application(2);
-    pub const APP_3: Self = Tag::application(3);
-    pub const APP_4: Self = Tag::application(4);
-    pub const APP_5: Self = Tag::application(5);
-    pub const APP_6: Self = Tag::application(6);
-    pub const APP_7: Self = Tag::application(7);
-    pub const APP_8: Self = Tag::application(8);
-    pub const APP_9: Self = Tag::application(9);
-    pub const APP_10: Self = Tag::application(10);
-    pub const APP_11: Self = Tag::application(11);
-    pub const APP_12: Self = Tag::application(12);
-    pub const APP_13: Self = Tag::application(13);
-    pub const APP_14: Self = Tag::application(14);
-    pub const APP_15: Self = Tag::application(15);
-    pub const CTX_0: Self = Tag::context_specific(0);
-    pub const CTX_1: Self = Tag::context_specific(1);
-    pub const CTX_2: Self = Tag::context_specific(2);
-    pub const CTX_3: Self = Tag::context_specific(3);
-    pub const CTX_4: Self = Tag::context_specific(4);
-    pub const CTX_5: Self = Tag::context_specific(5);
-    pub const CTX_6: Self = Tag::context_specific(6);
-    pub const CTX_7: Self = Tag::context_specific(7);
-    pub const CTX_8: Self = Tag::context_specific(8);
-    pub const CTX_9: Self = Tag::context_specific(9);
-    pub const CTX_10: Self = Tag::context_specific(10);
-    pub const CTX_11: Self = Tag::context_specific(11);
-    pub const CTX_12: Self = Tag::context_specific(12);
-    pub const CTX_13: Self = Tag::context_specific(13);
-    pub const CTX_14: Self = Tag::context_specific(14);
-    pub const CTX_15: Self = Tag::context_specific(15);
 
     #[inline]
-    pub const fn application(number: u8) -> Self {
-        Tag(0xA0 | number)
+    pub const fn application_primitive(number: u8) -> Self {
+        Tag(number & 0x1F | 0x40)
     }
 
     #[inline]
-    pub const fn context_specific(number: u8) -> Self {
-        Tag(0x80 | number)
+    pub const fn application_constructed(number: u8) -> Self {
+        Tag(number & 0x1F | 0x60)
     }
 
     #[inline]
-    pub const fn number(self) -> u8 {
+    pub const fn context_specific_primitive(number: u8) -> Self {
+        Tag(number & 0x1F | 0x80)
+    }
+
+    #[inline]
+    pub const fn context_specific_constructed(number: u8) -> Self {
+        Tag(number & 0x1F | 0xA0)
+    }
+
+    /// Identifier octets as u8
+    #[inline]
+    pub const fn inner(self) -> u8 {
         self.0
     }
 
+    /// Tag number of the ASN.1 value (filtering class bits and constructed bit with a mask)
     #[inline]
-    pub fn is_application(self) -> bool {
-        self.0 >= Self::APP_0.0 && self.0 <= Self::APP_15.0
+    pub const fn number(self) -> u8 {
+        self.0 & 0x1F
+    }
+
+    // TODO: need version bump to be made const
+    pub fn class(self) -> TagClass {
+        match self.0 & 0xC0 {
+            0x00 => TagClass::Universal,
+            0x40 => TagClass::Application,
+            0x80 => TagClass::ContextSpecific,
+            _ /* 0xC0 */ => TagClass::Private,
+        }
+    }
+
+    // TODO: need version bump to be made const
+    pub fn class_and_number(self) -> (TagClass, u8) {
+        (self.class(), self.number())
+    }
+
+    // TODO: need version bump to be made const
+    pub fn components(self) -> (TagClass, Encoding, u8) {
+        (self.class(), self.encoding(), self.number())
     }
 
     #[inline]
-    pub fn is_context_specific(self) -> bool {
-        self.0 >= Self::CTX_0.0 && self.0 <= Self::CTX_15.0
+    pub const fn is_application(self) -> bool {
+        self.0 & 0xC0 == 0x40
+    }
+
+    #[inline]
+    pub const fn is_context_specific(self) -> bool {
+        self.0 & 0xC0 == 0x80
+    }
+
+    #[inline]
+    pub const fn is_universal(self) -> bool {
+        self.0 & 0xC0 == 0x00
+    }
+
+    #[inline]
+    pub const fn is_private(self) -> bool {
+        self.0 & 0xC0 == 0xC0
+    }
+
+    #[inline]
+    pub const fn is_constructed(self) -> bool {
+        self.0 & 0x20 == 0x20
+    }
+
+    #[inline]
+    pub const fn is_primitive(self) -> bool {
+        !self.is_constructed()
+    }
+
+    // TODO: need version bump to be made const
+    #[inline]
+    pub fn encoding(self) -> Encoding {
+        if self.is_constructed() {
+            Encoding::Constructed
+        } else {
+            Encoding::Primitive
+        }
     }
 }
 
@@ -111,46 +180,14 @@ impl fmt::Display for Tag {
             Tag::GENERALIZED_TIME => write!(f, "GeneralizedTime"),
             Tag::SEQUENCE => write!(f, "SEQUENCE"),
             Tag::SET => write!(f, "SET"),
-            Tag::APP_0 => write!(f, "ApplicationTag0"),
-            Tag::APP_1 => write!(f, "ApplicationTag1"),
-            Tag::APP_2 => write!(f, "ApplicationTag2"),
-            Tag::APP_3 => write!(f, "ApplicationTag3"),
-            Tag::APP_4 => write!(f, "ApplicationTag4"),
-            Tag::APP_5 => write!(f, "ApplicationTag5"),
-            Tag::APP_6 => write!(f, "ApplicationTag6"),
-            Tag::APP_7 => write!(f, "ApplicationTag7"),
-            Tag::APP_8 => write!(f, "ApplicationTag8"),
-            Tag::APP_9 => write!(f, "ApplicationTag9"),
-            Tag::APP_10 => write!(f, "ApplicationTag10"),
-            Tag::APP_11 => write!(f, "ApplicationTag11"),
-            Tag::APP_12 => write!(f, "ApplicationTag12"),
-            Tag::APP_13 => write!(f, "ApplicationTag13"),
-            Tag::APP_14 => write!(f, "ApplicationTag14"),
-            Tag::APP_15 => write!(f, "ApplicationTag15"),
-            Tag::CTX_0 => write!(f, "ContextTag0"),
-            Tag::CTX_1 => write!(f, "ContextTag1"),
-            Tag::CTX_2 => write!(f, "ContextTag2"),
-            Tag::CTX_3 => write!(f, "ContextTag3"),
-            Tag::CTX_4 => write!(f, "ContextTag4"),
-            Tag::CTX_5 => write!(f, "ContextTag5"),
-            Tag::CTX_6 => write!(f, "ContextTag6"),
-            Tag::CTX_7 => write!(f, "ContextTag7"),
-            Tag::CTX_8 => write!(f, "ContextTag8"),
-            Tag::CTX_9 => write!(f, "ContextTag9"),
-            Tag::CTX_10 => write!(f, "ContextTag10"),
-            Tag::CTX_11 => write!(f, "ContextTag11"),
-            Tag::CTX_12 => write!(f, "ContextTag12"),
-            Tag::CTX_13 => write!(f, "ContextTag13"),
-            Tag::CTX_14 => write!(f, "ContextTag14"),
-            Tag::CTX_15 => write!(f, "ContextTag15"),
-            unknown => write!(f, "UNKNOWN({})", unknown.0),
+            other => write!(f, "{}({:02X}) {}", other.class(), other.number(), other.encoding()),
         }
     }
 }
 
 impl fmt::Debug for Tag {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Tag({}[{}])", self, self.0)
+        write!(f, "Tag({}[{:02X}])", self, self.0)
     }
 }
 

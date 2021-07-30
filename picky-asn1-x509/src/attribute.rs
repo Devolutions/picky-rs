@@ -1,43 +1,10 @@
 #[cfg(feature = "pkcs7")]
 use crate::pkcs7::content_info::SpcSpOpusInfo;
 use crate::{oids, Extension, Extensions};
-use picky_asn1::tag::Tag;
-use picky_asn1::wrapper::{Asn1SetOf, ObjectIdentifierAsn1, OctetStringAsn1};
+use picky_asn1::wrapper::{Asn1SequenceOf, Asn1SetOf, ObjectIdentifierAsn1, OctetStringAsn1};
 use serde::{de, ser};
 
-// FIXME: this type is a hack to workaround [this issue](https://github.com/Devolutions/picky-rs/pull/78#issuecomment-789904165).
-// Further refactorings are required to clean this up (proper support for IMPLICIT / EXPLICIT tags, etc)
-#[derive(Clone, Debug, PartialEq)]
-pub struct Attributes(pub Vec<Attribute>);
-
-impl ser::Serialize for Attributes {
-    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
-    where
-        S: ser::Serializer,
-    {
-        let mut raw_der = picky_asn1_der::to_vec(&self.0).unwrap_or_default();
-        raw_der[0] = Tag::APP_0.number();
-        picky_asn1_der::Asn1RawDer(raw_der).serialize(serializer)
-    }
-}
-
-impl<'de> de::Deserialize<'de> for Attributes {
-    fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
-    where
-        D: de::Deserializer<'de>,
-    {
-        let mut raw_der = picky_asn1_der::Asn1RawDer::deserialize(deserializer)?.0;
-        raw_der[0] = Tag::SEQUENCE.number();
-        let vec = picky_asn1_der::from_bytes(&raw_der).unwrap_or_default();
-        Ok(Attributes(vec))
-    }
-}
-
-impl Default for Attributes {
-    fn default() -> Self {
-        Self(Vec::new())
-    }
-}
+pub type Attributes = Asn1SequenceOf<Attribute>;
 
 /// [RFC 2985 page 15 and 16](https://tools.ietf.org/html/rfc2985#page-15)
 ///
@@ -54,11 +21,11 @@ pub enum AttributeValues {
     Extensions(Asn1SetOf<Extensions>), // the set will always have 1 element in this variant
     // TODO: support for challenge password
     // ChallengePassword(Asn1SetOf<ChallengePassword>))
-    Custom(picky_asn1_der::Asn1RawDer), // fallback
     ContentType(Asn1SetOf<ObjectIdentifierAsn1>),
     MessageDigest(Asn1SetOf<OctetStringAsn1>),
     #[cfg(feature = "pkcs7")]
     SpcSpOpusInfo(Asn1SetOf<SpcSpOpusInfo>),
+    Custom(picky_asn1_der::Asn1RawDer), // fallback
 }
 
 #[derive(Clone, Debug, PartialEq)]

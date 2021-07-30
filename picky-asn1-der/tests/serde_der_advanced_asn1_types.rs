@@ -229,7 +229,7 @@ fn sequence_of() {
 #[test]
 fn application_tag0() {
     let buffer = [0xA0, 0x03, 0x02, 0x01, 0xF9];
-    let application_tag = ApplicationTag0(IntegerAsn1::from((-7).to_bigint().unwrap().to_signed_bytes_be()));
+    let application_tag = ExplicitContextTag0(IntegerAsn1::from((-7).to_bigint().unwrap().to_signed_bytes_be()));
     check(&buffer, application_tag);
 }
 
@@ -251,6 +251,6 @@ fn restricted_strings() {
 #[test]
 fn nested_encapsulators() {
     let buffer = [0xA1, 0x5, 0xA4, 0x3, 0x02, 0x01, 0x05];
-    let expected = ApplicationTag1(ApplicationTag4(u8::from(5)));
+    let expected = ExplicitContextTag1(ExplicitContextTag4(u8::from(5)));
     check(&buffer, expected);
 }
