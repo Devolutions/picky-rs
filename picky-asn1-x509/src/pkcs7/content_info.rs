@@ -219,8 +219,7 @@ impl<'de> de::Deserialize<'de> for SpcAttributeAndOptionalValue {
                         SpcSipInfo,
                         "a SpcSipInfo object"
                     )),
-                    oid => {
-                        println!("{}", oid);
+                    _ => {
                         return Err(serde_invalid_value!(
                             SpcAttributeAndOptionalValue,
                             "unknown oid type",

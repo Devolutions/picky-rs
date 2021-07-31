@@ -72,7 +72,7 @@ impl<'de> de::Deserialize<'de> for CTLEntryAttribute {
                     oids::CERT_AUTH_ROOT_SHA256_HASH_PROP_ID => CTLEntryAttributeValues::CertAuthRootSha256HashPropId(
                         seq_next_element!(seq, Asn1SetOf<OctetStringAsn1>, CTLEntryAttribute, "OctetStringAsn1"),
                     ),
-                    oids::CERT_DISALLOWED_FILETIME_PROP_ID => CTLEntryAttributeValues::CertDisallowedFiletimePropId(
+                    oids::CERT_DISALLOWED_FILETIME_PROP_ID => CTLEntryAttributeValues::CertDisallowedFileTimePropId(
                         seq_next_element!(seq, Asn1SetOf<OctetStringAsn1>, CTLEntryAttribute, "OctetStringAsn1"),
                     ),
                     oids::DISALLOWED_ENHKEY_USAGE => CTLEntryAttributeValues::DisallowedEnhkeyUsage(seq_next_element!(
@@ -150,7 +150,7 @@ impl<'de> de::Deserialize<'de> for CTLEntryAttribute {
 #[derive(Debug, PartialEq, Clone)]
 pub enum CTLEntryAttributeValues {
     CertAuthRootSha256HashPropId(Asn1SetOf<OctetStringAsn1>),
-    CertDisallowedFiletimePropId(Asn1SetOf<OctetStringAsn1>), // A 64-bit little-endian Windows FILETIME that indicates when the certificate was revoked. It can be empty, which indicates since epoch
+    CertDisallowedFileTimePropId(Asn1SetOf<OctetStringAsn1>), // A 64-bit little-endian Windows FILETIME that indicates when the certificate was revoked. It can be empty, which indicates since epoch
     DisallowedEnhkeyUsage(Asn1SetOf<OctetStringAsn1Container<Asn1SequenceOf<ObjectIdentifierAsn1>>>),
     CertEnhkeyUsagePropId(Asn1SetOf<OctetStringAsn1Container<Asn1SequenceOf<ObjectIdentifierAsn1>>>), // Contains an array of object identifiers (OIDs) for Certificate Trust List (CTL) extensions
     CertFriendlyName(Asn1SetOf<OctetStringAsn1>), // The certificate friendly name
@@ -169,7 +169,7 @@ impl Serialize for CTLEntryAttributeValues {
     {
         match &self {
             CTLEntryAttributeValues::CertAuthRootSha256HashPropId(octet_string) => octet_string.serialize(serializer),
-            CTLEntryAttributeValues::CertDisallowedFiletimePropId(octet_string) => octet_string.serialize(serializer),
+            CTLEntryAttributeValues::CertDisallowedFileTimePropId(octet_string) => octet_string.serialize(serializer),
             CTLEntryAttributeValues::DisallowedEnhkeyUsage(octet_string_container) => {
                 octet_string_container.serialize(serializer)
             }
@@ -348,7 +348,7 @@ mod tests {
                 attributes: vec![
                     CTLEntryAttribute {
                         oid: oids::cert_disallowed_filetime_prop_id().into(),
-                        value: CTLEntryAttributeValues::CertDisallowedFiletimePropId(
+                        value: CTLEntryAttributeValues::CertDisallowedFileTimePropId(
                             vec![ctl_hex[107..115].to_vec().into()].into(),
                         ),
                     },

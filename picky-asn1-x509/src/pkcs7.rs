@@ -373,8 +373,8 @@ mod tests {
              .0
             .first()
             .expect("One SignedInfo always is present");
-        let usigned_attrs = signer_info.unsigned_attrs.0 .0.first().unwrap();
-        let mc_counter_sign = match &usigned_attrs.value {
+        let unsigned_attrs = signer_info.unsigned_attrs.0 .0.first().unwrap();
+        let mc_counter_sign = match &unsigned_attrs.value {
             UnsignedAttributeValue::MsCounterSign(mc_counter_sign) => mc_counter_sign,
             _ => unreachable!(),
         };

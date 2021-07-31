@@ -2,7 +2,7 @@ use crate::hash::{HashAlgorithm, UnsupportedHashAlgorithmError};
 use crate::key::PrivateKey;
 use crate::pem::Pem;
 use crate::signature::{SignatureAlgorithm, SignatureError};
-use crate::x509::certificate::{Cert, CertError, CertValidator, ValidityCheck};
+use crate::x509::certificate::{Cert, CertError, CertType, ValidityCheck};
 use crate::x509::date::UTCDate;
 use crate::x509::name::DirectoryName;
 #[cfg(feature = "ctl")]
@@ -54,14 +54,14 @@ pub enum AuthenticodeError {
     CertError(#[from] CertError),
     #[error("Digest algorithm mismatch: {description}")]
     DigestAlgorithmMismatch { description: String },
-    #[error("PKCS9_MESSAGE_DIGEST does not match hash of ContentInfo")]
+    #[error("PKCS9_MESSAGE_DIGEST does not match ContentInfo hash")]
     HashMismatch,
     #[error("Actual file hash is {actual:?}, but expected {expected:?}")]
     FileHashMismatch { actual: Vec<u8>, expected: Vec<u8> },
     #[error("Authenticode signatures support only one signer, digestAlgorithms must contain only one digestAlgorithmIdentifier, but {incorrect_count} entries present")]
     IncorrectDigestAlgorithmsCount { incorrect_count: usize },
     #[error(
-        "Authenticode use issuerAndSerialNumber to identifier signer, but got subjectKeyIdentifier identification"
+        "Authenticode uses issuerAndSerialNumber to identify the signer, but got subjectKeyIdentifier identification"
     )]
     IncorrectSignerIdentifier,
     #[error("Incorrect version. Expected: {expected}, but got {got}")]
@@ -80,7 +80,7 @@ pub enum AuthenticodeError {
     NoEKUCodeSigning,
     #[error("PKCS9_MESSAGE_DIGEST attribute is absent")]
     NoMessageDigest,
-    #[error("Can't find certificate which issuer is {issuer} and serial_number is {serial_number:#?}")]
+    #[error("Can't find certificate for issuer: {issuer}, and serial_number:  {serial_number:#?}")]
     NoCertificatesAssociatedWithIssuerAndSerialNumber { issuer: Name, serial_number: Vec<u8> },
     #[error(transparent)]
     SignatureError(#[from] SignatureError),
@@ -177,9 +177,17 @@ impl AuthenticodeSignature {
 
         check_eku_code_signing(&certificates)?;
 
+        // certificates contains the signer certificate and any intermediate certificates,
+        // but typically does not contain the root certificate
         let certificates = certificates
             .into_iter()
-            .map(Certificate::from)
+            .filter_map(|cert| {
+                if cert.ty() != CertType::Root {
+                    Some(Certificate::from(cert))
+                } else {
+                    None
+                }
+            })
             .collect::<Vec<Certificate>>();
 
         let signing_cert = certificates.get(0).ok_or(AuthenticodeError::NoCertificates)?;
@@ -213,12 +221,9 @@ impl AuthenticodeSignature {
             unsigned_attrs: UnsignedAttributes::default().into(),
         };
 
-        // certificates contains the signer certificate and any intermediate certificates,
-        // but typically does not contain the root certificate
         let certificates = CertificateSet(
             certificates
                 .into_iter()
-                .take(2)
                 .map(CertificateChoices::Certificate)
                 .collect::<Vec<CertificateChoices>>(),
         );
@@ -365,6 +370,7 @@ struct AuthenticodeStrictness {
     require_not_before_check: bool,
     require_not_after_check: bool,
     require_ca_verification_against_ctl: bool,
+    require_chain_check: bool,
     exclude_specific_cert_authorities_from_ctl_check: bool,
 }
 
@@ -376,6 +382,7 @@ impl Default for AuthenticodeStrictness {
             require_not_before_check: false,
             require_not_after_check: false,
             require_ca_verification_against_ctl: false,
+            require_chain_check: false,
             exclude_specific_cert_authorities_from_ctl_check: false,
         }
     }
@@ -451,6 +458,11 @@ impl<'a> AuthenticodeValidator<'a> {
         self
     }
 
+    pub fn require_chain_check(&self) -> &Self {
+        self.inner.borrow_mut().strictness.require_chain_check = true;
+        self
+    }
+
     #[cfg(feature = "ctl")]
     #[inline]
     pub fn exclude_cert_authorities(&self, excluded_cert_authorities: &'a [DirectoryName]) -> &Self {
@@ -504,7 +516,7 @@ impl<'a> AuthenticodeValidator<'a> {
 
         let digest_algorithm = digest_algorithms
             .first()
-            .expect("One digest algorithm should exists at this point");
+            .expect("One digest algorithm should exist at this point");
 
         let message_digest = &spc_indirect_data_content.message_digest;
         if digest_algorithm != &message_digest.oid {
@@ -530,7 +542,7 @@ impl<'a> AuthenticodeValidator<'a> {
             .borrow()
             .expected_file_hash
             .clone()
-            .expect("Expected file hash should be present for Authenticode basic validation");
+            .expect("Expected file hash to be present for Authenticode basic validation");
         if actual_file_hash != &expected_file_hash {
             return Err(AuthenticodeError::FileHashMismatch {
                 actual: actual_file_hash.clone(),
@@ -599,11 +611,16 @@ impl<'a> AuthenticodeValidator<'a> {
 
     fn verify_signing_certificate(&self) -> AuthenticodeResult<()> {
         let signing_certificate = self.authenticode_signature.signing_certificate()?;
+        let cert_validator = signing_certificate.verifier();
 
-        // Box<dyn Iterator<Item = &'a Cert> just to satisfy CertValidator bounds
-        let cert_validator: CertValidator<Box<dyn Iterator<Item = &'a Cert>>> = signing_certificate.verifier();
+        let certificates = self
+            .authenticode_signature
+            .0
+            .certificates()
+            .into_iter()
+            .filter(|cert| cert.subject_name() != signing_certificate.subject_name())
+            .collect::<Vec<Cert>>();
 
-        cert_validator.ignore_chain_check();
         let inner = self.inner.borrow_mut();
 
         let cert_validator = match inner.now {
@@ -622,6 +639,16 @@ impl<'a> AuthenticodeValidator<'a> {
             cert_validator.require_not_before_check()
         } else {
             cert_validator.ignore_not_before_check()
+        };
+
+        let cert_validator = if inner.strictness.require_chain_check {
+            // Authenticode has the signer certificate and any intermediate certificates,
+            // but typically does not contain the root
+            cert_validator
+                .skip_root_is_last_cert_chain_check()
+                .chain(certificates.iter())
+        } else {
+            cert_validator.ignore_chain_check()
         };
 
         match cert_validator.verify() {
@@ -745,12 +772,12 @@ impl<'a> AuthenticodeValidator<'a> {
             .ok_or(AuthenticodeError::CAIsNotTrusted)?;
 
         // check if the CA certificate was revoked
-        if let Some(CTLEntryAttributeValues::CertDisallowedFiletimePropId(when_ca_cert_was_revoked)) =
+        if let Some(CTLEntryAttributeValues::CertDisallowedFileTimePropId(when_ca_cert_was_revoked)) =
             ca_ctl_entry_attributes
                 .attributes
                 .0
                 .iter()
-                .find(|attr| matches!(attr.value, CTLEntryAttributeValues::CertDisallowedFiletimePropId(_)))
+                .find(|attr| matches!(attr.value, CTLEntryAttributeValues::CertDisallowedFileTimePropId(_)))
                 .map(|attr| &attr.value)
         {
             let when_ca_cert_was_revoked = when_ca_cert_was_revoked
@@ -1320,7 +1347,7 @@ mod test {
         .unwrap();
 
         let validator = authenticode_signature.authenticode_verifier();
-        let mut ca_name = DirectoryName::new_common_name("A Not existing CA");
+        let mut ca_name = DirectoryName::new_common_name("A non-existent CA");
         ca_name.add_attr(NameAttr::LocalityName, "The Place that nobody knows");
         ca_name.add_attr(NameAttr::OrganizationName, "A Bad known organization");
         ca_name.add_attr(NameAttr::StateOrProvinceName, "The first state of Mars");
@@ -1361,6 +1388,7 @@ mod test {
         let validation_result = validator
             .require_basic_authenticode_validation(file_hash)
             .require_signing_certificate_check()
+            .require_chain_check()
             .interval_date(
                 &UTCDate::new(2021, 7, 8, 11, 56, 49).unwrap(),
                 &UTCDate::new(2022, 7, 8, 11, 56, 49).unwrap(),
@@ -1577,6 +1605,7 @@ mod test {
             .authenticode_verifier()
             .require_basic_authenticode_validation(file_hash)
             .require_signing_certificate_check()
+            .require_chain_check()
             .exact_date(&UTCDate::new(2021, 3, 3, 18, 39, 47).unwrap())
             .require_not_after_check()
             .require_not_before_check()
@@ -1659,6 +1688,7 @@ mod test {
         let validation_result = validator
             .require_basic_authenticode_validation(file_hash)
             .require_signing_certificate_check()
+            .require_chain_check()
             .interval_date(
                 &UTCDate::new(2021, 7, 9, 7, 48, 3).unwrap(),
                 &UTCDate::new(2022, 7, 9, 7, 48, 3).unwrap(),
@@ -1756,6 +1786,7 @@ mod test {
         let validator_result = validator
             .require_basic_authenticode_validation(file_hash)
             .require_signing_certificate_check()
+            .require_chain_check()
             .exact_date(&UTCDate::new(2021, 9, 7, 12, 50, 40).unwrap())
             .require_not_before_check()
             .require_not_after_check()

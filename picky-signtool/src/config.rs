@@ -20,6 +20,7 @@ pub const ARG_PRIVATE_KEY: &str = "rsa-private-key";
 pub const ARG_VERIFY: &str = "verify";
 pub const ARG_VERIFY_DEFAULT: &str = "default";
 pub const ARG_VERIFY_SIGNING_CERTIFICATE: &str = "signing-certificate";
+pub const ARG_VERIFY_CHAIN: &str = "chain";
 pub const ARG_VERIFY_CA: &str = "ca";
 
 pub const ARG_LOGGING: &str = "logging";
@@ -63,7 +64,7 @@ pub fn config() -> ArgMatches<'static> {
             Arg::with_name(ARG_BINARY)
                 .short("b")
                 .long(ARG_BINARY)
-                .help("Specify to sign a PE binary")
+                .help("Specify a PE binary to sign")
                 .display_order(0),
         )
         .arg(
@@ -92,7 +93,7 @@ pub fn config() -> ArgMatches<'static> {
         .arg(
             Arg::with_name(ARG_PS_SCRIPT)
                 .long(ARG_PS_SCRIPT)
-                .help("Specify to sign or verify a PowerShell script or module")
+                .help("Specify a PowerShell script or module to sign or verify")
                 .display_order(3),
         )
         .arg(
@@ -109,7 +110,7 @@ pub fn config() -> ArgMatches<'static> {
             Arg::with_name(ARG_SIGN)
                 .short(ARG_SIGN)
                 .long("sign")
-                .help("Specify to sing input file(files)")
+                .help("Specify input file(files) to sing input")
                 .requires_all(&[ARG_CERTFILE, ARG_PRIVATE_KEY])
                 .display_order(5),
         )
@@ -143,17 +144,24 @@ pub fn config() -> ArgMatches<'static> {
                 .help("Verify input file")
                 .long_help(
                     format!(
-                    "`{}` - {}\n`{}` - {}\n`{}` - {}\n",
+                    "`{}` - {}\n`{}` - {}\n``{}` - {}\n``{}` - {}\n",
                     ARG_VERIFY_DEFAULT,
                     "Default behavior that tries to follow the Microsoft verification process as close as possible.",
                     ARG_VERIFY_SIGNING_CERTIFICATE,
                     "Requires checking signing certificate validity.",
+                     ARG_VERIFY_CHAIN,
+                    "Requires X509 certificates chain validation additional to signing certificate validation",
                     ARG_VERIFY_CA,
                     "Verify that the intermediate certificate of the signature was issued by a CA that Windows trust",
                 )
                     .as_str(),
                 )
-                .possible_values(&[ARG_VERIFY_DEFAULT, ARG_VERIFY_SIGNING_CERTIFICATE, ARG_VERIFY_CA])
+                .possible_values(&[
+                    ARG_VERIFY_DEFAULT,
+                    ARG_VERIFY_SIGNING_CERTIFICATE,
+                    ARG_VERIFY_CHAIN,
+                    ARG_VERIFY_CA,
+                ])
                 .display_order(8),
         )
         .arg(
@@ -174,6 +182,5 @@ pub fn config() -> ArgMatches<'static> {
                 ])
                 .display_order(9),
         )
-        .set_term_width(190)
         .get_matches()
 }

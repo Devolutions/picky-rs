@@ -34,7 +34,7 @@ cab = { version = "0.2", optional = true }
 # /!\ ===== cryptography dependencies ===== /!\
 # These should be updated as soon as possible.
 # /!\ ===================================== /!\
-md-5 = "0.9.1"
+md-5 = "0.9"
 sha1 = { package = "sha-1", version = "0.9" }
 sha2 = "0.9"
 sha3 = "0.9"

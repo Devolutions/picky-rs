@@ -53,9 +53,10 @@ impl WinCertificate {
 
         let certificate_type = CertificateType::try_from(buffer.read_u16::<LittleEndian>()?)?;
 
-        let mut certificate = Vec::with_capacity(length as usize);
+        let certificate_length = length as usize - MINIMUM_BYTES_TO_DECODE;
+        let mut certificate = Vec::with_capacity(certificate_length);
 
-        for _ in 0..length {
+        for _ in 0..certificate_length {
             certificate.push(buffer.read_u8()?);
         }
 
@@ -79,6 +80,8 @@ impl WinCertificate {
 
         let mut buffer = BufWriter::with_capacity(length as usize + padding, Vec::new());
 
+        // According to Authenticode_PE.docx WinCertificate::length is set to certificate length,
+        // but if do not contains others WinCertificate's fields sizes the signature is invalid
         buffer.write_u32::<LittleEndian>(length + padding as u32)?;
         buffer.write_u16::<LittleEndian>(revision as u16)?;
         buffer.write_u16::<LittleEndian>(certificate_type as u16)?;
@@ -94,7 +97,7 @@ impl WinCertificate {
     pub fn from_certificate<V: Into<Vec<u8>>>(certificate: V, certificate_type: CertificateType) -> Self {
         let certificate = certificate.into();
         Self {
-            length: certificate.len() as u32,
+            length: (MINIMUM_BYTES_TO_DECODE + certificate.len()) as u32,
             revision: RevisionType::WinCertificateRevision20,
             certificate_type,
             certificate,
@@ -167,7 +170,7 @@ mod tests {
     ];
 
     const WINCERT_WITH_ONE_BYTE_CERTIFICATE: [u8; 16] = [
-        0x08, 0x00, 0x00, 0x00, // -> WIN_CERTIFICATE::dwLength = 0x08 = 8
+        0x10, 0x00, 0x00, 0x00, // -> WIN_CERTIFICATE::dwLength = 0x10 = 16
         0x00, 0x01, // -> WIN_CERTIFICATE::wRevision = 0x0100 = WIN_CERT_REVISION_1_0
         0x01, 0x00, // -> WIN_CERTIFICATE::wCertificateType = 0x01 = WIN_CERTIFICATE::WIN_CERT_TYPE_X509
         0x01, // -> WIN_CERTIFICATE::bCertificate = bCertificate[0] = 1
@@ -175,7 +178,7 @@ mod tests {
     ];
 
     const WINCERT_WITH_TEN_BYTES_CERTIFICATE: [u8; 24] = [
-        0x10, 0x00, 0x00, 0x00, // -> WIN_CERTIFICATE::dwLength = 0x10 = 16
+        0x18, 0x00, 0x00, 0x00, // -> WIN_CERTIFICATE::dwLength = 0x18 = 24
         0x00, 0x02, // -> WIN_CERTIFICATE::wRevision = 0x0200 = WIN_CERT_REVISION_2_0
         0x09, 0x00, // -> WIN_CERTIFICATE::wCertificateType = 0x09 = WIN_CERTIFICATE::WinCertTypePkcs1Sign
         0x01, 0x20, 0x03, 0x40, 0x05, 0x60, 0x70, 0x08, // -> WIN_CERTIFICATE::bCertificate = bCertificate[10]
@@ -183,14 +186,14 @@ mod tests {
     ];
 
     const WINCERT_WITH_INVALID_REVISION: [u8; 9] = [
-        0x01, 0x00, 0x00, 0x00, // -> WIN_CERTIFICATE::dwLength = 0x01 = 1
+        0x09, 0x00, 0x00, 0x00, // -> WIN_CERTIFICATE::dwLength = 0x09 = 9
         0x00, 0x03, // -> WIN_CERTIFICATE::wRevision = 0x0300(not existing)
         0x01, 0x00, // -> WIN_CERTIFICATE::wCertificateType = 0x01 = WIN_CERTIFICATE::WIN_CERT_TYPE_X509
         0x01, // -> WIN_CERTIFICATE::bCertificate = bCertificate[0] = 1
     ];
 
     const WINCERT_WITH_X509_CERTIFICATE: [u8; 136] = [
-        0x80, 0x00, 0x00, 0x00, // -> WIN_CERTIFICATE::dwLength = 0x80 = 128
+        0x88, 0x00, 0x00, 0x00, // -> WIN_CERTIFICATE::dwLength = 0x80 = 136
         0x00, 0x02, // -> WIN_CERTIFICATE::wRevision = 0x0200 = WIN_CERT_REVISION_2_0
         0x01, 0x00, // -> WIN_CERTIFICATE::wCertificateType = 0x01 = WIN_CERTIFICATE::WIN_CERT_TYPE_X509
         // X509 certificate
@@ -214,7 +217,7 @@ mod tests {
     fn decode_wincert_with_one_byte_certificate() {
         let decoded = WinCertificate::decode(WINCERT_WITH_ONE_BYTE_CERTIFICATE.as_ref()).unwrap();
 
-        pretty_assertions::assert_eq!(decoded.length, 8);
+        pretty_assertions::assert_eq!(decoded.length, 16);
         pretty_assertions::assert_eq!(decoded.revision, RevisionType::WinCertificateRevision10);
         pretty_assertions::assert_eq!(decoded.certificate_type, CertificateType::WinCertTypeX509);
         pretty_assertions::assert_eq!(decoded.certificate, vec![1, 0, 0, 0, 0, 0, 0, 0]);
@@ -223,7 +226,7 @@ mod tests {
     #[test]
     fn encode_into_wincert_with_one_byte_certificate() {
         let wincert = WinCertificate {
-            length: 1,
+            length: 9,
             revision: RevisionType::WinCertificateRevision10,
             certificate_type: CertificateType::WinCertTypeX509,
             certificate: vec![1],
@@ -237,7 +240,7 @@ mod tests {
     fn decode_wincert_with_ten_bytes_certificate() {
         let decoded = WinCertificate::decode(WINCERT_WITH_TEN_BYTES_CERTIFICATE.as_ref()).unwrap();
 
-        pretty_assertions::assert_eq!(decoded.length, 16);
+        pretty_assertions::assert_eq!(decoded.length, 24);
         pretty_assertions::assert_eq!(decoded.revision, RevisionType::WinCertificateRevision20);
         pretty_assertions::assert_eq!(decoded.certificate_type, CertificateType::WinCertTypePkcs1Sign);
         pretty_assertions::assert_eq!(
@@ -249,7 +252,7 @@ mod tests {
     #[test]
     fn encode_into_wincert_with_ten_bytes_certificate() {
         let wincert = WinCertificate {
-            length: 10,
+            length: 18,
             revision: RevisionType::WinCertificateRevision20,
             certificate_type: CertificateType::WinCertTypePkcs1Sign,
             certificate: vec![1, 32, 3, 64, 5, 96, 112, 8, 144, 1],
@@ -274,7 +277,7 @@ mod tests {
     #[test]
     fn encode_wincert_with_x509_certificate() {
         let wincert = WinCertificate {
-            length: 128,
+            length: 136,
             revision: RevisionType::WinCertificateRevision20,
             certificate_type: CertificateType::WinCertTypeX509,
             certificate: WINCERT_WITH_X509_CERTIFICATE[8..].to_vec(),

@@ -108,21 +108,19 @@ fn sign_script(pkcs7: &Pkcs7, private_key: &PrivateKey, file_path: &Path) -> any
     let checksum = compute_ps_file_checksum_from_content(file_path, HashAlgorithm::SHA2_256)
         .with_context(|| format!("Failed to compute checksum for {:?}", file))?;
 
-    let authenticode_signature =
-        AuthenticodeSignature::new(&pkcs7, &checksum, ShaVariant::SHA2_256, &private_key, None)
-            .with_context(|| format!("Failed to create authenticode signature for {:?}", file))?
-            .to_pem()
-            .context("Failed convert to authenticode signature to PEM format")?
-            .to_string();
+    let authenticode_signature = AuthenticodeSignature::new(pkcs7, &checksum, ShaVariant::SHA2_256, private_key, None)
+        .with_context(|| format!("Failed to create authenticode signature for {:?}", file))?
+        .to_pem()
+        .context("Failed convert to authenticode signature to PEM format")?
+        .to_string();
 
     let mut ps_authenticode_signature = String::new();
     ps_authenticode_signature.push_str(CRLF);
     ps_authenticode_signature.push_str(PS_AUTHENTICODE_HEADER);
     ps_authenticode_signature.push_str(CRLF);
 
-    for line in authenticode_signature.lines().skip(1) {
-        // skip(1) to skip PKCS7 header
-        if line != "-----END PKCS7-----" {
+    for line in authenticode_signature.lines() {
+        if line != "-----END PKCS7-----" && line != "-----BEGIN PKCS7-----" {
             ps_authenticode_signature.push_str(PS_AUTHENTICODE_LINES_SPLITTER);
             ps_authenticode_signature.push_str(line);
             ps_authenticode_signature.push_str(CRLF);
@@ -148,20 +146,15 @@ fn sign_binary(
         .get_file_hash_sha256()
         .map_err(|err| anyhow!("Failed to compute file hash: {}", err))?;
 
-    let authenticode_signature = AuthenticodeSignature::new(
-        &pkcs7,
-        &file_hash,
-        ShaVariant::SHA2_256,
-        &private_key,
-        Some(binary_name),
-    )
-    .context("Failed to create authenticode signature for")?
-    .to_der()
-    .context("Failed to convert authenticode signature to der")?;
+    let authenticode_signature =
+        AuthenticodeSignature::new(pkcs7, &file_hash, ShaVariant::SHA2_256, private_key, Some(binary_name))
+            .context("Failed to create authenticode signature for")?
+            .to_der()
+            .context("Failed to convert authenticode signature to der")?;
 
     let wincert = WinCertificate::from_certificate(authenticode_signature, CertificateType::WinCertTypePkcsSignedData)
         .encode()
-        .map_err(|err| anyhow!("Failed wrap authenticode signature in WinCertificate: {}", err))?;
+        .map_err(|err| anyhow!("Failed to wrap authenticode signature in WinCertificate: {}", err))?;
 
     binary
         .set_authenticode_data(wincert)
