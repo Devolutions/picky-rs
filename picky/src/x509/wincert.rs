@@ -5,9 +5,7 @@ use crate::x509::extension::{ExtendedKeyUsage, ExtensionView};
 use crate::x509::pkcs7::{Pkcs7, Pkcs7Error};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use picky_asn1::tag::Tag;
-use picky_asn1::wrapper::{
-    Asn1SequenceOf, Asn1SetOf, ExplicitContextTag0, ExplicitContextTag1, ImplicitContextTag0, Optional,
-};
+use picky_asn1::wrapper::{Asn1SetOf, ExplicitContextTag0, ExplicitContextTag1, Optional};
 use picky_asn1_x509::algorithm_identifier::AlgorithmIdentifier;
 use picky_asn1_x509::pkcs7::cmsversion::CmsVersion;
 use picky_asn1_x509::pkcs7::content_info::{
@@ -27,6 +25,7 @@ use std::error;
 use std::io::{self, BufReader, BufWriter};
 use thiserror::Error;
 
+use picky_asn1_x509::signer_info::Attributes;
 pub use picky_asn1_x509::ShaVariant;
 
 const MINIMUM_BYTES_TO_DECODE: usize = 4 /* WinCertificate::length */ + 2 /* WinCertificate::revision */ + 2 /* WinCertificate::certificate */;
@@ -188,7 +187,7 @@ impl WinCertificate {
             version: CmsVersion::V1,
             sid: SignerIdentifier::IssuerAndSerialNumber(issuer_and_serial_number),
             digest_algorithm: DigestAlgorithmIdentifier(digest_algorithm.clone()),
-            signed_attrs: Optional(ImplicitContextTag0(Asn1SequenceOf(authenticated_attributes))),
+            signed_attrs: Optional(Attributes(authenticated_attributes)),
             signature_algorithm: SignatureAlgorithmIdentifier(AlgorithmIdentifier::new_rsa_encryption()),
             signature: encrypted_digest,
         };

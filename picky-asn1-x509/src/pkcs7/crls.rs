@@ -1,7 +1,9 @@
 use super::signer_info::CertificateSerialNumber;
 use crate::{AlgorithmIdentifier, Extensions, Name, Time, Version};
 use picky_asn1::tag::{Tag, TagClass, TagPeeker};
-use picky_asn1::wrapper::{ExplicitContextTag0, Asn1SequenceOf, BitStringAsn1, ImplicitContextTag1, ObjectIdentifierAsn1};
+use picky_asn1::wrapper::{
+    Asn1SequenceOf, BitStringAsn1, ExplicitContextTag0, ImplicitContextTag1, ObjectIdentifierAsn1,
+};
 use serde::{de, ser, Deserialize, Serialize};
 
 /// [RFC 5652 #10.2.1](https://datatracker.ietf.org/doc/html/rfc5652#section-10.2.1)
@@ -12,7 +14,7 @@ use serde::{de, ser, Deserialize, Serialize};
 #[derive(Debug, PartialEq, Clone, Default)]
 pub struct RevocationInfoChoices(pub Vec<RevocationInfoChoice>);
 
-// This is a workaround for consturcted encoding as implicit
+// This is a workaround for constructed encoding as implicit
 
 impl ser::Serialize for RevocationInfoChoices {
     fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
@@ -181,14 +183,28 @@ impl<'de> de::Deserialize<'de> for TbsCertList {
                     ));
                 }
 
+                let signature = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(1, &self))?;
+                let issuer = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(2, &self))?;
+                let this_update = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(3, &self))?;
+                let next_update = seq.next_element().unwrap_or(Some(None)).unwrap_or(None);
+
+                let tag_peeker: TagPeeker = seq_next_element!(seq, TbsCertList, "a tag");
+                let revoked_certificates = if tag_peeker.next_tag == Tag::SEQUENCE {
+                    seq.next_element()?.ok_or_else(|| de::Error::invalid_length(5, &self))?
+                } else {
+                    None
+                };
+
+                let crl_extension = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(6, &self))?;
+
                 Ok(TbsCertList {
                     version,
-                    signature: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(1, &self))?,
-                    issuer: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(2, &self))?,
-                    this_update: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(3, &self))?,
-                    next_update: seq.next_element().unwrap_or(Some(None)).unwrap_or(None),
-                    revoked_certificates: seq.next_element().unwrap_or(Some(None)).unwrap_or(None),
-                    crl_extension: ExplicitContextTag0(seq.next_element().unwrap_or(Some(None)).unwrap_or(None)),
+                    signature,
+                    issuer,
+                    this_update,
+                    next_update,
+                    revoked_certificates,
+                    crl_extension,
                 })
             }
         }

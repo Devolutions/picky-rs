@@ -1,6 +1,6 @@
 use crate::cmsversion::CmsVersion;
-use crate::{AlgorithmIdentifier, Attributes, Name, SubjectKeyIdentifier};
-use picky_asn1::tag::{TagClass, TagPeeker};
+use crate::{AlgorithmIdentifier, Attribute, Name, SubjectKeyIdentifier};
+use picky_asn1::tag::{Tag, TagClass, TagPeeker};
 use picky_asn1::wrapper::{ImplicitContextTag0, IntegerAsn1, OctetStringAsn1, Optional};
 use serde::{de, ser, Deserialize, Serialize};
 
@@ -24,7 +24,7 @@ pub struct SignerInfo {
     pub version: CmsVersion,
     pub sid: SignerIdentifier,
     pub digest_algorithm: DigestAlgorithmIdentifier,
-    pub signed_attrs: Optional<ImplicitContextTag0<Attributes>>,
+    pub signed_attrs: Optional<Attributes>,
     pub signature_algorithm: SignatureAlgorithmIdentifier,
     pub signature: SignatureValue,
     // unsigned_attrs
@@ -71,6 +71,33 @@ impl<'de> de::Deserialize<'de> for SignerInfo {
         }
 
         deserializer.deserialize_seq(Visitor)
+    }
+}
+
+// This is a workaround for constructed encoding as implicit
+#[derive(Debug, PartialEq, Clone, Default)]
+pub struct Attributes(pub Vec<Attribute>);
+
+impl ser::Serialize for Attributes {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
+    where
+        S: ser::Serializer,
+    {
+        let mut raw_der = picky_asn1_der::to_vec(&self.0).unwrap_or_else(|_| vec![0]);
+        raw_der[0] = Tag::context_specific_constructed(0).inner();
+        picky_asn1_der::Asn1RawDer(raw_der).serialize(serializer)
+    }
+}
+
+impl<'de> de::Deserialize<'de> for Attributes {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        let mut raw_der = picky_asn1_der::Asn1RawDer::deserialize(deserializer)?.0;
+        raw_der[0] = Tag::SEQUENCE.inner();
+        let vec = picky_asn1_der::from_bytes(&raw_der).unwrap_or_default();
+        Ok(Attributes(vec))
     }
 }
 

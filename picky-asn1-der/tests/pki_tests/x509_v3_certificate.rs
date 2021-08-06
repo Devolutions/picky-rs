@@ -62,8 +62,8 @@ use oid::prelude::*;
 use picky_asn1::bit_string::BitString;
 use picky_asn1::date::Date;
 use picky_asn1::wrapper::{
-    ExplicitContextTag0, ExplicitContextTag3, Asn1SequenceOf, Asn1SetOf, BitStringAsn1, Optional, IntegerAsn1,
-    ObjectIdentifierAsn1, OctetStringAsn1, UTCTimeAsn1,
+    Asn1SequenceOf, Asn1SetOf, BitStringAsn1, ExplicitContextTag0, ExplicitContextTag3, IntegerAsn1,
+    ObjectIdentifierAsn1, OctetStringAsn1, Optional, UTCTimeAsn1,
 };
 use serde::{Deserialize, Serialize};
 
