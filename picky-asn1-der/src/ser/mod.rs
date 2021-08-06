@@ -114,7 +114,9 @@ impl<'se> Serializer<'se> {
     fn h_write_header(&mut self, tag: Tag, len: usize) -> Result<usize> {
         let mut written;
         match self.encapsulators.last() {
-            Some(last_encapsulator_tag) if last_encapsulator_tag.is_context_specific() && last_encapsulator_tag.is_primitive() => {
+            Some(last_encapsulator_tag)
+                if last_encapsulator_tag.is_context_specific() && last_encapsulator_tag.is_primitive() =>
+            {
                 written = self.h_write_encapsulator(len)?;
             }
             _ => {

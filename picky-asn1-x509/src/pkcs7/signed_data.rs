@@ -48,7 +48,7 @@ pub struct SignersInfos(pub Asn1SetOf<SignerInfo>);
 #[derive(Debug, PartialEq, Clone)]
 pub struct CertificateSet(pub Vec<Certificate>);
 
-// This is a workaround for consturcted encoding as implicit
+// This is a workaround for constructed encoding as implicit
 
 impl ser::Serialize for CertificateSet {
     fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>

@@ -204,7 +204,7 @@ impl<'de> de::Deserialize<'de> for SpcAttributeAndOptionalValue {
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct SpcPeImageData {
     pub flags: SpcPeImageFlags,
-    pub file: ExplicitContextTag0<SpcLink>, // According to Authenticode_PE.docx, there is  no ApplicationTag0, but otherwise created Authenticode signature won't be valid
+    pub file: ExplicitContextTag0<SpcLink>, // According to Authenticode_PE.docx, there is  no ExplicitContextTag0, but otherwise created Authenticode signature won't be valid
 }
 
 impl<'de> de::Deserialize<'de> for SpcPeImageData {
