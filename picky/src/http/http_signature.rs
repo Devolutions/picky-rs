@@ -169,7 +169,7 @@ impl HttpSigAlgorithm {
     pub fn as_str(&self) -> &str {
         match self {
             Self::Known(algo) => to_http_sig_algo_str(*algo),
-            Self::Custom(name) => &name,
+            Self::Custom(name) => name,
         }
     }
 }

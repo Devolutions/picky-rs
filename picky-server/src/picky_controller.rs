@@ -70,7 +70,7 @@ impl Picky {
 
         CertificateBuilder::new()
             .validity(valid_from, valid_to)
-            .self_signed(DirectoryName::new_common_name(name), &key)
+            .self_signed(DirectoryName::new_common_name(name), key)
             .signature_hash_type(signature_hash_type)
             .ca(true)
             .key_usage(key_usage)

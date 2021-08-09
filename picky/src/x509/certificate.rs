@@ -654,7 +654,7 @@ impl<'a> CertificateBuilder<'a> {
     /// Required (alternative: `issuer`, `self_signed`)
     #[inline]
     pub fn issuer_cert(&self, issuer_cert: &Cert, issuer_key: &'a PrivateKey) -> &Self {
-        let builder = self.issuer(issuer_cert.subject_name(), &issuer_key);
+        let builder = self.issuer(issuer_cert.subject_name(), issuer_key);
 
         if let Ok(issuer_ski) = issuer_cert.subject_key_identifier() {
             self.authority_key_identifier(issuer_ski.to_vec())

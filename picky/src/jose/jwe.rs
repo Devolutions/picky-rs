@@ -546,19 +546,19 @@ fn decode_impl(encoded_token: &str, mode: DecoderMode<'_>) -> Result<Jwe, JweErr
     let aad = parts.protected_header_base64.as_bytes(); // The Additional Authenticated Data value used for AES-GCM.
     match header.enc {
         JweEnc::Aes128Gcm => Aes128Gcm::new(GenericArray::from_slice(&jwe_cek)).decrypt_in_place_detached(
-            &nonce,
+            nonce,
             aad,
             &mut buffer,
             GenericArray::from_slice(&parts.authentication_tag),
         )?,
         JweEnc::Aes192Gcm => Aes192Gcm::new(GenericArray::from_slice(&jwe_cek)).decrypt_in_place_detached(
-            &nonce,
+            nonce,
             aad,
             &mut buffer,
             GenericArray::from_slice(&parts.authentication_tag),
         )?,
         JweEnc::Aes256Gcm => Aes256Gcm::new(GenericArray::from_slice(&jwe_cek)).decrypt_in_place_detached(
-            &nonce,
+            nonce,
             aad,
             &mut buffer,
             GenericArray::from_slice(&parts.authentication_tag),

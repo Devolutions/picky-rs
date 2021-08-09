@@ -267,7 +267,7 @@ impl ServerController {
 }
 
 async fn extract_cert_from_request(req: &Request<Bytes>) -> Result<(Cert, Vec<u8>), GreedyError> {
-    match Format::request_format(&req)? {
+    match Format::request_format(req)? {
         Format::PemFile => {
             let pem = parse_pem(req.body())?;
             Ok((Cert::from_der(pem.data())?, pem.into_data().into_owned()))
@@ -607,7 +607,7 @@ async fn init_storage_from_config(storage: &dyn PickyStorage, config: &Config) -
         }
     } else {
         log::info!("root CA...");
-        let created = generate_root_ca(&config, storage)
+        let created = generate_root_ca(config, storage)
             .await
             .map_err(|e| format!("couldn't generate root CA: {}", e))?;
         if created {
@@ -625,7 +625,7 @@ async fn init_storage_from_config(storage: &dyn PickyStorage, config: &Config) -
         }
     } else {
         log::info!("intermediate CA...");
-        let created = generate_intermediate_ca(&config, storage)
+        let created = generate_intermediate_ca(config, storage)
             .await
             .map_err(|e| format!("couldn't generate intermediate CA: {}", e))?;
         if created {
