@@ -144,13 +144,13 @@ pub fn config() -> ArgMatches<'static> {
                 .help("Verify input file")
                 .long_help(
                     format!(
-                    "`{}` - {}\n`{}` - {}\n``{}` - {}\n``{}` - {}\n",
+                    "`{}` - {}\n`{}` - {}\n`{}` - {}\n`{}` - {}\n",
                     ARG_VERIFY_DEFAULT,
                     "Default behavior that tries to follow the Microsoft verification process as close as possible.",
                     ARG_VERIFY_SIGNING_CERTIFICATE,
                     "Requires checking signing certificate validity.",
                      ARG_VERIFY_CHAIN,
-                    "Requires X509 certificates chain validation additional to signing certificate validation",
+                    "Requires X509 certificates chain validation additionally to signing certificate validation",
                     ARG_VERIFY_CA,
                     "Verify that the intermediate certificate of the signature was issued by a CA that Windows trust",
                 )
