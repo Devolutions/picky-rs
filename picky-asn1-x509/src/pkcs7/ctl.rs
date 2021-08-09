@@ -16,7 +16,7 @@ use serde::{de, ser, Deserialize, Deserializer, Serialize};
 /// ```
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Ctl {
-    pub singers: Asn1SequenceOf<ObjectIdentifierAsn1>,
+    pub signers: Asn1SequenceOf<ObjectIdentifierAsn1>,
     pub sequence_number: IntegerAsn1,
     pub effective_date: UTCTimeAsn1,
     pub digest_algorithm: AlgorithmIdentifier,
@@ -339,7 +339,7 @@ mod tests {
         check_serde!(cert_enhkey_usage_prop_id_entry: CTLEntryAttribute in ctl_hex[141..171]);
 
         let ctl = Ctl {
-            singers: vec![oids::root_list_signer().into()].into(),
+            signers: vec![oids::root_list_signer().into()].into(),
             sequence_number: ctl_hex[20..29].to_vec().into(),
             effective_date: UTCTime::new(2021, 5, 19, 19, 15, 3).unwrap().into(),
             digest_algorithm: AlgorithmIdentifier::new_sha(ShaVariant::SHA1),

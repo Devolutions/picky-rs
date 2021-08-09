@@ -110,7 +110,7 @@ pub fn config() -> ArgMatches<'static> {
             Arg::with_name(ARG_SIGN)
                 .short(ARG_SIGN)
                 .long("sign")
-                .help("Specify input file(files) to sing input")
+                .help("Specify input file(files) to sign input")
                 .requires_all(&[ARG_CERTFILE, ARG_PRIVATE_KEY])
                 .display_order(5),
         )

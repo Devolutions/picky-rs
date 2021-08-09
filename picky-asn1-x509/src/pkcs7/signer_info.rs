@@ -157,7 +157,7 @@ impl<'de> Deserialize<'de> for SignerIdentifier {
             {
                 let tag_peeker: TagPeeker = seq_next_element!(seq, SignerIdentifier, "a choice tag");
 
-                let singer_identifier =
+                let signer_identifier =
                     if tag_peeker.next_tag.class() == TagClass::ContextSpecific && tag_peeker.next_tag.number() == 0 {
                         SignerIdentifier::SubjectKeyIdentifier(seq_next_element!(
                             seq,
@@ -173,7 +173,7 @@ impl<'de> Deserialize<'de> for SignerIdentifier {
                         ))
                     };
 
-                Ok(singer_identifier)
+                Ok(signer_identifier)
             }
         }
 

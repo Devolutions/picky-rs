@@ -66,8 +66,8 @@ pub enum AuthenticodeError {
     IncorrectSignerIdentifier,
     #[error("Incorrect version. Expected: {expected}, but got {got}")]
     IncorrectVersion { expected: u32, got: u32 },
-    #[error("Authenticode must contain only one SingerInfo, but got {count}")]
-    MultipleSingerInfo { count: usize },
+    #[error("Authenticode must contain only one SignerInfo, but got {count}")]
+    MultipleSignerInfo { count: usize },
     #[error("EncapsulatedContentInfo is missing")]
     NoEncapsulatedContentInfo,
     #[error("EncapsulatedContentInfo should contain SpcIndirectDataContent")]
@@ -211,7 +211,7 @@ impl AuthenticodeSignature {
 
         let encrypted_digest = SignatureValue(signature_algo.sign(auth_raw_data.as_ref(), private_key)?.into());
 
-        let singer_info = SignerInfo {
+        let signer_info = SignerInfo {
             version: CmsVersion::V1,
             sid: SignerIdentifier::IssuerAndSerialNumber(issuer_and_serial_number),
             digest_algorithm: DigestAlgorithmIdentifier(digest_algorithm.clone()),
@@ -234,7 +234,7 @@ impl AuthenticodeSignature {
             content_info,
             certificates,
             crls: Some(RevocationInfoChoices::default()),
-            signers_infos: SignersInfos(vec![singer_info].into()),
+            signers_infos: SignersInfos(vec![signer_info].into()),
         };
 
         Ok(AuthenticodeSignature(Pkcs7::from(Pkcs7Certificate {
@@ -276,7 +276,7 @@ impl AuthenticodeSignature {
     pub fn signing_certificate(&self) -> AuthenticodeResult<Cert> {
         let signer_infos = &self.0 .0.signed_data.signers_infos.0;
 
-        let signer_info = signer_infos.first().ok_or(AuthenticodeError::MultipleSingerInfo {
+        let signer_info = signer_infos.first().ok_or(AuthenticodeError::MultipleSignerInfo {
             count: signer_infos.len(),
         })?;
 
@@ -327,7 +327,7 @@ impl AuthenticodeSignature {
     pub fn authenticated_attributes(&self) -> &[Attribute] {
         &self
             .0
-            .singer_infos()
+            .signer_infos()
             .first()
             .expect("Exactly one SignerInfo should be present")
             .signed_attrs
@@ -489,9 +489,9 @@ impl<'a> AuthenticodeValidator<'a> {
         }
 
         // 2. It must contain only one singer info.
-        let signer_infos = self.authenticode_signature.0.singer_infos();
+        let signer_infos = self.authenticode_signature.0.signer_infos();
         if signer_infos.len() != 1 {
-            return Err(AuthenticodeError::MultipleSingerInfo {
+            return Err(AuthenticodeError::MultipleSignerInfo {
                 count: signer_infos.len(),
             });
         }

@@ -56,7 +56,7 @@ impl Pkcs7 {
         self.0.signed_data.digest_algorithms.0 .0.as_slice()
     }
 
-    pub fn singer_infos(&self) -> &[SignerInfo] {
+    pub fn signer_infos(&self) -> &[SignerInfo] {
         &self.0.signed_data.signers_infos.0
     }
 
