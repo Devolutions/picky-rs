@@ -9,7 +9,7 @@ use aes_gcm::{AeadCore, AeadInPlace, Aes128Gcm, Aes256Gcm, NewAead};
 use base64::DecodeError;
 use digest::generic_array::GenericArray;
 use rand::RngCore;
-use rsa::{PaddingScheme, PublicKey as RsaPublicKeyInterface, RSAPrivateKey, RSAPublicKey};
+use rsa::{PaddingScheme, PublicKey as RsaPublicKeyInterface, RsaPrivateKey, RsaPublicKey};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::convert::TryFrom;
@@ -395,7 +395,7 @@ fn encode_impl(jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
         }
         EncoderMode::Asymetric(public_key) => {
             // Currently, only rsa is supported
-            let rsa_public_key = RSAPublicKey::try_from(public_key)?;
+            let rsa_public_key = RsaPublicKey::try_from(public_key)?;
 
             let mut rng = rand::rngs::OsRng;
 
@@ -498,7 +498,7 @@ fn decode_impl(encoded_token: &str, mode: DecoderMode<'_>) -> Result<Jwe, JweErr
     let jwe_cek = match mode {
         DecoderMode::Direct(symmetric_key) => Cow::Borrowed(symmetric_key),
         DecoderMode::Normal(private_key) => {
-            let rsa_private_key = RSAPrivateKey::try_from(private_key)?;
+            let rsa_private_key = RsaPrivateKey::try_from(private_key)?;
 
             let padding = match header.alg {
                 JweAlg::RsaPkcs1v15 => PaddingScheme::new_pkcs1v15_encrypt(),

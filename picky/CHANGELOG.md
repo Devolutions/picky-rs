@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Changed
+
+- Update `rsa` dependency to `0.5`
+- Update `picky-asn1` dependency to `0.4`
+
 ## [6.3.0] 2021-05-27
 
 ### Added

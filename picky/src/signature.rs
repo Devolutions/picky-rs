@@ -4,7 +4,7 @@ use crate::hash::HashAlgorithm;
 use crate::key::{KeyError, PrivateKey, PublicKey};
 use core::convert::TryFrom;
 use picky_asn1_x509::{oids, AlgorithmIdentifier};
-use rsa::{PublicKey as RsaPublicKeyInterface, RSAPrivateKey, RSAPublicKey};
+use rsa::{PublicKey as _, RsaPrivateKey, RsaPublicKey};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -99,7 +99,7 @@ impl SignatureAlgorithm {
     pub fn sign(self, msg: &[u8], private_key: &PrivateKey) -> Result<Vec<u8>, SignatureError> {
         let signature = match self {
             SignatureAlgorithm::RsaPkcs1v15(picky_hash_algo) => {
-                let rsa_private_key = RSAPrivateKey::try_from(private_key)?;
+                let rsa_private_key = RsaPrivateKey::try_from(private_key)?;
                 let digest = picky_hash_algo.digest(msg);
                 let rsa_hash_algo = rsa::Hash::from(picky_hash_algo);
                 let padding_scheme = rsa::PaddingScheme::new_pkcs1v15_sign(Some(rsa_hash_algo));
@@ -113,7 +113,7 @@ impl SignatureAlgorithm {
     pub fn verify(self, public_key: &PublicKey, msg: &[u8], signature: &[u8]) -> Result<(), SignatureError> {
         match self {
             SignatureAlgorithm::RsaPkcs1v15(picky_hash_algo) => {
-                let rsa_public_key = RSAPublicKey::try_from(public_key)?;
+                let rsa_public_key = RsaPublicKey::try_from(public_key)?;
                 let digest = picky_hash_algo.digest(msg);
                 let rsa_hash_algo = rsa::Hash::from(picky_hash_algo);
                 let padding_scheme = rsa::PaddingScheme::new_pkcs1v15_sign(Some(rsa_hash_algo));
