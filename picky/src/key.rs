@@ -6,7 +6,7 @@ use num_bigint_dig::traits::ModInverse;
 use picky_asn1::wrapper::{BitStringAsn1Container, IntegerAsn1, OctetStringAsn1Container};
 use picky_asn1_der::Asn1DerError;
 use picky_asn1_x509::{private_key_info, PrivateKeyInfo, PrivateKeyValue, SubjectPublicKeyInfo};
-use rsa::{BigUint, RSAPrivateKey, RSAPublicKey};
+use rsa::{BigUint, RsaPrivateKey, RsaPublicKey};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -84,7 +84,7 @@ impl From<PrivateKey> for SubjectPublicKeyInfo {
     }
 }
 
-impl TryFrom<&'_ PrivateKey> for RSAPrivateKey {
+impl TryFrom<&'_ PrivateKey> for RsaPrivateKey {
     type Error = KeyError;
 
     fn try_from(v: &PrivateKey) -> Result<Self, Self::Error> {
@@ -92,7 +92,7 @@ impl TryFrom<&'_ PrivateKey> for RSAPrivateKey {
             private_key_info::PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => {
                 let p1 = BigUint::from_bytes_be(key.prime_1.as_unsigned_bytes_be());
                 let p2 = BigUint::from_bytes_be(key.prime_2.as_unsigned_bytes_be());
-                Ok(RSAPrivateKey::from_components(
+                Ok(RsaPrivateKey::from_components(
                     BigUint::from_bytes_be(key.modulus.as_unsigned_bytes_be()),
                     BigUint::from_bytes_be(key.public_exponent.as_unsigned_bytes_be()),
                     BigUint::from_bytes_be(key.private_exponent.as_unsigned_bytes_be()),
@@ -103,12 +103,12 @@ impl TryFrom<&'_ PrivateKey> for RSAPrivateKey {
     }
 }
 
-impl TryFrom<&'_ PrivateKey> for RSAPublicKey {
+impl TryFrom<&'_ PrivateKey> for RsaPublicKey {
     type Error = KeyError;
 
     fn try_from(v: &PrivateKey) -> Result<Self, Self::Error> {
         match &v.as_inner().private_key {
-            private_key_info::PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => Ok(RSAPublicKey::new(
+            private_key_info::PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => Ok(RsaPublicKey::new(
                 BigUint::from_bytes_be(key.modulus.as_unsigned_bytes_be()),
                 BigUint::from_bytes_be(key.public_exponent.as_unsigned_bytes_be()),
             )?),
@@ -181,7 +181,7 @@ impl PrivateKey {
         use rand::rngs::OsRng;
         use rsa::PublicKeyParts;
 
-        let key = RSAPrivateKey::new(&mut OsRng, bits)?;
+        let key = RsaPrivateKey::new(&mut OsRng, bits)?;
 
         let modulus = key.n();
         let public_exponent = key.e();
@@ -293,14 +293,14 @@ impl AsRef<PublicKey> for PublicKey {
     }
 }
 
-impl TryFrom<&'_ PublicKey> for RSAPublicKey {
+impl TryFrom<&'_ PublicKey> for RsaPublicKey {
     type Error = KeyError;
 
     fn try_from(v: &PublicKey) -> Result<Self, Self::Error> {
         use picky_asn1_x509::PublicKey as InnerPublicKey;
 
         match &v.as_inner().subject_public_key {
-            InnerPublicKey::Rsa(BitStringAsn1Container(key)) => Ok(RSAPublicKey::new(
+            InnerPublicKey::Rsa(BitStringAsn1Container(key)) => Ok(RsaPublicKey::new(
                 BigUint::from_bytes_be(key.modulus.as_unsigned_bytes_be()),
                 BigUint::from_bytes_be(key.public_exponent.as_unsigned_bytes_be()),
             )?),
@@ -499,10 +499,12 @@ mod tests {
 
     #[test]
     fn rsa_crate_private_key_conversion() {
+        use rsa::pkcs8::FromPrivateKey;
+
         let pk_pem = crate::test_files::RSA_2048_PK_1.parse::<crate::pem::Pem>().unwrap();
         let pk = PrivateKey::from_pem(&pk_pem).unwrap();
-        let converted_rsa_private_key = RSAPrivateKey::try_from(&pk).unwrap();
-        let expected_rsa_private_key = RSAPrivateKey::from_pkcs8(pk_pem.data()).unwrap();
+        let converted_rsa_private_key = RsaPrivateKey::try_from(&pk).unwrap();
+        let expected_rsa_private_key = RsaPrivateKey::from_pkcs8_der(pk_pem.data()).unwrap();
 
         assert_eq!(converted_rsa_private_key.n(), expected_rsa_private_key.n());
         assert_eq!(converted_rsa_private_key.e(), expected_rsa_private_key.e());
