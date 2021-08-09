@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+
+## [0.4.0] 2021-08-09
+
+### Changed
+
+- Rename `Tag::number` into `Tag::inner`
+- Rename `ApplicationTag{0-15}` into `ExplicitContextTag{0-15}`
+- Rename `ContextTag{0-15}` into `ImplicitContextTag{0-15}`
+- Rename `Implicit` into `Optional`
+
+### Added
+
+- `Tag::is_primitive`
+- `Tag::application_primitive`
+- `Tag::application_constructed`
+- `Tag::context_specific_primitive`
+- `Tag::context_specific_constructed`
+- `Tag::number`
+- `Tag::class`
+- `Tag::class_and_number`
+- `Tag::components`
+- `Tag::is_application`
+- `Tag::is_context_specific`
+- `Tag::is_universal`
+- `Tag::is_private`
+- `Tag::is_constructed`
+- `Tag::is_primitive`
+- `Tag::encoding`
+- `TagClass`
+- `Encoding`
+
+### Removed
+
+- `Tag::APP_{0-15}`
+- `Tag::CTX_{0-15}`
+- `Tag::application`
+- `Tag::context_specific`
+
 ## [0.3.3] 2021-07-02
 
 ### Fixed

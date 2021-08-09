@@ -16,7 +16,7 @@ readme = "README.md"
 include = ["src/**/*", "README.md", "CHANGELOG.md"]
 
 [dependencies]
-picky-asn1 = { version = "0.3", path = "../picky-asn1" }
+picky-asn1 = { version = "0.4", path = "../picky-asn1" }
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 serde_bytes = "0.11"
 lazy_static = { version = "1.4", optional = true }
