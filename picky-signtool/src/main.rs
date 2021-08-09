@@ -55,7 +55,7 @@ fn main() -> anyhow::Result<()> {
             }
         }
         (true, true) => bail!("Do not know what to process exactly(`binary` and `script` both are specified)"),
-        (false, false) => bail!("Do not knon what to process(`binary` or `script` is not specified)"),
+        (false, false) => bail!("Do not know what to process(`binary` or `script` is not specified)"),
     };
 
     if matches.is_present(ARG_SIGN) && !files_to_process.is_empty() {
