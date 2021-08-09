@@ -121,10 +121,7 @@ impl SignatureAlgorithm {
                 let padding_scheme = rsa::PaddingScheme::new_pkcs1v15_sign(Some(rsa_hash_algo));
                 rsa_public_key
                     .verify(padding_scheme, &digest, signature)
-                    .map_err(|err| {
-                        println!("{}", err);
-                        SignatureError::BadSignature
-                    })?;
+                    .map_err(|_| SignatureError::BadSignature)?;
             }
         }
 
