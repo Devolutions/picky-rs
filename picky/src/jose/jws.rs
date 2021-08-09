@@ -265,7 +265,7 @@ impl Jws {
 
         let signature = base64::decode_config(&encoded_token[last_dot_idx + 1..], base64::URL_SAFE_NO_PAD)?;
         let signature_algo = SignatureAlgorithm::try_from(self.header.alg)?;
-        signature_algo.verify(public_key, &encoded_token[..last_dot_idx].as_bytes(), &signature)?;
+        signature_algo.verify(public_key, encoded_token[..last_dot_idx].as_bytes(), &signature)?;
 
         Ok(())
     }
@@ -312,7 +312,7 @@ fn decode_impl(encoded_token: &str, public_key: Option<&PublicKey>) -> Result<Jw
     if let Some(public_key) = public_key {
         let signature = base64::decode_config(&encoded_token[last_dot_idx + 1..], base64::URL_SAFE_NO_PAD)?;
         let signature_algo = SignatureAlgorithm::try_from(header.alg)?;
-        signature_algo.verify(public_key, &encoded_token[..last_dot_idx].as_bytes(), &signature)?;
+        signature_algo.verify(public_key, encoded_token[..last_dot_idx].as_bytes(), &signature)?;
     }
 
     let payload = base64::decode_config(&encoded_token[first_dot_idx + 1..last_dot_idx], base64::URL_SAFE_NO_PAD)?;
