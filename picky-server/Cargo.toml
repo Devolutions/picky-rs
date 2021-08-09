@@ -12,7 +12,7 @@ repository = "https://github.com/Devolutions/picky-rs"
 
 [dependencies]
 picky = { version = "6.3.0", default-features = false, features = ["x509", "jose", "chrono_conversion"], path = "../picky" }
-picky-asn1 = { version = "0.3", path = "../picky-asn1" }
+picky-asn1 = { version = "0.4", path = "../picky-asn1" }
 mongodm = { version = "0.6", features = ["tokio-runtime"] }
 clap = { features = ["yaml"], version = "2.32" }
 saphir = { version = "2.7", features = ["macro"] }
