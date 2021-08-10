@@ -40,6 +40,10 @@ mod test_files {
 
         pub const INTERMEDIATE_CA: &str = include_str!("../../test_assets/intermediate_ca.crt");
         pub const ROOT_CA: &str = include_str!("../../test_assets/root_ca.crt");
+
+        pub const PSDIAG_ROOT: &str = include_str!("../../test_assets/authenticode-psdiagnostics/1_psdiag_root.pem");
+        pub const PSDIAG_INTER: &str = include_str!("../../test_assets/authenticode-psdiagnostics/2_psdiag_inter.pem");
+        pub const PSDIAG_LEAF: &str = include_str!("../../test_assets/authenticode-psdiagnostics/3_psdiag_leaf.pem");
     }}
 
     cfg_if::cfg_if! { if #[cfg(feature = "jose")] {

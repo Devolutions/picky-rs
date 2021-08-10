@@ -2,8 +2,7 @@ use crate::attribute::{Attribute, Attributes};
 use crate::{AlgorithmIdentifier, Name, SubjectPublicKeyInfo};
 use picky_asn1::tag::Tag;
 use picky_asn1::wrapper::{Asn1SequenceOf, BitStringAsn1};
-use serde::{de, ser};
-use serde::{Deserialize, Serialize};
+use serde::{de, ser, Deserialize, Serialize};
 
 /// [RFC 2986 #4](https://tools.ietf.org/html/rfc2986#section-4)
 ///
