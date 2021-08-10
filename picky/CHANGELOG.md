@@ -7,11 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [6.4.0] 2021-08-10
+
 ### Changed
 
 - Bump minimum supported Rust version to 1.51
 - Update `rsa` dependency to `0.5`
 - Update `picky-asn1` dependency to `0.4`
+- More robust certification validation (see commit [f5f8cb60e41](https://github.com/Devolutions/picky-rs/commit/f5f8cb60e410ffe49aabace131f7b802e206ced0) for details)
 
 ## [6.3.0] 2021-05-27
 

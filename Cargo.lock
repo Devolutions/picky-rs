@@ -1912,7 +1912,7 @@ dependencies = [
 
 [[package]]
 name = "picky"
-version = "6.3.0"
+version = "6.4.0"
 dependencies = [
  "aes-gcm",
  "base64 0.13.0",
@@ -2028,7 +2028,7 @@ dependencies = [
  "mongodm",
  "multibase",
  "multihash",
- "picky 6.3.0",
+ "picky 6.4.0",
  "picky-asn1 0.4.0",
  "rand 0.8.3",
  "reqwest 0.11.3",
@@ -2049,7 +2049,7 @@ dependencies = [
  "anyhow",
  "clap",
  "lief-rs",
- "picky 6.3.0",
+ "picky 6.4.0",
 ]
 
 [[package]]
