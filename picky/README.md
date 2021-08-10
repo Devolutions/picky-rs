@@ -2,7 +2,7 @@
 [![docs.rs](https://docs.rs/picky/badge.svg)](https://docs.rs/picky)
 ![Crates.io](https://img.shields.io/crates/l/picky)
 
-Compatible with rustc 1.49.
+Compatible with rustc 1.51.
 Minimal rustc version bumps happen [only with minor number bumps in this project](https://github.com/Devolutions/picky-rs/issues/89#issuecomment-868303478).
 
 # picky
