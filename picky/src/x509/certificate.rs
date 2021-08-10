@@ -9,12 +9,14 @@ use crate::x509::key_id_gen_method::{KeyIdGenError, KeyIdGenMethod};
 use crate::x509::name::{DirectoryName, GeneralNames};
 use picky_asn1::bit_string::BitString;
 use picky_asn1::wrapper::{ExplicitContextTag0, ExplicitContextTag3, IntegerAsn1};
-use picky_asn1_der::Asn1DerError;
+use picky_asn1_der::{Asn1DerError, Asn1RawDer};
 use picky_asn1_x509::{
     oids, AlgorithmIdentifier, AuthorityKeyIdentifier, BasicConstraints, Certificate, ExtendedKeyUsage, Extension,
     ExtensionView, Extensions, KeyIdentifier, KeyUsage, Name, SubjectPublicKeyInfo, TbsCertificate, Validity, Version,
 };
+use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
+use std::convert::TryFrom;
 use thiserror::Error;
 
 const ELEMENT_NAME: &str = "x509 certificate";
@@ -125,18 +127,43 @@ pub enum CertType {
 
 const CERT_PEM_LABEL: &str = "CERTIFICATE";
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct Cert(Certificate);
+/// CertificateOverview is used to validate signatures (using tbs_certificate der encoding) and encode back original certificate as is.
+/// Refer PSDiagnostics PowerShell module authenticode test for details as to why this is useful.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+struct CertificateOverview {
+    tbs_certificate: Asn1RawDer,
+    signature_algorithm: Asn1RawDer,
+    signature_value: Asn1RawDer,
+}
 
-impl From<Certificate> for Cert {
-    fn from(certificate: Certificate) -> Self {
-        Self(certificate)
+#[derive(Clone, Debug, PartialEq)]
+pub struct Cert {
+    details: Certificate,
+    overview: CertificateOverview,
+}
+
+impl TryFrom<Certificate> for Cert {
+    type Error = CertError;
+
+    fn try_from(certificate: Certificate) -> Result<Self, Self::Error> {
+        let der = picky_asn1_der::to_vec(&certificate).map_err(|source| CertError::Asn1Serialization {
+            element: "certificate",
+            source,
+        })?;
+        let overview = picky_asn1_der::from_bytes(&der).map_err(|source| CertError::Asn1Deserialization {
+            element: "certificate",
+            source,
+        })?;
+        Ok(Self {
+            details: certificate,
+            overview,
+        })
     }
 }
 
 impl From<Cert> for Certificate {
     fn from(certificate: Cert) -> Self {
-        certificate.0
+        certificate.details
     }
 }
 
@@ -153,23 +180,32 @@ macro_rules! find_ext {
 
 impl Cert {
     pub fn from_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, CertError> {
-        from_der(der, ELEMENT_NAME).map(Self)
+        Ok(Self {
+            details: from_der(der, ELEMENT_NAME)?,
+            overview: from_der(der, ELEMENT_NAME)?,
+        })
     }
 
     pub fn from_pem(pem: &Pem) -> Result<Self, CertError> {
-        from_pem(pem, CERT_PEM_LABEL, ELEMENT_NAME).map(Self)
+        Ok(Self {
+            details: from_pem(pem, CERT_PEM_LABEL, ELEMENT_NAME)?,
+            overview: from_pem(pem, CERT_PEM_LABEL, ELEMENT_NAME)?,
+        })
     }
 
     pub fn from_pem_str(pem_str: &str) -> Result<Self, CertError> {
-        from_pem_str(pem_str, CERT_PEM_LABEL, ELEMENT_NAME).map(Self)
+        Ok(Self {
+            details: from_pem_str(pem_str, CERT_PEM_LABEL, ELEMENT_NAME)?,
+            overview: from_pem_str(pem_str, CERT_PEM_LABEL, ELEMENT_NAME)?,
+        })
     }
 
     pub fn to_der(&self) -> Result<Vec<u8>, CertError> {
-        to_der(&self.0, ELEMENT_NAME)
+        to_der(&self.overview, ELEMENT_NAME)
     }
 
     pub fn to_pem(&self) -> Result<Pem<'static>, CertError> {
-        to_pem(&self.0, CERT_PEM_LABEL, ELEMENT_NAME)
+        to_pem(&self.overview, CERT_PEM_LABEL, ELEMENT_NAME)
     }
 
     pub fn ty(&self) -> CertType {
@@ -189,23 +225,23 @@ impl Cert {
     }
 
     pub fn serial_number(&self) -> &IntegerAsn1 {
-        &self.0.tbs_certificate.serial_number
+        &self.details.tbs_certificate.serial_number
     }
 
     pub fn signature_algorithm(&self) -> &AlgorithmIdentifier {
-        &self.0.tbs_certificate.signature
+        &self.details.tbs_certificate.signature
     }
 
     pub fn valid_not_before(&self) -> UTCDate {
-        self.0.tbs_certificate.validity.not_before.clone().into()
+        self.details.tbs_certificate.validity.not_before.clone().into()
     }
 
     pub fn valid_not_after(&self) -> UTCDate {
-        self.0.tbs_certificate.validity.not_after.clone().into()
+        self.details.tbs_certificate.validity.not_after.clone().into()
     }
 
     pub fn subject_key_identifier(&self) -> Result<&[u8], CertError> {
-        let certificate = &self.0;
+        let certificate = &self.details;
 
         let ext = find_ext!(oids::subject_key_identifier(), certificate, "subject key identifier")?;
         match ext.extn_value() {
@@ -215,7 +251,7 @@ impl Cert {
     }
 
     pub fn authority_key_identifier(&self) -> Result<&AuthorityKeyIdentifier, CertError> {
-        let certificate = &self.0;
+        let certificate = &self.details;
 
         let ext = find_ext!(
             oids::authority_key_identifier(),
@@ -229,7 +265,7 @@ impl Cert {
     }
 
     pub fn basic_constraints(&self) -> Result<&BasicConstraints, CertError> {
-        let certificate = &self.0;
+        let certificate = &self.details;
         let ext = find_ext!(oids::basic_constraints(), certificate, "basic constraints")?;
         match ext.extn_value() {
             ExtensionView::BasicConstraints(bc) => Ok(bc),
@@ -238,23 +274,23 @@ impl Cert {
     }
 
     pub fn subject_name(&self) -> DirectoryName {
-        self.0.tbs_certificate.subject.clone().into()
+        self.details.tbs_certificate.subject.clone().into()
     }
 
     pub fn issuer_name(&self) -> DirectoryName {
-        self.0.tbs_certificate.issuer.clone().into()
+        self.details.tbs_certificate.issuer.clone().into()
     }
 
     pub fn extensions(&self) -> &[Extension] {
-        (self.0.tbs_certificate.extensions.0).0.as_slice()
+        (self.details.tbs_certificate.extensions.0).0.as_slice()
     }
 
     pub fn public_key(&self) -> &PublicKey {
-        (&self.0.tbs_certificate.subject_public_key_info).into()
+        (&self.details.tbs_certificate.subject_public_key_info).into()
     }
 
     pub fn into_public_key(self) -> PublicKey {
-        self.0.tbs_certificate.subject_public_key_info.into()
+        self.details.tbs_certificate.subject_public_key_info.into()
     }
 
     pub fn is_parent_of(&self, other: &Cert) -> Result<(), CertError> {
@@ -471,23 +507,14 @@ impl<'a, 'b, Chain: Iterator<Item = &'b Cert>> CertValidator<'a, 'b, Chain> {
             parent_cert.is_parent_of(current_cert)?;
 
             // validate current cert signature using parent public key
-            let hash_type = SignatureAlgorithm::from_algorithm_identifier(&current_cert.0.signature_algorithm)
+            let hash_type = SignatureAlgorithm::from_algorithm_identifier(&current_cert.details.signature_algorithm)
                 .map_err(|e| CertError::Signature { source: e })?;
-            let public_key = &parent_cert.0.tbs_certificate.subject_public_key_info;
-            let msg = picky_asn1_der::to_vec(&current_cert.0.tbs_certificate)
-                .map_err(|e| CertError::Asn1Serialization {
-                    source: e,
-                    element: "tbs certificate",
-                })
-                .map_err(|e| CertError::InvalidCertificate {
-                    source: Box::new(e),
-                    id: current_cert.subject_name().to_string(),
-                })?;
+            let public_key = &parent_cert.details.tbs_certificate.subject_public_key_info;
             hash_type
                 .verify(
                     &public_key.clone().into(),
-                    &msg,
-                    current_cert.0.signature_value.0.payload_view(),
+                    &current_cert.overview.tbs_certificate.0,
+                    current_cert.details.signature_value.0.payload_view(),
                 )
                 .map_err(|e| CertError::Signature { source: e })
                 .map_err(|e| CertError::InvalidCertificate {
@@ -508,7 +535,7 @@ impl<'a, 'b, Chain: Iterator<Item = &'b Cert>> CertValidator<'a, 'b, Chain> {
 }
 
 fn verify_cert_validity(cert: &Cert, strictness: &CheckStrictness, now: ValidityCheck<'_>) -> Result<(), CertError> {
-    let validity = &cert.0.tbs_certificate.validity;
+    let validity = &cert.details.tbs_certificate.validity;
     let not_before: UTCDate = validity.not_before.clone().into();
     let not_after: UTCDate = validity.not_after.clone().into();
 
@@ -908,24 +935,47 @@ impl<'a> CertificateBuilder<'a> {
             extensions: ExplicitContextTag3(extensions),
         };
 
+        let signature_algorithm = signature_hash_type.into();
+
         let tbs_der = picky_asn1_der::to_vec(&tbs_certificate)
             .map_err(|e| CertError::Asn1Serialization {
                 source: e,
                 element: "tbs certificate",
             })
             .map_err(|e| CertError::CertGeneration { source: Box::new(e) })?;
+
         let signature_value = BitString::with_bytes(
             signature_hash_type
                 .sign(&tbs_der, issuer_key)
                 .map_err(|e| CertError::Signature { source: e })
                 .map_err(|e| CertError::CertGeneration { source: Box::new(e) })?,
-        );
+        )
+        .into();
 
-        Ok(Cert(Certificate {
-            tbs_certificate,
-            signature_algorithm: signature_hash_type.into(),
-            signature_value: signature_value.into(),
-        }))
+        let signature_algorithm_der =
+            picky_asn1_der::to_vec(&signature_algorithm).map_err(|source| CertError::Asn1Serialization {
+                element: "signature_algorithm",
+                source,
+            })?;
+
+        let signature_value_der =
+            picky_asn1_der::to_vec(&signature_value).map_err(|source| CertError::Asn1Serialization {
+                element: "signature_value",
+                source,
+            })?;
+
+        Ok(Cert {
+            details: Certificate {
+                tbs_certificate,
+                signature_algorithm,
+                signature_value,
+            },
+            overview: CertificateOverview {
+                tbs_certificate: Asn1RawDer(tbs_der),
+                signature_algorithm: Asn1RawDer(signature_algorithm_der),
+                signature_value: Asn1RawDer(signature_value_der),
+            },
+        })
     }
 }
 
@@ -1343,7 +1393,7 @@ mod tests {
             .build()
             .expect("couldn't build root ca");
 
-        let validity = &cert.0.tbs_certificate.validity;
+        let validity = &cert.details.tbs_certificate.validity;
 
         assert!(matches!(validity.not_before, Time::Utc(_)));
         assert!(matches!(validity.not_after, Time::Generalized(_)));
@@ -1396,5 +1446,53 @@ mod tests {
             .unwrap();
 
         assert_eq!(subject_alt_name, "localhost");
+    }
+
+    /// We noticed a few Authenticode certificates where encoded using a constructed (explicit)
+    /// context tag instead of a primitive (implicit) context tag for the subject alternative name
+    /// extension (notably PSDiagnostics PowerShell module).
+    ///
+    /// Relevant documentation from RFC5280 Appendix A.2:
+    /// ```not_rust
+    /// DEFINITIONS IMPLICIT TAGS ::=
+    ///
+    /// […]
+    ///
+    /// GeneralName ::= CHOICE {
+    ///      otherName                 [0]  AnotherName,
+    ///      rfc822Name                [1]  IA5String,
+    ///      dNSName                   [2]  IA5String,
+    ///      x400Address               [3]  ORAddress,
+    ///      directoryName             [4]  Name,
+    ///      ediPartyName              [5]  EDIPartyName,
+    ///      uniformResourceIdentifier [6]  IA5String,
+    ///      iPAddress                 [7]  OCTET STRING,
+    ///      registeredID              [8]  OBJECT IDENTIFIER }
+    /// ```
+    /// [Link](https://datatracker.ietf.org/doc/html/rfc5280#appendix-A.2)
+    ///
+    /// `DEFINITIONS IMPLICIT TAGS ::=` is used to specify that except stated otherwise, tags are
+    /// implicits (also said primitives).
+    ///
+    /// Picky is encoding this using an implicit context tag as specified by the RFC, and this is a
+    /// problem when validating some Windows certificates because picky 6.3.0 (and prior) is fully
+    /// parsing the certificate and encode back into der when validating the signature causing
+    /// signature validation to fail.
+    ///
+    /// To improve validation robustness, it was decided starting picky 6.4.0 to use the originally
+    /// parsed DER representation internally instead of re-encoding on demand.
+    ///
+    /// The aforementioned PSDiagnostics module certificate chain is used as test case to validate
+    /// this behavior.
+    #[test]
+    fn psdiag_constructed_context_tag_in_subject_alt_name_ext() {
+        let leaf = Cert::from_pem_str(crate::test_files::PSDIAG_LEAF).unwrap();
+        let inter = Cert::from_pem_str(crate::test_files::PSDIAG_INTER).unwrap();
+        let root = Cert::from_pem_str(crate::test_files::PSDIAG_ROOT).unwrap();
+
+        let chain = [inter, root];
+        let now = UTCDate::now();
+
+        leaf.verifier().exact_date(&now).chain(chain.iter()).verify().unwrap();
     }
 }

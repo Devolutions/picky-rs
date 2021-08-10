@@ -587,10 +587,10 @@ mod tests {
         let certificate = signed_data
             .certificates
             .0
-            .clone()
-            .into_iter()
-            .map(Cert::from)
-            .find(|certificate| matches!(certificate.ty(), CertType::Intermediate))
+            .iter()
+            .cloned()
+            .filter_map(|cert| Cert::try_from(cert).ok())
+            .find(|cert| matches!(cert.ty(), CertType::Intermediate))
             .map(Certificate::from)
             .unwrap();
 
