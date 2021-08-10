@@ -187,7 +187,7 @@ fn apply_flags<'a>(
             .require_not_after_check()
             .require_not_before_check()
             .require_chain_check()
-            .exact_date(&time)
+            .exact_date(time)
     } else {
         &validator
     };

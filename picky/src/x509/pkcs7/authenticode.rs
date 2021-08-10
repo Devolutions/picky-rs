@@ -82,6 +82,8 @@ pub enum AuthenticodeError {
     NoMessageDigest,
     #[error("Can't find certificate for issuer: {issuer}, and serial_number:  {serial_number:#?}")]
     NoCertificatesAssociatedWithIssuerAndSerialNumber { issuer: Name, serial_number: Vec<u8> },
+    #[error("Timestamp has invalid certificate: {0:?}")]
+    InvalidTimestampCert(CertError),
     #[error(transparent)]
     SignatureError(#[from] SignatureError),
     #[error("the program name has invalid charset")]
@@ -676,7 +678,7 @@ impl<'a> AuthenticodeValidator<'a> {
                                     _ => false,
                                 });
 
-                        let check_if_kp_time_stamping_present = |certificates: Vec<Cert>| -> bool {
+                        let check_if_kp_time_stamping_present = |certificates: &[Cert]| -> bool {
                             certificates
                                 .iter()
                                 .flat_map(|cert| cert.extensions().iter())
@@ -686,7 +688,7 @@ impl<'a> AuthenticodeValidator<'a> {
                                 })
                         };
 
-                        if check_if_kp_time_stamping_present(self.authenticode_signature.0.certificates())
+                        if check_if_kp_time_stamping_present(&self.authenticode_signature.0.certificates())
                             && !kp_lifetime_signing_is_present
                         {
                             return Ok(());
@@ -716,9 +718,57 @@ impl<'a> AuthenticodeValidator<'a> {
                                         })
                                         .collect::<Vec<Cert>>();
 
-                                    if check_if_kp_time_stamping_present(certificates)
+                                    if check_if_kp_time_stamping_present(&certificates)
                                         && !kp_lifetime_signing_is_present
                                     {
+                                        // check if certificates in the timestamp have the right chain
+                                        if let Some(leaf) = certificates.get(0) {
+                                            let timestamp_chain_validator = leaf.verifier();
+                                            let timestamp_chain = certificates
+                                                .iter()
+                                                .filter(|cert| cert.subject_name() != leaf.subject_name())
+                                                .cloned()
+                                                .collect::<Vec<Cert>>();
+
+                                            let timestamp_chain_validator = timestamp_chain_validator
+                                                .require_chain_check()
+                                                .chain(timestamp_chain.iter());
+
+                                            let timestamp_chain_validator = timestamp_chain_validator
+                                                .ignore_not_after_check()
+                                                .ignore_not_before_check()
+                                                .skip_root_is_last_cert_chain_check();
+
+                                            timestamp_chain_validator
+                                                .verify()
+                                                .map_err(AuthenticodeError::InvalidTimestampCert)?;
+
+                                            #[cfg(feature = "ctl")]
+                                            {
+                                                let ca_name = {
+                                                    if let Some(root) =
+                                                        certificates.iter().find(|cert| cert.ty() == CertType::Root)
+                                                    {
+                                                        root.subject_name()
+                                                    } else {
+                                                        let intermediate_certificates = certificates
+                                                            .iter()
+                                                            .filter(|cert| cert.ty() == CertType::Intermediate)
+                                                            .cloned()
+                                                            .collect::<Vec<Cert>>();
+
+                                                        if let Some(inter) = intermediate_certificates.last() {
+                                                            inter.issuer_name()
+                                                        } else {
+                                                            certificates.get(0).expect("At least one certificate should be in timestamp certificates").issuer_name()
+                                                        }
+                                                    }
+                                                };
+
+                                                self.verify_ca_certificate_against_ctl(&ca_name)?;
+                                            }
+                                        }
+
                                         return Ok(());
                                     }
                                 }
@@ -812,7 +862,7 @@ impl<'a> AuthenticodeValidator<'a> {
                 .first()
                 .expect("Asn1SetOf UnknownReservedPropId126 should contain exactly one value");
 
-            let not_before = time_octet_string_to_utc_time(&not_before);
+            let not_before = time_octet_string_to_utc_time(not_before);
             let now = Utc::now();
 
             if not_before > now {
@@ -865,12 +915,13 @@ impl<'a> AuthenticodeValidator<'a> {
 
         #[cfg(feature = "ctl")]
         if self.inner.borrow().strictness.require_ca_verification_against_ctl {
+            let intermediate_certificates = self.authenticode_signature.0.intermediate_certificates();
             let ca_name = match (
                 self.authenticode_signature.0.root_certificate(),
-                self.authenticode_signature.0.intermediate_certificate(),
+                !intermediate_certificates.is_empty(),
             ) {
                 (Some(root_certificate), _) => root_certificate.subject_name(),
-                (None, Some(intermediate_certificate)) => intermediate_certificate.issuer_name(),
+                (None, true) => intermediate_certificates.last().unwrap().issuer_name(),
                 _ => {
                     let signing_certificate = self.authenticode_signature.signing_certificate()?;
                     signing_certificate.issuer_name()
@@ -1314,7 +1365,8 @@ mod test {
         let validator = authenticode_signature.authenticode_verifier();
         let ca_name = authenticode_signature
             .0
-            .intermediate_certificate()
+            .intermediate_certificates()
+            .first()
             .unwrap()
             .issuer_name();
 
@@ -1381,7 +1433,8 @@ mod test {
 
         let ca_name = authenticode_signature
             .0
-            .intermediate_certificate()
+            .intermediate_certificates()
+            .first()
             .unwrap()
             .issuer_name();
 
@@ -1610,10 +1663,9 @@ mod test {
             .require_not_after_check()
             .require_not_before_check()
             .require_ca_against_ctl_check()
-            .verify()
-            .unwrap();
+            .verify();
 
-        assert!(true);
+        assert!(validation_result.is_ok());
     }
 
     #[cfg(feature = "ctl")]

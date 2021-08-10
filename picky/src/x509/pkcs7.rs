@@ -78,10 +78,11 @@ impl Pkcs7 {
             .collect::<Vec<Cert>>()
     }
 
-    pub fn intermediate_certificate(&self) -> Option<Cert> {
+    pub fn intermediate_certificates(&self) -> Vec<Cert> {
         self.certificates()
             .into_iter()
-            .find(|cert| cert.ty() == CertType::Intermediate)
+            .filter(|cert| cert.ty() == CertType::Intermediate)
+            .collect::<Vec<Cert>>()
     }
 
     pub fn root_certificate(&self) -> Option<Cert> {
