@@ -745,26 +745,7 @@ impl<'a> AuthenticodeValidator<'a> {
 
                                             #[cfg(feature = "ctl")]
                                             {
-                                                let ca_name = {
-                                                    if let Some(root) =
-                                                        certificates.iter().find(|cert| cert.ty() == CertType::Root)
-                                                    {
-                                                        root.subject_name()
-                                                    } else {
-                                                        let intermediate_certificates = certificates
-                                                            .iter()
-                                                            .filter(|cert| cert.ty() == CertType::Intermediate)
-                                                            .cloned()
-                                                            .collect::<Vec<Cert>>();
-
-                                                        if let Some(inter) = intermediate_certificates.last() {
-                                                            inter.issuer_name()
-                                                        } else {
-                                                            certificates.get(0).expect("At least one certificate should be in timestamp certificates").issuer_name()
-                                                        }
-                                                    }
-                                                };
-
+                                                let ca_name = get_ca_name(&certificates).unwrap();
                                                 self.verify_ca_certificate_against_ctl(&ca_name)?;
                                             }
                                         }
@@ -915,18 +896,7 @@ impl<'a> AuthenticodeValidator<'a> {
 
         #[cfg(feature = "ctl")]
         if self.inner.borrow().strictness.require_ca_verification_against_ctl {
-            let intermediate_certificates = self.authenticode_signature.0.intermediate_certificates();
-            let ca_name = match (
-                self.authenticode_signature.0.root_certificate(),
-                !intermediate_certificates.is_empty(),
-            ) {
-                (Some(root_certificate), _) => root_certificate.subject_name(),
-                (None, true) => intermediate_certificates.last().unwrap().issuer_name(),
-                _ => {
-                    let signing_certificate = self.authenticode_signature.signing_certificate()?;
-                    signing_certificate.issuer_name()
-                }
-            };
+            let ca_name = get_ca_name(&self.authenticode_signature.0.certificates()).unwrap();
 
             match self.verify_ca_certificate_against_ctl(&ca_name) {
                 Ok(()) => {}
@@ -968,6 +938,24 @@ fn check_eku_code_signing(certificates: &[Cert]) -> AuthenticodeResult<()> {
     }
 
     Ok(())
+}
+
+fn get_ca_name(certificates: &[Cert]) -> Option<DirectoryName> {
+    if let Some(root) = certificates.iter().find(|cert| cert.ty() == CertType::Root) {
+        Some(root.subject_name())
+    } else {
+        let intermediate_certificates = certificates
+            .iter()
+            .filter(|cert| cert.ty() == CertType::Intermediate)
+            .cloned()
+            .collect::<Vec<Cert>>();
+
+        if let Some(inter) = intermediate_certificates.last() {
+            Some(inter.issuer_name())
+        } else {
+            certificates.get(0).map(|cert| cert.issuer_name())
+        }
+    }
 }
 
 #[cfg(test)]
