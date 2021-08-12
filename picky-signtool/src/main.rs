@@ -3,7 +3,9 @@ use std::path::{Path, PathBuf};
 use anyhow::bail;
 use walkdir::{DirEntry, WalkDir};
 
-use picky_signtool::{config::*, sign::sign, verify::verify};
+use picky_signtool::config::*;
+use picky_signtool::sign::sign;
+use picky_signtool::verify::verify;
 
 fn main() -> anyhow::Result<()> {
     let matches = config();

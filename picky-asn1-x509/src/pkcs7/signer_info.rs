@@ -1,8 +1,9 @@
 use crate::cmsversion::CmsVersion;
-use crate::{oids, pkcs7::Pkcs7Certificate, AlgorithmIdentifier, Attribute, Name, SubjectKeyIdentifier};
+use crate::pkcs7::Pkcs7Certificate;
+use crate::{oids, AlgorithmIdentifier, Attribute, Name, SubjectKeyIdentifier};
 use picky_asn1::tag::{Tag, TagClass, TagPeeker};
 use picky_asn1::wrapper::{
-    Asn1SetOf, ImplicitContextTag0, IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1, Optional,
+    Asn1SequenceOf, Asn1SetOf, ImplicitContextTag0, IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1, Optional,
 };
 use serde::{de, ser, Deserialize, Serialize};
 
@@ -29,6 +30,7 @@ pub struct SignerInfo {
     pub signed_attrs: Optional<Attributes>,
     pub signature_algorithm: SignatureAlgorithmIdentifier,
     pub signature: SignatureValue,
+    #[serde(skip_serializing_if = "Optional::is_default")]
     pub unsigned_attrs: Optional<UnsignedAttributes>,
 }
 
@@ -81,8 +83,8 @@ impl<'de> de::Deserialize<'de> for SignerInfo {
 }
 
 // This is a workaround for constructed encoding as implicit
-#[derive(Debug, PartialEq, Clone, Default)]
-pub struct Attributes(pub Vec<Attribute>);
+#[derive(Debug, Deserialize, PartialEq, Clone, Default)]
+pub struct Attributes(pub Asn1SequenceOf<Attribute>);
 
 impl ser::Serialize for Attributes {
     fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
@@ -92,18 +94,6 @@ impl ser::Serialize for Attributes {
         let mut raw_der = picky_asn1_der::to_vec(&self.0).unwrap_or_else(|_| vec![0]);
         raw_der[0] = Tag::context_specific_constructed(0).inner();
         picky_asn1_der::Asn1RawDer(raw_der).serialize(serializer)
-    }
-}
-
-impl<'de> de::Deserialize<'de> for Attributes {
-    fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
-    where
-        D: de::Deserializer<'de>,
-    {
-        let mut raw_der = picky_asn1_der::Asn1RawDer::deserialize(deserializer)?.0;
-        raw_der[0] = Tag::SEQUENCE.inner();
-        let vec = picky_asn1_der::from_bytes(&raw_der).unwrap_or_default();
-        Ok(Attributes(vec))
     }
 }
 
@@ -225,7 +215,7 @@ pub struct IssuerAndSerialNumber {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct CertificateSerialNumber(pub IntegerAsn1);
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Deserialize, Debug, PartialEq, Clone)]
 pub struct UnsignedAttributes(pub Vec<UnsignedAttribute>);
 
 // FIXME: This is a workaround, related to https://github.com/Devolutions/picky-rs/pull/78#issuecomment-789904165
@@ -237,18 +227,6 @@ impl ser::Serialize for UnsignedAttributes {
         let mut raw_der = picky_asn1_der::to_vec(&self.0).unwrap_or_else(|_| vec![0]);
         raw_der[0] = Tag::context_specific_constructed(1).inner();
         picky_asn1_der::Asn1RawDer(raw_der).serialize(serializer)
-    }
-}
-
-impl<'de> de::Deserialize<'de> for UnsignedAttributes {
-    fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
-    where
-        D: de::Deserializer<'de>,
-    {
-        let mut raw_der = picky_asn1_der::Asn1RawDer::deserialize(deserializer)?.0;
-        raw_der[0] = Tag::SEQUENCE.number();
-        let vec = picky_asn1_der::from_bytes(&raw_der).unwrap_or_default();
-        Ok(UnsignedAttributes(vec))
     }
 }
 
@@ -340,9 +318,10 @@ mod tests {
     use super::*;
     use picky_asn1_der::Asn1DerError;
 
+    #[cfg(feature = "ctl")]
     #[test]
     fn decode_certificate_trust_list_signer_info() {
-        let signer_info = base64::decode(
+        let decoded = base64::decode(
             "MIICngIBATCBmTCBgTELMAkGA1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24x\
             EDAOBgNVBAcTB1JlZG1vbmQxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlv\
             bjErMCkGA1UEAxMiTWljcm9zb2Z0IENlcnRpZmljYXRlIExpc3QgQ0EgMjAxMQIT\
@@ -361,7 +340,7 @@ mod tests {
         )
         .unwrap();
 
-        let signer_info: Result<SignerInfo, Asn1DerError> = picky_asn1_der::from_bytes(&signer_info);
-        assert!(signer_info.is_ok());
+        let signer_info: SignerInfo = picky_asn1_der::from_bytes(&decoded).unwrap();
+        check_serde!(signer_info: SignerInfo in decoded);
     }
 }

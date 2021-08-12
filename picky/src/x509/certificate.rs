@@ -1492,6 +1492,7 @@ mod tests {
     ///
     /// The aforementioned PSDiagnostics module certificate chain is used as test case to validate
     /// this behavior.
+    #[cfg(feature = "chrono_conversion")]
     #[test]
     fn psdiag_constructed_context_tag_in_subject_alt_name_ext() {
         let leaf = Cert::from_pem_str(crate::test_files::PSDIAG_LEAF).unwrap();

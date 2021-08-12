@@ -7,7 +7,6 @@ use picky_asn1_x509::content_info::EncapsulatedContentInfo;
 use picky_asn1_x509::pkcs7::Pkcs7Certificate;
 use picky_asn1_x509::signed_data::CertificateChoices;
 use picky_asn1_x509::signer_info::SignerInfo;
-use std::convert::TryFrom;
 use thiserror::Error;
 
 pub mod authenticode;
@@ -72,7 +71,7 @@ impl Pkcs7 {
             .iter()
             .cloned()
             .filter_map(|cert| match cert {
-                CertificateChoices::Certificate(certificate) => Cert::try_from(certificate).ok(),
+                CertificateChoices::Certificate(certificate) => Cert::from_der(&certificate.0).ok(),
                 CertificateChoices::Other(_) => None,
             })
             .collect::<Vec<Cert>>()

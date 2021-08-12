@@ -2,9 +2,10 @@ use super::content_info::EncapsulatedContentInfo;
 use super::crls::RevocationInfoChoices;
 use super::signer_info::SignerInfo;
 use crate::cmsversion::CmsVersion;
-use crate::{AlgorithmIdentifier, Certificate};
+use crate::AlgorithmIdentifier;
 use picky_asn1::tag::{Tag, TagClass, TagPeeker};
 use picky_asn1::wrapper::Asn1SetOf;
+use picky_asn1_der::Asn1RawDer;
 use serde::{de, ser, Deserialize, Serialize};
 
 /// [RFC 5652 #5.1](https://datatracker.ietf.org/doc/html/rfc5652#section-5.1)
@@ -127,7 +128,7 @@ impl<'de> de::Deserialize<'de> for CertificateSet {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum CertificateChoices {
-    Certificate(Certificate),
+    Certificate(Asn1RawDer),
     Other(picky_asn1_der::Asn1RawDer),
 }
 
@@ -165,12 +166,9 @@ impl<'de> de::Deserialize<'de> for CertificateChoices {
             {
                 let tag_peeker: TagPeeker = seq_next_element!(seq, CertificateChoices, "Any tag");
                 let certificate_choice = match tag_peeker.next_tag {
-                    Tag::SEQUENCE => CertificateChoices::Certificate(seq_next_element!(
-                        seq,
-                        Certificate,
-                        CertificateChoices,
-                        "Certificate"
-                    )),
+                    Tag::SEQUENCE => {
+                        CertificateChoices::Certificate(seq_next_element!(seq, CertificateChoices, "Certificate"))
+                    }
                     _ => {
                         CertificateChoices::Other(seq_next_element!(seq, CertificateChoices, "Other certificate type"))
                     }
@@ -189,14 +187,13 @@ mod tests {
     use super::*;
     use crate::crls::*;
     use crate::{
-        oids, EncapsulatedRsaPublicKey, Extension, Extensions, KeyIdentifier, Name, NameAttr, PublicKey, RsaPublicKey,
-        SubjectPublicKeyInfo, TbsCertificate, Validity, Version,
+        oids, Certificate, EncapsulatedRsaPublicKey, Extension, Extensions, KeyIdentifier, Name, NameAttr, PublicKey,
+        RsaPublicKey, SubjectPublicKeyInfo, TbsCertificate, Validity, Version,
     };
     use picky_asn1::bit_string::BitString;
     use picky_asn1::date::UTCTime;
     use picky_asn1::restricted_string::{IA5String, PrintableString};
     use picky_asn1::wrapper::{IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1Container, PrintableStringAsn1};
-    use picky_asn1_der::Asn1DerError;
 
     #[test]
     fn decode_test() {
@@ -310,6 +307,7 @@ mod tests {
         };
         check_serde!(full_certificate: Certificate in pkcs7[45..1594]);
 
+        let full_certificate = picky_asn1_der::from_bytes(&picky_asn1_der::to_vec(&full_certificate).unwrap()).unwrap();
         let signed_data = SignedData {
             version: CmsVersion::V1,
             digest_algorithms: DigestAlgorithmIdentifiers(Vec::new().into()),
@@ -410,7 +408,7 @@ mod tests {
 
     #[test]
     fn decode_certificate_trust_list_certificate_set() {
-        let certificate_set_hex = base64::decode(
+        let decoded = base64::decode(
             "\
         oIINKTCCBhQwggP8oAMCAQICEzMAAABWo7N5AjhScwQAAAAAAFYwDQYJKoZIhvcN\
         AQELBQAwgYExCzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpXYXNoaW5ndG9uMRAwDgYD\
@@ -486,7 +484,7 @@ mod tests {
         )
         .unwrap();
 
-        let certificate_set: Result<CertificateSet, Asn1DerError> = picky_asn1_der::from_bytes(&certificate_set_hex);
-        assert!(certificate_set.is_ok());
+        let certificate_set: CertificateSet = picky_asn1_der::from_bytes(&decoded).unwrap();
+        check_serde!(certificate_set: CertificateSet in decoded);
     }
 }

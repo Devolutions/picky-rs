@@ -22,6 +22,7 @@ pub enum AttributeValues {
     // TODO: support for challenge password
     // ChallengePassword(Asn1SetOf<ChallengePassword>))
     ContentType(Asn1SetOf<ObjectIdentifierAsn1>),
+    SpcStatementType(Asn1SetOf<Asn1SequenceOf<ObjectIdentifierAsn1>>),
     MessageDigest(Asn1SetOf<OctetStringAsn1>),
     #[cfg(feature = "pkcs7")]
     SpcSpOpusInfo(Asn1SetOf<SpcSpOpusInfo>),
@@ -58,6 +59,7 @@ impl ser::Serialize for Attribute {
             AttributeValues::MessageDigest(octet_string) => seq.serialize_element(octet_string)?,
             #[cfg(feature = "pkcs7")]
             AttributeValues::SpcSpOpusInfo(spc_sp_opus_info) => seq.serialize_element(spc_sp_opus_info)?,
+            AttributeValues::SpcStatementType(spc_statement_type) => seq.serialize_element(spc_statement_type)?,
         }
         seq.end()
     }
@@ -98,6 +100,9 @@ impl<'de> de::Deserialize<'de> for Attribute {
                     #[cfg(feature = "pkcs7")]
                     oids::SPC_SP_OPUS_INFO_OBJID => {
                         AttributeValues::SpcSpOpusInfo(seq_next_element!(seq, Attribute, "an SpcSpOpusInfo object"))
+                    }
+                    oids::SPC_STATEMENT_TYPE => {
+                        AttributeValues::SpcStatementType(seq_next_element!(seq, Attribute, "an SpcStatementType"))
                     }
                     _ => AttributeValues::Custom(seq_next_element!(seq, Attribute, "at custom value")),
                 };

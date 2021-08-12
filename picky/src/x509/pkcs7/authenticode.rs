@@ -172,7 +172,7 @@ impl AuthenticodeSignature {
             .0
             .into_iter()
             .filter_map(|cert| match cert {
-                CertificateChoices::Certificate(certificate) => Cert::try_from(certificate).ok(),
+                CertificateChoices::Certificate(certificate) => Cert::from_der(&certificate.0).ok(),
                 CertificateChoices::Other(_) => None,
             })
             .collect::<Vec<Cert>>();
@@ -209,7 +209,7 @@ impl AuthenticodeSignature {
         //
         // "[...] The Attributes value's tag is SET OF, and the DER encoding ofs
         // the SET OF tag, rather than of the IMPLICIT [0] tag [...]"
-        auth_raw_data[0] = Tag::SET.number();
+        auth_raw_data[0] = Tag::SET.inner();
 
         let encrypted_digest = SignatureValue(signature_algo.sign(auth_raw_data.as_ref(), private_key)?.into());
 
@@ -217,24 +217,25 @@ impl AuthenticodeSignature {
             version: CmsVersion::V1,
             sid: SignerIdentifier::IssuerAndSerialNumber(issuer_and_serial_number),
             digest_algorithm: DigestAlgorithmIdentifier(digest_algorithm.clone()),
-            signed_attrs: Attributes(authenticated_attributes).into(),
+            signed_attrs: Attributes(authenticated_attributes.into()).into(),
             signature_algorithm: SignatureAlgorithmIdentifier(AlgorithmIdentifier::new_rsa_encryption()),
             signature: encrypted_digest,
             unsigned_attrs: UnsignedAttributes::default().into(),
         };
 
-        let certificates = CertificateSet(
-            certificates
-                .into_iter()
-                .map(CertificateChoices::Certificate)
-                .collect::<Vec<CertificateChoices>>(),
-        );
+        let mut certs = Vec::new();
+        for cert in certificates.into_iter() {
+            let raw_certificates = picky_asn1_der::to_vec(&cert)?;
+            certs.push(CertificateChoices::Certificate(picky_asn1_der::from_bytes(
+                &raw_certificates,
+            )?));
+        }
 
         let signed_data = SignedData {
             version: CmsVersion::V1,
             digest_algorithms: DigestAlgorithmIdentifiers(vec![digest_algorithm].into()),
             content_info,
-            certificates,
+            certificates: CertificateSet(certs),
             crls: Some(RevocationInfoChoices::default()),
             signers_infos: SignersInfos(vec![signer_info].into()),
         };
@@ -561,19 +562,17 @@ impl<'a> AuthenticodeValidator<'a> {
         let hash_algo = ShaVariant::try_from(Into::<ObjectIdentifierAsn1>::into(digest_algorithm.oid().clone()))
             .map_err(AuthenticodeError::UnsupportedAlgorithmError)?;
 
-        let authenticated_attributes = &signer_info.signed_attrs.0 .0;
+        let authenticated_attributes = self.authenticode_signature.authenticated_attributes();
         let mut raw_attributes = picky_asn1_der::to_vec(authenticated_attributes)?;
         // According to the RFC:
         //
         // "[...] The Attributes value's tag is SET OF, and the DER encoding ofs
         // the SET OF tag, rather than of the IMPLICIT [0] tag [...]"
-        raw_attributes[0] = Tag::SET.number();
+        raw_attributes[0] = Tag::SET.inner();
 
         let signature_algorithm_identifier = AlgorithmIdentifier::new_rsa_encryption_with_sha(hash_algo)
             .map_err(AuthenticodeError::UnsupportedAlgorithmError)?;
-
         let signature_algorithm = SignatureAlgorithm::from_algorithm_identifier(&signature_algorithm_identifier)?;
-
         signature_algorithm
             .verify(public_key, &raw_attributes, &signer_info.signature.0 .0)
             .map_err(AuthenticodeError::SignatureError)?;
@@ -712,7 +711,7 @@ impl<'a> AuthenticodeValidator<'a> {
                                         .cloned()
                                         .filter_map(|cert| match cert {
                                             CertificateChoices::Certificate(certificate) => {
-                                                Cert::try_from(certificate).ok()
+                                                Cert::from_der(&certificate.0).ok()
                                             }
                                             CertificateChoices::Other(_) => None,
                                         })
@@ -1168,7 +1167,7 @@ mod test {
             .clone()
             .into_iter()
             .filter_map(|cert| match cert {
-                CertificateChoices::Certificate(certificate) => Cert::try_from(certificate).ok(),
+                CertificateChoices::Certificate(certificate) => Cert::from_der(&certificate.0).ok(),
                 CertificateChoices::Other(_) => None,
             })
             .find(|certificate| matches!(certificate.ty(), CertType::Intermediate))
@@ -1188,7 +1187,7 @@ mod test {
         let encrypted_digest = singer_info.signature.0 .0.as_ref();
 
         let mut auth_raw_data = picky_asn1_der::to_vec(&authenticated_attributes).unwrap();
-        auth_raw_data[0] = Tag::SET.number();
+        auth_raw_data[0] = Tag::SET.inner();
 
         assert!(signature_algo
             .verify(&public_key.into(), auth_raw_data.as_ref(), encrypted_digest)
@@ -1257,15 +1256,14 @@ mod test {
         let pkcs7 = Pkcs7::from_pem_str(pem).unwrap();
         let private_key = PrivateKey::from_pem_str(RSA_PRIVATE_KEY).unwrap();
 
-        let authenticode_signature = AuthenticodeSignature::new(
+        AuthenticodeSignature::new(
             &pkcs7,
             FILE_HASH.as_ref(),
             ShaVariant::SHA2_256,
             &private_key,
             Some("into_authenticate_signature_from_pkcs7_with_x509_root_chain".to_string()),
-        );
-
-        assert!(authenticode_signature.is_ok());
+        )
+        .unwrap();
     }
 
     #[test]
@@ -1284,9 +1282,10 @@ mod test {
         let file_hash = authenticode_signature.file_hash().expect("File hash should be present");
 
         let validator = authenticode_signature.authenticode_verifier();
-        let validator = validator.require_basic_authenticode_validation(file_hash);
-
-        assert!(validator.verify().is_ok());
+        validator
+            .require_basic_authenticode_validation(file_hash)
+            .verify()
+            .unwrap();
     }
 
     #[test]
@@ -1305,13 +1304,12 @@ mod test {
 
         let file_hash = authenticode_signature.file_hash().expect("File hash should be present");
         let validator = authenticode_signature.authenticode_verifier();
-        let validator_result = validator
+        validator
             .require_basic_authenticode_validation(file_hash)
             .require_signing_certificate_check()
             .exact_date(&UTCDate::new(2021, 8, 7, 0, 0, 0).unwrap())
-            .verify();
-
-        assert!(validator_result.is_ok())
+            .verify()
+            .unwrap();
     }
 
     #[cfg(feature = "ctl")]
@@ -1358,12 +1356,11 @@ mod test {
             .unwrap()
             .issuer_name();
 
-        let validation_result = validator
+        validator
             .require_ca_against_ctl_check()
             .exclude_cert_authorities(&[ca_name])
-            .verify();
-
-        assert!(validation_result.is_ok());
+            .verify()
+            .unwrap();
     }
 
     #[cfg(feature = "ctl")]
@@ -1426,7 +1423,7 @@ mod test {
             .unwrap()
             .issuer_name();
 
-        let validation_result = validator
+        validator
             .require_basic_authenticode_validation(file_hash)
             .require_signing_certificate_check()
             .require_chain_check()
@@ -1438,9 +1435,8 @@ mod test {
             .require_not_after_check()
             .require_ca_against_ctl_check()
             .exclude_cert_authorities(&[ca_name])
-            .verify();
-
-        assert!(validation_result.is_ok());
+            .verify()
+            .unwrap();
     }
 
     #[cfg(feature = "ctl")]
@@ -1642,7 +1638,7 @@ mod test {
         let authenticode_signature = AuthenticodeSignature::from_pem_str(pkcs7).unwrap();
         let file_hash = authenticode_signature.file_hash().expect("File hash should be present");
 
-        let validation_result = authenticode_signature
+        authenticode_signature
             .authenticode_verifier()
             .require_basic_authenticode_validation(file_hash)
             .require_signing_certificate_check()
@@ -1651,9 +1647,8 @@ mod test {
             .require_not_after_check()
             .require_not_before_check()
             .require_ca_against_ctl_check()
-            .verify();
-
-        assert!(validation_result.is_ok());
+            .verify()
+            .unwrap();
     }
 
     #[cfg(feature = "ctl")]
@@ -1725,7 +1720,7 @@ mod test {
         let ca_name = authenticode_signature.signing_certificate().unwrap().issuer_name();
 
         let validator = authenticode_signature.authenticode_verifier();
-        let validation_result = validator
+        validator
             .require_basic_authenticode_validation(file_hash)
             .require_signing_certificate_check()
             .require_chain_check()
@@ -1736,9 +1731,8 @@ mod test {
             .require_not_before_check()
             .require_ca_against_ctl_check()
             .exclude_cert_authorities(&[ca_name])
-            .verify();
-
-        assert!(validation_result.is_ok());
+            .verify()
+            .unwrap();
     }
 
     #[cfg(feature = "ctl")]
@@ -1823,7 +1817,7 @@ mod test {
         let ca_name = authenticode_signature.signing_certificate().unwrap().issuer_name();
 
         let validator = authenticode_signature.authenticode_verifier();
-        let validator_result = validator
+        validator
             .require_basic_authenticode_validation(file_hash)
             .require_signing_certificate_check()
             .require_chain_check()
@@ -1832,8 +1826,7 @@ mod test {
             .require_not_after_check()
             .require_ca_against_ctl_check()
             .exclude_cert_authorities(&[ca_name])
-            .verify();
-
-        assert!(validator_result.is_ok());
+            .verify()
+            .unwrap();
     }
 }

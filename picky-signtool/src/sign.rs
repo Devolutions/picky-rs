@@ -9,10 +9,8 @@ use lief::{Binary, LogLevel};
 
 use picky::hash::HashAlgorithm;
 use picky::key::PrivateKey;
-use picky::x509::pkcs7::{
-    authenticode::{AuthenticodeSignature, ShaVariant},
-    Pkcs7,
-};
+use picky::x509::pkcs7::authenticode::{AuthenticodeSignature, ShaVariant};
+use picky::x509::pkcs7::Pkcs7;
 use picky::x509::wincert::{CertificateType, WinCertificate};
 
 use crate::config::{
