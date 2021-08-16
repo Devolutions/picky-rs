@@ -1,5 +1,5 @@
 use crate::pem::Pem;
-use crate::x509::certificate::{Cert, CertError, CertType};
+use crate::x509::certificate::{Cert, CertError};
 use crate::x509::utils::{from_der, from_pem, from_pem_str, to_der, to_pem};
 use crate::AlgorithmIdentifier;
 use picky_asn1_der::Asn1DerError;
@@ -63,29 +63,18 @@ impl Pkcs7 {
         &self.0.signed_data.0.content_info
     }
 
-    pub fn certificates(&self) -> Vec<Cert> {
+    pub fn decode_certificates(&self) -> Vec<Cert> {
         self.0
             .signed_data
             .certificates
             .0
+             .0
             .iter()
-            .cloned()
             .filter_map(|cert| match cert {
                 CertificateChoices::Certificate(certificate) => Cert::from_der(&certificate.0).ok(),
                 CertificateChoices::Other(_) => None,
             })
             .collect::<Vec<Cert>>()
-    }
-
-    pub fn intermediate_certificates(&self) -> Vec<Cert> {
-        self.certificates()
-            .into_iter()
-            .filter(|cert| cert.ty() == CertType::Intermediate)
-            .collect::<Vec<Cert>>()
-    }
-
-    pub fn root_certificate(&self) -> Option<Cert> {
-        self.certificates().into_iter().find(|cert| cert.ty() == CertType::Root)
     }
 }
 

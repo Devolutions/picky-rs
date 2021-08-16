@@ -4,7 +4,7 @@ use super::signer_info::SignerInfo;
 use crate::cmsversion::CmsVersion;
 use crate::AlgorithmIdentifier;
 use picky_asn1::tag::{Tag, TagClass, TagPeeker};
-use picky_asn1::wrapper::Asn1SetOf;
+use picky_asn1::wrapper::{Asn1SetOf, Optional};
 use picky_asn1_der::Asn1RawDer;
 use serde::{de, ser, Deserialize, Serialize};
 
@@ -23,7 +23,7 @@ pub struct SignedData {
     pub version: CmsVersion,
     pub digest_algorithms: DigestAlgorithmIdentifiers,
     pub content_info: EncapsulatedContentInfo,
-    pub certificates: CertificateSet,
+    pub certificates: Optional<CertificateSet>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub crls: Option<RevocationInfoChoices>,
     pub signers_infos: SignersInfos,
@@ -123,6 +123,12 @@ impl<'de> de::Deserialize<'de> for CertificateSet {
         raw_der[0] = Tag::SEQUENCE.inner();
         let vec = picky_asn1_der::from_bytes(&raw_der).unwrap_or_default();
         Ok(CertificateSet(vec))
+    }
+}
+
+impl Default for CertificateSet {
+    fn default() -> Self {
+        Self(Vec::new())
     }
 }
 
@@ -312,7 +318,7 @@ mod tests {
             version: CmsVersion::V1,
             digest_algorithms: DigestAlgorithmIdentifiers(Vec::new().into()),
             content_info,
-            certificates: CertificateSet(vec![CertificateChoices::Certificate(full_certificate)]),
+            certificates: CertificateSet(vec![CertificateChoices::Certificate(full_certificate)]).into(),
             crls: Some(RevocationInfoChoices(Vec::new())),
             signers_infos: SignersInfos(Vec::new().into()),
         };

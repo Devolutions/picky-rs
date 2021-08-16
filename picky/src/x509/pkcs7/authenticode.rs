@@ -105,7 +105,7 @@ pub struct AuthenticodeSignature(pub Pkcs7);
 impl AuthenticodeSignature {
     pub fn new(
         pkcs7: &Pkcs7,
-        file_hash: &[u8],
+        file_hash: Vec<u8>,
         hash_algo: ShaVariant,
         private_key: &PrivateKey,
         program_name: Option<String>,
@@ -167,9 +167,9 @@ impl AuthenticodeSignature {
 
         // The signing certificate must contain either the extended key usage (EKU) value for code signing,
         // or the entire certificate chain must contain no EKUs
-        let certificates = pkcs7.certificates();
+        let certificates = pkcs7.decode_certificates();
 
-        check_eku_code_signing(&certificates)?;
+        h_check_eku_code_signing(&certificates)?;
 
         // certificates contains the signer certificate and any intermediate certificates,
         // but typically does not contain the root certificate
@@ -227,7 +227,7 @@ impl AuthenticodeSignature {
             version: CmsVersion::V1,
             digest_algorithms: DigestAlgorithmIdentifiers(vec![digest_algorithm].into()),
             content_info,
-            certificates: CertificateSet(certs),
+            certificates: CertificateSet(certs).into(),
             crls: Some(RevocationInfoChoices::default()),
             signers_infos: SignersInfos(vec![signer_info].into()),
         };
@@ -268,7 +268,7 @@ impl AuthenticodeSignature {
         Ok(to_pem(&self.0 .0, pkcs7::PKCS7_PEM_LABEL, pkcs7::ELEMENT_NAME)?)
     }
 
-    pub fn signing_certificate(&self) -> AuthenticodeResult<Cert> {
+    pub fn signing_certificate<'a>(&'a self, certificates: &'a [Cert]) -> AuthenticodeResult<&'a Cert> {
         let signer_infos = &self.0 .0.signed_data.signers_infos.0;
 
         let signer_info = signer_infos.first().ok_or(AuthenticodeError::MultipleSignerInfo {
@@ -280,9 +280,8 @@ impl AuthenticodeSignature {
             SignerIdentifier::SubjectKeyIdentifier(_) => return Err(AuthenticodeError::IncorrectSignerIdentifier),
         };
 
-        self.0
-            .certificates()
-            .into_iter()
+        certificates
+            .iter()
             .find(|cert| {
                 Name::from(cert.issuer_name()) == issuer_and_serial_number.issuer
                     && cert.serial_number() == &issuer_and_serial_number.serial_number.0
@@ -510,7 +509,7 @@ impl<'a> AuthenticodeValidator<'a> {
         self
     }
 
-    fn verify_authenticode_basic(&self) -> AuthenticodeResult<()> {
+    fn h_verify_authenticode_basic(&self, certificates: &[Cert]) -> AuthenticodeResult<()> {
         // 1. SignedData version field must be set to 1.
         let version = self.authenticode_signature.0 .0.signed_data.version;
         if version != CmsVersion::V1 {
@@ -583,7 +582,7 @@ impl<'a> AuthenticodeValidator<'a> {
         }
 
         // 6.The x509 certificate specified by SignerInfo::serial_number and SignerInfo::issuer must exist within Signature::certificates
-        let signing_certificate = self.authenticode_signature.signing_certificate()?;
+        let signing_certificate = self.authenticode_signature.signing_certificate(certificates)?;
 
         // 7. Given the x509 certificate, compare SignerInfo::encrypted_digest against hash of authenticated attributes and hash of ContentInfo
         let public_key = signing_certificate.public_key();
@@ -633,23 +632,14 @@ impl<'a> AuthenticodeValidator<'a> {
 
         // 9. The signing certificate must contain either the extended key usage (EKU) value for code signing,
         // or the entire certificate chain must contain no EKUs
-        let certificates = self.authenticode_signature.0.certificates();
-        check_eku_code_signing(&certificates)?;
+        h_check_eku_code_signing(certificates)?;
 
         Ok(())
     }
 
-    fn verify_signing_certificate(&self) -> AuthenticodeResult<()> {
-        let signing_certificate = self.authenticode_signature.signing_certificate()?;
+    fn h_verify_signing_certificate(&self, certificates: &[Cert]) -> AuthenticodeResult<()> {
+        let signing_certificate = self.authenticode_signature.signing_certificate(certificates)?;
         let cert_validator = signing_certificate.verifier();
-
-        let certificates = self
-            .authenticode_signature
-            .0
-            .certificates()
-            .into_iter()
-            .filter(|cert| cert.subject_name() != signing_certificate.subject_name())
-            .collect::<Vec<Cert>>();
 
         let inner = self.inner.borrow_mut();
 
@@ -674,9 +664,11 @@ impl<'a> AuthenticodeValidator<'a> {
         let cert_validator = if inner.strictness.require_chain_check {
             // Authenticode has the signer certificate and any intermediate certificates,
             // but typically does not contain the root
-            cert_validator
-                .chain_should_contains_root_certificate(false)
-                .chain(certificates.iter())
+            cert_validator.chain_should_contains_root_certificate(false).chain(
+                certificates
+                    .iter()
+                    .filter(|cert| cert.subject_name() != signing_certificate.subject_name()),
+            )
         } else {
             cert_validator.ignore_chain_check()
         };
@@ -716,9 +708,7 @@ impl<'a> AuthenticodeValidator<'a> {
                                 })
                         };
 
-                        if check_if_kp_time_stamping_present(&self.authenticode_signature.0.certificates())
-                            && !kp_lifetime_signing_is_present
-                        {
+                        if check_if_kp_time_stamping_present(certificates) && !kp_lifetime_signing_is_present {
                             return Ok(());
                         }
 
@@ -736,8 +726,8 @@ impl<'a> AuthenticodeValidator<'a> {
                                         .signed_data
                                         .certificates
                                         .0
+                                         .0
                                         .iter()
-                                        .cloned()
                                         .filter_map(|cert| match cert {
                                             CertificateChoices::Certificate(certificate) => {
                                                 Cert::from_der(&certificate.0).ok()
@@ -754,13 +744,10 @@ impl<'a> AuthenticodeValidator<'a> {
                                             let timestamp_chain_validator = leaf.verifier();
                                             let timestamp_chain = certificates
                                                 .iter()
-                                                .filter(|cert| cert.subject_name() != leaf.subject_name())
-                                                .cloned()
-                                                .collect::<Vec<Cert>>();
+                                                .filter(|cert| cert.subject_name() != leaf.subject_name());
 
-                                            let timestamp_chain_validator = timestamp_chain_validator
-                                                .require_chain_check()
-                                                .chain(timestamp_chain.iter());
+                                            let timestamp_chain_validator =
+                                                timestamp_chain_validator.require_chain_check().chain(timestamp_chain);
 
                                             let timestamp_chain_validator = timestamp_chain_validator
                                                 .ignore_not_after_check()
@@ -773,8 +760,8 @@ impl<'a> AuthenticodeValidator<'a> {
 
                                             #[cfg(feature = "ctl")]
                                             {
-                                                let ca_name = get_ca_name(&certificates).unwrap();
-                                                self.verify_ca_certificate_against_ctl(&ca_name)?;
+                                                let ca_name = h_get_ca_name(&certificates).unwrap();
+                                                self.h_verify_ca_certificate_against_ctl(&ca_name)?;
                                             }
                                         }
 
@@ -792,8 +779,9 @@ impl<'a> AuthenticodeValidator<'a> {
         }
     }
 
+    // https://github.com/robstradling/authroot_parser was used as a reference while implementing this function
     #[cfg(feature = "ctl")]
-    fn verify_ca_certificate_against_ctl(&self, ca_name: &DirectoryName) -> AuthenticodeResult<()> {
+    fn h_verify_ca_certificate_against_ctl(&self, ca_name: &DirectoryName) -> AuthenticodeResult<()> {
         use chrono::{DateTime, Duration, NaiveDate, Utc};
         use picky_asn1::wrapper::OctetStringAsn1;
         use std::ops::Add;
@@ -811,11 +799,11 @@ impl<'a> AuthenticodeValidator<'a> {
         let raw_ca_name = picky_asn1_der::to_vec(&Name::from(ca_name.clone()))?;
         let ca_name_md5_digest = HashAlgorithm::MD5.digest(&raw_ca_name);
 
-        let ctl = CertificateTrustList::new()?;
-        let clt_entries = ctl.ctl_entries()?;
+        let ctl = CertificateTrustList::fetch()?;
+        let ctl_entries = ctl.ctl_entries()?;
 
         // find the CA certificate info by its md5 name digest
-        let ca_ctl_entry_attributes = clt_entries
+        let ca_ctl_entry_attributes = ctl_entries
             .iter()
             .find(|&ctl_entry| {
                 ctl_entry.attributes.0.iter().any(|attr| match &attr.value {
@@ -914,19 +902,20 @@ impl<'a> AuthenticodeValidator<'a> {
     }
 
     pub fn verify(&self) -> AuthenticodeResult<()> {
+        let certificates = self.authenticode_signature.0.decode_certificates();
         if self.inner.borrow().strictness.require_basic_authenticode_validation {
-            self.verify_authenticode_basic()?;
+            self.h_verify_authenticode_basic(&certificates)?;
         }
 
         if self.inner.borrow().strictness.require_signing_certificate_check {
-            self.verify_signing_certificate()?;
+            self.h_verify_signing_certificate(&certificates)?;
         }
 
         #[cfg(feature = "ctl")]
         if self.inner.borrow().strictness.require_ca_verification_against_ctl {
-            let ca_name = get_ca_name(&self.authenticode_signature.0.certificates()).unwrap();
+            let ca_name = h_get_ca_name(&certificates).unwrap();
 
-            match self.verify_ca_certificate_against_ctl(&ca_name) {
+            match self.h_verify_ca_certificate_against_ctl(&ca_name) {
                 Ok(()) => {}
                 Err(err) => {
                     if !self
@@ -946,7 +935,7 @@ impl<'a> AuthenticodeValidator<'a> {
     }
 }
 
-fn check_eku_code_signing(certificates: &[Cert]) -> AuthenticodeResult<()> {
+fn h_check_eku_code_signing(certificates: &[Cert]) -> AuthenticodeResult<()> {
     if certificates
         .iter()
         .flat_map(|cert| cert.extensions().iter())
@@ -968,15 +957,11 @@ fn check_eku_code_signing(certificates: &[Cert]) -> AuthenticodeResult<()> {
     Ok(())
 }
 
-fn get_ca_name(certificates: &[Cert]) -> Option<DirectoryName> {
+fn h_get_ca_name(certificates: &[Cert]) -> Option<DirectoryName> {
     if let Some(root) = certificates.iter().find(|cert| cert.ty() == CertType::Root) {
         Some(root.subject_name())
     } else {
-        let intermediate_certificates = certificates
-            .iter()
-            .filter(|cert| cert.ty() == CertType::Intermediate)
-            .cloned()
-            .collect::<Vec<Cert>>();
+        let intermediate_certificates = certificates.iter().filter(|cert| cert.ty() == CertType::Intermediate);
 
         if let Some(inter) = intermediate_certificates.last() {
             Some(inter.issuer_name())
@@ -1125,7 +1110,7 @@ mod test {
         let program_name = "decoding_into_authenticode_signature".to_string();
 
         let authenticode_signature =
-            AuthenticodeSignature::new(&pkcs7, FILE_HASH.as_ref(), hash_type, &private_key, Some(program_name))
+            AuthenticodeSignature::new(&pkcs7, FILE_HASH.to_vec(), hash_type, &private_key, Some(program_name))
                 .unwrap();
 
         let pkcs7certificate = authenticode_signature.0 .0;
@@ -1194,6 +1179,7 @@ mod test {
             .certificates
             .0
             .clone()
+            .0
             .into_iter()
             .filter_map(|cert| match cert {
                 CertificateChoices::Certificate(certificate) => Cert::from_der(&certificate.0).ok(),
@@ -1287,7 +1273,7 @@ mod test {
 
         AuthenticodeSignature::new(
             &pkcs7,
-            FILE_HASH.as_ref(),
+            FILE_HASH.to_vec(),
             ShaVariant::SHA2_256,
             &private_key,
             Some("into_authenticate_signature_from_pkcs7_with_x509_root_chain".to_string()),
@@ -1302,7 +1288,7 @@ mod test {
 
         let authenticode_signature = AuthenticodeSignature::new(
             &pkcs7,
-            FILE_HASH.as_ref(),
+            FILE_HASH.to_vec(),
             ShaVariant::SHA2_256,
             &private_key,
             Some("self_signed_authenticode_signature_basic_validation".to_string()),
@@ -1330,7 +1316,7 @@ mod test {
 
         let authenticode_signature = AuthenticodeSignature::new(
             &pkcs7,
-            FILE_HASH.as_ref(),
+            FILE_HASH.to_vec(),
             ShaVariant::SHA2_256,
             &private_key,
             Some("self_signed_authenticate_signature_with_basic_and_signing_certificate_validation".to_string()),
@@ -1358,7 +1344,7 @@ mod test {
 
         let authenticode_signature = AuthenticodeSignature::new(
             &pkcs7,
-            FILE_HASH.as_ref(),
+            FILE_HASH.to_vec(),
             ShaVariant::SHA2_256,
             &private_key,
             Some("self_signed_authenticode_signature_validation_against_ctl".to_string()),
@@ -1385,7 +1371,7 @@ mod test {
 
         let authenticode_signature = AuthenticodeSignature::new(
             &pkcs7,
-            FILE_HASH.as_ref(),
+            FILE_HASH.to_vec(),
             ShaVariant::SHA2_256,
             &private_key,
             Some("self_signed_authenticode_signature_validation_against_ctl_with_excluded_ca_certificate".to_string()),
@@ -1395,8 +1381,9 @@ mod test {
         let validator = authenticode_signature.authenticode_verifier();
         let ca_name = authenticode_signature
             .0
-            .intermediate_certificates()
-            .first()
+            .decode_certificates()
+            .iter()
+            .find(|cert| cert.ty() == CertType::Intermediate)
             .unwrap()
             .issuer_name();
 
@@ -1422,7 +1409,7 @@ mod test {
 
         let authenticode_signature = AuthenticodeSignature::new(
             &pkcs7,
-            FILE_HASH.as_ref(),
+            FILE_HASH.to_vec(),
             ShaVariant::SHA2_256,
             &private_key,
             Some(
@@ -1460,7 +1447,7 @@ mod test {
 
         let authenticode_signature = AuthenticodeSignature::new(
             &pkcs7,
-            FILE_HASH.as_ref(),
+            FILE_HASH.to_vec(),
             ShaVariant::SHA2_256,
             &private_key,
             Some("self_signed_authenticode_signature_validation_against_ctl_with_excluded_ca_certificate".to_string()),
@@ -1472,8 +1459,9 @@ mod test {
 
         let ca_name = authenticode_signature
             .0
-            .intermediate_certificates()
-            .first()
+            .decode_certificates()
+            .iter()
+            .find(|cert| cert.ty() == CertType::Intermediate)
             .unwrap()
             .issuer_name();
 
@@ -1764,14 +1752,19 @@ mod test {
 
         let authenticode_signature = AuthenticodeSignature::new(
             &pkcs7,
-            FILE_HASH.as_ref(),
+            FILE_HASH.to_vec(),
             ShaVariant::SHA2_256,
             &private_key,
             Some("validate_self_signed_authenticode_signature_with_only_leaf_certificate".to_string()),
         )
         .unwrap();
+
         let file_hash = authenticode_signature.file_hash().expect("File hash should be present");
-        let ca_name = authenticode_signature.signing_certificate().unwrap().issuer_name();
+        let certificates = authenticode_signature.0.decode_certificates();
+        let ca_name = authenticode_signature
+            .signing_certificate(&certificates)
+            .unwrap()
+            .issuer_name();
 
         let validator = authenticode_signature.authenticode_verifier();
         validator
@@ -1865,10 +1858,14 @@ mod test {
         let private_key = PrivateKey::from_pem_str(private_key).unwrap();
 
         let authenticode_signature =
-            AuthenticodeSignature::new(&pkcs7, &FILE_HASH, ShaVariant::SHA2_256, &private_key, None).unwrap();
+            AuthenticodeSignature::new(&pkcs7, FILE_HASH.to_vec(), ShaVariant::SHA2_256, &private_key, None).unwrap();
         let file_hash = authenticode_signature.file_hash().expect("File hash should be present");
 
-        let ca_name = authenticode_signature.signing_certificate().unwrap().issuer_name();
+        let certificates = authenticode_signature.0.decode_certificates();
+        let ca_name = authenticode_signature
+            .signing_certificate(&certificates)
+            .unwrap()
+            .issuer_name();
 
         let validator = authenticode_signature.authenticode_verifier();
         validator

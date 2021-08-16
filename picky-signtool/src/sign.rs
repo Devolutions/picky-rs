@@ -106,7 +106,7 @@ fn sign_script(pkcs7: &Pkcs7, private_key: &PrivateKey, file_path: &Path) -> any
     let checksum = compute_ps_file_checksum_from_content(file_path, HashAlgorithm::SHA2_256)
         .with_context(|| format!("Failed to compute checksum for {:?}", file))?;
 
-    let authenticode_signature = AuthenticodeSignature::new(pkcs7, &checksum, ShaVariant::SHA2_256, private_key, None)
+    let authenticode_signature = AuthenticodeSignature::new(pkcs7, checksum, ShaVariant::SHA2_256, private_key, None)
         .with_context(|| format!("Failed to create authenticode signature for {:?}", file))?
         .to_pem()
         .context("Failed convert to authenticode signature to PEM format")?
@@ -145,7 +145,7 @@ fn sign_binary(
         .map_err(|err| anyhow!("Failed to compute file hash: {}", err))?;
 
     let authenticode_signature =
-        AuthenticodeSignature::new(pkcs7, &file_hash, ShaVariant::SHA2_256, private_key, Some(binary_name))
+        AuthenticodeSignature::new(pkcs7, file_hash, ShaVariant::SHA2_256, private_key, Some(binary_name))
             .context("Failed to create authenticode signature for")?
             .to_der()
             .context("Failed to convert authenticode signature to der")?;

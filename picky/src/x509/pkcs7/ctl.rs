@@ -26,7 +26,7 @@ pub struct CertificateTrustList {
 }
 
 impl CertificateTrustList {
-    pub fn new() -> Result<Self, CtlError> {
+    pub fn fetch() -> Result<Self, CtlError> {
         let ctl_url: &str =
             "http://www.download.windowsupdate.com/msdownload/update/v3/static/trustedr/en/authrootstl.cab";
 
@@ -61,7 +61,7 @@ impl CertificateTrustList {
         Ok(Self { pkcs7 })
     }
 
-    pub fn ctl_entries(&self) -> Result<Vec<CTLEntry>, CtlError> {
+    pub fn ctl_entries(&self) -> Result<&[CTLEntry], CtlError> {
         let content_value = self
             .pkcs7
             .0
@@ -76,7 +76,7 @@ impl CertificateTrustList {
             _ => return Err(CtlError::IncorrectContentValue),
         };
 
-        Ok(ctl.crl_entries.0.clone())
+        Ok(&ctl.crl_entries.0)
     }
 }
 
@@ -93,7 +93,7 @@ mod tests {
 
     #[test]
     fn create_ctl() {
-        let ctl = CertificateTrustList::new();
+        let ctl = CertificateTrustList::fetch();
         assert!(ctl.is_ok());
     }
 }

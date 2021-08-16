@@ -14,9 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Pkcs7::digest_algorithms`
 - `Pkcs7::signer_infos`
 - `Pkcs7::encapsulated_content_info`
-- `Pkcs7::certificates`
-- `Pkcs7::intermediate_certificates`
-- `Pkcs7::root_certificate`
+- `Pkcs7::decode_certificates`
 - `impl From<Pkcs7Certificate> for Pkcs7`
 - `impl From<Pkcs7> for Pkcs7Certificate`
 - Add `AuthenticodeSignature` struct
