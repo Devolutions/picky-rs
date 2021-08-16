@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Support for SHA1 and MD5
+- Support for MD5 hashing
 - CTL implementation behind `ctl` feature
 - `Pkcs7::digest_algorithms`
 - `Pkcs7::signer_infos`
@@ -37,12 +37,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Move Authenticode related code from `wincert.rs`  to `authenticode.rs` module
-- Authenticode behind `pkcs7` feature
+- (Breaking) Move Authenticode related code from `picky::x509::wincert` to `picky::x509::pkcs7::authenticode` module
+- (Breaking) Authenticode implementation is now behind `pkcs7` feature
 
 ### Fixed
 - Fix `BufReader` panic in `WinCertificate::decode` and `WinCertificate::encode` if data len is bigger than default capacity.
-- Fix `WinCertificate` encoding. `Wincertificate::length` should contain `WinCertificate::certificate` size and other fields sizes.
+- Fix `WinCertificate` encoding: `length` wasn’t correct.
 
 ## [6.4.0] 2021-08-10
 

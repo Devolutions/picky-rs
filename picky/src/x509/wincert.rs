@@ -80,8 +80,6 @@ impl WinCertificate {
 
         let mut buffer = BufWriter::with_capacity(length as usize + padding, Vec::new());
 
-        // According to Authenticode_PE.docx WinCertificate::length is set to certificate length,
-        // but if do not contains others WinCertificate's fields sizes the signature is invalid
         buffer.write_u32::<LittleEndian>(length + padding as u32)?;
         buffer.write_u16::<LittleEndian>(revision as u16)?;
         buffer.write_u16::<LittleEndian>(certificate_type as u16)?;
@@ -97,6 +95,12 @@ impl WinCertificate {
     pub fn from_certificate<V: Into<Vec<u8>>>(certificate: V, certificate_type: CertificateType) -> Self {
         let certificate = certificate.into();
         Self {
+            // According to Authenticode_PE.docx WinCertificate::length is set to the WinCertificate::certificate length,
+            // but if the length does not include other WinCertificate's fields (WinCertificate::revision,
+            // WinCertificate::certificate_type and WinCertificate::length itself) sizes the signature will invalid.
+            // MSDN says the same:
+            // dwLength - Specifies the length, in bytes, of the signature
+            // (see https://docs.microsoft.com/en-us/windows/win32/api/wintrust/ns-wintrust-win_certificate).
             length: (MINIMUM_BYTES_TO_DECODE + certificate.len()) as u32,
             revision: RevisionType::WinCertificateRevision20,
             certificate_type,

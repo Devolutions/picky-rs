@@ -9,19 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added 
 
-- Support for SHA1 and MD5
+- (Breaking) `ShaVariant` enum is extended for MD5 and SH1 algorithms
 - Support for an Authenticode timestamp deserialization/serialization
 - CTL implementation behind `ctl` feature
+- New `SpcSipInfo` struct
+- `SpcAttributeAndOptionalValue` now supports both `SpcPeImageData` and `SpcSipInfo` values
 
 ### Changed
 
-- Add `SpcStatementType` attribute value
-- Add `SpcSipInfo` `SpcAttributeTypeAndOptionalValue` value 
+- (Breaking) Add `SpcStatementType` variant in `AttributeValues` enum
 
 ### Fixed
 - SignedData:
-  - Add support of absent `RevocationInfoChoice` in `SignedData`
-  - `CertificateSet` is `Vec<CertificateChoices>` according to the RFC. `CertificateChoices::Certificate` contains Asn1RawDer value(see https://github.com/Devolutions/picky-rs/pull/94)  
+  - (Breaking) `RevocationInfoChoice` field is now optional as specified by the RFC
+  - (Breaking) `CertificateSet` is now a `Vec<CertificateChoices>` which can accept both a normal `Certificate` and an `other` kind of certificate as specified by the RFC  
 
 ## [0.6.1] 2021-06-02
 

@@ -129,7 +129,7 @@ impl<'de> de::Deserialize<'de> for CertificateSet {
 #[derive(Debug, PartialEq, Clone)]
 pub enum CertificateChoices {
     Certificate(Asn1RawDer),
-    Other(picky_asn1_der::Asn1RawDer),
+    Other(Asn1RawDer),
 }
 
 impl Serialize for CertificateChoices {
