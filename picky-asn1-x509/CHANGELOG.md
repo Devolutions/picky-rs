@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added 
 
 - (Breaking) `ShaVariant` enum is extended for MD5 and SH1 algorithms
-- Support for an Authenticode timestamp deserialization/serialization
+- Support for Authenticode timestamp deserialization/serialization
 - CTL implementation behind `ctl` feature
 - New `SpcSipInfo` struct
 
