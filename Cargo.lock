@@ -1399,7 +1399,7 @@ checksum = "c7d73b3f436185384286bd8098d17ec07c9a7d2388a6599f824d8502b529702a"
 [[package]]
 name = "lief-rs"
 version = "0.1.0"
-source = "git+https://github.com/Devolutions/lief-rs.git?rev=4b0ff76f4be75ee54a6033aed1a1af2d12ef0859#4b0ff76f4be75ee54a6033aed1a1af2d12ef0859"
+source = "git+https://github.com/Devolutions/lief-rs.git?rev=2e3297#2e329785b259226dbba8f8c3c69e38fb92a4b984"
 dependencies = [
  "bitflags",
  "image",
@@ -1412,7 +1412,7 @@ dependencies = [
 [[package]]
 name = "lief-sys"
 version = "0.1.0"
-source = "git+https://github.com/Devolutions/lief-rs.git?rev=4b0ff76f4be75ee54a6033aed1a1af2d12ef0859#4b0ff76f4be75ee54a6033aed1a1af2d12ef0859"
+source = "git+https://github.com/Devolutions/lief-rs.git?rev=2e3297#2e329785b259226dbba8f8c3c69e38fb92a4b984"
 dependencies = [
  "cmake",
 ]
