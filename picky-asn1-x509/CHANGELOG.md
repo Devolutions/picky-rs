@@ -13,11 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for an Authenticode timestamp deserialization/serialization
 - CTL implementation behind `ctl` feature
 - New `SpcSipInfo` struct
-- `SpcAttributeAndOptionalValue` now supports both `SpcPeImageData` and `SpcSipInfo` values
 
 ### Changed
 
 - (Breaking) Add `SpcStatementType` variant in `AttributeValues` enum
+- `SpcAttributeAndOptionalValue` now supports both `SpcPeImageData` and `SpcSipInfo` values
 
 ### Fixed
 - SignedData:
