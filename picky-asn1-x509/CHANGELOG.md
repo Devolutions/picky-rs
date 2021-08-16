@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added 
+
+- Support for SHA1 and MD5
+- Support for an Authenticode timestamp deserialization/serialization
+- CTL implementation behind `ctl` feature
+
+### Changed
+
+- Add `SpcStatementType` attribute value
+- Add `SpcSipInfo` `SpcAttributeTypeAndOptionalValue` value 
+
+### Fixed
+- SignedData:
+  - Add support of absent `RevocationInfoChoice` in `SignedData`
+  - `CertificateSet` is `Vec<CertificateChoices>` according to the RFC. `CertificateChoices::Certificate` contains Asn1RawDer value(see https://github.com/Devolutions/picky-rs/pull/94)  
+
 ## [0.6.1] 2021-06-02
 
 ### Added
