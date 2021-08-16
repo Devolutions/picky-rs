@@ -1399,12 +1399,12 @@ checksum = "c7d73b3f436185384286bd8098d17ec07c9a7d2388a6599f824d8502b529702a"
 [[package]]
 name = "lief-rs"
 version = "0.1.0"
-source = "git+https://github.com/Devolutions/lief-rs.git?rev=2e3297#2e329785b259226dbba8f8c3c69e38fb92a4b984"
+source = "git+https://github.com/Devolutions/lief-rs.git?rev=797f33#797f3395a806c1a003039d80cc84ccbb6d382770"
 dependencies = [
  "bitflags",
  "image",
  "lief-sys",
- "picky 6.4.0 (git+https://github.com/Devolutions/picky-rs.git?branch=powershell-scripts-signing-and-verifying)",
+ "picky 6.4.0 (git+https://github.com/Devolutions/picky-rs.git?rev=610a4ef)",
  "thiserror",
  "widestring",
 ]
@@ -1412,7 +1412,7 @@ dependencies = [
 [[package]]
 name = "lief-sys"
 version = "0.1.0"
-source = "git+https://github.com/Devolutions/lief-rs.git?rev=2e3297#2e329785b259226dbba8f8c3c69e38fb92a4b984"
+source = "git+https://github.com/Devolutions/lief-rs.git?rev=797f33#797f3395a806c1a003039d80cc84ccbb6d382770"
 dependencies = [
  "cmake",
 ]
@@ -2015,20 +2015,23 @@ dependencies = [
 [[package]]
 name = "picky"
 version = "6.4.0"
-source = "git+https://github.com/Devolutions/picky-rs.git?branch=powershell-scripts-signing-and-verifying#9e5da7668796ef86104d226863ac211135d586df"
+source = "git+https://github.com/Devolutions/picky-rs.git?rev=610a4ef#610a4ef4d570e7b965f49a95a25b389763c5fe56"
 dependencies = [
+ "aes-gcm",
  "base64 0.13.0",
  "byteorder",
  "digest 0.9.0",
+ "http",
  "md-5 0.9.1",
  "num-bigint-dig",
  "oid",
- "picky-asn1 0.4.0 (git+https://github.com/Devolutions/picky-rs.git?branch=powershell-scripts-signing-and-verifying)",
- "picky-asn1-der 0.2.5 (git+https://github.com/Devolutions/picky-rs.git?branch=powershell-scripts-signing-and-verifying)",
- "picky-asn1-x509 0.6.1 (git+https://github.com/Devolutions/picky-rs.git?branch=powershell-scripts-signing-and-verifying)",
+ "picky-asn1 0.4.0 (git+https://github.com/Devolutions/picky-rs.git?rev=610a4ef)",
+ "picky-asn1-der 0.2.5 (git+https://github.com/Devolutions/picky-rs.git?rev=610a4ef)",
+ "picky-asn1-x509 0.6.1 (git+https://github.com/Devolutions/picky-rs.git?rev=610a4ef)",
  "rand 0.8.3",
  "rsa",
  "serde",
+ "serde_json",
  "sha-1 0.9.4",
  "sha2 0.9.3",
  "sha3",
@@ -2049,7 +2052,7 @@ dependencies = [
 [[package]]
 name = "picky-asn1"
 version = "0.4.0"
-source = "git+https://github.com/Devolutions/picky-rs.git?branch=powershell-scripts-signing-and-verifying#9e5da7668796ef86104d226863ac211135d586df"
+source = "git+https://github.com/Devolutions/picky-rs.git?rev=610a4ef#610a4ef4d570e7b965f49a95a25b389763c5fe56"
 dependencies = [
  "oid",
  "serde",
@@ -2073,9 +2076,9 @@ dependencies = [
 [[package]]
 name = "picky-asn1-der"
 version = "0.2.5"
-source = "git+https://github.com/Devolutions/picky-rs.git?branch=powershell-scripts-signing-and-verifying#9e5da7668796ef86104d226863ac211135d586df"
+source = "git+https://github.com/Devolutions/picky-rs.git?rev=610a4ef#610a4ef4d570e7b965f49a95a25b389763c5fe56"
 dependencies = [
- "picky-asn1 0.4.0 (git+https://github.com/Devolutions/picky-rs.git?branch=powershell-scripts-signing-and-verifying)",
+ "picky-asn1 0.4.0 (git+https://github.com/Devolutions/picky-rs.git?rev=610a4ef)",
  "serde",
  "serde_bytes",
 ]
@@ -2098,13 +2101,13 @@ dependencies = [
 [[package]]
 name = "picky-asn1-x509"
 version = "0.6.1"
-source = "git+https://github.com/Devolutions/picky-rs.git?branch=powershell-scripts-signing-and-verifying#9e5da7668796ef86104d226863ac211135d586df"
+source = "git+https://github.com/Devolutions/picky-rs.git?rev=610a4ef#610a4ef4d570e7b965f49a95a25b389763c5fe56"
 dependencies = [
  "base64 0.13.0",
  "num-bigint-dig",
  "oid",
- "picky-asn1 0.4.0 (git+https://github.com/Devolutions/picky-rs.git?branch=powershell-scripts-signing-and-verifying)",
- "picky-asn1-der 0.2.5 (git+https://github.com/Devolutions/picky-rs.git?branch=powershell-scripts-signing-and-verifying)",
+ "picky-asn1 0.4.0 (git+https://github.com/Devolutions/picky-rs.git?rev=610a4ef)",
+ "picky-asn1-der 0.2.5 (git+https://github.com/Devolutions/picky-rs.git?rev=610a4ef)",
  "serde",
  "widestring",
 ]
