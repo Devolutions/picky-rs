@@ -110,7 +110,6 @@ impl AuthenticodeSignature {
         private_key: &PrivateKey,
         program_name: Option<String>,
     ) -> Result<Self, AuthenticodeError> {
-        let certificates = pkcs7.0.signed_data.certificates.clone();
         let digest_algorithm = AlgorithmIdentifier::new_sha(hash_algo);
 
         let data = SpcAttributeAndOptionalValue {
@@ -168,14 +167,7 @@ impl AuthenticodeSignature {
 
         // The signing certificate must contain either the extended key usage (EKU) value for code signing,
         // or the entire certificate chain must contain no EKUs
-        let certificates = certificates
-            .0
-            .into_iter()
-            .filter_map(|cert| match cert {
-                CertificateChoices::Certificate(certificate) => Cert::from_der(&certificate.0).ok(),
-                CertificateChoices::Other(_) => None,
-            })
-            .collect::<Vec<Cert>>();
+        let certificates = pkcs7.certificates();
 
         check_eku_code_signing(&certificates)?;
 
@@ -380,13 +372,13 @@ struct AuthenticodeStrictness {
 impl Default for AuthenticodeStrictness {
     fn default() -> Self {
         AuthenticodeStrictness {
-            require_basic_authenticode_validation: false,
-            require_signing_certificate_check: false,
-            require_not_before_check: false,
-            require_not_after_check: false,
-            require_ca_verification_against_ctl: false,
-            require_chain_check: false,
-            exclude_specific_cert_authorities_from_ctl_check: false,
+            require_basic_authenticode_validation: true,
+            require_signing_certificate_check: true,
+            require_not_before_check: true,
+            require_not_after_check: true,
+            require_chain_check: true,
+            require_ca_verification_against_ctl: true,
+            exclude_specific_cert_authorities_from_ctl_check: true,
         }
     }
 }
@@ -448,9 +440,22 @@ impl<'a> AuthenticodeValidator<'a> {
     }
 
     #[inline]
+    pub fn ignore_signing_certificate_check(&self) -> &Self {
+        self.inner.borrow_mut().strictness.require_signing_certificate_check = false;
+        self
+    }
+
+    #[inline]
     pub fn require_basic_authenticode_validation(&self, expected_file_hash: Vec<u8>) -> &Self {
         self.inner.borrow_mut().strictness.require_basic_authenticode_validation = true;
         self.inner.borrow_mut().expected_file_hash = Some(expected_file_hash);
+        self
+    }
+
+    #[inline]
+    pub fn ignore_basic_authenticode_validation(&self) -> &Self {
+        self.inner.borrow_mut().strictness.require_basic_authenticode_validation = false;
+        self.inner.borrow_mut().expected_file_hash = None;
         self
     }
 
@@ -461,8 +466,20 @@ impl<'a> AuthenticodeValidator<'a> {
         self
     }
 
+    #[cfg(feature = "ctl")]
+    #[inline]
+    pub fn ignore_ca_against_ctl_check(&self) -> &Self {
+        self.inner.borrow_mut().strictness.require_ca_verification_against_ctl = false;
+        self
+    }
+
     pub fn require_chain_check(&self) -> &Self {
         self.inner.borrow_mut().strictness.require_chain_check = true;
+        self
+    }
+
+    pub fn ignore_chain_check(&self) -> &Self {
+        self.inner.borrow_mut().strictness.require_chain_check = false;
         self
     }
 
@@ -477,6 +494,18 @@ impl<'a> AuthenticodeValidator<'a> {
             .borrow_mut()
             .excluded_cert_authorities
             .extend_from_slice(excluded_cert_authorities);
+
+        self
+    }
+
+    #[cfg(feature = "ctl")]
+    #[inline]
+    pub fn ignore_excluded_cert_authorities(&self) -> &Self {
+        self.inner
+            .borrow_mut()
+            .strictness
+            .exclude_specific_cert_authorities_from_ctl_check = false;
+        self.inner.borrow_mut().excluded_cert_authorities.clear();
 
         self
     }
@@ -646,7 +675,7 @@ impl<'a> AuthenticodeValidator<'a> {
             // Authenticode has the signer certificate and any intermediate certificates,
             // but typically does not contain the root
             cert_validator
-                .skip_root_is_last_cert_chain_check()
+                .chain_should_contains_root_certificate(false)
                 .chain(certificates.iter())
         } else {
             cert_validator.ignore_chain_check()
@@ -736,7 +765,7 @@ impl<'a> AuthenticodeValidator<'a> {
                                             let timestamp_chain_validator = timestamp_chain_validator
                                                 .ignore_not_after_check()
                                                 .ignore_not_before_check()
-                                                .skip_root_is_last_cert_chain_check();
+                                                .chain_should_contains_root_certificate(false);
 
                                             timestamp_chain_validator
                                                 .verify()
@@ -1284,6 +1313,12 @@ mod test {
         let validator = authenticode_signature.authenticode_verifier();
         validator
             .require_basic_authenticode_validation(file_hash)
+            .ignore_signing_certificate_check()
+            .ignore_chain_check()
+            .ignore_not_after_check()
+            .ignore_not_before_check()
+            .ignore_ca_against_ctl_check()
+            .ignore_excluded_cert_authorities()
             .verify()
             .unwrap();
     }
@@ -1308,6 +1343,9 @@ mod test {
             .require_basic_authenticode_validation(file_hash)
             .require_signing_certificate_check()
             .exact_date(&UTCDate::new(2021, 8, 7, 0, 0, 0).unwrap())
+            .ignore_chain_check()
+            .ignore_ca_against_ctl_check()
+            .ignore_excluded_cert_authorities()
             .verify()
             .unwrap();
     }
@@ -1328,7 +1366,13 @@ mod test {
         .unwrap();
 
         let validator = authenticode_signature.authenticode_verifier();
-        let validator = validator.require_ca_against_ctl_check();
+        let validator = validator
+            .require_ca_against_ctl_check()
+            .ignore_signing_certificate_check()
+            .ignore_chain_check()
+            .ignore_not_after_check()
+            .ignore_not_before_check()
+            .ignore_basic_authenticode_validation();
         let err = validator.verify().unwrap_err();
         assert_eq!(err.to_string(), "The Authenticode signature CA is not trusted");
     }
@@ -1359,6 +1403,11 @@ mod test {
         validator
             .require_ca_against_ctl_check()
             .exclude_cert_authorities(&[ca_name])
+            .ignore_signing_certificate_check()
+            .ignore_chain_check()
+            .ignore_not_after_check()
+            .ignore_not_before_check()
+            .ignore_basic_authenticode_validation()
             .verify()
             .unwrap();
     }
@@ -1392,6 +1441,11 @@ mod test {
         let err = validator
             .require_ca_against_ctl_check()
             .exclude_cert_authorities(&[ca_name])
+            .ignore_signing_certificate_check()
+            .ignore_chain_check()
+            .ignore_not_after_check()
+            .ignore_not_before_check()
+            .ignore_basic_authenticode_validation()
             .verify()
             .unwrap_err();
 

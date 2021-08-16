@@ -218,7 +218,7 @@ pub struct CertificateSerialNumber(pub IntegerAsn1);
 #[derive(Deserialize, Debug, PartialEq, Clone)]
 pub struct UnsignedAttributes(pub Vec<UnsignedAttribute>);
 
-// FIXME: This is a workaround, related to https://github.com/Devolutions/picky-rs/pull/78#issuecomment-789904165
+// This is a workaround for constructed encoding as implicit
 impl ser::Serialize for UnsignedAttributes {
     fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
     where
@@ -316,7 +316,6 @@ impl Serialize for UnsignedAttributeValue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use picky_asn1_der::Asn1DerError;
 
     #[cfg(feature = "ctl")]
     #[test]

@@ -582,8 +582,7 @@ mod tests {
         .unwrap();
 
         let pkcs7: Pkcs7Certificate = picky_asn1_der::from_bytes(&decoded).unwrap();
-        let bytes = &decoded[3882..3914];
-        println!("{:X?}", bytes);
+
         let message_digest = Attribute {
             ty: crate::oids::message_digest().into(),
             value: AttributeValues::MessageDigest(Asn1SetOf(vec![OctetStringAsn1::from(decoded[3882..3914].to_vec())])),

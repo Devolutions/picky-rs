@@ -18,7 +18,7 @@ use crate::config::{
     ARG_LOGGING_TRACE, ARG_LOGGING_WARN, ARG_OUTPUT, ARG_PS_SCRIPT, CRLF, PS_AUTHENTICODE_FOOTER,
     PS_AUTHENTICODE_HEADER, PS_AUTHENTICODE_LINES_SPLITTER,
 };
-use crate::file_name_from_path;
+use crate::get_utf8_file_name;
 use crate::verify::extract_signed_ps_file_content;
 use picky::pem::Pem;
 
@@ -51,7 +51,7 @@ pub fn sign(
         for ps_file in files.iter() {
             sign_script(&pkcs7, &private_key, ps_file.as_path())?;
 
-            let file_name = file_name_from_path(ps_file.as_path())?;
+            let file_name = get_utf8_file_name(ps_file.as_path())?;
             println!("Signed {} successfully", file_name);
         }
 
@@ -64,7 +64,7 @@ pub fn sign(
             .value_of(ARG_OUTPUT)
             .context("Output path for signed binary is not specified")?;
 
-        let binary_name = file_name_from_path(file.as_path())?;
+        let binary_name = get_utf8_file_name(file.as_path())?;
 
         match matches.value_of(ARG_LOGGING) {
             Some(log_level) => {
@@ -85,9 +85,9 @@ pub fn sign(
         sign_binary(
             &pkcs7,
             &private_key,
-            file,
+            file.clone(),
             PathBuf::from(output_path),
-            binary_name.clone(),
+            binary_name.to_owned(),
         )?;
 
         println!("Signed {} successfully!", binary_name);

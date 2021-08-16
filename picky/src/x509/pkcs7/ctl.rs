@@ -17,7 +17,7 @@ pub enum CtlError {
     FailedToParseCtl(Pkcs7Error),
     #[error(transparent)]
     IoError(#[from] io::Error),
-    #[error("For CTL we expects CertificateTrustList content in EncapsulatedContentInfo, but something else")]
+    #[error("For CTL we expect CertificateTrustList content in EncapsulatedContentInfo, but something else")]
     IncorrectContentValue,
 }
 

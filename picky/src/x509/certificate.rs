@@ -359,7 +359,7 @@ struct CheckStrictness {
     require_not_before_check: bool,
     require_not_after_check: bool,
     require_chain_check: bool,
-    skip_root_is_last_cert_chain_check: bool,
+    chain_should_contains_root_certificate: bool,
 }
 
 impl Default for CheckStrictness {
@@ -368,7 +368,7 @@ impl Default for CheckStrictness {
             require_not_before_check: true,
             require_not_after_check: true,
             require_chain_check: true,
-            skip_root_is_last_cert_chain_check: false,
+            chain_should_contains_root_certificate: true,
         }
     }
 }
@@ -443,8 +443,11 @@ impl<'a, 'b, Chain: Iterator<Item = &'b Cert>> CertValidator<'a, 'b, Chain> {
     }
 
     #[inline]
-    pub(super) fn skip_root_is_last_cert_chain_check(&self) -> &Self {
-        self.inner.borrow_mut().strictness.skip_root_is_last_cert_chain_check = true;
+    pub(super) fn chain_should_contains_root_certificate(&self, should_contains: bool) -> &Self {
+        self.inner
+            .borrow_mut()
+            .strictness
+            .chain_should_contains_root_certificate = should_contains;
         self
     }
 
@@ -534,7 +537,7 @@ impl<'a, 'b, Chain: Iterator<Item = &'b Cert>> CertValidator<'a, 'b, Chain> {
         }
 
         // make sure `current_cert` (the last certificate of the chain) is a root CA
-        if !inner.strictness.skip_root_is_last_cert_chain_check && current_cert.ty() != CertType::Root {
+        if inner.strictness.chain_should_contains_root_certificate && current_cert.ty() != CertType::Root {
             return Err(CaChainError::NoRoot).map_err(|e| CertError::InvalidChain { source: e });
         }
 

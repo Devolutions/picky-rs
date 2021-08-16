@@ -17,7 +17,7 @@ use crate::config::{
     ARG_BINARY, ARG_PS_SCRIPT, ARG_VERIFY, ARG_VERIFY_CA, ARG_VERIFY_CHAIN, ARG_VERIFY_DEFAULT,
     ARG_VERIFY_SIGNING_CERTIFICATE, PS_AUTHENTICODE_FOOTER, PS_AUTHENTICODE_HEADER, PS_AUTHENTICODE_LINES_SPLITTER,
 };
-use crate::file_name_from_path;
+use crate::get_utf8_file_name;
 use crate::sign::compute_ps_file_checksum_from_content;
 
 pub fn verify(matches: &ArgMatches, files: &[PathBuf]) -> anyhow::Result<()> {
@@ -34,12 +34,12 @@ pub fn verify(matches: &ArgMatches, files: &[PathBuf]) -> anyhow::Result<()> {
                 Binary::new(binary_path.clone()).map_err(|err| anyhow!("Failed to load the executable: {}", err))?;
 
             let authenticode_signature = extract_authenticode_signature_from_binary(&binary)?;
-            let binary_name = file_name_from_path(&binary_path)?;
+            let binary_name = get_utf8_file_name(&binary_path)?;
             let file_hash = binary
                 .get_file_hash_sha256()
                 .map_err(|err| anyhow!("Failed to compute file hash for target binary: {}", err.to_string()))?;
 
-            vec![(authenticode_signature, binary_name, file_hash)]
+            vec![(authenticode_signature, binary_name.to_owned(), file_hash)]
         }
         (false, true) => {
             let mut authenticode_signatures = Vec::with_capacity(files.len());
@@ -67,12 +67,12 @@ pub fn verify(matches: &ArgMatches, files: &[PathBuf]) -> anyhow::Result<()> {
                 let hash = HashAlgorithm::try_from(sha_variant)
                     .with_context(|| format!("Failed compute checksum for {:?}", file_path))?;
 
-                let ps_file_name = file_name_from_path(file_path.as_path())?;
+                let ps_file_name = get_utf8_file_name(file_path.as_path())?;
 
                 let file_hash = compute_ps_file_checksum_from_content(file_path, hash)
                     .with_context(|| format!("Failed to compute {:?} checksum for {:?}", hash, file_path.as_path()))?;
 
-                authenticode_signatures.push((authenticode_signature, ps_file_name, file_hash))
+                authenticode_signatures.push((authenticode_signature, ps_file_name.to_owned(), file_hash))
             }
             authenticode_signatures
         }
@@ -175,6 +175,15 @@ fn apply_flags<'a>(
     time: &'a UTCDate,
     file_hash: Vec<u8>,
 ) -> &'a AuthenticodeValidator<'a> {
+    let validator = validator
+        .ignore_basic_authenticode_validation()
+        .ignore_signing_certificate_check()
+        .ignore_chain_check()
+        .ignore_ca_against_ctl_check()
+        .ignore_not_before_check()
+        .ignore_not_after_check()
+        .ignore_excluded_cert_authorities();
+
     let validator = if flags.iter().any(|flag| flag.as_str() == ARG_VERIFY_DEFAULT) {
         validator.require_basic_authenticode_validation(file_hash)
     } else {
