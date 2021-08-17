@@ -9,17 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added 
 
-- (Breaking) `ShaVariant` enum is extended for MD5 and SH1 algorithms
 - Support for Authenticode timestamp deserialization/serialization
 - CTL implementation behind `ctl` feature
 - New `SpcSipInfo` struct
 
 ### Changed
 
+- (Breaking) `ShaVariant` enum is extended for MD5 and SH1 algorithms
 - (Breaking) Add `SpcStatementType` variant in `AttributeValues` enum
 - `SpcAttributeAndOptionalValue` now supports both `SpcPeImageData` and `SpcSipInfo` values
 
 ### Fixed
+
 - SignedData:
   - (Breaking) `RevocationInfoChoice` field is now optional as specified by the RFC
   - (Breaking) `CertificateSet` is now a `Vec<CertificateChoices>` which can accept both a normal `Certificate` and an `other` kind of certificate as specified by the RFC  
