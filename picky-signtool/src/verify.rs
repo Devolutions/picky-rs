@@ -69,9 +69,8 @@ pub fn verify(matches: &ArgMatches, files: &[PathBuf]) -> anyhow::Result<()> {
 
                     let ps_file_name = get_utf8_file_name(file_path)?;
 
-                    let file_hash = compute_ps_file_checksum_from_content(file_path, hash).with_context(|| {
-                        format!("Failed to compute {:?} checksum for {:?}", hash, file_path)
-                    })?;
+                    let file_hash = compute_ps_file_checksum_from_content(file_path, hash)
+                        .with_context(|| format!("Failed to compute {:?} checksum for {:?}", hash, file_path))?;
 
                     Ok((authenticode_signature, ps_file_name.to_owned(), file_hash))
                 };
@@ -81,7 +80,7 @@ pub fn verify(matches: &ArgMatches, files: &[PathBuf]) -> anyhow::Result<()> {
                     Err(e) => {
                         at_least_one_error = true;
                         eprintln!("{:?}", e);
-                    },
+                    }
                 }
             }
             authenticode_signatures
