@@ -52,6 +52,7 @@ jobs:
 
           mkdir -p $(Build.ArtifactStagingDirectory)/linux/x86_64
           cp $(Build.Repository.LocalPath)/target/release/picky-server $(Build.ArtifactStagingDirectory)/linux/x86_64/
+          cp $(Build.Repository.LocalPath)/target/release/picky-signtool $(Build.ArtifactStagingDirectory)/linux/x86_64/
         displayName: Building picky-rs
 
       - task: PublishBuildArtifacts@1
@@ -79,6 +80,7 @@ jobs:
           cargo build --release --target=x86_64-pc-windows-msvc
           mkdir $(Build.ArtifactStagingDirectory)/windows/x86_64
           cp $(Build.Repository.LocalPath)/target/x86_64-pc-windows-msvc/release/picky-server.exe $(Build.ArtifactStagingDirectory)/windows/x86_64/
+          cp $(Build.Repository.LocalPath)/target/x86_64-pc-windows-msvc/release/picky-signtool.exe $(Build.ArtifactStagingDirectory)/windows/x86_64/
         displayName: Building picky-rs
         env:
           RUSTFLAGS: '-C target-feature=+crt-static'
