@@ -25,6 +25,7 @@ impl Error for UnsupportedHashAlgorithmError {}
 #[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum HashAlgorithm {
+    MD5,
     SHA1,
     SHA2_224,
     SHA2_256,
@@ -37,6 +38,7 @@ pub enum HashAlgorithm {
 impl From<HashAlgorithm> for rsa::Hash {
     fn from(v: HashAlgorithm) -> rsa::Hash {
         match v {
+            HashAlgorithm::MD5 => rsa::Hash::MD5,
             HashAlgorithm::SHA1 => rsa::Hash::SHA1,
             HashAlgorithm::SHA2_224 => rsa::Hash::SHA2_224,
             HashAlgorithm::SHA2_256 => rsa::Hash::SHA2_256,
@@ -53,6 +55,8 @@ impl TryFrom<HashAlgorithm> for ShaVariant {
 
     fn try_from(v: HashAlgorithm) -> Result<ShaVariant, UnsupportedHashAlgorithmError> {
         match v {
+            HashAlgorithm::MD5 => Ok(ShaVariant::MD5),
+            HashAlgorithm::SHA1 => Ok(ShaVariant::SHA1),
             HashAlgorithm::SHA2_256 => Ok(ShaVariant::SHA2_256),
             HashAlgorithm::SHA2_384 => Ok(ShaVariant::SHA2_384),
             HashAlgorithm::SHA2_512 => Ok(ShaVariant::SHA2_512),
@@ -70,6 +74,8 @@ impl TryFrom<ShaVariant> for HashAlgorithm {
 
     fn try_from(v: ShaVariant) -> Result<HashAlgorithm, UnsupportedHashAlgorithmError> {
         match v {
+            ShaVariant::MD5 => Ok(HashAlgorithm::MD5),
+            ShaVariant::SHA1 => Ok(HashAlgorithm::SHA1),
             ShaVariant::SHA2_256 => Ok(HashAlgorithm::SHA2_256),
             ShaVariant::SHA2_384 => Ok(HashAlgorithm::SHA2_384),
             ShaVariant::SHA2_512 => Ok(HashAlgorithm::SHA2_512),
@@ -85,6 +91,7 @@ impl TryFrom<ShaVariant> for HashAlgorithm {
 impl HashAlgorithm {
     pub fn digest(self, msg: &[u8]) -> Vec<u8> {
         match self {
+            Self::MD5 => md5::Md5::digest(msg).as_slice().to_vec(),
             Self::SHA1 => sha1::Sha1::digest(msg).as_slice().to_vec(),
             Self::SHA2_224 => sha2::Sha224::digest(msg).as_slice().to_vec(),
             Self::SHA2_256 => sha2::Sha256::digest(msg).as_slice().to_vec(),

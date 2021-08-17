@@ -53,6 +53,7 @@ impl TryFrom<&'_ AlgorithmIdentifier> for SignatureAlgorithm {
     fn try_from(v: &AlgorithmIdentifier) -> Result<Self, Self::Error> {
         let oid_string: String = v.oid().into();
         match oid_string.as_str() {
+            oids::MD5_WITH_RSA_ENCRYPTHION => Ok(Self::RsaPkcs1v15(HashAlgorithm::MD5)),
             oids::SHA1_WITH_RSA_ENCRYPTION => Ok(Self::RsaPkcs1v15(HashAlgorithm::SHA1)),
             oids::SHA224_WITH_RSA_ENCRYPTION => Ok(Self::RsaPkcs1v15(HashAlgorithm::SHA2_224)),
             oids::SHA256_WITH_RSA_ENCRYPTION => Ok(Self::RsaPkcs1v15(HashAlgorithm::SHA2_256)),
@@ -68,6 +69,7 @@ impl TryFrom<&'_ AlgorithmIdentifier> for SignatureAlgorithm {
 impl From<SignatureAlgorithm> for AlgorithmIdentifier {
     fn from(ty: SignatureAlgorithm) -> Self {
         match ty {
+            SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::MD5) => AlgorithmIdentifier::new_md5_with_rsa_encryption(),
             SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA1) => AlgorithmIdentifier::new_sha1_with_rsa_encryption(),
             SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_224) => {
                 AlgorithmIdentifier::new_sha224_with_rsa_encryption()

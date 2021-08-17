@@ -5,11 +5,14 @@ use widestring::U16String;
 
 use picky_asn1::bit_string::BitString;
 use picky_asn1::restricted_string::{BMPString, CharSetError};
-use picky_asn1::tag::{Tag, TagClass, TagPeeker};
+use picky_asn1::tag::{TagClass, TagPeeker};
 use picky_asn1::wrapper::{
     BMPStringAsn1, BitStringAsn1, ExplicitContextTag0, ExplicitContextTag1, ExplicitContextTag2, IA5StringAsn1,
-    ImplicitContextTag0, ImplicitContextTag1, ObjectIdentifierAsn1, OctetStringAsn1, Optional,
+    ImplicitContextTag0, ImplicitContextTag1, IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1, Optional,
 };
+
+#[cfg(feature = "ctl")]
+use super::ctl::Ctl;
 
 use crate::{oids, DigestInfo};
 
@@ -25,6 +28,8 @@ use crate::{oids, DigestInfo};
 pub enum ContentValue {
     SpcIndirectDataContent(SpcIndirectDataContent),
     OctetString(OctetStringAsn1),
+    #[cfg(feature = "ctl")]
+    CertificateTrustList(Ctl),
 }
 
 impl Serialize for ContentValue {
@@ -37,6 +42,8 @@ impl Serialize for ContentValue {
                 spc_indirect_data_content.serialize(serializer)
             }
             ContentValue::OctetString(octet_string) => octet_string.serialize(serializer),
+            #[cfg(feature = "ctl")]
+            ContentValue::CertificateTrustList(ctl) => ctl.serialize(serializer),
         }
     }
 }
@@ -85,30 +92,28 @@ impl<'de> de::Deserialize<'de> for EncapsulatedContentInfo {
                         .into(),
                     ),
                     oids::PKCS7 => None,
-                    _ => {
-                        let tag_peeker: TagPeeker = seq_next_element!(seq, EncapsulatedContentInfo, "OctetString");
-                        match tag_peeker.next_tag {
-                            Tag::OCTET_STRING => Some(
-                                ContentValue::OctetString(
-                                    seq_next_element!(
-                                        seq,
-                                        ExplicitContextTag0<OctetStringAsn1>,
-                                        EncapsulatedContentInfo,
-                                        "OctetStringAsn1"
-                                    )
-                                    .0,
-                                )
-                                .into(),
-                            ),
-                            _ => {
-                                return Err(serde_invalid_value!(
-                                    EncapsulatedContentInfo,
-                                    "unknown oid type",
-                                    "SPC_INDIRECT_DATA_OBJID or PKCS7 oid"
-                                ))
-                            }
-                        }
-                    }
+                    #[cfg(feature = "ctl")]
+                    oids::CERT_TRUST_LIST => Some(
+                        ContentValue::CertificateTrustList(
+                            seq_next_element!(
+                                seq,
+                                ExplicitContextTag0<Ctl>,
+                                EncapsulatedContentInfo,
+                                "CertificateTrustList"
+                            )
+                            .0,
+                        )
+                        .into(),
+                    ),
+                    _ => Some(ExplicitContextTag0::from(ContentValue::OctetString(
+                        seq_next_element!(
+                            seq,
+                            ExplicitContextTag0<OctetStringAsn1>,
+                            EncapsulatedContentInfo,
+                            "OctetStringAsn1"
+                        )
+                        .0,
+                    ))),
                 };
 
                 Ok(EncapsulatedContentInfo {
@@ -120,6 +125,18 @@ impl<'de> de::Deserialize<'de> for EncapsulatedContentInfo {
 
         deserializer.deserialize_seq(Visitor)
     }
+}
+
+// https://github.com/sassoftware/relic/blob/master/lib/authenticode/structs.go#L46
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct SpcSipInfo {
+    pub version: IntegerAsn1,
+    pub uuid: OctetStringAsn1,
+    reserved1: IntegerAsn1,
+    reserved2: IntegerAsn1,
+    reserved3: IntegerAsn1,
+    reserved4: IntegerAsn1,
+    reserved5: IntegerAsn1,
 }
 
 /// [Authenticode_PE.docx](http://download.microsoft.com/download/9/c/5/9c5b2167-8017-4bae-9fde-d599bac8184a/Authenticode_PE.docx)
@@ -142,10 +159,30 @@ pub struct SpcIndirectDataContent {
 ///     value                   [0] EXPLICIT ANY OPTIONAL
 /// }
 /// ```
+#[derive(Debug, PartialEq, Clone)]
+pub enum SpcAttributeAndOptionalValueValue {
+    SpcPeImageData(SpcPeImageData),
+    SpcSipInfo(SpcSipInfo),
+}
+
+impl Serialize for SpcAttributeAndOptionalValueValue {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
+    where
+        S: ser::Serializer,
+    {
+        match &self {
+            SpcAttributeAndOptionalValueValue::SpcPeImageData(spc_pe_image_data) => {
+                spc_pe_image_data.serialize(serializer)
+            }
+            SpcAttributeAndOptionalValueValue::SpcSipInfo(spc_sip_info) => spc_sip_info.serialize(serializer),
+        }
+    }
+}
+
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct SpcAttributeAndOptionalValue {
     pub ty: ObjectIdentifierAsn1,
-    pub value: SpcPeImageData,
+    pub value: SpcAttributeAndOptionalValueValue,
 }
 
 impl<'de> de::Deserialize<'de> for SpcAttributeAndOptionalValue {
@@ -171,18 +208,23 @@ impl<'de> de::Deserialize<'de> for SpcAttributeAndOptionalValue {
                 let oid: ObjectIdentifierAsn1 = seq_next_element!(seq, SpcAttributeAndOptionalValue, "type oid");
 
                 let value = match Into::<String>::into(&oid.0).as_str() {
-                    oids::SPC_PE_IMAGE_DATAOBJ => seq_next_element!(
+                    oids::SPC_PE_IMAGE_DATAOBJ => SpcAttributeAndOptionalValueValue::SpcPeImageData(seq_next_element!(
                         seq,
                         SpcPeImageData,
                         SpcAttributeAndOptionalValue,
                         "a SpcPeImageData object"
-                    ),
+                    )),
+                    oids::SPC_SIPINFO_OBJID => SpcAttributeAndOptionalValueValue::SpcSipInfo(seq_next_element!(
+                        seq,
+                        SpcSipInfo,
+                        "a SpcSipInfo object"
+                    )),
                     _ => {
                         return Err(serde_invalid_value!(
                             SpcAttributeAndOptionalValue,
                             "unknown oid type",
                             "a SPC_PE_IMAGE_DATAOBJ oid"
-                        ))
+                        ));
                     }
                 };
 

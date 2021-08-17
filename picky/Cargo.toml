@@ -29,10 +29,13 @@ byteorder = { version = "1.4", optional = true }
 chrono = { version = "0.4", optional = true }
 serde_json = { version = "1.0", optional = true }
 http = { version = "0.2", optional = true }
+reqwest = { version = "0.11", default-features = false, features = ["blocking"], optional = true }
+cab = { version = "0.2", optional = true }
 
 # /!\ ===== cryptography dependencies ===== /!\
 # These should be updated as soon as possible.
 # /!\ ===================================== /!\
+md-5 = "0.9"
 sha1 = { package = "sha-1", version = "0.9" }
 sha2 = "0.9"
 sha3 = "0.9"
@@ -58,6 +61,7 @@ http_signature = []
 
 # secondary features
 pkcs7 = ["x509", "picky-asn1-x509/pkcs7"]
-wincert = ["pkcs7", "byteorder"]
+ctl = ["picky-asn1-x509/ctl", "pkcs7", "chrono_conversion", "reqwest", "cab"]
+wincert = ["byteorder"]
 http_trait_impl = ["http"]
 chrono_conversion = ["chrono", "picky-asn1/chrono_conversion"]

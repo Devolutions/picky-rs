@@ -1,7 +1,10 @@
 use crate::cmsversion::CmsVersion;
-use crate::{AlgorithmIdentifier, Attribute, Name, SubjectKeyIdentifier};
+use crate::pkcs7::Pkcs7Certificate;
+use crate::{oids, AlgorithmIdentifier, Attribute, Name, SubjectKeyIdentifier};
 use picky_asn1::tag::{Tag, TagClass, TagPeeker};
-use picky_asn1::wrapper::{ImplicitContextTag0, IntegerAsn1, OctetStringAsn1, Optional};
+use picky_asn1::wrapper::{
+    Asn1SequenceOf, Asn1SetOf, ImplicitContextTag0, IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1, Optional,
+};
 use serde::{de, ser, Deserialize, Serialize};
 
 /// [RFC 5652 #5.3](https://datatracker.ietf.org/doc/html/rfc5652#section-5.3)
@@ -27,7 +30,8 @@ pub struct SignerInfo {
     pub signed_attrs: Optional<Attributes>,
     pub signature_algorithm: SignatureAlgorithmIdentifier,
     pub signature: SignatureValue,
-    // unsigned_attrs
+    #[serde(skip_serializing_if = "Optional::is_default")]
+    pub unsigned_attrs: Optional<UnsignedAttributes>,
 }
 
 impl<'de> de::Deserialize<'de> for SignerInfo {
@@ -66,6 +70,10 @@ impl<'de> de::Deserialize<'de> for SignerInfo {
                     signed_attrs: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(3, &self))?,
                     signature_algorithm: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(4, &self))?,
                     signature: seq.next_element()?.ok_or_else(|| de::Error::invalid_length(5, &self))?,
+                    unsigned_attrs: seq
+                        .next_element()
+                        .unwrap_or_default()
+                        .unwrap_or_else(|| Optional::from(UnsignedAttributes::default())),
                 })
             }
         }
@@ -75,8 +83,8 @@ impl<'de> de::Deserialize<'de> for SignerInfo {
 }
 
 // This is a workaround for constructed encoding as implicit
-#[derive(Debug, PartialEq, Clone, Default)]
-pub struct Attributes(pub Vec<Attribute>);
+#[derive(Debug, Deserialize, PartialEq, Clone, Default)]
+pub struct Attributes(pub Asn1SequenceOf<Attribute>);
 
 impl ser::Serialize for Attributes {
     fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
@@ -86,18 +94,6 @@ impl ser::Serialize for Attributes {
         let mut raw_der = picky_asn1_der::to_vec(&self.0).unwrap_or_else(|_| vec![0]);
         raw_der[0] = Tag::context_specific_constructed(0).inner();
         picky_asn1_der::Asn1RawDer(raw_der).serialize(serializer)
-    }
-}
-
-impl<'de> de::Deserialize<'de> for Attributes {
-    fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
-    where
-        D: de::Deserializer<'de>,
-    {
-        let mut raw_der = picky_asn1_der::Asn1RawDer::deserialize(deserializer)?.0;
-        raw_der[0] = Tag::SEQUENCE.inner();
-        let vec = picky_asn1_der::from_bytes(&raw_der).unwrap_or_default();
-        Ok(Attributes(vec))
     }
 }
 
@@ -151,7 +147,7 @@ impl<'de> Deserialize<'de> for SignerIdentifier {
             {
                 let tag_peeker: TagPeeker = seq_next_element!(seq, SignerIdentifier, "a choice tag");
 
-                let singer_identifier =
+                let signer_identifier =
                     if tag_peeker.next_tag.class() == TagClass::ContextSpecific && tag_peeker.next_tag.number() == 0 {
                         SignerIdentifier::SubjectKeyIdentifier(seq_next_element!(
                             seq,
@@ -167,7 +163,7 @@ impl<'de> Deserialize<'de> for SignerIdentifier {
                         ))
                     };
 
-                Ok(singer_identifier)
+                Ok(signer_identifier)
             }
         }
 
@@ -218,3 +214,132 @@ pub struct IssuerAndSerialNumber {
 /// ```
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct CertificateSerialNumber(pub IntegerAsn1);
+
+#[derive(Deserialize, Debug, PartialEq, Clone)]
+pub struct UnsignedAttributes(pub Vec<UnsignedAttribute>);
+
+// This is a workaround for constructed encoding as implicit
+impl ser::Serialize for UnsignedAttributes {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
+    where
+        S: ser::Serializer,
+    {
+        let mut raw_der = picky_asn1_der::to_vec(&self.0).unwrap_or_else(|_| vec![0]);
+        raw_der[0] = Tag::context_specific_constructed(1).inner();
+        picky_asn1_der::Asn1RawDer(raw_der).serialize(serializer)
+    }
+}
+
+impl Default for UnsignedAttributes {
+    fn default() -> Self {
+        UnsignedAttributes(Vec::new())
+    }
+}
+
+#[derive(Serialize, Debug, PartialEq, Clone)]
+pub struct UnsignedAttribute {
+    pub ty: ObjectIdentifierAsn1,
+    pub value: UnsignedAttributeValue,
+}
+
+impl<'de> de::Deserialize<'de> for UnsignedAttribute {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        use std::fmt;
+
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = UnsignedAttribute;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a valid DER-encoded ContentInfo")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let ty: ObjectIdentifierAsn1 =
+                    seq.next_element()?.ok_or_else(|| de::Error::invalid_length(0, &self))?;
+
+                let value = match Into::<String>::into(&ty.0).as_str() {
+                    oids::MS_COUNTER_SIGN => UnsignedAttributeValue::MsCounterSign(seq_next_element!(
+                        seq,
+                        Asn1SetOf<Pkcs7Certificate>,
+                        UnsignedAttributeValue,
+                        "McCounterSign"
+                    )),
+                    oids::COUNTER_SIGN => UnsignedAttributeValue::CounterSign(seq_next_element!(
+                        seq,
+                        Asn1SetOf<SignerInfo>,
+                        UnsignedAttributeValue,
+                        "CounterSign"
+                    )),
+                    _ => {
+                        return Err(serde_invalid_value!(
+                            UnsignedAttributeValue,
+                            "unknown oid type",
+                            "MS_COUNTER_SIGN or CounterSign oid"
+                        ))
+                    }
+                };
+
+                Ok(UnsignedAttribute { ty, value })
+            }
+        }
+
+        deserializer.deserialize_seq(Visitor)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum UnsignedAttributeValue {
+    MsCounterSign(Asn1SetOf<Pkcs7Certificate>),
+    CounterSign(Asn1SetOf<SignerInfo>),
+}
+
+impl Serialize for UnsignedAttributeValue {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
+    where
+        S: ser::Serializer,
+    {
+        match &self {
+            UnsignedAttributeValue::MsCounterSign(ms_counter_sign) => ms_counter_sign.serialize(serializer),
+            UnsignedAttributeValue::CounterSign(counter_sign) => counter_sign.serialize(serializer),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(feature = "ctl")]
+    #[test]
+    fn decode_certificate_trust_list_signer_info() {
+        let decoded = base64::decode(
+            "MIICngIBATCBmTCBgTELMAkGA1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24x\
+            EDAOBgNVBAcTB1JlZG1vbmQxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlv\
+            bjErMCkGA1UEAxMiTWljcm9zb2Z0IENlcnRpZmljYXRlIExpc3QgQ0EgMjAxMQIT\
+            MwAAAFajs3kCOFJzBAAAAAAAVjANBglghkgBZQMEAgEFAKCB2jAYBgkqhkiG9w0B\
+            CQMxCwYJKwYBBAGCNwoBMC8GCSqGSIb3DQEJBDEiBCDKbAY82LhZRyLtnnizMz42\
+            OJp0yEyTg/jBC9lXDMyatTCBjAYKKwYBBAGCNwIBDDF+MHygVoBUAE0AaQBjAHIA\
+            bwBzAG8AZgB0ACAAQwBlAHIAdABpAGYAaQBjAGEAdABlACAAVAByAHUAcwB0ACAA\
+            TABpAHMAdAAgAFAAdQBiAGwAaQBzAGgAZQByoSKAIGh0dHA6Ly93d3cubWljcm9z\
+            b2Z0LmNvbS93aW5kb3dzMA0GCSqGSIb3DQEBAQUABIIBAJolH27b3wLNu+E2Gh+B\
+            9FFUsp5eiF1AGyUQb6hcjoYJIUjQgqW1shr+P4z9MI0ziTVWc1qVYh8LgXBAcuzN\
+            pGu7spEFIckf40eITNeB5KUZFtHWym+MUIQERfs/C+iqCiSgtSiWxUIci7h/VF39\
+            vhRTABMyZQddozLldJMsawRIhlceaOCTrp9tLQLLHHkEVDHSMOkbd4S9IOhw/YY9\
+            cwcGic2ebDrpSZe0VVEgF9Blqk49W+JRwADVNdWFcDZbiAQv63vSy+VdFzKZer07\
+            JAVDdVamvS5pk4MvNkszAG2KHsij6J3M97KcJY0FKuhPsfb9pnR61nmfDaFzoHOY\
+            pkw=",
+        )
+        .unwrap();
+
+        let signer_info: SignerInfo = picky_asn1_der::from_bytes(&decoded).unwrap();
+        check_serde!(signer_info: SignerInfo in decoded);
+    }
+}

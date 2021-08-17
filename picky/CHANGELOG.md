@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+- Support for MD5 hashing
+- CTL implementation behind `ctl` feature
+- `Pkcs7::digest_algorithms`
+- `Pkcs7::signer_infos`
+- `Pkcs7::encapsulated_content_info`
+- `Pkcs7::decode_certificates`
+- `impl From<Pkcs7Certificate> for Pkcs7`
+- `impl From<Pkcs7> for Pkcs7Certificate`
+- Add `AuthenticodeSignature` struct
+- `AuthenticodeSignature::new`
+- `AuthenticodeSignature::from_der`
+- `AuthenticodeSignature::from_pem`
+- `AuthenticodeSignature::from_pem_str`
+- `AuthenticodeSignature::to_der`
+- `AuthenticodeSignature::to_pem`
+- `AuthenticodeSignature::signing_certificate`
+- `AuthenticodeSignature::authenticode_verifier`
+- `AuthenticodeSignature::file_hash`
+- `Authenticated_attributes::authenticated_attributes`
+- `Authenticated_attributes::unauthenticated_attributes`
+- `impl From<Pkcs7> for AuthenticodeSignature`
+- `From<AuthenticodeSignature> for Pkcs7`
+- Authenticode validation
+
+### Changed
+
+- (Breaking) Move Authenticode related code from `picky::x509::wincert` to `picky::x509::pkcs7::authenticode` module
+- (Breaking) Authenticode implementation is now behind `pkcs7` feature
+
+### Fixed
+- Fix `BufReader` panic in `WinCertificate::decode` and `WinCertificate::encode` if data len is bigger than default capacity.
+- Fix `WinCertificate` encoding: `length` wasn’t correct.
+
 ## [6.4.0] 2021-08-10
 
 ### Changed

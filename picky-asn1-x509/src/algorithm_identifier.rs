@@ -1,4 +1,5 @@
 use crate::oids;
+use oid::prelude::TryFrom;
 use oid::ObjectIdentifier;
 use picky_asn1::tag::{Tag, TagPeeker};
 use picky_asn1::wrapper::{IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1};
@@ -31,12 +32,23 @@ impl AlgorithmIdentifier {
         &self.algorithm.0
     }
 
+    pub fn oid_asn1(&self) -> &ObjectIdentifierAsn1 {
+        &self.algorithm
+    }
+
     pub fn parameters(&self) -> &AlgorithmIdentifierParameters {
         &self.parameters
     }
 
     pub fn is_a(&self, algorithm: ObjectIdentifier) -> bool {
         algorithm.eq(&self.algorithm.0)
+    }
+
+    pub fn new_md5_with_rsa_encryption() -> Self {
+        Self {
+            algorithm: oids::md5_with_rsa_encryption().into(),
+            parameters: AlgorithmIdentifierParameters::Null,
+        }
     }
 
     pub fn new_sha1_with_rsa_encryption() -> Self {
@@ -244,7 +256,7 @@ impl<'de> de::Deserialize<'de> for AlgorithmIdentifier {
                         seq_next_element!(seq, AlgorithmIdentifier, "aes algorithm identifier"),
                     ),
                     // SHA
-                    x if x.starts_with("2.16.840.1.101.3.4.2.") => {
+                    x if x.starts_with("2.16.840.1.101.3.4.2.") || x == oids::SHA1 => {
                         seq_next_element!(seq, AlgorithmIdentifier, "sha algorithm identifier");
                         AlgorithmIdentifierParameters::Null
                     }
@@ -478,6 +490,8 @@ impl<'de> de::Deserialize<'de> for AesParameters {
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[allow(non_camel_case_types)] // 'SHA2_512_224' is clearer than 'SHA2512224' or 'Sha2512224' imo
 pub enum ShaVariant {
+    MD5,
+    SHA1,
     SHA2_224,
     SHA2_256,
     SHA2_384,
@@ -495,6 +509,8 @@ pub enum ShaVariant {
 impl From<ShaVariant> for ObjectIdentifierAsn1 {
     fn from(variant: ShaVariant) -> Self {
         match variant {
+            ShaVariant::MD5 => oids::md5().into(),
+            ShaVariant::SHA1 => oids::sha1().into(),
             ShaVariant::SHA2_224 => oids::sha224().into(),
             ShaVariant::SHA2_256 => oids::sha256().into(),
             ShaVariant::SHA2_384 => oids::sha384().into(),
@@ -507,6 +523,32 @@ impl From<ShaVariant> for ObjectIdentifierAsn1 {
             ShaVariant::SHA3_512 => oids::sha3_512().into(),
             ShaVariant::SHAKE128 => oids::shake128().into(),
             ShaVariant::SHAKE256 => oids::shake256().into(),
+        }
+    }
+}
+
+impl TryFrom<ObjectIdentifierAsn1> for ShaVariant {
+    type Error = UnsupportedAlgorithmError;
+
+    fn try_from(oid: ObjectIdentifierAsn1) -> Result<Self, Self::Error> {
+        match Into::<String>::into(oid.0).as_str() {
+            oids::MD5 => Ok(ShaVariant::MD5),
+            oids::SHA1 => Ok(ShaVariant::SHA1),
+            oids::SHA224 => Ok(ShaVariant::SHA2_224),
+            oids::SHA256 => Ok(ShaVariant::SHA2_256),
+            oids::SHA384 => Ok(ShaVariant::SHA2_384),
+            oids::SHA512 => Ok(ShaVariant::SHA2_512),
+            oids::SHA512_224 => Ok(ShaVariant::SHA2_512_224),
+            oids::SHA512_256 => Ok(ShaVariant::SHA2_512_256),
+            oids::SHA3_224 => Ok(ShaVariant::SHA3_224),
+            oids::SHA3_256 => Ok(ShaVariant::SHA3_256),
+            oids::SHA3_384 => Ok(ShaVariant::SHA3_384),
+            oids::SHA3_512 => Ok(ShaVariant::SHA3_512),
+            oids::SHAKE128 => Ok(ShaVariant::SHAKE128),
+            oids::SHAKE256 => Ok(ShaVariant::SHAKE256),
+            unsupported => Err(UnsupportedAlgorithmError {
+                algorithm: unsupported.to_string(),
+            }),
         }
     }
 }

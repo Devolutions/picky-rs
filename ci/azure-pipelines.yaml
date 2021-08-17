@@ -44,7 +44,7 @@ jobs:
               exit 1
           fi
 
-          cargo test --release --features "wincert"
+          cargo test --release --features "wincert","ctl","pkcs7"
           if ! [ $? -eq 0 ] ; then
               echo "Unit tests failed"
               exit 1

@@ -8,9 +8,12 @@ description = "A signtool like Authenticode sign and verify tool based on picky 
 [dependencies]
 anyhow = "1.0"
 clap = "2.33"
-lief-rs = { git = "https://github.com/Devolutions/lief-rs.git", rev = "c487e1" }
+walkdir = "2.3"
+base64 = "0.13"
+encoding = "0.2"
+lief-rs = { git = "https://github.com/Devolutions/lief-rs.git", rev = "797f33" }
 
 [dependencies.picky]
 path = "../picky"
 default-features = false
-features = ["wincert"]
+features = ["wincert", "ctl"]

@@ -2,9 +2,10 @@ use super::content_info::EncapsulatedContentInfo;
 use super::crls::RevocationInfoChoices;
 use super::signer_info::SignerInfo;
 use crate::cmsversion::CmsVersion;
-use crate::{AlgorithmIdentifier, Certificate};
-use picky_asn1::tag::Tag;
-use picky_asn1::wrapper::Asn1SetOf;
+use crate::AlgorithmIdentifier;
+use picky_asn1::tag::{Tag, TagClass, TagPeeker};
+use picky_asn1::wrapper::{Asn1SetOf, Optional};
+use picky_asn1_der::Asn1RawDer;
 use serde::{de, ser, Deserialize, Serialize};
 
 /// [RFC 5652 #5.1](https://datatracker.ietf.org/doc/html/rfc5652#section-5.1)
@@ -17,14 +18,66 @@ use serde::{de, ser, Deserialize, Serialize};
 ///         crls [1] IMPLICIT RevocationInfoChoices OPTIONAL,
 ///         signerInfos SignerInfos }
 /// ```
-#[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct SignedData {
     pub version: CmsVersion,
     pub digest_algorithms: DigestAlgorithmIdentifiers,
     pub content_info: EncapsulatedContentInfo,
-    pub certificates: CertificateSet,
-    pub crls: RevocationInfoChoices,
+    pub certificates: Optional<CertificateSet>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub crls: Option<RevocationInfoChoices>,
     pub signers_infos: SignersInfos,
+}
+
+// Implement Deserialize manually to support absent RevocationInfoChoices
+impl<'de> de::Deserialize<'de> for SignedData {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        use std::fmt;
+
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = SignedData;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a valid DER-encoded SignedData")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let version = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(0, &self))?;
+                let digest_algorithms = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(1, &self))?;
+                let content_info = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(2, &self))?;
+                let certificates = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(3, &self))?;
+
+                let tag_peeker: TagPeeker = seq_next_element!(seq, SignedData, "ApplicationTag1");
+                let crls =
+                    if tag_peeker.next_tag.class() == TagClass::ContextSpecific && tag_peeker.next_tag.number() == 1 {
+                        seq.next_element()?.ok_or_else(|| de::Error::invalid_length(4, &self))?
+                    } else {
+                        None
+                    };
+
+                let signers_infos = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(5, &self))?;
+
+                Ok(SignedData {
+                    version,
+                    digest_algorithms,
+                    content_info,
+                    certificates,
+                    crls,
+                    signers_infos,
+                })
+            }
+        }
+
+        deserializer.deserialize_seq(Visitor)
+    }
 }
 
 /// [RFC 5652 #5.1](https://datatracker.ietf.org/doc/html/rfc5652#section-5.1)
@@ -46,7 +99,7 @@ pub struct SignersInfos(pub Asn1SetOf<SignerInfo>);
 /// CertificateSet ::= SET OF CertificateChoices
 /// ```
 #[derive(Debug, PartialEq, Clone)]
-pub struct CertificateSet(pub Vec<Certificate>);
+pub struct CertificateSet(pub Vec<CertificateChoices>);
 
 // This is a workaround for constructed encoding as implicit
 
@@ -73,13 +126,75 @@ impl<'de> de::Deserialize<'de> for CertificateSet {
     }
 }
 
+impl Default for CertificateSet {
+    fn default() -> Self {
+        Self(Vec::new())
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum CertificateChoices {
+    Certificate(Asn1RawDer),
+    Other(Asn1RawDer),
+}
+
+impl Serialize for CertificateChoices {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
+    where
+        S: ser::Serializer,
+    {
+        match &self {
+            CertificateChoices::Certificate(certificate) => certificate.serialize(serializer),
+            CertificateChoices::Other(other) => other.serialize(serializer),
+        }
+    }
+}
+
+impl<'de> de::Deserialize<'de> for CertificateChoices {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        use std::fmt;
+
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = CertificateChoices;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a valid DER-encoded CertificateChoices")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let tag_peeker: TagPeeker = seq_next_element!(seq, CertificateChoices, "Any tag");
+                let certificate_choice = match tag_peeker.next_tag {
+                    Tag::SEQUENCE => {
+                        CertificateChoices::Certificate(seq_next_element!(seq, CertificateChoices, "Certificate"))
+                    }
+                    _ => {
+                        CertificateChoices::Other(seq_next_element!(seq, CertificateChoices, "Other certificate type"))
+                    }
+                };
+
+                Ok(certificate_choice)
+            }
+        }
+
+        deserializer.deserialize_enum("CertificateChoices", &["Certificate, Other"], Visitor)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::crls::*;
     use crate::{
-        oids, EncapsulatedRsaPublicKey, Extension, Extensions, KeyIdentifier, Name, NameAttr, PublicKey, RsaPublicKey,
-        SubjectPublicKeyInfo, TbsCertificate, Validity, Version,
+        oids, Certificate, EncapsulatedRsaPublicKey, Extension, Extensions, KeyIdentifier, Name, NameAttr, PublicKey,
+        RsaPublicKey, SubjectPublicKeyInfo, TbsCertificate, Validity, Version,
     };
     use picky_asn1::bit_string::BitString;
     use picky_asn1::date::UTCTime;
@@ -198,12 +313,13 @@ mod tests {
         };
         check_serde!(full_certificate: Certificate in pkcs7[45..1594]);
 
+        let full_certificate = picky_asn1_der::from_bytes(&picky_asn1_der::to_vec(&full_certificate).unwrap()).unwrap();
         let signed_data = SignedData {
             version: CmsVersion::V1,
             digest_algorithms: DigestAlgorithmIdentifiers(Vec::new().into()),
             content_info,
-            certificates: CertificateSet(vec![full_certificate]),
-            crls: RevocationInfoChoices(Vec::new()),
+            certificates: CertificateSet(vec![CertificateChoices::Certificate(full_certificate)]).into(),
+            crls: Some(RevocationInfoChoices(Vec::new())),
             signers_infos: SignersInfos(Vec::new().into()),
         };
 
@@ -294,5 +410,87 @@ mod tests {
         })]);
 
         check_serde!(crl: RevocationInfoChoices in decoded[1526..2249]);
+    }
+
+    #[test]
+    fn decode_certificate_trust_list_certificate_set() {
+        let decoded = base64::decode(
+            "\
+        oIINKTCCBhQwggP8oAMCAQICEzMAAABWo7N5AjhScwQAAAAAAFYwDQYJKoZIhvcN\
+        AQELBQAwgYExCzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpXYXNoaW5ndG9uMRAwDgYD\
+        VQQHEwdSZWRtb25kMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xKzAp\
+        BgNVBAMTIk1pY3Jvc29mdCBDZXJ0aWZpY2F0ZSBMaXN0IENBIDIwMTEwHhcNMjAx\
+        MjE1MjEyNTI0WhcNMjExMjAyMjEyNTI0WjCBiTELMAkGA1UEBhMCVVMxEzARBgNV\
+        BAgTCldhc2hpbmd0b24xEDAOBgNVBAcTB1JlZG1vbmQxHjAcBgNVBAoTFU1pY3Jv\
+        c29mdCBDb3Jwb3JhdGlvbjEzMDEGA1UEAxMqTWljcm9zb2Z0IENlcnRpZmljYXRl\
+        IFRydXN0IExpc3QgUHVibGlzaGVyMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIB\
+        CgKCAQEAwXbtTwWpw7LVTZ3PWvV+xvhv7FZALwvCKjBVWINWi02HmMvxlgJM7y4Z\
+        EOfG4A6PUyXBn7rSSLx1zz309yRYvBjkkY7Ai7S+eG8z99P5AJmVXAkm9AJccFEb\
+        e5jw3HyLAYTEJiR9X550pYb3w29HLrCz9hGDZ+PJ2nGiXGQFnNkrJuY9yYBoEYRU\
+        CFWqs1HvX5GcfDT0MuJZpMlg5bG4rvm5+t6Ge5aq9qlgD5YAxFLrEQbZ89BBHRG4\
+        PODqrYm4+CYWmZADIBxc9aPC5ZWAGYjBc3vu7iMAZu8IDpSeOre2EChCzHiJZn/b\
+        nguWA6sUvJ3QKx0Gsyld4xbLWhfWGwIDAQABo4IBeTCCAXUwFQYDVR0lBA4wDAYK\
+        KwYBBAGCNwoDCTAdBgNVHQ4EFgQUIIpJhsQJpHIBXXfSdyHTm19nzx4wVAYDVR0R\
+        BE0wS6RJMEcxLTArBgNVBAsTJE1pY3Jvc29mdCBJcmVsYW5kIE9wZXJhdGlvbnMg\
+        TGltaXRlZDEWMBQGA1UEBRMNMjI5ODg3KzQ2Mjk5MjAfBgNVHSMEGDAWgBRB8CHH\
+        7cSH+oN1/woM3C3sqGqrWTBZBgNVHR8EUjBQME6gTKBKhkhodHRwOi8vY3JsLm1p\
+        Y3Jvc29mdC5jb20vcGtpL2NybC9wcm9kdWN0cy9NaWNDZXJMaXNDQTIwMTFfMjAx\
+        MS0wMy0yOS5jcmwwXQYIKwYBBQUHAQEEUTBPME0GCCsGAQUFBzAChkFodHRwOi8v\
+        d3d3Lm1pY3Jvc29mdC5jb20vcGtpL2NlcnRzL01pY0Nlckxpc0NBMjAxMV8yMDEx\
+        LTAzLTI5LmNydDAMBgNVHRMBAf8EAjAAMA0GCSqGSIb3DQEBCwUAA4ICAQB36571\
+        4rZo6lGtH4lxhxjjgzdsFuJs3vQwuIMulUuaF0+viu4966O+SqX3PtRLj97CqgI5\
+        wLZK5Ib03ytIFlZ35Q1AE63yPl5gU8LDF2KkE+/kuWkHhxCNMXbQWfsH/7mIbzbo\
+        PXoixiMHwBsWmEg/Nmk2Ya23NBdnKeGxEv7EI81kejbePacEMzIeXha4vLFrWzsT\
+        FXICjVh47GcHSCwcGRp2G/wkItekTpXMrkdWr1cjaXHqxqlPorfr7zAoBBkJWMKC\
+        Wfo09voRYXEhp4TE4ZkMzS+Q4GWyOxU0hCBaQPEt4lm5x5exJPkByGfKVZRhzr4z\
+        9IRIptO0ozTSjs9nl7eg5dDqgf/MfoZyTY4mhuGsJqGbwxIoBC/kTbvQP35zjMeT\
+        66w8pxx/E+qDunzBWZkKXS4kdgpnb4Mpr3gAIeHpPb+ijiqhB0mS1gKvbCAx4OIZ\
+        YHJcZU92trWagrRLzS0rvd2WVC/3kkFvcSt5AQg2cJkeKEUOHKGtH6gUzxd1GE11\
+        XhQO+GTMihVqApJ1KFxrjtZ5J2ZZVM+bd908OAfCEpG5+fFi2FhJZ7LKydWzCGbH\
+        P7YASXdZ94lGtBqGm8a5FiQAwTOuUaIaHXql8IQAVAqyUpKEDBjl1BcKvb7drWHV\
+        HeNYLDMntpdv+KAX/WtLapSBsrbxSFlCE3Ag8TCCBw0wggT1oAMCAQICCmERbJIA\
+        AAAAAAcwDQYJKoZIhvcNAQELBQAwgYgxCzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpX\
+        YXNoaW5ndG9uMRAwDgYDVQQHEwdSZWRtb25kMR4wHAYDVQQKExVNaWNyb3NvZnQg\
+        Q29ycG9yYXRpb24xMjAwBgNVBAMTKU1pY3Jvc29mdCBSb290IENlcnRpZmljYXRl\
+        IEF1dGhvcml0eSAyMDEwMB4XDTExMDMyOTE4NTgzOVoXDTI2MDMyOTE5MDgzOVow\
+        gYExCzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpXYXNoaW5ndG9uMRAwDgYDVQQHEwdS\
+        ZWRtb25kMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xKzApBgNVBAMT\
+        Ik1pY3Jvc29mdCBDZXJ0aWZpY2F0ZSBMaXN0IENBIDIwMTEwggIiMA0GCSqGSIb3\
+        DQEBAQUAA4ICDwAwggIKAoICAQC4hHqA/U0np9LvgjbxUwWdvkJtjjEIR8vNs4MK\
+        S04zGi583XKBjc6Q/DwFyy80hTiPPBxobWBRUk2s2m0rfrNzR6vS3JVxSjGBWqEf\
+        q4ImRS2M6IR4vSDwDcb1riaHHlaOVTwIMDKUlCKTC6Wwxl3mLYE5zenHrujYSXFJ\
+        q5F0uE+NL0ezP9CTg1wCGt5LuLI8N+mT6nJbmMfjrBjg5n5KwYEs/SIUdnPhaNwg\
+        CcDzRs0jJshFIsrHvHT8if9X4M+9jrAr7ybWd6sa9GdB8V4McaoCf17AgqoJi+yJ\
+        iEH1A0Jp2R9F2Vc+BJZK1TK30WEmaMfBsaDgegVOtW3CguAutudknxZ9lSqGMtAh\
+        yF34ywUwHrkCmGyzk2vIg2chXdZlmCBk3cu/R5v/GPrxkN6neM17BIZ+J4q3lZwm\
+        3bGW/E/gQCCDaN3sM/IqoAen65H6rA9RQYjxxYdBTIdHYp1YwJ5/uxJ93tOf/cHH\
+        FL1/mNBXm+HjbFfhZV/w3CucoVTCVioVZMuqTuT9w+h3iP/bDa+Qn9dogQEvlOGv\
+        xuTGdtt12t/QEkzyiTZvSICBWN0XCSgrVayTI+WOMWWtDY6T03GngRSY6ayqBVju\
+        10RDMG0dx7rCf/VIxOWgjlWOtAnAAcOdHUb1/ka1OgCII7XwykHNOw3G9spABOqb\
+        5Yg2nwIDAQABo4IBfDCCAXgwEAYJKwYBBAGCNxUBBAMCAQAwHQYDVR0OBBYEFEHw\
+        IcftxIf6g3X/CgzcLeyoaqtZMBkGCSsGAQQBgjcUAgQMHgoAUwB1AGIAQwBBMAsG\
+        A1UdDwQEAwIBhjAPBgNVHRMBAf8EBTADAQH/MB8GA1UdIwQYMBaAFNX2VsuP6KJc\
+        YmjRPZSQW9fOmhjEMFYGA1UdHwRPME0wS6BJoEeGRWh0dHA6Ly9jcmwubWljcm9z\
+        b2Z0LmNvbS9wa2kvY3JsL3Byb2R1Y3RzL01pY1Jvb0NlckF1dF8yMDEwLTA2LTIz\
+        LmNybDBaBggrBgEFBQcBAQROMEwwSgYIKwYBBQUHMAKGPmh0dHA6Ly93d3cubWlj\
+        cm9zb2Z0LmNvbS9wa2kvY2VydHMvTWljUm9vQ2VyQXV0XzIwMTAtMDYtMjMuY3J0\
+        MDcGA1UdJQQwMC4GCCsGAQUFBwMDBgorBgEEAYI3CgMBBgorBgEEAYI3CgMJBgor\
+        BgEEAYI3CgMTMA0GCSqGSIb3DQEBCwUAA4ICAQCC96mls7/lyFlBJzQPYpxB8Ksr\
+        ffmnqMioD11Dvq3ymfj/+/Z5UEQMUOpC250B6aVJeSgpEz5ANnQW248gzI0tURDc\
+        K0E2fLbQQBObHAA3TIFpaLEagpY7aXXH5TTYPtxaCavTv6mvxAhv40fGMu8l6QsL\
+        VRKU74cUGdLhId43z66mNF0jKQQEbW3nGt1EMHl0Go2Mwfk++a0wa6O0anRJOVs3\
+        LQEZ7gMp3a5KL/mCr0gfFJqcPSUxVuo6p023/Ys//r93NotV5bMQUO5U1L9r2Cry\
+        M3guvzH5NhHvMAv5TEOD41upXB1bpnYFuPB1T+m4HzZEpn9m0EsNGFUedC4nJ+Um\
+        QoNuu6Tve/nkmL3VO4nTWJK40c0Wfzl+ZiUN24NZv1cfm9LpG3InXWsz0f6ikkxR\
+        PcbMlDpW/+sQQS7dklPNEPEdNusEGts12ZG2mWAP4AusZwxEFpwCR8u3RpZJD98D\
+        sQ+tDhKtSAU24S0/u1rglNSXkuk+5uslGcsz8d+TYJCmuQ5W9ijpQsceEFumLg+5\
+        26lk147lM9KdQ4JLbjdmuQ1nV1RaSA7jivsf7QomvA000gpHhWEqI7HgVIpQFFaF\
+        wP8t92mZRH0a9E18GA7hBwfuCWZSSnoaYqTli8+FooaKcZCxfdYR01Ee2lznzNYS\
+        EHaork+TtWTJve3c+w==",
+        )
+        .unwrap();
+
+        let certificate_set: CertificateSet = picky_asn1_der::from_bytes(&decoded).unwrap();
+        check_serde!(certificate_set: CertificateSet in decoded);
     }
 }

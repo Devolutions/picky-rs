@@ -1,13 +1,17 @@
-use crate::hash::UnsupportedHashAlgorithmError;
 use crate::pem::Pem;
-use crate::x509::certificate::CertError;
+use crate::x509::certificate::{Cert, CertError};
 use crate::x509::utils::{from_der, from_pem, from_pem_str, to_der, to_pem};
-use picky_asn1::restricted_string::CharSetError;
+use crate::AlgorithmIdentifier;
 use picky_asn1_der::Asn1DerError;
-use picky_asn1_x509::algorithm_identifier::UnsupportedAlgorithmError;
+use picky_asn1_x509::content_info::EncapsulatedContentInfo;
 use picky_asn1_x509::pkcs7::Pkcs7Certificate;
-
+use picky_asn1_x509::signed_data::CertificateChoices;
+use picky_asn1_x509::signer_info::SignerInfo;
 use thiserror::Error;
+
+pub mod authenticode;
+#[cfg(feature = "ctl")]
+pub mod ctl;
 
 type Pkcs7Result<T> = Result<T, Pkcs7Error>;
 
@@ -19,24 +23,12 @@ pub enum Pkcs7Error {
     Cert(#[from] CertError),
     #[error(transparent)]
     Asn1DerError(#[from] Asn1DerError),
-    #[error(transparent)]
-    SignatureError(#[from] crate::signature::SignatureError),
-    #[error("the program name has invalid charset")]
-    ProgramNameCharSet(#[from] CharSetError),
-    #[error(transparent)]
-    UnsupportedHashAlgorithmError(UnsupportedHashAlgorithmError),
-    #[error(transparent)]
-    UnsupportedAlgorithmError(UnsupportedAlgorithmError),
-    #[error("The signing certificate must contain the extended key usage (EKU) value for code signing")]
-    NoEKUCodeSigning,
-    #[error("Certificates must contain at least Leaf and Intermediate certificates, but got no certificates")]
-    NoCertificates,
 }
 
 const PKCS7_PEM_LABEL: &str = "PKCS7";
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Pkcs7(pub(crate) Pkcs7Certificate);
+pub struct Pkcs7(Pkcs7Certificate);
 
 impl Pkcs7 {
     pub fn from_der<V: ?Sized + AsRef<[u8]>>(data: &V) -> Pkcs7Result<Self> {
@@ -57,6 +49,44 @@ impl Pkcs7 {
 
     pub fn to_pem(&self) -> Pkcs7Result<Pem> {
         Ok(to_pem(&self.0, PKCS7_PEM_LABEL, ELEMENT_NAME)?)
+    }
+
+    pub fn digest_algorithms(&self) -> &[AlgorithmIdentifier] {
+        self.0.signed_data.digest_algorithms.0 .0.as_slice()
+    }
+
+    pub fn signer_infos(&self) -> &[SignerInfo] {
+        &self.0.signed_data.signers_infos.0
+    }
+
+    pub fn encapsulated_content_info(&self) -> &EncapsulatedContentInfo {
+        &self.0.signed_data.0.content_info
+    }
+
+    pub fn decode_certificates(&self) -> Vec<Cert> {
+        self.0
+            .signed_data
+            .certificates
+            .0
+             .0
+            .iter()
+            .filter_map(|cert| match cert {
+                CertificateChoices::Certificate(certificate) => Cert::from_der(&certificate.0).ok(),
+                CertificateChoices::Other(_) => None,
+            })
+            .collect::<Vec<Cert>>()
+    }
+}
+
+impl From<Pkcs7Certificate> for Pkcs7 {
+    fn from(pkcs7_certificate: Pkcs7Certificate) -> Self {
+        Pkcs7(pkcs7_certificate)
+    }
+}
+
+impl From<Pkcs7> for Pkcs7Certificate {
+    fn from(pkcs7: Pkcs7) -> Self {
+        pkcs7.0
     }
 }
 
