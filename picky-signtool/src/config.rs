@@ -18,7 +18,7 @@ pub const ARG_CERTFILE: &str = "certfile";
 pub const ARG_PRIVATE_KEY: &str = "rsa-private-key";
 
 pub const ARG_VERIFY: &str = "verify";
-pub const ARG_VERIFY_DEFAULT: &str = "default";
+pub const ARG_VERIFY_BASIC: &str = "basic";
 pub const ARG_VERIFY_SIGNING_CERTIFICATE: &str = "signing-certificate";
 pub const ARG_VERIFY_CHAIN: &str = "chain";
 pub const ARG_VERIFY_CA: &str = "ca";
@@ -144,20 +144,20 @@ pub fn config() -> ArgMatches<'static> {
                 .help("Verify input file")
                 .long_help(
                     format!(
-                    "`{}` - {}\n`{}` - {}\n`{}` - {}\n`{}` - {}\n",
-                    ARG_VERIFY_DEFAULT,
-                    "Default behavior that tries to follow the Microsoft verification process as close as possible.",
-                    ARG_VERIFY_SIGNING_CERTIFICATE,
-                    "Requires checking signing certificate validity.",
-                     ARG_VERIFY_CHAIN,
-                    "Requires X509 certificates chain validation additionally to signing certificate validation",
-                    ARG_VERIFY_CA,
-                    "Verify that the intermediate certificate of the signature was issued by a CA that Windows trust",
+                        "`{}` - {}\n`{}` - {}\n`{}` - {}\n`{}` - {}\n",
+                        ARG_VERIFY_BASIC,
+                        "Default behavior that tries to follow the Microsoft verification process as close as possible.",
+                        ARG_VERIFY_SIGNING_CERTIFICATE,
+                        "Requires checking signing certificate validity.",
+                        ARG_VERIFY_CHAIN,
+                        "Requires X509 certificates chain validation additionally to signing certificate validation",
+                        ARG_VERIFY_CA,
+                        "Verify that the intermediate certificate of the signature was issued by a CA that Windows trust",
                 )
                     .as_str(),
                 )
                 .possible_values(&[
-                    ARG_VERIFY_DEFAULT,
+                    ARG_VERIFY_BASIC,
                     ARG_VERIFY_SIGNING_CERTIFICATE,
                     ARG_VERIFY_CHAIN,
                     ARG_VERIFY_CA,

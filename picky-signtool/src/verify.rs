@@ -14,7 +14,7 @@ use picky::x509::pkcs7::authenticode::{AuthenticodeSignature, AuthenticodeValida
 use picky::x509::wincert::WinCertificate;
 
 use crate::config::{
-    ARG_BINARY, ARG_PS_SCRIPT, ARG_VERIFY, ARG_VERIFY_CA, ARG_VERIFY_CHAIN, ARG_VERIFY_DEFAULT,
+    ARG_BINARY, ARG_PS_SCRIPT, ARG_VERIFY, ARG_VERIFY_BASIC, ARG_VERIFY_CA, ARG_VERIFY_CHAIN,
     ARG_VERIFY_SIGNING_CERTIFICATE, PS_AUTHENTICODE_FOOTER, PS_AUTHENTICODE_HEADER, PS_AUTHENTICODE_LINES_SPLITTER,
 };
 use crate::get_utf8_file_name;
@@ -48,7 +48,7 @@ pub fn verify(matches: &ArgMatches, files: &[PathBuf]) -> anyhow::Result<()> {
                 let authenticode_signature = match authenticode_signature_ps_from_file(file_path) {
                     Ok(authenticode_signature) => authenticode_signature,
                     Err(err) => {
-                        println!("{} -> {}\n", err.to_string(), err.root_cause());
+                        eprintln!("{} -> {}\n", err.to_string(), err.root_cause());
                         continue;
                     }
                 };
@@ -83,9 +83,9 @@ pub fn verify(matches: &ArgMatches, files: &[PathBuf]) -> anyhow::Result<()> {
     let flags = flags
         .iter()
         .filter(|flag| match flag.as_str() {
-            ARG_VERIFY_DEFAULT | ARG_VERIFY_SIGNING_CERTIFICATE | ARG_VERIFY_CHAIN | ARG_VERIFY_CA => true,
+            ARG_VERIFY_BASIC | ARG_VERIFY_SIGNING_CERTIFICATE | ARG_VERIFY_CHAIN | ARG_VERIFY_CA => true,
             other => {
-                println!("Skipping unknown flag `{}`", other);
+                eprintln!("Skipping unknown flag `{}`", other);
                 false
             }
         })
@@ -100,7 +100,7 @@ pub fn verify(matches: &ArgMatches, files: &[PathBuf]) -> anyhow::Result<()> {
 
         match validator.verify() {
             Ok(()) => println!("{} has valid digital signature", file_name),
-            Err(err) => println!("{} has invalid digital signature: {}", file_name, err.to_string()),
+            Err(err) => eprintln!("{} has invalid digital signature: {}", file_name, err.to_string()),
         }
     }
 
@@ -184,7 +184,7 @@ fn apply_flags<'a>(
         .ignore_not_after_check()
         .ignore_excluded_cert_authorities();
 
-    let validator = if flags.iter().any(|flag| flag.as_str() == ARG_VERIFY_DEFAULT) {
+    let validator = if flags.iter().any(|flag| flag.as_str() == ARG_VERIFY_BASIC) {
         validator.require_basic_authenticode_validation(file_hash)
     } else {
         &validator
