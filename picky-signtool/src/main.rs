@@ -7,7 +7,7 @@ use picky_signtool::config::*;
 use picky_signtool::sign::sign;
 use picky_signtool::verify::verify;
 
-fn main() -> anyhow::Result<()> {
+fn main() {
     let matches = config();
 
     let files_to_process: Vec<PathBuf> = match (matches.is_present(ARG_BINARY), matches.is_present(ARG_PS_SCRIPT)) {
@@ -56,8 +56,8 @@ fn main() -> anyhow::Result<()> {
                     .collect::<Vec<PathBuf>>()
             }
         }
-        (true, true) => bail!("Do not know what to process exactly(`binary` and `script` both are specified)"),
-        (false, false) => bail!("Do not know what to process(`binary` or `script` is not specified)"),
+        (true, true) => panic!("Do not know what to process exactly(`binary` and `script` both are specified)"),
+        (false, false) => panic!("Do not know what to process(`binary` or `script` is not specified)"),
     };
 
     if matches.is_present(ARG_SIGN) && !files_to_process.is_empty() {
@@ -68,13 +68,12 @@ fn main() -> anyhow::Result<()> {
                 PathBuf::from(certfile),
                 PathBuf::from(private_key),
                 &files_to_process,
-            )?;
+            )
+            .unwrap();
         }
     }
 
     if matches.is_present(ARG_VERIFY) && !files_to_process.is_empty() {
-        verify(&matches, &files_to_process)?
+        verify(&matches, &files_to_process).unwrap()
     }
-
-    Ok(())
 }
