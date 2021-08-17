@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, bail};
+use anyhow::bail;
 use walkdir::{DirEntry, WalkDir};
 
 use picky_signtool::config::*;
@@ -72,9 +72,13 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
-    if matches.is_present(ARG_VERIFY) && !files_to_process.is_empty() {
-        return verify(&matches, &files_to_process);
+    if files_to_process.is_empty() {
+        bail!("Nothing to do")
     }
 
-    Err(anyhow!("Nothing was done"))
+    if matches.is_present(ARG_VERIFY) {
+        verify(&matches, &files_to_process)?;
+    }
+
+    Ok(())
 }

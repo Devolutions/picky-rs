@@ -21,6 +21,8 @@ use crate::get_utf8_file_name;
 use crate::sign::compute_ps_file_checksum_from_content;
 
 pub fn verify(matches: &ArgMatches, files: &[PathBuf]) -> anyhow::Result<()> {
+    let mut at_least_one_error = false;
+
     let flags = matches
         .values_of(ARG_VERIFY)
         .unwrap()
@@ -45,33 +47,42 @@ pub fn verify(matches: &ArgMatches, files: &[PathBuf]) -> anyhow::Result<()> {
             let mut authenticode_signatures = Vec::with_capacity(files.len());
 
             for file_path in files {
-                let authenticode_signature = match authenticode_signature_ps_from_file(file_path) {
-                    Ok(authenticode_signature) => authenticode_signature,
-                    Err(err) => {
-                        bail!("{} -> {}\n", err.to_string(), err.root_cause());
-                    }
+                let extract_signature = |file_path: &Path| -> anyhow::Result<(AuthenticodeSignature, String, Vec<u8>)> {
+                    let authenticode_signature = match authenticode_signature_ps_from_file(file_path) {
+                        Ok(authenticode_signature) => authenticode_signature,
+                        Err(err) => bail!("{} -> {}\n", err.to_string(), err.root_cause()),
+                    };
+
+                    let algorithm_identifier_oid = authenticode_signature
+                        .0
+                        .digest_algorithms()
+                        .first()
+                        .expect("AlgorithmIdentifier should be present")
+                        .oid_asn1()
+                        .clone();
+
+                    let sha_variant = ShaVariant::try_from(algorithm_identifier_oid)
+                        .with_context(|| format!("Failed compute checksum for {:?}", file_path))?;
+
+                    let hash = HashAlgorithm::try_from(sha_variant)
+                        .with_context(|| format!("Failed compute checksum for {:?}", file_path))?;
+
+                    let ps_file_name = get_utf8_file_name(file_path)?;
+
+                    let file_hash = compute_ps_file_checksum_from_content(file_path, hash).with_context(|| {
+                        format!("Failed to compute {:?} checksum for {:?}", hash, file_path)
+                    })?;
+
+                    Ok((authenticode_signature, ps_file_name.to_owned(), file_hash))
                 };
 
-                let algorithm_identifier_oid = authenticode_signature
-                    .0
-                    .digest_algorithms()
-                    .first()
-                    .expect("AlgorithmIdentifier should be present")
-                    .oid_asn1()
-                    .clone();
-
-                let sha_variant = ShaVariant::try_from(algorithm_identifier_oid)
-                    .with_context(|| format!("Failed compute checksum for {:?}", file_path))?;
-
-                let hash = HashAlgorithm::try_from(sha_variant)
-                    .with_context(|| format!("Failed compute checksum for {:?}", file_path))?;
-
-                let ps_file_name = get_utf8_file_name(file_path.as_path())?;
-
-                let file_hash = compute_ps_file_checksum_from_content(file_path, hash)
-                    .with_context(|| format!("Failed to compute {:?} checksum for {:?}", hash, file_path.as_path()))?;
-
-                authenticode_signatures.push((authenticode_signature, ps_file_name.to_owned(), file_hash))
+                match extract_signature(file_path) {
+                    Ok(extracted) => authenticode_signatures.push(extracted),
+                    Err(e) => {
+                        at_least_one_error = true;
+                        eprintln!("{:?}", e);
+                    },
+                }
             }
             authenticode_signatures
         }
@@ -99,8 +110,15 @@ pub fn verify(matches: &ArgMatches, files: &[PathBuf]) -> anyhow::Result<()> {
 
         match validator.verify() {
             Ok(()) => println!("{} has valid digital signature", file_name),
-            Err(err) => bail!("{} has invalid digital signature: {}", file_name, err.to_string()),
+            Err(err) => {
+                eprintln!("{} has invalid digital signature: {}", file_name, err.to_string());
+                at_least_one_error = true;
+            }
         }
+    }
+
+    if at_least_one_error {
+        bail!("Terminated with error(s)");
     }
 
     Ok(())
