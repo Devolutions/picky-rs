@@ -3,7 +3,7 @@ use std::fs::OpenOptions;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, Context};
+use anyhow::{anyhow, bail, Context};
 use clap::ArgMatches;
 use encoding::DecoderTrap;
 use lief::Binary;
@@ -48,7 +48,7 @@ pub fn verify(matches: &ArgMatches, files: &[PathBuf]) -> anyhow::Result<()> {
                 let authenticode_signature = match authenticode_signature_ps_from_file(file_path) {
                     Ok(authenticode_signature) => authenticode_signature,
                     Err(err) => {
-                        panic!("{} -> {}\n", err.to_string(), err.root_cause());
+                        bail!("{} -> {}\n", err.to_string(), err.root_cause());
                     }
                 };
 
@@ -75,8 +75,8 @@ pub fn verify(matches: &ArgMatches, files: &[PathBuf]) -> anyhow::Result<()> {
             }
             authenticode_signatures
         }
-        (true, true) => panic!("Do not know what to verify exactly(`binary` and `script` both are specified)"),
-        (false, false) => panic!("Do not know what to verify(`binary` or `script` is not specified)"),
+        (true, true) => bail!("Do not know what to verify exactly(`binary` and `script` both are specified)"),
+        (false, false) => bail!("Do not know what to verify(`binary` or `script` is not specified)"),
     };
 
     let flags = flags
@@ -99,7 +99,7 @@ pub fn verify(matches: &ArgMatches, files: &[PathBuf]) -> anyhow::Result<()> {
 
         match validator.verify() {
             Ok(()) => println!("{} has valid digital signature", file_name),
-            Err(err) => panic!("{} has invalid digital signature: {}", file_name, err.to_string()),
+            Err(err) => bail!("{} has invalid digital signature: {}", file_name, err.to_string()),
         }
     }
 

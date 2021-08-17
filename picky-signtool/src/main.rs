@@ -1,13 +1,13 @@
 use std::path::{Path, PathBuf};
 
-use anyhow::bail;
+use anyhow::{anyhow, bail};
 use walkdir::{DirEntry, WalkDir};
 
 use picky_signtool::config::*;
 use picky_signtool::sign::sign;
 use picky_signtool::verify::verify;
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     let matches = config();
 
     let files_to_process: Vec<PathBuf> = match (matches.is_present(ARG_BINARY), matches.is_present(ARG_PS_SCRIPT)) {
@@ -56,24 +56,25 @@ fn main() {
                     .collect::<Vec<PathBuf>>()
             }
         }
-        (true, true) => panic!("Do not know what to process exactly(`binary` and `script` both are specified)"),
-        (false, false) => panic!("Do not know what to process(`binary` or `script` is not specified)"),
+        (true, true) => bail!("Do not know what to process exactly(`binary` and `script` both are specified)"),
+        (false, false) => bail!("Do not know what to process(`binary` or `script` is not specified)"),
     };
 
     if matches.is_present(ARG_SIGN) && !files_to_process.is_empty() {
         if let (Some(certfile), Some(private_key)) = (matches.value_of(ARG_CERTFILE), matches.value_of(ARG_PRIVATE_KEY))
         {
-            sign(
+            return sign(
                 &matches,
                 PathBuf::from(certfile),
                 PathBuf::from(private_key),
                 &files_to_process,
-            )
-            .unwrap();
+            );
         }
     }
 
     if matches.is_present(ARG_VERIFY) && !files_to_process.is_empty() {
-        verify(&matches, &files_to_process).unwrap()
+        return verify(&matches, &files_to_process);
     }
+
+    Err(anyhow!("Nothing was done"))
 }
