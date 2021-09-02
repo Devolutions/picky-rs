@@ -12,6 +12,7 @@ use thiserror::Error;
 pub mod authenticode;
 #[cfg(feature = "ctl")]
 pub mod ctl;
+pub mod timestamp;
 
 type Pkcs7Result<T> = Result<T, Pkcs7Error>;
 

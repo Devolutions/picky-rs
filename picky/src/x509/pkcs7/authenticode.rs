@@ -7,6 +7,7 @@ use crate::x509::date::UTCDate;
 use crate::x509::name::DirectoryName;
 #[cfg(feature = "ctl")]
 use crate::x509::pkcs7::ctl::{self, CTLEntryAttributeValues, CertificateTrustList};
+use crate::x509::pkcs7::timestamp::{self, Timestamper};
 use crate::x509::pkcs7::{self, Pkcs7};
 use crate::x509::utils::{from_der, from_pem, from_pem_str, to_der, to_pem};
 use picky_asn1::restricted_string::CharSetError;
@@ -32,11 +33,11 @@ use picky_asn1_x509::pkcs7::signer_info::{
 use picky_asn1_x509::pkcs7::Pkcs7Certificate;
 use picky_asn1_x509::{oids, Attribute, AttributeValues, Certificate, DigestInfo, Name};
 
+pub use picky_asn1_x509::ShaVariant;
+
 use std::cell::RefCell;
 use std::convert::TryFrom;
 use thiserror::Error;
-
-pub use picky_asn1_x509::ShaVariant;
 
 #[derive(Debug, Error)]
 pub enum AuthenticodeError {
@@ -95,6 +96,8 @@ pub enum AuthenticodeError {
     #[cfg(feature = "ctl")]
     #[error(transparent)]
     CtlError(#[from] ctl::CtlError),
+    #[error(transparent)]
+    TimestampError(timestamp::TimestampError),
 }
 
 type AuthenticodeResult<T> = Result<T, AuthenticodeError>;
@@ -236,6 +239,32 @@ impl AuthenticodeSignature {
             oid: oids::signed_data().into(),
             signed_data: signed_data.into(),
         })))
+    }
+
+    pub fn timestamp(
+        &mut self,
+        timestamper: &impl Timestamper,
+        hash_algo: HashAlgorithm,
+    ) -> Result<(), AuthenticodeError> {
+        let signer_info = self
+            .0
+             .0
+            .signed_data
+            .signers_infos
+            .0
+             .0
+            .first()
+            .expect("Exactly one SignedInfo should be present");
+
+        let encrypted_digest = signer_info.signature.0 .0.clone();
+
+        let token = timestamper
+            .timestamp(encrypted_digest, hash_algo)
+            .map_err(AuthenticodeError::TimestampError)?;
+
+        timestamper.modify_signed_data(token, &mut self.0 .0.signed_data);
+
+        Ok(())
     }
 
     pub fn from_der<V: ?Sized + AsRef<[u8]>>(data: &V) -> AuthenticodeResult<Self> {

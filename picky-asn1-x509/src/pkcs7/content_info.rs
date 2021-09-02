@@ -28,6 +28,7 @@ use crate::{oids, DigestInfo};
 pub enum ContentValue {
     SpcIndirectDataContent(SpcIndirectDataContent),
     OctetString(OctetStringAsn1),
+    Data(OctetStringAsn1),
     #[cfg(feature = "ctl")]
     CertificateTrustList(Ctl),
 }
@@ -42,6 +43,7 @@ impl Serialize for ContentValue {
                 spc_indirect_data_content.serialize(serializer)
             }
             ContentValue::OctetString(octet_string) => octet_string.serialize(serializer),
+            ContentValue::Data(octet_string) => octet_string.serialize(serializer),
             #[cfg(feature = "ctl")]
             ContentValue::CertificateTrustList(ctl) => ctl.serialize(serializer),
         }
@@ -91,7 +93,28 @@ impl<'de> de::Deserialize<'de> for EncapsulatedContentInfo {
                         )
                         .into(),
                     ),
-                    oids::PKCS7 => None,
+                    oids::PKCS7 => {
+                        let tag_peeker: TagPeeker =
+                            seq_next_element!(seq, EncapsulatedContentInfo, "ExplicitContextTag0");
+
+                        if tag_peeker.next_tag.class() == TagClass::ContextSpecific && tag_peeker.next_tag.number() == 0
+                        {
+                            Some(
+                                ContentValue::Data(
+                                    seq_next_element!(
+                                        seq,
+                                        ExplicitContextTag0<OctetStringAsn1>,
+                                        EncapsulatedContentInfo,
+                                        "Data"
+                                    )
+                                    .0,
+                                )
+                                .into(),
+                            )
+                        } else {
+                            None
+                        }
+                    }
                     #[cfg(feature = "ctl")]
                     oids::CERT_TRUST_LIST => Some(
                         ContentValue::CertificateTrustList(

@@ -5,6 +5,7 @@ pub mod crls;
 pub mod ctl;
 pub mod signed_data;
 pub mod signer_info;
+pub mod timestamp;
 
 use crate::oids;
 use signed_data::SignedData;
