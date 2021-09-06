@@ -298,7 +298,7 @@ impl ServerController {
 
         let response = ResponseBuilder::new()
             .header(header::CONTENT_TYPE, "application/octet-stream")
-            .body(raw_signature)
+            .body(base64::encode(raw_signature))
             .status(StatusCode::OK);
 
         Ok(response)

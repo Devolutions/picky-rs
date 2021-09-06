@@ -13,7 +13,6 @@ use reqwest::blocking::Client;
 use reqwest::header::{CACHE_CONTROL, CONTENT_LENGTH, CONTENT_TYPE};
 use reqwest::{Method, StatusCode, Url};
 
-use crate::x509::pkcs7::authenticode::{AuthenticodeSignature, AuthenticodeSignatureBuilder};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -22,6 +21,8 @@ pub enum TimestampError {
     Asn1DerError(#[from] CertError),
     #[error(transparent)]
     Pkcs7Error(#[from] Pkcs7Error),
+    #[error("Failed to decode base64 response")]
+    Base64DecodeError,
     #[error("Remote Authenticode TSA server responded with `{0}` status code")]
     BadResponse(StatusCode),
     #[error("Timestamp token is empty")]
@@ -73,14 +74,17 @@ impl Timestamper for AuthenticodeTimestamper {
             return Err(TimestampError::BadResponse(response.status()));
         }
 
-        let body = response
+        let mut body = response
             .bytes()
             .map_err(TimestampError::RemoteServerResponseError)?
             .to_vec();
 
-        let token = picky_asn1_der::from_bytes::<Pkcs7Certificate>(&body).map_err(TimestampError::Asn1DerError)?;
+        body.retain(|&x| x != 0x0d && x != 0x0a); // do not include CRLF!
 
-        Ok(token.into())
+        let der = base64::decode(body).map_err(|_| TimestampError::Base64DecodeError)?;
+        let token = Pkcs7::from_der(&der).map_err(TimestampError::Pkcs7Error)?;
+
+        Ok(token)
     }
 
     fn modify_signed_data(&self, token: Pkcs7, signed_data: &mut SignedData) {
