@@ -85,6 +85,7 @@ const REPO_KEY: &str = "key_store/";
 const REPO_CERT_NAME: &str = "name_store/";
 const REPO_KEY_IDENTIFIER: &str = "key_identifier_store/";
 const REPO_HASH_LOOKUP_TABLE: &str = "hash_lookup_store/";
+const REPO_AUTHENTICODE_TIMESTAMP: &str = "timestamp_counter_store/";
 const TXT_EXT: &str = ".txt";
 const DER_EXT: &str = ".der";
 
@@ -96,6 +97,7 @@ pub struct FileStorage {
     keys: FileRepo<Vec<u8>>,
     key_identifiers: FileRepo<String>,
     hash_lookup: FileRepo<String>,
+    issued_timestamps_counter: FileRepo<[u8; 4]>,
 }
 
 impl FileStorage {
@@ -132,6 +134,8 @@ impl FileStorage {
                 .expect("couldn't initialize key identifiers repo"),
             hash_lookup: FileRepo::new(&config.file_backend_path, REPO_HASH_LOOKUP_TABLE)
                 .expect("couldn't initialize hash lookup table repo"),
+            issued_timestamps_counter: FileRepo::new(&config.file_backend_path, REPO_AUTHENTICODE_TIMESTAMP)
+                .expect("couldn't initialize authenticode timestamp counter repo"),
         }
     }
 
@@ -251,6 +255,27 @@ impl PickyStorage for FileStorage {
                 .map_err(|e| FileStorageError::Other {
                     description: format!("error reading file '{}': {}", file_path.to_string_lossy(), e),
                 })?)
+        }
+        .boxed()
+    }
+
+    fn increase_issued_authenticode_timestamps_counter(&self) -> BoxFuture<'_, Result<(), StorageError>> {
+        use tokio::{
+            fs::{self, OpenOptions},
+            io::AsyncWriteExt,
+        };
+
+        async move {
+            let file = &self.issued_timestamps_counter.folder_path;
+            let content = fs::read(file).await.unwrap();
+            let mut counter = u32::from_le_bytes([content[0], content[1], content[2], content[3]]);
+            counter += 1;
+
+            let mut file = OpenOptions::new().write(true).truncate(true).open(file).await.unwrap();
+
+            file.write_all(&counter.to_le_bytes()).await.unwrap();
+
+            Ok(())
         }
         .boxed()
     }

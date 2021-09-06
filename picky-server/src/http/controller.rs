@@ -8,7 +8,13 @@ use crate::picky_controller::Picky;
 use crate::utils::{GreedyError, PathOr};
 use log4rs::Handle;
 use picky::pem::{parse_pem, to_pem, Pem};
+use picky::x509::date::UTCDate;
+use picky::x509::pkcs7::{
+    authenticode::{Attribute, AuthenticodeSignatureBuilder},
+    timestamp::TimestampRequest,
+};
 use picky::x509::{Cert, Csr};
+use saphir::hyper::body::Buf;
 use saphir::prelude::*;
 use saphir::response::Builder as ResponseBuilder;
 use serde_json::{self, Value};
@@ -228,6 +234,74 @@ impl ServerController {
                 ("Couldn't reload config... See logs", StatusCode::INTERNAL_SERVER_ERROR)
             }
         }
+    }
+
+    #[post("/timestamp")]
+    async fn authenticode_timestamp(&self, req: Request) -> Result<ResponseBuilder, StatusCode> {
+        let req = req.load_body().await.bad_request()?;
+        let timestamp_request = TimestampRequest::from_der(req.body().bytes()).bad_request()?;
+
+        let config = self.read_conf().await;
+
+        let intermediate_name = format!("{} Authority", config.realm);
+        let intermediate_hash = self
+            .storage
+            .get_addressing_hash_by_name(&intermediate_name)
+            .await
+            .map_err(|e| format!("couldn't fetch intermediate cert: {}", e))
+            .internal_error()?;
+
+        let intermediate_cert_der = self
+            .storage
+            .get_cert_by_addressing_hash(&intermediate_hash)
+            .await
+            .map_err(|e| format!("couldn't get intermediate cert der: {}", e))
+            .internal_error()?;
+
+        let intermediate_cert = Cert::from_der(&intermediate_cert_der)
+            .map_err(|e| format!("couldn't deserialize intermediate cert: {}", e))
+            .internal_error()?;
+
+        let intermediate_pk_der = self
+            .storage
+            .get_key_by_addressing_hash(&intermediate_hash)
+            .await
+            .map_err(|e| format!("couldn't fetch intermediate private key: {}", e))
+            .internal_error()?;
+
+        let intermediate_pk = Picky::parse_pk_from_magic_der(&intermediate_pk_der)
+            .map_err(|e| e.to_string())
+            .internal_error()?;
+
+        let digest = timestamp_request.digest();
+
+        let attributes = vec![
+            Attribute::new_content_type_pkcs7(),
+            Attribute::new_signing_time(UTCDate::now().into()),
+            Attribute::new_message_digest(digest.to_owned()),
+        ];
+
+        let authenticode_signature = AuthenticodeSignatureBuilder::new()
+            .digest_algorithm(config.signing_algorithm.inner_hash_algo())
+            .signing_key(&intermediate_pk)
+            .content_info(timestamp_request.content().clone())
+            .authenticated_attributes(attributes)
+            .issuer_and_serial_number(
+                intermediate_cert.issuer_name(),
+                intermediate_cert.serial_number().0.clone(),
+            )
+            .certs(vec![intermediate_cert])
+            .build()
+            .internal_error()?;
+
+        let raw_signature = authenticode_signature.to_der().internal_error()?;
+
+        let response = ResponseBuilder::new()
+            .header(header::CONTENT_TYPE, "application/octet-stream")
+            .body(raw_signature)
+            .status(StatusCode::OK);
+
+        Ok(response)
     }
 }
 

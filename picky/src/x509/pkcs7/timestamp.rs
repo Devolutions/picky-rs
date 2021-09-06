@@ -1,22 +1,28 @@
 use crate::hash::HashAlgorithm;
-use crate::x509::pkcs7::Pkcs7;
-use picky_asn1_der::Asn1DerError;
+use crate::x509::certificate::CertError;
+use crate::x509::pkcs7::{Pkcs7, Pkcs7Error};
+use crate::x509::utils::{from_der, to_der};
+use picky_asn1::wrapper::ExplicitContextTag0;
+
+use picky_asn1_x509::oids;
 use picky_asn1_x509::pkcs7::content_info::{ContentValue, EncapsulatedContentInfo};
 use picky_asn1_x509::pkcs7::signed_data::SignedData;
 use picky_asn1_x509::pkcs7::signer_info::UnsignedAttribute;
 use picky_asn1_x509::signer_info::UnsignedAttributeValue;
-use picky_asn1_x509::timestamp::TimestampRequest;
-use picky_asn1_x509::{oids, Pkcs7Certificate};
 use reqwest::blocking::Client;
 use reqwest::header::{CACHE_CONTROL, CONTENT_LENGTH, CONTENT_TYPE};
 use reqwest::{Method, StatusCode, Url};
+
+use crate::x509::pkcs7::authenticode::{AuthenticodeSignature, AuthenticodeSignatureBuilder};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum TimestampError {
     #[error(transparent)]
-    Asn1DerError(#[from] Asn1DerError),
-    #[error("Remote Authenticode TSA server response with {0} status code")]
+    Asn1DerError(#[from] CertError),
+    #[error(transparent)]
+    Pkcs7Error(#[from] Pkcs7Error),
+    #[error("Remote Authenticode TSA server responded with `{0}` status code")]
     BadResponse(StatusCode),
     #[error("Timestamp token is empty")]
     TimestampTokenEmpty,
@@ -45,16 +51,10 @@ impl AuthenticodeTimestamper {
 
 impl Timestamper for AuthenticodeTimestamper {
     fn timestamp(&self, digest: Vec<u8>, _: HashAlgorithm) -> Result<Pkcs7, TimestampError> {
-        let timestamp_request = TimestampRequest {
-            countersignature_type: oids::timestamp_request().into(),
-            content: EncapsulatedContentInfo {
-                content_type: oids::pkcs7().into(),
-                content: Some(ContentValue::Data(digest.into()).into()),
-            },
-        };
+        let timestamp_request = TimestampRequest::new(digest);
 
         let client = Client::new();
-        let content = picky_asn1_der::to_vec(&timestamp_request).map_err(TimestampError::Asn1DerError)?;
+        let content = timestamp_request.to_der()?;
 
         let request = client
             .request(Method::POST, self.url.clone())
@@ -110,5 +110,54 @@ impl Timestamper for AuthenticodeTimestamper {
         signer_info.unsigned_attrs.0 .0.push(unsigned_attribute);
 
         signed_data.certificates.0 .0.extend(certificates.0 .0);
+    }
+}
+
+const ELEMENT_NAME: &str = "TimestampRequest";
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TimestampRequest(picky_asn1_x509::timestamp::TimestampRequest);
+
+impl TimestampRequest {
+    pub fn new(digest: Vec<u8>) -> TimestampRequest {
+        Self(picky_asn1_x509::timestamp::TimestampRequest {
+            countersignature_type: oids::timestamp_request().into(),
+            content: EncapsulatedContentInfo {
+                content_type: oids::pkcs7().into(),
+                content: Some(ContentValue::Data(digest.into()).into()),
+            },
+        })
+    }
+
+    pub fn content(&self) -> &EncapsulatedContentInfo {
+        &self.0.content
+    }
+
+    pub fn digest(&self) -> &[u8] {
+        if let ExplicitContextTag0(ContentValue::Data(data)) = self.0.content.content.as_ref().unwrap() {
+            &data.0
+        } else {
+            unreachable!()
+        }
+    }
+
+    pub fn from_der<V: ?Sized + AsRef<[u8]>>(data: &V) -> Result<Self, CertError> {
+        from_der(data, ELEMENT_NAME).map(Self)
+    }
+
+    pub fn to_der(&self) -> Result<Vec<u8>, CertError> {
+        to_der(&self.0, ELEMENT_NAME)
+    }
+}
+
+impl From<TimestampRequest> for picky_asn1_x509::timestamp::TimestampRequest {
+    fn from(tr: TimestampRequest) -> picky_asn1_x509::timestamp::TimestampRequest {
+        tr.0
+    }
+}
+
+impl From<picky_asn1_x509::timestamp::TimestampRequest> for TimestampRequest {
+    fn from(tr: picky_asn1_x509::timestamp::TimestampRequest) -> TimestampRequest {
+        Self(tr)
     }
 }

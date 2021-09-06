@@ -70,6 +70,7 @@ pub trait PickyStorage: Send + Sync {
     fn get_cert_by_addressing_hash<'a>(&'a self, hash: &'a str) -> BoxFuture<'a, Result<Vec<u8>, StorageError>>;
     fn get_key_by_addressing_hash<'a>(&'a self, hash: &'a str) -> BoxFuture<'a, Result<Vec<u8>, StorageError>>;
     fn get_addressing_hash_by_name<'a>(&'a self, name: &'a str) -> BoxFuture<'a, Result<String, StorageError>>;
+    fn increase_issued_authenticode_timestamps_counter(&self) -> BoxFuture<'_, Result<(), StorageError>>;
     fn get_addressing_hash_by_key_identifier<'a>(
         &'a self,
         key_identifier: &'a str,

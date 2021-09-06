@@ -6,11 +6,13 @@ use futures::future::BoxFuture;
 use futures::stream::StreamExt;
 use futures::FutureExt;
 use model::*;
+use mongodm::bson::Document;
 use mongodm::mongo::bson::oid::ObjectId;
 use mongodm::mongo::bson::spec::BinarySubtype;
 use mongodm::mongo::bson::{doc, Binary, Bson};
 use mongodm::mongo::options::{ClientOptions, ReadPreference, ReplaceOptions, SelectionCriteria};
 use mongodm::mongo::{Client, Database};
+use mongodm::prelude::Set;
 use mongodm::{f, ToRepository};
 use picky::x509::Cert;
 use std::collections::HashMap;
@@ -113,6 +115,7 @@ impl MongoStorage {
                     let key_collection = storage.repository::<Key>();
                     let name_collection = storage.repository::<Name>();
                     let hash_lookup_collection = storage.repository::<HashLookupEntry>();
+                    let timestamp_collection = storage.repository::<IssuedTimestampsCounter>();
 
                     let mut original_data =
                         HashMap::with_capacity(usize::try_from(certs_count).expect("try from certs count"));
@@ -152,6 +155,7 @@ impl MongoStorage {
                     key_collection.drop(None).await.expect("drop key store");
                     name_collection.drop(None).await.expect("drop name store");
                     hash_lookup_collection.drop(None).await.expect("drop hash lookup table");
+                    timestamp_collection.drop(None).await.expect("drop timestamp store");
 
                     for (_, (cert_der, key_pkcs10)) in original_data.into_iter() {
                         let cert = Cert::from_der(&cert_der).expect("decode cert from der");
@@ -380,6 +384,29 @@ impl PickyStorage for MongoStorage {
                 })?
                 .value;
             Ok(addressing_hash)
+        }
+        .boxed()
+    }
+
+    fn increase_issued_authenticode_timestamps_counter(&self) -> BoxFuture<'_, Result<(), StorageError>> {
+        async move {
+            let new_counter = self
+                .repository::<IssuedTimestampsCounter>()
+                .find_one(None, None)
+                .await?
+                .unwrap()
+                .counter
+                + 1;
+            /*
+            repository.counter += 1;
+            let mut document = Document::new();
+            document.insert(f!(counter in IssuedTimestampsCounter), repository.counter);
+            */
+            self.repository::<IssuedTimestampsCounter>()
+                .find_one_and_update(Document::new(), doc!(Set: &new_counter), None)
+                .await?;
+
+            Ok(())
         }
         .boxed()
     }
