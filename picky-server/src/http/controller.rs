@@ -9,12 +9,9 @@ use crate::utils::{GreedyError, PathOr};
 use log4rs::Handle;
 use picky::pem::{parse_pem, to_pem, Pem};
 use picky::x509::date::UTCDate;
-use picky::x509::pkcs7::{
-    authenticode::{Attribute, AuthenticodeSignatureBuilder},
-    timestamp::TimestampRequest,
-};
+use picky::x509::pkcs7::authenticode::{Attribute, AuthenticodeSignatureBuilder};
+use picky::x509::pkcs7::timestamp::TimestampRequest;
 use picky::x509::{Cert, Csr};
-use saphir::hyper::body::Buf;
 use saphir::prelude::*;
 use saphir::response::Builder as ResponseBuilder;
 use serde_json::{self, Value};
@@ -239,7 +236,14 @@ impl ServerController {
     #[post("/timestamp")]
     async fn authenticode_timestamp(&self, req: Request) -> Result<ResponseBuilder, StatusCode> {
         let req = req.load_body().await.bad_request()?;
-        let timestamp_request = TimestampRequest::from_der(req.body().bytes()).bad_request()?;
+
+        let mut body = req.body().to_vec();
+        body.retain(|&x| x != 0x0d && x != 0x0a && x != 0x00); // do not include CRLF!
+                                                               //println!("{:02X?}", &body[390..397]);
+        let der = base64::decode(body)
+            .map_err(|e| format!("base64 failed to decode timestamp request body: {}", e))
+            .internal_error()?;
+        let timestamp_request = TimestampRequest::from_der(&der).bad_request()?;
 
         let config = self.read_conf().await;
 
@@ -274,15 +278,16 @@ impl ServerController {
             .internal_error()?;
 
         let digest = timestamp_request.digest();
+        let picky_server_hash = config.signing_algorithm.inner_hash_algo();
 
         let attributes = vec![
             Attribute::new_content_type_pkcs7(),
             Attribute::new_signing_time(UTCDate::now().into()),
-            Attribute::new_message_digest(digest.to_owned()),
+            Attribute::new_message_digest(picky_server_hash.digest(digest)),
         ];
 
         let authenticode_signature = AuthenticodeSignatureBuilder::new()
-            .digest_algorithm(config.signing_algorithm.inner_hash_algo())
+            .digest_algorithm(picky_server_hash)
             .signing_key(&intermediate_pk)
             .content_info(timestamp_request.content().clone())
             .authenticated_attributes(attributes)
@@ -295,11 +300,17 @@ impl ServerController {
             .internal_error()?;
 
         let raw_signature = authenticode_signature.to_der().internal_error()?;
-
+        let content = base64::encode(raw_signature);
         let response = ResponseBuilder::new()
             .header(header::CONTENT_TYPE, "application/octet-stream")
-            .body(base64::encode(raw_signature))
+            .header(header::CONTENT_LENGTH, content.len())
+            .body(content)
             .status(StatusCode::OK);
+
+        self.storage
+            .increase_issued_authenticode_timestamps_counter()
+            .await
+            .internal_error()?;
 
         Ok(response)
     }

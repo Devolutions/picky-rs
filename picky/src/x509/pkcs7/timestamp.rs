@@ -55,7 +55,7 @@ impl Timestamper for AuthenticodeTimestamper {
         let timestamp_request = TimestampRequest::new(digest);
 
         let client = Client::new();
-        let content = timestamp_request.to_der()?;
+        let content = base64::encode(timestamp_request.to_der()?);
 
         let request = client
             .request(Method::POST, self.url.clone())
@@ -79,7 +79,7 @@ impl Timestamper for AuthenticodeTimestamper {
             .map_err(TimestampError::RemoteServerResponseError)?
             .to_vec();
 
-        body.retain(|&x| x != 0x0d && x != 0x0a); // do not include CRLF!
+        body.retain(|&x| x != 0x0d && x != 0x0a && x != 0x00); // do not include CRLF!
 
         let der = base64::decode(body).map_err(|_| TimestampError::Base64DecodeError)?;
         let token = Pkcs7::from_der(&der).map_err(TimestampError::Pkcs7Error)?;

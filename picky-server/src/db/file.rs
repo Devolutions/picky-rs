@@ -76,6 +76,20 @@ where
             .map_err(|e| format!("Error writing data to {}: {}", key, e))?;
         Ok(())
     }
+
+    async fn get(&self, key: &str, buf: &mut Vec<u8>) -> Result<(), FileStorageError> {
+        let mut file = File::open(self.folder_path.join(key)).map_err(|e| {
+            format!(
+                "File doesn't exists ({}{}): {}",
+                self.folder_path.to_string_lossy(),
+                key,
+                e
+            )
+        })?;
+
+        file.read_exact(buf)
+            .map_err(|e| format!("Error reading data from {}: {}", key, e).into())
+    }
 }
 
 const REPO_CERTIFICATE_OLD: &str = "CertificateStore/";
@@ -260,20 +274,21 @@ impl PickyStorage for FileStorage {
     }
 
     fn increase_issued_authenticode_timestamps_counter(&self) -> BoxFuture<'_, Result<(), StorageError>> {
-        use tokio::{
-            fs::{self, OpenOptions},
-            io::AsyncWriteExt,
-        };
+        let name = format!("{}{}", "timestamp_counter_store", TXT_EXT).replace(" ", "_");
 
         async move {
-            let file = &self.issued_timestamps_counter.folder_path;
-            let content = fs::read(file).await.unwrap();
+            let mut content = 0_u32.to_le_bytes().to_vec();
+            if let Err(err) = self.issued_timestamps_counter.get(&name, &mut content).await {
+                if !err.to_string().contains("File doesn't exists") {
+                    return Err(err.into());
+                }
+            }
+
             let mut counter = u32::from_le_bytes([content[0], content[1], content[2], content[3]]);
             counter += 1;
-
-            let mut file = OpenOptions::new().write(true).truncate(true).open(file).await.unwrap();
-
-            file.write_all(&counter.to_le_bytes()).await.unwrap();
+            self.issued_timestamps_counter
+                .insert(&name, &counter.to_le_bytes())
+                .await?;
 
             Ok(())
         }

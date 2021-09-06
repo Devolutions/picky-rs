@@ -154,7 +154,7 @@ impl mongodm::CollectionConfig for TimestampCollConf {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct IssuedTimestampsCounter {
-    pub counter: u32,
+    pub counter: i64,
 }
 
 impl mongodm::Model for IssuedTimestampsCounter {

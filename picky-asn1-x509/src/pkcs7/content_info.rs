@@ -5,7 +5,7 @@ use widestring::U16String;
 
 use picky_asn1::bit_string::BitString;
 use picky_asn1::restricted_string::{BMPString, CharSetError};
-use picky_asn1::tag::{Encoding, Tag, TagClass, TagPeeker};
+use picky_asn1::tag::{TagClass, TagPeeker};
 use picky_asn1::wrapper::{
     BMPStringAsn1, BitStringAsn1, ExplicitContextTag0, ExplicitContextTag1, ExplicitContextTag2, IA5StringAsn1,
     ImplicitContextTag0, ImplicitContextTag1, IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1, Optional,
@@ -104,8 +104,7 @@ impl<'de> de::Deserialize<'de> for EncapsulatedContentInfo {
                     ),
                     oids::PKCS7 => seq
                         .next_element::<ExplicitContextTag0<OctetStringAsn1>>()?
-                        .map(|value| Some(ExplicitContextTag0(ContentValue::Data(value.0))))
-                        .unwrap_or(None),
+                        .map(|value| ExplicitContextTag0(ContentValue::Data(value.0))),
                     #[cfg(feature = "ctl")]
                     oids::CERT_TRUST_LIST => Some(
                         ContentValue::CertificateTrustList(

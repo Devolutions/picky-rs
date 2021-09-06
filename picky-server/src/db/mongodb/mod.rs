@@ -6,13 +6,11 @@ use futures::future::BoxFuture;
 use futures::stream::StreamExt;
 use futures::FutureExt;
 use model::*;
-use mongodm::bson::Document;
 use mongodm::mongo::bson::oid::ObjectId;
 use mongodm::mongo::bson::spec::BinarySubtype;
 use mongodm::mongo::bson::{doc, Binary, Bson};
 use mongodm::mongo::options::{ClientOptions, ReadPreference, ReplaceOptions, SelectionCriteria};
 use mongodm::mongo::{Client, Database};
-use mongodm::prelude::Set;
 use mongodm::{f, ToRepository};
 use picky::x509::Cert;
 use std::collections::HashMap;
@@ -390,20 +388,20 @@ impl PickyStorage for MongoStorage {
 
     fn increase_issued_authenticode_timestamps_counter(&self) -> BoxFuture<'_, Result<(), StorageError>> {
         async move {
-            let new_counter = self
-                .repository::<IssuedTimestampsCounter>()
-                .find_one(None, None)
-                .await?
-                .unwrap()
-                .counter
-                + 1;
-            /*
-            repository.counter += 1;
-            let mut document = Document::new();
-            document.insert(f!(counter in IssuedTimestampsCounter), repository.counter);
-            */
+            let repository = self.repository::<IssuedTimestampsCounter>();
+            let counter = if let Some(issued_timestamps_counter) = repository.find_one(doc!(), None).await? {
+                issued_timestamps_counter.counter + 1
+            } else {
+                1
+            };
+
+            let issued_timestamps_counter = IssuedTimestampsCounter { counter };
             self.repository::<IssuedTimestampsCounter>()
-                .find_one_and_update(Document::new(), doc!(Set: &new_counter), None)
+                .replace_one(
+                    doc! {},
+                    &issued_timestamps_counter,
+                    Some(ReplaceOptions::builder().upsert(true).build()),
+                )
                 .await?;
 
             Ok(())
