@@ -5,7 +5,7 @@ use widestring::U16String;
 
 use picky_asn1::bit_string::BitString;
 use picky_asn1::restricted_string::{BMPString, CharSetError};
-use picky_asn1::tag::{TagClass, TagPeeker};
+use picky_asn1::tag::{Encoding, Tag, TagClass, TagPeeker};
 use picky_asn1::wrapper::{
     BMPStringAsn1, BitStringAsn1, ExplicitContextTag0, ExplicitContextTag1, ExplicitContextTag2, IA5StringAsn1,
     ImplicitContextTag0, ImplicitContextTag1, IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1, Optional,
@@ -57,6 +57,15 @@ pub struct EncapsulatedContentInfo {
     pub content: Option<ExplicitContextTag0<ContentValue>>,
 }
 
+impl EncapsulatedContentInfo {
+    pub fn new_pkcs7_data(data: Option<Vec<u8>>) -> Self {
+        Self {
+            content_type: oids::pkcs7().into(),
+            content: data.map(|data| ContentValue::Data(data.into()).into()),
+        }
+    }
+}
+
 impl<'de> de::Deserialize<'de> for EncapsulatedContentInfo {
     fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
     where
@@ -93,28 +102,10 @@ impl<'de> de::Deserialize<'de> for EncapsulatedContentInfo {
                         )
                         .into(),
                     ),
-                    oids::PKCS7 => {
-                        let tag_peeker: TagPeeker =
-                            seq_next_element!(seq, EncapsulatedContentInfo, "ExplicitContextTag0");
-
-                        if tag_peeker.next_tag.class() == TagClass::ContextSpecific && tag_peeker.next_tag.number() == 0
-                        {
-                            Some(
-                                ContentValue::Data(
-                                    seq_next_element!(
-                                        seq,
-                                        ExplicitContextTag0<OctetStringAsn1>,
-                                        EncapsulatedContentInfo,
-                                        "Data"
-                                    )
-                                    .0,
-                                )
-                                .into(),
-                            )
-                        } else {
-                            None
-                        }
-                    }
+                    oids::PKCS7 => seq
+                        .next_element::<ExplicitContextTag0<OctetStringAsn1>>()?
+                        .map(|value| Some(ExplicitContextTag0(ContentValue::Data(value.0))))
+                        .unwrap_or(None),
                     #[cfg(feature = "ctl")]
                     oids::CERT_TRUST_LIST => Some(
                         ContentValue::CertificateTrustList(

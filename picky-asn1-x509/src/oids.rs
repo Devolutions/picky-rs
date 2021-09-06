@@ -177,6 +177,7 @@ define_oid! {
     SHAKE256 => shake256 => "2.16.840.1.101.3.4.2.12",
 
     // authenticode
+    SIGNING_TIME => signing_time => "1.2.840.113549.1.9.5",
     COUNTER_SIGN => counter_sign => "1.2.840.113549.1.9.6",
     SPC_INDIRECT_DATA_OBJID => spc_indirect_data_objid => "1.3.6.1.4.1.311.2.1.4",
     SPC_STATEMENT_TYPE => spc_statement_type => "1.3.6.1.4.1.311.2.1.11",

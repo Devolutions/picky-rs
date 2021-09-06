@@ -31,12 +31,15 @@ use picky_asn1_x509::pkcs7::signer_info::{
     UnsignedAttributeValue, UnsignedAttributes,
 };
 use picky_asn1_x509::pkcs7::Pkcs7Certificate;
-use picky_asn1_x509::{oids, Attribute, AttributeValues, Certificate, DigestInfo, Name};
+use picky_asn1_x509::{oids, AttributeValues, Certificate, DigestInfo, Name};
 
+pub use picky_asn1_x509::attribute::Attribute;
+pub use picky_asn1_x509::pkcs7::content_info;
 pub use picky_asn1_x509::ShaVariant;
 
 use std::cell::RefCell;
 use std::convert::TryFrom;
+use std::ops::DerefMut;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -1000,11 +1003,235 @@ fn h_get_ca_name(certificates: &[Cert]) -> Option<DirectoryName> {
     }
 }
 
+#[derive(Error, Debug)]
+pub enum AuthenticodeSignatureBuilderError {
+    #[error("Digest algorithm is required, but missing")]
+    MissingDigestAlgorithm,
+    #[error("Signing key is required, but missing")]
+    MissingSigningKey,
+    #[error("Issuer and serial number are required, but missing")]
+    MissingIssuerAndSerialNumber,
+    #[error("Certificates are required, but missing")]
+    MissingCertificatesRequired,
+    #[error("Content info is required, but missing")]
+    MissingContentInfo,
+    #[error(transparent)]
+    Asn1DerError(#[from] Asn1DerError),
+    #[error(transparent)]
+    SignatureError(#[from] SignatureError),
+    #[error(transparent)]
+    AuthenticodeError(#[from] AuthenticodeError),
+}
+
+#[derive(Default, Clone, Debug)]
+struct AuthenticodeSignatureBuilderInner<'a> {
+    certs: Option<Vec<Cert>>,
+    digest_algorithm: Option<HashAlgorithm>,
+    content_info: Option<EncapsulatedContentInfo>,
+    signing_key: Option<&'a PrivateKey>,
+    issuer_and_serial_number: Option<IssuerAndSerialNumber>,
+    authenticated_attributes: Option<Vec<Attribute>>,
+    unsigned_attributes: Option<Vec<UnsignedAttribute>>,
+}
+
+#[derive(Default, Clone, Debug)]
+pub struct AuthenticodeSignatureBuilder<'a> {
+    inner: RefCell<AuthenticodeSignatureBuilderInner<'a>>,
+}
+
+impl<'a> AuthenticodeSignatureBuilder<'a> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Required
+    #[inline]
+    pub fn certs(&self, certs: Vec<Cert>) -> &Self {
+        self.inner.borrow_mut().certs = Some(certs);
+        self
+    }
+
+    /// Required
+    #[inline]
+    pub fn digest_algorithm(&self, digest_algorithm: HashAlgorithm) -> &Self {
+        self.inner.borrow_mut().digest_algorithm = Some(digest_algorithm);
+        self
+    }
+
+    /// Required
+    #[inline]
+    pub fn content_info(&self, content_info: EncapsulatedContentInfo) -> &Self {
+        self.inner.borrow_mut().content_info = Some(content_info);
+        self
+    }
+
+    /// Required
+    #[inline]
+    pub fn signing_key(&self, signing_key: &'a PrivateKey) -> &Self {
+        self.inner.borrow_mut().signing_key = Some(signing_key);
+        self
+    }
+
+    /// Optional
+    #[inline]
+    pub fn authenticated_attributes(&self, authenticate_attributes: Vec<Attribute>) -> &Self {
+        self.inner.borrow_mut().authenticated_attributes = Some(authenticate_attributes);
+        self
+    }
+
+    /// Optional
+    #[inline]
+    pub fn unsigned_attributes(&self, unsigned_attributes: Vec<UnsignedAttribute>) -> &Self {
+        self.inner.borrow_mut().unsigned_attributes = Some(unsigned_attributes);
+        self
+    }
+
+    /// Required
+    #[inline]
+    pub fn issuer_and_serial_number(&self, issuer: DirectoryName, serial_number: Vec<u8>) -> &Self {
+        self.inner.borrow_mut().issuer_and_serial_number = Some(IssuerAndSerialNumber {
+            issuer: issuer.into(),
+            serial_number: CertificateSerialNumber(serial_number.into()),
+        });
+        self
+    }
+
+    pub fn build(&self) -> Result<AuthenticodeSignature, AuthenticodeSignatureBuilderError> {
+        let mut inner = self.inner.borrow_mut();
+        let AuthenticodeSignatureBuilderInner {
+            certs,
+            digest_algorithm,
+            content_info,
+            signing_key,
+            issuer_and_serial_number,
+            authenticated_attributes,
+            unsigned_attributes,
+            ..
+        } = inner.deref_mut();
+
+        let digest_algorithm = ShaVariant::try_from(
+            digest_algorithm
+                .take()
+                .ok_or(AuthenticodeSignatureBuilderError::MissingDigestAlgorithm)?,
+        )
+        .map_err(|err| {
+            AuthenticodeSignatureBuilderError::AuthenticodeError(AuthenticodeError::UnsupportedHashAlgorithmError(err))
+        })?;
+
+        let content_info = content_info
+            .take()
+            .ok_or(AuthenticodeSignatureBuilderError::MissingContentInfo)?;
+
+        let signing_key = signing_key
+            .take()
+            .ok_or(AuthenticodeSignatureBuilderError::MissingSigningKey)?;
+
+        let issuer_and_serial_number = issuer_and_serial_number
+            .take()
+            .ok_or(AuthenticodeSignatureBuilderError::MissingIssuerAndSerialNumber)?;
+
+        let certificates = certs
+            .take()
+            .ok_or(AuthenticodeSignatureBuilderError::MissingCertificatesRequired)?;
+
+        // The signing certificate must contain either the extended key usage (EKU) value for code signing,
+        // or the entire certificate chain must contain no EKUs
+        h_check_eku_code_signing(&certificates).map_err(AuthenticodeSignatureBuilderError::AuthenticodeError)?;
+
+        if !certificates.iter().any(|cert| {
+            Name::from(cert.issuer_name()) == issuer_and_serial_number.issuer
+                && cert.serial_number() == &issuer_and_serial_number.serial_number.0
+        }) {
+            return Err(AuthenticodeSignatureBuilderError::AuthenticodeError(
+                AuthenticodeError::NoCertificatesAssociatedWithIssuerAndSerialNumber {
+                    issuer: issuer_and_serial_number.issuer,
+                    serial_number: issuer_and_serial_number.serial_number.0 .0,
+                },
+            ));
+        }
+
+        // certificates contains the signer certificate and any intermediate certificates,
+        // but typically does not contain the root certificate
+        let certificates = certificates
+            .into_iter()
+            .filter_map(|cert| {
+                if cert.ty() != CertType::Root {
+                    Some(Certificate::from(cert))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<Certificate>>();
+
+        let digest_encryption_algorithm = AlgorithmIdentifier::new_rsa_encryption_with_sha(digest_algorithm)
+            .map_err(AuthenticodeError::UnsupportedAlgorithmError)?;
+
+        let signature_algo = SignatureAlgorithm::from_algorithm_identifier(&digest_encryption_algorithm)?;
+
+        let to_sign_data = if let Some(ref authenticated_attributes) = authenticated_attributes {
+            let mut auth_raw_data = picky_asn1_der::to_vec(&authenticated_attributes)?;
+            // According to the RFC:
+            //
+            // "[...] The Attributes value's tag is SET OF, and the DER encoding ofs
+            // the SET OF tag, rather than of the IMPLICIT [0] tag [...]"
+            auth_raw_data[0] = Tag::SET.inner();
+            auth_raw_data
+        } else {
+            // If there is no authenticated attributes, then we should sign content_info
+            picky_asn1_der::to_vec(&content_info)?
+        };
+
+        let encrypted_digest = SignatureValue(
+            signature_algo
+                .sign(&to_sign_data, signing_key)
+                .map_err(|err| {
+                    AuthenticodeSignatureBuilderError::AuthenticodeError(AuthenticodeError::SignatureError(err))
+                })?
+                .into(),
+        );
+
+        let digest_algorithm = AlgorithmIdentifier::new_sha(digest_algorithm);
+
+        let signer_info = SignerInfo {
+            version: CmsVersion::V1,
+            sid: SignerIdentifier::IssuerAndSerialNumber(issuer_and_serial_number),
+            digest_algorithm: DigestAlgorithmIdentifier(digest_algorithm.clone()),
+            signed_attrs: Attributes(authenticated_attributes.take().unwrap_or_default().into()).into(),
+            signature_algorithm: SignatureAlgorithmIdentifier(AlgorithmIdentifier::new_rsa_encryption()),
+            signature: encrypted_digest,
+            unsigned_attrs: UnsignedAttributes(unsigned_attributes.take().unwrap_or_default()).into(),
+        };
+
+        let mut certs = Vec::new();
+        for cert in certificates.into_iter() {
+            let raw_certificates = picky_asn1_der::to_vec(&cert)?;
+            certs.push(CertificateChoices::Certificate(picky_asn1_der::from_bytes(
+                &raw_certificates,
+            )?));
+        }
+
+        let signed_data = SignedData {
+            version: CmsVersion::V1,
+            digest_algorithms: DigestAlgorithmIdentifiers(vec![digest_algorithm].into()),
+            content_info,
+            certificates: CertificateSet(certs).into(),
+            crls: Some(RevocationInfoChoices::default()),
+            signers_infos: SignersInfos(vec![signer_info].into()),
+        };
+
+        Ok(AuthenticodeSignature(Pkcs7::from(Pkcs7Certificate {
+            oid: oids::signed_data().into(),
+            signed_data: signed_data.into(),
+        })))
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::pem::parse_pem;
-    use crate::x509::certificate::CertType;
+    use crate::x509::certificate::{CertType, CertificateBuilder};
+    use crate::x509::{Csr, KeyIdGenMethod};
     use picky_asn1_x509::Extension;
 
     const RSA_PRIVATE_KEY: &str = "-----BEGIN RSA PRIVATE KEY-----\n\
@@ -1906,6 +2133,135 @@ mod test {
             .require_not_after_check()
             .require_ca_against_ctl_check()
             .exclude_cert_authorities(&[ca_name])
+            .verify()
+            .unwrap();
+    }
+
+    #[test]
+    fn validate_authenticode_singature_create_by_authenticode_builder() {
+        let parse_key = |pem_str: &str| -> PrivateKey {
+            let pem = pem_str.parse::<Pem>().unwrap();
+            PrivateKey::from_pkcs8(pem.data()).unwrap()
+        };
+
+        // certificates generation code copied from `valid_ca_chain` unit test in certificate.rs :)
+        let root_key = parse_key(crate::test_files::RSA_2048_PK_1);
+        let intermediate_key = parse_key(crate::test_files::RSA_2048_PK_2);
+        let leaf_key = parse_key(crate::test_files::RSA_2048_PK_3);
+
+        let root = CertificateBuilder::new()
+            .validity(UTCDate::ymd(2065, 6, 15).unwrap(), UTCDate::ymd(2070, 6, 15).unwrap())
+            .self_signed(DirectoryName::new_common_name("TheFuture.usodakedo Root CA"), &root_key)
+            .ca(true)
+            .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_512))
+            .key_id_gen_method(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_384))
+            .build()
+            .expect("couldn't build root ca");
+        assert_eq!(root.ty(), CertType::Root);
+
+        let intermediate = CertificateBuilder::new()
+            .validity(UTCDate::ymd(2068, 1, 1).unwrap(), UTCDate::ymd(2071, 1, 1).unwrap())
+            .subject(
+                DirectoryName::new_common_name("TheFuture.usodakedo Authority"),
+                intermediate_key.to_public_key(),
+            )
+            .issuer_cert(&root, &root_key)
+            .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_224))
+            .key_id_gen_method(KeyIdGenMethod::SPKValueHashedLeftmost160(HashAlgorithm::SHA1))
+            .ca(true)
+            .pathlen(0)
+            .build()
+            .expect("couldn't build intermediate ca");
+        assert_eq!(intermediate.ty(), CertType::Intermediate);
+
+        let csr = Csr::generate(
+            DirectoryName::new_common_name("ChillingInTheFuture.usobakkari"),
+            &leaf_key,
+            SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA1),
+        )
+        .unwrap();
+
+        let signed_leaf = CertificateBuilder::new()
+            .validity(UTCDate::ymd(2069, 1, 1).unwrap(), UTCDate::ymd(2072, 1, 1).unwrap())
+            .subject_from_csr(csr)
+            .issuer_cert(&intermediate, &intermediate_key)
+            .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_384))
+            .key_id_gen_method(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_512))
+            .pathlen(0) // not meaningful in non-CA certificates
+            .build()
+            .expect("couldn't build signed leaf");
+
+        assert_eq!(signed_leaf.ty(), CertType::Leaf);
+
+        let digest_algorithm = AlgorithmIdentifier::new_sha(ShaVariant::SHA2_256);
+
+        let data = SpcAttributeAndOptionalValue {
+            ty: oids::spc_pe_image_dataobj().into(),
+            value: SpcAttributeAndOptionalValueValue::SpcPeImageData(SpcPeImageData {
+                flags: SpcPeImageFlags::default(),
+                file: Default::default(),
+            }),
+        };
+
+        let message_digest = DigestInfo {
+            oid: digest_algorithm,
+            digest: FILE_HASH.to_vec().into(),
+        };
+
+        let mut raw_spc_indirect_data_content = picky_asn1_der::to_vec(&data).unwrap();
+
+        let mut raw_message_digest = picky_asn1_der::to_vec(&message_digest).unwrap();
+
+        raw_spc_indirect_data_content.append(&mut raw_message_digest);
+
+        let message_digest_value = HashAlgorithm::try_from(ShaVariant::SHA2_256)
+            .unwrap()
+            .digest(raw_spc_indirect_data_content.as_ref());
+
+        let authenticated_attributes = vec![
+            Attribute {
+                ty: oids::content_type().into(),
+                value: AttributeValues::ContentType(Asn1SetOf(vec![oids::spc_indirect_data_objid().into()])),
+            },
+            Attribute {
+                ty: oids::spc_sp_opus_info_objid().into(),
+                value: AttributeValues::SpcSpOpusInfo(Asn1SetOf(vec![SpcSpOpusInfo {
+                    program_name: None,
+                    more_info: Some(ExplicitContextTag1(SpcLink::default())),
+                }])),
+            },
+            Attribute {
+                ty: oids::message_digest().into(),
+                value: AttributeValues::MessageDigest(Asn1SetOf(vec![message_digest_value.into()])),
+            },
+        ];
+
+        let content = SpcIndirectDataContent { data, message_digest };
+
+        let content_info = EncapsulatedContentInfo {
+            content_type: oids::spc_indirect_data_objid().into(),
+            content: Some(ContentValue::SpcIndirectDataContent(content).into()),
+        };
+
+        let authenticode_signature = AuthenticodeSignatureBuilder::new()
+            .digest_algorithm(HashAlgorithm::SHA2_256)
+            .content_info(content_info)
+            .issuer_and_serial_number(signed_leaf.issuer_name(), signed_leaf.serial_number().0.clone())
+            .authenticated_attributes(authenticated_attributes)
+            .signing_key(&leaf_key)
+            .certs(vec![signed_leaf, intermediate, root])
+            .build()
+            .unwrap();
+
+        let validator = authenticode_signature.authenticode_verifier();
+        validator
+            .require_basic_authenticode_validation(FILE_HASH.to_vec())
+            .require_signing_certificate_check()
+            .require_chain_check()
+            .ignore_not_before_check()
+            .ignore_not_after_check()
+            .ignore_ca_against_ctl_check()
+            .ignore_excluded_cert_authorities()
             .verify()
             .unwrap();
     }
