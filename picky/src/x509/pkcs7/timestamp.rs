@@ -79,7 +79,7 @@ impl Timestamper for AuthenticodeTimestamper {
             .map_err(TimestampError::RemoteServerResponseError)?
             .to_vec();
 
-        body.retain(|&x| x != 0x0d && x != 0x0a && x != 0x00); // Removing CRLF entries
+        body.retain(|&x| x != b'\n' && x != b'\r' && x != b'\0'); // Removing CRLF entries
 
         let der = base64::decode(body).map_err(|_| TimestampError::Base64DecodeError)?;
         let token = Pkcs7::from_der(&der).map_err(TimestampError::Pkcs7Error)?;

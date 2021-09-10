@@ -252,7 +252,7 @@ impl PickyStorage for FileStorage {
     }
 
     fn get_addressing_hash_by_name(&self, name: &str) -> BoxFuture<'_, Result<String, StorageError>> {
-        let name = format!("{}{}", name, TXT_EXT);
+        let name = format!("{}{}", name, TXT_EXT).replace(" ", "_");
         async move {
             let file = self
                 .name
@@ -274,7 +274,7 @@ impl PickyStorage for FileStorage {
     }
 
     fn increase_issued_authenticode_timestamps_counter(&self) -> BoxFuture<'_, Result<(), StorageError>> {
-        let name = format!("{}{}", "timestamp_counter_store", TXT_EXT).replace(" ", "_");
+        let name = format!("{}{}", "timestamp_counter_store", TXT_EXT);
 
         async move {
             let mut content = [0; 4];
