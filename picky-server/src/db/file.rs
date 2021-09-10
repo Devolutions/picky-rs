@@ -77,7 +77,7 @@ where
         Ok(())
     }
 
-    async fn get(&self, key: &str, buf: &mut Vec<u8>) -> Result<(), FileStorageError> {
+    async fn get(&self, key: &str, buf: &mut [u8]) -> Result<(), FileStorageError> {
         let mut file = File::open(self.folder_path.join(key)).map_err(|e| {
             format!(
                 "File doesn't exists ({}{}): {}",
@@ -252,7 +252,7 @@ impl PickyStorage for FileStorage {
     }
 
     fn get_addressing_hash_by_name(&self, name: &str) -> BoxFuture<'_, Result<String, StorageError>> {
-        let name = format!("{}{}", name, TXT_EXT).replace(" ", "_");
+        let name = format!("{}{}", name, TXT_EXT);
         async move {
             let file = self
                 .name
@@ -277,7 +277,7 @@ impl PickyStorage for FileStorage {
         let name = format!("{}{}", "timestamp_counter_store", TXT_EXT).replace(" ", "_");
 
         async move {
-            let mut content = 0_u32.to_le_bytes().to_vec();
+            let mut content = [0; 4];
             if let Err(err) = self.issued_timestamps_counter.get(&name, &mut content).await {
                 if !err.to_string().contains("File doesn't exists") {
                     return Err(err.into());

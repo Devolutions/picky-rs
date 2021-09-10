@@ -1152,16 +1152,13 @@ impl<'a> AuthenticodeSignatureBuilder<'a> {
 
         // certificates contains the signer certificate and any intermediate certificates,
         // but typically does not contain the root certificate
-        let certificates = certificates
-            .into_iter()
-            .filter_map(|cert| {
-                if cert.ty() != CertType::Root {
-                    Some(Certificate::from(cert))
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<Certificate>>();
+        let certificates = certificates.into_iter().filter_map(|cert| {
+            if cert.ty() != CertType::Root {
+                Some(Certificate::from(cert))
+            } else {
+                None
+            }
+        });
 
         let digest_encryption_algorithm = AlgorithmIdentifier::new_rsa_encryption_with_sha(digest_algorithm)
             .map_err(AuthenticodeError::UnsupportedAlgorithmError)?;
@@ -1203,7 +1200,7 @@ impl<'a> AuthenticodeSignatureBuilder<'a> {
         };
 
         let mut certs = Vec::new();
-        for cert in certificates.into_iter() {
+        for cert in certificates {
             let raw_certificates = picky_asn1_der::to_vec(&cert)?;
             certs.push(CertificateChoices::Certificate(picky_asn1_der::from_bytes(
                 &raw_certificates,

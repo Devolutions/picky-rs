@@ -238,7 +238,7 @@ impl ServerController {
         let req = req.load_body().await.bad_request()?;
 
         let mut body = req.body().to_vec();
-        body.retain(|&x| x != 0x0d && x != 0x0a && x != 0x00); // do not include CRL
+        body.retain(|&x| x != 0x0d && x != 0x0a && x != 0x00); // Removing CRLF entries
 
         let der = base64::decode(body)
             .map_err(|e| format!("base64 failed to decode timestamp request body: {}", e))

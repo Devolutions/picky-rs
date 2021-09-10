@@ -139,7 +139,7 @@ pub fn config() -> ArgMatches<'static> {
             .short("t")
             .long(ARG_TIMESTAMP)
             .value_name("URL")
-            .help("Specify url of a Authenticode TSA server to timestamp")
+            .help("Specify url of a Authenticode TSA server when timestamping")
             .takes_value(true)
             .requires(ARG_SIGN)
             .display_order(8)
