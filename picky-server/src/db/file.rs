@@ -5,7 +5,7 @@ use crate::db::{CertificateEntry, PickyStorage, StorageError, SCHEMA_LAST_VERSIO
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use std::fs::File;
-use std::io::{Read, Write};
+use std::io::{Read, Write, self, ErrorKind};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
@@ -13,6 +13,8 @@ use thiserror::Error;
 pub enum FileStorageError {
     #[error("generic error: {}", description)]
     Other { description: String },
+    #[error(transparent)]
+    Io(#[from] io::Error),
 }
 
 impl From<String> for FileStorageError {
@@ -78,17 +80,13 @@ where
     }
 
     async fn get(&self, key: &str, buf: &mut [u8]) -> Result<(), FileStorageError> {
-        let mut file = File::open(self.folder_path.join(key)).map_err(|e| {
-            format!(
-                "File doesn't exists ({}{}): {}",
-                self.folder_path.to_string_lossy(),
-                key,
-                e
-            )
-        })?;
+        let file_to_open = self.folder_path.join(key);
+        let mut file = File::open(file_to_open.as_path()).map_err(
+            FileStorageError::Io
+        )?;
 
         file.read_exact(buf)
-            .map_err(|e| format!("Error reading data from {}: {}", key, e).into())
+            .map_err(FileStorageError::Io)
     }
 }
 
@@ -279,8 +277,10 @@ impl PickyStorage for FileStorage {
         async move {
             let mut content = [0; 4];
             if let Err(err) = self.issued_timestamps_counter.get(&name, &mut content).await {
-                if !err.to_string().contains("File doesn't exists") {
-                    return Err(err.into());
+                if let FileStorageError::Io(io_error) = &err {
+                    if io_error.kind() != ErrorKind::NotFound {
+                        return Err(err.into())
+                    }
                 }
             }
 

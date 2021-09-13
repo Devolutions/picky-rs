@@ -127,7 +127,7 @@ impl SignatureAlgorithm {
 
         Ok(())
     }
-    
+
     pub fn hash_algorithm(&self) -> HashAlgorithm {
         match &self {
             SignatureAlgorithm::RsaPkcs1v15(hash_algo) => *hash_algo,
