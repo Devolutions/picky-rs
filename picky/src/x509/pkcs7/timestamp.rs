@@ -137,6 +137,8 @@ impl TimestampRequest {
         &self.0.content
     }
 
+    pub fn into_content(self) -> EncapsulatedContentInfo { self.0.content }
+
     pub fn digest(&self) -> &[u8] {
         if let ExplicitContextTag0(ContentValue::Data(data)) = self.0.content.content.as_ref().unwrap() {
             &data.0

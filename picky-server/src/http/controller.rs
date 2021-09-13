@@ -289,7 +289,7 @@ impl ServerController {
         let authenticode_signature = AuthenticodeSignatureBuilder::new()
             .digest_algorithm(picky_server_hash)
             .signing_key(&intermediate_pk)
-            .content_info(timestamp_request.content().clone())
+            .content_info(timestamp_request.into_content())
             .authenticated_attributes(attributes)
             .issuer_and_serial_number(
                 intermediate_cert.issuer_name(),
