@@ -278,7 +278,7 @@ impl ServerController {
             .internal_error()?;
 
         let digest = timestamp_request.digest();
-        let picky_server_hash = config.signing_algorithm.inner_hash_algo();
+        let picky_server_hash = config.signing_algorithm.hash_algorithm();
 
         let attributes = vec![
             Attribute::new_content_type_pkcs7(),

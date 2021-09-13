@@ -127,8 +127,8 @@ impl SignatureAlgorithm {
 
         Ok(())
     }
-
-    pub fn inner_hash_algo(&self) -> HashAlgorithm {
+    
+    pub fn hash_algorithm(&self) -> HashAlgorithm {
         match &self {
             SignatureAlgorithm::RsaPkcs1v15(hash_algo) => *hash_algo,
         }
