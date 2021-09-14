@@ -10,17 +10,19 @@ use lief::{Binary, LogLevel};
 use picky::hash::HashAlgorithm;
 use picky::key::PrivateKey;
 use picky::x509::pkcs7::authenticode::{AuthenticodeSignature, ShaVariant};
+use picky::x509::pkcs7::timestamp::Timestamper;
 use picky::x509::pkcs7::Pkcs7;
 use picky::x509::wincert::{CertificateType, WinCertificate};
 
 use crate::config::{
     ARG_BINARY, ARG_LOGGING, ARG_LOGGING_CRITICAL, ARG_LOGGING_DEBUG, ARG_LOGGING_ERR, ARG_LOGGING_INFO,
-    ARG_LOGGING_TRACE, ARG_LOGGING_WARN, ARG_OUTPUT, ARG_PS_SCRIPT, CRLF, PS_AUTHENTICODE_FOOTER,
+    ARG_LOGGING_TRACE, ARG_LOGGING_WARN, ARG_OUTPUT, ARG_PS_SCRIPT, ARG_TIMESTAMP, CRLF, PS_AUTHENTICODE_FOOTER,
     PS_AUTHENTICODE_HEADER, PS_AUTHENTICODE_LINES_SPLITTER,
 };
 use crate::get_utf8_file_name;
 use crate::verify::extract_signed_ps_file_content;
 use picky::pem::Pem;
+use picky::x509::pkcs7::timestamp::http_timestamp::AuthenticodeTimestamper;
 
 const UTF8_BOM: [u8; 3] = [0xEF, 0xBB, 0xBF];
 const UTF16_BE_BOM: [u8; 2] = [0xFE, 0xFF];
@@ -47,9 +49,15 @@ pub fn sign(
     let private_key = PrivateKey::from_pem(&private_key).context("Failed to parse RSA Private key")?;
     let pkcs7 = Pkcs7::from_pem(&certfile).context("Failed to parse Pkcs7 certificate")?;
 
+    let timestamper = if let Some(url) = matches.value_of(ARG_TIMESTAMP) {
+        Some(AuthenticodeTimestamper::new(url)?)
+    } else {
+        None
+    };
+
     if matches.is_present(ARG_PS_SCRIPT) {
         for ps_file in files.iter() {
-            sign_script(&pkcs7, &private_key, ps_file.as_path())?;
+            sign_script(&pkcs7, &private_key, ps_file.as_path(), timestamper.as_ref())?;
 
             let file_name = get_utf8_file_name(ps_file.as_path())?;
             println!("Signed {} successfully", file_name);
@@ -88,6 +96,7 @@ pub fn sign(
             file.clone(),
             PathBuf::from(output_path),
             binary_name.to_owned(),
+            timestamper.as_ref(),
         )?;
 
         println!("Signed {} successfully!", binary_name);
@@ -96,7 +105,12 @@ pub fn sign(
     Ok(())
 }
 
-fn sign_script(pkcs7: &Pkcs7, private_key: &PrivateKey, file_path: &Path) -> anyhow::Result<()> {
+fn sign_script(
+    pkcs7: &Pkcs7,
+    private_key: &PrivateKey,
+    file_path: &Path,
+    timestamper: Option<&impl Timestamper>,
+) -> anyhow::Result<()> {
     let mut file = OpenOptions::new()
         .append(true)
         .read(true)
@@ -106,8 +120,15 @@ fn sign_script(pkcs7: &Pkcs7, private_key: &PrivateKey, file_path: &Path) -> any
     let checksum = compute_ps_file_checksum_from_content(file_path, HashAlgorithm::SHA2_256)
         .with_context(|| format!("Failed to compute checksum for {:?}", file))?;
 
-    let authenticode_signature = AuthenticodeSignature::new(pkcs7, checksum, ShaVariant::SHA2_256, private_key, None)
-        .with_context(|| format!("Failed to create authenticode signature for {:?}", file))?
+    let mut authenticode_signature =
+        AuthenticodeSignature::new(pkcs7, checksum, ShaVariant::SHA2_256, private_key, None)
+            .with_context(|| format!("Failed to create authenticode signature for {:?}", file))?;
+
+    if timestamper.is_some() {
+        authenticode_signature.timestamp(timestamper.unwrap(), HashAlgorithm::SHA2_256)?;
+    }
+
+    let raw_authenticode_signature = authenticode_signature
         .to_pem()
         .context("Failed convert to authenticode signature to PEM format")?
         .to_string();
@@ -117,7 +138,7 @@ fn sign_script(pkcs7: &Pkcs7, private_key: &PrivateKey, file_path: &Path) -> any
     ps_authenticode_signature.push_str(PS_AUTHENTICODE_HEADER);
     ps_authenticode_signature.push_str(CRLF);
 
-    for line in authenticode_signature.lines() {
+    for line in raw_authenticode_signature.lines() {
         if line != "-----END PKCS7-----" && line != "-----BEGIN PKCS7-----" {
             ps_authenticode_signature.push_str(PS_AUTHENTICODE_LINES_SPLITTER);
             ps_authenticode_signature.push_str(line);
@@ -137,6 +158,7 @@ fn sign_binary(
     binary_path: PathBuf,
     output_path: PathBuf,
     binary_name: String,
+    timestamper: Option<&impl Timestamper>,
 ) -> anyhow::Result<()> {
     let binary = Binary::new(binary_path).map_err(|err| anyhow!("Failed to load the executable: {}", err))?;
 
@@ -144,15 +166,22 @@ fn sign_binary(
         .get_file_hash_sha256()
         .map_err(|err| anyhow!("Failed to compute file hash: {}", err))?;
 
-    let authenticode_signature =
+    let mut authenticode_signature =
         AuthenticodeSignature::new(pkcs7, file_hash, ShaVariant::SHA2_256, private_key, Some(binary_name))
-            .context("Failed to create authenticode signature for")?
-            .to_der()
-            .context("Failed to convert authenticode signature to der")?;
+            .context("Failed to create authenticode signature for")?;
 
-    let wincert = WinCertificate::from_certificate(authenticode_signature, CertificateType::WinCertTypePkcsSignedData)
-        .encode()
-        .map_err(|err| anyhow!("Failed to wrap authenticode signature in WinCertificate: {}", err))?;
+    if timestamper.is_some() {
+        authenticode_signature.timestamp(timestamper.unwrap(), HashAlgorithm::SHA2_256)?;
+    }
+
+    let raw_authenticode_signature = authenticode_signature
+        .to_der()
+        .context("Failed to convert authenticode signature to der")?;
+
+    let wincert =
+        WinCertificate::from_certificate(raw_authenticode_signature, CertificateType::WinCertTypePkcsSignedData)
+            .encode()
+            .map_err(|err| anyhow!("Failed to wrap authenticode signature in WinCertificate: {}", err))?;
 
     binary
         .set_authenticode_data(wincert)

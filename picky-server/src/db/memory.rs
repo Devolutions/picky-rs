@@ -52,6 +52,7 @@ pub struct MemoryStorage {
     keys: MemoryRepository<Vec<u8>>,
     key_identifiers: MemoryRepository<String>,
     hash_lookup: MemoryRepository<String>,
+    issued_timestamps_counter: MemoryRepository<u32>,
 }
 
 impl MemoryStorage {
@@ -134,6 +135,22 @@ impl PickyStorage for MemoryStorage {
                 .ok_or_else(|| MemoryStorageError::Other {
                     description: format!("hash not found using name {}", name),
                 })?)
+        }
+        .boxed()
+    }
+
+    fn increase_issued_authenticode_timestamps_counter(&self) -> BoxFuture<'_, Result<(), StorageError>> {
+        async move {
+            let mut coll = self
+                .issued_timestamps_counter
+                .repo
+                .write()
+                .expect("couldn't get write lock on repo (poisoned)");
+            let counter = coll.entry("timestamps_counter".to_string()).or_insert(0);
+
+            *counter += 1;
+
+            Ok(())
         }
         .boxed()
     }

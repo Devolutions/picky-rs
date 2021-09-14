@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Support for MD5 hashing
 - CTL implementation behind `ctl` feature
+- CTL fetching over HTTP is behind `ctl_http_fetch` feature
 - `Pkcs7::digest_algorithms`
 - `Pkcs7::signer_infos`
 - `Pkcs7::encapsulated_content_info`
@@ -32,6 +33,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `impl From<Pkcs7> for AuthenticodeSignature`
 - `From<AuthenticodeSignature> for Pkcs7`
 - Authenticode validation
+- Support for `AuthenticodeSignature` timestamping:
+  - Method `timestamp` to `AuthenticodeSignature`
+  - `Timestamper` trait.
+  - Timestamping implementation using reqwest is behind `http_timestamp` feature
+- Add  Authenticode timestamp request struct - `TimestampRequest`
+- Add `AuthenticodeBuilder` for easier `AuthenticodeSignature` creation
+- Add `SignatureAlgorithm::hash_algorithm`
 
 ### Changed
 

@@ -11,6 +11,8 @@ use lief::Binary;
 use picky::hash::HashAlgorithm;
 use picky::x509::date::UTCDate;
 use picky::x509::pkcs7::authenticode::{AuthenticodeSignature, AuthenticodeValidator, ShaVariant};
+use picky::x509::pkcs7::ctl::http_fetch::CtlHttpFetch;
+use picky::x509::pkcs7::ctl::CertificateTrustList;
 use picky::x509::wincert::WinCertificate;
 
 use crate::config::{
@@ -101,11 +103,18 @@ pub fn verify(matches: &ArgMatches, files: &[PathBuf]) -> anyhow::Result<()> {
         .cloned()
         .collect::<Vec<String>>();
 
+    let ctl = if flags.iter().any(|flag| flag.as_str() == ARG_VERIFY_CHAIN) {
+        let ctl = CertificateTrustList::fetch()?;
+        Some(ctl)
+    } else {
+        None
+    };
+
     for (authenticode_signature, file_name, file_hash) in authenticode_signatures {
         let validator = authenticode_signature.authenticode_verifier();
 
         let now = UTCDate::now();
-        let validator = apply_flags(&validator, &flags, &now, file_hash);
+        let validator = apply_flags(&validator, &flags, &now, file_hash, ctl.as_ref());
 
         match validator.verify() {
             Ok(()) => println!("{} has valid digital signature", file_name),
@@ -190,6 +199,7 @@ fn apply_flags<'a>(
     flags: &[String],
     time: &'a UTCDate,
     file_hash: Vec<u8>,
+    ctl: Option<&'a CertificateTrustList>,
 ) -> &'a AuthenticodeValidator<'a> {
     let validator = validator
         .ignore_basic_authenticode_validation()
@@ -218,7 +228,12 @@ fn apply_flags<'a>(
     };
 
     let validator = if flags.iter().any(|flag| flag.as_str() == ARG_VERIFY_CHAIN) {
-        validator.require_chain_check()
+        let validator = validator.require_chain_check();
+        if let Some(ctl) = ctl {
+            validator.ctl(ctl)
+        } else {
+            validator
+        }
     } else {
         &validator
     };

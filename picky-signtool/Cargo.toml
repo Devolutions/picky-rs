@@ -11,9 +11,9 @@ clap = "2.33"
 walkdir = "2.3"
 base64 = "0.13"
 encoding = "0.2"
-lief-rs = { git = "https://github.com/Devolutions/lief-rs.git", rev = "797f33" }
+lief-rs = { git = "https://github.com/Devolutions/lief-rs.git", rev = "8f439c" }
 
 [dependencies.picky]
 path = "../picky"
 default-features = false
-features = ["wincert", "ctl"]
+features = ["wincert", "ctl", "ctl_http_fetch", "http_timestamp"]

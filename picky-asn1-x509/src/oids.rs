@@ -177,12 +177,14 @@ define_oid! {
     SHAKE256 => shake256 => "2.16.840.1.101.3.4.2.12",
 
     // authenticode
+    SIGNING_TIME => signing_time => "1.2.840.113549.1.9.5",
     COUNTER_SIGN => counter_sign => "1.2.840.113549.1.9.6",
     SPC_INDIRECT_DATA_OBJID => spc_indirect_data_objid => "1.3.6.1.4.1.311.2.1.4",
     SPC_STATEMENT_TYPE => spc_statement_type => "1.3.6.1.4.1.311.2.1.11",
     SPC_SP_OPUS_INFO_OBJID => spc_sp_opus_info_objid => "1.3.6.1.4.1.311.2.1.12",
     SPC_PE_IMAGE_DATAOBJ => spc_pe_image_dataobj => "1.3.6.1.4.1.311.2.1.15",
     SPC_SIPINFO_OBJID => spc_sip_info_objid => "1.3.6.1.4.1.311.2.1.30",
+    TIMESTAMP_REQUEST => timestamp_request => "1.3.6.1.4.1.311.3.2.1",
     MS_COUNTER_SIGN => ms_counter_signature => "1.3.6.1.4.1.311.3.3.1",
 
     // CTL

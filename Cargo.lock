@@ -1399,12 +1399,12 @@ checksum = "c7d73b3f436185384286bd8098d17ec07c9a7d2388a6599f824d8502b529702a"
 [[package]]
 name = "lief-rs"
 version = "0.1.0"
-source = "git+https://github.com/Devolutions/lief-rs.git?rev=797f33#797f3395a806c1a003039d80cc84ccbb6d382770"
+source = "git+https://github.com/Devolutions/lief-rs.git?rev=8f439c#8f439c2397035eb5e1d72277dd12eb0717930d67"
 dependencies = [
  "bitflags",
  "image",
  "lief-sys",
- "picky 6.4.0 (git+https://github.com/Devolutions/picky-rs.git?rev=610a4ef)",
+ "picky 6.4.0 (git+https://github.com/Devolutions/picky-rs.git?rev=a0a0d1)",
  "thiserror",
  "widestring",
 ]
@@ -1412,7 +1412,7 @@ dependencies = [
 [[package]]
 name = "lief-sys"
 version = "0.1.0"
-source = "git+https://github.com/Devolutions/lief-rs.git?rev=797f33#797f3395a806c1a003039d80cc84ccbb6d382770"
+source = "git+https://github.com/Devolutions/lief-rs.git?rev=8f439c#8f439c2397035eb5e1d72277dd12eb0717930d67"
 dependencies = [
  "cmake",
 ]
@@ -2015,7 +2015,7 @@ dependencies = [
 [[package]]
 name = "picky"
 version = "6.4.0"
-source = "git+https://github.com/Devolutions/picky-rs.git?rev=610a4ef#610a4ef4d570e7b965f49a95a25b389763c5fe56"
+source = "git+https://github.com/Devolutions/picky-rs.git?rev=a0a0d1#a0a0d1216d86aa46693e0e78b137a233db2f872f"
 dependencies = [
  "aes-gcm",
  "base64 0.13.0",
@@ -2025,9 +2025,9 @@ dependencies = [
  "md-5 0.9.1",
  "num-bigint-dig",
  "oid",
- "picky-asn1 0.4.0 (git+https://github.com/Devolutions/picky-rs.git?rev=610a4ef)",
- "picky-asn1-der 0.2.5 (git+https://github.com/Devolutions/picky-rs.git?rev=610a4ef)",
- "picky-asn1-x509 0.6.1 (git+https://github.com/Devolutions/picky-rs.git?rev=610a4ef)",
+ "picky-asn1 0.4.0 (git+https://github.com/Devolutions/picky-rs.git?rev=a0a0d1)",
+ "picky-asn1-der 0.2.5 (git+https://github.com/Devolutions/picky-rs.git?rev=a0a0d1)",
+ "picky-asn1-x509 0.6.1 (git+https://github.com/Devolutions/picky-rs.git?rev=a0a0d1)",
  "rand 0.8.3",
  "rsa",
  "serde",
@@ -2052,7 +2052,7 @@ dependencies = [
 [[package]]
 name = "picky-asn1"
 version = "0.4.0"
-source = "git+https://github.com/Devolutions/picky-rs.git?rev=610a4ef#610a4ef4d570e7b965f49a95a25b389763c5fe56"
+source = "git+https://github.com/Devolutions/picky-rs.git?rev=a0a0d1#a0a0d1216d86aa46693e0e78b137a233db2f872f"
 dependencies = [
  "oid",
  "serde",
@@ -2076,9 +2076,9 @@ dependencies = [
 [[package]]
 name = "picky-asn1-der"
 version = "0.2.5"
-source = "git+https://github.com/Devolutions/picky-rs.git?rev=610a4ef#610a4ef4d570e7b965f49a95a25b389763c5fe56"
+source = "git+https://github.com/Devolutions/picky-rs.git?rev=a0a0d1#a0a0d1216d86aa46693e0e78b137a233db2f872f"
 dependencies = [
- "picky-asn1 0.4.0 (git+https://github.com/Devolutions/picky-rs.git?rev=610a4ef)",
+ "picky-asn1 0.4.0 (git+https://github.com/Devolutions/picky-rs.git?rev=a0a0d1)",
  "serde",
  "serde_bytes",
 ]
@@ -2101,13 +2101,13 @@ dependencies = [
 [[package]]
 name = "picky-asn1-x509"
 version = "0.6.1"
-source = "git+https://github.com/Devolutions/picky-rs.git?rev=610a4ef#610a4ef4d570e7b965f49a95a25b389763c5fe56"
+source = "git+https://github.com/Devolutions/picky-rs.git?rev=a0a0d1#a0a0d1216d86aa46693e0e78b137a233db2f872f"
 dependencies = [
  "base64 0.13.0",
  "num-bigint-dig",
  "oid",
- "picky-asn1 0.4.0 (git+https://github.com/Devolutions/picky-rs.git?rev=610a4ef)",
- "picky-asn1-der 0.2.5 (git+https://github.com/Devolutions/picky-rs.git?rev=610a4ef)",
+ "picky-asn1 0.4.0 (git+https://github.com/Devolutions/picky-rs.git?rev=a0a0d1)",
+ "picky-asn1-der 0.2.5 (git+https://github.com/Devolutions/picky-rs.git?rev=a0a0d1)",
  "serde",
  "widestring",
 ]

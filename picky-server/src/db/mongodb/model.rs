@@ -143,3 +143,20 @@ pub struct HashLookupEntry {
 impl mongodm::Model for HashLookupEntry {
     type CollConf = HashCollConf;
 }
+
+pub struct TimestampCollConf;
+
+impl mongodm::CollectionConfig for TimestampCollConf {
+    fn collection_name() -> &'static str {
+        "timestamps_counter"
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct IssuedTimestampsCounter {
+    pub counter: i64,
+}
+
+impl mongodm::Model for IssuedTimestampsCounter {
+    type CollConf = TimestampCollConf;
+}

@@ -5,7 +5,7 @@ use crate::db::{CertificateEntry, PickyStorage, StorageError, SCHEMA_LAST_VERSIO
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use std::fs::File;
-use std::io::{Read, Write};
+use std::io::{self, ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
@@ -13,6 +13,8 @@ use thiserror::Error;
 pub enum FileStorageError {
     #[error("generic error: {}", description)]
     Other { description: String },
+    #[error(transparent)]
+    Io(#[from] io::Error),
 }
 
 impl From<String> for FileStorageError {
@@ -76,6 +78,13 @@ where
             .map_err(|e| format!("Error writing data to {}: {}", key, e))?;
         Ok(())
     }
+
+    async fn get(&self, key: &str, buf: &mut [u8]) -> Result<(), FileStorageError> {
+        let file_to_open = self.folder_path.join(key);
+        let mut file = File::open(file_to_open.as_path()).map_err(FileStorageError::Io)?;
+
+        file.read_exact(buf).map_err(FileStorageError::Io)
+    }
 }
 
 const REPO_CERTIFICATE_OLD: &str = "CertificateStore/";
@@ -85,6 +94,7 @@ const REPO_KEY: &str = "key_store/";
 const REPO_CERT_NAME: &str = "name_store/";
 const REPO_KEY_IDENTIFIER: &str = "key_identifier_store/";
 const REPO_HASH_LOOKUP_TABLE: &str = "hash_lookup_store/";
+const REPO_AUTHENTICODE_TIMESTAMP: &str = "timestamp_counter_store/";
 const TXT_EXT: &str = ".txt";
 const DER_EXT: &str = ".der";
 
@@ -96,6 +106,7 @@ pub struct FileStorage {
     keys: FileRepo<Vec<u8>>,
     key_identifiers: FileRepo<String>,
     hash_lookup: FileRepo<String>,
+    issued_timestamps_counter: FileRepo<[u8; 4]>,
 }
 
 impl FileStorage {
@@ -132,6 +143,8 @@ impl FileStorage {
                 .expect("couldn't initialize key identifiers repo"),
             hash_lookup: FileRepo::new(&config.file_backend_path, REPO_HASH_LOOKUP_TABLE)
                 .expect("couldn't initialize hash lookup table repo"),
+            issued_timestamps_counter: FileRepo::new(&config.file_backend_path, REPO_AUTHENTICODE_TIMESTAMP)
+                .expect("couldn't initialize authenticode timestamp counter repo"),
         }
     }
 
@@ -251,6 +264,30 @@ impl PickyStorage for FileStorage {
                 .map_err(|e| FileStorageError::Other {
                     description: format!("error reading file '{}': {}", file_path.to_string_lossy(), e),
                 })?)
+        }
+        .boxed()
+    }
+
+    fn increase_issued_authenticode_timestamps_counter(&self) -> BoxFuture<'_, Result<(), StorageError>> {
+        let name = format!("{}{}", "timestamp_counter_store", TXT_EXT);
+
+        async move {
+            let mut content = [0; 4];
+            if let Err(err) = self.issued_timestamps_counter.get(&name, &mut content).await {
+                if let FileStorageError::Io(io_error) = &err {
+                    if io_error.kind() != ErrorKind::NotFound {
+                        return Err(err.into());
+                    }
+                }
+            }
+
+            let mut counter = u32::from_le_bytes([content[0], content[1], content[2], content[3]]);
+            counter += 1;
+            self.issued_timestamps_counter
+                .insert(&name, &counter.to_le_bytes())
+                .await?;
+
+            Ok(())
         }
         .boxed()
     }

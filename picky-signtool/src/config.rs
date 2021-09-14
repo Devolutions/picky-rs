@@ -16,6 +16,7 @@ pub const ARG_SIGN: &str = "sign";
 
 pub const ARG_CERTFILE: &str = "certfile";
 pub const ARG_PRIVATE_KEY: &str = "rsa-private-key";
+pub const ARG_TIMESTAMP: &str = "timestamp";
 
 pub const ARG_VERIFY: &str = "verify";
 pub const ARG_VERIFY_BASIC: &str = "basic";
@@ -134,6 +135,15 @@ pub fn config() -> ArgMatches<'static> {
                 .requires_all(&[ARG_SIGN, ARG_CERTFILE])
                 .display_order(7),
         )
+        .arg(Arg::with_name(ARG_TIMESTAMP)
+            .short("t")
+            .long(ARG_TIMESTAMP)
+            .value_name("URL")
+            .help("Specify url of a Authenticode TSA server when timestamping")
+            .takes_value(true)
+            .requires(ARG_SIGN)
+            .display_order(8)
+        )
         .arg(
             Arg::with_name(ARG_VERIFY)
                 .short("v")
@@ -162,7 +172,7 @@ pub fn config() -> ArgMatches<'static> {
                     ARG_VERIFY_CHAIN,
                     ARG_VERIFY_CA,
                 ])
-                .display_order(8),
+                .display_order(9),
         )
         .arg(
             Arg::with_name(ARG_LOGGING)
@@ -180,7 +190,7 @@ pub fn config() -> ArgMatches<'static> {
                     ARG_LOGGING_ERR,
                     ARG_LOGGING_CRITICAL,
                 ])
-                .display_order(9),
+                .display_order(10),
         )
         .get_matches()
 }

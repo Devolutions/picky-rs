@@ -61,7 +61,9 @@ http_signature = []
 
 # secondary features
 pkcs7 = ["x509", "picky-asn1-x509/pkcs7"]
-ctl = ["picky-asn1-x509/ctl", "pkcs7", "chrono_conversion", "reqwest", "cab"]
+http_timestamp = ["reqwest"]
+ctl = ["picky-asn1-x509/ctl", "pkcs7", "chrono_conversion"]
+ctl_http_fetch = ["reqwest", "cab"]
 wincert = ["byteorder"]
 http_trait_impl = ["http"]
 chrono_conversion = ["chrono", "picky-asn1/chrono_conversion"]

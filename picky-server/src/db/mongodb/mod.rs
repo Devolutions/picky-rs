@@ -113,6 +113,7 @@ impl MongoStorage {
                     let key_collection = storage.repository::<Key>();
                     let name_collection = storage.repository::<Name>();
                     let hash_lookup_collection = storage.repository::<HashLookupEntry>();
+                    let timestamp_collection = storage.repository::<IssuedTimestampsCounter>();
 
                     let mut original_data =
                         HashMap::with_capacity(usize::try_from(certs_count).expect("try from certs count"));
@@ -152,6 +153,7 @@ impl MongoStorage {
                     key_collection.drop(None).await.expect("drop key store");
                     name_collection.drop(None).await.expect("drop name store");
                     hash_lookup_collection.drop(None).await.expect("drop hash lookup table");
+                    timestamp_collection.drop(None).await.expect("drop timestamp store");
 
                     for (_, (cert_der, key_pkcs10)) in original_data.into_iter() {
                         let cert = Cert::from_der(&cert_der).expect("decode cert from der");
@@ -380,6 +382,29 @@ impl PickyStorage for MongoStorage {
                 })?
                 .value;
             Ok(addressing_hash)
+        }
+        .boxed()
+    }
+
+    fn increase_issued_authenticode_timestamps_counter(&self) -> BoxFuture<'_, Result<(), StorageError>> {
+        async move {
+            let repository = self.repository::<IssuedTimestampsCounter>();
+            let counter = if let Some(issued_timestamps_counter) = repository.find_one(doc!(), None).await? {
+                issued_timestamps_counter.counter + 1
+            } else {
+                1
+            };
+
+            let issued_timestamps_counter = IssuedTimestampsCounter { counter };
+            self.repository::<IssuedTimestampsCounter>()
+                .replace_one(
+                    doc! {},
+                    &issued_timestamps_counter,
+                    Some(ReplaceOptions::builder().upsert(true).build()),
+                )
+                .await?;
+
+            Ok(())
         }
         .boxed()
     }

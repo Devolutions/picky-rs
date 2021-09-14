@@ -28,6 +28,7 @@ use crate::{oids, DigestInfo};
 pub enum ContentValue {
     SpcIndirectDataContent(SpcIndirectDataContent),
     OctetString(OctetStringAsn1),
+    Data(OctetStringAsn1),
     #[cfg(feature = "ctl")]
     CertificateTrustList(Ctl),
 }
@@ -42,6 +43,7 @@ impl Serialize for ContentValue {
                 spc_indirect_data_content.serialize(serializer)
             }
             ContentValue::OctetString(octet_string) => octet_string.serialize(serializer),
+            ContentValue::Data(octet_string) => octet_string.serialize(serializer),
             #[cfg(feature = "ctl")]
             ContentValue::CertificateTrustList(ctl) => ctl.serialize(serializer),
         }
@@ -53,6 +55,15 @@ pub struct EncapsulatedContentInfo {
     pub content_type: ObjectIdentifierAsn1,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub content: Option<ExplicitContextTag0<ContentValue>>,
+}
+
+impl EncapsulatedContentInfo {
+    pub fn new_pkcs7_data(data: Option<Vec<u8>>) -> Self {
+        Self {
+            content_type: oids::pkcs7().into(),
+            content: data.map(|data| ContentValue::Data(data.into()).into()),
+        }
+    }
 }
 
 impl<'de> de::Deserialize<'de> for EncapsulatedContentInfo {
@@ -91,7 +102,9 @@ impl<'de> de::Deserialize<'de> for EncapsulatedContentInfo {
                         )
                         .into(),
                     ),
-                    oids::PKCS7 => None,
+                    oids::PKCS7 => seq
+                        .next_element::<ExplicitContextTag0<OctetStringAsn1>>()?
+                        .map(|value| ExplicitContextTag0(ContentValue::Data(value.0))),
                     #[cfg(feature = "ctl")]
                     oids::CERT_TRUST_LIST => Some(
                         ContentValue::CertificateTrustList(
