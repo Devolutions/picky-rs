@@ -7,8 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added 
-- Authenticode timestamping option(behind `/timestamp` REST endpoint).
+### Added
+
+- Authenticode timestamping option (behind `/timestamp` REST endpoint)
 
 ### Changed
 

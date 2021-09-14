@@ -33,13 +33,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `impl From<Pkcs7> for AuthenticodeSignature`
 - `From<AuthenticodeSignature> for Pkcs7`
 - Authenticode validation
-- Add possibility to timestamp `AuthenticodeSignature`: 
-  - Add method `timestamp` to `AuthenticodeSignature`.
-  - Add `Timestamper` trait.
-  - Timestamping over HTTP is behind `http_timestamp` feature.
+- Support for `AuthenticodeSignature` timestamping:
+  - Method `timestamp` to `AuthenticodeSignature`
+  - `Timestamper` trait.
+  - Timestamping implementation using reqwest is behind `http_timestamp` feature
 - Add  Authenticode timestamp request struct - `TimestampRequest`
-- Add `AuthenticodeBuilder` for easier creating `AuthenticodeSignature` without usage low-level API.
-- Add `SignatureAlgorithm::hash_algorithm` 
+- Add `AuthenticodeBuilder` for easier `AuthenticodeSignature` creation
+- Add `SignatureAlgorithm::hash_algorithm`
 
 ### Changed
 
