@@ -12,11 +12,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for Authenticode timestamp deserialization/serialization
 - CTL implementation behind `ctl` feature
 - New `SpcSipInfo` struct
+- Add serialization/deserialization of Authenticode `TimestampRequest`. 
+- Add timestamp request oid.
+- Add a few methods for creating an Attribute without usage low-level API:
+  - `Attribute::new_content_type_pkcs7`
+  - `Attribute::new_signing_time`
+  - `Attribute::new_message_digest`
+- Add `EncapsulatedContentInfo::new_pkcs7_data` method.
 
 ### Changed
 
 - (Breaking) `ShaVariant` enum is extended for MD5 and SH1 algorithms
 - (Breaking) Add `SpcStatementType` variant in `AttributeValues` enum
+- (Breaking) Add `SigningTime` variant in `AttributeValues` enum
 - `SpcAttributeAndOptionalValue` now supports both `SpcPeImageData` and `SpcSipInfo` values
 
 ### Fixed
