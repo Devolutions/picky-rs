@@ -11,8 +11,9 @@ use lief::Binary;
 use picky::hash::HashAlgorithm;
 use picky::x509::date::UTCDate;
 use picky::x509::pkcs7::authenticode::{AuthenticodeSignature, AuthenticodeValidator, ShaVariant};
+use picky::x509::pkcs7::ctl::http_fetch::CtlHttpFetch;
+use picky::x509::pkcs7::ctl::CertificateTrustList;
 use picky::x509::wincert::WinCertificate;
-use picky::x509::pkcs7::ctl::{CertificateTrustList, http_fetch::CtlHttpFetch};
 
 use crate::config::{
     ARG_BINARY, ARG_PS_SCRIPT, ARG_VERIFY, ARG_VERIFY_BASIC, ARG_VERIFY_CA, ARG_VERIFY_CHAIN,
@@ -198,7 +199,7 @@ fn apply_flags<'a>(
     flags: &[String],
     time: &'a UTCDate,
     file_hash: Vec<u8>,
-    ctl: Option<&'a CertificateTrustList>
+    ctl: Option<&'a CertificateTrustList>,
 ) -> &'a AuthenticodeValidator<'a> {
     let validator = validator
         .ignore_basic_authenticode_validation()

@@ -5,7 +5,7 @@ use crate::db::{CertificateEntry, PickyStorage, StorageError, SCHEMA_LAST_VERSIO
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use std::fs::File;
-use std::io::{Read, Write, self, ErrorKind};
+use std::io::{self, ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
@@ -81,12 +81,9 @@ where
 
     async fn get(&self, key: &str, buf: &mut [u8]) -> Result<(), FileStorageError> {
         let file_to_open = self.folder_path.join(key);
-        let mut file = File::open(file_to_open.as_path()).map_err(
-            FileStorageError::Io
-        )?;
+        let mut file = File::open(file_to_open.as_path()).map_err(FileStorageError::Io)?;
 
-        file.read_exact(buf)
-            .map_err(FileStorageError::Io)
+        file.read_exact(buf).map_err(FileStorageError::Io)
     }
 }
 
@@ -279,7 +276,7 @@ impl PickyStorage for FileStorage {
             if let Err(err) = self.issued_timestamps_counter.get(&name, &mut content).await {
                 if let FileStorageError::Io(io_error) = &err {
                     if io_error.kind() != ErrorKind::NotFound {
-                        return Err(err.into())
+                        return Err(err.into());
                     }
                 }
             }

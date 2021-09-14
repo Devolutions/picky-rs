@@ -1,9 +1,9 @@
+use crate::x509::pkcs7::{Pkcs7, Pkcs7Error};
 use picky_asn1_x509::content_info::ContentValue;
 use picky_asn1_x509::pkcs7::ctl::CTLEntry;
-use crate::x509::pkcs7::{Pkcs7, Pkcs7Error};
+pub use picky_asn1_x509::pkcs7::ctl::CTLEntryAttributeValues;
 use std::io;
 use thiserror::Error;
-pub use picky_asn1_x509::pkcs7::ctl::CTLEntryAttributeValues;
 
 #[derive(Debug, Error)]
 pub enum CtlError {
@@ -44,12 +44,10 @@ impl CertificateTrustList {
     }
 }
 
-
-
 #[cfg(feature = "ctl_http_fetch")]
 pub mod http_fetch {
-    use std::io::{Cursor, Read};
     use super::*;
+    use std::io::{Cursor, Read};
 
     pub trait CtlHttpFetch {
         fn fetch() -> Result<CertificateTrustList, CtlError>;
@@ -95,9 +93,9 @@ pub mod http_fetch {
 
 #[cfg(test)]
 mod tests {
+    use super::http_fetch::CtlHttpFetch;
     use super::*;
     use crate::x509::pkcs7::Pkcs7;
-    use super::http_fetch::CtlHttpFetch;
 
     #[test]
     fn parse_certificate_trust_list_in_der() {

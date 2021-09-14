@@ -824,7 +824,11 @@ impl<'a> AuthenticodeValidator<'a> {
 
     // https://github.com/robstradling/authroot_parser was used as a reference while implementing this function
     #[cfg(feature = "ctl")]
-    fn h_verify_ca_certificate_against_ctl(&self, ctl: &CertificateTrustList, ca_name: &DirectoryName) -> AuthenticodeResult<()> {
+    fn h_verify_ca_certificate_against_ctl(
+        &self,
+        ctl: &CertificateTrustList,
+        ca_name: &DirectoryName,
+    ) -> AuthenticodeResult<()> {
         use chrono::{DateTime, Duration, NaiveDate, Utc};
         use picky_asn1::wrapper::OctetStringAsn1;
         use std::ops::Add;
@@ -1645,7 +1649,6 @@ mod test {
             Some("self_signed_authenticode_signature_validation_against_ctl_with_excluded_ca_certificate".to_string()),
         )
         .unwrap();
-
 
         let validator = authenticode_signature.authenticode_verifier();
         let ca_name = authenticode_signature
