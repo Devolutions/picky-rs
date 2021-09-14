@@ -9,9 +9,6 @@ use picky_asn1_x509::pkcs7::content_info::{ContentValue, EncapsulatedContentInfo
 use picky_asn1_x509::pkcs7::signed_data::SignedData;
 use picky_asn1_x509::pkcs7::signer_info::UnsignedAttribute;
 use picky_asn1_x509::signer_info::UnsignedAttributeValue;
-use reqwest::blocking::Client;
-use reqwest::header::{CACHE_CONTROL, CONTENT_LENGTH, CONTENT_TYPE};
-use reqwest::{Method, StatusCode, Url};
 
 use thiserror::Error;
 
@@ -21,14 +18,18 @@ pub enum TimestampError {
     Asn1DerError(#[from] CertError),
     #[error(transparent)]
     Pkcs7Error(#[from] Pkcs7Error),
-    #[error("Failed to decode base64 response")]
-    Base64DecodeError,
-    #[error("Remote Authenticode TSA server responded with `{0}` status code")]
-    BadResponse(StatusCode),
     #[error("Timestamp token is empty")]
     TimestampTokenEmpty,
+    #[cfg(feature = "http_timestamp")]
+    #[error("Failed to decode base64 response")]
+    Base64DecodeError,
+    #[cfg(feature = "http_timestamp")]
+    #[error("Remote Authenticode TSA server responded with `{0}` status code")]
+    BadResponse(reqwest::StatusCode),
+    #[cfg(feature = "http_timestamp")]
     #[error("Remote Authenticode TSA server response error: {0}")]
     RemoteServerResponseError(reqwest::Error),
+    #[cfg(feature = "http_timestamp")]
     #[error("Badly formatted URL")]
     BadUrl,
 }
@@ -38,82 +39,90 @@ pub trait Timestamper: Sized {
     fn modify_signed_data(&self, token: Pkcs7, signed_data: &mut SignedData);
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct AuthenticodeTimestamper {
-    url: Url,
-}
+#[cfg(feature = "http_timestamp")]
+pub mod http_timestamp {
+    use super::*;
+    use reqwest::blocking::Client;
+    use reqwest::header::{CACHE_CONTROL, CONTENT_LENGTH, CONTENT_TYPE};
+    use reqwest::{Method, StatusCode, Url};
 
-impl AuthenticodeTimestamper {
-    pub fn new<U: AsRef<str>>(url: U) -> Result<AuthenticodeTimestamper, TimestampError> {
-        let url = Url::parse(url.as_ref()).map_err(|_| TimestampError::BadUrl)?;
-        Ok(Self { url })
+    #[derive(Clone, Debug, PartialEq)]
+    pub struct AuthenticodeTimestamper {
+        url: Url,
     }
-}
 
-impl Timestamper for AuthenticodeTimestamper {
-    fn timestamp(&self, digest: Vec<u8>, _: HashAlgorithm) -> Result<Pkcs7, TimestampError> {
-        let timestamp_request = TimestampRequest::new(digest);
+    impl AuthenticodeTimestamper {
+        pub fn new<U: AsRef<str>>(url: U) -> Result<AuthenticodeTimestamper, TimestampError> {
+            let url = Url::parse(url.as_ref()).map_err(|_| TimestampError::BadUrl)?;
+            Ok(Self { url })
+        }
+    }
 
-        let client = Client::new();
-        let content = base64::encode(timestamp_request.to_der()?);
+    impl Timestamper for AuthenticodeTimestamper {
+        fn timestamp(&self, digest: Vec<u8>, _: HashAlgorithm) -> Result<Pkcs7, TimestampError> {
+            let timestamp_request = TimestampRequest::new(digest);
 
-        let request = client
-            .request(Method::POST, self.url.clone())
-            .header(CACHE_CONTROL, "no-cache")
-            .header(CONTENT_TYPE, "application/octet-stream")
-            .header(CONTENT_LENGTH, content.len())
-            .body(content)
-            .build()
-            .expect("RequestBuilder should not panic");
+            let client = Client::new();
+            let content = base64::encode(timestamp_request.to_der()?);
 
-        let response = client
-            .execute(request)
-            .map_err(TimestampError::RemoteServerResponseError)?;
+            let request = client
+                .request(Method::POST, self.url.clone())
+                .header(CACHE_CONTROL, "no-cache")
+                .header(CONTENT_TYPE, "application/octet-stream")
+                .header(CONTENT_LENGTH, content.len())
+                .body(content)
+                .build()
+                .expect("RequestBuilder should not panic");
 
-        if response.status() != StatusCode::OK {
-            return Err(TimestampError::BadResponse(response.status()));
+            let response = client
+                .execute(request)
+                .map_err(TimestampError::RemoteServerResponseError)?;
+
+            if response.status() != StatusCode::OK {
+                return Err(TimestampError::BadResponse(response.status()));
+            }
+
+            let mut body = response
+                .bytes()
+                .map_err(TimestampError::RemoteServerResponseError)?
+                .to_vec();
+
+            body.retain(|&x| x != b'\n' && x != b'\r' && x != b'\0'); // Removing CRLF entries
+
+            let der = base64::decode(body).map_err(|_| TimestampError::Base64DecodeError)?;
+            let token = Pkcs7::from_der(&der).map_err(TimestampError::Pkcs7Error)?;
+
+            Ok(token)
         }
 
-        let mut body = response
-            .bytes()
-            .map_err(TimestampError::RemoteServerResponseError)?
-            .to_vec();
+        fn modify_signed_data(&self, token: Pkcs7, signed_data: &mut SignedData) {
+            let SignedData {
+                certificates,
+                signers_infos,
+                ..
+            } = token.0.signed_data.0;
 
-        body.retain(|&x| x != b'\n' && x != b'\r' && x != b'\0'); // Removing CRLF entries
+            let singer_info = signers_infos
+                .0
+                .first()
+                .expect("Exactly one SignedInfo should be present");
 
-        let der = base64::decode(body).map_err(|_| TimestampError::Base64DecodeError)?;
-        let token = Pkcs7::from_der(&der).map_err(TimestampError::Pkcs7Error)?;
+            let unsigned_attribute = UnsignedAttribute {
+                ty: oids::counter_sign().into(),
+                value: UnsignedAttributeValue::CounterSign(vec![singer_info.clone()].into()),
+            };
 
-        Ok(token)
-    }
+            let signer_info = signed_data
+                .signers_infos
+                .0
+                 .0
+                .first_mut()
+                .expect("Exactly one SignedInfo should be present");
 
-    fn modify_signed_data(&self, token: Pkcs7, signed_data: &mut SignedData) {
-        let SignedData {
-            certificates,
-            signers_infos,
-            ..
-        } = token.0.signed_data.0;
+            signer_info.unsigned_attrs.0 .0.push(unsigned_attribute);
 
-        let singer_info = signers_infos
-            .0
-            .first()
-            .expect("Exactly one SignedInfo should be present");
-
-        let unsigned_attribute = UnsignedAttribute {
-            ty: oids::counter_sign().into(),
-            value: UnsignedAttributeValue::CounterSign(vec![singer_info.clone()].into()),
-        };
-
-        let signer_info = signed_data
-            .signers_infos
-            .0
-             .0
-            .first_mut()
-            .expect("Exactly one SignedInfo should be present");
-
-        signer_info.unsigned_attrs.0 .0.push(unsigned_attribute);
-
-        signed_data.certificates.0 .0.extend(certificates.0 .0);
+            signed_data.certificates.0 .0.extend(certificates.0 .0);
+        }
     }
 }
 
@@ -137,7 +146,9 @@ impl TimestampRequest {
         &self.0.content
     }
 
-    pub fn into_content(self) -> EncapsulatedContentInfo { self.0.content }
+    pub fn into_content(self) -> EncapsulatedContentInfo {
+        self.0.content
+    }
 
     pub fn digest(&self) -> &[u8] {
         if let ExplicitContextTag0(ContentValue::Data(data)) = self.0.content.content.as_ref().unwrap() {

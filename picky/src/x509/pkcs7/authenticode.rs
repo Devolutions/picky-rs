@@ -334,6 +334,7 @@ impl AuthenticodeSignature {
                 now: None,
                 excluded_cert_authorities: vec![],
                 expected_file_hash: None,
+                ctl: None,
             }),
         }
     }
@@ -420,6 +421,7 @@ struct AuthenticodeValidatorInner<'a> {
     excluded_cert_authorities: Vec<DirectoryName>,
     now: Option<ValidityCheck<'a>>,
     expected_file_hash: Option<Vec<u8>>,
+    ctl: Option<&'a CertificateTrustList>,
 }
 
 pub struct AuthenticodeValidator<'a> {
@@ -494,6 +496,13 @@ impl<'a> AuthenticodeValidator<'a> {
     #[inline]
     pub fn require_ca_against_ctl_check(&self) -> &Self {
         self.inner.borrow_mut().strictness.require_ca_verification_against_ctl = true;
+        self
+    }
+
+    #[cfg(feature = "ctl")]
+    #[inline]
+    pub fn ctl(&self, ctl: &'a CertificateTrustList) -> &Self {
+        self.inner.borrow_mut().ctl = Some(ctl);
         self
     }
 
@@ -792,8 +801,10 @@ impl<'a> AuthenticodeValidator<'a> {
 
                                             #[cfg(feature = "ctl")]
                                             {
-                                                let ca_name = h_get_ca_name(&certificates).unwrap();
-                                                self.h_verify_ca_certificate_against_ctl(&ca_name)?;
+                                                if let Some(ctl) = self.inner.borrow().ctl {
+                                                    let ca_name = h_get_ca_name(&certificates).unwrap();
+                                                    self.h_verify_ca_certificate_against_ctl(ctl, &ca_name)?;
+                                                }
                                             }
                                         }
 
@@ -813,7 +824,7 @@ impl<'a> AuthenticodeValidator<'a> {
 
     // https://github.com/robstradling/authroot_parser was used as a reference while implementing this function
     #[cfg(feature = "ctl")]
-    fn h_verify_ca_certificate_against_ctl(&self, ca_name: &DirectoryName) -> AuthenticodeResult<()> {
+    fn h_verify_ca_certificate_against_ctl(&self, ctl: &CertificateTrustList, ca_name: &DirectoryName) -> AuthenticodeResult<()> {
         use chrono::{DateTime, Duration, NaiveDate, Utc};
         use picky_asn1::wrapper::OctetStringAsn1;
         use std::ops::Add;
@@ -831,7 +842,6 @@ impl<'a> AuthenticodeValidator<'a> {
         let raw_ca_name = picky_asn1_der::to_vec(&Name::from(ca_name.clone()))?;
         let ca_name_md5_digest = HashAlgorithm::MD5.digest(&raw_ca_name);
 
-        let ctl = CertificateTrustList::fetch()?;
         let ctl_entries = ctl.ctl_entries()?;
 
         // find the CA certificate info by its md5 name digest
@@ -947,17 +957,19 @@ impl<'a> AuthenticodeValidator<'a> {
         if self.inner.borrow().strictness.require_ca_verification_against_ctl {
             let ca_name = h_get_ca_name(&certificates).unwrap();
 
-            match self.h_verify_ca_certificate_against_ctl(&ca_name) {
-                Ok(()) => {}
-                Err(err) => {
-                    if !self
-                        .inner
-                        .borrow()
-                        .strictness
-                        .exclude_specific_cert_authorities_from_ctl_check
-                        || !self.inner.borrow().excluded_cert_authorities.contains(&ca_name)
-                    {
-                        return Err(err);
+            if let Some(ctl) = self.inner.borrow().ctl {
+                match self.h_verify_ca_certificate_against_ctl(ctl, &ca_name) {
+                    Ok(()) => {}
+                    Err(err) => {
+                        if !self
+                            .inner
+                            .borrow()
+                            .strictness
+                            .exclude_specific_cert_authorities_from_ctl_check
+                            || !self.inner.borrow().excluded_cert_authorities.contains(&ca_name)
+                        {
+                            return Err(err);
+                        }
                     }
                 }
             }
@@ -1556,8 +1568,6 @@ mod test {
             .ignore_chain_check()
             .ignore_not_after_check()
             .ignore_not_before_check()
-            .ignore_ca_against_ctl_check()
-            .ignore_excluded_cert_authorities()
             .verify()
             .unwrap();
     }
@@ -1583,8 +1593,6 @@ mod test {
             .require_signing_certificate_check()
             .exact_date(&UTCDate::new(2021, 8, 7, 0, 0, 0).unwrap())
             .ignore_chain_check()
-            .ignore_ca_against_ctl_check()
-            .ignore_excluded_cert_authorities()
             .verify()
             .unwrap();
     }
@@ -1592,6 +1600,8 @@ mod test {
     #[cfg(feature = "ctl")]
     #[test]
     fn self_signed_authenticode_signature_validation_against_ctl() {
+        use ctl::http_fetch::CtlHttpFetch;
+
         let pkcs7 = Pkcs7::from_pem_str(SELF_SIGNED_PKCS7).unwrap();
         let private_key = PrivateKey::from_pem_str(SELF_SIGNED_PKCS7_RSA_PRIVATE_KEY).unwrap();
 
@@ -1604,8 +1614,11 @@ mod test {
         )
         .unwrap();
 
+        let ctl = CertificateTrustList::fetch().unwrap();
+
         let validator = authenticode_signature.authenticode_verifier();
         let validator = validator
+            .ctl(&ctl)
             .require_ca_against_ctl_check()
             .ignore_signing_certificate_check()
             .ignore_chain_check()
@@ -1619,6 +1632,8 @@ mod test {
     #[cfg(feature = "ctl")]
     #[test]
     fn self_signed_authenticode_signature_validation_against_ctl_with_excluded_ca_certificate() {
+        use ctl::http_fetch::CtlHttpFetch;
+
         let pkcs7 = Pkcs7::from_pem_str(SELF_SIGNED_PKCS7).unwrap();
         let private_key = PrivateKey::from_pem_str(SELF_SIGNED_PKCS7_RSA_PRIVATE_KEY).unwrap();
 
@@ -1631,6 +1646,7 @@ mod test {
         )
         .unwrap();
 
+
         let validator = authenticode_signature.authenticode_verifier();
         let ca_name = authenticode_signature
             .0
@@ -1640,7 +1656,10 @@ mod test {
             .unwrap()
             .issuer_name();
 
+        let ctl = CertificateTrustList::fetch().unwrap();
+
         validator
+            .ctl(&ctl)
             .require_ca_against_ctl_check()
             .exclude_cert_authorities(&[ca_name])
             .ignore_signing_certificate_check()
@@ -1656,6 +1675,7 @@ mod test {
     #[test]
     fn self_signed_authenticode_signature_validation_against_ctl_with_excluded_not_existing_ca_certificate() {
         use crate::x509::name::NameAttr;
+        use ctl::http_fetch::CtlHttpFetch;
 
         let pkcs7 = Pkcs7::from_pem_str(SELF_SIGNED_PKCS7).unwrap();
         let private_key = PrivateKey::from_pem_str(SELF_SIGNED_PKCS7_RSA_PRIVATE_KEY).unwrap();
@@ -1677,8 +1697,10 @@ mod test {
         ca_name.add_attr(NameAttr::LocalityName, "The Place that nobody knows");
         ca_name.add_attr(NameAttr::OrganizationName, "A Bad known organization");
         ca_name.add_attr(NameAttr::StateOrProvinceName, "The first state of Mars");
+        let ctl = CertificateTrustList::fetch().unwrap();
 
         let err = validator
+            .ctl(&ctl)
             .require_ca_against_ctl_check()
             .exclude_cert_authorities(&[ca_name])
             .ignore_signing_certificate_check()
@@ -1695,6 +1717,8 @@ mod test {
     #[cfg(feature = "ctl")]
     #[test]
     fn full_validation_self_signed_authenticode_signature() {
+        use ctl::http_fetch::CtlHttpFetch;
+
         let pkcs7 = Pkcs7::from_pem_str(SELF_SIGNED_PKCS7).unwrap();
         let private_key = PrivateKey::from_pem_str(SELF_SIGNED_PKCS7_RSA_PRIVATE_KEY).unwrap();
 
@@ -1718,6 +1742,8 @@ mod test {
             .unwrap()
             .issuer_name();
 
+        let ctl = CertificateTrustList::fetch().unwrap();
+
         validator
             .require_basic_authenticode_validation(file_hash)
             .require_signing_certificate_check()
@@ -1728,6 +1754,7 @@ mod test {
             )
             .require_not_before_check()
             .require_not_after_check()
+            .ctl(&ctl)
             .require_ca_against_ctl_check()
             .exclude_cert_authorities(&[ca_name])
             .verify()
@@ -1737,6 +1764,8 @@ mod test {
     #[cfg(feature = "ctl")]
     #[test]
     fn full_validation_authenticode_signature_with_well_known_ca() {
+        use ctl::http_fetch::CtlHttpFetch;
+
         let pkcs7 = "-----BEGIN PKCS7-----\
                         MIIjkgYJKoZIhvcNAQcCoIIjgzCCI38CAQExDzANBglghkgBZQMEAgEFADB5Bgor\
                         BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG\
@@ -1932,6 +1961,7 @@ mod test {
 
         let authenticode_signature = AuthenticodeSignature::from_pem_str(pkcs7).unwrap();
         let file_hash = authenticode_signature.file_hash().expect("File hash should be present");
+        let ctl = CertificateTrustList::fetch().unwrap();
 
         authenticode_signature
             .authenticode_verifier()
@@ -1941,14 +1971,18 @@ mod test {
             .exact_date(&UTCDate::new(2021, 3, 3, 18, 39, 47).unwrap())
             .require_not_after_check()
             .require_not_before_check()
+            .ctl(&ctl)
             .require_ca_against_ctl_check()
             .verify()
             .unwrap();
     }
 
     #[cfg(feature = "ctl")]
+    #[cfg(feature = "ctl_http_fetch")]
     #[test]
     fn full_validation_self_signed_authenticode_signature_with_only_leaf_certificate() {
+        use ctl::http_fetch::CtlHttpFetch;
+
         let pkcs7 = "-----BEGIN PKCS7-----\
                             MIIDpQYJKoZIhvcNAQcCoIIDljCCA5ICAQExADALBgkqhkiG9w0BBwGgggN4MIID\
                             dDCCAlygAwIBAgIUcSw2pEU1K7Rx7HKPuFsl13pPmqswDQYJKoZIhvcNAQELBQAw\
@@ -2018,6 +2052,7 @@ mod test {
             .signing_certificate(&certificates)
             .unwrap()
             .issuer_name();
+        let ctl = CertificateTrustList::fetch().unwrap();
 
         let validator = authenticode_signature.authenticode_verifier();
         validator
@@ -2029,6 +2064,7 @@ mod test {
                 &UTCDate::new(2022, 7, 9, 7, 48, 3).unwrap(),
             )
             .require_not_before_check()
+            .ctl(&ctl)
             .require_ca_against_ctl_check()
             .exclude_cert_authorities(&[ca_name])
             .verify()
@@ -2038,6 +2074,8 @@ mod test {
     #[cfg(feature = "ctl")]
     #[test]
     fn full_validation_self_signed_authenticode_signature_with_root_and_leaf_certificate() {
+        use ctl::http_fetch::CtlHttpFetch;
+
         let pkcs7 = "-----BEGIN PKCS7-----\
                           MIIG6wYJKoZIhvcNAQcCoIIG3DCCBtgCAQExADALBgkqhkiG9w0BBwGggga+MIID\
                           VTCCAj0CFCjdwv1V0L2iCEmXLgUMcYo5o9d2MA0GCSqGSIb3DQEBCwUAMG0xCzAJ\
@@ -2119,6 +2157,7 @@ mod test {
             .signing_certificate(&certificates)
             .unwrap()
             .issuer_name();
+        let ctl = CertificateTrustList::fetch().unwrap();
 
         let validator = authenticode_signature.authenticode_verifier();
         validator
@@ -2128,6 +2167,7 @@ mod test {
             .exact_date(&UTCDate::new(2021, 9, 7, 12, 50, 40).unwrap())
             .require_not_before_check()
             .require_not_after_check()
+            .ctl(&ctl)
             .require_ca_against_ctl_check()
             .exclude_cert_authorities(&[ca_name])
             .verify()
@@ -2257,8 +2297,6 @@ mod test {
             .require_chain_check()
             .ignore_not_before_check()
             .ignore_not_after_check()
-            .ignore_ca_against_ctl_check()
-            .ignore_excluded_cert_authorities()
             .verify()
             .unwrap();
     }

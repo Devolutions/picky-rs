@@ -22,7 +22,7 @@ use crate::config::{
 use crate::get_utf8_file_name;
 use crate::verify::extract_signed_ps_file_content;
 use picky::pem::Pem;
-use picky::x509::pkcs7::timestamp::AuthenticodeTimestamper;
+use picky::x509::pkcs7::timestamp::http_timestamp::AuthenticodeTimestamper;
 
 const UTF8_BOM: [u8; 3] = [0xEF, 0xBB, 0xBF];
 const UTF16_BE_BOM: [u8; 2] = [0xFE, 0xFF];

@@ -1,10 +1,8 @@
 use picky_asn1_x509::content_info::ContentValue;
 use picky_asn1_x509::pkcs7::ctl::CTLEntry;
-use std::io::{self, Cursor, Read};
-
 use crate::x509::pkcs7::{Pkcs7, Pkcs7Error};
+use std::io;
 use thiserror::Error;
-
 pub use picky_asn1_x509::pkcs7::ctl::CTLEntryAttributeValues;
 
 #[derive(Debug, Error)]
@@ -21,46 +19,12 @@ pub enum CtlError {
     IncorrectContentValue,
 }
 
+#[derive(Clone, Debug, PartialEq)]
 pub struct CertificateTrustList {
     pkcs7: Pkcs7,
 }
 
 impl CertificateTrustList {
-    pub fn fetch() -> Result<Self, CtlError> {
-        let ctl_url: &str =
-            "http://www.download.windowsupdate.com/msdownload/update/v3/static/trustedr/en/authrootstl.cab";
-
-        let mut cab = reqwest::blocking::get(ctl_url).map_err(|err| CtlError::DownloadError {
-            description: err.to_string(),
-        })?;
-
-        if !cab.status().is_success() {
-            return Err(CtlError::DownloadError {
-                description: format!("Response status code is {}", cab.status()),
-            });
-        }
-
-        let mut buffer = Vec::new();
-        cab.copy_to(&mut buffer).map_err(|err| CtlError::ExtractingError {
-            description: format!("Failed to copy Response body to Vec: {}", err),
-        })?;
-
-        let mut cabinet = cab::Cabinet::new(Cursor::new(&mut buffer)).map_err(|err| CtlError::ExtractingError {
-            description: format!("Failed to parse Cabinet file: {}", err),
-        })?;
-
-        let mut authroot = cabinet
-            .read_file("authroot.stl")
-            .expect("authroot.stl should be present in authrootstl.cab");
-
-        let mut ctl_buffer = Vec::new();
-        authroot.read_to_end(&mut ctl_buffer)?;
-
-        let pkcs7: Pkcs7 = Pkcs7::from_der(&ctl_buffer).map_err(CtlError::FailedToParseCtl)?;
-
-        Ok(Self { pkcs7 })
-    }
-
     pub fn ctl_entries(&self) -> Result<&[CTLEntry], CtlError> {
         let content_value = self
             .pkcs7
@@ -80,10 +44,60 @@ impl CertificateTrustList {
     }
 }
 
+
+
+#[cfg(feature = "ctl_http_fetch")]
+pub mod http_fetch {
+    use std::io::{Cursor, Read};
+    use super::*;
+
+    pub trait CtlHttpFetch {
+        fn fetch() -> Result<CertificateTrustList, CtlError>;
+    }
+
+    impl CtlHttpFetch for CertificateTrustList {
+        fn fetch() -> Result<CertificateTrustList, CtlError> {
+            let ctl_url: &str =
+                "http://www.download.windowsupdate.com/msdownload/update/v3/static/trustedr/en/authrootstl.cab";
+
+            let mut cab = reqwest::blocking::get(ctl_url).map_err(|err| CtlError::DownloadError {
+                description: err.to_string(),
+            })?;
+
+            if !cab.status().is_success() {
+                return Err(CtlError::DownloadError {
+                    description: format!("Response status code is {}", cab.status()),
+                });
+            }
+
+            let mut buffer = Vec::new();
+            cab.copy_to(&mut buffer).map_err(|err| CtlError::ExtractingError {
+                description: format!("Failed to copy Response body to Vec: {}", err),
+            })?;
+
+            let mut cabinet = cab::Cabinet::new(Cursor::new(&mut buffer)).map_err(|err| CtlError::ExtractingError {
+                description: format!("Failed to parse Cabinet file: {}", err),
+            })?;
+
+            let mut authroot = cabinet
+                .read_file("authroot.stl")
+                .expect("authroot.stl should be present in authrootstl.cab");
+
+            let mut ctl_buffer = Vec::new();
+            authroot.read_to_end(&mut ctl_buffer)?;
+
+            let pkcs7: Pkcs7 = Pkcs7::from_der(&ctl_buffer).map_err(CtlError::FailedToParseCtl)?;
+
+            Ok(CertificateTrustList { pkcs7 })
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::x509::pkcs7::Pkcs7;
+    use super::http_fetch::CtlHttpFetch;
 
     #[test]
     fn parse_certificate_trust_list_in_der() {
