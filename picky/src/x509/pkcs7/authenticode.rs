@@ -194,8 +194,7 @@ impl AuthenticodeSignature {
                 .collect::<Vec<Certificate>>()
         };
 
-        let signing_cert = certificates.get(0);
-        let signing_cert = signing_cert.ok_or(AuthenticodeError::NoCertificates)?;
+        let signing_cert = certificates.get(0).ok_or(AuthenticodeError::NoCertificates)?;
 
         let issuer_and_serial_number = IssuerAndSerialNumber {
             issuer: signing_cert.tbs_certificate.issuer.clone(),
