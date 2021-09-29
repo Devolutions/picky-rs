@@ -179,16 +179,20 @@ impl AuthenticodeSignature {
 
         // certificates contains the signer certificate and any intermediate certificates,
         // but typically does not contain the root certificate
-        let certificates = certificates
-            .into_iter()
-            .filter_map(|cert| {
-                if cert.ty() != CertType::Root {
-                    Some(Certificate::from(cert))
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<Certificate>>();
+        let certificates = if certificates.len() == 1 && certificates[0].ty() == CertType::Root {
+            vec![Certificate::from(certificates[0].clone())]
+        } else {
+            certificates
+                .into_iter()
+                .filter_map(|cert| {
+                    if cert.ty() != CertType::Root {
+                        Some(Certificate::from(cert))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<Certificate>>()
+        };
 
         let signing_cert = certificates.get(0).ok_or(AuthenticodeError::NoCertificates)?;
 

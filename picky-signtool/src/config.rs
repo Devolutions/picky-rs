@@ -76,7 +76,7 @@ pub fn config() -> ArgMatches<'static> {
                 .help("Path to a Windows executable")
                 .takes_value(true)
                 .required(false)
-                .requires_all(&[ARG_BINARY, ARG_OUTPUT])
+                .requires(ARG_BINARY)
                 .validator(validate_executable_postfix)
                 .display_order(1),
         )
@@ -95,6 +95,7 @@ pub fn config() -> ArgMatches<'static> {
             Arg::with_name(ARG_PS_SCRIPT)
                 .long(ARG_PS_SCRIPT)
                 .help("Specify a PowerShell script or module to sign or verify")
+                .requires(ARG_SCRIPTS_PATH)
                 .display_order(3),
         )
         .arg(
