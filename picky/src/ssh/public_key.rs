@@ -1,9 +1,8 @@
 use super::SshParser;
 use crate::key::PublicKey;
-use crate::ssh::{Minpt, SshString};
+use crate::ssh::{Mpint, SshString};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use rsa::{BigUint, PublicKeyParts, RsaPublicKey};
-use std::hash::Hasher;
 use std::io::{self, Cursor, Read, Write};
 use std::string;
 use thiserror::Error;
@@ -85,8 +84,8 @@ impl SshParser for SshPublicKey {
                 let mut cursor = Cursor::new(decoded);
 
                 let _: SshString = SshParser::decode(&mut cursor)?;
-                let e: Minpt = SshParser::decode(&mut cursor)?;
-                let n: Minpt = SshParser::decode(&mut cursor)?;
+                let e: Mpint = SshParser::decode(&mut cursor)?;
+                let n: Mpint = SshParser::decode(&mut cursor)?;
 
                 buffer.clear();
                 SshInnerPublicKey::Rsa(RsaPublicKey::new(
@@ -106,7 +105,7 @@ impl SshParser for SshPublicKey {
     fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
         match &self.inner_key {
             SshInnerPublicKey::Rsa(rsa) => {
-                let key_type = "ssh-rsa";
+                let key_type = "ssh-rsa"; //
 
                 stream.write_all(key_type.as_bytes())?;
                 stream.write_u8(' ' as u8)?;
@@ -117,10 +116,10 @@ impl SshParser for SshPublicKey {
                 let ssh_string = SshString(key_type.to_string());
                 ssh_string.encode(&mut cursor)?;
 
-                let e = Minpt(rsa.e().to_bytes_be());
+                let e = Mpint(rsa.e().to_bytes_be());
                 e.encode(&mut cursor);
 
-                let n = Minpt(rsa.n().to_bytes_be());
+                let n = Mpint(rsa.n().to_bytes_be());
                 n.encode(&mut cursor);
 
                 let buffer = cursor.into_inner();

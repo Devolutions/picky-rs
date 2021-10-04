@@ -1,9 +1,10 @@
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::io::{self, Read, Write};
 
+pub mod private_key;
 #[allow(dead_code)]
 #[allow(unused)]
-pub mod key;
+pub mod public_key;
 
 pub trait SshParser {
     type Error;
@@ -14,10 +15,11 @@ pub trait SshParser {
     fn encode(&self, stream: impl Write) -> Result<(), Self::Error>;
 }
 
-pub(crate) struct Minpt(pub(crate) Vec<u8>);
+pub(crate) struct Mpint(pub(crate) Vec<u8>);
+pub(crate) struct ByteArray(pub(crate) Vec<u8>);
 pub(crate) struct SshString(pub(crate) String);
 
-impl SshParser for Minpt {
+impl SshParser for Mpint {
     type Error = io::Error;
 
     fn decode(mut stream: impl Read) -> Result<Self, Self::Error>
@@ -32,12 +34,19 @@ impl SshParser for Minpt {
             buffer.remove(0);
         }
 
-        Ok(Minpt(buffer))
+        Ok(Mpint(buffer))
     }
 
     fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
         let size = self.0.len();
-        stream.write_u32::<BigEndian>(size as u32)?;
+        // If the most significant bit would be set for
+        // a positive number, the number MUST be preceded by a zero byte.
+        if size > 0 && self.0[0] & 0b10000000 != 0 {
+            stream.write_u32::<BigEndian>(size as u32 + 1)?;
+            stream.write_u8(0)?;
+        } else {
+            stream.write_u32::<BigEndian>(size as u32)?;
+        }
         stream.write_all(&self.0)
     }
 }
@@ -63,30 +72,50 @@ impl SshParser for SshString {
     }
 }
 
+impl SshParser for ByteArray {
+    type Error = io::Error;
+
+    fn decode(mut stream: impl Read) -> Result<Self, Self::Error>
+    where
+        Self: Sized,
+    {
+        let size = stream.read_u32::<BigEndian>()? as usize;
+        let mut buffer = vec![0; size];
+        stream.read_exact(&mut buffer)?;
+
+        Ok(ByteArray(buffer))
+    }
+
+    fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
+        let size = self.0.len();
+        stream.write_u32::<BigEndian>(size as u32)?;
+        stream.write_all(&self.0)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::ssh::key::SshPublicKey;
     use std::io::Cursor;
 
     #[test]
     fn mpint_decoding() {
-        let mpint: Minpt = SshParser::decode(Cursor::new(vec![
+        let mpint: Mpint = SshParser::decode(Cursor::new(vec![
             0x00, 0x00, 0x00, 0x08, 0x09, 0xa3, 0x78, 0xf9, 0xb2, 0xe3, 0x32, 0xa7,
         ]))
         .unwrap();
         assert_eq!(mpint.0, vec![0x09, 0xa3, 0x78, 0xf9, 0xb2, 0xe3, 0x32, 0xa7]);
 
-        let mpint: Minpt = SshParser::decode(Cursor::new(vec![0x00, 0x00, 0x00, 0x02, 0x00, 0x80])).unwrap();
+        let mpint: Mpint = SshParser::decode(Cursor::new(vec![0x00, 0x00, 0x00, 0x02, 0x00, 0x80])).unwrap();
         assert_eq!(mpint.0, vec![0x00, 0x80]);
 
-        let mpint: Minpt = SshParser::decode(Cursor::new(vec![0x00, 0x00, 0x00, 0x02, 0xed, 0xcc])).unwrap();
+        let mpint: Mpint = SshParser::decode(Cursor::new(vec![0x00, 0x00, 0x00, 0x02, 0xed, 0xcc])).unwrap();
         assert_eq!(mpint.0, vec![0xed, 0xcc]);
     }
 
     #[test]
     fn mpint_encoding() {
-        let mpint = Minpt(vec![0x09, 0xa3, 0x78, 0xf9, 0xb2, 0xe3, 0x32, 0xa7]);
+        let mpint = Mpint(vec![0x09, 0xa3, 0x78, 0xf9, 0xb2, 0xe3, 0x32, 0xa7]);
         let mut cursor = Cursor::new(Vec::new());
         mpint.encode(&mut cursor).unwrap();
 
@@ -95,7 +124,7 @@ mod test {
             vec![0x00, 0x00, 0x00, 0x08, 0x09, 0xa3, 0x78, 0xf9, 0xb2, 0xe3, 0x32, 0xa7],
         );
 
-        let mpint = Minpt(vec![0x80]);
+        let mpint = Mpint(vec![0x80]);
         let mut cursor = Cursor::new(Vec::new());
         mpint.encode(&mut cursor).unwrap();
 
