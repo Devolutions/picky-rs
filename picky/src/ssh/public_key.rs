@@ -7,6 +7,8 @@ use std::io::{self, Cursor, Read, Write};
 use std::string;
 use thiserror::Error;
 
+const RSA_PUBLIC_KEY_TYPE: &str = "ssh-rsa";
+
 #[derive(Debug, Error)]
 pub enum SshPublicKeyError {
     #[error(transparent)]
@@ -22,12 +24,54 @@ pub enum SshPublicKeyError {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub enum SshInnerPublicKey {
+    Rsa(RsaPublicKey),
+}
+
+impl SshParser for SshInnerPublicKey {
+    type Error = SshPublicKeyError;
+
+    fn decode(mut stream: impl Read) -> Result<Self, Self::Error> where Self: Sized {
+        let key_type: SshString = SshParser::decode(&mut stream)?;
+        match key_type.0.as_str() {
+            RSA_PUBLIC_KEY_TYPE => {
+                let e: Mpint = SshParser::decode(&mut stream)?;
+                let n: Mpint = SshParser::decode(&mut stream)?;
+                Ok(SshInnerPublicKey::Rsa(RsaPublicKey::new(
+                    BigUint::from_bytes_be(&n.0),
+                    BigUint::from_bytes_be(&e.0),
+                )?))
+            },
+            _ => Err(SshPublicKeyError::UnknownKeyType),
+        }
+    }
+
+    fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
+        match self {
+            SshInnerPublicKey::Rsa(rsa) => {
+                SshString(RSA_PUBLIC_KEY_TYPE.to_owned()).encode(&mut stream);
+                Mpint(rsa.e().to_bytes_be()).encode(&mut stream);
+                Mpint(rsa.n().to_bytes_be()).encode(&mut stream);
+                Ok(())
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct SshPublicKey {
-    inner_key: SshInnerPublicKey,
+    pub inner_key: SshInnerPublicKey,
     comment: String,
 }
 
 impl SshPublicKey {
+    pub fn from_inner(inner_key: SshInnerPublicKey) -> Self {
+        Self {
+            inner_key,
+            comment: "".to_owned(),
+        }
+    }
+
     pub fn from_pem_str(pem: &str) -> Result<Self, SshPublicKeyError> {
         SshParser::decode(pem.as_bytes())
     }
@@ -47,11 +91,6 @@ impl SshPublicKey {
         self.encode(&mut cursor)?;
         Ok(cursor.into_inner())
     }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum SshInnerPublicKey {
-    Rsa(RsaPublicKey),
 }
 
 impl SshParser for SshPublicKey {
@@ -78,20 +117,13 @@ impl SshParser for SshPublicKey {
         buffer.clear();
 
         let inner_key = match header.as_str() {
-            "ssh-rsa" => {
+            RSA_PUBLIC_KEY_TYPE => {
                 read_to_buffer_till_whitespace(&mut buffer);
                 let decoded = base64::decode(&mut buffer)?;
                 let mut cursor = Cursor::new(decoded);
 
-                let _: SshString = SshParser::decode(&mut cursor)?;
-                let e: Mpint = SshParser::decode(&mut cursor)?;
-                let n: Mpint = SshParser::decode(&mut cursor)?;
-
                 buffer.clear();
-                SshInnerPublicKey::Rsa(RsaPublicKey::new(
-                    BigUint::from_bytes_be(&n.0),
-                    BigUint::from_bytes_be(&e.0),
-                )?)
+                SshParser::decode(&mut cursor)?
             }
             _ => return Err(SshPublicKeyError::UnknownKeyType),
         };
@@ -105,25 +137,12 @@ impl SshParser for SshPublicKey {
     fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
         match &self.inner_key {
             SshInnerPublicKey::Rsa(rsa) => {
-                let key_type = "ssh-rsa"; //
-
-                stream.write_all(key_type.as_bytes())?;
+                stream.write_all(RSA_PUBLIC_KEY_TYPE.as_bytes())?;
                 stream.write_u8(' ' as u8)?;
 
-                let buffer = vec![0u8; 1024];
-                let mut cursor = Cursor::new(buffer);
-
-                let ssh_string = SshString(key_type.to_string());
-                ssh_string.encode(&mut cursor)?;
-
-                let e = Mpint(rsa.e().to_bytes_be());
-                e.encode(&mut cursor);
-
-                let n = Mpint(rsa.n().to_bytes_be());
-                n.encode(&mut cursor);
-
-                let buffer = cursor.into_inner();
-                stream.write_all(base64::encode(buffer).as_bytes());
+                let mut rsa_key = Vec::new();
+                self.inner_key.encode(&mut rsa_key)?;
+                stream.write_all(base64::encode(rsa_key).as_bytes());
             }
         }
 

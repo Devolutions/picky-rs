@@ -1,6 +1,9 @@
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use std::io::{self, Read, Write};
+use chrono::{Utc, DateTime, Datelike, Timelike};
+use std::time::{UNIX_EPOCH, Duration, SystemTime};
 
+pub mod certificate;
 pub mod private_key;
 #[allow(dead_code)]
 #[allow(unused)]
@@ -15,9 +18,57 @@ pub trait SshParser {
     fn encode(&self, stream: impl Write) -> Result<(), Self::Error>;
 }
 
+#[derive(Debug)]
+pub(crate) struct SshTime(pub(crate) DateTime<Utc>);
+
+impl SshTime {
+    pub fn now() -> Self {
+        SshTime(DateTime::<Utc>::from(SystemTime::now()))
+    }
+
+    pub fn year(&self) -> u16 {
+        self.0.year() as u16
+    }
+
+    pub fn month(&self) -> u8 {
+        self.0.month() as u8
+    }
+
+    pub fn day(&self) -> u8 {
+        self.0.day() as u8
+    }
+
+    pub fn hour(&self) -> u8 {
+        self.0.hour() as u8
+    }
+
+    pub fn minute(&self) -> u8 {
+        self.0.minute() as u8
+    }
+
+    pub fn second(&self) -> u8 {
+        self.0.second() as u8
+    }
+}
+
+impl SshParser for SshTime {
+    type Error = io::Error;
+
+    fn decode(mut stream: impl Read) -> Result<Self, Self::Error>
+    where
+        Self: Sized,
+    {
+        let timestamp = stream.read_u64::<BigEndian>()?;
+        Ok(SshTime(DateTime::<Utc>::from(UNIX_EPOCH + Duration::from_secs(timestamp))))
+    }
+
+    fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
+        stream.write_u64::<BigEndian>(self.0.timestamp() as u64)?;
+        Ok(())
+    }
+}
+
 pub(crate) struct Mpint(pub(crate) Vec<u8>);
-pub(crate) struct ByteArray(pub(crate) Vec<u8>);
-pub(crate) struct SshString(pub(crate) String);
 
 impl SshParser for Mpint {
     type Error = io::Error;
@@ -38,18 +89,21 @@ impl SshParser for Mpint {
     }
 
     fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
-        let size = self.0.len();
+        let size = self.0.len() as u32;
         // If the most significant bit would be set for
         // a positive number, the number MUST be preceded by a zero byte.
         if size > 0 && self.0[0] & 0b10000000 != 0 {
-            stream.write_u32::<BigEndian>(size as u32 + 1)?;
+            stream.write_u32::<BigEndian>(size + 1)?;
             stream.write_u8(0)?;
         } else {
-            stream.write_u32::<BigEndian>(size as u32)?;
+            stream.write_u32::<BigEndian>(size)?;
         }
         stream.write_all(&self.0)
     }
 }
+
+#[derive(Debug)]
+pub(crate) struct SshString(pub(crate) String);
 
 impl SshParser for SshString {
     type Error = io::Error;
@@ -71,6 +125,9 @@ impl SshParser for SshString {
         stream.write_all(self.0.as_bytes())
     }
 }
+
+#[derive(Debug)]
+pub(crate) struct ByteArray(pub(crate) Vec<u8>);
 
 impl SshParser for ByteArray {
     type Error = io::Error;
