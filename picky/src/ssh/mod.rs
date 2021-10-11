@@ -1,7 +1,7 @@
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use chrono::{DateTime, Datelike, Timelike, Utc};
 use std::io::{self, Read, Write};
-use chrono::{Utc, DateTime, Datelike, Timelike};
-use std::time::{UNIX_EPOCH, Duration, SystemTime};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 pub mod certificate;
 pub mod private_key;
@@ -59,7 +59,9 @@ impl SshParser for SshTime {
         Self: Sized,
     {
         let timestamp = stream.read_u64::<BigEndian>()?;
-        Ok(SshTime(DateTime::<Utc>::from(UNIX_EPOCH + Duration::from_secs(timestamp))))
+        Ok(SshTime(DateTime::<Utc>::from(
+            UNIX_EPOCH + Duration::from_secs(timestamp),
+        )))
     }
 
     fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {

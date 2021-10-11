@@ -31,7 +31,10 @@ pub enum SshInnerPublicKey {
 impl SshParser for SshInnerPublicKey {
     type Error = SshPublicKeyError;
 
-    fn decode(mut stream: impl Read) -> Result<Self, Self::Error> where Self: Sized {
+    fn decode(mut stream: impl Read) -> Result<Self, Self::Error>
+    where
+        Self: Sized,
+    {
         let key_type: SshString = SshParser::decode(&mut stream)?;
         match key_type.0.as_str() {
             RSA_PUBLIC_KEY_TYPE => {
@@ -41,7 +44,7 @@ impl SshParser for SshInnerPublicKey {
                     BigUint::from_bytes_be(&n.0),
                     BigUint::from_bytes_be(&e.0),
                 )?))
-            },
+            }
             _ => Err(SshPublicKeyError::UnknownKeyType),
         }
     }
