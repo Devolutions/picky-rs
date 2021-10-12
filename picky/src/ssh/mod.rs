@@ -19,7 +19,7 @@ pub trait SshParser {
 }
 
 #[derive(Debug)]
-pub(crate) struct SshTime(pub(crate) DateTime<Utc>);
+pub struct SshTime(pub(crate) DateTime<Utc>);
 
 impl SshTime {
     pub fn now() -> Self {

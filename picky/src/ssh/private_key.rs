@@ -1,18 +1,18 @@
 use super::SshParser;
+use crate::key::{KeyError, PrivateKey};
 use crate::ssh::{ByteArray, Mpint, SshString};
 use aes::cipher::{NewCipher, StreamCipher};
 use aes::{Aes128, Aes128Ctr, Aes256, Aes256Ctr};
 use block_modes::block_padding::NoPadding;
 use block_modes::BlockMode;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use picky_asn1_x509::PrivateKeyValue;
 use rand::Rng;
 use rsa::{BigUint, PublicKeyParts, RsaPrivateKey};
 use std::io;
 use std::io::{Cursor, Read, Write};
 use std::string;
 use thiserror::Error;
-use crate::key::{PrivateKey, KeyError};
-use picky_asn1_x509::PrivateKeyValue;
 
 type Aes128Cbc = block_modes::Cbc<Aes128, NoPadding>;
 type Aes256Cbc = block_modes::Cbc<Aes256, NoPadding>;
