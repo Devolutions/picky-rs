@@ -57,14 +57,14 @@ jobs:
           conan remote clean
           conan remote add artifactory https://devolutions.jfrog.io/devolutions/api/conan/conan-local
 
-      - name: Build
+      - name: Build [{{ matrix.os }}]
         if: matrix.os == 'linux'
         run: |
          conan install openssl/1.1.1l@devolutions/stable -g virtualenv -pr ${{ matrix.os }}-x86_64 -s build_type=Release
          . activate.sh
          cargo build --release
 
-      - name: Build
+      - name: Build [{{ matrix.os }}]
         if: matrix.os == 'windows'
         env:
           RUSTFLAGS: '-C target-feature=+crt-static'
@@ -81,6 +81,8 @@ jobs:
         shell: pwsh
         run: |
           $StagingDir = Join-Path "$Env:RUNNER_TEMP" "picky" "${{runner.os}}" "x86_64"
+          New-Item -Path $StagingDir -ItemType "directory"
+
           $Binaries = @("picky-server", "picky-signtool")
           
           if ($Env:RUNNER_OS -Eq "Windows") {
@@ -99,7 +101,29 @@ jobs:
           name: picky
           path: ${{ steps.prepare-artifacts.outputs.staging-dir }}
 
+  msrv:
+    name: Check minimum rust version
+    runs-on: ubuntu-18.04
 
+    steps:
+      - uses: actions/checkout@v2
 
+      - name: Configure runner 
+        run: |
+          set -e
+          curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-toolchain 1.43
+          rustup toolchain install 1.51
+
+      - name: cargo check picky-asn1
+        run: cargo +1.43 check -p picky-asn1
+
+      - name: cargo check picky-asn1-der
+        run: cargo +1.43 check -p picky-asn1-der
+        
+      - name: cargo check picky-asn1-x509
+        run: cargo +1.43 check -p picky-asn1-x509
+
+      - name: cargo check picky
+        run: cargo +1.51 check -p picky
 
 
