@@ -17,7 +17,7 @@ jobs:
           Write-Host "Check formatting"
           cargo fmt --all -- --check
 
-          if ($LastExitCode -eq 0) {   
+          if ($LastExitCode -eq 1) {   
             throw "Bad formatting, please run 'cargo +stable fmt --all'"
           }
 
