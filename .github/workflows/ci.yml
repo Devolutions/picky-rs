@@ -76,4 +76,30 @@ jobs:
       - name: Test
         run: cargo test --release --features "wincert","ctl","pkcs7"
 
+      - name: Prepare artifacts
+        id: prepare-artifacts
+        shell: pwsh
+        run: |
+          $StagingDir = Join-Path "$Env:RUNNER_TEMP" "picky" "${{runner.os}}" "x86_64"
+          $Binaries = @("picky-server", "picky-signtool")
+          
+          if ($Env:RUNNER_OS -Eq "Windows") {
+            $Binaries = $Binaries | ForEach-Object {"$_.exe"}
+          }
+
+          Get-ChildItem -Recurse -Include $Binaries -File  | % {
+            Copy-Item -Path $_.FullName -Destination $StagingDir -Force 
+          }
+
+          echo "::set-output name=staging-dir::$StagingDir"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: picky
+          path: ${{ steps.prepare-artifacts.outputs.staging-dir }}
+
+
+
+
 
