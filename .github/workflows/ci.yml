@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  workflow_dispatch:
+
+jobs:
+  formatting:
+    name: Check formatting
+    runs-on: ubuntu-18.04
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Check formatting
+        shell: pwsh
+        run: |
+          Write-Host "Check formatting"
+          cargo fmt --all -- --check
+
+          if ($LastExitCode -eq 0) {   
+            throw "Bad formatting, please run 'cargo +stable fmt --all'"
+          }
+
+  build:
+    name: picky [${{ matrix.arch }}-${{ matrix.os }}]
+    runs-on: ${{ matrix.runner }}
+    needs: formatting
+    env:
+      CONAN_LOGIN_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
+      CONAN_PASSWORD: ${{ secrets.ARTIFACTORY_READ_TOKEN }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ windows, linux ]
+        include:
+          - os: windows
+            runner: windows-2019
+          - os: linux
+            runner: ubuntu-18.04
+          
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install conan
+        run: |
+          pip3 install conan==1.40.0 invoke Jinja2 --upgrade
+
+      - name: Configure conan
+        run: |
+          conan config install --type=git -sf settings https://github.com/Devolutions/conan-public
+          conan remote clean
+          conan remote add artifactory https://devolutions.jfrog.io/devolutions/api/conan/conan-local
+
+      - name: Build
+        if: matrix.os == 'linux'
+        run: |
+         conan install openssl/1.1.1l@devolutions/stable -g virtualenv -pr ${{ matrix.os }}-x86_64
+         . activate.sh
+         cargo build --release
+
+      - name: Build
+        if: matrix.os == 'windows'
+        env:
+          RUSTFLAGS: '-C target-feature=+crt-static'
+        run: |
+         conan install openssl/1.1.1l@devolutions/stable -g virtualenv -pr ${{ matrix.os }}-x86_64
+         .\activate.ps1
+         cargo build --release --target=x86_64-pc-windows-msvc
+
+      - name: Test
+        run: cargo test --release --features "wincert","ctl","pkcs7"
+
+
