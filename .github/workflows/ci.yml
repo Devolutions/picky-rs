@@ -22,7 +22,7 @@ jobs:
           }
 
   build:
-    name: picky [${{ matrix.arch }}-${{ matrix.os }}]
+    name: picky [${{ matrix.os }}]
     runs-on: ${{ matrix.runner }}
     needs: formatting
     env:
@@ -40,6 +40,12 @@ jobs:
           
     steps:
       - uses: actions/checkout@v2
+
+      - name: Configure runner
+        if: matrix.os == 'linux'
+        run: |
+          sudo apt update
+          sudo apt install python3-wget python3-setuptools
 
       - name: Install conan
         run: |
