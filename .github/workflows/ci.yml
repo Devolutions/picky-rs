@@ -32,6 +32,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ windows, linux ]
+        type: [ build, test ]
         include:
           - os: windows
             runner: windows-2019
@@ -58,14 +59,14 @@ jobs:
           conan remote add artifactory https://devolutions.jfrog.io/devolutions/api/conan/conan-local
 
       - name: Build [${{ matrix.os }}]
-        if: matrix.os == 'linux'
+        if: matrix.os == 'linux' && matrix.type == 'build'
         run: |
          conan install openssl/1.1.1l@devolutions/stable -g virtualenv -pr ${{ matrix.os }}-x86_64 -s build_type=Release
          . activate.sh
          cargo build --release
 
       - name: Build [${{ matrix.os }}]
-        if: matrix.os == 'windows'
+        if: matrix.os == 'windows' && matrix.type == 'build'
         env:
           RUSTFLAGS: '-C target-feature=+crt-static'
         run: |
@@ -74,10 +75,12 @@ jobs:
          cargo build --release --target=x86_64-pc-windows-msvc
 
       - name: Test
+        if: matrix.type == 'test'
         run: cargo test --release --features "wincert","ctl","pkcs7"
 
       - name: Prepare artifacts
         id: prepare-artifacts
+        if: matrix.type == 'build'
         shell: pwsh
         run: |
           $StagingDir = Join-Path "$Env:RUNNER_TEMP" "picky"
@@ -98,6 +101,7 @@ jobs:
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v2
+        if: matrix.type == 'build'
         with:
           name: picky
           path: ${{ steps.prepare-artifacts.outputs.staging-dir }}
