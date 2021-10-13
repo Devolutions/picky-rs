@@ -22,7 +22,7 @@ jobs:
           }
 
   build:
-    name: picky [${{ matrix.os }}-${{ matrix.type }}]
+    name: picky ${{ matrix.type }} [${{ matrix.os }}]
     runs-on: ${{ matrix.runner }}
     needs: formatting
     env:
