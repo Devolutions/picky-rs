@@ -57,14 +57,14 @@ jobs:
           conan remote clean
           conan remote add artifactory https://devolutions.jfrog.io/devolutions/api/conan/conan-local
 
-      - name: Build [{{ matrix.os }}]
+      - name: Build [${{ matrix.os }}]
         if: matrix.os == 'linux'
         run: |
          conan install openssl/1.1.1l@devolutions/stable -g virtualenv -pr ${{ matrix.os }}-x86_64 -s build_type=Release
          . activate.sh
          cargo build --release
 
-      - name: Build [{{ matrix.os }}]
+      - name: Build [${{ matrix.os }}]
         if: matrix.os == 'windows'
         env:
           RUSTFLAGS: '-C target-feature=+crt-static'
@@ -80,7 +80,8 @@ jobs:
         id: prepare-artifacts
         shell: pwsh
         run: |
-          $StagingDir = Join-Path "$Env:RUNNER_TEMP" "picky" "${{runner.os}}" "x86_64"
+          $StagingDir = Join-Path "$Env:RUNNER_TEMP" "picky"
+          $ArchDir = Join-Path $StagingDir "${{matrix.os}}" "x86_64"
           New-Item -Path $StagingDir -ItemType "directory"
 
           $Binaries = @("picky-server", "picky-signtool")
@@ -90,7 +91,7 @@ jobs:
           }
 
           Get-ChildItem -Recurse -Include $Binaries -File  | % {
-            Copy-Item -Path $_.FullName -Destination $StagingDir -Force 
+            Copy-Item -Path $_.FullName -Destination $ArchDir -Force 
           }
 
           echo "::set-output name=staging-dir::$StagingDir"
@@ -104,6 +105,7 @@ jobs:
   msrv:
     name: Check minimum rust version
     runs-on: ubuntu-18.04
+    needs: formatting
 
     steps:
       - uses: actions/checkout@v2
