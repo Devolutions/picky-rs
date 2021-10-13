@@ -17,12 +17,12 @@ jobs:
           Write-Host "Check formatting"
           cargo fmt --all -- --check
 
-          if ($LastExitCode -eq 0) {   
+          if ($LastExitCode -eq 1) {   
             throw "Bad formatting, please run 'cargo +stable fmt --all'"
           }
 
   build:
-    name: picky [${{ matrix.arch }}-${{ matrix.os }}]
+    name: picky ${{ matrix.type }} [${{ matrix.os }}]
     runs-on: ${{ matrix.runner }}
     needs: formatting
     env:
@@ -32,6 +32,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ windows, linux ]
+        type: [ build, test ]
         include:
           - os: windows
             runner: windows-2019
@@ -40,6 +41,12 @@ jobs:
           
     steps:
       - uses: actions/checkout@v2
+
+      - name: Configure runner
+        if: matrix.os == 'linux'
+        run: |
+          sudo apt update
+          sudo apt install python3-wget python3-setuptools
 
       - name: Install conan
         run: |
@@ -51,23 +58,82 @@ jobs:
           conan remote clean
           conan remote add artifactory https://devolutions.jfrog.io/devolutions/api/conan/conan-local
 
-      - name: Build
-        if: matrix.os == 'linux'
+      - name: Build [${{ matrix.os }}]
+        if: matrix.os == 'linux' && matrix.type == 'build'
         run: |
-         conan install openssl/1.1.1l@devolutions/stable -g virtualenv -pr ${{ matrix.os }}-x86_64
+         conan install openssl/1.1.1l@devolutions/stable -g virtualenv -pr ${{ matrix.os }}-x86_64 -s build_type=Release
          . activate.sh
          cargo build --release
 
-      - name: Build
-        if: matrix.os == 'windows'
+      - name: Build [${{ matrix.os }}]
+        if: matrix.os == 'windows' && matrix.type == 'build'
         env:
           RUSTFLAGS: '-C target-feature=+crt-static'
         run: |
-         conan install openssl/1.1.1l@devolutions/stable -g virtualenv -pr ${{ matrix.os }}-x86_64
+         conan install openssl/1.1.1l@devolutions/stable -g virtualenv -pr ${{ matrix.os }}-x86_64 -s build_type=Release
          .\activate.ps1
          cargo build --release --target=x86_64-pc-windows-msvc
 
-      - name: Test
+      - name: Test [${{ matrix.os }}]
+        if: matrix.type == 'test'
         run: cargo test --release --features "wincert","ctl","pkcs7"
+
+      - name: Prepare artifacts
+        id: prepare-artifacts
+        if: matrix.type == 'build'
+        shell: pwsh
+        run: |
+          $StagingDir = Join-Path "$Env:RUNNER_TEMP" "picky"
+          $ArchDir = Join-Path $StagingDir "${{matrix.os}}" "x86_64"
+          New-Item -Path $ArchDir -ItemType "directory"
+
+          $Binaries = @("picky-server", "picky-signtool")
+          
+          if ($Env:RUNNER_OS -Eq "Windows") {
+            $Binaries = $Binaries | ForEach-Object {"$_.exe"}
+          }
+
+          Get-ChildItem -Recurse -Include $Binaries -File  | % {
+            Copy-Item -Path $_.FullName -Destination $ArchDir -Force 
+          }
+
+          echo "::set-output name=staging-dir::$StagingDir"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        if: matrix.type == 'build'
+        with:
+          name: picky
+          path: ${{ steps.prepare-artifacts.outputs.staging-dir }}
+
+  msrv:
+    name: Check minimum rust version
+    runs-on: ubuntu-18.04
+    needs: build
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Configure runner 
+        run: |
+          set -e
+          curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-toolchain 1.43
+          rustup toolchain install 1.51
+
+      - name: cargo check picky-asn1
+        continue-on-error: true
+        run: cargo +1.43 check -p picky-asn1
+
+      - name: cargo check picky-asn1-der
+        continue-on-error: true
+        run: cargo +1.43 check -p picky-asn1-der
+        
+      - name: cargo check picky-asn1-x509
+        continue-on-error: true
+        run: cargo +1.43 check -p picky-asn1-x509
+
+      - name: cargo check picky
+        continue-on-error: true
+        run: cargo +1.51 check -p picky
 
 
