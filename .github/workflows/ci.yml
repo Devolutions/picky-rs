@@ -22,7 +22,7 @@ jobs:
           }
 
   build:
-    name: picky [${{ matrix.os }}]
+    name: picky [${{ matrix.os }}-${{ matrix.type }}]
     runs-on: ${{ matrix.runner }}
     needs: formatting
     env:
@@ -74,7 +74,7 @@ jobs:
          .\activate.ps1
          cargo build --release --target=x86_64-pc-windows-msvc
 
-      - name: Test
+      - name: Test [${{ matrix.os }}]
         if: matrix.type == 'test'
         run: cargo test --release --features "wincert","ctl","pkcs7"
 
@@ -85,7 +85,7 @@ jobs:
         run: |
           $StagingDir = Join-Path "$Env:RUNNER_TEMP" "picky"
           $ArchDir = Join-Path $StagingDir "${{matrix.os}}" "x86_64"
-          New-Item -Path $StagingDir -ItemType "directory"
+          New-Item -Path $ArchDir -ItemType "directory"
 
           $Binaries = @("picky-server", "picky-signtool")
           
@@ -109,7 +109,7 @@ jobs:
   msrv:
     name: Check minimum rust version
     runs-on: ubuntu-18.04
-    needs: formatting
+    needs: build
 
     steps:
       - uses: actions/checkout@v2
@@ -121,15 +121,19 @@ jobs:
           rustup toolchain install 1.51
 
       - name: cargo check picky-asn1
+        continue-on-error: true
         run: cargo +1.43 check -p picky-asn1
 
       - name: cargo check picky-asn1-der
+        continue-on-error: true
         run: cargo +1.43 check -p picky-asn1-der
         
       - name: cargo check picky-asn1-x509
+        continue-on-error: true
         run: cargo +1.43 check -p picky-asn1-x509
 
       - name: cargo check picky
+        continue-on-error: true
         run: cargo +1.51 check -p picky
 
 
