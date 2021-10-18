@@ -1,14 +1,16 @@
 use super::SshParser;
 use crate::key::{KeyError, PrivateKey};
+use crate::ssh::public_key::{SshInnerPublicKey, SshPublicKey, SshPublicKeyError};
 use crate::ssh::{ByteArray, Mpint, SshString};
 use aes::cipher::{NewCipher, StreamCipher};
 use aes::{Aes128, Aes128Ctr, Aes256, Aes256Ctr};
 use block_modes::block_padding::NoPadding;
 use block_modes::BlockMode;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use num_bigint_dig::ModInverse;
 use picky_asn1_x509::PrivateKeyValue;
 use rand::Rng;
-use rsa::{BigUint, PublicKeyParts, RsaPrivateKey};
+use rsa::{BigUint, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
 use std::io;
 use std::io::{Cursor, Read, Write};
 use std::string;
@@ -49,8 +51,10 @@ pub enum SshPrivateKeyError {
     InvalidAuthMagicHeader,
     #[error("Invalid keys amount. Expected 1 but got {0}")]
     InvalidKeysAmount(u32),
-    #[error("Check numbers are not equal: {0} {1}. Wrong passphrase or key if corrupted")]
+    #[error("Check numbers are not equal: {0} {1}. Wrong passphrase or key is corrupted")]
     InvalidCheckNumbers(u32, u32),
+    #[error("Invalid public key: {0:?}")]
+    InvalidPublicKey(#[from] SshPublicKeyError),
     #[error("Invalid key format")]
     InvalidKeyFormat,
     #[error("Can not decrypt private key: {0:?}")]
@@ -63,7 +67,7 @@ pub enum SshPrivateKeyError {
     PrivateKeyGenerationError(#[from] KeyError),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct KdfOption {
     salt: Vec<u8>,
     rounds: u32,
@@ -112,7 +116,7 @@ impl SshParser for KdfOption {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct Kdf {
     name: String,
     option: KdfOption,
@@ -129,12 +133,61 @@ pub enum SshInnerPrivateKey {
     Rsa(RsaPrivateKey),
 }
 
+impl SshParser for SshInnerPrivateKey {
+    type Error = SshPrivateKeyError;
+
+    fn decode(mut stream: impl Read) -> Result<Self, Self::Error>
+    where
+        Self: Sized,
+    {
+        let key_type: SshString = SshParser::decode(&mut stream)?;
+        match key_type.0.as_str() {
+            KEY_TYPE_RSA => {
+                let n: Mpint = SshParser::decode(&mut stream)?;
+                let e: Mpint = SshParser::decode(&mut stream)?;
+                let d: Mpint = SshParser::decode(&mut stream)?;
+                let _iqmp: Mpint = SshParser::decode(&mut stream)?;
+                let p: Mpint = SshParser::decode(&mut stream)?;
+                let q: Mpint = SshParser::decode(&mut stream)?;
+
+                Ok(SshInnerPrivateKey::Rsa(RsaPrivateKey::from_components(
+                    BigUint::from_bytes_be(&n.0),
+                    BigUint::from_bytes_be(&e.0),
+                    BigUint::from_bytes_be(&d.0),
+                    vec![BigUint::from_bytes_be(&p.0), BigUint::from_bytes_be(&q.0)],
+                )))
+            }
+            key_type => return Err(SshPrivateKeyError::UnsupportedKeyType(key_type.to_owned())),
+        }
+    }
+
+    fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
+        match self {
+            SshInnerPrivateKey::Rsa(rsa) => {
+                SshString("ssh-rsa".to_owned()).encode(&mut stream)?;
+                Mpint(rsa.n().to_bytes_be()).encode(&mut stream)?;
+                Mpint(rsa.e().to_bytes_be()).encode(&mut stream)?;
+                Mpint(rsa.d().to_bytes_be()).encode(&mut stream)?;
+
+                let iqmp = rsa.primes()[1].clone().mod_inverse(&rsa.primes()[0]).unwrap();
+                Mpint(iqmp.to_bytes_be().1).encode(&mut stream)?;
+
+                for prime in rsa.primes().iter() {
+                    Mpint(prime.to_bytes_be()).encode(&mut stream)?;
+                }
+            }
+        };
+        Ok(())
+    }
+}
+
 #[derive(Debug)]
 pub struct SshPrivateKey {
     kdf: Kdf,
     cipher_name: String,
     inner_key: SshInnerPrivateKey,
     passphrase: Option<String>,
+    check: u32,
     comment: String,
 }
 
@@ -152,6 +205,7 @@ impl SshPrivateKey {
             inner_key,
             passphrase,
             comment,
+            check: rand::thread_rng().gen::<u32>(),
         }
     }
 
@@ -212,6 +266,13 @@ impl SshPrivateKey {
             passphrase,
         ))
     }
+
+    pub fn public_key(&self) -> SshPublicKey {
+        let inner_public_key = match &self.inner_key {
+            SshInnerPrivateKey::Rsa(rsa) => SshInnerPublicKey::Rsa(RsaPublicKey::from(rsa)),
+        };
+        SshPublicKey::from_inner(inner_public_key)
+    }
 }
 
 impl SshPrivateKeyParser for SshPrivateKey {
@@ -240,7 +301,9 @@ impl SshPrivateKeyParser for SshPrivateKey {
             return Err(SshPrivateKeyError::InvalidKeyFormat);
         }
         let data = base64::decode(&data[PRIVATE_KEY_HEADER.len()..(data.len() - PRIVATE_KEY_FOOTER.len() - 1)])?;
+        println!("{:?}", data);
         let mut cursor = Cursor::new(data);
+
         let mut auth_magic = vec![0; 14];
         cursor.read_exact(&mut auth_magic)?;
         if auth_magic != AUTH_MAGIC.as_bytes() {
@@ -264,7 +327,19 @@ impl SshPrivateKeyParser for SshPrivateKey {
         let private_key: ByteArray = SshParser::decode(&mut cursor)?;
         let data = decrypt(&cipher_name, &kdf_name, &kdf_option, &passphrase, private_key)?;
 
-        let (inner_key, comment) = parse_decrypted_private_key(data)?;
+        println!("decrypted: {:?} {}", &data, data.len());
+
+        let mut cursor = Cursor::new(data);
+
+        let check0 = cursor.read_u32::<BigEndian>()?;
+        let check1 = cursor.read_u32::<BigEndian>()?;
+        if check0 != check1 {
+            return Err(SshPrivateKeyError::InvalidCheckNumbers(check0, check1));
+        }
+
+        let inner_key: SshInnerPrivateKey = SshParser::decode(&mut cursor)?;
+
+        let comment: SshString = SshParser::decode(&mut cursor)?;
         Ok(SshPrivateKey {
             inner_key,
             passphrase: passphrase.map(|p| p.to_owned()),
@@ -273,14 +348,17 @@ impl SshPrivateKeyParser for SshPrivateKey {
                 option: kdf_option,
             },
             cipher_name: cipher_name.0,
-            comment,
+            check: check0,
+            comment: comment.0,
         })
     }
 
     fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
         let mut result_key = Vec::new();
+
         result_key.extend_from_slice(b"openssh-key-v1\0");
-        if let Some(passphrase) = self.passphrase.clone() {
+
+        if self.passphrase.is_some() {
             SshString("aes256-ctr".to_owned()).encode(&mut result_key)?;
             SshString("bcrypt".to_owned()).encode(&mut result_key)?;
 
@@ -292,49 +370,49 @@ impl SshPrivateKeyParser for SshPrivateKey {
             kdf_options.write_u32::<BigEndian>(rounds)?;
 
             ByteArray(kdf_options).encode(&mut result_key)?;
-
-            result_key.write_u32::<BigEndian>(1)?;
-
-            match &self.inner_key {
-                SshInnerPrivateKey::Rsa(rsa) => {
-                    let (public_key, mut private_key) = encode_private_rsa(rsa)?;
-
-                    SshString(self.comment.clone()).encode(&mut private_key)?;
-                    // now we must encrypt private_key
-                    let n = 48;
-                    let mut hash = vec![0; n];
-                    bcrypt_pbkdf::bcrypt_pbkdf(&passphrase, salt, rounds, &mut hash)?;
-
-                    let (key, iv) = hash.split_at(n - 16);
-                    let mut cipher = Aes256Ctr::new_from_slices(key.clone(), iv.clone()).unwrap();
-
-                    let private_key_len = private_key.len();
-                    private_key.resize(private_key_len + 32, 0u8);
-                    cipher.apply_keystream(&mut private_key);
-                    private_key.truncate(private_key_len);
-
-                    ByteArray(public_key).encode(&mut result_key)?;
-                    ByteArray(private_key).encode(&mut result_key)?;
-                }
-            };
         } else {
             SshString("none".to_owned()).encode(&mut result_key)?;
             SshString("none".to_owned()).encode(&mut result_key)?;
             SshString("".to_owned()).encode(&mut result_key)?;
-
-            result_key.write_u32::<BigEndian>(1)?;
-
-            match &self.inner_key {
-                SshInnerPrivateKey::Rsa(rsa) => {
-                    let (public_key, mut private_key) = encode_private_rsa(rsa)?;
-
-                    SshString(self.comment.clone()).encode(&mut private_key)?;
-
-                    ByteArray(public_key).encode(&mut result_key)?;
-                    ByteArray(private_key).encode(&mut result_key)?;
-                }
-            }
         }
+
+        result_key.write_u32::<BigEndian>(1)?;
+
+        let mut public_key = Vec::new();
+        self.public_key().inner_key.encode(&mut public_key)?;
+
+        let mut private_key = Vec::new();
+        private_key.write_u32::<BigEndian>(self.check)?;
+        private_key.write_u32::<BigEndian>(self.check)?;
+        self.inner_key.encode(&mut private_key)?;
+
+        SshString(self.comment.clone()).encode(&mut private_key)?;
+
+        // add padding
+        for i in 1..=(8 - (private_key.len() % 8)) {
+            private_key.push(i as u8);
+        }
+
+        if let Some(passphrase) = self.passphrase.clone() {
+            // encrypt private_key
+            let n = 48;
+            let mut hash = vec![0; n];
+            let salt = &self.kdf.option.salt;
+            let rounds = self.kdf.option.rounds;
+            bcrypt_pbkdf::bcrypt_pbkdf(&passphrase, salt, rounds, &mut hash)?;
+
+            let (key, iv) = hash.split_at(n - 16);
+            let mut cipher = Aes256Ctr::new_from_slices(key.clone(), iv.clone()).unwrap();
+
+            let private_key_len = private_key.len();
+            private_key.resize(private_key_len + 32, 0u8);
+            cipher.apply_keystream(&mut private_key);
+            private_key.truncate(private_key_len);
+        }
+
+        ByteArray(public_key).encode(&mut result_key)?;
+        ByteArray(private_key).encode(&mut result_key)?;
+
         stream.write_all(
             format!(
                 "{}{}{}",
@@ -346,28 +424,6 @@ impl SshPrivateKeyParser for SshPrivateKey {
         )?;
         Ok(())
     }
-}
-
-fn encode_private_rsa(rsa: &RsaPrivateKey) -> Result<(Vec<u8>, Vec<u8>), SshPrivateKeyError> {
-    let mut public_key = Vec::new();
-    SshString("ssh-rsa".to_owned()).encode(&mut public_key)?;
-    Mpint(rsa.e().to_bytes_be()).encode(&mut public_key)?;
-    Mpint(rsa.n().to_bytes_be()).encode(&mut public_key)?;
-
-    let mut private_key = Vec::new();
-    let check = rand::thread_rng().gen::<u32>();
-    private_key.write_u32::<BigEndian>(check)?;
-    private_key.write_u32::<BigEndian>(check)?;
-
-    SshString("ssh-rsa".to_owned()).encode(&mut private_key)?;
-    Mpint(rsa.n().to_bytes_be()).encode(&mut private_key)?;
-    Mpint(rsa.e().to_bytes_be()).encode(&mut private_key)?;
-    Mpint(rsa.d().to_bytes_be()).encode(&mut private_key)?;
-
-    for prime in rsa.primes().iter() {
-        Mpint(prime.to_bytes_be()).encode(&mut private_key)?;
-    }
-    Ok((public_key, private_key))
 }
 
 fn decrypt(
@@ -432,100 +488,148 @@ fn decrypt(
     }
 }
 
-fn parse_decrypted_private_key(data: Vec<u8>) -> Result<(SshInnerPrivateKey, String), SshPrivateKeyError> {
-    let mut cursor = Cursor::new(data);
-    let check0 = cursor.read_u32::<BigEndian>()?;
-    let check1 = cursor.read_u32::<BigEndian>()?;
-    if check0 != check1 {
-        return Err(SshPrivateKeyError::InvalidCheckNumbers(check0, check1));
-    }
-    let key_type: SshString = SshParser::decode(&mut cursor)?;
-    match key_type.0.as_str() {
-        KEY_TYPE_RSA => {
-            let n: Mpint = SshParser::decode(&mut cursor)?;
-            let e: Mpint = SshParser::decode(&mut cursor)?;
-            let d: Mpint = SshParser::decode(&mut cursor)?;
-            let iqmp: Mpint = SshParser::decode(&mut cursor)?;
-            let p: Mpint = SshParser::decode(&mut cursor)?;
-            let q: Mpint = SshParser::decode(&mut cursor)?;
-
-            let comment: SshString = SshParser::decode(&mut cursor)?;
-
-            Ok((
-                SshInnerPrivateKey::Rsa(RsaPrivateKey::from_components(
-                    BigUint::from_bytes_be(&n.0),
-                    BigUint::from_bytes_be(&e.0),
-                    BigUint::from_bytes_be(&d.0),
-                    vec![
-                        BigUint::from_bytes_be(&iqmp.0),
-                        BigUint::from_bytes_be(&p.0),
-                        BigUint::from_bytes_be(&q.0),
-                    ],
-                )),
-                comment.0,
-            ))
-        }
-        key_type => return Err(SshPrivateKeyError::UnsupportedKeyType(key_type.to_owned())),
-    }
-}
-
 #[cfg(test)]
 pub mod tests {
-    use crate::ssh::private_key::{SshPrivateKey, SshPrivateKeyError, SshPrivateKeyParser};
+    use super::*;
+    use crate::ssh::private_key::{SshPrivateKey, SshPrivateKeyParser};
 
     #[test]
-    fn test_decode_bcrypt() {
-        let pass = "123123";
-        let private_key = b"-----BEGIN OPENSSH PRIVATE KEY-----b3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABDN4gGxcVYaD4AgpDG88jzMAAAAEAAAAAEAAAGXAAAAB3NzaC1yc2EAAAADAQABAAABgQCokOIprecFJeK/WjOCE5SZzmLGyqA8Zt6+p5Fut0yaEuAE4TfbfNMiJ67QnviT4YNPQruDxVuZQpviJmIryhvrWRoZOO+ax2tqaD/XZQGFXa1NEwgVpb9b1IpimhQANvTQ1ePWrYXgp6d3rowjvcCuCL6mk7KacCxQDV0LnSHsrGvc65GGdRycaTezg1kqjiDZL/rL3C/AEJLoaTWNEZWdtPHj+PGmDflB+QyCE7pXmG0WEwMUMfhgbAqARwm5NhqeYfAJ+saO6+dKAh+PsMeYK6emDZ4OXrvqCuCE0b0dbgKHzMceJnAf9e9sfV0EvHpIgskNUltoQBQrOH8f6y3c4hLPCsZjP0YJUVf9asMe2df05gh0AolsJ5Iuizbt4dIsTjok/7X2oLguw6/FEiCVPC8RJUxS6xG/7Wmv6H6jF7KbHifyGarmUwrGYvVfvUSj69Q1441YQmAMPNdp+ePJ4/f4EwMEwG38wrtH8WO64uigceNzoK4s5eRw9eM4Y1cAAAWQ4RTRhnCxGgtCDHZ8Fbq1fi6VhbpStOq62AnAIt4BiNJyNS4xfYpmxBOaqvzpXSaMv5qb2kkl6ClJ1CGT28I5zQS3mB/nZFjUbxQxSh7buiJpzsElH8HfC6mMW5uSQh2YKwfAWmEk0hkKvQOix1V+Z0GzqCGqWLsWWrOysapJpqmDXejAUGoRFUxFLDURMCtvp1ZAP3tKA4jxJOQ4GSbr3hDKedThR+aZ1hO+9ip2rty5nAev87cS83UQxFGjj0G1chlFNUJD8E5+QWch3t+Vkw8N1knskgvREXOj+aScOl7pfpAWyKMMJGAvsL2rYLJu3Vj3fqpCKy8J2tklqYnD76KUE4Gv3/ooskCMxJBEII+HGthMWOtRWx+a/0DicuMbZw3EmWLcXliCwX3Yit9jOxAW7tGdlMMeW28bqp1Q2lp9geEnhUv7Z4DE7RyFXDVk+0PTR0HgD5xAssucqA8tQD95upE6bRUJbFWXwKamskU4oYBgFJhIptk6xXetZAO/z5Rgp6y8UIqWN1ejQvw0Kbwy12rCqHMZVuDtKswDzYJATsz/+43odLlSwHXIKeu6IqfIObx/x3LvXvr2ytzXoui2AIQwzIsmjkz0H9+pPZ70lcb4n/cL86/KQtFTUXldxFe8bxnyy9MeXJP5DckfI30tqlHD/Gp4woUmrkEY+UIr9xTRenSIUL4WrmxE8ieP9YP+vy+VAV3TFmG57m1jWEi9Rd//vmXWleMEV0Xxzs7WPgR7XUbmMcoy9eE0a9zPgnRu0x/HVJSqRFPF1rQ8w9KdfveetSOM+PoLOqTQ41TqMc/C2wORiwzOEdQApKTr7ZXBvcTm28Ez6WzKE8bHe7AETRTTjNcVJ3mz7cNYLXDrFFztOPxtIwmiJXaMRckPIjMF5l181UMuPhNDJrcGKJ2y8JJspjeggJVBtuLC4QNOR2Tepj0A+YnaF+8KsF7i43PpQ/3Mn42tDwvRAecIOyAPnrkL3o8zffhs09rLXEWJ3eYdeg6txarDsB0fB/VvNo+OGGAnufl6tVg4y1lMOTunVC0fXIkeTKLQr8ePMq052G9vJWw210OTNie2ziTKDYkUU378QZlhwkArJaPSvrnuT+Q2lmw9Vr1eCf1p6uYTPw25WExc7VYwYF4TJq2UMEqYW3firtW5zz5JjHyCb4dSzdNTz7RMhBKziPd9CH/BTRQKObIrE3OgzUvQJgr7TRiFz6taE0O+NMGR0PbNWMTl4cpC+6q2TjUTkzD2WisFhcWvYZvNm4bwMwwIJ2kBBfQLe3KPcrcI4yTj2wmGlCvFXSbjpevt1fp0aAGS3gIqFi4N93USUizVI+VhBogBRwzGY/kqQKBb4apmqr8/cMbgA1XtvE/cJ1f7bXmhW3UEjoEAskj7BPQe+2TH0UnkEmsD1gAYOEBIcQ6VCYt3k5t30Gj6/Vidh9jCI43OEYX857A68dIyhikpBpC2wt1X+9wVX5QkI/9wR6BWGyZ5fU2yK2B14p2xRnyyCZhCl/HLvPjxZhWNQkASZXr/eKVJlmrTwz2oCz5TfMkj4B2TqlbBWxsC9s9ynlo3vNOC1lCZ9yv9lUd5AmwrPr1O3KM2vJDntKgGPWt6IKkRCrmV2hSnIZc/pqA0xJTUaMm3k5sNQOOWo9918du0LQr2BcWt/0wWSGDLnVIVv1z2zHjJM0g+QvnLiHOHtb2wNd/hWKZII2rcQCG0GP6r5Tf7FPbaem8P++EvgHKmx+/ge/qK6igxaTrbtqURMKcmJ6kM8m/EZBkbS/36Zq9a65NSK8vodqmLffCqY7SHIFCI3QA7oPng4k9hxz1V70CgQBTUvN85FWiCHKulE2zkHh8ChbmOzhesNMh+5mkWll7S2dpef8gp64hzvjX44r4gzApSqKk=-----END OPENSSH PRIVATE KEY-----".to_vec();
-        let private_key: Result<SshPrivateKey, SshPrivateKeyError> =
-            SshPrivateKeyParser::decode(private_key.as_slice(), Option::Some(pass));
-        println!("{:?}", private_key);
-        assert!(private_key.is_ok());
+    fn decode_without_passphrase_2048() {
+        // ssh-keygen -t rsa -b 2048 -C "test2@picky.com" (without the passphrase)
+        let ssh_private_key = "-----BEGIN OPENSSH PRIVATE KEY-----b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAABFwAAAAdzc2gtcnNhAAAAAwEAAQAAAQEAyPYbdoNqjj4EhuYblWIxVKLsmsOff+kLkKlFRsIJyE5YUWzPm5LyUH3LoqnL/rw/f/Og37oJO/bEn4P2lSvlf6ZagAGaLo8/8ACw4xKYUsQFHAEfreIthd/T2u9TEnN+yPS99M99bXG2tV+6He4c61TJfYrq5DsgQuMXCFmtR/IdJg8qF8lj06qEzjQ1HvXQdXruhm4sQn1HMb3VbdKQFSU3TpmzVysEaOVl3zK7KirBU9gHIOFZuE3y0oUklFuK6jOhjgQnxeo58Rb00g3p7R+YcpI1i95TAoIQ/tYScjnZzByQv+ak1BjgfOjMbEeEQl6kvi2axqTEnFcg0IHu6wAAA8iqDGUDqgxlAwAAAAdzc2gtcnNhAAABAQDI9ht2g2qOPgSG5huVYjFUouyaw59/6QuQqUVGwgnITlhRbM+bkvJQfcuiqcv+vD9/86Dfugk79sSfg/aVK+V/plqAAZoujz/wALDjEphSxAUcAR+t4i2F39Pa71MSc37I9L30z31tcba1X7od7hzrVMl9iurkOyBC4xcIWa1H8h0mDyoXyWPTqoTONDUe9dB1eu6GbixCfUcxvdVt0pAVJTdOmbNXKwRo5WXfMrsqKsFT2Acg4Vm4TfLShSSUW4rqM6GOBCfF6jnxFvTSDentH5hykjWL3lMCghD+1hJyOdnMHJC/5qTUGOB86MxsR4RCXqS+LZrGpMScVyDQge7rAAAAAwEAAQAAAQATZEw6H2xE1Y8yRTocLCF+fUo/lOjrOt22096veUHgZk73bHyMEp33Tmw8Ag6BQkEOY7/+VsFVW/aVPfKpalb2/mJ1P7JVE9Wjny1ye/Te57NmhGU+LjkeVf7nfXiSqzpswdEisnL0AKkUz2vyP2vi+YeH6cPIyjvOuIMcdyrVakejnGbss19ZoXw660X/7TRqG/41KhTmlkN610JBKI2Rozecx9l3LZ3CTRpOOJ2sfssegvL+qxvvH1YVkRat4dwNZxsi+chozqWOciXrbzifBghBp0Upe5fgR2JRpyB6sMVXIHKkeP9YBQUARm1ECdbdJmPSiNYPgMKpTaEObMahAAAAgCtugmDSAwIPibrD9MAbJB6KbN15heA6vTtCLOvFe1Hikw94DYAJz+vlKadbOZW5SfGAOuIe7IynafthWm4RcbXEXxhnVtqHxzMHOZo/Mnoh+bUOesDSoERyNHokpNK6m1NKbmQeFj4n7rkcrR8hrwX8+Ng8CsBEglDi+ULtVivbAAAAgQD1vEPRUu9aD7CjkYgDyD2vNRRevARf01ImgT1tpiEA+GLHJ0xMetd7OH0wutAZuH26V19Kt4sWpsTwfdl2fIw7XHPc+G1OSqiOk6AS9qT/sy/VL1Wn7CqyAN2jikznquE6MbebTUJQSNHK9vQhn+u4hUDdEoMOLTYdWxxcjdJirQAAAIEA0VsOxBRDSTLcAr0Y97oCmb/6tU9XGAZwL2E14GVK85PnJNwHrx4aqb0qATE4iPLfE7ms+eBtT8UjHF0fxM3KDQiFSrvtgM4JjGTDS4dTYIBD/eQ0/aTaRgLOQqplyBgYVr3x7ATfcIP5961TfdiJ/QESutdb1KQquFXIMRII4vcAAAAPdGVzdDJAcGlja3kuY29tAQIDBA==-----END OPENSSH PRIVATE KEY-----";
+
+        let private_key: SshPrivateKey = SshPrivateKeyParser::decode(ssh_private_key.as_bytes(), None).unwrap();
+
+        println!("{:?}", &private_key);
+        assert_eq!("test2@picky.com".to_owned(), private_key.comment);
+        assert_eq!(
+            Kdf::construct("none".to_owned(), KdfOption::construct(Vec::new(), 0)),
+            private_key.kdf
+        );
+        assert_eq!("none", private_key.cipher_name);
     }
 
     #[test]
-    fn test_decode_none() {
-        let private_key = b"-----BEGIN OPENSSH PRIVATE KEY-----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-----END OPENSSH PRIVATE KEY-----".to_vec();
-        let private_key: Result<SshPrivateKey, SshPrivateKeyError> =
-            SshPrivateKeyParser::decode(private_key.as_slice(), Option::None);
-        println!("{:?}", private_key);
-        assert!(private_key.is_ok());
+    fn decode_without_passphrase_4096() {
+        // ssh-keygen -t rsa -b 4096 -C "test@picky.com" (without the passphrase)
+        let ssh_private_key = "-----BEGIN OPENSSH PRIVATE KEY-----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-----END OPENSSH PRIVATE KEY-----";
+
+        let private_key: SshPrivateKey = SshPrivateKeyParser::decode(ssh_private_key.as_bytes(), None).unwrap();
+
+        println!("{:?}", &private_key);
+        assert_eq!("test@picky.com".to_owned(), private_key.comment);
+        assert_eq!(
+            Kdf::construct("none".to_owned(), KdfOption::construct(Vec::new(), 0)),
+            private_key.kdf
+        );
+        assert_eq!("none", private_key.cipher_name);
     }
 
     #[test]
-    fn test_encode_none() {
-        let private_key = b"-----BEGIN OPENSSH PRIVATE KEY-----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-----END OPENSSH PRIVATE KEY-----".to_vec();
-        let private_key: Result<SshPrivateKey, SshPrivateKeyError> =
-            SshPrivateKeyParser::decode(private_key.as_slice(), Option::None);
-        assert!(private_key.is_ok());
-        let private_key = private_key.unwrap();
+    fn decode_with_passphrase_2048() {
+        // ssh-keygen -t rsa -b 2048 -C "test_with_pass2@picky.com"
+        let passphrase = Some("123123");
+        let ssh_private_key = "-----BEGIN OPENSSH PRIVATE KEY-----b3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABBIMsVovOqXSrZa+iEvQwXzAAAAEAAAAAEAAAEXAAAAB3NzaC1yc2EAAAADAQABAAABAQCkR5WaC3NTPZdj9X/bX88YYbR2k5r3aE+I/ezxzbG6xIJi+So9AohypAhReyW97XSGut5n6a9O+n/c9nCiXFVoyXbMSdM90Av5bu799+V4w3kBlRzN5D3A6uIZRjglwc3Xso9kthneNByB7OjZuSDdmuWE3YOgmW0TirP3dztbtVScLPZUSsEveIMt90awuOFWaEUshqb7l713bdEB0Tb77Z1wZpt6UmIgpraV58kN/ahepbY8lirMS4ym75wtBe6PgyKGKIR3aNQdbfHYMHCgxNQMAFUt2yD9f+JE5HWG7kyKDcLTHCY60dtKTNfpcByi4Bwm3209V4rGYSKAzFXvAAAD0CdYEpFE8Dda2GBNy1l5vDNdbyJvx7SSP49l4OmHsgRE2WneNC9CfO2IxPRNXsPEmXimeubqm6alsmJ1Ch+KsdjvyU7WIEnjuonClLWx6rhsuppJqZSICbikMUXjhlHpLirGnL0WoaBnLYEVYgu8cMbIgE9BNho+bS+1qvyIrIdIblJwwc66CJKUYPz1yRA84WIMZOWlsYfeHnCvTGjiYUG2YFayVAuXvAz/ND3bQYUlO34XOOsJvZxfQNEg1/tzhB7RvcGOG1InoQxT6dZtTp85CkTU/QQ6w2eYj4qDDmsFm/eSDgEFfOJDLrfHsB4+G2aBZLmgk2bn7vo3JBkcPAETX6kKd7bkyEfhLVph9i48vbmNJ8mXWiXMoRXqRgkKqBAMVnuXtbKVDVzzlZXIFu1cbuKyt0zUg7jBIeIdG+5U0L6qygTjOKU6aP+dK1wRc0XyC8jxTJupt2eTEKBLzy4TwlLH5QhEcj1ccoV97PyslJ/NnQx8IKflHxxxQF4CbYgyXt9fWZpBfaD9TVWgsFoKrlZ9HOb6s5WJMwijgNLfllKNkJB/KpQUIwMAqEjkfk4HyKeC9sfCHkjkXoZO28GypRR8Bd5M+/QfotFvcdRHqbvv+mj1y6nBIv0hv5eqJEil5s/dwGI7cexMGBjPVOPK63kbh6JlMcrb58jKid1VTzUbxxKm6YfL2aQpGp/veGPZRkm+x3DHoANYLYJ64WRQgBOGcf4QSqiTxP9Y5ZxfQuheDzOkiQCt3ToTWwguXtVLm3AAUKxUhHVgMy2PQNFXcNsPWGCzhOW1FzC82iZhuQi7SlTX7iA40np23nMkHu37hkHpfpipySxEIIjv1T0UglqN25hPlHDIjrTRwcBVxikVhP0IFbDUtlmqSP5MkDEE2ZKTeD0ivd8c2WLO5RUoEICaTVHOx+MxOJ9L07ZhA2NMKiMMqhe0bXwZoFFHMUxXh8+iTTy89oE1PQ7xz/d6hJUtbqJ/N2xpcWMNtnvbjWpxzwhjPGiqKx8GCtpGoAjpUeNqWL9V0a20rJBYqzJGLYfKDd+PW2XTtOHbQwl0DFNq41jP4nYnaFo2YCjWb3mleRUWkU5SoUHq+vUvs4dxqKjlzvKnK5pcyH9bnpKPaBI28QHtye7o25AfkOj7eHVSe5CV4u8okVaBEq1OFhBeWm+jx1fBrk82hEGamuq1GZsZre2y9jauusOFcMXrV5oxJjBLLbGCi0i5ES0O+kBOlB/kY3hdkReCHCJlMN7v92mkSsadahzwx3fTQWCwgVDg6LLN+xCPGFTMts4XDwg=-----END OPENSSH PRIVATE KEY-----";
 
-        let mut private_key_data: Vec<u8> = Vec::new();
-        let res = private_key.encode(&mut private_key_data);
-        println!("{:?}", String::from_utf8(private_key_data).unwrap());
-        assert!(res.is_ok());
+        let private_key: SshPrivateKey = SshPrivateKeyParser::decode(ssh_private_key.as_bytes(), passphrase).unwrap();
+
+        println!("{:?}", &private_key);
+        assert_eq!("test_with_pass2@picky.com".to_owned(), private_key.comment);
+        assert_eq!(
+            Kdf::construct(
+                "bcrypt".to_owned(),
+                KdfOption::construct(
+                    vec![72, 50, 197, 104, 188, 234, 151, 74, 182, 90, 250, 33, 47, 67, 5, 243],
+                    16
+                )
+            ),
+            private_key.kdf
+        );
+        assert_eq!("aes256-ctr", private_key.cipher_name);
     }
 
     #[test]
-    fn test_encode_bcrypt() {
-        let private_key = b"-----BEGIN OPENSSH PRIVATE KEY-----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-----END OPENSSH PRIVATE KEY-----".to_vec();
-        let private_key: SshPrivateKey =
-            SshPrivateKeyParser::decode(private_key.as_slice(), Option::Some("123123")).unwrap();
+    fn encode_without_passphrase_2048() {
+        // ssh-keygen -t rsa -b 2048 -C "test2@picky.com" (without the passphrase)
+        let ssh_private_key = "-----BEGIN OPENSSH PRIVATE KEY-----b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAABFwAAAAdzc2gtcnNhAAAAAwEAAQAAAQEAyPYbdoNqjj4EhuYblWIxVKLsmsOff+kLkKlFRsIJyE5YUWzPm5LyUH3LoqnL/rw/f/Og37oJO/bEn4P2lSvlf6ZagAGaLo8/8ACw4xKYUsQFHAEfreIthd/T2u9TEnN+yPS99M99bXG2tV+6He4c61TJfYrq5DsgQuMXCFmtR/IdJg8qF8lj06qEzjQ1HvXQdXruhm4sQn1HMb3VbdKQFSU3TpmzVysEaOVl3zK7KirBU9gHIOFZuE3y0oUklFuK6jOhjgQnxeo58Rb00g3p7R+YcpI1i95TAoIQ/tYScjnZzByQv+ak1BjgfOjMbEeEQl6kvi2axqTEnFcg0IHu6wAAA8iqDGUDqgxlAwAAAAdzc2gtcnNhAAABAQDI9ht2g2qOPgSG5huVYjFUouyaw59/6QuQqUVGwgnITlhRbM+bkvJQfcuiqcv+vD9/86Dfugk79sSfg/aVK+V/plqAAZoujz/wALDjEphSxAUcAR+t4i2F39Pa71MSc37I9L30z31tcba1X7od7hzrVMl9iurkOyBC4xcIWa1H8h0mDyoXyWPTqoTONDUe9dB1eu6GbixCfUcxvdVt0pAVJTdOmbNXKwRo5WXfMrsqKsFT2Acg4Vm4TfLShSSUW4rqM6GOBCfF6jnxFvTSDentH5hykjWL3lMCghD+1hJyOdnMHJC/5qTUGOB86MxsR4RCXqS+LZrGpMScVyDQge7rAAAAAwEAAQAAAQATZEw6H2xE1Y8yRTocLCF+fUo/lOjrOt22096veUHgZk73bHyMEp33Tmw8Ag6BQkEOY7/+VsFVW/aVPfKpalb2/mJ1P7JVE9Wjny1ye/Te57NmhGU+LjkeVf7nfXiSqzpswdEisnL0AKkUz2vyP2vi+YeH6cPIyjvOuIMcdyrVakejnGbss19ZoXw660X/7TRqG/41KhTmlkN610JBKI2Rozecx9l3LZ3CTRpOOJ2sfssegvL+qxvvH1YVkRat4dwNZxsi+chozqWOciXrbzifBghBp0Upe5fgR2JRpyB6sMVXIHKkeP9YBQUARm1ECdbdJmPSiNYPgMKpTaEObMahAAAAgCtugmDSAwIPibrD9MAbJB6KbN15heA6vTtCLOvFe1Hikw94DYAJz+vlKadbOZW5SfGAOuIe7IynafthWm4RcbXEXxhnVtqHxzMHOZo/Mnoh+bUOesDSoERyNHokpNK6m1NKbmQeFj4n7rkcrR8hrwX8+Ng8CsBEglDi+ULtVivbAAAAgQD1vEPRUu9aD7CjkYgDyD2vNRRevARf01ImgT1tpiEA+GLHJ0xMetd7OH0wutAZuH26V19Kt4sWpsTwfdl2fIw7XHPc+G1OSqiOk6AS9qT/sy/VL1Wn7CqyAN2jikznquE6MbebTUJQSNHK9vQhn+u4hUDdEoMOLTYdWxxcjdJirQAAAIEA0VsOxBRDSTLcAr0Y97oCmb/6tU9XGAZwL2E14GVK85PnJNwHrx4aqb0qATE4iPLfE7ms+eBtT8UjHF0fxM3KDQiFSrvtgM4JjGTDS4dTYIBD/eQ0/aTaRgLOQqplyBgYVr3x7ATfcIP5961TfdiJ/QESutdb1KQquFXIMRII4vcAAAAPdGVzdDJAcGlja3kuY29tAQIDBA==-----END OPENSSH PRIVATE KEY-----";
+        let private_key: SshPrivateKey = SshPrivateKeyParser::decode(ssh_private_key.as_bytes(), None).unwrap();
 
-        let mut new_pr: Vec<u8> = Vec::new();
-        private_key.encode(&mut new_pr).unwrap();
+        let mut ssh_private_key_after: Vec<u8> = Vec::new();
+        private_key.encode(&mut ssh_private_key_after).unwrap();
 
-        println!("new_pr: {}", String::from_utf8(new_pr.clone()).unwrap());
+        let ssh_private_key_after = String::from_utf8(ssh_private_key_after).unwrap();
+        println!("{}", &ssh_private_key_after);
+        assert_eq!(ssh_private_key.to_owned(), ssh_private_key_after);
+    }
 
-        let _private_key: SshPrivateKey =
-            SshPrivateKeyParser::decode(new_pr.as_slice(), Option::Some("123123")).unwrap();
+    #[test]
+    fn encode_with_passphrase_2048() {
+        // ssh-keygen -t rsa -b 2048 -C "test_with_pass2@picky.com"
+        let passphrase = Some("123123");
+        let ssh_private_key = "-----BEGIN OPENSSH PRIVATE KEY-----b3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAABBIMsVovOqXSrZa+iEvQwXzAAAAEAAAAAEAAAEXAAAAB3NzaC1yc2EAAAADAQABAAABAQCkR5WaC3NTPZdj9X/bX88YYbR2k5r3aE+I/ezxzbG6xIJi+So9AohypAhReyW97XSGut5n6a9O+n/c9nCiXFVoyXbMSdM90Av5bu799+V4w3kBlRzN5D3A6uIZRjglwc3Xso9kthneNByB7OjZuSDdmuWE3YOgmW0TirP3dztbtVScLPZUSsEveIMt90awuOFWaEUshqb7l713bdEB0Tb77Z1wZpt6UmIgpraV58kN/ahepbY8lirMS4ym75wtBe6PgyKGKIR3aNQdbfHYMHCgxNQMAFUt2yD9f+JE5HWG7kyKDcLTHCY60dtKTNfpcByi4Bwm3209V4rGYSKAzFXvAAAD0CdYEpFE8Dda2GBNy1l5vDNdbyJvx7SSP49l4OmHsgRE2WneNC9CfO2IxPRNXsPEmXimeubqm6alsmJ1Ch+KsdjvyU7WIEnjuonClLWx6rhsuppJqZSICbikMUXjhlHpLirGnL0WoaBnLYEVYgu8cMbIgE9BNho+bS+1qvyIrIdIblJwwc66CJKUYPz1yRA84WIMZOWlsYfeHnCvTGjiYUG2YFayVAuXvAz/ND3bQYUlO34XOOsJvZxfQNEg1/tzhB7RvcGOG1InoQxT6dZtTp85CkTU/QQ6w2eYj4qDDmsFm/eSDgEFfOJDLrfHsB4+G2aBZLmgk2bn7vo3JBkcPAETX6kKd7bkyEfhLVph9i48vbmNJ8mXWiXMoRXqRgkKqBAMVnuXtbKVDVzzlZXIFu1cbuKyt0zUg7jBIeIdG+5U0L6qygTjOKU6aP+dK1wRc0XyC8jxTJupt2eTEKBLzy4TwlLH5QhEcj1ccoV97PyslJ/NnQx8IKflHxxxQF4CbYgyXt9fWZpBfaD9TVWgsFoKrlZ9HOb6s5WJMwijgNLfllKNkJB/KpQUIwMAqEjkfk4HyKeC9sfCHkjkXoZO28GypRR8Bd5M+/QfotFvcdRHqbvv+mj1y6nBIv0hv5eqJEil5s/dwGI7cexMGBjPVOPK63kbh6JlMcrb58jKid1VTzUbxxKm6YfL2aQpGp/veGPZRkm+x3DHoANYLYJ64WRQgBOGcf4QSqiTxP9Y5ZxfQuheDzOkiQCt3ToTWwguXtVLm3AAUKxUhHVgMy2PQNFXcNsPWGCzhOW1FzC82iZhuQi7SlTX7iA40np23nMkHu37hkHpfpipySxEIIjv1T0UglqN25hPlHDIjrTRwcBVxikVhP0IFbDUtlmqSP5MkDEE2ZKTeD0ivd8c2WLO5RUoEICaTVHOx+MxOJ9L07ZhA2NMKiMMqhe0bXwZoFFHMUxXh8+iTTy89oE1PQ7xz/d6hJUtbqJ/N2xpcWMNtnvbjWpxzwhjPGiqKx8GCtpGoAjpUeNqWL9V0a20rJBYqzJGLYfKDd+PW2XTtOHbQwl0DFNq41jP4nYnaFo2YCjWb3mleRUWkU5SoUHq+vUvs4dxqKjlzvKnK5pcyH9bnpKPaBI28QHtye7o25AfkOj7eHVSe5CV4u8okVaBEq1OFhBeWm+jx1fBrk82hEGamuq1GZsZre2y9jauusOFcMXrV5oxJjBLLbGCi0i5ES0O+kBOlB/kY3hdkReCHCJlMN7v92mkSsadahzwx3fTQWCwgVDg6LLN+xCPGFTMts4XDwg=-----END OPENSSH PRIVATE KEY-----";
+        let private_key: SshPrivateKey = SshPrivateKeyParser::decode(ssh_private_key.as_bytes(), passphrase).unwrap();
+
+        let mut ssh_private_key_after: Vec<u8> = Vec::new();
+        private_key.encode(&mut ssh_private_key_after).unwrap();
+
+        let ssh_private_key_after = String::from_utf8(ssh_private_key_after).unwrap();
+        println!("{}", &ssh_private_key_after);
+        assert_eq!(ssh_private_key.to_owned(), ssh_private_key_after);
     }
 
     #[test]
     fn test_private_key_generation() {
-        let mut private_key = SshPrivateKey::generate_ssh_private_key(2048, Option::Some("123".to_string())).unwrap();
+        let private_key = SshPrivateKey::generate_ssh_private_key(2048, Option::Some("123".to_string())).unwrap();
         let mut data = Vec::new();
         private_key.encode(&mut data).unwrap();
-        println!("{}", String::from_utf8(data).unwrap());
+        println!("{}", String::from_utf8(data.clone()).unwrap());
+        let _: SshPrivateKey = SshPrivateKeyParser::decode(data.as_slice(), Option::Some("123")).unwrap();
+    }
+
+    #[test]
+    fn kdf_option_decode() {
+        let mut cursor = Cursor::new(vec![
+            0, 0, 0, 24, 0, 0, 0, 16, 72, 50, 197, 104, 188, 234, 151, 74, 182, 90, 250, 33, 47, 67, 5, 243, 0, 0, 0,
+            16,
+        ]);
+        let kdf_option: KdfOption = SshParser::decode(&mut cursor).unwrap();
+        let KdfOption { salt, rounds } = kdf_option;
+        assert_eq!(
+            vec![72, 50, 197, 104, 188, 234, 151, 74, 182, 90, 250, 33, 47, 67, 5, 243],
+            salt
+        );
+        assert_eq!(16, rounds);
+
+        let mut cursor = Cursor::new(vec![0, 0, 0, 0]);
+        let kdf_option: KdfOption = SshParser::decode(&mut cursor).unwrap();
+        let KdfOption { salt, rounds } = kdf_option;
+        assert_eq!(Vec::<u8>::new(), salt);
+        assert_eq!(0, rounds);
+    }
+
+    #[test]
+    fn kdf_option_encode() {
+        let mut res: Vec<u8> = Vec::new();
+        let kdf_option = KdfOption::construct(
+            vec![72, 50, 197, 104, 188, 234, 151, 74, 182, 90, 250, 33, 47, 67, 5, 243],
+            16,
+        );
+
+        kdf_option.encode(&mut res).unwrap();
+
+        assert_eq!(
+            vec![
+                0, 0, 0, 24, 0, 0, 0, 16, 72, 50, 197, 104, 188, 234, 151, 74, 182, 90, 250, 33, 47, 67, 5, 243, 0, 0,
+                0, 16
+            ],
+            res
+        );
+
+        res.clear();
+        let kdf_option = KdfOption::new();
+
+        kdf_option.encode(&mut res).unwrap();
+
+        assert_eq!(vec![0, 0, 0, 0], res);
     }
 }

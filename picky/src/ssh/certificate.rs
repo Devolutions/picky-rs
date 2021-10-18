@@ -37,7 +37,7 @@ pub enum SshCertificateError {
     RsaError(#[from] rsa::errors::Error),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum SshCertType {
     Client,
     Host,
@@ -85,7 +85,7 @@ pub enum SshCertificateKeyType {
     SshRsaV01,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum SshCriticalOptionType {
     ForceCommand,
     SourceAddress,
@@ -115,7 +115,7 @@ impl ToString for SshCriticalOptionType {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct SshCriticalOption {
     option_type: SshCriticalOptionType,
     data: String,
@@ -162,7 +162,6 @@ impl SshParser for Vec<SshCriticalOption> {
 
     fn encode(&self, stream: impl Write) -> Result<(), Self::Error> {
         let mut data = Vec::new();
-        println!("{}", self.len());
         for critical_option in self.iter() {
             critical_option.encode(&mut data)?;
         }
@@ -171,7 +170,7 @@ impl SshParser for Vec<SshCriticalOption> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum SshExtensionType {
     NoTouchRequired,
     PermitX11Forwarding,
@@ -226,10 +225,16 @@ impl SshParser for SshExtensionType {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct SshExtension {
     extension_type: SshExtensionType,
     data: String,
+}
+
+impl SshExtension {
+    pub fn new(extension_type: SshExtensionType, data: String) -> Self {
+        Self { extension_type, data }
+    }
 }
 
 impl SshParser for SshExtension {
@@ -273,7 +278,6 @@ impl SshParser for Vec<SshExtension> {
 
     fn encode(&self, stream: impl Write) -> Result<(), Self::Error> {
         let mut data = Vec::new();
-        println!("{}", self.len());
         for critical_option in self.iter() {
             critical_option.encode(&mut data)?;
         }
@@ -346,6 +350,10 @@ impl SshCertificate {
         let mut cursor = Cursor::new(Vec::with_capacity(1024));
         self.encode(&mut cursor)?;
         Ok(cursor.into_inner())
+    }
+
+    pub fn builder(&self) -> SshCertificateBuilder {
+        SshCertificateBuilder::init()
     }
 }
 
@@ -657,27 +665,66 @@ impl SshCertificateBuilder {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::ssh::certificate::{SshCertificate, SshCertificateError};
+    use crate::ssh::certificate::{SshCertType, SshCertificate, SshCriticalOption, SshExtension, SshExtensionType};
     use crate::ssh::SshParser;
 
     #[test]
-    fn test_decode() {
-        // let cert = b"ssh-rsa-cert-v01@openssh.com AAAAHHNzaC1yc2EtY2VydC12MDFAb3BlbnNzaC5jb20AAAAgRask7lW3wv86YhfVWBdm0wJ0T6AFIdoXqlQdqAK6JXgAAAADAQABAAABgQCl1TxqXj4BMygs00pZtfrsThPvA6WB9Wyi/UKTkifxhecPC2/8HoJBbqoSlm4CVPt/hLkdSbJERUCA97d4OA3Tz3uwRrQinrEC0g6eYJXhKNUHMsDd3JvNa4emI/WAp46iP4aJ/UW9lGW1YA3fgN3/dmYHBVDL7QKp/oHyZbO0JNbhhDCG7Fwp7txaWkASW4GMDBJJiQtpLe/tGYW6JMCAvrO/3Y37rXeIetvMcw1LecmWwVbRjSULqmScPKYa+n4UnwFgisdmyzNuRIZHDHXCkQIIB2K8b5wJhEQUAPvs+8gWTw00MYycAFPdgjv/CRJj7M1ZdcFydMTJlw9IoO2HNNyqo3l9SiqvrzdICrGJ5PmaakQpZMecosVW/refJMKybCOigr/11yuG2soKy7+Nbxz8AHYPhcpDCUV/6VRFmRV0CYt8qWwETqE9npWFUAal01rMqvVsDHhg6anc5wrmd9tp2k6aUMfZ135nbVmlQtZylkVyLkNvYAICZWBmJ/kAAAAAAAAAAAAAAAIAAAAHcWthdGlvbgAAABQAAAAQbWFpbi5xa2F0aW9uLmNvbQAAAABhWzTwAAAAAGGJWbAAAAAAAAAAAAAAAAAAAAGXAAAAB3NzaC1yc2EAAAADAQABAAABgQCpDY4gkD/TAvfZdSGlymgc1njCh3/Tcyoe3t5O4m32dRo54d3w4nuP4/p7UzeXMOXIoyA576CjFzbg/fBwHhxooRcXquSA5Low0W6231q0Gv2iJ0AnXIK9Xycmf4LZ8BmVukjHONH2qKBXcbIwqozAmNt50Sx2s+0EFWE8cIDu+k9pA1qeRSQijjBnaDu6xER1DgYFJa7np7kYsAusk738RiOuhjlLAFSBgJu3z5y/iiuz7fq0ZKFczmzvuokIT1c1ClaXtOfKvnjqJUewqEnkSHStt4Jg+8SZoR3w68vdgkdBjhtgYl62OcTBS9XtgDn+Tqfeu8uTAEBab2XTDWTx/TEWCV0qNp8y09DGDE/JTFSi/hrhVLAvZaUBIq3ZCwbC4xa/obTJumNV8dgWxg/yZ/hTRrza2dPoEpbmo13ekuKpXao0ecw26fGCLyLIA7wBYBqrg6/AdMzsC5efFZa2zqHET9CdXopzlHxzhvtdrUumtpIOy6LYp07uEbZNbLMAAAGUAAAADHJzYS1zaGEyLTUxMgAAAYCaoAufe/4j7ULdd5819Xi8tYooFniH0L59WkQQPk7lL/qM4m4RIolx7ZNeUB7G2zEG95S99R6JfkgOiTUqMbrU2YUAi/lNjQv5ZIEx2hBrBFRciuUAuuUXJ6DVvqAf80R4+rs/7hgruEwm8cgbf490Ylu1tapoldvD9BtZopJL2hrKmoZdFtNfKWaVctvodT3u+3WS72Nlw375dBz7VhgzL2r50V6YGkhqMKqI0ym7V3bIld3PxO94pVYLwKX417+5CU6wzCceKgTrwDCgHMJlQqFZv/VrlxHpD+HIi4ND0oq5566aQAlEFSm3Fudj/Q3iVAiWUQqFtgA+mg9QJEpNXpsxwE2iMm3M5TIlOIzNy3G1Y0Ooz5yJreUKfoqgnBRsU4UOO/sBXPToDOJfg6MMkUby8t7mPCFIAZXrn/BIIJgQ03WB1I/ifOVgyw9KtzSYIENf69KrQy0VFpTXUZUKGDedEVdp1QHUiVM+5mXQYWqBe6hRD7dTH7MYNL26hm8= pavlom@manjaro";
-        let cert = b"ssh-rsa-cert-v01@openssh.com AAAAHHNzaC1yc2EtY2VydC12MDFAb3BlbnNzaC5jb20AAAAgdEQTNrUVDtqSYWmDkObJE+1EtlxBRTr+GESY2Fu/EwQAAAADAQABAAABgQC/jRvnngHM93BoVuQcT1kcrIGpL0I9rqM5O21JqF/Di9qNizoeY7hfmNB+e3HoxGixBitv5NB70/Mq3QqB+4Jmg5Vm3SphbpUNfZaRBMxQIHjCk5NIQoemPTApVToWfOuixQ/fBLUZ5RBJF83CvrCmRPCj882HxRfIFDTnCkVWSy+mKyHOveeIX2XcdQ1L8wrLqxmzApjYLF23EIDV6W2J2b2JapiahkbFjBbOy2Hnlj0z+mO9WCtqOD/cvI2O4IkBcil1g3jJ0kGPc5adi9jnuDlE8B6EiEaCoiZXMBXWQY6dKepr7QwIOSXP4DraVAPCGHOK7h0iVyzS+lvp/4lewHrKEY88bCvYGl/WhT9mcmgXRok6AkeX8Hv6FIFmp/i0VCdif6v/uPoOt96G7ChN4ev9P/5mJ1ij3VZEAR4kcfrsc93mbSvbxqCV3w4Qb964fFdVblaWco+ike7DeU6xfyP/Wc/mL0w+CbBSwfffNfaYRSVpz22bKdTpfV2MT4MAAAAAAAAAAAAAAAEAAAACSUQAAAALAAAAB3FrYXRpb24AAAAAYVMh/AAAAABjMwRAAAAAAAAAAIIAAAAVcGVybWl0LVgxMS1mb3J3YXJkaW5nAAAAAAAAABdwZXJtaXQtYWdlbnQtZm9yd2FyZGluZwAAAAAAAAAWcGVybWl0LXBvcnQtZm9yd2FyZGluZwAAAAAAAAAKcGVybWl0LXB0eQAAAAAAAAAOcGVybWl0LXVzZXItcmMAAAAAAAAAAAAAAZcAAAAHc3NoLXJzYQAAAAMBAAEAAAGBAMlFcqanV4pBSws2owmkcMSEOA0vY8resxqICkXjuvdrwN52DshFcXyZbUM//VHswHmMS3HHX6wOdRzZn79FA9aJ+iWFAuQNxgH5SduBfylX0KO8LeF3a+hzbNeJNUxnsQhLmMZXz42sK8NxodgFhvSFL1HsAN7ViH0egYked1EK54MBbPGpVq2m6Cv8sBXab2ZB2GOCy0/N3m5SwCJ/hix4gPB+vD1AXrWlcVL8Y789AsG7r1zFIk+Ub/9ALM7qLZ0cZo7G8Te/B3JgYowwWy+UE+8/K4xy2veRkMpSgj3CsDYH3ePCzwlNN5jbghIR8kuO+wRXavKkxJbzvcZSXItuox5c8H7nrUsZwv88we+oabq4ps0j2qwTzGIjL8LfzYapbBNqlkoT6XAxWH+iDuhHJe03sM0WjjB+g/Vwl8kX+r8rq0Tew3M9hWIcMFkZ4GTE8hnjyDiOoy57xu93IDpiawFMGgBATzXwq8xxHbDWYmfTjnr+S/xdhzIqmIC42QAAAZQAAAAMcnNhLXNoYTItNTEyAAABgCHxq0sTi2RllJP2cTd89Hcfyq5iBg5hR2QG5m60UntGHOAsvh45qzcstQjR3zjOyXoi/OlJ8yJ6mv86Ux8lmnOF/HeHrI5B8l8WV51kfiLZtK30T+1QSaZ64vV4yeKMikF1kTHJ6jYJMAzg4LH2qUJP2uugelJrgjYrtOrGbIZPuiKebfgxtnXdh4zx2rElDeLnkVhllwMbzOVq3POqL5/eTomexe1HuVqv8TMr0doJKtWnJVJyANfT0azQrBAzIqTPYD55pT1gndhPcZnxdVRIhTXdpWgWJu63keMNnBJk9MPl77ZBH1pGplCcbZ6vWiK/SP4QaUJ2414oEaqXaRRxZ3SsGk0ymPW+OHcueFE5xSWOPKBHcfHDSYNyhGGVnCPf9ZafTyEtS/RN4FG6zrKmiuub8sg8ENnRlNVYzBzvOlBLQdiiaaHkLMnGuerVNWGJhm+RkdW2otDOMwcxvcikdgcV8v3AUyGtZnCuYSomISNxPZjZkwvLbg1B7xaiWw== pavlom@manjaro";
-        let cert: Result<SshCertificate, SshCertificateError> = SshParser::decode(cert.to_vec().as_slice());
+    fn decode_host_cert() {
+        let cert = b"ssh-rsa-cert-v01@openssh.com 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 pavlom@manjaro";
+        let cert: SshCertificate = SshParser::decode(cert.to_vec().as_slice()).unwrap();
         println!("{:?}", &cert);
-        assert!(cert.is_ok());
+        assert_eq!(SshCertType::Host, cert.cert_type);
+        assert_eq!("picky".to_owned(), cert.key_id);
+        assert_eq!(
+            vec!["first.example.com".to_owned(), "second.example.com".to_owned()],
+            cert.valid_principals
+        );
+        assert_eq!("pavlom@manjaro", cert.comment);
+        assert_eq!(Vec::<SshCriticalOption>::new(), cert.critical_options);
+        assert_eq!(Vec::<SshExtension>::new(), cert.extensions);
     }
 
     #[test]
-    fn test_encode() {
-        let cert = b"ssh-rsa-cert-v01@openssh.com AAAAHHNzaC1yc2EtY2VydC12MDFAb3BlbnNzaC5jb20AAAAgRask7lW3wv86YhfVWBdm0wJ0T6AFIdoXqlQdqAK6JXgAAAADAQABAAABgQCl1TxqXj4BMygs00pZtfrsThPvA6WB9Wyi/UKTkifxhecPC2/8HoJBbqoSlm4CVPt/hLkdSbJERUCA97d4OA3Tz3uwRrQinrEC0g6eYJXhKNUHMsDd3JvNa4emI/WAp46iP4aJ/UW9lGW1YA3fgN3/dmYHBVDL7QKp/oHyZbO0JNbhhDCG7Fwp7txaWkASW4GMDBJJiQtpLe/tGYW6JMCAvrO/3Y37rXeIetvMcw1LecmWwVbRjSULqmScPKYa+n4UnwFgisdmyzNuRIZHDHXCkQIIB2K8b5wJhEQUAPvs+8gWTw00MYycAFPdgjv/CRJj7M1ZdcFydMTJlw9IoO2HNNyqo3l9SiqvrzdICrGJ5PmaakQpZMecosVW/refJMKybCOigr/11yuG2soKy7+Nbxz8AHYPhcpDCUV/6VRFmRV0CYt8qWwETqE9npWFUAal01rMqvVsDHhg6anc5wrmd9tp2k6aUMfZ135nbVmlQtZylkVyLkNvYAICZWBmJ/kAAAAAAAAAAAAAAAIAAAAHcWthdGlvbgAAABQAAAAQbWFpbi5xa2F0aW9uLmNvbQAAAABhWzTwAAAAAGGJWbAAAAAAAAAAAAAAAAAAAAGXAAAAB3NzaC1yc2EAAAADAQABAAABgQCpDY4gkD/TAvfZdSGlymgc1njCh3/Tcyoe3t5O4m32dRo54d3w4nuP4/p7UzeXMOXIoyA576CjFzbg/fBwHhxooRcXquSA5Low0W6231q0Gv2iJ0AnXIK9Xycmf4LZ8BmVukjHONH2qKBXcbIwqozAmNt50Sx2s+0EFWE8cIDu+k9pA1qeRSQijjBnaDu6xER1DgYFJa7np7kYsAusk738RiOuhjlLAFSBgJu3z5y/iiuz7fq0ZKFczmzvuokIT1c1ClaXtOfKvnjqJUewqEnkSHStt4Jg+8SZoR3w68vdgkdBjhtgYl62OcTBS9XtgDn+Tqfeu8uTAEBab2XTDWTx/TEWCV0qNp8y09DGDE/JTFSi/hrhVLAvZaUBIq3ZCwbC4xa/obTJumNV8dgWxg/yZ/hTRrza2dPoEpbmo13ekuKpXao0ecw26fGCLyLIA7wBYBqrg6/AdMzsC5efFZa2zqHET9CdXopzlHxzhvtdrUumtpIOy6LYp07uEbZNbLMAAAGUAAAADHJzYS1zaGEyLTUxMgAAAYCaoAufe/4j7ULdd5819Xi8tYooFniH0L59WkQQPk7lL/qM4m4RIolx7ZNeUB7G2zEG95S99R6JfkgOiTUqMbrU2YUAi/lNjQv5ZIEx2hBrBFRciuUAuuUXJ6DVvqAf80R4+rs/7hgruEwm8cgbf490Ylu1tapoldvD9BtZopJL2hrKmoZdFtNfKWaVctvodT3u+3WS72Nlw375dBz7VhgzL2r50V6YGkhqMKqI0ym7V3bIld3PxO94pVYLwKX417+5CU6wzCceKgTrwDCgHMJlQqFZv/VrlxHpD+HIi4ND0oq5566aQAlEFSm3Fudj/Q3iVAiWUQqFtgA+mg9QJEpNXpsxwE2iMm3M5TIlOIzNy3G1Y0Ooz5yJreUKfoqgnBRsU4UOO/sBXPToDOJfg6MMkUby8t7mPCFIAZXrn/BIIJgQ03WB1I/ifOVgyw9KtzSYIENf69KrQy0VFpTXUZUKGDedEVdp1QHUiVM+5mXQYWqBe6hRD7dTH7MYNL26hm8= pavlom@manjaro";
+    fn decode_client_cert() {
+        let cert = b"ssh-rsa-cert-v01@openssh.com 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 pavlom@manjaro";
         let cert: SshCertificate = SshParser::decode(cert.to_vec().as_slice()).unwrap();
+        println!("{:?}", &cert);
+        assert_eq!(SshCertType::Client, cert.cert_type);
+        assert_eq!("picky@example.com".to_owned(), cert.key_id);
+        assert_eq!(vec!["test-user".to_owned(), "guest".to_owned()], cert.valid_principals);
+        assert_eq!("pavlom@manjaro", cert.comment);
+        assert_eq!(Vec::<SshCriticalOption>::new(), cert.critical_options);
+        assert_eq!(
+            vec![
+                SshExtension::new(SshExtensionType::PermitX11Forwarding, "".to_owned()),
+                SshExtension::new(SshExtensionType::PermitAgentForwarding, "".to_owned()),
+                SshExtension::new(SshExtensionType::PermitPortForwarding, "".to_owned()),
+                SshExtension::new(SshExtensionType::PermitPty, "".to_owned()),
+                SshExtension::new(SshExtensionType::PermitUserPc, "".to_owned()),
+            ],
+            cert.extensions
+        );
+    }
+
+    #[test]
+    fn encode_host_cert() {
+        let cert_before = b"ssh-rsa-cert-v01@openssh.com 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 pavlom@manjaro";
+        let cert: SshCertificate = SshParser::decode(cert_before.to_vec().as_slice()).unwrap();
         println!("{:?}", cert);
-        let mut result_cert = Vec::new();
-        let res = cert.encode(&mut result_cert);
-        println!("{:?}", res);
-        println!("{:?}", String::from_utf8(result_cert).unwrap());
-        assert!(res.is_ok());
+        let mut cert_after = Vec::new();
+        cert.encode(&mut cert_after).unwrap();
+        println!("{:?}", String::from_utf8(cert_after.clone()).unwrap());
+        assert_eq!(cert_before.to_vec(), cert_after);
+    }
+
+    #[test]
+    fn encode_client_cert() {
+        let cert_before = b"ssh-rsa-cert-v01@openssh.com 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 pavlom@manjaro";
+        let cert: SshCertificate = SshParser::decode(cert_before.to_vec().as_slice()).unwrap();
+        println!("{:?}", cert);
+        let mut cert_after = Vec::new();
+        cert.encode(&mut cert_after).unwrap();
+        println!("{:?}", String::from_utf8(cert_after.clone()).unwrap());
+        assert_eq!(cert_before.to_vec(), cert_after);
     }
 }

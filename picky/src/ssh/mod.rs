@@ -158,6 +158,78 @@ mod test {
     use std::io::Cursor;
 
     #[test]
+    fn ssh_string_decode() {
+        let mut cursor = Cursor::new([0, 0, 0, 5, 112, 105, 99, 107, 121].to_vec());
+
+        let ssh_string: SshString = SshParser::decode(&mut cursor).unwrap();
+
+        assert_eq!(5, ssh_string.0.len());
+        assert_eq!("picky".to_owned(), ssh_string.0);
+        assert_eq!(9, cursor.position());
+
+        let mut cursor = Cursor::new([0, 0, 0, 0].to_vec());
+
+        let ssh_string: SshString = SshParser::decode(&mut cursor).unwrap();
+
+        assert_eq!(0, ssh_string.0.len());
+        assert_eq!("".to_owned(), ssh_string.0);
+        assert_eq!(4, cursor.position());
+    }
+
+    #[test]
+    fn ssh_string_encode() {
+        let mut res = Vec::new();
+        let ssh_string = SshString("picky".to_owned());
+
+        ssh_string.encode(&mut res).unwrap();
+
+        assert_eq!(vec![0, 0, 0, 5, 112, 105, 99, 107, 121], res);
+
+        res.clear();
+        let ssh_string = SshString("".to_owned());
+
+        ssh_string.encode(&mut res).unwrap();
+
+        assert_eq!(vec![0, 0, 0, 0], res);
+    }
+
+    #[test]
+    fn byte_array_decode() {
+        let mut cursor = Cursor::new([0, 0, 0, 5, 1, 2, 3, 4, 5].to_vec());
+
+        let byte_array: ByteArray = SshParser::decode(&mut cursor).unwrap();
+
+        assert_eq!(5, byte_array.0.len());
+        assert_eq!([1, 2, 3, 4, 5].to_vec(), byte_array.0);
+        assert_eq!(9, cursor.position());
+
+        let mut cursor = Cursor::new([0, 0, 0, 0].to_vec());
+
+        let byte_array: ByteArray = SshParser::decode(&mut cursor).unwrap();
+
+        assert_eq!(0, byte_array.0.len());
+        assert_eq!(Vec::<u8>::new(), byte_array.0);
+        assert_eq!(4, cursor.position());
+    }
+
+    #[test]
+    fn byte_array_encode() {
+        let mut res = Vec::new();
+        let byte_array = ByteArray(vec![1, 2, 3, 4, 5, 6]);
+
+        byte_array.encode(&mut res).unwrap();
+
+        assert_eq!(vec![0, 0, 0, 6, 1, 2, 3, 4, 5, 6], res);
+
+        res.clear();
+        let byte_array = ByteArray(Vec::new());
+
+        byte_array.encode(&mut res).unwrap();
+
+        assert_eq!(vec![0, 0, 0, 0], res);
+    }
+
+    #[test]
     fn mpint_decoding() {
         let mpint: Mpint = SshParser::decode(Cursor::new(vec![
             0x00, 0x00, 0x00, 0x08, 0x09, 0xa3, 0x78, 0xf9, 0xb2, 0xe3, 0x32, 0xa7,
@@ -166,7 +238,7 @@ mod test {
         assert_eq!(mpint.0, vec![0x09, 0xa3, 0x78, 0xf9, 0xb2, 0xe3, 0x32, 0xa7]);
 
         let mpint: Mpint = SshParser::decode(Cursor::new(vec![0x00, 0x00, 0x00, 0x02, 0x00, 0x80])).unwrap();
-        assert_eq!(mpint.0, vec![0x00, 0x80]);
+        assert_eq!(mpint.0, vec![0x80]);
 
         let mpint: Mpint = SshParser::decode(Cursor::new(vec![0x00, 0x00, 0x00, 0x02, 0xed, 0xcc])).unwrap();
         assert_eq!(mpint.0, vec![0xed, 0xcc]);
@@ -187,6 +259,6 @@ mod test {
         let mut cursor = Cursor::new(Vec::new());
         mpint.encode(&mut cursor).unwrap();
 
-        assert_eq!(cursor.into_inner(), vec![0x00, 0x00, 0x00, 0x01, 0x80]);
+        assert_eq!(cursor.into_inner(), vec![0x00, 0x00, 0x00, 0x02, 0x00, 0x80]);
     }
 }
