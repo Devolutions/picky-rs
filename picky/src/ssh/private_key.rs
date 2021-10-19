@@ -67,7 +67,7 @@ pub enum SshPrivateKeyError {
     PrivateKeyGenerationError(#[from] KeyError),
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct KdfOption {
     salt: Vec<u8>,
     rounds: u32,
@@ -116,7 +116,7 @@ impl SshParser for KdfOption {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Kdf {
     name: String,
     option: KdfOption,
@@ -128,7 +128,7 @@ impl Kdf {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum SshInnerPrivateKey {
     Rsa(RsaPrivateKey),
 }
@@ -181,7 +181,7 @@ impl SshParser for SshInnerPrivateKey {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SshPrivateKey {
     kdf: Kdf,
     cipher_name: String,
@@ -207,6 +207,11 @@ impl SshPrivateKey {
             comment,
             check: rand::thread_rng().gen::<u32>(),
         }
+    }
+
+    pub fn from_file(filepath: &str, passphrase: Option<&str>) -> Result<Self, SshPrivateKeyError> {
+        let key = std::fs::read(std::path::Path::new(filepath))?;
+        Ok(SshPrivateKey::from_raw(&key, passphrase)?)
     }
 
     pub fn from_pem_str(pem: &str, passphrase: Option<&str>) -> Result<Self, SshPrivateKeyError> {

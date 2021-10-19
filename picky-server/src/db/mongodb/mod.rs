@@ -1,9 +1,9 @@
-mod model;
+pub mod model;
 
 use crate::addressing::{encode_to_alternative_addresses, encode_to_canonical_address};
 use crate::db::{CertificateEntry, PickyStorage, StorageError, SCHEMA_LAST_VERSION};
 use futures::future::BoxFuture;
-use futures::stream::StreamExt;
+// use futures::stream::StreamExt;
 use futures::FutureExt;
 use model::*;
 use mongodm::mongo::bson::oid::ObjectId;
@@ -15,6 +15,7 @@ use mongodm::{f, ToRepository};
 use picky::x509::Cert;
 use std::collections::HashMap;
 use thiserror::Error;
+use tokio::stream::StreamExt;
 
 const DB_CONNECTION_TIMEOUT_SECS: u64 = 15;
 
@@ -110,6 +111,7 @@ impl MongoStorage {
 
                     let key_identifier_collection = storage.repository::<KeyIdentifier>();
                     let key_collection = storage.repository::<Key>();
+                    let ssh_key_collection = storage.repository::<SshKeyEntry>();
                     let name_collection = storage.repository::<Name>();
                     let hash_lookup_collection = storage.repository::<HashLookupEntry>();
                     let timestamp_collection = storage.repository::<IssuedTimestampsCounter>();
@@ -143,6 +145,12 @@ impl MongoStorage {
                         }
                     }
 
+                    let mut ssh_keys_cursor = ssh_key_collection.find(doc!(), None).await.expect("find ssh private keys");
+                    while let Some(ssh_key_model) = ssh_keys_cursor.next().await {
+                        let ssh_key_model = ssh_key_model.expect("unwrap ssh key model");
+                        storage.store_private_ssh_key(ssh_key_model).await.expect("couldn't store ssh private key");
+                    }
+
                     // clean all
                     cert_collection.drop(None).await.expect("drop certificate store");
                     key_identifier_collection
@@ -150,6 +158,7 @@ impl MongoStorage {
                         .await
                         .expect("drop key identifier store");
                     key_collection.drop(None).await.expect("drop key store");
+                    ssh_key_collection.drop(None).await.expect("drop ssh key store");
                     name_collection.drop(None).await.expect("drop name store");
                     hash_lookup_collection.drop(None).await.expect("drop hash lookup table");
                     timestamp_collection.drop(None).await.expect("drop timestamp store");
@@ -404,6 +413,37 @@ impl PickyStorage for MongoStorage {
                 .await?;
 
             Ok(())
+        }
+        .boxed()
+    }
+
+    fn store_private_ssh_key(&self, key: SshKeyEntry) -> BoxFuture<Result<(), StorageError>> {
+        async move {
+            self.repository::<SshKeyEntry>()
+                .replace_one(
+                    doc!(f!(key_type in SshKeyEntry): key.key_type()),
+                    &key,
+                    Some(ReplaceOptions::builder().upsert(true).build()),
+                )
+                .await?;
+            Ok(())
+        }
+        .boxed()
+    }
+
+    fn get_ssh_private_key_by_type<'a>(
+        &'a self,
+        key_type: &'a SshKeyType,
+    ) -> BoxFuture<'a, Result<SshKeyEntry, StorageError>> {
+        async move {
+            let ssh_key = self
+                .repository::<SshKeyEntry>()
+                .find_one(doc!(f!(key_type in SshKeyEntry): key_type), None)
+                .await?
+                .ok_or_else(|| MongoStorageError::Other {
+                    description: format!("ssh not found using key type '{}'", key_type.to_string()),
+                })?;
+            Ok(ssh_key)
         }
         .boxed()
     }

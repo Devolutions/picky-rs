@@ -1,3 +1,4 @@
+use crate::ssh::private_key::SshPrivateKey;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use chrono::{DateTime, Datelike, Timelike, Utc};
 use std::io::{self, Read, Write};
@@ -149,6 +150,17 @@ impl SshParser for ByteArray {
         let size = self.0.len();
         stream.write_u32::<BigEndian>(size as u32)?;
         stream.write_all(&self.0)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct SshKey {
+    key: SshPrivateKey,
+}
+
+impl SshKey {
+    pub fn new(key: SshPrivateKey) -> Self {
+        Self { key }
     }
 }
 

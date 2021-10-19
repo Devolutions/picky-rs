@@ -1,4 +1,5 @@
 use crate::addressing::{encode_to_alternative_addresses, encode_to_canonical_address};
+use crate::db::mongodb::model::{SshKeyEntry, SshKeyType};
 use crate::db::{CertificateEntry, PickyStorage, StorageError};
 use futures::future::BoxFuture;
 use futures::FutureExt;
@@ -50,6 +51,7 @@ pub struct MemoryStorage {
     name: MemoryRepository<String>,
     cert: MemoryRepository<Vec<u8>>,
     keys: MemoryRepository<Vec<u8>>,
+    ssh_keys: MemoryRepository<SshKeyEntry>,
     key_identifiers: MemoryRepository<String>,
     hash_lookup: MemoryRepository<String>,
     issued_timestamps_counter: MemoryRepository<u32>,
@@ -181,6 +183,31 @@ impl PickyStorage for MemoryStorage {
                 .cloned()
                 .ok_or_else(|| MemoryStorageError::Other {
                     description: "hash not found".to_owned(),
+                })?)
+        }
+        .boxed()
+    }
+
+    fn store_private_ssh_key(&self, key: SshKeyEntry) -> BoxFuture<Result<(), StorageError>> {
+        async move {
+            self.ssh_keys.insert(key.key_type().to_string(), key);
+            Ok(())
+        }
+        .boxed()
+    }
+
+    fn get_ssh_private_key_by_type<'a>(
+        &'a self,
+        key_type: &'a SshKeyType,
+    ) -> BoxFuture<'a, Result<SshKeyEntry, StorageError>> {
+        async move {
+            Ok(self
+                .ssh_keys
+                .get_collection()
+                .get(&key_type.to_string())
+                .cloned()
+                .ok_or_else(|| MemoryStorageError::Other {
+                    description: "ssh key not found".to_owned(),
                 })?)
         }
         .boxed()

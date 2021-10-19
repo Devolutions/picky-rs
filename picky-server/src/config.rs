@@ -5,6 +5,8 @@ use picky::hash::HashAlgorithm;
 use picky::key::{PrivateKey, PublicKey};
 use picky::pem::Pem;
 use picky::signature::SignatureAlgorithm;
+use picky::ssh::private_key::SshPrivateKey;
+use picky::ssh::SshKey;
 use picky::x509::Cert;
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -31,6 +33,11 @@ const PICKY_INTERMEDIATE_KEY_PATH_ENV: &str = "PICKY_INTERMEDIATE_KEY_PATH";
 
 const PICKY_PROVISIONER_PUBLIC_KEY_ENV: &str = "PICKY_PROVISIONER_PUBLIC_KEY";
 const PICKY_PROVISIONER_PUBLIC_KEY_PATH_ENV: &str = "PICKY_PROVISIONER_PUBLIC_KEY_PATH";
+
+const PICKY_SSH_HOST_KEY_PATH: &str = "PICKY_SSH_HOST_KEY_PATH";
+const PICKY_SSH_HOST_KEY_ENV: &str = "PICKY_SSH_HOST_KEY";
+const PICKY_SSH_CLIENT_KEY_PATH: &str = "PICKY_SSH_CLIENT_KEY_PATH";
+const PICKY_SSH_CLIENT_KEY_ENV: &str = "PICKY_SSH_CLIENT_KEY";
 
 fn default_picky_realm() -> String {
     String::from("Picky")
@@ -128,6 +135,11 @@ pub struct Config {
     pub intermediate: Option<CertKeyPair>,
     #[serde(default)]
     pub provisioner_public_key: Option<PathOr<PublicKey>>,
+
+    #[serde(skip)]
+    pub ssh_host_key: Option<SshKey>,
+    #[serde(skip)]
+    pub ssh_client_key: Option<SshKey>,
 }
 
 impl Default for Config {
@@ -144,6 +156,8 @@ impl Default for Config {
             root: None,
             intermediate: None,
             provisioner_public_key: None,
+            ssh_host_key: None,
+            ssh_client_key: None,
         }
     }
 }
@@ -185,6 +199,18 @@ impl Config {
             self.log_level = parse_level_filter(v);
         }
 
+        if let Some(path) = matches.value_of("ssh-host-key") {
+            inject_ssh_key(&mut self.ssh_host_key, path, matches.value_of("ssh-host-passphrase"));
+        }
+
+        if let Some(path) = matches.value_of("ssh-client-key") {
+            inject_ssh_key(
+                &mut self.ssh_client_key,
+                path,
+                matches.value_of("ssh-client-passphrase"),
+            );
+        }
+
         if let Some(v) = matches.value_of("backend") {
             self.backend = BackendType::from(v);
         }
@@ -220,6 +246,14 @@ impl Config {
 
         if let Ok(val) = env::var(PICKY_BACKEND_ENV) {
             self.backend = BackendType::from(val.as_str());
+        }
+
+        if !inject_ssh_key_env(&mut self.ssh_host_key, PICKY_SSH_HOST_KEY_ENV) {
+            inject_ssh_key_path(&mut self.ssh_host_key, PICKY_SSH_HOST_KEY_PATH);
+        }
+
+        if !inject_ssh_key_env(&mut self.ssh_client_key, PICKY_SSH_CLIENT_KEY_ENV) {
+            inject_ssh_key_path(&mut self.ssh_client_key, PICKY_SSH_CLIENT_KEY_PATH);
         }
 
         self.file_backend_path = env::var(PICKY_FILE_BACKEND_PATH_ENV)
@@ -260,6 +294,32 @@ impl Config {
             self.provisioner_public_key = Some(PathOr::Path(val.into()));
         }
     }
+}
+
+fn inject_ssh_key_env(ssh_key: &mut Option<SshKey>, key_env: &str) -> bool {
+    if let Ok(key) = env::var(key_env) {
+        *ssh_key = Option::Some(SshKey::new(
+            SshPrivateKey::from_pem_str(&key, None).expect("couldn't parse ssh private key"),
+        ));
+        return true;
+    }
+    return false;
+}
+
+fn inject_ssh_key_path(ssh_key: &mut Option<SshKey>, key_env: &str) -> bool {
+    if let Ok(key_path) = env::var(key_env) {
+        *ssh_key = Option::Some(SshKey::new(
+            SshPrivateKey::from_file(&key_path, None).expect("couldn't parse ssh private key"),
+        ));
+        return true;
+    }
+    return false;
+}
+
+fn inject_ssh_key(ssh_key: &mut Option<SshKey>, key_path: &str, passphrase: Option<&str>) {
+    *ssh_key = Option::Some(SshKey::new(
+        SshPrivateKey::from_file(&key_path, passphrase).expect("couldn't parse ssh private key"),
+    ));
 }
 
 fn inject_cert_key_pair(pair: &mut Option<CertKeyPair>, cert_pem_env: &str, key_pem_env: &str) -> bool {

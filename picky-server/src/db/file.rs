@@ -1,6 +1,7 @@
 use crate::addressing::{encode_to_alternative_addresses, encode_to_canonical_address};
 use crate::config::Config;
 use crate::db::config::DatabaseConfig;
+use crate::db::mongodb::model::{SshKeyEntry, SshKeyType};
 use crate::db::{CertificateEntry, PickyStorage, StorageError, SCHEMA_LAST_VERSION};
 use futures::future::BoxFuture;
 use futures::FutureExt;
@@ -90,6 +91,7 @@ where
 const REPO_CERTIFICATE_OLD: &str = "CertificateStore/";
 
 const REPO_CERTIFICATE: &str = "certificate_store/";
+const REPO_SSH_KEY: &str = "ssh_key_store/";
 const REPO_KEY: &str = "key_store/";
 const REPO_CERT_NAME: &str = "name_store/";
 const REPO_KEY_IDENTIFIER: &str = "key_identifier_store/";
@@ -104,6 +106,7 @@ pub struct FileStorage {
     name: FileRepo<String>,
     cert: FileRepo<Vec<u8>>,
     keys: FileRepo<Vec<u8>>,
+    ssh_keys: FileRepo<SshKeyEntry>,
     key_identifiers: FileRepo<String>,
     hash_lookup: FileRepo<String>,
     issued_timestamps_counter: FileRepo<[u8; 4]>,
@@ -139,6 +142,8 @@ impl FileStorage {
             name: FileRepo::new(&config.file_backend_path, REPO_CERT_NAME).expect("couldn't initialize name repo"),
             cert: FileRepo::new(&config.file_backend_path, REPO_CERTIFICATE).expect("couldn't initialize cert repo"),
             keys: FileRepo::new(&config.file_backend_path, REPO_KEY).expect("couldn't initialize keys repo"),
+            ssh_keys: FileRepo::new(&config.file_backend_path, REPO_SSH_KEY)
+                .expect("couldn't initialize ssh keys repo"),
             key_identifiers: FileRepo::new(&config.file_backend_path, REPO_KEY_IDENTIFIER)
                 .expect("couldn't initialize key identifiers repo"),
             hash_lookup: FileRepo::new(&config.file_backend_path, REPO_HASH_LOOKUP_TABLE)
@@ -335,6 +340,40 @@ impl PickyStorage for FileStorage {
                 .map_err(|e| FileStorageError::Other {
                     description: format!("error reading file '{}': {}", file_path.to_string_lossy(), e),
                 })?)
+        }
+        .boxed()
+    }
+
+    fn store_private_ssh_key(&self, key: SshKeyEntry) -> BoxFuture<Result<(), StorageError>> {
+        async move {
+            self.ssh_keys.insert(&key.key_type().to_string(), &key).await?;
+            Ok(())
+        }
+        .boxed()
+    }
+
+    fn get_ssh_private_key_by_type<'a>(
+        &'a self,
+        key_type: &'a SshKeyType,
+    ) -> BoxFuture<'a, Result<SshKeyEntry, StorageError>> {
+        let key_type_str = key_type.to_string();
+        async move {
+            let filename = self
+                .ssh_keys
+                .get_collection()
+                .await?
+                .into_iter()
+                .find(|filename| *filename == key_type_str)
+                .ok_or_else(|| FileStorageError::Other {
+                    description: format!("ssh key '{}' not found", key_type_str),
+                })?;
+            let filepath = self.ssh_keys.folder_path.join(filename);
+            let key = tokio::fs::read_to_string(&filepath)
+                .await
+                .map_err(|e| FileStorageError::Other {
+                    description: format!("error reading file '{}': '{}'", filepath.to_string_lossy(), e),
+                })?;
+            Ok(SshKeyEntry::new(key_type.clone(), key))
         }
         .boxed()
     }
