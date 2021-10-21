@@ -1,7 +1,7 @@
 pub mod model;
 
 use crate::addressing::{encode_to_alternative_addresses, encode_to_canonical_address};
-use crate::db::{CertificateEntry, PickyStorage, StorageError, SCHEMA_LAST_VERSION};
+use crate::db::{CertificateEntry, PickyStorage, SshKeyEntry, SshKeyType, StorageError, SCHEMA_LAST_VERSION};
 use futures::future::BoxFuture;
 // use futures::stream::StreamExt;
 use futures::FutureExt;
@@ -145,10 +145,16 @@ impl MongoStorage {
                         }
                     }
 
-                    let mut ssh_keys_cursor = ssh_key_collection.find(doc!(), None).await.expect("find ssh private keys");
+                    let mut ssh_keys_cursor = ssh_key_collection
+                        .find(doc!(), None)
+                        .await
+                        .expect("find ssh private keys");
                     while let Some(ssh_key_model) = ssh_keys_cursor.next().await {
                         let ssh_key_model = ssh_key_model.expect("unwrap ssh key model");
-                        storage.store_private_ssh_key(ssh_key_model).await.expect("couldn't store ssh private key");
+                        storage
+                            .store_private_ssh_key(ssh_key_model)
+                            .await
+                            .expect("couldn't store ssh private key");
                     }
 
                     // clean all
@@ -441,7 +447,7 @@ impl PickyStorage for MongoStorage {
                 .find_one(doc!(f!(key_type in SshKeyEntry): key_type), None)
                 .await?
                 .ok_or_else(|| MongoStorageError::Other {
-                    description: format!("ssh not found using key type '{}'", key_type.to_string()),
+                    description: format!("ssh key not found using key type '{}'", key_type.to_string()),
                 })?;
             Ok(ssh_key)
         }

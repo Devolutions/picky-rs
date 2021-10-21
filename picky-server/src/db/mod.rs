@@ -6,9 +6,9 @@ pub mod mongodb;
 use crate::config::{BackendType, Config};
 use crate::db::file::{FileStorage, FileStorageError};
 use crate::db::memory::{MemoryStorage, MemoryStorageError};
-use crate::db::mongodb::model::{SshKeyEntry, SshKeyType};
 use crate::db::mongodb::{MongoStorage, MongoStorageError};
 use futures::future::BoxFuture;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 pub const SCHEMA_LAST_VERSION: u8 = 1;
@@ -63,6 +63,51 @@ pub struct CertificateEntry {
     pub cert: Vec<u8>,
     pub key_identifier: String,
     pub key: Option<Vec<u8>>,
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, Hash, Serialize, Deserialize)]
+pub enum SshKeyType {
+    Host,
+    Client,
+}
+
+impl ToString for SshKeyType {
+    fn to_string(&self) -> String {
+        match self {
+            SshKeyType::Client => "client".to_owned(),
+            SshKeyType::Host => "host".to_owned(),
+        }
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, Hash, Serialize, Deserialize)]
+pub struct SshKeyEntry {
+    pub key_type: SshKeyType,
+    pub key: String,
+}
+
+impl Default for SshKeyEntry {
+    fn default() -> Self {
+        SshKeyEntry {
+            key_type: SshKeyType::Host,
+            key: "".to_owned(),
+        }
+    }
+}
+
+impl AsRef<[u8]> for SshKeyEntry {
+    fn as_ref(&self) -> &[u8] {
+        self.key.as_ref()
+    }
+}
+
+impl SshKeyEntry {
+    pub fn new(key_type: SshKeyType, key: String) -> Self {
+        Self { key_type, key }
+    }
+    pub fn key_type(&self) -> &SshKeyType {
+        &self.key_type
+    }
 }
 
 pub trait PickyStorage: Send + Sync {

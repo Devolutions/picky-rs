@@ -1,8 +1,8 @@
+use crate::db::{SshKeyEntry, SshKeyType};
 use mongodm::mongo::bson::oid::ObjectId;
 use mongodm::mongo::bson::Bson;
 use mongodm::{Index, IndexOption, Indexes};
 use serde::{Deserialize, Serialize};
-
 // == name == //
 
 pub struct NameCollConf;
@@ -69,55 +69,9 @@ impl mongodm::Model for SshKeyEntry {
     type CollConf = SshKeyCollConf;
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Hash, Serialize, Deserialize)]
-pub enum SshKeyType {
-    Host,
-    Client,
-}
-
-impl ToString for SshKeyType {
-    fn to_string(&self) -> String {
-        match self {
-            SshKeyType::Client => "Client".to_owned(),
-            SshKeyType::Host => "Host".to_owned(),
-        }
-    }
-}
-
 impl From<SshKeyType> for Bson {
     fn from(key_type: SshKeyType) -> Self {
         Bson::String(key_type.to_string())
-    }
-}
-
-#[derive(Debug, Eq, PartialEq, Clone, Hash, Serialize, Deserialize)]
-pub struct SshKeyEntry {
-    pub key_type: SshKeyType,
-    pub key: String,
-}
-
-impl Default for SshKeyEntry {
-    fn default() -> Self {
-        SshKeyEntry {
-            key_type: SshKeyType::Host,
-            key: "".to_owned(),
-        }
-    }
-}
-
-impl AsRef<[u8]> for SshKeyEntry {
-    fn as_ref(&self) -> &[u8] {
-        self.key.as_ref()
-    }
-}
-
-impl SshKeyEntry {
-    pub fn new(key_type: SshKeyType, key: String) -> Self {
-        Self { key_type, key }
-    }
-
-    pub fn key_type(&self) -> &SshKeyType {
-        &self.key_type
     }
 }
 

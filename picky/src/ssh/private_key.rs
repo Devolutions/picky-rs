@@ -11,8 +11,7 @@ use num_bigint_dig::ModInverse;
 use picky_asn1_x509::PrivateKeyValue;
 use rand::Rng;
 use rsa::{BigUint, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
-use std::io;
-use std::io::{Cursor, Read, Write};
+use std::io::{self, Cursor, Read, Write};
 use std::string;
 use thiserror::Error;
 
@@ -67,7 +66,7 @@ pub enum SshPrivateKeyError {
     PrivateKeyGenerationError(#[from] KeyError),
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Default)]
 pub struct KdfOption {
     salt: Vec<u8>,
     rounds: u32,
@@ -75,12 +74,8 @@ pub struct KdfOption {
 
 impl KdfOption {
     pub fn new() -> Self {
-        Self {
-            salt: Vec::new(),
-            rounds: 0,
-        }
+        Self::default()
     }
-
     pub fn construct(salt: Vec<u8>, rounds: u32) -> Self {
         Self { salt, rounds }
     }
@@ -94,7 +89,7 @@ impl SshParser for KdfOption {
         Self: Sized,
     {
         let data: ByteArray = SshParser::decode(stream)?;
-        if data.0.len() == 0 {
+        if data.0.is_empty() {
             return Ok(KdfOption::new());
         }
         let mut data = Cursor::new(data.0);
@@ -104,7 +99,7 @@ impl SshParser for KdfOption {
     }
 
     fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
-        if self.salt.len() == 0 {
+        if self.salt.is_empty() {
             stream.write_u32::<BigEndian>(0)?;
             return Ok(());
         }
@@ -128,7 +123,7 @@ impl Kdf {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum SshInnerPrivateKey {
     Rsa(RsaPrivateKey),
 }
@@ -143,21 +138,24 @@ impl SshParser for SshInnerPrivateKey {
         let key_type: SshString = SshParser::decode(&mut stream)?;
         match key_type.0.as_str() {
             KEY_TYPE_RSA => {
-                let n: Mpint = SshParser::decode(&mut stream)?;
-                let e: Mpint = SshParser::decode(&mut stream)?;
-                let d: Mpint = SshParser::decode(&mut stream)?;
+                let n_constant: Mpint = SshParser::decode(&mut stream)?;
+                let e_constant: Mpint = SshParser::decode(&mut stream)?;
+                let d_constant: Mpint = SshParser::decode(&mut stream)?;
                 let _iqmp: Mpint = SshParser::decode(&mut stream)?;
-                let p: Mpint = SshParser::decode(&mut stream)?;
-                let q: Mpint = SshParser::decode(&mut stream)?;
+                let p_constant: Mpint = SshParser::decode(&mut stream)?;
+                let q_constant: Mpint = SshParser::decode(&mut stream)?;
 
                 Ok(SshInnerPrivateKey::Rsa(RsaPrivateKey::from_components(
-                    BigUint::from_bytes_be(&n.0),
-                    BigUint::from_bytes_be(&e.0),
-                    BigUint::from_bytes_be(&d.0),
-                    vec![BigUint::from_bytes_be(&p.0), BigUint::from_bytes_be(&q.0)],
+                    BigUint::from_bytes_be(&n_constant.0),
+                    BigUint::from_bytes_be(&e_constant.0),
+                    BigUint::from_bytes_be(&d_constant.0),
+                    vec![
+                        BigUint::from_bytes_be(&p_constant.0),
+                        BigUint::from_bytes_be(&q_constant.0),
+                    ],
                 )))
             }
-            key_type => return Err(SshPrivateKeyError::UnsupportedKeyType(key_type.to_owned())),
+            key_type => Err(SshPrivateKeyError::UnsupportedKeyType(key_type.to_owned())),
         }
     }
 
@@ -181,10 +179,10 @@ impl SshParser for SshInnerPrivateKey {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct SshPrivateKey {
     kdf: Kdf,
-    cipher_name: String,
+    _cipher_name: String,
     inner_key: SshInnerPrivateKey,
     passphrase: Option<String>,
     check: u32,
@@ -201,17 +199,12 @@ impl SshPrivateKey {
     ) -> Self {
         Self {
             kdf,
-            cipher_name,
+            _cipher_name: cipher_name,
             inner_key,
             passphrase,
             comment,
             check: rand::thread_rng().gen::<u32>(),
         }
-    }
-
-    pub fn from_file(filepath: &str, passphrase: Option<&str>) -> Result<Self, SshPrivateKeyError> {
-        let key = std::fs::read(std::path::Path::new(filepath))?;
-        Ok(SshPrivateKey::from_raw(&key, passphrase)?)
     }
 
     pub fn from_pem_str(pem: &str, passphrase: Option<&str>) -> Result<Self, SshPrivateKeyError> {
@@ -305,8 +298,8 @@ impl SshPrivateKeyParser for SshPrivateKey {
         {
             return Err(SshPrivateKeyError::InvalidKeyFormat);
         }
+
         let data = base64::decode(&data[PRIVATE_KEY_HEADER.len()..(data.len() - PRIVATE_KEY_FOOTER.len() - 1)])?;
-        println!("{:?}", data);
         let mut cursor = Cursor::new(data);
 
         let mut auth_magic = vec![0; 14];
@@ -332,8 +325,6 @@ impl SshPrivateKeyParser for SshPrivateKey {
         let private_key: ByteArray = SshParser::decode(&mut cursor)?;
         let data = decrypt(&cipher_name, &kdf_name, &kdf_option, &passphrase, private_key)?;
 
-        println!("decrypted: {:?} {}", &data, data.len());
-
         let mut cursor = Cursor::new(data);
 
         let check0 = cursor.read_u32::<BigEndian>()?;
@@ -352,7 +343,7 @@ impl SshPrivateKeyParser for SshPrivateKey {
                 name: kdf_name.0,
                 option: kdf_option,
             },
-            cipher_name: cipher_name.0,
+            _cipher_name: cipher_name.0,
             check: check0,
             comment: comment.0,
         })
@@ -407,7 +398,7 @@ impl SshPrivateKeyParser for SshPrivateKey {
             bcrypt_pbkdf::bcrypt_pbkdf(&passphrase, salt, rounds, &mut hash)?;
 
             let (key, iv) = hash.split_at(n - 16);
-            let mut cipher = Aes256Ctr::new_from_slices(key.clone(), iv.clone()).unwrap();
+            let mut cipher = Aes256Ctr::new_from_slices(key, iv).unwrap();
 
             let private_key_len = private_key.len();
             private_key.resize(private_key_len + 32, 0u8);
@@ -505,13 +496,12 @@ pub mod tests {
 
         let private_key: SshPrivateKey = SshPrivateKeyParser::decode(ssh_private_key.as_bytes(), None).unwrap();
 
-        println!("{:?}", &private_key);
         assert_eq!("test2@picky.com".to_owned(), private_key.comment);
         assert_eq!(
             Kdf::construct("none".to_owned(), KdfOption::construct(Vec::new(), 0)),
             private_key.kdf
         );
-        assert_eq!("none", private_key.cipher_name);
+        assert_eq!("none", private_key._cipher_name);
     }
 
     #[test]
@@ -521,13 +511,12 @@ pub mod tests {
 
         let private_key: SshPrivateKey = SshPrivateKeyParser::decode(ssh_private_key.as_bytes(), None).unwrap();
 
-        println!("{:?}", &private_key);
         assert_eq!("test@picky.com".to_owned(), private_key.comment);
         assert_eq!(
             Kdf::construct("none".to_owned(), KdfOption::construct(Vec::new(), 0)),
             private_key.kdf
         );
-        assert_eq!("none", private_key.cipher_name);
+        assert_eq!("none", private_key._cipher_name);
     }
 
     #[test]
@@ -538,7 +527,6 @@ pub mod tests {
 
         let private_key: SshPrivateKey = SshPrivateKeyParser::decode(ssh_private_key.as_bytes(), passphrase).unwrap();
 
-        println!("{:?}", &private_key);
         assert_eq!("test_with_pass2@picky.com".to_owned(), private_key.comment);
         assert_eq!(
             Kdf::construct(
@@ -550,7 +538,7 @@ pub mod tests {
             ),
             private_key.kdf
         );
-        assert_eq!("aes256-ctr", private_key.cipher_name);
+        assert_eq!("aes256-ctr", private_key._cipher_name);
     }
 
     #[test]
@@ -563,7 +551,6 @@ pub mod tests {
         private_key.encode(&mut ssh_private_key_after).unwrap();
 
         let ssh_private_key_after = String::from_utf8(ssh_private_key_after).unwrap();
-        println!("{}", &ssh_private_key_after);
         assert_eq!(ssh_private_key.to_owned(), ssh_private_key_after);
     }
 
@@ -578,7 +565,7 @@ pub mod tests {
         private_key.encode(&mut ssh_private_key_after).unwrap();
 
         let ssh_private_key_after = String::from_utf8(ssh_private_key_after).unwrap();
-        println!("{}", &ssh_private_key_after);
+
         assert_eq!(ssh_private_key.to_owned(), ssh_private_key_after);
     }
 
@@ -587,7 +574,6 @@ pub mod tests {
         let private_key = SshPrivateKey::generate_ssh_private_key(2048, Option::Some("123".to_string())).unwrap();
         let mut data = Vec::new();
         private_key.encode(&mut data).unwrap();
-        println!("{}", String::from_utf8(data.clone()).unwrap());
         let _: SshPrivateKey = SshPrivateKeyParser::decode(data.as_slice(), Option::Some("123")).unwrap();
     }
 
@@ -599,6 +585,7 @@ pub mod tests {
         ]);
         let kdf_option: KdfOption = SshParser::decode(&mut cursor).unwrap();
         let KdfOption { salt, rounds } = kdf_option;
+
         assert_eq!(
             vec![72, 50, 197, 104, 188, 234, 151, 74, 182, 90, 250, 33, 47, 67, 5, 243],
             salt
@@ -608,6 +595,7 @@ pub mod tests {
         let mut cursor = Cursor::new(vec![0, 0, 0, 0]);
         let kdf_option: KdfOption = SshParser::decode(&mut cursor).unwrap();
         let KdfOption { salt, rounds } = kdf_option;
+
         assert_eq!(Vec::<u8>::new(), salt);
         assert_eq!(0, rounds);
     }
@@ -632,7 +620,6 @@ pub mod tests {
 
         res.clear();
         let kdf_option = KdfOption::new();
-
         kdf_option.encode(&mut res).unwrap();
 
         assert_eq!(vec![0, 0, 0, 0], res);

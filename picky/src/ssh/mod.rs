@@ -1,4 +1,3 @@
-use crate::ssh::private_key::SshPrivateKey;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use chrono::{DateTime, Datelike, Timelike, Utc};
 use std::io::{self, Read, Write};
@@ -6,8 +5,6 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 pub mod certificate;
 pub mod private_key;
-#[allow(dead_code)]
-#[allow(unused)]
 pub mod public_key;
 
 pub trait SshParser {
@@ -19,7 +16,7 @@ pub trait SshParser {
     fn encode(&self, stream: impl Write) -> Result<(), Self::Error>;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct SshTime(pub(crate) DateTime<Utc>);
 
 impl SshTime {
@@ -123,8 +120,7 @@ impl SshParser for SshString {
     }
 
     fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
-        let size = self.0.len();
-        stream.write_u32::<BigEndian>(size as u32)?;
+        stream.write_u32::<BigEndian>(self.0.len() as u32)?;
         stream.write_all(self.0.as_bytes())
     }
 }
@@ -147,21 +143,29 @@ impl SshParser for ByteArray {
     }
 
     fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
-        let size = self.0.len();
-        stream.write_u32::<BigEndian>(size as u32)?;
+        stream.write_u32::<BigEndian>(self.0.len() as u32)?;
         stream.write_all(&self.0)
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct SshKey {
-    key: SshPrivateKey,
-}
-
-impl SshKey {
-    pub fn new(key: SshPrivateKey) -> Self {
-        Self { key }
+fn read_to_buffer_till_whitespace(stream: &mut dyn Read, buffer: &mut Vec<u8>) -> io::Result<()> {
+    loop {
+        match stream.read_u8() {
+            Ok(symbol) => {
+                if symbol as char == ' ' {
+                    break;
+                } else {
+                    buffer.push(symbol);
+                }
+            }
+            Err(ref e) if e.kind() == io::ErrorKind::UnexpectedEof => {
+                break;
+            }
+            Err(e) => return Err(e),
+        };
     }
+
+    Ok(())
 }
 
 #[cfg(test)]

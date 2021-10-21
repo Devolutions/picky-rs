@@ -298,17 +298,11 @@ where
 }
 
 /// A Vec<u8> wrapper for Asn1 encoding as OctetString.
-#[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd, Hash, Clone, Default)]
 pub struct OctetStringAsn1(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 type VecU8 = Vec<u8>;
 impls! { OctetStringAsn1(VecU8), Tag::OCTET_STRING }
-
-impl Default for OctetStringAsn1 {
-    fn default() -> Self {
-        OctetStringAsn1(vec![])
-    }
-}
 
 /// A BigInt wrapper for Asn1 encoding.
 ///

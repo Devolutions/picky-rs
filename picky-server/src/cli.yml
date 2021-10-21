@@ -33,28 +33,16 @@ args:
         - mongodb
         - memory
         - file
-  - ssh-host-key:
-      long: ssh-host-key
-      value_name: SSH_HOST_KEY
-      help: Path to private key of host ca key pair
-      takes_value: true
-      empty_values: false
-  - ssh-client-key:
-      long: ssh-client-key
-      value_name: SSH_CLIENT_KEY
-      help: Path to private key of client ca key pair
-      takes_value: true
-      empty_values: false
   - ssh-host-password:
       long: ssh-host-passphrase
       value_name: SSH_HOST_PASSPHRASE
-      help: Passphrase of the private key of host ca key pair
+      help: A passphrase of the private key of the host CA key
       takes_value: true
       empty_values: false
   - ssh-client-password:
       long: ssh-client-passphrase
       value_name: SSH_CLIENT_PASSPHRASE
-      help: Passwphrase of the private key of client ca key pair
+      help: A passphrase of the private key of the client CA key
       takes_value: true
       empty_values: false
   - db-url:

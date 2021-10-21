@@ -1,7 +1,6 @@
 use super::SshParser;
-use crate::key::PublicKey;
-use crate::ssh::{Mpint, SshString};
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use crate::ssh::{read_to_buffer_till_whitespace, Mpint, SshString};
+use byteorder::WriteBytesExt;
 use rsa::{BigUint, PublicKeyParts, RsaPublicKey};
 use std::io::{self, Cursor, Read, Write};
 use std::string;
@@ -23,7 +22,7 @@ pub enum SshPublicKeyError {
     UnknownKeyType,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum SshInnerPublicKey {
     Rsa(RsaPublicKey),
 }
@@ -52,16 +51,16 @@ impl SshParser for SshInnerPublicKey {
     fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
         match self {
             SshInnerPublicKey::Rsa(rsa) => {
-                SshString(RSA_PUBLIC_KEY_TYPE.to_owned()).encode(&mut stream);
-                Mpint(rsa.e().to_bytes_be()).encode(&mut stream);
-                Mpint(rsa.n().to_bytes_be()).encode(&mut stream);
+                SshString(RSA_PUBLIC_KEY_TYPE.to_owned()).encode(&mut stream)?;
+                Mpint(rsa.e().to_bytes_be()).encode(&mut stream)?;
+                Mpint(rsa.n().to_bytes_be()).encode(&mut stream)?;
                 Ok(())
             }
         }
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct SshPublicKey {
     pub inner_key: SshInnerPublicKey,
     comment: String,
@@ -102,33 +101,14 @@ impl SshParser for SshPublicKey {
     fn decode(mut stream: impl Read) -> Result<Self, Self::Error> {
         let mut buffer = Vec::with_capacity(1024);
 
-        let mut read_to_buffer_till_whitespace = |buffer: &mut Vec<u8>| -> io::Result<()> {
-            loop {
-                match stream.read_u8() {
-                    Ok(symbol) => {
-                        if symbol as char == ' ' {
-                            break;
-                        } else {
-                            buffer.push(symbol);
-                        }
-                    }
-                    Err(ref e) if e.kind() == io::ErrorKind::UnexpectedEof => {
-                        break;
-                    }
-                    Err(e) => return Err(e),
-                };
-            }
-            Ok(())
-        };
-
-        read_to_buffer_till_whitespace(&mut buffer).unwrap();
+        read_to_buffer_till_whitespace(&mut stream, &mut buffer).unwrap();
 
         let header = String::from_utf8_lossy(&buffer).to_string();
         buffer.clear();
 
         let inner_key = match header.as_str() {
             RSA_PUBLIC_KEY_TYPE => {
-                read_to_buffer_till_whitespace(&mut buffer);
+                read_to_buffer_till_whitespace(&mut stream, &mut buffer)?;
                 let decoded = base64::decode(&mut buffer)?;
                 let mut cursor = Cursor::new(decoded);
 
@@ -138,25 +118,18 @@ impl SshParser for SshPublicKey {
             _ => return Err(SshPublicKeyError::UnknownKeyType),
         };
 
-        read_to_buffer_till_whitespace(&mut buffer)?;
+        read_to_buffer_till_whitespace(&mut stream, &mut buffer)?;
         let comment = String::from_utf8(buffer)?;
 
         Ok(SshPublicKey { inner_key, comment })
     }
 
     fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
-        match &self.inner_key {
-            SshInnerPublicKey::Rsa(rsa) => {
-                stream.write_all(RSA_PUBLIC_KEY_TYPE.as_bytes())?;
-                stream.write_u8(' ' as u8)?;
+        let mut buf = Vec::with_capacity(1024);
+        self.inner_key.encode(&mut buf)?;
 
-                let mut rsa_key = Vec::new();
-                self.inner_key.encode(&mut rsa_key)?;
-                stream.write_all(base64::encode(rsa_key).as_bytes());
-            }
-        }
-
-        stream.write_u8(' ' as u8)?;
+        stream.write_all(&buf)?;
+        stream.write_u8(b' ')?;
         stream.write_all(self.comment.as_bytes())?;
 
         Ok(())
@@ -188,7 +161,6 @@ mod tests {
 
         let public_key: SshPublicKey = SshParser::decode(ssh_public_key.as_bytes()).unwrap();
 
-        println!("{:?}", public_key);
         assert_eq!("test@picky.com".to_owned(), public_key.comment);
         assert_eq!(
             SshInnerPublicKey::Rsa(
@@ -235,7 +207,6 @@ mod tests {
 
         let public_key: SshPublicKey = SshParser::decode(ssh_public_key.as_bytes()).unwrap();
 
-        println!("{:?}", public_key);
         assert_eq!("test2@picky.com".to_owned(), public_key.comment);
         assert_eq!(
             SshInnerPublicKey::Rsa(
@@ -273,7 +244,6 @@ mod tests {
         public_key.encode(&mut ssh_public_key_after).unwrap();
         let ssh_public_key_after = String::from_utf8(ssh_public_key_after).unwrap();
 
-        println!("{}", ssh_public_key_after);
         assert!(compare_fingerprints(ssh_public_key, ssh_public_key_after.as_str()));
         assert_eq!(ssh_public_key, ssh_public_key_after.as_str());
     }
@@ -288,7 +258,6 @@ mod tests {
         public_key.encode(&mut ssh_public_key_after).unwrap();
         let ssh_public_key_after = String::from_utf8(ssh_public_key_after).unwrap();
 
-        println!("{}", ssh_public_key_after);
         assert!(compare_fingerprints(ssh_public_key, ssh_public_key_after.as_str()));
         assert_eq!(ssh_public_key, ssh_public_key_after.as_str());
     }

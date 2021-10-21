@@ -1,6 +1,5 @@
 use crate::addressing::{encode_to_alternative_addresses, encode_to_canonical_address};
-use crate::db::mongodb::model::{SshKeyEntry, SshKeyType};
-use crate::db::{CertificateEntry, PickyStorage, StorageError};
+use crate::db::{CertificateEntry, PickyStorage, SshKeyEntry, SshKeyType, StorageError};
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use std::collections::HashMap;

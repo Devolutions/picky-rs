@@ -48,9 +48,9 @@ rsa = "0.5.0"
 rand = "0.8.4"
 num-bigint-dig = "0.7.0"
 aes-gcm = { version = "0.9.4", optional = true }
-bcrypt-pbkdf = "0.6"
-block-modes = { version = "0.8" }
-aes = { version = "0.7.5", features = ["ctr"], default-features = false }
+bcrypt-pbkdf = { version = "0.6", optional = true }
+block-modes = { version = "0.8", optional = true }
+aes = { version = "0.7.5", features = ["ctr"], default-features = false, optional = true }
 
 [dev-dependencies]
 pretty_assertions = "1.0.0"
@@ -72,7 +72,7 @@ http_timestamp = ["reqwest"]
 ctl = ["picky-asn1-x509/ctl", "pkcs7", "chrono_conversion"]
 ctl_http_fetch = ["reqwest", "cab"]
 wincert = ["byteorder"]
-ssh = ["byteorder"]
+ssh = ["byteorder", "aes", "block-modes", "bcrypt-pbkdf"]
 http_trait_impl = ["http"]
 chrono_conversion = ["chrono", "picky-asn1/chrono_conversion"]
 time_conversion = ["time", "picky-asn1/time_conversion"]
