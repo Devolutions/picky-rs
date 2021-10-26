@@ -351,10 +351,7 @@ impl PickyStorage for FileStorage {
         .boxed()
     }
 
-    fn get_ssh_private_key_by_type<'a>(
-        &'a self,
-        key_type: &'a SshKeyType,
-    ) -> BoxFuture<'a, Result<SshKeyEntry, StorageError>> {
+    fn get_ssh_private_key_by_type(&self, key_type: SshKeyType) -> BoxFuture<Result<SshKeyEntry, StorageError>> {
         let key_type_str = key_type.to_string();
         async move {
             let filename = self

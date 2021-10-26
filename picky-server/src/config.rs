@@ -38,9 +38,6 @@ const PICKY_SSH_HOST_KEY_ENV: &str = "PICKY_SSH_HOST_KEY";
 const PICKY_SSH_CLIENT_KEY_PATH: &str = "PICKY_SSH_CLIENT_KEY_PATH";
 const PICKY_SSH_CLIENT_KEY_ENV: &str = "PICKY_SSH_CLIENT_KEY";
 
-pub const PICKY_HOST_KEY_DEFAULT_PASSPHRASE: &str = "picky_host";
-pub const PICKY_CLIENT_KEY_DEFAULT_PASSPHRASE: &str = "picky_client";
-
 fn default_picky_realm() -> String {
     String::from("Picky")
 }
@@ -55,6 +52,14 @@ fn default_database_name() -> String {
 
 fn default_file_backend_path() -> PathBuf {
     Path::new("database/").to_owned()
+}
+
+fn default_ssh_client_key_passphrase() -> String {
+    String::from("picky_client")
+}
+
+fn default_ssh_host_key_passphrase() -> String {
+    String::from("picky_host")
 }
 
 const fn default_save_certificate() -> bool {
@@ -140,12 +145,12 @@ pub struct Config {
 
     #[serde(skip)]
     pub ssh_host_key: Option<PathOr<SshPrivateKey>>,
-    #[serde(default)]
-    pub ssh_host_passphrase: Option<String>,
+    #[serde(default = "default_ssh_host_key_passphrase")]
+    pub ssh_host_passphrase: String,
     #[serde(skip)]
     pub ssh_client_key: Option<PathOr<SshPrivateKey>>,
-    #[serde(default)]
-    pub ssh_client_passphrase: Option<String>,
+    #[serde(default = "default_ssh_client_key_passphrase")]
+    pub ssh_client_passphrase: String,
 }
 
 impl Default for Config {
@@ -163,9 +168,9 @@ impl Default for Config {
             intermediate: None,
             provisioner_public_key: None,
             ssh_host_key: None,
-            ssh_host_passphrase: None,
+            ssh_host_passphrase: default_ssh_host_key_passphrase(),
             ssh_client_key: None,
-            ssh_client_passphrase: None,
+            ssh_client_passphrase: default_ssh_client_key_passphrase(),
         }
     }
 }
@@ -208,11 +213,11 @@ impl Config {
         }
 
         if let Some(passphrase) = matches.value_of("ssh-host-passphrase") {
-            self.ssh_host_passphrase = Some(passphrase.to_owned());
+            self.ssh_host_passphrase = passphrase.to_owned();
         }
 
         if let Some(passphrase) = matches.value_of("ssh-client-password") {
-            self.ssh_client_passphrase = Some(passphrase.to_owned())
+            self.ssh_client_passphrase = passphrase.to_owned()
         }
 
         if let Some(v) = matches.value_of("backend") {
@@ -293,7 +298,7 @@ impl Config {
         if !inject_ssh_key_env(
             &mut self.ssh_host_key,
             PICKY_SSH_HOST_KEY_ENV,
-            self.ssh_host_passphrase.as_deref(),
+            Some(self.ssh_host_passphrase.as_str()),
         ) {
             inject_ssh_key_path(&mut self.ssh_host_key, PICKY_SSH_HOST_KEY_PATH);
         }
@@ -301,7 +306,7 @@ impl Config {
         if !inject_ssh_key_env(
             &mut self.ssh_client_key,
             PICKY_SSH_CLIENT_KEY_ENV,
-            self.ssh_client_passphrase.as_deref(),
+            Some(self.ssh_client_passphrase.as_str()),
         ) {
             inject_ssh_key_path(&mut self.ssh_client_key, PICKY_SSH_CLIENT_KEY_PATH);
         }

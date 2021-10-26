@@ -195,10 +195,7 @@ impl PickyStorage for MemoryStorage {
         .boxed()
     }
 
-    fn get_ssh_private_key_by_type<'a>(
-        &'a self,
-        key_type: &'a SshKeyType,
-    ) -> BoxFuture<'a, Result<SshKeyEntry, StorageError>> {
+    fn get_ssh_private_key_by_type(&self, key_type: SshKeyType) -> BoxFuture<Result<SshKeyEntry, StorageError>> {
         async move {
             Ok(self
                 .ssh_keys

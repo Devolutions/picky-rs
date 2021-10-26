@@ -1,14 +1,18 @@
 use crate::addressing::{convert_to_canonical_base, CANONICAL_HASH_CODE};
-use crate::config::{CertKeyPair, Config, PICKY_CLIENT_KEY_DEFAULT_PASSPHRASE, PICKY_HOST_KEY_DEFAULT_PASSPHRASE};
+use crate::config::{CertKeyPair, Config};
 use crate::db::{get_storage, BoxedPickyStorage, CertificateEntry, PickyStorage, SshKeyEntry, SshKeyType};
 use crate::http::authorization::{check_authorization, ProviderClaims};
 use crate::http::utils::{Format, StatusCodeResult};
 use crate::logging::build_logger_config;
 use crate::picky_controller::Picky;
 use crate::utils::{GreedyError, PathOr};
+use chrono::{Duration, Utc};
 use log4rs::Handle;
 use picky::pem::{parse_pem, to_pem, Pem};
+use picky::ssh::certificate::{SshCertType, SshCertificateBuilder, SshCertificateKeyType};
 use picky::ssh::private_key::SshPrivateKey;
+use picky::ssh::public_key::SshPublicKey;
+use picky::ssh::SshTime;
 use picky::x509::date::UTCDate;
 use picky::x509::pkcs7::authenticode::{Attribute, AuthenticodeSignatureBuilder};
 use picky::x509::pkcs7::timestamp::TimestampRequest;
@@ -17,6 +21,8 @@ use saphir::prelude::*;
 use saphir::response::Builder as ResponseBuilder;
 use serde_json::{self, Value};
 use std::borrow::Cow;
+use std::convert::TryFrom;
+use std::ops::Add;
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 pub struct ServerController {
@@ -314,6 +320,85 @@ impl ServerController {
 
         Ok(response)
     }
+
+    #[post("/ssh/sign_key")]
+    async fn sign_ssh_key(&self, req: Request) -> Result<ResponseBuilder, StatusCode> {
+        use serde::{Deserialize, Serialize};
+
+        #[derive(Deserialize, Serialize)]
+        struct SshSignRequest {
+            key: String,
+            key_type: SshKeyType,
+            key_id: String,
+            principals: Vec<String>,
+            duration_secs: u64,
+        }
+
+        let sign_request: SshSignRequest = match check_authorization(&*self.read_conf().await, &req) {
+            Ok(token) => serde_json::from_value(token.claims).bad_request()?,
+            Err(e) => {
+                log::error!("authorization failed: {}", e);
+                return Err(StatusCode::UNAUTHORIZED);
+            }
+        };
+
+        let ssh_public_key = SshPublicKey::from_pem_str(sign_request.key.as_str()).bad_request()?;
+
+        let sing_key = self
+            .storage
+            .get_ssh_private_key_by_type(sign_request.key_type.clone())
+            .await
+            .internal_error()?;
+
+        let config = self.read_conf().await;
+        let sign_key_passphrase = match sign_request.key_type {
+            SshKeyType::Client => config.ssh_client_passphrase.as_str(),
+            SshKeyType::Host => config.ssh_host_passphrase.as_str(),
+        };
+
+        let builder = SshCertificateBuilder::init();
+
+        let cert_type = match sign_request.key_type {
+            SshKeyType::Client => SshCertType::Client,
+            SshKeyType::Host => SshCertType::Host,
+        };
+
+        let ssh_private_key = SshPrivateKey::from_pem_str(sing_key.key.as_str(), Some(sign_key_passphrase))
+            .internal_error_desc("couldn't deserialize SSH private key")?;
+        let now = Utc::now();
+        let valid_before = now.add(Duration::seconds(
+            i64::try_from(sign_request.duration_secs).bad_request()?,
+        ));
+
+        let ssh_cert = builder
+            .key_type(SshCertificateKeyType::SshRsaV01)
+            .key(&ssh_public_key)
+            .key_id(sign_request.key_id)
+            .cert_type(cert_type)
+            .principals(sign_request.principals)
+            .valid_after(SshTime::from(now))
+            .valid_before(SshTime::from(valid_before))
+            .signature_key(&ssh_private_key)
+            .comment(ssh_public_key.comment.clone())
+            .build()
+            .internal_error()?;
+
+        let ssh_cert_pem = ssh_cert
+            .to_pem()
+            .internal_error_desc("Failed to convert SSH certificate to PEM format")?;
+
+        Ok(ResponseBuilder::new().body(ssh_cert_pem).status(StatusCode::OK))
+    }
+
+    #[get("/ssh/user_ssh_key")]
+    async fn get_user_public_ssh_key(&self, _req: Request) -> Result<ResponseBuilder, StatusCode> {
+        self.get_shh_key(SshKeyType::Client).await
+    }
+
+    #[get("/ssh/host_ssh_key")]
+    async fn get_host_public_ssh_key(&self, _req: Request) -> Result<ResponseBuilder, StatusCode> {
+        self.get_shh_key(SshKeyType::Host).await
+    }
 }
 
 impl ServerController {
@@ -348,6 +433,30 @@ impl ServerController {
             }
             Err(e) => Err(format!("couldn't reload config: {}", e)),
         }
+    }
+
+    async fn get_shh_key(&self, key_type: SshKeyType) -> Result<ResponseBuilder, StatusCode> {
+        let config = &self.read_conf().await;
+        let passphrase = match key_type {
+            SshKeyType::Client => config.ssh_client_passphrase.as_str(),
+            SshKeyType::Host => config.ssh_host_passphrase.as_str(),
+        };
+
+        let key_entry = self
+            .storage
+            .get_ssh_private_key_by_type(key_type)
+            .await
+            .internal_error_desc("couldn't get SSH key")?;
+
+        let ssh_key = SshPrivateKey::from_pem_str(key_entry.key.as_str(), Some(passphrase))
+            .internal_error_desc("couldn't parse SSH key")?;
+
+        let pub_key = ssh_key
+            .public_key()
+            .to_pem()
+            .internal_error_desc("couldn't deserialize SSH public key")?;
+
+        Ok(ResponseBuilder::new().body(pub_key).status(StatusCode::OK))
     }
 }
 
@@ -612,20 +721,20 @@ async fn generate_intermediate_ca(config: &Config, storage: &dyn PickyStorage) -
     Ok(true)
 }
 
-async fn generate_ssh_key(storage: &dyn PickyStorage, key_type: SshKeyType) -> Result<bool, String> {
-    if let Ok(certs) = storage.get_ssh_private_key_by_type(&key_type).await {
+async fn generate_ssh_key(config: &Config, storage: &dyn PickyStorage, key_type: SshKeyType) -> Result<bool, String> {
+    if let Ok(certs) = storage.get_ssh_private_key_by_type(key_type.clone()).await {
         if !certs.key.is_empty() {
             // already exists
             return Ok(false);
         }
     }
 
-    let default_password = match key_type {
-        SshKeyType::Host => PICKY_HOST_KEY_DEFAULT_PASSPHRASE.to_owned(),
-        SshKeyType::Client => PICKY_CLIENT_KEY_DEFAULT_PASSPHRASE.to_owned(),
+    let passphrase = match key_type {
+        SshKeyType::Host => config.ssh_host_passphrase.clone(),
+        SshKeyType::Client => config.ssh_client_passphrase.clone(),
     };
 
-    let key = SshPrivateKey::generate_ssh_private_key(2048, Some(default_password))
+    let key = SshPrivateKey::generate_ssh_private_key(2048, Some(passphrase))
         .map_err(|err| err.to_string())?
         .to_pem()
         .map_err(|err| format!("Failed to serialize generated SSH host key to pem: {}", err))?;
@@ -779,7 +888,7 @@ async fn init_storage_from_config(storage: &dyn PickyStorage, config: &Config) -
 
     if let Some(ssh_host_key) = &config.ssh_host_key {
         log::info!("inject SSH host key provided by settings");
-        let host_key_passphrase = config.ssh_host_passphrase.as_deref();
+        let host_key_passphrase = Some(config.ssh_host_passphrase.as_str());
 
         if let Err(e) =
             inject_config_provided_ssh_key(storage, ssh_host_key, host_key_passphrase, SshKeyType::Host).await
@@ -787,7 +896,7 @@ async fn init_storage_from_config(storage: &dyn PickyStorage, config: &Config) -
             return Err(format!("couldn't inject SSH client key: {}", e));
         }
     } else {
-        let created = generate_ssh_key(storage, SshKeyType::Host)
+        let created = generate_ssh_key(config, storage, SshKeyType::Host)
             .await
             .map_err(|e| format!("couldn't generate SSH host key: {}", e))?;
         if created {
@@ -799,7 +908,7 @@ async fn init_storage_from_config(storage: &dyn PickyStorage, config: &Config) -
 
     if let Some(ssh_client_key) = &config.ssh_client_key {
         log::info!("inject SSH client key provided by settings");
-        let client_key_passphrase = config.ssh_client_passphrase.as_deref();
+        let client_key_passphrase = Some(config.ssh_client_passphrase.as_str());
 
         if let Err(e) =
             inject_config_provided_ssh_key(storage, ssh_client_key, client_key_passphrase, SshKeyType::Client).await
@@ -808,7 +917,7 @@ async fn init_storage_from_config(storage: &dyn PickyStorage, config: &Config) -
         }
     } else {
         log::info!("SSH client key...");
-        let created = generate_ssh_key(storage, SshKeyType::Client)
+        let created = generate_ssh_key(config, storage, SshKeyType::Client)
             .await
             .map_err(|e| format!("couldn't generate SSH client key: {}", e))?;
         if created {

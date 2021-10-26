@@ -123,8 +123,5 @@ pub trait PickyStorage: Send + Sync {
     ) -> BoxFuture<'a, Result<String, StorageError>>;
     fn lookup_addressing_hash<'a>(&'a self, lookup_key: &'a str) -> BoxFuture<'a, Result<String, StorageError>>;
     fn store_private_ssh_key(&self, key: SshKeyEntry) -> BoxFuture<Result<(), StorageError>>;
-    fn get_ssh_private_key_by_type<'a>(
-        &'a self,
-        key_type: &'a SshKeyType,
-    ) -> BoxFuture<'a, Result<SshKeyEntry, StorageError>>;
+    fn get_ssh_private_key_by_type(&self, key_type: SshKeyType) -> BoxFuture<Result<SshKeyEntry, StorageError>>;
 }

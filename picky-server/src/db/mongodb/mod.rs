@@ -437,14 +437,11 @@ impl PickyStorage for MongoStorage {
         .boxed()
     }
 
-    fn get_ssh_private_key_by_type<'a>(
-        &'a self,
-        key_type: &'a SshKeyType,
-    ) -> BoxFuture<'a, Result<SshKeyEntry, StorageError>> {
+    fn get_ssh_private_key_by_type(&self, key_type: SshKeyType) -> BoxFuture<Result<SshKeyEntry, StorageError>> {
         async move {
             let ssh_key = self
                 .repository::<SshKeyEntry>()
-                .find_one(doc!(f!(key_type in SshKeyEntry): key_type), None)
+                .find_one(doc!(f!(key_type in SshKeyEntry): key_type.clone()), None)
                 .await?
                 .ok_or_else(|| MongoStorageError::Other {
                     description: format!("ssh key not found using key type '{}'", key_type.to_string()),
