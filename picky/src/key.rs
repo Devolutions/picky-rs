@@ -116,6 +116,52 @@ impl TryFrom<&'_ PrivateKey> for RsaPublicKey {
 }
 
 impl PrivateKey {
+    pub fn from_components(
+        modulus: &BigUint,
+        public_exponent: &BigUint,
+        private_exponent: &BigUint,
+        primes: &[BigUint],
+    ) -> Result<Self, KeyError> {
+        if primes.len() != 2 {
+            // to be really safe
+            return Err(KeyError::Rsa {
+                context: format!("invalid number of primes generated: expected 2, got: {}", primes.len()),
+            });
+        }
+
+        let prime_1 = primes.get(0).unwrap();
+        let prime_2 = primes.get(1).unwrap();
+        let exponent_1 = private_exponent.clone() % (prime_1 - 1u8);
+        let exponent_2 = private_exponent.clone() % (prime_2 - 1u8);
+
+        let coefficient = prime_2
+            .mod_inverse(prime_1)
+            .ok_or_else(|| KeyError::Rsa {
+                context: "no modular inverse for prime 1".to_string(),
+            })?
+            .to_biguint()
+            .ok_or_else(|| KeyError::Rsa {
+                context: "BigUint conversion failed".to_string(),
+            })?;
+
+        Ok(Self(PrivateKeyInfo::new_rsa_encryption(
+            IntegerAsn1::from_bytes_be_unsigned(modulus.to_bytes_be()),
+            IntegerAsn1::from_bytes_be_unsigned(public_exponent.to_bytes_be()),
+            IntegerAsn1::from_bytes_be_unsigned(private_exponent.to_bytes_be()),
+            (
+                // primes
+                IntegerAsn1::from_bytes_be_unsigned(prime_1.to_bytes_be()),
+                IntegerAsn1::from_bytes_be_unsigned(prime_2.to_bytes_be()),
+            ),
+            (
+                // exponents
+                IntegerAsn1::from_bytes_be_unsigned(exponent_1.to_bytes_be()),
+                IntegerAsn1::from_bytes_be_unsigned(exponent_2.to_bytes_be()),
+            ),
+            IntegerAsn1::from_bytes_be_unsigned(coefficient.to_bytes_be()),
+        )))
+    }
+
     pub fn from_pem(pem: &Pem) -> Result<Self, KeyError> {
         match pem.label() {
             PRIVATE_KEY_PEM_LABEL => Self::from_pkcs8(pem.data()),
@@ -186,47 +232,7 @@ impl PrivateKey {
         let public_exponent = key.e();
         let private_exponent = key.d();
 
-        if key.primes().len() != 2 {
-            // to be really safe
-            return Err(KeyError::Rsa {
-                context: format!(
-                    "invalid number of primes generated: expected 2, got: {}",
-                    key.primes().len()
-                ),
-            });
-        }
-
-        let prime_1 = &key.primes()[0];
-        let prime_2 = &key.primes()[1];
-        let exponent_1 = private_exponent.clone() % (prime_1 - 1u8);
-        let exponent_2 = private_exponent.clone() % (prime_2 - 1u8);
-
-        let coefficient = prime_2
-            .mod_inverse(prime_1)
-            .ok_or_else(|| KeyError::Rsa {
-                context: "no modular inverse for prime 1".to_string(),
-            })?
-            .to_biguint()
-            .ok_or_else(|| KeyError::Rsa {
-                context: "BigUint conversion failed".to_string(),
-            })?;
-
-        Ok(Self(PrivateKeyInfo::new_rsa_encryption(
-            IntegerAsn1::from_bytes_be_unsigned(modulus.to_bytes_be()),
-            IntegerAsn1::from_bytes_be_unsigned(public_exponent.to_bytes_be()),
-            IntegerAsn1::from_bytes_be_unsigned(private_exponent.to_bytes_be()),
-            (
-                // primes
-                IntegerAsn1::from_bytes_be_unsigned(prime_1.to_bytes_be()),
-                IntegerAsn1::from_bytes_be_unsigned(prime_2.to_bytes_be()),
-            ),
-            (
-                // exponents
-                IntegerAsn1::from_bytes_be_unsigned(exponent_1.to_bytes_be()),
-                IntegerAsn1::from_bytes_be_unsigned(exponent_2.to_bytes_be()),
-            ),
-            IntegerAsn1::from_bytes_be_unsigned(coefficient.to_bytes_be()),
-        )))
+        Self::from_components(modulus, public_exponent, private_exponent, key.primes())
     }
 
     pub(crate) fn as_inner(&self) -> &PrivateKeyInfo {
@@ -314,6 +320,13 @@ impl TryFrom<&'_ PublicKey> for RsaPublicKey {
 }
 
 impl PublicKey {
+    pub fn from_components(modulus: &BigUint, public_exponent: &BigUint) -> Self {
+        PublicKey(SubjectPublicKeyInfo::new_rsa_key(
+            IntegerAsn1::from_bytes_be_unsigned(modulus.to_bytes_be()),
+            IntegerAsn1::from_bytes_be_unsigned(public_exponent.to_bytes_be()),
+        ))
+    }
+
     pub fn to_der(&self) -> Result<Vec<u8>, KeyError> {
         picky_asn1_der::to_vec(&self.0).map_err(|e| KeyError::Asn1Serialization {
             source: e,

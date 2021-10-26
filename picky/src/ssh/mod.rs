@@ -49,6 +49,30 @@ impl SshTime {
     }
 }
 
+impl From<u64> for SshTime {
+    fn from(timestamp: u64) -> Self {
+        Self(DateTime::<Utc>::from(UNIX_EPOCH + Duration::from_secs(timestamp)))
+    }
+}
+
+impl From<SshTime> for u64 {
+    fn from(time: SshTime) -> u64 {
+        time.0.second() as u64
+    }
+}
+
+impl From<DateTime<Utc>> for SshTime {
+    fn from(date: DateTime<Utc>) -> Self {
+        Self(date)
+    }
+}
+
+impl From<SshTime> for DateTime<Utc> {
+    fn from(time: SshTime) -> Self {
+        time.0
+    }
+}
+
 impl SshParser for SshTime {
     type Error = io::Error;
 
@@ -57,9 +81,7 @@ impl SshParser for SshTime {
         Self: Sized,
     {
         let timestamp = stream.read_u64::<BigEndian>()?;
-        Ok(SshTime(DateTime::<Utc>::from(
-            UNIX_EPOCH + Duration::from_secs(timestamp),
-        )))
+        Ok(SshTime::from(timestamp))
     }
 
     fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {

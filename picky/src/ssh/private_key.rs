@@ -1,6 +1,6 @@
 use super::SshParser;
 use crate::key::{KeyError, PrivateKey};
-use crate::ssh::public_key::{SshInnerPublicKey, SshPublicKey, SshPublicKeyError};
+use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
 use crate::ssh::{ByteArray, Mpint, SshString};
 use aes::cipher::{NewCipher, StreamCipher};
 use aes::{Aes128, Aes128Ctr, Aes256, Aes256Ctr};
@@ -8,9 +8,9 @@ use block_modes::block_padding::NoPadding;
 use block_modes::BlockMode;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use num_bigint_dig::ModInverse;
-use picky_asn1_x509::PrivateKeyValue;
 use rand::Rng;
-use rsa::{BigUint, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
+use rsa::{BigUint, PublicKeyParts, RsaPrivateKey};
+use std::convert::TryFrom;
 use std::io::{self, Cursor, Read, Write};
 use std::string;
 use thiserror::Error;
@@ -62,8 +62,8 @@ pub enum SshPrivateKeyError {
     HashingError(#[from] bcrypt_pbkdf::Error),
     #[error("Passphrase required for encrypted private key")]
     MissingPassphrase,
-    #[error("Can not generate private key: {0:?}")]
-    PrivateKeyGenerationError(#[from] KeyError),
+    #[error(transparent)]
+    KeyError(#[from] KeyError),
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Default)]
@@ -123,12 +123,12 @@ impl Kdf {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum SshInnerPrivateKey {
-    Rsa(RsaPrivateKey),
+#[derive(Debug, Clone, PartialEq)]
+pub enum SshBasePrivateKey {
+    Rsa(crate::key::PrivateKey),
 }
 
-impl SshParser for SshInnerPrivateKey {
+impl SshParser for SshBasePrivateKey {
     type Error = SshPrivateKeyError;
 
     fn decode(mut stream: impl Read) -> Result<Self, Self::Error>
@@ -145,15 +145,15 @@ impl SshParser for SshInnerPrivateKey {
                 let p_constant: Mpint = SshParser::decode(&mut stream)?;
                 let q_constant: Mpint = SshParser::decode(&mut stream)?;
 
-                Ok(SshInnerPrivateKey::Rsa(RsaPrivateKey::from_components(
-                    BigUint::from_bytes_be(&n_constant.0),
-                    BigUint::from_bytes_be(&e_constant.0),
-                    BigUint::from_bytes_be(&d_constant.0),
-                    vec![
+                Ok(SshBasePrivateKey::Rsa(PrivateKey::from_components(
+                    &BigUint::from_bytes_be(&n_constant.0),
+                    &BigUint::from_bytes_be(&e_constant.0),
+                    &BigUint::from_bytes_be(&d_constant.0),
+                    &[
                         BigUint::from_bytes_be(&p_constant.0),
                         BigUint::from_bytes_be(&q_constant.0),
                     ],
-                )))
+                )?))
             }
             key_type => Err(SshPrivateKeyError::UnsupportedKeyType(key_type.to_owned())),
         }
@@ -161,7 +161,9 @@ impl SshParser for SshInnerPrivateKey {
 
     fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
         match self {
-            SshInnerPrivateKey::Rsa(rsa) => {
+            SshBasePrivateKey::Rsa(rsa) => {
+                let rsa = RsaPrivateKey::try_from(rsa)?;
+
                 SshString("ssh-rsa".to_owned()).encode(&mut stream)?;
                 Mpint(rsa.n().to_bytes_be()).encode(&mut stream)?;
                 Mpint(rsa.e().to_bytes_be()).encode(&mut stream)?;
@@ -175,32 +177,33 @@ impl SshParser for SshInnerPrivateKey {
                 }
             }
         };
+
         Ok(())
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SshPrivateKey {
-    kdf: Kdf,
     _cipher_name: String,
-    inner_key: SshInnerPrivateKey,
-    passphrase: Option<String>,
+    kdf: Kdf,
+    base_key: SshBasePrivateKey,
     check: u32,
     comment: String,
+    passphrase: Option<String>,
 }
 
 impl SshPrivateKey {
     pub fn construct(
         kdf: Kdf,
         cipher_name: String,
-        inner_key: SshInnerPrivateKey,
+        base_key: SshBasePrivateKey,
         passphrase: Option<String>,
         comment: String,
     ) -> Self {
         Self {
             kdf,
             _cipher_name: cipher_name,
-            inner_key,
+            base_key,
             passphrase,
             comment,
             check: rand::thread_rng().gen::<u32>(),
@@ -227,7 +230,7 @@ impl SshPrivateKey {
         Ok(cursor.into_inner())
     }
 
-    pub fn private_key_to_ssh_private_key(private_key: PrivateKey, passphrase: Option<String>) -> SshPrivateKey {
+    pub fn picky_private_key_to_ssh_private_key(private_key: PrivateKey, passphrase: Option<String>) -> SshPrivateKey {
         let (kdf, cipher_name) = match &passphrase {
             Some(_) => {
                 let mut salt = Vec::new();
@@ -243,33 +246,34 @@ impl SshPrivateKey {
             }
             None => (Kdf::construct("none".to_owned(), KdfOption::new()), "none".to_owned()),
         };
-        let rsa_private_key = match &private_key.as_inner().private_key {
-            PrivateKeyValue::RSA(rsa) => RsaPrivateKey::from_components(
-                BigUint::from_bytes_be(rsa.modulus.as_unsigned_bytes_be()),
-                BigUint::from_bytes_be(rsa.public_exponent.as_unsigned_bytes_be()),
-                BigUint::from_bytes_be(rsa.private_exponent.as_unsigned_bytes_be()),
-                vec![
-                    BigUint::from_bytes_be(rsa.prime_1.as_unsigned_bytes_be()),
-                    BigUint::from_bytes_be(rsa.prime_2.as_unsigned_bytes_be()),
-                ],
-            ),
-        };
-        let inner_key = SshInnerPrivateKey::Rsa(rsa_private_key);
-        SshPrivateKey::construct(kdf, cipher_name, inner_key, passphrase, "".to_owned())
+
+        SshPrivateKey::construct(
+            kdf,
+            cipher_name,
+            SshBasePrivateKey::Rsa(private_key),
+            passphrase,
+            "".to_owned(),
+        )
     }
 
     pub fn generate_ssh_private_key(bits: usize, passphrase: Option<String>) -> Result<Self, SshPrivateKeyError> {
-        Ok(SshPrivateKey::private_key_to_ssh_private_key(
+        Ok(SshPrivateKey::picky_private_key_to_ssh_private_key(
             PrivateKey::generate_rsa(bits)?,
             passphrase,
         ))
     }
 
+    // TODO: Return as reference
     pub fn public_key(&self) -> SshPublicKey {
-        let inner_public_key = match &self.inner_key {
-            SshInnerPrivateKey::Rsa(rsa) => SshInnerPublicKey::Rsa(RsaPublicKey::from(rsa)),
+        let inner_public_key = match &self.base_key {
+            SshBasePrivateKey::Rsa(rsa) => rsa.to_public_key(),
         };
-        SshPublicKey::from_inner(inner_public_key)
+
+        SshPublicKey::from_inner(SshBasePublicKey::Rsa(inner_public_key))
+    }
+
+    pub fn base_key(&self) -> &SshBasePrivateKey {
+        &self.base_key
     }
 }
 
@@ -333,11 +337,11 @@ impl SshPrivateKeyParser for SshPrivateKey {
             return Err(SshPrivateKeyError::InvalidCheckNumbers(check0, check1));
         }
 
-        let inner_key: SshInnerPrivateKey = SshParser::decode(&mut cursor)?;
+        let inner_key: SshBasePrivateKey = SshParser::decode(&mut cursor)?;
 
         let comment: SshString = SshParser::decode(&mut cursor)?;
         Ok(SshPrivateKey {
-            inner_key,
+            base_key: inner_key,
             passphrase: passphrase.map(|p| p.to_owned()),
             kdf: Kdf {
                 name: kdf_name.0,
@@ -380,7 +384,7 @@ impl SshPrivateKeyParser for SshPrivateKey {
         let mut private_key = Vec::new();
         private_key.write_u32::<BigEndian>(self.check)?;
         private_key.write_u32::<BigEndian>(self.check)?;
-        self.inner_key.encode(&mut private_key)?;
+        self.base_key.encode(&mut private_key)?;
 
         SshString(self.comment.clone()).encode(&mut private_key)?;
 
@@ -551,7 +555,7 @@ pub mod tests {
         private_key.encode(&mut ssh_private_key_after).unwrap();
 
         let ssh_private_key_after = String::from_utf8(ssh_private_key_after).unwrap();
-        assert_eq!(ssh_private_key.to_owned(), ssh_private_key_after);
+        pretty_assertions::assert_eq!(ssh_private_key.to_owned(), ssh_private_key_after);
     }
 
     #[test]
@@ -566,7 +570,7 @@ pub mod tests {
 
         let ssh_private_key_after = String::from_utf8(ssh_private_key_after).unwrap();
 
-        assert_eq!(ssh_private_key.to_owned(), ssh_private_key_after);
+        pretty_assertions::assert_eq!(ssh_private_key.to_owned(), ssh_private_key_after);
     }
 
     #[test]
