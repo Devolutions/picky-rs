@@ -21,11 +21,10 @@ macro_rules! define_oid {
     ($uppercase:ident => $lowercase:ident => $str_value:literal) => {
         pub const $uppercase: &'static str = $str_value;
 
-        pub fn $lowercase() -> oid::ObjectIdentifier {
-            use std::sync::Once;
-            use std::convert::TryInto;
+        pub fn $lowercase() -> ::oid::ObjectIdentifier {
+            use ::std::sync::Once;
 
-            static mut OID: Option<oid::ObjectIdentifier> = None;
+            static mut OID: Option<::oid::ObjectIdentifier> = None;
             static INIT: Once = Once::new();
             unsafe {
                 INIT.call_once(|| {

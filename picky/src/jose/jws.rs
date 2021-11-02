@@ -7,7 +7,6 @@ use crate::jose::jwk::Jwk;
 use crate::key::{PrivateKey, PublicKey};
 use crate::signature::{SignatureAlgorithm, SignatureError};
 use base64::DecodeError;
-use core::convert::TryFrom;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 

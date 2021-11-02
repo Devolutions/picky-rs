@@ -1,5 +1,4 @@
 use crate::oids;
-use oid::prelude::TryFrom;
 use oid::ObjectIdentifier;
 use picky_asn1::tag::{Tag, TagPeeker};
 use picky_asn1::wrapper::{IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1};

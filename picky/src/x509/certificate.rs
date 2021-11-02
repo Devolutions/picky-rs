@@ -16,7 +16,6 @@ use picky_asn1_x509::{
 };
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
-use std::convert::TryFrom;
 use thiserror::Error;
 
 const ELEMENT_NAME: &str = "x509 certificate";

@@ -146,7 +146,6 @@ impl fmt::Display for UTCDate {
 #[cfg(feature = "time_conversion")]
 mod time_convert {
     use super::*;
-    use std::convert::{TryFrom, TryInto};
     use time::OffsetDateTime;
 
     impl From<OffsetDateTime> for UTCDate {
