@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `Optional::is_default`
+- Support for `time 0.3` types conversions behind `time_conversion` feature gate
+
+### Changed
+
+- Bump minimal rustc version to 1.56
 
 ## [0.4.0] 2021-08-09
 

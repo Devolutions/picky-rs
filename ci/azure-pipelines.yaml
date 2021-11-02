@@ -108,6 +108,6 @@ jobs:
         displayName: cargo check picky-asn1-der
       - script: cargo +1.56 check -p picky-asn1-x509
         displayName: cargo check picky-asn1-x509
-      - script: cargo +1.51 check -p picky
+      - script: cargo +1.56 check -p picky
         displayName: cargo check picky
 
