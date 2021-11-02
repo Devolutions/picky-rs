@@ -1,3 +1,7 @@
+pub use picky_asn1_x509::attribute::Attribute;
+pub use picky_asn1_x509::pkcs7::content_info;
+pub use picky_asn1_x509::ShaVariant;
+
 use crate::hash::{HashAlgorithm, UnsupportedHashAlgorithmError};
 use crate::key::PrivateKey;
 use crate::pem::Pem;
@@ -32,13 +36,7 @@ use picky_asn1_x509::pkcs7::signer_info::{
 };
 use picky_asn1_x509::pkcs7::Pkcs7Certificate;
 use picky_asn1_x509::{oids, AttributeValues, Certificate, DigestInfo, Name};
-
-pub use picky_asn1_x509::attribute::Attribute;
-pub use picky_asn1_x509::pkcs7::content_info;
-pub use picky_asn1_x509::ShaVariant;
-
 use std::cell::RefCell;
-use std::convert::TryFrom;
 use std::ops::DerefMut;
 use thiserror::Error;
 

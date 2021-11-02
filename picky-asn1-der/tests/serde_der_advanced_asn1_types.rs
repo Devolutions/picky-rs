@@ -11,7 +11,6 @@ use picky_asn1::wrapper::*;
 use pretty_assertions::assert_eq;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
-use std::convert::TryFrom;
 use std::fmt::Debug;
 use std::str::FromStr;
 

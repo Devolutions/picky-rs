@@ -16,7 +16,6 @@ use saphir::prelude::*;
 use saphir::response::Builder as ResponseBuilder;
 use serde_json::{self, Value};
 use std::borrow::Cow;
-use std::convert::TryFrom;
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 pub struct ServerController {

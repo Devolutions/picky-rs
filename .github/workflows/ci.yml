@@ -38,7 +38,7 @@ jobs:
             runner: windows-2019
           - os: linux
             runner: ubuntu-18.04
-          
+
     steps:
       - uses: actions/checkout@v2
 
@@ -88,7 +88,7 @@ jobs:
           New-Item -Path $ArchDir -ItemType "directory"
 
           $Binaries = @("picky-server", "picky-signtool")
-          
+
           if ($Env:RUNNER_OS -Eq "Windows") {
             $Binaries = $Binaries | ForEach-Object {"$_.exe"}
           }
@@ -107,6 +107,9 @@ jobs:
           path: ${{ steps.prepare-artifacts.outputs.staging-dir }}
 
   msrv:
+    # Minimum supported Rust version check for published crates.
+    # If this break, bump crate version minor number.
+    # See https://github.com/Devolutions/picky-rs/issues/89
     name: Check minimum rust version
     runs-on: ubuntu-18.04
     needs: build
@@ -117,23 +120,21 @@ jobs:
       - name: Configure runner 
         run: |
           set -e
-          curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-toolchain 1.43
-          rustup toolchain install 1.51
+          curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-toolchain 1.56
 
       - name: cargo check picky-asn1
         continue-on-error: true
-        run: cargo +1.43 check -p picky-asn1
+        run: cargo +1.56 check -p picky-asn1
 
       - name: cargo check picky-asn1-der
         continue-on-error: true
-        run: cargo +1.43 check -p picky-asn1-der
-        
+        run: cargo +1.56 check -p picky-asn1-der
+
       - name: cargo check picky-asn1-x509
         continue-on-error: true
-        run: cargo +1.43 check -p picky-asn1-x509
+        run: cargo +1.56 check -p picky-asn1-x509
 
       - name: cargo check picky
         continue-on-error: true
-        run: cargo +1.51 check -p picky
-
+        run: cargo +1.56 check -p picky
 

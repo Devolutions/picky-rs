@@ -3,7 +3,6 @@
 use digest::Digest;
 use picky_asn1_x509::ShaVariant;
 use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
 use std::error::Error;
 use std::fmt;
 

@@ -1,4 +1,3 @@
-use std::convert::TryFrom;
 use std::fs::OpenOptions;
 use std::io::Read;
 use std::path::{Path, PathBuf};

@@ -2,7 +2,6 @@
 
 use crate::hash::HashAlgorithm;
 use crate::key::{KeyError, PrivateKey, PublicKey};
-use core::convert::TryFrom;
 use picky_asn1_x509::{oids, AlgorithmIdentifier};
 use rsa::{PublicKey as _, RsaPrivateKey, RsaPublicKey};
 use serde::{Deserialize, Serialize};

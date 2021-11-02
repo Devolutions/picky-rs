@@ -1,5 +1,4 @@
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use std::convert::TryFrom;
 use std::error;
 use std::io::{self, BufReader, BufWriter, Write};
 use thiserror::Error;
