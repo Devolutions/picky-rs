@@ -351,7 +351,7 @@ dependencies = [
  "libc",
  "num-integer",
  "num-traits",
- "time",
+ "time 0.1.44",
  "winapi 0.3.9",
 ]
 
@@ -1386,9 +1386,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.93"
+version = "0.2.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9385f66bf6105b241aa65a61cb923ef20efc665cb9f9bb50ac2f0c4b7f378d41"
+checksum = "a60553f9a9e039a333b4e9b20573b9e9b9c0bb3a11e201ccc48ef4283456d673"
 
 [[package]]
 name = "libm"
@@ -1399,7 +1399,7 @@ checksum = "c7d73b3f436185384286bd8098d17ec07c9a7d2388a6599f824d8502b529702a"
 [[package]]
 name = "lief-rs"
 version = "0.1.0"
-source = "git+https://github.com/Devolutions/lief-rs.git?rev=8f439c#8f439c2397035eb5e1d72277dd12eb0717930d67"
+source = "git+https://github.com/Devolutions/lief-rs.git?rev=52dca2#52dca2b5795a54e110b6210c07ce1d2c41fd974a"
 dependencies = [
  "bitflags",
  "image",
@@ -1412,7 +1412,7 @@ dependencies = [
 [[package]]
 name = "lief-sys"
 version = "0.1.0"
-source = "git+https://github.com/Devolutions/lief-rs.git?rev=8f439c#8f439c2397035eb5e1d72277dd12eb0717930d67"
+source = "git+https://github.com/Devolutions/lief-rs.git?rev=52dca2#52dca2b5795a54e110b6210c07ce1d2c41fd974a"
 dependencies = [
  "cmake",
 ]
@@ -1677,7 +1677,7 @@ dependencies = [
  "stringprep",
  "strsim 0.10.0",
  "take_mut",
- "time",
+ "time 0.1.44",
  "tokio 0.2.25",
  "tokio-rustls 0.13.1",
  "trust-dns-proto",
@@ -2010,6 +2010,7 @@ dependencies = [
  "sha2 0.9.3",
  "sha3",
  "thiserror",
+ "time 0.3.4",
 ]
 
 [[package]]
@@ -2047,6 +2048,7 @@ dependencies = [
  "picky-asn1-der 0.2.5",
  "serde",
  "serde_bytes",
+ "time 0.3.4",
 ]
 
 [[package]]
@@ -2117,7 +2119,6 @@ name = "picky-server"
 version = "4.9.0"
 dependencies = [
  "base64 0.13.0",
- "chrono",
  "clap",
  "criterion",
  "futures",
@@ -2136,6 +2137,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "thiserror",
+ "time 0.3.4",
  "tokio 0.2.25",
  "tokio-test",
  "unicase",
@@ -2722,7 +2724,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ebbfddbcede862061268cdcf2657ebb430d139d33d82932f0f7accc3a78bff74"
 dependencies = [
  "chrono",
- "time",
+ "time 0.1.44",
 ]
 
 [[package]]
@@ -3154,6 +3156,15 @@ dependencies = [
  "libc",
  "wasi 0.10.0+wasi-snapshot-preview1",
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "time"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "99beeb0daeac2bd1e86ac2c21caddecb244b39a093594da1a661ec2060c7aedd"
+dependencies = [
+ "libc",
 ]
 
 [[package]]

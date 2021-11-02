@@ -1,4 +1,5 @@
 use serde::{de, ser, Deserializer, Serializer};
+use std::convert::TryFrom;
 use std::fmt;
 
 pub trait TimeRepr
@@ -288,31 +289,65 @@ impl TimeRepr for GeneralizedTimeRepr {
     }
 }
 
-#[cfg(feature = "chrono_conversion")]
-mod chrono_conversion {
+#[cfg(feature = "time_conversion")]
+mod time_convert {
     use super::*;
-    use chrono::naive::NaiveDateTime;
-    use chrono::{DateTime, Datelike, Duration, NaiveDate, Timelike, Utc};
-    use std::convert::TryFrom;
+    use time::{OffsetDateTime, PrimitiveDateTime};
 
-    impl<TR: TimeRepr> TryFrom<Duration> for Date<TR> {
-        type Error = ();
-
-        fn try_from(d: Duration) -> Result<Self, Self::Error> {
-            let date = Utc::now().checked_add_signed(d).ok_or(())?;
-            Ok(Self::from(date))
+    impl<TR: TimeRepr> From<PrimitiveDateTime> for Date<TR> {
+        fn from(d: PrimitiveDateTime) -> Self {
+            Self::from(d.assume_utc())
         }
     }
+
+    impl<TR: TimeRepr> TryFrom<Date<TR>> for PrimitiveDateTime {
+        type Error = time::error::ComponentRange;
+
+        fn try_from(d: Date<TR>) -> Result<Self, Self::Error> {
+            let date = time::Date::from_calendar_date(i32::from(d.year), time::Month::try_from(d.month)?, d.day)?;
+            let time = time::Time::from_hms(d.hour, d.minute, d.second)?;
+            Ok(Self::new(date, time))
+        }
+    }
+
+    impl<TR: TimeRepr> From<OffsetDateTime> for Date<TR> {
+        fn from(d: OffsetDateTime) -> Self {
+            Self {
+                year: u16::try_from(d.year()).unwrap(),
+                month: u8::from(d.month()),
+                day: d.day(),
+                hour: d.hour(),
+                minute: d.minute(),
+                second: d.second(),
+                _pd: std::marker::PhantomData,
+            }
+        }
+    }
+
+    impl<TR: TimeRepr> TryFrom<Date<TR>> for OffsetDateTime {
+        type Error = time::error::ComponentRange;
+
+        fn try_from(d: Date<TR>) -> Result<Self, Self::Error> {
+            Ok(PrimitiveDateTime::try_from(d)?.assume_utc())
+        }
+    }
+}
+
+#[cfg(feature = "chrono_conversion")]
+mod chrono_convert {
+    use super::*;
+    use chrono::naive::NaiveDateTime;
+    use chrono::{DateTime, Datelike, NaiveDate, Timelike, Utc};
 
     impl<TR: TimeRepr> From<NaiveDateTime> for Date<TR> {
         fn from(d: NaiveDateTime) -> Self {
             Self {
-                year: d.year() as u16,
-                month: d.month() as u8,
-                day: d.day() as u8,
-                hour: d.hour() as u8,
-                minute: d.minute() as u8,
-                second: d.second() as u8,
+                year: u16::try_from(d.year()).unwrap(),
+                month: u8::try_from(d.month()).unwrap(),
+                day: u8::try_from(d.day()).unwrap(),
+                hour: u8::try_from(d.hour()).unwrap(),
+                minute: u8::try_from(d.minute()).unwrap(),
+                second: u8::try_from(d.second()).unwrap(),
                 _pd: std::marker::PhantomData,
             }
         }
@@ -331,12 +366,12 @@ mod chrono_conversion {
     impl<TR: TimeRepr> From<DateTime<Utc>> for Date<TR> {
         fn from(d: DateTime<Utc>) -> Self {
             Self {
-                year: d.year() as u16,
-                month: d.month() as u8,
-                day: d.day() as u8,
-                hour: d.hour() as u8,
-                minute: d.minute() as u8,
-                second: d.second() as u8,
+                year: u16::try_from(d.year()).unwrap(),
+                month: u8::try_from(d.month()).unwrap(),
+                day: u8::try_from(d.day()).unwrap(),
+                hour: u8::try_from(d.hour()).unwrap(),
+                minute: u8::try_from(d.minute()).unwrap(),
+                second: u8::try_from(d.second()).unwrap(),
                 _pd: std::marker::PhantomData,
             }
         }

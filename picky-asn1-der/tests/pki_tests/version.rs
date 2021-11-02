@@ -25,10 +25,6 @@ impl Version {
             _ => None,
         }
     }
-
-    fn is_default(&self) -> bool {
-        self == &Self::V1
-    }
 }
 
 impl Serialize for Version {
