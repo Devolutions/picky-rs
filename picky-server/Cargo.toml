@@ -11,7 +11,7 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/Devolutions/picky-rs"
 
 [dependencies]
-picky = { version = "6.4.0", default-features = false, features = ["x509", "jose", "chrono_conversion", "pkcs7" ], path = "../picky" }
+picky = { version = "6.4.0", default-features = false, features = ["x509", "jose", "time_conversion", "pkcs7"], path = "../picky" }
 picky-asn1 = { version = "0.4", path = "../picky-asn1" }
 mongodm = { version = "0.6", features = ["tokio-runtime"] }
 clap = { features = ["yaml"], version = "2.32" }
@@ -23,7 +23,7 @@ multihash = "0.11" # v0.12 removed support for Sha1 because it's not cryptograph
 multibase = "0.9"
 log = "0.4"
 log4rs = "1"
-chrono = "0.4"
+time = "0.3"
 base64 = "0.13"
 hex = "0.4"
 thiserror = "1.0"

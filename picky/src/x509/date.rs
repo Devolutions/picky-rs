@@ -1,5 +1,3 @@
-#[cfg(feature = "chrono_conversion")]
-use chrono::{DateTime, Utc};
 use picky_asn1::date::{Date, GeneralizedTime, UTCTime, UTCTimeRepr};
 use picky_asn1_x509::validity::Time;
 use std::fmt;
@@ -18,10 +16,17 @@ impl UTCDate {
         Some(Self(GeneralizedTime::new(year, month, day, 0, 0, 0)?))
     }
 
-    #[cfg(feature = "chrono_conversion")]
+    #[cfg(any(feature = "time_conversion", feature = "chrono_conversion"))]
     #[inline]
     pub fn now() -> Self {
-        Self(chrono::offset::Utc::now().into())
+        #[cfg(feature = "time_conversion")]
+        {
+            Self(time::OffsetDateTime::now_utc().into())
+        }
+        #[cfg(all(feature = "chrono_conversion", not(feature = "time_conversion")))]
+        {
+            Self(chrono::offset::Utc::now().into())
+        }
     }
 
     #[inline]
@@ -123,20 +128,6 @@ impl From<Time> for UTCDate {
     }
 }
 
-#[cfg(feature = "chrono_conversion")]
-impl From<DateTime<Utc>> for UTCDate {
-    fn from(dt: DateTime<Utc>) -> Self {
-        Self(dt.into())
-    }
-}
-
-#[cfg(feature = "chrono_conversion")]
-impl From<UTCDate> for DateTime<Utc> {
-    fn from(date: UTCDate) -> Self {
-        date.0.into()
-    }
-}
-
 impl fmt::Display for UTCDate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -149,5 +140,44 @@ impl fmt::Display for UTCDate {
             self.minute(),
             self.second()
         )
+    }
+}
+
+#[cfg(feature = "time_conversion")]
+mod time_convert {
+    use super::*;
+    use std::convert::{TryFrom, TryInto};
+    use time::OffsetDateTime;
+
+    impl From<OffsetDateTime> for UTCDate {
+        fn from(dt: OffsetDateTime) -> Self {
+            Self(dt.into())
+        }
+    }
+
+    impl TryFrom<UTCDate> for OffsetDateTime {
+        type Error = time::error::ComponentRange;
+
+        fn try_from(date: UTCDate) -> Result<Self, Self::Error> {
+            date.0.try_into()
+        }
+    }
+}
+
+#[cfg(feature = "chrono_conversion")]
+mod chrono_convert {
+    use super::*;
+    use chrono::{DateTime, Utc};
+
+    impl From<DateTime<Utc>> for UTCDate {
+        fn from(dt: DateTime<Utc>) -> Self {
+            Self(dt.into())
+        }
+    }
+
+    impl From<UTCDate> for DateTime<Utc> {
+        fn from(date: UTCDate) -> Self {
+            date.0.into()
+        }
     }
 }

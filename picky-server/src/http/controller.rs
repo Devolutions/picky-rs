@@ -435,7 +435,7 @@ async fn sign_certificate(
         &ca_pk,
         config.signing_algorithm,
         &dns_name,
-        chrono::Duration::seconds(
+        time::Duration::seconds(
             i64::try_from(duration_secs).map_err(|e| format!("invalid x509 duration (too big?): {}", e))?,
         ),
     )
