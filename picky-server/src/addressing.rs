@@ -1,36 +1,48 @@
 use multibase::Base;
-use multihash::{Code as Hash, Multihash};
+use multihash::{Code as Hash, Multihash, MultihashDigest};
 
 pub const CANONICAL_HASH: Hash = Hash::Sha2_256;
 pub const CANONICAL_BASE: Base = Base::Base64Url;
+pub const CANONICAL_HASH_CODE: u64 = SHA2_256_HASH_CODE;
+pub const SHA1_HASH_CODE: u64 = 0x11;
+pub const SHA2_256_HASH_CODE: u64 = 0x12;
 
 pub fn encode_to_canonical_address(data: &[u8]) -> String {
     let hash = CANONICAL_HASH.digest(data);
-    multibase::encode(CANONICAL_BASE, hash.as_bytes())
+    multibase::encode(CANONICAL_BASE, hash.to_bytes())
 }
 
 pub fn encode_to_alternative_addresses(data: &[u8]) -> Result<Vec<String>, String> {
-    const ALTERNATIVE_HASHES: [Hash; 1] = [Hash::Sha1];
+    use multihash::StatefulHasher as _;
 
-    let mut addresses = Vec::with_capacity(ALTERNATIVE_HASHES.len());
+    const ALTERNATIVE_SECUSE_HASHES: [Hash; 0] = [];
 
-    for hash in ALTERNATIVE_HASHES.iter() {
+    let mut addresses = Vec::with_capacity(ALTERNATIVE_SECUSE_HASHES.len());
+
+    for hash in ALTERNATIVE_SECUSE_HASHES.iter() {
         let address = hash.digest(data);
-        addresses.push(multibase::encode(CANONICAL_BASE, address.as_bytes()))
+        addresses.push(multibase::encode(CANONICAL_BASE, address.to_bytes()))
     }
+
+    // Also support SHA1 (unsecure hash algorithm, not provided in multihash::Code [Hash] enum)
+    let mut sha1_hash = multihash::Sha1::default();
+    sha1_hash.update(data);
+    let sha1_hash = Multihash::wrap(SHA1_HASH_CODE, sha1_hash.finalize().as_ref()).map_err(|e| e.to_string())?;
+    addresses.push(multibase::encode(CANONICAL_BASE, sha1_hash.to_bytes()));
 
     Ok(addresses)
 }
 
-pub fn convert_to_canonical_base(multibase_multihash_address: &str) -> Result<(String, Hash), String> {
-    let (_, raw_multi) = multibase::decode(multibase_multihash_address).map_err(|e| e.to_string())?;
-    let multi = Multihash::from_bytes(raw_multi).map_err(|e| e.to_string())?;
-    Ok((multibase::encode(CANONICAL_BASE, multi.as_bytes()), multi.algorithm()))
+pub fn convert_to_canonical_base(multibase_multihash_address: &str) -> Result<(String, u64), String> {
+    let (_, hash) = multibase::decode(multibase_multihash_address).map_err(|e| e.to_string())?;
+    let hash = Multihash::from_bytes(&hash).map_err(|e| e.to_string())?;
+    Ok((multibase::encode(CANONICAL_BASE, hash.to_bytes()), hash.code()))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use multihash::StatefulHasher;
 
     fn alternate_to_canonical_table(alternate: &str) -> Option<&'static str> {
         match alternate {
@@ -47,11 +59,13 @@ mod tests {
 
     #[test]
     fn convert_to_canonical() {
-        let sha1_hash = multihash::Sha1::digest(b"multihash");
-        let base58btc_sha1_hash = multibase::encode(Base::Base58Btc, sha1_hash.as_bytes());
+        let mut sha1_hash = multihash::Sha1::default();
+        sha1_hash.update(b"multihash");
+        let sha1_hash = Multihash::wrap(SHA1_HASH_CODE, sha1_hash.finalize().as_ref()).unwrap();
+        let base58btc_sha1_hash = multibase::encode(Base::Base58Btc, sha1_hash.to_bytes());
 
         let (base64url_sha1_hash, algorithm) = convert_to_canonical_base(&base58btc_sha1_hash).expect("convert");
-        assert_eq!(algorithm, Hash::Sha1);
+        assert_eq!(algorithm, SHA1_HASH_CODE);
         let base64url_sha256_hash = alternate_to_canonical_table(&base64url_sha1_hash).expect("table");
         assert_eq!(base64url_sha256_hash, "uEiCcvAfD-ZFyWDajqipYHKICkZiqQgudmbwOEx2fPiy-Rw");
     }

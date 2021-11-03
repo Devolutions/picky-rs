@@ -1,4 +1,4 @@
-use crate::addressing::{convert_to_canonical_base, CANONICAL_HASH};
+use crate::addressing::{convert_to_canonical_base, CANONICAL_HASH_CODE};
 use crate::config::{CertKeyPair, Config};
 use crate::db::{get_storage, BoxedPickyStorage, CertificateEntry, PickyStorage};
 use crate::http::authorization::{check_authorization, ProviderClaims};
@@ -177,7 +177,7 @@ impl ServerController {
     async fn get_cert(&self, multihash: String, req: Request) -> Result<ResponseBuilder, StatusCode> {
         let addressing_hash_any_base = multihash;
         let (addressing_hash, hash) = convert_to_canonical_base(&addressing_hash_any_base).internal_error()?;
-        let canonical_address = if hash == CANONICAL_HASH {
+        let canonical_address = if hash == CANONICAL_HASH_CODE {
             addressing_hash
         } else {
             let converted = self
