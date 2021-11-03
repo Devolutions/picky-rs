@@ -336,6 +336,7 @@ impl AuthenticodeSignature {
                 now: None,
                 excluded_cert_authorities: vec![],
                 expected_file_hash: None,
+                #[cfg(feature = "ctl")]
                 ctl: None,
             }),
         }
@@ -423,6 +424,7 @@ struct AuthenticodeValidatorInner<'a> {
     excluded_cert_authorities: Vec<DirectoryName>,
     now: Option<ValidityCheck<'a>>,
     expected_file_hash: Option<Vec<u8>>,
+    #[cfg(feature = "ctl")]
     ctl: Option<&'a CertificateTrustList>,
 }
 
@@ -1007,6 +1009,7 @@ fn h_check_eku_code_signing(certificates: &[Cert]) -> AuthenticodeResult<()> {
     Ok(())
 }
 
+#[cfg(feature = "ctl")]
 fn h_get_ca_name(certificates: &[Cert]) -> Option<DirectoryName> {
     if let Some(root) = certificates.iter().find(|cert| cert.ty() == CertType::Root) {
         Some(root.subject_name())
