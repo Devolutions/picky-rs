@@ -30,8 +30,11 @@ chrono = { version = "0.4.19", optional = true }
 time = { version = "0.3.4", optional = true }
 serde_json = { version = "1.0.68", optional = true }
 http = { version = "0.2.5", optional = true }
-reqwest = { version = "0.11.6", default-features = false, features = ["blocking"], optional = true }
 cab = { version = "0.3.0", optional = true }
+
+# FIXME: either use ureq, or even better: do not require this kind of dependency at all to let user decide which lib to use.
+# (currently users should *really* not forget to use `spawn_blocking` when calling associated functions from async context)
+reqwest = { version = "0.11.6", default-features = false, features = ["blocking"], optional = true }
 
 # /!\ ===== cryptography dependencies ===== /!\
 # These should be updated as soon as possible.
