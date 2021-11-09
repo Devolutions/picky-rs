@@ -4,9 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       run-id:
-        description: 'run id'
+        description: 'The CI workflow run ID with the artifacts to release'
         required: true
-        default: '1338900215'
 
 concurrency: picky-release
 
@@ -31,10 +30,10 @@ jobs:
   containers:
     name: Containers [${{ matrix.os }} ${{ matrix.base-image }}]
     runs-on: ${{ matrix.runner }}
-    #environment: build-and-publish
+    environment: build-and-publish
     needs: preflight
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         arch: [ x86_64 ]
         os: [ windows, linux ]
@@ -111,6 +110,5 @@ jobs:
       - name: Push container
         shell: pwsh
         run: |
-          echo ${{ steps.build-container.outputs.image-name }}
-          # echo ${{ secrets.DOCKER_HUB_BOT_PASSWORD }} | docker login -u devolutionsbot --password-stdin
-          # docker push ${{ steps.build-container.outputs.image-name }}
+          echo ${{ secrets.DOCKER_HUB_BOT_PASSWORD }} | docker login -u devolutionsbot --password-stdin
+          docker push ${{ steps.build-container.outputs.image-name }}
