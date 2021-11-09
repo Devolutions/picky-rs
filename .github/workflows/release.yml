@@ -84,7 +84,7 @@ jobs:
             $SourceFile = "$($SourceFile).exe"
           }
 
-          $SourcePath = Join-Path "$Env:RUNNER_TEMP" picky ${{ matrix.os }} ${{ matrix.arch }} $SourceFile
+          $SourcePath = Join-Path "$Env:RUNNER_TEMP" ${{ matrix.os }} ${{ matrix.arch }} $SourceFile
           $TargetPath = Join-Path $pwd $SourceFile
           Copy-Item $SourcePath $TargetPath
 
