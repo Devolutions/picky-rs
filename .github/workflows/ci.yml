@@ -137,4 +137,3 @@ jobs:
       - name: cargo check picky
         continue-on-error: true
         run: cargo +1.56 check -p picky
-
