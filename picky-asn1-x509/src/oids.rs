@@ -40,10 +40,12 @@ macro_rules! define_oid {
 }
 
 define_oid! {
+    DSA_WITH_SHA1 => dsa_with_sha1 => "1.2.840.10040.4.3",
     // ANSI-X962
     EC_PUBLIC_KEY => ec_public_key => "1.2.840.10045.2.1",
     ECDSA_WITH_SHA256 => ecdsa_with_sha256 => "1.2.840.10045.4.3.2",
     ECDSA_WITH_SHA384 => ecdsa_with_sha384 => "1.2.840.10045.4.3.3",
+    ECDSA_WITH_SHA512 => ecdsa_with_sha512 => "1.2.840.10045.4.3.4",
     SECP192R1 => secp192r1 => "1.2.840.10045.3.1.1",
     SECP256R1 => secp256r1 => "1.2.840.10045.3.1.7",
 

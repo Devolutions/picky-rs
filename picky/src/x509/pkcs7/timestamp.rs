@@ -44,6 +44,7 @@ pub trait Timestamper: Sized {
 #[cfg(feature = "http_timestamp")]
 pub mod http_timestamp {
     use super::*;
+    use picky_asn1_x509::pkcs7::signer_info::{UnsignedAttribute, UnsignedAttributeValue};
     use reqwest::blocking::Client;
     use reqwest::header::{CACHE_CONTROL, CONTENT_LENGTH, CONTENT_TYPE};
     use reqwest::{Method, StatusCode, Url};

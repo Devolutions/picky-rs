@@ -527,7 +527,6 @@ impl<'a> AuthenticodeValidator<'a> {
         self
     }
 
-    #[cfg(feature = "ctl")]
     #[inline]
     pub fn exclude_cert_authorities(&self, excluded_cert_authorities: &'a [DirectoryName]) -> &Self {
         self.inner

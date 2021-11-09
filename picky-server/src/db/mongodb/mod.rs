@@ -3,7 +3,7 @@ pub mod model;
 use crate::addressing::{encode_to_alternative_addresses, encode_to_canonical_address};
 use crate::db::{CertificateEntry, PickyStorage, SshKeyEntry, SshKeyType, StorageError, SCHEMA_LAST_VERSION};
 use futures::future::BoxFuture;
-// use futures::stream::StreamExt;
+use futures::stream::StreamExt;
 use futures::FutureExt;
 use model::*;
 use mongodm::mongo::bson::oid::ObjectId;
@@ -15,7 +15,6 @@ use mongodm::{f, ToRepository};
 use picky::x509::Cert;
 use std::collections::HashMap;
 use thiserror::Error;
-use tokio::stream::StreamExt;
 
 const DB_CONNECTION_TIMEOUT_SECS: u64 = 15;
 
@@ -441,12 +440,23 @@ impl PickyStorage for MongoStorage {
         async move {
             let ssh_key = self
                 .repository::<SshKeyEntry>()
-                .find_one(doc!(f!(key_type in SshKeyEntry): key_type.clone()), None)
+                .find_one(doc!(f!(key_type in SshKeyEntry): &key_type), None)
                 .await?
                 .ok_or_else(|| MongoStorageError::Other {
-                    description: format!("ssh key not found using key type '{}'", key_type.to_string()),
+                    description: format!("ssh key not found using key type '{}'", key_type.as_str()),
                 })?;
             Ok(ssh_key)
+        }
+        .boxed()
+    }
+
+    fn remove_ssh_private_key_by_type(&self, key_type: SshKeyType) -> BoxFuture<Result<(), StorageError>> {
+        async move {
+            self.repository::<SshKeyEntry>()
+                .delete_one(doc!(f!(key_type in SshKeyEntry): &key_type), None)
+                .await?;
+
+            Ok(())
         }
         .boxed()
     }

@@ -1,14 +1,13 @@
-use super::SshParser;
 use crate::key::{KeyError, PublicKey};
-use crate::ssh::{read_to_buffer_till_whitespace, Mpint, SshString};
+use crate::ssh::traits::{SshMpintDecoder, SshMpintEncoder, SshParser, SshStringDecoder, SshStringEncoder};
+use crate::ssh::{read_to_buffer_till_whitespace, Base64Reader, Base64Writer, SSH_RSA_KEY_TYPE};
 use byteorder::WriteBytesExt;
-use rsa::{BigUint, PublicKeyParts, RsaPublicKey};
+use rsa::{PublicKeyParts, RsaPublicKey};
 use std::convert::TryFrom;
-use std::io::{self, Cursor, Read, Write};
+use std::io::{self, Read, Write};
+use std::str::FromStr;
 use std::string;
 use thiserror::Error;
-
-const RSA_PUBLIC_KEY_TYPE: &str = "ssh-rsa";
 
 #[derive(Debug, Error)]
 pub enum SshPublicKeyError {
@@ -38,15 +37,12 @@ impl SshParser for SshBasePublicKey {
     where
         Self: Sized,
     {
-        let key_type: SshString = SshParser::decode(&mut stream)?;
-        match key_type.0.as_str() {
-            RSA_PUBLIC_KEY_TYPE => {
-                let e: Mpint = SshParser::decode(&mut stream)?;
-                let n: Mpint = SshParser::decode(&mut stream)?;
-                Ok(SshBasePublicKey::Rsa(PublicKey::from_components(
-                    &BigUint::from_bytes_be(&n.0),
-                    &BigUint::from_bytes_be(&e.0),
-                )))
+        let key_type = stream.ssh_string_decode()?;
+        match key_type.as_str() {
+            SSH_RSA_KEY_TYPE => {
+                let e = stream.ssh_mpint_decode()?;
+                let n = stream.ssh_mpint_decode()?;
+                Ok(SshBasePublicKey::Rsa(PublicKey::from_components(&n, &e)))
             }
             _ => Err(SshPublicKeyError::UnknownKeyType),
         }
@@ -56,9 +52,9 @@ impl SshParser for SshBasePublicKey {
         match self {
             SshBasePublicKey::Rsa(rsa) => {
                 let rsa = RsaPublicKey::try_from(rsa)?;
-                SshString(RSA_PUBLIC_KEY_TYPE.to_owned()).encode(&mut stream)?;
-                Mpint(rsa.e().to_bytes_be()).encode(&mut stream)?;
-                Mpint(rsa.n().to_bytes_be()).encode(&mut stream)?;
+                SSH_RSA_KEY_TYPE.ssh_string_encode(&mut stream)?;
+                rsa.e().ssh_mpint_encode(&mut stream)?;
+                rsa.n().ssh_mpint_encode(&mut stream)?;
                 Ok(())
             }
         }
@@ -72,31 +68,10 @@ pub struct SshPublicKey {
 }
 
 impl SshPublicKey {
-    pub fn from_inner(inner_key: SshBasePublicKey) -> Self {
-        Self {
-            inner_key,
-            comment: "".to_owned(),
-        }
-    }
-
-    pub fn from_pem_str(pem: &str) -> Result<Self, SshPublicKeyError> {
-        SshParser::decode(pem.as_bytes())
-    }
-
-    pub fn from_raw<R: ?Sized + AsRef<[u8]>>(raw: &R) -> Result<Self, SshPublicKeyError> {
-        let mut slice = raw.as_ref();
-        SshParser::decode(&mut slice)
-    }
-
-    pub fn to_pem(&self) -> Result<String, SshPublicKeyError> {
-        let buffer = self.to_raw()?;
+    pub fn to_string(&self) -> Result<String, SshPublicKeyError> {
+        let mut buffer = Vec::with_capacity(1024);
+        self.encode(&mut buffer)?;
         Ok(String::from_utf8(buffer)?)
-    }
-
-    pub fn to_raw(&self) -> Result<Vec<u8>, SshPublicKeyError> {
-        let mut cursor = Cursor::new(Vec::with_capacity(1024));
-        self.encode(&mut cursor)?;
-        Ok(cursor.into_inner())
     }
 }
 
@@ -112,46 +87,58 @@ impl SshParser for SshPublicKey {
         buffer.clear();
 
         let inner_key = match header.as_str() {
-            RSA_PUBLIC_KEY_TYPE => {
+            SSH_RSA_KEY_TYPE => {
                 read_to_buffer_till_whitespace(&mut stream, &mut buffer)?;
-                let decoded = base64::decode(&mut buffer)?;
-                let mut cursor = Cursor::new(decoded);
-
-                buffer.clear();
-                SshParser::decode(&mut cursor)?
+                let mut slice = buffer.as_slice();
+                let decoder = Base64Reader::new(&mut slice, base64::STANDARD);
+                SshParser::decode(decoder)?
             }
             _ => return Err(SshPublicKeyError::UnknownKeyType),
         };
 
+        buffer.clear();
         read_to_buffer_till_whitespace(&mut stream, &mut buffer)?;
-        let comment = String::from_utf8(buffer)?;
+        let comment = String::from_utf8(buffer)?.trim_end().to_owned();
 
         Ok(SshPublicKey { inner_key, comment })
     }
 
     fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
-        let mut raw_key = Vec::with_capacity(1028);
         match &self.inner_key {
             SshBasePublicKey::Rsa(_) => {
-                stream.write_all(RSA_PUBLIC_KEY_TYPE.as_bytes())?;
+                stream.write_all(SSH_RSA_KEY_TYPE.as_bytes())?;
                 stream.write_u8(b' ')?;
             }
         };
 
-        self.inner_key.encode(&mut raw_key)?;
-        stream.write_all(base64::encode(&raw_key).as_bytes())?;
+        {
+            let mut base64_write = Base64Writer::new(&mut stream, base64::STANDARD);
+            self.inner_key.encode(&mut base64_write)?;
+            base64_write.finish()?;
+        }
+
         stream.write_u8(b' ')?;
         stream.write_all(self.comment.as_bytes())?;
+        stream.write_all("\r\n".as_bytes())?;
 
         Ok(())
+    }
+}
+
+impl FromStr for SshPublicKey {
+    type Err = SshPublicKeyError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        SshParser::decode(s.as_bytes())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ssh::SshParser;
+
     use digest::Digest;
+    use num_bigint_dig::BigUint;
 
     fn compare_fingerprints(public_key1: &str, public_key2: &str) -> bool {
         let mut hasher = md5::Md5::new();
@@ -168,9 +155,9 @@ mod tests {
     #[test]
     fn decode_ssh_rsa_4096_public_key() {
         // ssh-keygen -t rsa -b 4096 -C "test@picky.com"
-        let ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDbUCK4dH1n4dOFBv/sjfMma4q5qe7SZ49j2GODGKr8DueZMWYLTck61uUMMlVBT3XyX6me6X4WsBoijzQWvgwpLCGTqlhQTntm5FphXHHkKxFvjMhPzCnHNS+L0ebzewcecsY5rtgw+6BhFwdZGhFBfif1/6s9q7y7+8Ge3hUIEqLdiMDDzxc66zIaW26jZxO4BMHuKp7Xln2JeDjsRHvz0vBNAddOfkvtp+gM72OH4tm9wS/V8bVOZ68oU0os8DuiEGnwA5RnjOjaFdHWt1mD8B+nRINxI8zYyQcqp3t4p552P0Frhvjgixi67Ryax0DUNuzN2MpQ0ORUgRkfy/xWvImUseP/BfqvNiWkFAWHNDDSsc50Wmr+g0JicG2gowHLYPxKRjLIbOq+JgxHrE4TdaA2NJoeUppJgWU4yuGl5fx1G+Bcdr0C+lsMj14Hp+aGajEOLQ7Mq3HzWEox9G1KgN4r266Mofd8T4vrjF6Ja9E+pp0pXgEv2cvtYJLP0qdrHWafb3lWsP4hJWnv/NaXP6ZAxiEeHsigrY98kmgZbHm/6AmiBJ7bKQ/S/PelYj3mTL0aYkGF79qVtAzSl7yI9yVyHsl7dt5jdmp6+IofuEtNfnAcfoaSLu0Ojotp9VBMvil6ojScbJNLBL8tGN4+urIcsNUvVjAOnwc3nothKw== test@picky.com";
+        let ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDbUCK4dH1n4dOFBv/sjfMma4q5qe7SZ49j2GODGKr8DueZMWYLTck61uUMMlVBT3XyX6me6X4WsBoijzQWvgwpLCGTqlhQTntm5FphXHHkKxFvjMhPzCnHNS+L0ebzewcecsY5rtgw+6BhFwdZGhFBfif1/6s9q7y7+8Ge3hUIEqLdiMDDzxc66zIaW26jZxO4BMHuKp7Xln2JeDjsRHvz0vBNAddOfkvtp+gM72OH4tm9wS/V8bVOZ68oU0os8DuiEGnwA5RnjOjaFdHWt1mD8B+nRINxI8zYyQcqp3t4p552P0Frhvjgixi67Ryax0DUNuzN2MpQ0ORUgRkfy/xWvImUseP/BfqvNiWkFAWHNDDSsc50Wmr+g0JicG2gowHLYPxKRjLIbOq+JgxHrE4TdaA2NJoeUppJgWU4yuGl5fx1G+Bcdr0C+lsMj14Hp+aGajEOLQ7Mq3HzWEox9G1KgN4r266Mofd8T4vrjF6Ja9E+pp0pXgEv2cvtYJLP0qdrHWafb3lWsP4hJWnv/NaXP6ZAxiEeHsigrY98kmgZbHm/6AmiBJ7bKQ/S/PelYj3mTL0aYkGF79qVtAzSl7yI9yVyHsl7dt5jdmp6+IofuEtNfnAcfoaSLu0Ojotp9VBMvil6ojScbJNLBL8tGN4+urIcsNUvVjAOnwc3nothKw== test@picky.com\r\n";
 
-        let public_key: SshPublicKey = SshParser::decode(ssh_public_key.as_bytes()).unwrap();
+        let public_key = SshPublicKey::from_str(ssh_public_key).unwrap();
 
         assert_eq!("test@picky.com".to_owned(), public_key.comment);
         assert_eq!(
@@ -210,9 +197,9 @@ mod tests {
     #[test]
     fn decode_ssh_rsa_2048_public_key() {
         // ssh-keygen -t rsa -b 2048 -C "test2@picky.com"
-        let ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDI9ht2g2qOPgSG5huVYjFUouyaw59/6QuQqUVGwgnITlhRbM+bkvJQfcuiqcv+vD9/86Dfugk79sSfg/aVK+V/plqAAZoujz/wALDjEphSxAUcAR+t4i2F39Pa71MSc37I9L30z31tcba1X7od7hzrVMl9iurkOyBC4xcIWa1H8h0mDyoXyWPTqoTONDUe9dB1eu6GbixCfUcxvdVt0pAVJTdOmbNXKwRo5WXfMrsqKsFT2Acg4Vm4TfLShSSUW4rqM6GOBCfF6jnxFvTSDentH5hykjWL3lMCghD+1hJyOdnMHJC/5qTUGOB86MxsR4RCXqS+LZrGpMScVyDQge7r test2@picky.com";
+        let ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDI9ht2g2qOPgSG5huVYjFUouyaw59/6QuQqUVGwgnITlhRbM+bkvJQfcuiqcv+vD9/86Dfugk79sSfg/aVK+V/plqAAZoujz/wALDjEphSxAUcAR+t4i2F39Pa71MSc37I9L30z31tcba1X7od7hzrVMl9iurkOyBC4xcIWa1H8h0mDyoXyWPTqoTONDUe9dB1eu6GbixCfUcxvdVt0pAVJTdOmbNXKwRo5WXfMrsqKsFT2Acg4Vm4TfLShSSUW4rqM6GOBCfF6jnxFvTSDentH5hykjWL3lMCghD+1hJyOdnMHJC/5qTUGOB86MxsR4RCXqS+LZrGpMScVyDQge7r test2@picky.com\r\n";
 
-        let public_key: SshPublicKey = SshParser::decode(ssh_public_key.as_bytes()).unwrap();
+        let public_key: SshPublicKey = SshPublicKey::from_str(ssh_public_key).unwrap();
 
         assert_eq!("test2@picky.com".to_owned(), public_key.comment);
         assert_eq!(
@@ -240,12 +227,10 @@ mod tests {
     #[test]
     fn encode_ssh_rsa_4096_public_key() {
         // ssh-keygen -t rsa -b 4096 -C "test@picky.com"
-        let ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDbUCK4dH1n4dOFBv/sjfMma4q5qe7SZ49j2GODGKr8DueZMWYLTck61uUMMlVBT3XyX6me6X4WsBoijzQWvgwpLCGTqlhQTntm5FphXHHkKxFvjMhPzCnHNS+L0ebzewcecsY5rtgw+6BhFwdZGhFBfif1/6s9q7y7+8Ge3hUIEqLdiMDDzxc66zIaW26jZxO4BMHuKp7Xln2JeDjsRHvz0vBNAddOfkvtp+gM72OH4tm9wS/V8bVOZ68oU0os8DuiEGnwA5RnjOjaFdHWt1mD8B+nRINxI8zYyQcqp3t4p552P0Frhvjgixi67Ryax0DUNuzN2MpQ0ORUgRkfy/xWvImUseP/BfqvNiWkFAWHNDDSsc50Wmr+g0JicG2gowHLYPxKRjLIbOq+JgxHrE4TdaA2NJoeUppJgWU4yuGl5fx1G+Bcdr0C+lsMj14Hp+aGajEOLQ7Mq3HzWEox9G1KgN4r266Mofd8T4vrjF6Ja9E+pp0pXgEv2cvtYJLP0qdrHWafb3lWsP4hJWnv/NaXP6ZAxiEeHsigrY98kmgZbHm/6AmiBJ7bKQ/S/PelYj3mTL0aYkGF79qVtAzSl7yI9yVyHsl7dt5jdmp6+IofuEtNfnAcfoaSLu0Ojotp9VBMvil6ojScbJNLBL8tGN4+urIcsNUvVjAOnwc3nothKw== test@picky.com";
-        let public_key: SshPublicKey = SshParser::decode(ssh_public_key.as_bytes()).unwrap();
+        let ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDbUCK4dH1n4dOFBv/sjfMma4q5qe7SZ49j2GODGKr8DueZMWYLTck61uUMMlVBT3XyX6me6X4WsBoijzQWvgwpLCGTqlhQTntm5FphXHHkKxFvjMhPzCnHNS+L0ebzewcecsY5rtgw+6BhFwdZGhFBfif1/6s9q7y7+8Ge3hUIEqLdiMDDzxc66zIaW26jZxO4BMHuKp7Xln2JeDjsRHvz0vBNAddOfkvtp+gM72OH4tm9wS/V8bVOZ68oU0os8DuiEGnwA5RnjOjaFdHWt1mD8B+nRINxI8zYyQcqp3t4p552P0Frhvjgixi67Ryax0DUNuzN2MpQ0ORUgRkfy/xWvImUseP/BfqvNiWkFAWHNDDSsc50Wmr+g0JicG2gowHLYPxKRjLIbOq+JgxHrE4TdaA2NJoeUppJgWU4yuGl5fx1G+Bcdr0C+lsMj14Hp+aGajEOLQ7Mq3HzWEox9G1KgN4r266Mofd8T4vrjF6Ja9E+pp0pXgEv2cvtYJLP0qdrHWafb3lWsP4hJWnv/NaXP6ZAxiEeHsigrY98kmgZbHm/6AmiBJ7bKQ/S/PelYj3mTL0aYkGF79qVtAzSl7yI9yVyHsl7dt5jdmp6+IofuEtNfnAcfoaSLu0Ojotp9VBMvil6ojScbJNLBL8tGN4+urIcsNUvVjAOnwc3nothKw== test@picky.com\r\n";
+        let public_key = SshPublicKey::from_str(ssh_public_key).unwrap();
 
-        let mut ssh_public_key_after = Vec::new();
-        public_key.encode(&mut ssh_public_key_after).unwrap();
-        let ssh_public_key_after = String::from_utf8(ssh_public_key_after).unwrap();
+        let ssh_public_key_after = public_key.to_string().unwrap();
 
         assert!(compare_fingerprints(ssh_public_key, ssh_public_key_after.as_str()));
         assert_eq!(ssh_public_key, ssh_public_key_after.as_str());
@@ -254,12 +239,10 @@ mod tests {
     #[test]
     fn encode_ssh_rsa_2048_public_key() {
         // ssh-keygen -t rsa -b 4096 -C "test@picky.com"
-        let ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDI9ht2g2qOPgSG5huVYjFUouyaw59/6QuQqUVGwgnITlhRbM+bkvJQfcuiqcv+vD9/86Dfugk79sSfg/aVK+V/plqAAZoujz/wALDjEphSxAUcAR+t4i2F39Pa71MSc37I9L30z31tcba1X7od7hzrVMl9iurkOyBC4xcIWa1H8h0mDyoXyWPTqoTONDUe9dB1eu6GbixCfUcxvdVt0pAVJTdOmbNXKwRo5WXfMrsqKsFT2Acg4Vm4TfLShSSUW4rqM6GOBCfF6jnxFvTSDentH5hykjWL3lMCghD+1hJyOdnMHJC/5qTUGOB86MxsR4RCXqS+LZrGpMScVyDQge7r test2@picky.com";
-        let public_key: SshPublicKey = SshParser::decode(ssh_public_key.as_bytes()).unwrap();
+        let ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDI9ht2g2qOPgSG5huVYjFUouyaw59/6QuQqUVGwgnITlhRbM+bkvJQfcuiqcv+vD9/86Dfugk79sSfg/aVK+V/plqAAZoujz/wALDjEphSxAUcAR+t4i2F39Pa71MSc37I9L30z31tcba1X7od7hzrVMl9iurkOyBC4xcIWa1H8h0mDyoXyWPTqoTONDUe9dB1eu6GbixCfUcxvdVt0pAVJTdOmbNXKwRo5WXfMrsqKsFT2Acg4Vm4TfLShSSUW4rqM6GOBCfF6jnxFvTSDentH5hykjWL3lMCghD+1hJyOdnMHJC/5qTUGOB86MxsR4RCXqS+LZrGpMScVyDQge7r test2@picky.com\r\n";
+        let public_key = SshPublicKey::from_str(ssh_public_key).unwrap();
 
-        let mut ssh_public_key_after = Vec::new();
-        public_key.encode(&mut ssh_public_key_after).unwrap();
-        let ssh_public_key_after = String::from_utf8(ssh_public_key_after).unwrap();
+        let ssh_public_key_after = public_key.to_string().unwrap();
 
         assert!(compare_fingerprints(ssh_public_key, ssh_public_key_after.as_str()));
         assert_eq!(ssh_public_key, ssh_public_key_after.as_str());

@@ -65,17 +65,26 @@ pub struct CertificateEntry {
     pub key: Option<Vec<u8>>,
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Hash, Serialize, Deserialize)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Hash, Serialize, Deserialize)]
 pub enum SshKeyType {
     Host,
     Client,
 }
 
+impl SshKeyType {
+    pub fn as_str(&self) -> &str {
+        match &self {
+            SshKeyType::Client => "Client",
+            SshKeyType::Host => "Host",
+        }
+    }
+}
+
 impl ToString for SshKeyType {
     fn to_string(&self) -> String {
-        match self {
-            SshKeyType::Client => "client".to_owned(),
-            SshKeyType::Host => "host".to_owned(),
+        match &self {
+            SshKeyType::Client => "Client".to_owned(),
+            SshKeyType::Host => "Host".to_owned(),
         }
     }
 }
@@ -124,4 +133,5 @@ pub trait PickyStorage: Send + Sync {
     fn lookup_addressing_hash<'a>(&'a self, lookup_key: &'a str) -> BoxFuture<'a, Result<String, StorageError>>;
     fn store_private_ssh_key(&self, key: SshKeyEntry) -> BoxFuture<Result<(), StorageError>>;
     fn get_ssh_private_key_by_type(&self, key_type: SshKeyType) -> BoxFuture<Result<SshKeyEntry, StorageError>>;
+    fn remove_ssh_private_key_by_type(&self, key_type: SshKeyType) -> BoxFuture<Result<(), StorageError>>;
 }

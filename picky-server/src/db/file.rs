@@ -352,24 +352,51 @@ impl PickyStorage for FileStorage {
     }
 
     fn get_ssh_private_key_by_type(&self, key_type: SshKeyType) -> BoxFuture<Result<SshKeyEntry, StorageError>> {
-        let key_type_str = key_type.to_string();
         async move {
+            let key_type_str = key_type.as_str();
             let filename = self
                 .ssh_keys
                 .get_collection()
                 .await?
                 .into_iter()
-                .find(|filename| *filename == key_type_str)
+                .find(|filename| filename.as_str() == key_type_str)
                 .ok_or_else(|| FileStorageError::Other {
                     description: format!("ssh key '{}' not found", key_type_str),
                 })?;
+
             let filepath = self.ssh_keys.folder_path.join(filename);
             let key = tokio::fs::read_to_string(&filepath)
                 .await
                 .map_err(|e| FileStorageError::Other {
-                    description: format!("error reading file '{}': '{}'", filepath.to_string_lossy(), e),
+                    description: format!("error reading file '{:?}': '{}'", filepath.as_path(), e),
                 })?;
-            Ok(SshKeyEntry::new(key_type.clone(), key))
+            Ok(SshKeyEntry::new(key_type, key))
+        }
+        .boxed()
+    }
+
+    fn remove_ssh_private_key_by_type(&self, key_type: SshKeyType) -> BoxFuture<Result<(), StorageError>> {
+        async move {
+            let key_type_str = key_type.as_str();
+            let filename = self
+                .ssh_keys
+                .get_collection()
+                .await?
+                .into_iter()
+                .find(|filename| filename.as_str() == key_type_str)
+                .ok_or_else(|| FileStorageError::Other {
+                    description: format!("ssh key '{}' not found", key_type_str),
+                })?;
+
+            let filepath = self.ssh_keys.folder_path.join(filename);
+            tokio::fs::OpenOptions::new()
+                .write(true) // we need set write to true to truncate
+                .truncate(true)
+                .open(filepath)
+                .await
+                .map_err(FileStorageError::Io)?;
+
+            Ok(())
         }
         .boxed()
     }

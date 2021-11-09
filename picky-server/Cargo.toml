@@ -11,7 +11,7 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/Devolutions/picky-rs"
 
 [dependencies]
-picky = { version = "6.4.0", default-features = false, features = ["x509", "jose", "chrono_conversion", "pkcs7", "ssh" ], path = "../picky" }
+picky = { version = "6.4.0", default-features = false, features = ["x509", "jose", "chrono_conversion", "pkcs7", "ssh", "time_conversion" ], path = "../picky" }
 picky-asn1 = { version = "0.4", path = "../picky-asn1" }
 mongodm = { version = "0.7.3", features = ["tokio-runtime"] }
 clap = { features = ["yaml"], version = "2.33.3" }
@@ -31,6 +31,7 @@ unicase = "2.6.0"
 rand = { version = "0.8.4", optional = true }
 tokio = "0.2"
 futures = "0.3.17"
+chrono = { version = "0.4.19", optional = true }
 
 [dev-dependencies]
 rand = "0.8.4"

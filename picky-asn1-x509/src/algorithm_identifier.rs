@@ -127,6 +127,20 @@ impl AlgorithmIdentifier {
         })
     }
 
+    pub fn new_dsa_with_sha1() -> Self {
+        Self {
+            algorithm: oids::dsa_with_sha1().into(),
+            parameters: AlgorithmIdentifierParameters::Null,
+        }
+    }
+
+    pub fn new_ecdsa_with_sha512() -> Self {
+        Self {
+            algorithm: oids::ecdsa_with_sha512().into(),
+            parameters: AlgorithmIdentifierParameters::Null,
+        }
+    }
+
     pub fn new_ecdsa_with_sha384() -> Self {
         Self {
             algorithm: oids::ecdsa_with_sha384().into(),
@@ -242,7 +256,15 @@ impl<'de> de::Deserialize<'de> for AlgorithmIdentifier {
                         let _ = seq.next_element::<()>();
                         AlgorithmIdentifierParameters::Null
                     }
-                    oids::ECDSA_WITH_SHA384 | oids::ECDSA_WITH_SHA256 | oids::ED25519 => {
+                    oids::ECDSA_WITH_SHA384 | oids::ECDSA_WITH_SHA256 | oids::ECDSA_WITH_SHA512 | oids::ED25519 => {
+                        AlgorithmIdentifierParameters::None
+                    }
+                    oids::DSA_WITH_SHA1 => {
+                        // A note from RFC 3927[https://www.ietf.org/rfc/rfc3279.txt]
+                        // When the id-dsa-with-sha1 algorithm identifier appears as the
+                        // algorithm field in an AlgorithmIdentifier, the encoding SHALL omit
+                        // the parameters field.  That is, the AlgorithmIdentifier SHALL be a
+                        // SEQUENCE of one component: the OBJECT IDENTIFIER id-dsa-with-sha1.
                         AlgorithmIdentifierParameters::None
                     }
                     oids::EC_PUBLIC_KEY => AlgorithmIdentifierParameters::Ec(seq_next_element!(

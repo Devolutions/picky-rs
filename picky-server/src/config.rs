@@ -212,7 +212,7 @@ impl Config {
             self.log_level = parse_level_filter(v);
         }
 
-        if let Some(passphrase) = matches.value_of("ssh-host-passphrase") {
+        if let Some(passphrase) = matches.value_of("ssh-host-password") {
             self.ssh_host_passphrase = passphrase.to_owned();
         }
 
@@ -298,7 +298,7 @@ impl Config {
         if !inject_ssh_key_env(
             &mut self.ssh_host_key,
             PICKY_SSH_HOST_KEY_ENV,
-            Some(self.ssh_host_passphrase.as_str()),
+            Some(self.ssh_host_passphrase.clone()),
         ) {
             inject_ssh_key_path(&mut self.ssh_host_key, PICKY_SSH_HOST_KEY_PATH);
         }
@@ -306,7 +306,7 @@ impl Config {
         if !inject_ssh_key_env(
             &mut self.ssh_client_key,
             PICKY_SSH_CLIENT_KEY_ENV,
-            Some(self.ssh_client_passphrase.as_str()),
+            Some(self.ssh_client_passphrase.clone()),
         ) {
             inject_ssh_key_path(&mut self.ssh_client_key, PICKY_SSH_CLIENT_KEY_PATH);
         }
@@ -352,7 +352,7 @@ fn inject_cert_key_pair_path(pair: &mut Option<CertKeyPair>, cert_path_env: &str
 fn inject_ssh_key_env(
     ssh_key: &mut Option<PathOr<SshPrivateKey>>,
     key_pen_env: &str,
-    passphrase: Option<&str>,
+    passphrase: Option<String>,
 ) -> bool {
     if let Ok(key) = env::var(key_pen_env) {
         *ssh_key = Some(PathOr::Some(

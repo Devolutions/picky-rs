@@ -4,7 +4,7 @@ use futures::future::BoxFuture;
 use futures::FutureExt;
 use std::collections::HashMap;
 use std::hash::Hash;
-use std::sync::{RwLock, RwLockReadGuard};
+use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -30,6 +30,10 @@ where
 {
     fn get_collection(&'a self) -> RwLockReadGuard<'a, HashMap<String, T>> {
         self.repo.read().expect("couldn't get read lock on repo (poisoned)")
+    }
+
+    fn get_collection_mut(&'a self) -> RwLockWriteGuard<'a, HashMap<String, T>> {
+        self.repo.write().expect("couldn't get read lock on repo (poisoned)")
     }
 
     fn insert(&self, key: String, value: T) {
@@ -200,11 +204,25 @@ impl PickyStorage for MemoryStorage {
             Ok(self
                 .ssh_keys
                 .get_collection()
-                .get(&key_type.to_string())
+                .get(key_type.as_str())
                 .cloned()
                 .ok_or_else(|| MemoryStorageError::Other {
-                    description: "ssh key not found".to_owned(),
+                    description: "SSH key not found".to_owned(),
                 })?)
+        }
+        .boxed()
+    }
+
+    fn remove_ssh_private_key_by_type(&self, key_type: SshKeyType) -> BoxFuture<Result<(), StorageError>> {
+        async move {
+            Ok(self
+                .ssh_keys
+                .get_collection_mut()
+                .remove(key_type.as_str())
+                .ok_or_else(|| MemoryStorageError::Other {
+                    description: "failed to remove an SSH key".to_owned(),
+                })
+                .map(|_| ())?)
         }
         .boxed()
     }
