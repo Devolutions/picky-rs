@@ -101,7 +101,7 @@ jobs:
           if ($Env:RUNNER_OS -Eq "Windows") {
             $DockerFile = "$($DockerFile)-win2k19"
           }
-          docker build -t devolutions/picky:${{ steps.get-version.outputs.version }}-servercore-ltsc2019 -f "$DockerFile" .
+          docker build -t "$ImageName" -f "$DockerFile" .
           echo "::set-output name=image-name::$ImageName"
 
       - name: Push container
