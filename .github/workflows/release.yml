@@ -1,4 +1,4 @@
-name: release
+name: Release
 
 on:
   workflow_dispatch:
@@ -74,11 +74,13 @@ jobs:
       - name: Download and copy artifacts
         id: download
         shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.DEVOLUTIONSBOT_TOKEN }}
         run: |
           gh run download ${{ github.event.inputs.run-id }} --dir "$Env:RUNNER_TEMP" --name picky
           $SourceFile = "picky-server"
 
-          if (Env:RUNNER_OS -Eq "Windows") {
+          if ($Env:RUNNER_OS -Eq "Windows") {
             $SourceFile = "$($SourceFile).exe"
           }
 
