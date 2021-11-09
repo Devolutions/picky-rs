@@ -97,11 +97,15 @@ jobs:
         shell: pwsh
         run: |
           $ImageName = "devolutions/picky:${{ steps.get-version.outputs.version }}-${{ matrix.base-image }}"
-          $DockerFile = "DockerFile"
           if ($Env:RUNNER_OS -Eq "Windows") {
-            $DockerFile = "$($DockerFile)-win2k19"
+            if ("${{ matrix.base-image }}" -Eq "nanoserver-1809") {
+              docker build --build-arg FROM_IMAGE=mcr.microsoft.com/windows/nanoserver:1809 -t "$ImageName" -f DockerFile-win2k19 .
+            } else {
+              docker build -t "$ImageName" -f DockerFile-win2k19 .
+            }
+          } else {
+            docker build -t "$ImageName" .
           }
-          docker build -t "$ImageName" -f "$DockerFile" .
           echo "::set-output name=image-name::$ImageName"
 
       - name: Push container
