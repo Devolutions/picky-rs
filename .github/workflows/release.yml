@@ -34,7 +34,7 @@ jobs:
     #environment: build-and-publish
     needs: preflight
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         arch: [ x86_64 ]
         os: [ windows, linux ]
