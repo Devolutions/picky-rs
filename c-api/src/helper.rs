@@ -36,7 +36,7 @@ macro_rules! char_ptr_to_str {
 
         ::ffi_helpers::null_pointer_check!($c_str_ptr);
         let input = ::std::ffi::CStr::from_ptr($c_str_ptr);
-        err_check!(input.to_str().context(concat!("bad parameter ", stringify!($c_str_ptr))))
+        err_check!(input.to_str().context(concat!("bad parameter `", stringify!($c_str_ptr), "`")))
     }};
     ($c_str_ptr:expr, $max_size:expr) => {{
         use ::anyhow::Context;
@@ -51,10 +51,10 @@ macro_rules! char_ptr_to_str {
         let index = buffer
             .iter()
             .position(|&v| v == 0)
-            .context(concat!("nul-byte not found in parameter ", stringify!($c_str_ptr)));
+            .context(concat!("nul-byte not found in parameter `", stringify!($c_str_ptr), "`"));
         let nul_byte_index = err_check!(index);
         let input = ::std::ffi::CStr::from_bytes_with_nul_unchecked(&buffer[..=nul_byte_index]);
-        err_check!(input.to_str().context(concat!("bad parameter ", stringify!($c_str_ptr))))
+        err_check!(input.to_str().context(concat!("bad parameter `", stringify!($c_str_ptr), "`")))
     }};
 }
 
@@ -88,7 +88,7 @@ macro_rules! ptr_to_buffer {
     }};
     (@impl $slice_method:ident, $ptr:expr, $size:expr, $err_value:expr) => {{
         null_pointer_check!($ptr, $err_value);
-        let size = err_check!(usize::try_from($size).context(concat!("invalid size parameter ", stringify!($size))));
+        let size = err_check!(usize::try_from($size).context(concat!("invalid size parameter `", stringify!($size), "`")));
         ::core::slice::$slice_method($ptr, size)
     }};
 }
