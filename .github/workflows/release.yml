@@ -1,12 +1,11 @@
-name: release
+name: Release
 
 on:
   workflow_dispatch:
     inputs:
       run-id:
-        description: 'run id'
+        description: 'The CI workflow run ID with the artifacts to release'
         required: true
-        default: '1338900215'
 
 concurrency: picky-release
 
@@ -29,9 +28,9 @@ jobs:
           echo "::set-output name=commit::$($Run.head_sha)"
 
   containers:
-    name: containers [${{ matrix.os }} ${{ matrix.arch }}]
+    name: Containers [${{ matrix.os }} ${{ matrix.base-image }}]
     runs-on: ${{ matrix.runner }}
-    #environment: build-and-publish
+    environment: build-and-publish
     needs: preflight
     strategy:
       fail-fast: true
@@ -74,15 +73,17 @@ jobs:
       - name: Download and copy artifacts
         id: download
         shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.DEVOLUTIONSBOT_TOKEN }}
         run: |
           gh run download ${{ github.event.inputs.run-id }} --dir "$Env:RUNNER_TEMP" --name picky
           $SourceFile = "picky-server"
 
-          if (Env:RUNNER_OS -Eq "Windows") {
+          if ($Env:RUNNER_OS -Eq "Windows") {
             $SourceFile = "$($SourceFile).exe"
           }
 
-          $SourcePath = Join-Path "$Env:RUNNER_TEMP" picky ${{ matrix.os }} ${{ matrix.arch }} $SourceFile
+          $SourcePath = Join-Path "$Env:RUNNER_TEMP" ${{ matrix.os }} ${{ matrix.arch }} $SourceFile
           $TargetPath = Join-Path $pwd $SourceFile
           Copy-Item $SourcePath $TargetPath
 
@@ -94,13 +95,20 @@ jobs:
         id: build-container
         shell: pwsh
         run: |
-          $ImageName = "devolutions/picky:${{ needs.preflight.outputs.version }}-${{ matrix.base-image }}"
-          docker build -t $ImageName .
+          $ImageName = "devolutions/picky:${{ steps.get-version.outputs.version }}-${{ matrix.base-image }}"
+          if ($Env:RUNNER_OS -Eq "Windows") {
+            if ("${{ matrix.base-image }}" -Eq "nanoserver-1809") {
+              docker build --build-arg FROM_IMAGE=mcr.microsoft.com/windows/nanoserver:1809 -t "$ImageName" -f DockerFile-win2k19 .
+            } else {
+              docker build -t "$ImageName" -f DockerFile-win2k19 .
+            }
+          } else {
+            docker build -t "$ImageName" .
+          }
           echo "::set-output name=image-name::$ImageName"
 
       - name: Push container
         shell: pwsh
         run: |
-          echo ${{ steps.build-container.outputs.image-name }}
-          # echo ${{ secrets.DOCKER_HUB_BOT_PASSWORD }} | docker login -u devolutionsbot --password-stdin
-          # docker push ${{ steps.build-container.outputs.image-name }}
+          echo ${{ secrets.DOCKER_HUB_BOT_PASSWORD }} | docker login -u devolutionsbot --password-stdin
+          docker push ${{ steps.build-container.outputs.image-name }}
