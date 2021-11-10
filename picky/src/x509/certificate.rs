@@ -442,6 +442,7 @@ impl<'a, 'b, Chain: Iterator<Item = &'b Cert>> CertValidator<'a, 'b, Chain> {
     }
 
     #[inline]
+    #[allow(dead_code)]
     pub(super) fn chain_should_contains_root_certificate(&self, should_contains: bool) -> &Self {
         self.inner
             .borrow_mut()
