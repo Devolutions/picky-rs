@@ -889,6 +889,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e88a8acf291dafb59c2d96e8f59828f3838bb1a70398823ade51a84de6a6deed"
 
 [[package]]
+name = "ffi_helpers"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c06bad5d1e3a9cfc3825643e055eb7f1fc1b1d52d1543c8ddb9107abd6497f2e"
+dependencies = [
+ "anyhow",
+ "libc",
+ "thiserror",
+]
+
+[[package]]
 name = "flate2"
 version = "1.0.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2215,6 +2226,15 @@ dependencies = [
  "picky-asn1-der 0.2.5 (git+https://github.com/Devolutions/picky-rs.git?rev=a0a0d1)",
  "serde",
  "widestring 0.4.3",
+]
+
+[[package]]
+name = "picky-c-api"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ffi_helpers",
+ "picky 6.4.0",
 ]
 
 [[package]]

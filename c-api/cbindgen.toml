@@ -1,0 +1,8 @@
+language = "C"
+usize_is_size_t = true
+
+[export]
+prefix = "picky_"
+
+[enum]
+rename_variants = "QualifiedScreamingSnakeCase"

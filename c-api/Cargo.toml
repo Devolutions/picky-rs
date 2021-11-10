@@ -1,0 +1,17 @@
+[package]
+name = "picky-c-api"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "picky"
+crate-type = ["staticlib", "cdylib"]
+doc = false
+test = false
+doctest = false
+
+[dependencies]
+picky = { version = "6.4.0", default-features = false, features = ["x509", "jose", "http_signature", "time_conversion"], path = "../picky" }
+ffi_helpers = "0.3"
+anyhow = "1"
