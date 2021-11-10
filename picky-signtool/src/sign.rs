@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Context};
 use clap::ArgMatches;
-use lief::{Binary, LogLevel};
+use lief::Binary;
 
 use picky::hash::HashAlgorithm;
 use picky::key::PrivateKey;
@@ -14,10 +14,10 @@ use picky::x509::pkcs7::Pkcs7;
 use picky::x509::wincert::{CertificateType, WinCertificate};
 
 use crate::config::{
-    ARG_BINARY, ARG_LOGGING, ARG_LOGGING_CRITICAL, ARG_LOGGING_DEBUG, ARG_LOGGING_ERR, ARG_LOGGING_INFO,
-    ARG_LOGGING_TRACE, ARG_LOGGING_WARN, ARG_OUTPUT, ARG_PS_SCRIPT, ARG_TIMESTAMP, CRLF, PS_AUTHENTICODE_FOOTER,
-    PS_AUTHENTICODE_HEADER, PS_AUTHENTICODE_LINES_SPLITTER,
+    ARG_BINARY, ARG_OUTPUT, ARG_PS_SCRIPT, ARG_TIMESTAMP, CRLF, PS_AUTHENTICODE_FOOTER, PS_AUTHENTICODE_HEADER,
+    PS_AUTHENTICODE_LINES_SPLITTER,
 };
+
 use crate::get_utf8_file_name;
 use crate::utils::str_to_utf16_bytes;
 use crate::verify::extract_signed_ps_file_content_bytes;
@@ -73,22 +73,6 @@ pub fn sign(
             .context("Output path for signed binary is not specified")?;
 
         let binary_name = get_utf8_file_name(file.as_path())?;
-
-        match matches.value_of(ARG_LOGGING) {
-            Some(log_level) => {
-                let log_level = match log_level {
-                    ARG_LOGGING_TRACE => LogLevel::LogTrace,
-                    ARG_LOGGING_DEBUG => LogLevel::LogDebug,
-                    ARG_LOGGING_INFO => LogLevel::LogInfo,
-                    ARG_LOGGING_WARN => LogLevel::LogWarn,
-                    ARG_LOGGING_ERR => LogLevel::LogErr,
-                    ARG_LOGGING_CRITICAL => LogLevel::LogCritical,
-                    _ => unreachable!("Unexpected log level value"),
-                };
-                lief::enable_logging(log_level);
-            }
-            None => lief::disable_logging(),
-        }
 
         sign_binary(
             &pkcs7,

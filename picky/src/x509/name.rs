@@ -3,6 +3,7 @@ use picky_asn1::restricted_string::{CharSetError, IA5String};
 use picky_asn1::wrapper::{Asn1SequenceOf, IA5StringAsn1};
 use picky_asn1_x509::{
     DirectoryString, GeneralName as SerdeGeneralName, GeneralNames as SerdeGeneralNames, Name, NamePrettyFormatter,
+    OtherName,
 };
 use std::fmt;
 
@@ -66,6 +67,7 @@ impl From<DirectoryName> for Name {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum GeneralName {
+    OtherName(OtherName),
     RFC822Name(IA5String),
     DNSName(IA5String),
     DirectoryName(DirectoryName),
@@ -118,6 +120,7 @@ impl GeneralName {
 impl From<SerdeGeneralName> for GeneralName {
     fn from(gn: SerdeGeneralName) -> Self {
         match gn {
+            SerdeGeneralName::OtherName(other_name) => Self::OtherName(other_name),
             SerdeGeneralName::Rfc822Name(name) => Self::RFC822Name(name.0),
             SerdeGeneralName::DnsName(name) => Self::DNSName(name.0),
             SerdeGeneralName::DirectoryName(name) => Self::DirectoryName(name.into()),
@@ -135,6 +138,7 @@ impl From<SerdeGeneralName> for GeneralName {
 impl From<GeneralName> for SerdeGeneralName {
     fn from(gn: GeneralName) -> Self {
         match gn {
+            GeneralName::OtherName(other_name) => SerdeGeneralName::OtherName(other_name),
             GeneralName::RFC822Name(name) => SerdeGeneralName::Rfc822Name(name.into()),
             GeneralName::DNSName(name) => SerdeGeneralName::DnsName(name.into()),
             GeneralName::DirectoryName(name) => SerdeGeneralName::DirectoryName(name.into()),

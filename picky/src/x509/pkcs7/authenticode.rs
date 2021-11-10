@@ -317,8 +317,8 @@ impl AuthenticodeSignature {
         certificates
             .iter()
             .find(|cert| {
-                Name::from(cert.issuer_name()) == issuer_and_serial_number.issuer
-                    && cert.serial_number() == &issuer_and_serial_number.serial_number.0
+                (Name::from(cert.issuer_name()) == issuer_and_serial_number.issuer)
+                    && (cert.serial_number() == &issuer_and_serial_number.serial_number.0)
             })
             .ok_or_else(
                 || AuthenticodeError::NoCertificatesAssociatedWithIssuerAndSerialNumber {
@@ -708,11 +708,15 @@ impl<'a> AuthenticodeValidator<'a> {
         let cert_validator = if inner.strictness.require_chain_check {
             // Authenticode has the signer certificate and any intermediate certificates,
             // but typically does not contain the root
-            cert_validator.chain_should_contains_root_certificate(false).chain(
-                certificates
-                    .iter()
-                    .filter(|cert| cert.subject_name() != signing_certificate.subject_name()),
-            )
+            let mut prev_issuer_name = signing_certificate.issuer_name();
+
+            cert_validator
+                .chain_should_contains_root_certificate(false)
+                .chain(certificates.iter().filter(move |cert| {
+                    let should_be_validated = cert.subject_name() == prev_issuer_name;
+                    prev_issuer_name = cert.issuer_name();
+                    should_be_validated
+                }))
         } else {
             cert_validator.ignore_chain_check()
         };
@@ -952,6 +956,7 @@ impl<'a> AuthenticodeValidator<'a> {
 
     pub fn verify(&self) -> AuthenticodeResult<()> {
         let certificates = self.authenticode_signature.0.decode_certificates();
+
         if self.inner.borrow().strictness.require_basic_authenticode_validation {
             self.h_verify_authenticode_basic(&certificates)?;
         }
@@ -2306,5 +2311,198 @@ mod test {
             .ignore_not_after_check()
             .verify()
             .unwrap();
+    }
+
+    #[test]
+    fn test_timestamped_signature_with_simple_chain_verification() {
+        // this signature signed using Root -> End certificates chain
+        let signature = "MIINFgYJKoZIhvcNAQcCoIINBzCCDQMCAQExDzANBglghkgBZQMEAgEFADB5BgorBgEEAY\
+                            I3AgEEoGswaTA0BgorBgEEAYI3AgEPMCYDAgWAoCCiHoAcADwAPAA8AE8AYgBzAG8AbABl\
+                            AHQAZQA+AD4APjAxMA0GCWCGSAFlAwQCAQUABCBrzsxooHhDUS5MX6mQrGeiWzWMUhlXO8\
+                            MlVr3wCPo2MaCCCEwwggQUMIIC/KADAgECAhQZvvjV83AsB614bVI6VFZ7XHJahTANBgkq\
+                            hkiG9w0BAQsFADCBiDELMAkGA1UEBhMCVUExEjAQBgNVBAgMCVJvb3RTdGF0ZTENMAsGA1\
+                            UEBwwEbGFuZDESMBAGA1UECgwJUGFzaGFDb3JwMQ8wDQYDVQQLDAZjb29wZXIxEjAQBgNV\
+                            BAMMCXBhc2hhLmNvbTEdMBsGCSqGSIb3DQEJARYOcGFzaGFAY29ycC5jb20wHhcNMjExMT\
+                            E1MTg0NDUyWhcNMzExMTEzMTg0NDUyWjCBmDELMAkGA1UEBhMCQ08xGDAWBgNVBAgMD0Jy\
+                            aXRpc2hDb2x1bWJpYTENMAsGA1UEBwwEY2l0eTESMBAGA1UECgwJVGVjb21Db3JwMRIwEA\
+                            YDVQQLDAlVbml2ZXJzYWwxHTAbBgNVBAMMFHRlY29tLmNvcnBAZ21haWwuY29tMRkwFwYJ\
+                            KoZIhvcNAQkBFgp0ZWNvbS5jb3JwMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQ\
+                            EAtLUsSVVvIIf6h4FJHaiw2bCbBuEl0onXPNs6cUoDRBtwDCN+8I3BTk+8IkDBwk360r+9\
+                            WRv14dwP54CjirCKqS90xMsC3rpjwHBFEUWfYVS/W2F5cFs5hTH2G/tp158PkGyTzUxluc\
+                            LN3xDlV9XB90dzDK3cBJPIz6XmwYCH8ies18WBMwrdWyKYBpavZ0yP4EsjFl0LZgQKoItn\
+                            el3GIEvqTJKolAolcunRxxcyiQetBrregVZL12ArKHMXmzW1eqIqJ4BLDVPWWs7OMjEkmv\
+                            af/Qg2KIT8f+BVj/6zz9BdQlFMaS/kog91rcqmh5fd+HfXqHDFbm43C1BJiZfXkQIDAQAB\
+                            o2QwYjALBgNVHQ8EBAMCAbYwEwYDVR0lBAwwCgYIKwYBBQUHAwMwHQYDVR0OBBYEFAxq+j\
+                            nnXAe9nEUPyN7H19UVktTKMB8GA1UdIwQYMBaAFHSMPvti9N00ILGqdSg14i2i8RgPMA0G\
+                            CSqGSIb3DQEBCwUAA4IBAQCBm+Q31pBby3insoF/1Le4uvxp3bQniw6PhhNmpVmBcFcVk1\
+                            fS0tuZDBWUrWzMnKEGlKTOpR4WSdAgaYqxG8FHS4FotSwzFnJoEadhu9RUYzJ6JPLUKcNe\
+                            0zTn0jZ0L6RBUm7J8xSLYCVIkkIn3h67CORkuUDUsiByAqETzVJ0byl1BLEyqeMg/f7HRM\
+                            PnnhGTUTV4ay5XJobY53hf/5WlaEFFasqjUVRyL816ZCYM6QPVtzYsCD0HwvJ8qNuXS/Zu\
+                            Xf1pD8a4P/g3HPmzC4cA49urEomr6/Ggf+6KmTDE6KCVk9p7MotpxEWJhl8Ijbmm9csrlU\
+                            wDu1cO6M3a0/LyMIIEMDCCAhigAwIBAgIFAP0rOYYwDQYJKoZIhvcNAQELBQAwGDEWMBQG\
+                            A1UEAwwNU2FzaGEgUm9vdCBDQTAeFw0yMTExMTUxOTE4MTRaFw0yNjExMTQxOTE4MTRaMB\
+                            oxGDAWBgNVBAMMD1Nhc2hhIEF1dGhvcml0eTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCC\
+                            AQoCggEBANZRqREbdNdmS+InSj455zfF1FGZxveNNV6pPs9Ht3WW5LZI8B56zoy66o24Su\
+                            znDFDGZcdxUnLnlM2j/gMNYdPJvsVH6qLR6Nd1VSHyQPZVPd9QBuFaMbr/Gs1Yj6ofYazd\
+                            FwF3AwI4Nw2HeIdtm1oxsz/peZCFYThZTZzioEtNnfbnF2s9E+aZXPS0jl+x7kzbBpVzAy\
+                            0rvMPymDtaIxYgoI+pGZbqblLTYec/LmXQaBgWictbRAny9cOm6BLMB2f7CWYmJNOJNOH6\
+                            kpY0jC7BghcLc5id/2EvNgeb8p87cElR7oIjhXyFU1uV6x7VtGWMWGIfQOSqObeo8JEzqu\
+                            8CAwEAAaN/MH0wEgYDVR0TAQH/BAgwBgEB/wIBADAPBgNVHQ8BAf8EBQMDB4YAMCkGA1Ud\
+                            DgQiBCCnik1mKZTTk8AlP3iFEAEx0WxqlL9hYQ0UKHI/cGhbXzArBgNVHSMEJDAigCDoFj\
+                            JS7DjrCOEXyzdeN8t1verL9hCvsHIP10zAmRQ9nTANBgkqhkiG9w0BAQsFAAOCAgEADZlO\
+                            HfkroGZtaDClxC3zUUkdvB24ohFBmYlZtOZATycrbEb6s5/DepL/LHrADiLyDbnd6VxLCL\
+                            zqkNB0eiU/37R4PljrODUS10I9byGXclljltusY1A07fWIDUwk1hkh2U/6RntGPIY4vPlX\
+                            6ve/F/IDKVT9OynNTarZmYiFOnWSutZZokO8bNAv1U38EglPTBcKd22330l6xEc4vcWRkB\
+                            ieiZPiqPRLfpDwk+4akVQbgwi7lkJSZQUB8NvwZj70hER6AWLDXZF+IKRlr5GDl02Q29hE\
+                            hfzHJnoJJb7UI7lI6GhZXAIOampmm3vGkMbhSV5kAx8HcaKG390UY9CNMWdynQo9S/XwCH\
+                            jcwoEJkleItOOJj9fOszlGyA6JpjERsLYtoGksUdGxOOr3Ozr6SV6gXkaqa9c5RXsBzJQg\
+                            oWDK1emBM3+hogwaLplW2jfLsRH+XfXg4QFmCtMHynsahBlgR8J+2Z6yLdEy/pMBeL987x\
+                            4wHOyqWMYXH537dpam/3LqzOg1508TkDt1Pr36YbNynPU3BrmN+lB+dN/KFWovAjiaWYSF\
+                            K3fT3YTaZrdvy0lE2iG9uyi88ZpvV03wQ1n4fIiE2F4CiU5slrduYRw/8f/qbGvNpoETHd\
+                            1dVNQAK55kfz1I1roCGZu4JgmFzz/e9BomqUwLcKxmmbxwj36hADGCBB4wggQaAgEBMIGh\
+                            MIGIMQswCQYDVQQGEwJVQTESMBAGA1UECAwJUm9vdFN0YXRlMQ0wCwYDVQQHDARsYW5kMR\
+                            IwEAYDVQQKDAlQYXNoYUNvcnAxDzANBgNVBAsMBmNvb3BlcjESMBAGA1UEAwwJcGFzaGEu\
+                            Y29tMR0wGwYJKoZIhvcNAQkBFg5wYXNoYUBjb3JwLmNvbQIUGb741fNwLAeteG1SOlRWe1\
+                            xyWoUwDQYJYIZIAWUDBAIBBQCggYAwGQYJKoZIhvcNAQkDMQwGCisGAQQBgjcCAQQwMgYK\
+                            KwYBBAGCNwIBDDEkMCKhIKIegBwAPAA8ADwATwBiAHMAbwBsAGUAdABlAD4APgA+MC8GCS\
+                            qGSIb3DQEJBDEiBCC9eETpakSiPnInPgy2r3fGQFP3ZDSmGN4SW8pZfUEHmTANBgkqhkiG\
+                            9w0BAQEFAASCAQBmzok+hjGVQP0DPoSKdW4nXtwyzD42wdnGpnN3gXIxIClGw3WbbFQcRe\
+                            J868Ispv3q14CDHOJicSpHnZeIZdrN5G/Mbyrtzhd8DfiP6x1GNnVETAUO33IwMG18qxbN\
+                            O+kuD16D59V5WmcRwqTFXmUoLvzJxhlxaE65ZA4UCGbHvxffWuW8PzGz8B7t/wh02Qzdj6\
+                            s047TAC0841yWm5xrcU8wJxgDCVjYRB9nCfVcavhHyTAqsiGxXP8zWq84wW//OuJ70e6j6\
+                            w8GcSJJRHSByVMBJd0alvqpoZCH3Pk3ZUaOW0M72M0Ru4xObGuhcF4n9LP3BP2ejOo2q6K\
+                            2dwmyeoYIByjCCAcYGCSqGSIb3DQEJBjGCAbcwggGzAgEBMCEwGDEWMBQGA1UEAwwNU2Fz\
+                            aGEgUm9vdCBDQQIFAP0rOYYwDQYJYIZIAWUDBAIBBQCgaTAYBgkqhkiG9w0BCQMxCwYJKo\
+                            ZIhvcNAQcBMBwGCSqGSIb3DQEJBTEPFw0yMTExMTUxOTI0MTFaMC8GCSqGSIb3DQEJBDEi\
+                            BCAk+UwrzxzsljUCVqZrEYmhZYYAVU5rPdSMR1dP0jt7djANBgkqhkiG9w0BAQEFAASCAQ\
+                            AfCNejQbDkZeEPgmyD9yDzL5/urHpTp/gKIt1SRUealVmvNLg5LeknZJ7BQfd2G53zEA9c\
+                            fJ8TvyY6GP1YNROtkrQ0sWucJFNwFPMAlDtosJf+2L7BPvem+OI5/5QpL+wz+Ck/jDEF8m\
+                            xHQm8b1Foo7RDc9iJnRaZTK1ES2MJKjxgEAKKVQois5UVTxO2WuG+HZ0x69Ye30u3vTlvq\
+                            2/zdX1wrovKdyKa8bF+34x+bnObgiiiNs0vqWXELgiCu2pHtcEHnHv70H62f3jBUKc5gIZ\
+                            PHvJPJq54bXy2JxFBRUZFo8r8af75X3+atMp9eSErcSUK2UTygICS2lz/ZRaIZ";
+
+        let der_signature = base64::decode(signature).unwrap();
+        let authenticode_signature = AuthenticodeSignature::from_der(&der_signature).unwrap();
+
+        let time = UTCDate::now();
+        let validator = authenticode_signature.authenticode_verifier();
+        let validator = validator
+            .ignore_basic_authenticode_validation()
+            .ignore_chain_check()
+            .ignore_ca_against_ctl_check()
+            .ignore_excluded_cert_authorities()
+            .require_signing_certificate_check()
+            .require_not_after_check()
+            .require_not_before_check()
+            .require_chain_check()
+            .exact_date(&time);
+
+        validator.verify().unwrap();
+    }
+
+    #[test]
+    fn test_timestamped_signature_with_full_chain_verification() {
+        // this signature signed using Root -> Intermediate -> End certificates chain
+        let signature = "MIIQ6wYJKoZIhvcNAQcCoIIQ3DCCENgCAQExDzANBglghkgBZQMEAgEFADB5BgorBgEEAY\
+                              I3AgEEoGswaTA0BgorBgEEAYI3AgEPMCYDAgWAoCCiHoAcADwAPAA8AE8AYgBzAG8AbABl\
+                              AHQAZQA+AD4APjAxMA0GCWCGSAFlAwQCAQUABCBrzsxooHhDUS5MX6mQrGeiWzWMUhlXO8\
+                              MlVr3wCPo2MaCCDDcwggQfMIIDB6ADAgECAgEDMA0GCSqGSIb3DQEBCwUAMIGFMQswCQYD\
+                              VQQGEwJJVDENMAsGA1UECAwEa3J1czENMAsGA1UEBwwEbGFrZTESMBAGA1UECgwJS3J1c0\
+                              l0YWx5MQ8wDQYDVQQLDAZsYXBzaGExEzARBgNVBAMMCmxhcHNoYS5jb20xHjAcBgkqhkiG\
+                              9w0BCQEWD2xhcHNoYUBrcnVzLmNvbTAeFw0yMTExMTYwOTU4NTlaFw0yMjExMTYwOTU4NT\
+                              laMIGJMQswCQYDVQQGEwJFTjEPMA0GA1UECAwGTG9uZG9uMQ0wCwYDVQQHDARjaXR5MQ8w\
+                              DQYDVQQKDAZCcmlja0IxDTALBgNVBAsMBHBvcnQxGTAXBgNVBAMMEGJyaWNrLmJAcG9ydC\
+                              5jb20xHzAdBgkqhkiG9w0BCQEWEGJyaWNrLmJAcG9ydC5jb20wggEiMA0GCSqGSIb3DQEB\
+                              AQUAA4IBDwAwggEKAoIBAQDPTE55lW0MDHc1sfeckJXGk15sku6Wa6NFeD7QnJX2HB0TSl\
+                              2Zx8AJ9G6G2rbfVUFv4aQlHB7rKki+CHLKuYYa4qoqUGfI9+oj4XtjEgky/ksgZgR+CR/J\
+                              kZpauYXVgUXxMLosoYwFhtPNvLrITYC9vjpub39tDN/CQSQUbm7uR3i3KNCG1VrpmjMccu\
+                              j3G7KU0/n9Y9QWma2kDF/79hbWjIpP2KCJLR61JDNxRbQS64wOfAojtOJiluo6ZLI1rPOn\
+                              jeugUKjAlL+0dJUt40Wh2PHI6ysg4s6Iw7IIK/zW7n+xI2WsF0bixKRaxTHOEnOewN0jix\
+                              B/yR9CsHUwU+kbAgMBAAGjgZMwgZAwCwYDVR0PBAQDAgG2MBMGA1UdJQQMMAoGCCsGAQUF\
+                              BwMDMCwGCWCGSAGG+EIBDQQfFh1PcGVuU1NMIEdlbmVyYXRlZCBDZXJ0aWZpY2F0ZTAdBg\
+                              NVHQ4EFgQUoljjRcajmZI7KTF21LizYPPCq2owHwYDVR0jBBgwFoAUfqsVmxAp5WyQpfDX\
+                              Ipg8KLMitQIwDQYJKoZIhvcNAQELBQADggEBAA64XnyVCad0+eC9Z7H0UISm4onEEwbTgf\
+                              O6H1pimhLKz14WJ1bXYqLRK3GvlBsU3XWS/1HLSeYhW0bahOMnb5d+ASOullFs+5Kmmu8f\
+                              g3HbbTrUkUMS3+fxzR8tkIYpQ/JXK+nA1r9SXVDP5DJUQ245V+QB5hdQITrAumppwxdmWW\
+                              NbpM4SjFPvUn4BjRKiuvYzWgEzKyCbEIidqrVOUEwpApVbZpltJI7HyP1LwW0ohZ3KThkp\
+                              iKrmSOKFaa4iZ1P4/MuEG5J8FOzYG8JPkcpZtGPwaaqPkdGaxQ4U0gGctl6pct16XGFAu0\
+                              4cOw//uXVzHD2STWRzZaolGf8P4XQwggPcMIICxKADAgECAgECMA0GCSqGSIb3DQEBCwUA\
+                              MIGHMQswCQYDVQQGEwJVQTESMBAGA1UECAwJUm9vdFN0YXRlMQ0wCwYDVQQHDARsYW5kMR\
+                              IwEAYDVQQKDAlQYXNoYUNvcnAxDjAMBgNVBAsMBWNvb3JwMRIwEAYDVQQDDAlwYXNoYS5j\
+                              b20xHTAbBgkqhkiG9w0BCQEWDnBhc2hhQGxhbmQuY29tMB4XDTIxMTExNjA5NTU0NFoXDT\
+                              IyMTExNjA5NTU0NFowgYUxCzAJBgNVBAYTAklUMQ0wCwYDVQQIDARrcnVzMQ0wCwYDVQQH\
+                              DARsYWtlMRIwEAYDVQQKDAlLcnVzSXRhbHkxDzANBgNVBAsMBmxhcHNoYTETMBEGA1UEAw\
+                              wKbGFwc2hhLmNvbTEeMBwGCSqGSIb3DQEJARYPbGFwc2hhQGtydXMuY29tMIIBIjANBgkq\
+                              hkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvC8zMDWPNgpGGpyrVcOXCdYLwGHndS0LDdhfn1\
+                              3HaZ+5F2kQ1aXKDLEXbOR4EN5Z563QMqyBYuWWfX0IIuIjxSHT3ablyHpEjw7/AvWN28Vh\
+                              5bbkXaPWaxQ0/QaMXtQg2Mmt/32mWtniwhFhuLSKIE845fX+UVlSWqH7NfdbrNwJZUwNf/\
+                              21Le7VuNaK2ju9ozZ7FtunWjUQs+IZAsxXxwh18aIk24MY2zYHKR4ZPRpqvNXuNgSCjkgF\
+                              swT94KPhQqYB9Fqm52xpz43Acwb0rq91V1+LPULEiiVaXeXOyTX1935wwWBwKoJdpMjm5P\
+                              wnEnuEB1LejDNSoCnvNZ5vfQIDAQABo1MwUTAdBgNVHQ4EFgQUfqsVmxAp5WyQpfDXIpg8\
+                              KLMitQIwHwYDVR0jBBgwFoAUQQZbLPOL+TzMrd5xBN+QW1lSncYwDwYDVR0TAQH/BAUwAw\
+                              EB/zANBgkqhkiG9w0BAQsFAAOCAQEAQl7N6B9BOHbUuvHnohDuAcCXxkiyLgGywKyDDTLf\
+                              h+5eDrMJwuRjMNYw+X4GLc2675Gu1dPcsGr2XRwRE60wSjPnoZ4+4USZFV5H77frjuxddD\
+                              1qG0DXvnBilmFUOOzOLYc+Z2gWMba6Yh081LfCVpcIT8ll+yCFLpd49YXFiCyEUD0pSX6C\
+                              iFqsND+QVEy3bdhmO9uNp1pWBO3NyKhDrE17IMWPJF7tmCJ2tDE6uuHiJcWiTo5XWC3qge\
+                              UksluqYtfuk2Ys/FMwb58WkNqcxC1YZyxSFSrFtWSdJ783boduS7mlhx98M64n1eJ8OHsg\
+                              xeNa//yh0gewSxmxqFwewTCCBDAwggIYoAMCAQICBQD9KzmGMA0GCSqGSIb3DQEBCwUAMB\
+                              gxFjAUBgNVBAMMDVNhc2hhIFJvb3QgQ0EwHhcNMjExMTE1MTkxODE0WhcNMjYxMTE0MTkx\
+                              ODE0WjAaMRgwFgYDVQQDDA9TYXNoYSBBdXRob3JpdHkwggEiMA0GCSqGSIb3DQEBAQUAA4\
+                              IBDwAwggEKAoIBAQDWUakRG3TXZkviJ0o+Oec3xdRRmcb3jTVeqT7PR7d1luS2SPAees6M\
+                              uuqNuErs5wxQxmXHcVJy55TNo/4DDWHTyb7FR+qi0ejXdVUh8kD2VT3fUAbhWjG6/xrNWI\
+                              +qH2Gs3RcBdwMCODcNh3iHbZtaMbM/6XmQhWE4WU2c4qBLTZ325xdrPRPmmVz0tI5fse5M\
+                              2waVcwMtK7zD8pg7WiMWIKCPqRmW6m5S02HnPy5l0GgYFonLW0QJ8vXDpugSzAdn+wlmJi\
+                              TTiTTh+pKWNIwuwYIXC3OYnf9hLzYHm/KfO3BJUe6CI4V8hVNblese1bRljFhiH0Dkqjm3\
+                              qPCRM6rvAgMBAAGjfzB9MBIGA1UdEwEB/wQIMAYBAf8CAQAwDwYDVR0PAQH/BAUDAweGAD\
+                              ApBgNVHQ4EIgQgp4pNZimU05PAJT94hRABMdFsapS/YWENFChyP3BoW18wKwYDVR0jBCQw\
+                              IoAg6BYyUuw46wjhF8s3XjfLdb3qy/YQr7ByD9dMwJkUPZ0wDQYJKoZIhvcNAQELBQADgg\
+                              IBAA2ZTh35K6BmbWgwpcQt81FJHbwduKIRQZmJWbTmQE8nK2xG+rOfw3qS/yx6wA4i8g25\
+                              3elcSwi86pDQdHolP9+0eD5Y6zg1EtdCPW8hl3JZY5bbrGNQNO31iA1MJNYZIdlP+kZ7Rj\
+                              yGOLz5V+r3vxfyAylU/TspzU2q2ZmIhTp1krrWWaJDvGzQL9VN/BIJT0wXCndtt99JesRH\
+                              OL3FkZAYnomT4qj0S36Q8JPuGpFUG4MIu5ZCUmUFAfDb8GY+9IREegFiw12RfiCkZa+Rg5\
+                              dNkNvYRIX8xyZ6CSW+1CO5SOhoWVwCDmpqZpt7xpDG4UleZAMfB3Giht/dFGPQjTFncp0K\
+                              PUv18Ah43MKBCZJXiLTjiY/XzrM5RsgOiaYxEbC2LaBpLFHRsTjq9zs6+kleoF5GqmvXOU\
+                              V7AcyUIKFgytXpgTN/oaIMGi6ZVto3y7ER/l314OEBZgrTB8p7GoQZYEfCftmesi3RMv6T\
+                              AXi/fO8eMBzsqljGFx+d+3aWpv9y6szoNedPE5A7dT69+mGzcpz1Nwa5jfpQfnTfyhVqLw\
+                              I4mlmEhSt3092E2ma3b8tJRNohvbsovPGab1dN8ENZ+HyIhNheAolObJa3bmEcP/H/6mxr\
+                              zaaBEx3dXVTUACueZH89SNa6AhmbuCYJhc8/3vQaJqlMC3CsZpm8cI9+oQAxggQIMIIEBA\
+                              IBATCBizCBhTELMAkGA1UEBhMCSVQxDTALBgNVBAgMBGtydXMxDTALBgNVBAcMBGxha2Ux\
+                              EjAQBgNVBAoMCUtydXNJdGFseTEPMA0GA1UECwwGbGFwc2hhMRMwEQYDVQQDDApsYXBzaG\
+                              EuY29tMR4wHAYJKoZIhvcNAQkBFg9sYXBzaGFAa3J1cy5jb20CAQMwDQYJYIZIAWUDBAIB\
+                              BQCggYAwGQYJKoZIhvcNAQkDMQwGCisGAQQBgjcCAQQwMgYKKwYBBAGCNwIBDDEkMCKhIK\
+                              IegBwAPAA8ADwATwBiAHMAbwBsAGUAdABlAD4APgA+MC8GCSqGSIb3DQEJBDEiBCC9eETp\
+                              akSiPnInPgy2r3fGQFP3ZDSmGN4SW8pZfUEHmTANBgkqhkiG9w0BAQEFAASCAQC40luaPt\
+                              aTsPAtQ3wF8LCf9OPWiXWiDmuMVopDgDCoTw3OI8GTWhQ2uEE19GUd++1DdBY96++lWckA\
+                              NVd7xz1HUdWzXRV9YyFW1Pg7VFB/qcjeWYUM8mgWH5wEyxEexhGygcQDZ1vCUkQvfodM85\
+                              1jU9DEhEQeZkhKniisTDkmZL8Y4Zuee2aQr+/EutRcO9LTUzy4XvyJDmcrXW7vCrhDnBJq\
+                              ptrbU+bh2umnXo2dZKTDh1/Y2bu5hKbtpc6laSh6ecHNmxxjguO0ve4NpW3GIhH+4kHjbr\
+                              iJxpBkPcHrV4lbOHZJ4Dmd6qGzp+bq8Lc42eGnM4BItBSPZl2xba0uoYIByjCCAcYGCSqG\
+                              SIb3DQEJBjGCAbcwggGzAgEBMCEwGDEWMBQGA1UEAwwNU2FzaGEgUm9vdCBDQQIFAP0rOY\
+                              YwDQYJYIZIAWUDBAIBBQCgaTAYBgkqhkiG9w0BCQMxCwYJKoZIhvcNAQcBMBwGCSqGSIb3\
+                              DQEJBTEPFw0yMTExMTYxMDEzMjZaMC8GCSqGSIb3DQEJBDEiBCDHUYaaNCyO4nNkrkLJ5G\
+                              HIdEhgP9x/cOu0Os7BVaPWpjANBgkqhkiG9w0BAQEFAASCAQCU9oBkFiA3J5WvylHzNVGI\
+                              NKmllhjrVd4b1Edhd5eIHn4k2SPR2wTEhHOM7Tg5wDvJyEJE5yMqL4LAOl88slk0hrNEQ0\
+                              4/sPkZh40JTXwh/J8faKG+zsA0oL2JhhTBRy4BEqVyQ8f3qV/kq1ufxgLr4Cvsp71golwW\
+                              DcZnkWMel/+lUY4DcSvByChKcedu+Mc2qMo+nrO569GoTWA2MC8Z2yNK1OQqaBkiinaadA\
+                              CmE1KKJ1vU1qzC03SsoPtxHKFKo5cJ88tiehDxCKDNjf1c2JJy9iGEaQZN9tLCPHtz/W6p\
+                              Q355Y6GW1xdqI879CvAQX/Dy9+g42WddYjeJE0iD";
+
+        let der_signature = base64::decode(signature).unwrap();
+        let authenticode_signature = AuthenticodeSignature::from_der(&der_signature).unwrap();
+
+        let time = UTCDate::now();
+        let validator = authenticode_signature.authenticode_verifier();
+        let validator = validator
+            .ignore_basic_authenticode_validation()
+            .ignore_chain_check()
+            .ignore_ca_against_ctl_check()
+            .ignore_excluded_cert_authorities()
+            .require_signing_certificate_check()
+            .require_not_after_check()
+            .require_not_before_check()
+            .require_chain_check()
+            .exact_date(&time);
+
+        validator.verify().unwrap();
     }
 }
