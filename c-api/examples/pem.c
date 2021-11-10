@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -48,13 +49,13 @@ int main(int argc, char **argv) {
 
   pem_file = fopen(argv[1], "r");
   if (pem_file == NULL) {
-    printf("Couldn't open PEM file: error %d.\n", errno);
+    printf("Couldn't open PEM file: errno %d.\n", errno);
     goto exit;
   }
 
   fread(pem_file_content, sizeof(uint8_t), FILE_CONTENT_BUF_SIZE, pem_file);
   if (ferror(pem_file) != 0) {
-    printf("Couldn't read PEM file: error %d.\n", errno);
+    printf("Couldn't read PEM file: errno %d.\n", errno);
     goto exit;
   }
 
