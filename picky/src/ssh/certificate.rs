@@ -788,7 +788,7 @@ impl<'a> SshCertificateBuilder<'a> {
         let cur_date = DateTime::<Utc>::from(SystemTime::now());
         let valid_after = valid_after.take().ok_or(SshCertificateGenerationError::InvalidTime)?;
         let valid_before = valid_before.take().ok_or(SshCertificateGenerationError::InvalidTime)?;
-        if valid_after.0.timestamp() > cur_date.timestamp() || cur_date.timestamp() >= valid_before.0.timestamp() {
+        if valid_after.timestamp() > cur_date.timestamp() || cur_date.timestamp() >= valid_before.timestamp() {
             return Err(SshCertificateGenerationError::InvalidTime);
         }
 
@@ -947,9 +947,7 @@ pub mod tests {
     use super::*;
     use crate::ssh::private_key::SshPrivateKey;
     use crate::ssh::sshtime::SshTime;
-    use chrono::{DateTime, Duration, Utc};
-    use std::ops::{Add, Sub};
-    use std::time::SystemTime;
+    use time::OffsetDateTime;
 
     #[test]
     fn decode_host_cert() {
@@ -1073,10 +1071,11 @@ pub mod tests {
 
         certificate_builder.cert_type(SshCertType::Host);
 
-        let now_timestamp = DateTime::<Utc>::from(SystemTime::now());
+        let now_timestamp = OffsetDateTime::now_utc().unix_timestamp() as u64;
         certificate_builder.valid_after(SshTime::from(now_timestamp));
 
-        let valid_before = now_timestamp.add(Duration::minutes(10));
+        // 10 minutes = 600 seconds
+        let valid_before = now_timestamp + 600;
         certificate_builder.valid_before(SshTime::from(valid_before));
 
         certificate_builder.signature_key(&private_key);
@@ -1148,9 +1147,10 @@ pub mod tests {
 
         certificate_builder.cert_type(SshCertType::Host);
 
-        let now_timestamp = DateTime::<Utc>::from(SystemTime::now());
-        let after = now_timestamp.add(Duration::minutes(10));
-        let before = now_timestamp.sub(Duration::minutes(10));
+        let now_timestamp = OffsetDateTime::now_utc().unix_timestamp() as u64;
+        // 10 minutes = 600 seconds
+        let after = now_timestamp + 600;
+        let before = now_timestamp - 600;
 
         certificate_builder.valid_after(SshTime::from(after));
 
@@ -1226,10 +1226,11 @@ pub mod tests {
 
         certificate_builder.cert_type(SshCertType::Host);
 
-        let now_timestamp = DateTime::<Utc>::from(SystemTime::now());
+        let now_timestamp = OffsetDateTime::now_utc().unix_timestamp() as u64;
         certificate_builder.valid_after(SshTime::from(now_timestamp));
 
-        let valid_before = now_timestamp.add(Duration::minutes(10));
+        // 10 minutes = 600 seconds
+        let valid_before = now_timestamp + 600;
         certificate_builder.valid_before(SshTime::from(valid_before));
 
         certificate_builder.signature_key(&private_key);

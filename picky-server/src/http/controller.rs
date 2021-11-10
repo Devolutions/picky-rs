@@ -6,7 +6,6 @@ use crate::http::utils::{Format, StatusCodeResult};
 use crate::logging::build_logger_config;
 use crate::picky_controller::Picky;
 use crate::utils::{GreedyError, PathOr};
-use chrono::{Duration, Utc};
 use log4rs::Handle;
 use picky::pem::{parse_pem, to_pem, Pem};
 use picky::ssh::certificate::{SshCertKeyType, SshCertType, SshCertificateBuilder};
@@ -22,7 +21,7 @@ use saphir::response::Builder as ResponseBuilder;
 use serde_json::{self, Value};
 use std::borrow::Cow;
 use std::convert::TryFrom;
-use std::ops::Add;
+use time::OffsetDateTime;
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 pub struct ServerController {
@@ -363,10 +362,8 @@ impl ServerController {
 
         let ssh_private_key = SshPrivateKey::from_pem_str(sing_key.key.as_str(), Some(sign_key_passphrase))
             .internal_error_desc("couldn't deserialize SSH private key")?;
-        let now = Utc::now();
-        let valid_before = now.add(Duration::seconds(
-            i64::try_from(sign_request.duration_secs).bad_request()?,
-        ));
+        let now = OffsetDateTime::now_utc();
+        let valid_before = (now.unix_timestamp() + i64::try_from(sign_request.duration_secs).bad_request()?) as u64;
 
         let ssh_cert = builder
             .cert_key_type(SshCertKeyType::SshRsaV01)

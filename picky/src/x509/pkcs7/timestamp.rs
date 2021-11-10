@@ -7,10 +7,6 @@ use picky_asn1::wrapper::ExplicitContextTag0;
 use picky_asn1_x509::oids;
 use picky_asn1_x509::pkcs7::content_info::{ContentValue, EncapsulatedContentInfo};
 use picky_asn1_x509::pkcs7::signed_data::SignedData;
-#[cfg(feature = "http_timestamp")]
-use picky_asn1_x509::pkcs7::signer_info::UnsignedAttribute;
-#[cfg(feature = "http_timestamp")]
-use picky_asn1_x509::signer_info::UnsignedAttributeValue;
 
 use thiserror::Error;
 
