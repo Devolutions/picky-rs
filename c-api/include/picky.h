@@ -70,10 +70,10 @@ struct picky_pem_t *picky_pem_parse(const char *input, int input_sz);
 /**
  * Creates a PEM object with a copy of the data.
  */
-struct picky_pem_t *picky_pem_new(const uint8_t *data,
-                                  int data_sz,
-                                  const char *label,
-                                  int label_sz);
+struct picky_pem_t *picky_pem_new(const char *label,
+                                  int label_sz,
+                                  const uint8_t *data,
+                                  int data_sz);
 
 /**
  * Encodes to PEM string without copying the payload.
