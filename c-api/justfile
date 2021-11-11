@@ -9,27 +9,36 @@
 # Easy way is: cargo install just            #
 ##############################################
 
-default: libpicky bindings
+default: bindings
 
 ## Native library ##
 
-lib_path       := "../target/debug/libpicky.a"
+lib_path := "../target/debug/libpicky.a"
 
-libpicky:
+native-lib-debug:
     cargo build -p picky-c-api
 
 ## Bindings ##
 
-bindings: c_bindings csharp_bindings
+bindings: c-bindings dotnet-bindings
 
-include_folder := "include/"
-header_path    := include_folder + "picky.h"
+include_folder       := "./include/"
+header_path          := include_folder + "picky.h"
+cbindgen_config_file := "./cbindgen.toml"
 
-c_bindings:
-    cbindgen --crate picky-c-api --config cbindgen.toml --output "{{header_path}}"
-    @echo "C header generated at {{header_path}}"
+c-bindings:
+    cbindgen --crate picky-c-api --config {{cbindgen_config_file}} --output "{{header_path}}"
+    @echo ">> C header generated at {{header_path}}"
 
-csharp_bindings:
+response_file           := "./dotnet_native.rsp"
+dotnet_folder           := "./dotnet/"
+dotnet_native_path      := dotnet_folder + "src/Picky/Native"
+dotnet_native_test_path := dotnet_folder + "tests/Picky.Tests/Native"
+
+dotnet-bindings: c-bindings
+    ClangSharpPInvokeGenerator @{{response_file}} --output {{dotnet_native_path}} --test-output {{dotnet_native_test_path}}
+    @echo ">> Native .NET wrapper generated at {{dotnet_native_path}}"
+    @echo ">> Native .NET wrapper tests generated at {{dotnet_native_test_path}}"
 
 ## Examples ##
 
@@ -39,10 +48,10 @@ common_gcc_args     := lib_path + " -I" + include_folder + " -lm"
 
 examples: pem
 
-pem: libpicky make_examples_output_directory
+pem: native-lib-debug c-bindings make-examples-output-directory
     gcc {{examples_folder}}pem.c {{common_gcc_args}} -o {{examples_out_folder}}pem
 
-make_examples_output_directory:
+make-examples-output-directory:
     mkdir -p {{examples_out_folder}}
 
 clean:
@@ -50,11 +59,14 @@ clean:
 
 ## Tests ##
 
-test: test_pem
+test: test-pem test-dotnet
+
+test-dotnet: native-lib-debug dotnet-bindings
+    cd {{dotnet_folder}} && dotnet test
 
 pem_path := "../test_assets/intermediate_ca.crt"
 
-test_pem: pem
+test-pem: pem
     #!/usr/bin/env nu
 
     let $output = ({{examples_out_folder}}pem {{pem_path}})
@@ -64,9 +76,9 @@ test_pem: pem
     let $expected_len = "835"
 
     if $output.label == $expected_label && $output.len == $expected_len {
-        echo "test_pem: success"
+        echo ">> test_pem: success"
     } {
-        echo $"test_pem: failed(char nl)"
+        echo $">> test_pem: failed(char nl)"
         echo $"expected:(char nl)"
         echo [[label, len]; [$expected_label, $expected_len]]
         echo $"output:(char nl)"

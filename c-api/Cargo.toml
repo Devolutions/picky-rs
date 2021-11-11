@@ -13,5 +13,5 @@ doctest = false
 
 [dependencies]
 picky = { version = "6.4.0", default-features = false, features = ["x509", "jose", "http_signature", "time_conversion"], path = "../picky" }
-ffi_helpers = "0.3"
+ffi_helpers = { version = "0.3", git = "https://github.com/CBenoit/ffi_helpers", branch = "error_format_anyhow_debug" }
 anyhow = "1"

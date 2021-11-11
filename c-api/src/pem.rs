@@ -22,10 +22,10 @@ pub unsafe extern "C" fn picky_pem_parse(input: *const c_char, input_sz: c_int) 
 /// Creates a PEM object with a copy of the data.
 #[no_mangle]
 pub unsafe extern "C" fn picky_pem_new(
-    data: *const u8,
-    data_sz: c_int,
     label: *const c_char,
     label_sz: c_int,
+    data: *const u8,
+    data_sz: c_int,
 ) -> Option<Box<pem_t>> {
     let data = ptr_to_buffer!(@u8 data, data_sz);
     let label = char_ptr_to_str!(label, label_sz);
