@@ -4,7 +4,7 @@ namespace Devolutions.Picky;
 
 public static class Utils
 {
-    public static byte[] StringToUtf8WithNulTerminator(String s)
+    public static byte[] StringToUtf8WithNulTerminator(string s)
     {
         int size = Encoding.UTF8.GetByteCount(s) + 1;
         byte[] buf = new byte[size];
@@ -13,11 +13,11 @@ public static class Utils
         return buf;
     }
 
-    public static String Utf8WithNulTerminatorToString(byte[] utf8)
+    public static string Utf8WithNulTerminatorToString(byte[] utf8)
     {
-        int size_without_nul = utf8.Length - 1;
-        char[] chars = new char[size_without_nul];
-        Encoding.UTF8.GetChars(utf8, 0, size_without_nul, chars, 0);
-        return new String(chars);
+        int sizeWithoutNul = utf8.Length - 1;
+        char[] chars = new char[sizeWithoutNul];
+        Encoding.UTF8.GetChars(utf8, 0, sizeWithoutNul, chars, 0);
+        return new string(chars);
     }
 }

@@ -840,7 +840,7 @@ checksum = "e88a8acf291dafb59c2d96e8f59828f3838bb1a70398823ade51a84de6a6deed"
 [[package]]
 name = "ffi_helpers"
 version = "0.3.0"
-source = "git+https://github.com/CBenoit/ffi_helpers?branch=error_format_anyhow_debug#531cda24b23ddd85a99b29b1b4940573029be73a"
+source = "git+https://github.com/Michael-F-Bryan/ffi_helpers?rev=4a1d448#4a1d4481d5800fcc9e2e92ce3b432e419f03f9db"
 dependencies = [
  "anyhow",
  "libc",

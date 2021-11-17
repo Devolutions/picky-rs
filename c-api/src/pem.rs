@@ -12,6 +12,7 @@ pub struct pem_t {
 }
 
 /// Parses a PEM-encoded string representation into a PEM object.
+#[allow(clippy::missing_safety_doc)]
 #[no_mangle]
 pub unsafe extern "C" fn picky_pem_parse(input: *const c_char, input_sz: c_int) -> Option<Box<pem_t>> {
     let input = char_ptr_to_str!(input, input_sz);
@@ -20,6 +21,7 @@ pub unsafe extern "C" fn picky_pem_parse(input: *const c_char, input_sz: c_int) 
 }
 
 /// Creates a PEM object with a copy of the data.
+#[allow(clippy::missing_safety_doc)]
 #[no_mangle]
 pub unsafe extern "C" fn picky_pem_new(
     label: *const c_char,
@@ -38,6 +40,7 @@ pub unsafe extern "C" fn picky_pem_new(
 }
 
 /// Encodes to PEM string without copying the payload.
+#[allow(clippy::missing_safety_doc)]
 #[no_mangle]
 pub unsafe extern "C" fn picky_encode_pem(
     data: *const u8,
@@ -60,6 +63,7 @@ pub unsafe extern "C" fn picky_encode_pem(
 /// Get the length of the pem data in bytes.
 ///
 /// Returns the number of required bytes, or `-1` if there was an error.
+#[allow(clippy::missing_safety_doc)]
 #[no_mangle]
 pub unsafe extern "C" fn picky_pem_data_length(this: Option<&pem_t>) -> c_int {
     let this = none_check!(this, -1);
@@ -72,6 +76,7 @@ pub unsafe extern "C" fn picky_pem_data_length(this: Option<&pem_t>) -> c_int {
 /// Copy raw data contained in the PEM object.
 ///
 /// Returns the number of bytes written, or `-1` if there was an error.
+#[allow(clippy::missing_safety_doc)]
 #[no_mangle]
 pub unsafe extern "C" fn picky_pem_data(this: Option<&pem_t>, data: *mut u8, data_sz: c_int) -> c_int {
     let this = none_check!(this, -1);
@@ -82,6 +87,7 @@ pub unsafe extern "C" fn picky_pem_data(this: Option<&pem_t>, data: *mut u8, dat
 /// Get the length of the pem label in bytes when encoded as UTF-8, including the trailing null.
 ///
 /// Returns the number of required bytes, or `-1` if there was an error.
+#[allow(clippy::missing_safety_doc)]
 #[no_mangle]
 pub unsafe extern "C" fn picky_pem_label_length(this: Option<&pem_t>) -> c_int {
     let this = none_check!(this, -1);
@@ -94,6 +100,7 @@ pub unsafe extern "C" fn picky_pem_label_length(this: Option<&pem_t>) -> c_int {
 /// Copy the label associated to the data contained in the PEM object.
 ///
 /// Returns the number of bytes written, or `-1` if there was an error.
+#[allow(clippy::missing_safety_doc)]
 #[no_mangle]
 pub unsafe extern "C" fn picky_pem_label(this: Option<&pem_t>, label: *mut c_char, label_sz: c_int) -> c_int {
     let this = none_check!(this, -1);
@@ -104,6 +111,7 @@ pub unsafe extern "C" fn picky_pem_label(this: Option<&pem_t>, label: *mut c_cha
 /// Compute the length of the PEM representation, including the trailing null.
 ///
 /// Returns the number of required bytes, or `-1` if there was an error.
+#[allow(clippy::missing_safety_doc)]
 #[no_mangle]
 pub unsafe extern "C" fn picky_pem_compute_repr_length(this: Option<&pem_t>) -> c_int {
     let this = none_check!(this, -1);
@@ -114,6 +122,7 @@ pub unsafe extern "C" fn picky_pem_compute_repr_length(this: Option<&pem_t>) -> 
 /// Encodes PEM object to the PEM string representation.
 ///
 /// Returns the number of bytes written, or `-1` if there was an error.
+#[allow(clippy::missing_safety_doc)]
 #[no_mangle]
 pub unsafe extern "C" fn picky_pem_to_repr(this: Option<&pem_t>, repr: *mut c_char, repr_sz: c_int) -> c_int {
     let this = none_check!(this, -1);

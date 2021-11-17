@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+
 using Xunit;
 
 namespace Devolutions.Picky.Native.UnitTests

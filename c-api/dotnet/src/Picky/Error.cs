@@ -1,14 +1,18 @@
 namespace Devolutions.Picky;
 
-public class ErrorException : System.Exception
-{
-    public ErrorException(String message) : base(message) { }
-}
-
 public static class Error
 {
-    /// <summary>Returns a String containing last error message from Picky.</summary>
-    public static String Last()
+    /// <summary>
+    /// Returns a string containing last error message from Picky.
+    ///
+    /// When calling native functions, user is supposed to check if that
+    /// function returned a special value (null, -1…) and only then call
+    /// this function to retrieve the error description.
+    /// This function fails (intentionally) if no error occurred in native code.
+    ///
+    /// Users of idiomatic C# wrappers are not expected to use this interface.
+    /// </summary>
+    public static string Last()
     {
         int len = Native.Raw.last_error_length_utf8();
 

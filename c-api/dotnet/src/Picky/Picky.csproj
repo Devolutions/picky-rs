@@ -3,14 +3,17 @@
   <PropertyGroup>
     <Company>Devolutions</Company>
     <Description>Bindings to Rust picky native library</Description>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFrameworks>net472;net48;net6.0</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
     <Version>0.1.0</Version>
-    <ImplicitUsings>enable</ImplicitUsings>
+    <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+  </PropertyGroup>
 
-    <!-- custom properties -->
+  <!-- custom properties -->
+  <PropertyGroup>
     <NativeLibPath>lib/$(Configuration)</NativeLibPath>
     <NativeLibPathLinux64>$(NativeLibPath)/linux-x64/libpicky.so</NativeLibPathLinux64>
     <NativeLibPathWin64>$(NativeLibPath)/win-x64/picky.dll</NativeLibPathWin64>
