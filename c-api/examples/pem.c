@@ -79,7 +79,7 @@ int main(int argc, char **argv) {
     goto exit;
   }
 
-  printf("label = %s, len = %d\n", pem_label, pem_data_sz);
+  printf("label=%s\nlen=%d\n", pem_label, pem_data_sz);
 
   exit_status = EXIT_SUCCESS;
 

@@ -78,22 +78,5 @@ test-dotnet: native-lib-debug dotnet-bindings
 pem_path := "../test_assets/intermediate_ca.crt"
 
 test-pem: pem
-    #!/usr/bin/env nu
-
-    let $output = ({{examples_out_folder}}pem {{pem_path}})
-    let $output = ($output | lines | parse "label = {label}, len = {len}")
-
-    let $expected_label = "CERTIFICATE"
-    let $expected_len = "835"
-
-    if $output.label == $expected_label && $output.len == $expected_len {
-        echo ">> test_pem: success"
-    } {
-        echo $">> test_pem: failed(char nl)"
-        echo $"expected:(char nl)"
-        echo [[label, len]; [$expected_label, $expected_len]]
-        echo $"output:(char nl)"
-        echo $output
-        exit 1
-    }
+    eval $({{examples_out_folder}}pem {{pem_path}}) && [ "$label" = "CERTIFICATE" ] && [ "$len" -eq 835 ] && echo ">> test_pem: success"
 
