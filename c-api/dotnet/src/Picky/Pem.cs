@@ -1,35 +1,28 @@
 ﻿namespace Devolutions.Picky;
 
-public class PemException : System.Exception
-{
-    public PemException(String message) : base(message) { }
-}
-
 public class Pem
 {
-    private unsafe Native.picky_pem_t* inner = null;
+    private unsafe Native.picky_pem_t* _inner = null;
+    private string? _label = null;
+    private byte[]? _data = null;
 
-    private String? label = null;
-
-    public String Label
+    public string Label
     {
         get
         {
-            return this.GetLabel();
+            return GetLabel();
         }
     }
-
-    private byte[]? data = null;
 
     public byte[] Data
     {
         get
         {
-            return this.GetData();
+            return GetData();
         }
     }
 
-    public Pem(String label, byte[] data)
+    public Pem(string label, byte[] data)
     {
         byte[] utf8Label = Utils.StringToUtf8WithNulTerminator(label);
 
@@ -37,20 +30,20 @@ public class Pem
         {
             fixed (byte* utf8LabelPtr = utf8Label, dataPtr = data)
             {
-                this.inner = Native.Raw.pem_new((sbyte*)utf8LabelPtr, utf8Label.Length, dataPtr, data.Length);
+                _inner = Native.Raw.pem_new((sbyte*)utf8LabelPtr, utf8Label.Length, dataPtr, data.Length);
 
-                if (this.inner == null)
+                if (_inner == null)
                 {
                     throw new PemException(Error.Last());
                 }
 
-                this.label = label;
-                this.data = data;
+                _label = label;
+                _data = data;
             }
         }
     }
 
-    public Pem(String pem_repr)
+    public Pem(string pem_repr)
     {
         byte[] input = Utils.StringToUtf8WithNulTerminator(pem_repr);
 
@@ -60,9 +53,9 @@ public class Pem
             // don't move it while it's being used inside the native call.
             fixed (byte* inputPtr = input)
             {
-                this.inner = Native.Raw.pem_parse((sbyte*)inputPtr, input.Length);
+                _inner = Native.Raw.pem_parse((sbyte*)inputPtr, input.Length);
 
-                if (this.inner == null)
+                if (_inner == null)
                 {
                     throw new PemException(Error.Last());
                 }
@@ -70,11 +63,11 @@ public class Pem
         }
     }
 
-    public String ToRepr()
+    public string ToRepr()
     {
         unsafe
         {
-            int len = Native.Raw.pem_compute_repr_length(this.inner);
+            int len = Native.Raw.pem_compute_repr_length(_inner);
 
             if (len == -1)
             {
@@ -85,7 +78,7 @@ public class Pem
 
             fixed (byte* bufPtr = buf)
             {
-                if (Native.Raw.pem_to_repr(this.inner, (sbyte*)bufPtr, buf.Length) != len)
+                if (Native.Raw.pem_to_repr(_inner, (sbyte*)bufPtr, buf.Length) != len)
                 {
                     throw new PemException(Error.Last());
                 }
@@ -95,16 +88,16 @@ public class Pem
         }
     }
 
-    public String GetLabel()
+    public string GetLabel()
     {
-        if (this.label != null)
+        if (_label != null)
         {
-            return this.label;
+            return _label;
         }
 
         unsafe
         {
-            int len = Native.Raw.pem_label_length(this.inner);
+            int len = Native.Raw.pem_label_length(_inner);
 
             if (len == -1)
             {
@@ -115,28 +108,28 @@ public class Pem
 
             fixed (byte* bufPtr = buf)
             {
-                if (Native.Raw.pem_label(this.inner, (sbyte*)bufPtr, buf.Length) != len)
+                if (Native.Raw.pem_label(_inner, (sbyte*)bufPtr, buf.Length) != len)
                 {
                     throw new PemException(Error.Last());
                 }
             }
 
-            this.label = Utils.Utf8WithNulTerminatorToString(buf);
+            _label = Utils.Utf8WithNulTerminatorToString(buf);
 
-            return this.label;
+            return _label;
         }
     }
 
     public byte[] GetData()
     {
-        if (this.data != null)
+        if (_data != null)
         {
-            return this.data;
+            return _data;
         }
 
         unsafe
         {
-            int len = Native.Raw.pem_data_length(this.inner);
+            int len = Native.Raw.pem_data_length(_inner);
 
             if (len == -1)
             {
@@ -147,13 +140,13 @@ public class Pem
 
             fixed (byte* bufPtr = buf)
             {
-                if (Native.Raw.pem_data(this.inner, bufPtr, buf.Length) != len)
+                if (Native.Raw.pem_data(_inner, bufPtr, buf.Length) != len)
                 {
                     throw new PemException(Error.Last());
                 }
             }
 
-            this.data = buf;
+            _data = buf;
 
             return buf;
         }
@@ -163,8 +156,8 @@ public class Pem
     {
         unsafe
         {
-            Native.Raw.pem_drop(this.inner);
-            this.inner = null;
+            Native.Raw.pem_drop(_inner);
+            _inner = null;
         }
     }
 }

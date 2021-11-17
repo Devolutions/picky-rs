@@ -6,7 +6,7 @@ namespace Devolutions.Picky.Tests;
 
 public class PemTest
 {
-    private static readonly String certPemRepr = @"-----BEGIN CERTIFICATE-----
+    private static readonly string certPemRepr = @"-----BEGIN CERTIFICATE-----
 MIIDPzCCAiegAwIBAgIBATANBgkqhkiG9w0BAQUFADA7MQswCQYDVQQGEwJOTDER
 MA8GA1UECgwIUG9sYXJTU0wxGTAXBgNVBAMMEFBvbGFyU1NMIFRlc3QgQ0EwHhcN
 MTEwMjEyMTQ0NDA2WhcNMjEwMjEyMTQ0NDA2WjA8MQswCQYDVQQGEwJOTDERMA8G

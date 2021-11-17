@@ -49,6 +49,8 @@ dotnet-bindings: c-bindings
     ClangSharpPInvokeGenerator @{{response_file}} --output {{dotnet_native_path}} --test-output {{dotnet_native_test_path}}
     @echo ">> Native .NET wrapper generated at {{dotnet_native_path}}"
     @echo ">> Native .NET wrapper tests generated at {{dotnet_native_test_path}}"
+    @echo ">> Proceeds to code formating…"
+    cd {{dotnet_folder}} && dotnet format
 
 ## Examples ##
 
