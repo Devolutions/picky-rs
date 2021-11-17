@@ -53,5 +53,3 @@ and sanity tests are run with
 ```
 $ just test
 ```
-
-Note: `test-pem` target requires [Nushell](https://www.nushell.sh) to be available in PATH.
