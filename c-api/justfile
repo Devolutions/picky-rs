@@ -13,10 +13,17 @@ default: bindings
 
 ## Native library ##
 
-lib_path := "../target/debug/libpicky.a"
+target_debug_folder   := "../target/debug/"
+static_lib_path       := target_debug_folder + "libpicky.a"
+shared_lib_path_linux := target_debug_folder + "libpicky.so"
+shared_lib_path_win   := target_debug_folder + "picky.dll"
 
 native-lib-debug:
     cargo build -p picky-c-api
+    mkdir -p {{dotnet_native_lib_path_linux}}
+    -cp {{shared_lib_path_linux}} {{dotnet_native_lib_path_linux}}
+    mkdir -p {{dotnet_native_lib_path_win}}
+    -cp {{shared_lib_path_win}} {{dotnet_native_lib_path_win}}
 
 ## Bindings ##
 
@@ -30,10 +37,13 @@ c-bindings:
     cbindgen --crate picky-c-api --config {{cbindgen_config_file}} --output "{{header_path}}"
     @echo ">> C header generated at {{header_path}}"
 
-response_file           := "./dotnet_native.rsp"
-dotnet_folder           := "./dotnet/"
-dotnet_native_path      := dotnet_folder + "src/Picky/Native"
-dotnet_native_test_path := dotnet_folder + "tests/Picky.Tests/Native"
+response_file                := "./dotnet_native.rsp"
+dotnet_folder                := "./dotnet/"
+dotnet_lib_path              := dotnet_folder + "src/Picky/"
+dotnet_native_path           := dotnet_lib_path + "Native/"
+dotnet_native_test_path      := dotnet_folder + "tests/Picky.Tests/Native/"
+dotnet_native_lib_path_linux := dotnet_lib_path + "lib/Debug/linux-x64/"
+dotnet_native_lib_path_win   := dotnet_lib_path + "lib/Debug/win-x64/"
 
 dotnet-bindings: c-bindings
     ClangSharpPInvokeGenerator @{{response_file}} --output {{dotnet_native_path}} --test-output {{dotnet_native_test_path}}
@@ -44,7 +54,7 @@ dotnet-bindings: c-bindings
 
 examples_folder     := "./examples/"
 examples_out_folder := examples_folder + "out/"
-common_gcc_args     := lib_path + " -I" + include_folder + " -lm"
+common_gcc_args     := static_lib_path + " -I" + include_folder + " -lm"
 
 examples: pem
 
@@ -56,6 +66,7 @@ make-examples-output-directory:
 
 clean:
     -rm -rf {{examples_out_folder}}
+    -cd {{dotnet_folder}} && dotnet clean
 
 ## Tests ##
 
