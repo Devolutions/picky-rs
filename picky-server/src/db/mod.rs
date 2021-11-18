@@ -1,14 +1,13 @@
 mod config;
 mod file;
 mod memory;
-pub mod mongodb;
+mod mongodb;
 
 use crate::config::{BackendType, Config};
 use crate::db::file::{FileStorage, FileStorageError};
 use crate::db::memory::{MemoryStorage, MemoryStorageError};
 use crate::db::mongodb::{MongoStorage, MongoStorageError};
 use futures::future::BoxFuture;
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 pub const SCHEMA_LAST_VERSION: u8 = 1;
@@ -65,60 +64,6 @@ pub struct CertificateEntry {
     pub key: Option<Vec<u8>>,
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy, Hash, Serialize, Deserialize)]
-pub enum SshKeyType {
-    Host,
-    Client,
-}
-
-impl SshKeyType {
-    pub fn as_str(&self) -> &str {
-        match &self {
-            SshKeyType::Client => "Client",
-            SshKeyType::Host => "Host",
-        }
-    }
-}
-
-impl ToString for SshKeyType {
-    fn to_string(&self) -> String {
-        match &self {
-            SshKeyType::Client => "Client".to_owned(),
-            SshKeyType::Host => "Host".to_owned(),
-        }
-    }
-}
-
-#[derive(Debug, Eq, PartialEq, Clone, Hash, Serialize, Deserialize)]
-pub struct SshKeyEntry {
-    pub key_type: SshKeyType,
-    pub key: String,
-}
-
-impl Default for SshKeyEntry {
-    fn default() -> Self {
-        SshKeyEntry {
-            key_type: SshKeyType::Host,
-            key: "".to_owned(),
-        }
-    }
-}
-
-impl AsRef<[u8]> for SshKeyEntry {
-    fn as_ref(&self) -> &[u8] {
-        self.key.as_ref()
-    }
-}
-
-impl SshKeyEntry {
-    pub fn new(key_type: SshKeyType, key: String) -> Self {
-        Self { key_type, key }
-    }
-    pub fn key_type(&self) -> &SshKeyType {
-        &self.key_type
-    }
-}
-
 pub trait PickyStorage: Send + Sync {
     fn health(&self) -> BoxFuture<'_, Result<(), StorageError>>;
     fn store(&self, entry: CertificateEntry) -> BoxFuture<'_, Result<(), StorageError>>;
@@ -131,7 +76,4 @@ pub trait PickyStorage: Send + Sync {
         key_identifier: &'a str,
     ) -> BoxFuture<'a, Result<String, StorageError>>;
     fn lookup_addressing_hash<'a>(&'a self, lookup_key: &'a str) -> BoxFuture<'a, Result<String, StorageError>>;
-    fn store_private_ssh_key(&self, key: SshKeyEntry) -> BoxFuture<Result<(), StorageError>>;
-    fn get_ssh_private_key_by_type(&self, key_type: SshKeyType) -> BoxFuture<Result<SshKeyEntry, StorageError>>;
-    fn remove_ssh_private_key_by_type(&self, key_type: SshKeyType) -> BoxFuture<Result<(), StorageError>>;
 }

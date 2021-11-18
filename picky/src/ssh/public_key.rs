@@ -1,10 +1,7 @@
 use crate::key::{KeyError, PublicKey};
-use crate::ssh::traits::{SshMpintDecoder, SshMpintEncoder, SshParser, SshStringDecoder, SshStringEncoder};
-use crate::ssh::{read_to_buffer_till_whitespace, Base64Reader, Base64Writer, SSH_RSA_KEY_TYPE};
-use byteorder::WriteBytesExt;
-use rsa::{PublicKeyParts, RsaPublicKey};
-use std::convert::TryFrom;
-use std::io::{self, Read, Write};
+use crate::ssh::decode::SshComplexTypeDecode;
+use crate::ssh::encode::SshComplexTypeEncode;
+use std::io;
 use std::str::FromStr;
 use std::string;
 use thiserror::Error;
@@ -30,37 +27,6 @@ pub enum SshBasePublicKey {
     Rsa(PublicKey),
 }
 
-impl SshParser for SshBasePublicKey {
-    type Error = SshPublicKeyError;
-
-    fn decode(mut stream: impl Read) -> Result<Self, Self::Error>
-    where
-        Self: Sized,
-    {
-        let key_type = stream.ssh_string_decode()?;
-        match key_type.as_str() {
-            SSH_RSA_KEY_TYPE => {
-                let e = stream.ssh_mpint_decode()?;
-                let n = stream.ssh_mpint_decode()?;
-                Ok(SshBasePublicKey::Rsa(PublicKey::from_components(&n, &e)))
-            }
-            _ => Err(SshPublicKeyError::UnknownKeyType),
-        }
-    }
-
-    fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
-        match self {
-            SshBasePublicKey::Rsa(rsa) => {
-                let rsa = RsaPublicKey::try_from(rsa)?;
-                SSH_RSA_KEY_TYPE.ssh_string_encode(&mut stream)?;
-                rsa.e().ssh_mpint_encode(&mut stream)?;
-                rsa.n().ssh_mpint_encode(&mut stream)?;
-                Ok(())
-            }
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct SshPublicKey {
     pub inner_key: SshBasePublicKey,
@@ -75,61 +41,11 @@ impl SshPublicKey {
     }
 }
 
-impl SshParser for SshPublicKey {
-    type Error = SshPublicKeyError;
-
-    fn decode(mut stream: impl Read) -> Result<Self, Self::Error> {
-        let mut buffer = Vec::with_capacity(1024);
-
-        read_to_buffer_till_whitespace(&mut stream, &mut buffer).unwrap();
-
-        let header = String::from_utf8_lossy(&buffer).to_string();
-        buffer.clear();
-
-        let inner_key = match header.as_str() {
-            SSH_RSA_KEY_TYPE => {
-                read_to_buffer_till_whitespace(&mut stream, &mut buffer)?;
-                let mut slice = buffer.as_slice();
-                let decoder = Base64Reader::new(&mut slice, base64::STANDARD);
-                SshParser::decode(decoder)?
-            }
-            _ => return Err(SshPublicKeyError::UnknownKeyType),
-        };
-
-        buffer.clear();
-        read_to_buffer_till_whitespace(&mut stream, &mut buffer)?;
-        let comment = String::from_utf8(buffer)?.trim_end().to_owned();
-
-        Ok(SshPublicKey { inner_key, comment })
-    }
-
-    fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
-        match &self.inner_key {
-            SshBasePublicKey::Rsa(_) => {
-                stream.write_all(SSH_RSA_KEY_TYPE.as_bytes())?;
-                stream.write_u8(b' ')?;
-            }
-        };
-
-        {
-            let mut base64_write = Base64Writer::new(&mut stream, base64::STANDARD);
-            self.inner_key.encode(&mut base64_write)?;
-            base64_write.finish()?;
-        }
-
-        stream.write_u8(b' ')?;
-        stream.write_all(self.comment.as_bytes())?;
-        stream.write_all("\r\n".as_bytes())?;
-
-        Ok(())
-    }
-}
-
 impl FromStr for SshPublicKey {
     type Err = SshPublicKeyError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        SshParser::decode(s.as_bytes())
+        SshComplexTypeDecode::decode(s.as_bytes())
     }
 }
 
@@ -161,7 +77,7 @@ mod tests {
 
         assert_eq!("test@picky.com".to_owned(), public_key.comment);
         assert_eq!(
-            SshBasePublicKey::Rsa(PublicKey::from_components(
+            SshBasePublicKey::Rsa(PublicKey::from_rsa_components(
                 &BigUint::from_bytes_be(&[
                     219, 80, 34, 184, 116, 125, 103, 225, 211, 133, 6, 255, 236, 141, 243, 38, 107, 138, 185, 169, 238,
                     210, 103, 143, 99, 216, 99, 131, 24, 170, 252, 14, 231, 153, 49, 102, 11, 77, 201, 58, 214, 229,
@@ -203,7 +119,7 @@ mod tests {
 
         assert_eq!("test2@picky.com".to_owned(), public_key.comment);
         assert_eq!(
-            SshBasePublicKey::Rsa(PublicKey::from_components(
+            SshBasePublicKey::Rsa(PublicKey::from_rsa_components(
                 &BigUint::from_bytes_be(&[
                     200, 246, 27, 118, 131, 106, 142, 62, 4, 134, 230, 27, 149, 98, 49, 84, 162, 236, 154, 195, 159,
                     127, 233, 11, 144, 169, 69, 70, 194, 9, 200, 78, 88, 81, 108, 207, 155, 146, 242, 80, 125, 203,

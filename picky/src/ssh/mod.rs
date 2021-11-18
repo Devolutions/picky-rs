@@ -1,20 +1,21 @@
+pub mod certificate;
+pub mod decode;
+pub mod encode;
+pub mod private_key;
+pub mod public_key;
+pub mod sshtime;
+
 use base64::read::DecoderReader;
 use base64::write::EncoderWriter;
 use byteorder::ReadBytesExt;
 use std::io::{self, Read};
-
-pub mod certificate;
-pub mod private_key;
-pub mod public_key;
-pub mod sshtime;
-pub mod traits;
 
 pub type Base64Writer<T> = EncoderWriter<T>;
 pub type Base64Reader<'a, R> = DecoderReader<'a, R>;
 
 const SSH_RSA_KEY_TYPE: &str = "ssh-rsa";
 
-fn read_to_buffer_till_whitespace(stream: &mut dyn Read, buffer: &mut Vec<u8>) -> io::Result<()> {
+fn read_to_buffer_untill_whitespace(stream: &mut dyn Read, buffer: &mut Vec<u8>) -> io::Result<()> {
     loop {
         match stream.read_u8() {
             Ok(symbol) => {

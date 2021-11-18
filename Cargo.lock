@@ -2222,7 +2222,6 @@ name = "picky-server"
 version = "4.9.0"
 dependencies = [
  "base64 0.13.0",
- "chrono",
  "clap",
  "criterion",
  "futures",

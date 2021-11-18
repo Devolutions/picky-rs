@@ -1,10 +1,10 @@
 use crate::addressing::{encode_to_alternative_addresses, encode_to_canonical_address};
-use crate::db::{CertificateEntry, PickyStorage, SshKeyEntry, SshKeyType, StorageError};
+use crate::db::{CertificateEntry, PickyStorage, StorageError};
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use std::collections::HashMap;
 use std::hash::Hash;
-use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::sync::{RwLock, RwLockReadGuard};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -32,10 +32,6 @@ where
         self.repo.read().expect("couldn't get read lock on repo (poisoned)")
     }
 
-    fn get_collection_mut(&'a self) -> RwLockWriteGuard<'a, HashMap<String, T>> {
-        self.repo.write().expect("couldn't get read lock on repo (poisoned)")
-    }
-
     fn insert(&self, key: String, value: T) {
         if self
             .repo
@@ -54,7 +50,6 @@ pub struct MemoryStorage {
     name: MemoryRepository<String>,
     cert: MemoryRepository<Vec<u8>>,
     keys: MemoryRepository<Vec<u8>>,
-    ssh_keys: MemoryRepository<SshKeyEntry>,
     key_identifiers: MemoryRepository<String>,
     hash_lookup: MemoryRepository<String>,
     issued_timestamps_counter: MemoryRepository<u32>,
@@ -187,42 +182,6 @@ impl PickyStorage for MemoryStorage {
                 .ok_or_else(|| MemoryStorageError::Other {
                     description: "hash not found".to_owned(),
                 })?)
-        }
-        .boxed()
-    }
-
-    fn store_private_ssh_key(&self, key: SshKeyEntry) -> BoxFuture<Result<(), StorageError>> {
-        async move {
-            self.ssh_keys.insert(key.key_type().to_string(), key);
-            Ok(())
-        }
-        .boxed()
-    }
-
-    fn get_ssh_private_key_by_type(&self, key_type: SshKeyType) -> BoxFuture<Result<SshKeyEntry, StorageError>> {
-        async move {
-            Ok(self
-                .ssh_keys
-                .get_collection()
-                .get(key_type.as_str())
-                .cloned()
-                .ok_or_else(|| MemoryStorageError::Other {
-                    description: "SSH key not found".to_owned(),
-                })?)
-        }
-        .boxed()
-    }
-
-    fn remove_ssh_private_key_by_type(&self, key_type: SshKeyType) -> BoxFuture<Result<(), StorageError>> {
-        async move {
-            Ok(self
-                .ssh_keys
-                .get_collection_mut()
-                .remove(key_type.as_str())
-                .ok_or_else(|| MemoryStorageError::Other {
-                    description: "failed to remove an SSH key".to_owned(),
-                })
-                .map(|_| ())?)
         }
         .boxed()
     }

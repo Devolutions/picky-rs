@@ -116,7 +116,7 @@ impl TryFrom<&'_ PrivateKey> for RsaPublicKey {
 }
 
 impl PrivateKey {
-    pub fn from_components(
+    pub fn from_rsa_components(
         modulus: &BigUint,
         public_exponent: &BigUint,
         private_exponent: &BigUint,
@@ -232,7 +232,7 @@ impl PrivateKey {
         let public_exponent = key.e();
         let private_exponent = key.d();
 
-        Self::from_components(modulus, public_exponent, private_exponent, key.primes())
+        Self::from_rsa_components(modulus, public_exponent, private_exponent, key.primes())
     }
 
     pub(crate) fn as_inner(&self) -> &PrivateKeyInfo {
@@ -320,7 +320,7 @@ impl TryFrom<&'_ PublicKey> for RsaPublicKey {
 }
 
 impl PublicKey {
-    pub fn from_components(modulus: &BigUint, public_exponent: &BigUint) -> Self {
+    pub fn from_rsa_components(modulus: &BigUint, public_exponent: &BigUint) -> Self {
         PublicKey(SubjectPublicKeyInfo::new_rsa_key(
             IntegerAsn1::from_bytes_be_unsigned(modulus.to_bytes_be()),
             IntegerAsn1::from_bytes_be_unsigned(public_exponent.to_bytes_be()),

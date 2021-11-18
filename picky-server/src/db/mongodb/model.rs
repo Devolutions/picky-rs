@@ -1,4 +1,3 @@
-use crate::db::{SshKeyEntry, SshKeyType};
 use mongodm::mongo::bson::oid::ObjectId;
 use mongodm::mongo::bson::Bson;
 use mongodm::{Index, IndexOption, Indexes};
@@ -49,30 +48,6 @@ pub struct Key {
 
 impl mongodm::Model for Key {
     type CollConf = KeyCollConf;
-}
-
-// == ssh key == //
-
-pub struct SshKeyCollConf;
-
-impl mongodm::CollectionConfig for SshKeyCollConf {
-    fn collection_name() -> &'static str {
-        "ssh_key_store"
-    }
-
-    fn indexes() -> Indexes {
-        Indexes::new().with(Index::new("ssh_key").with_option(IndexOption::Unique))
-    }
-}
-
-impl mongodm::Model for SshKeyEntry {
-    type CollConf = SshKeyCollConf;
-}
-
-impl From<SshKeyType> for Bson {
-    fn from(key_type: SshKeyType) -> Self {
-        Bson::String(key_type.to_string())
-    }
 }
 
 // == key identifier == //

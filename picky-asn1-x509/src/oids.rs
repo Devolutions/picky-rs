@@ -40,6 +40,7 @@ macro_rules! define_oid {
 }
 
 define_oid! {
+    // x9-57
     DSA_WITH_SHA1 => dsa_with_sha1 => "1.2.840.10040.4.3",
     // ANSI-X962
     EC_PUBLIC_KEY => ec_public_key => "1.2.840.10045.2.1",

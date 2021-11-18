@@ -1,26 +1,23 @@
 use crate::hash::HashAlgorithm;
-use crate::key::{KeyError, PublicKey};
+use crate::key::KeyError;
 use crate::signature::{SignatureAlgorithm, SignatureError};
+use crate::ssh::decode::SshComplexTypeDecode;
+use crate::ssh::encode::{SshComplexTypeEncode, SshWriteExt};
 use crate::ssh::private_key::{SshBasePrivateKey, SshPrivateKey, SshPrivateKeyError};
 use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
-use crate::ssh::sshtime::{SshTime, SshTimeDecoder, SshTimeEncoder};
-use crate::ssh::traits::{
-    SshByteArrayDecoder, SshByteArrayEncoder, SshMpintDecoder, SshMpintEncoder, SshParser, SshStringDecoder,
-    SshStringEncoder,
-};
-use crate::ssh::{read_to_buffer_till_whitespace, Base64Reader, Base64Writer};
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use chrono::{DateTime, Utc};
+use crate::ssh::sshtime::SshTime;
+use byteorder::{BigEndian, WriteBytesExt};
 use rand::Rng;
 use rsa::{PublicKeyParts, RsaPublicKey};
+use serde::Deserialize;
 use std::cell::RefCell;
 use std::convert::TryFrom;
-use std::io::{self, Cursor, Read, Write};
+use std::io;
 use std::ops::DerefMut;
 use std::str::FromStr;
 use std::string;
-use std::time::SystemTime;
 use thiserror::Error;
+use time::OffsetDateTime;
 
 #[derive(Debug, Error)]
 pub enum SshCertificateError {
@@ -50,7 +47,7 @@ pub enum SshCertificateError {
     SshSignatureError(#[from] SshSignatureError),
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize)]
 pub enum SshCertType {
     Client,
     Host,
@@ -85,22 +82,6 @@ impl From<SshCertType> for u32 {
     }
 }
 
-impl SshParser for SshCertType {
-    type Error = SshCertTypeError;
-
-    fn decode(mut stream: impl Read) -> Result<Self, Self::Error>
-    where
-        Self: Sized,
-    {
-        SshCertType::try_from(stream.read_u32::<BigEndian>()?)
-    }
-
-    fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
-        stream.write_u32::<BigEndian>((*self).into())?;
-        Ok(())
-    }
-}
-
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum SshCertKeyType {
     SshRsaV01,
@@ -114,7 +95,7 @@ pub enum SshCertKeyType {
 }
 
 impl SshCertKeyType {
-    fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &str {
         match self {
             SshCertKeyType::SshRsaV01 => "ssh-rsa-cert-v01@openssh.com",
             SshCertKeyType::SshDssV01 => "ssh-dss-cert-v01@openssh.com",
@@ -186,61 +167,8 @@ impl TryFrom<String> for SshCriticalOptionType {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct SshCriticalOption {
-    option_type: SshCriticalOptionType,
-    data: String,
-}
-
-impl SshParser for SshCriticalOption {
-    type Error = SshCriticalOptionError;
-
-    fn decode(mut stream: impl Read) -> Result<Self, Self::Error>
-    where
-        Self: Sized,
-    {
-        let option_type: String = stream.ssh_string_decode()?;
-        let data: String = stream.ssh_string_decode()?;
-        Ok(SshCriticalOption {
-            option_type: SshCriticalOptionType::try_from(option_type)?,
-            data,
-        })
-    }
-
-    fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
-        self.option_type.as_str().ssh_string_encode(&mut stream)?;
-        self.data.as_str().ssh_string_encode(&mut stream)?;
-        Ok(())
-    }
-}
-
-impl<T> SshParser for Vec<T>
-where
-    T: SshParser,
-{
-    type Error = T::Error;
-
-    fn decode(mut stream: impl Read) -> Result<Self, Self::Error>
-    where
-        Self: Sized,
-    {
-        let data = stream.ssh_byte_array_decode()?;
-        let len = data.len() as u64;
-        let mut cursor = Cursor::new(data);
-        let mut res = Vec::new();
-        while cursor.position() < len {
-            let elem: Result<T, Self::Error> = SshParser::decode(&mut cursor);
-            res.push(elem?);
-        }
-        Ok(res)
-    }
-
-    fn encode(&self, stream: impl Write) -> Result<(), Self::Error> {
-        let mut data = Vec::new();
-        for elem in self.iter() {
-            elem.encode(&mut data)?;
-        }
-        data.ssh_byte_array_encode(stream)?;
-        Ok(())
-    }
+    pub option_type: SshCriticalOptionType,
+    pub data: String,
 }
 
 #[derive(Error, Debug)]
@@ -292,62 +220,13 @@ impl TryFrom<String> for SshExtensionType {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct SshExtension {
-    extension_type: SshExtensionType,
-    data: String,
+    pub extension_type: SshExtensionType,
+    pub data: String,
 }
 
 impl SshExtension {
     pub fn new(extension_type: SshExtensionType, data: String) -> Self {
         Self { extension_type, data }
-    }
-}
-
-impl SshParser for SshExtension {
-    type Error = SshExtensionError;
-
-    fn decode(mut stream: impl Read) -> Result<Self, Self::Error>
-    where
-        Self: Sized,
-    {
-        let extension_type = stream.ssh_string_decode()?;
-        let data = stream.ssh_string_decode()?;
-        Ok(SshExtension {
-            extension_type: SshExtensionType::try_from(extension_type)?,
-            data,
-        })
-    }
-
-    fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
-        self.extension_type.as_str().ssh_string_encode(&mut stream)?;
-        self.data.ssh_string_encode(&mut stream)?;
-        Ok(())
-    }
-}
-
-impl SshParser for Vec<String> {
-    type Error = io::Error;
-
-    fn decode(mut stream: impl Read) -> Result<Self, Self::Error>
-    where
-        Self: Sized,
-    {
-        let data = stream.ssh_byte_array_decode()?;
-        let len = data.len();
-        let mut cursor = Cursor::new(data);
-        let mut res = Vec::new();
-        while cursor.position() < len as u64 {
-            res.push(cursor.ssh_string_decode()?);
-        }
-        Ok(res)
-    }
-
-    fn encode(&self, stream: impl Write) -> Result<(), Self::Error> {
-        let mut data = Vec::new();
-        for s in self.iter() {
-            s.ssh_string_encode(&mut data)?;
-        }
-        data.ssh_byte_array_encode(stream)?;
-        Ok(())
     }
 }
 
@@ -393,48 +272,22 @@ pub struct SshSignature {
     pub blob: Vec<u8>,
 }
 
-impl SshParser for SshSignature {
-    type Error = SshSignatureError;
-
-    fn decode(mut stream: impl Read) -> Result<Self, Self::Error>
-    where
-        Self: Sized,
-    {
-        let _overall_size = stream.read_u32::<BigEndian>()?;
-        let format = stream.ssh_string_decode()?;
-        let blob = stream.ssh_byte_array_decode()?;
-
-        Ok(Self {
-            format: SshSignatureFormat::new(format.as_str())?,
-            blob,
-        })
-    }
-
-    fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
-        let overall_size = self.format.as_str().len() + self.blob.len() + 8;
-        stream.write_u32::<BigEndian>(overall_size as u32)?;
-        self.format.as_str().ssh_string_encode(&mut stream)?;
-        self.blob.clone().ssh_byte_array_encode(&mut stream)?;
-        Ok(())
-    }
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct SshCertificate {
-    cert_key_type: SshCertKeyType,
-    public_key: SshPublicKey,
-    nonce: Vec<u8>,
-    serial: u64,
-    cert_type: SshCertType,
-    key_id: String,
-    valid_principals: Vec<String>,
-    valid_after: SshTime,
-    valid_before: SshTime,
-    critical_options: Vec<SshCriticalOption>,
-    extensions: Vec<SshExtension>,
-    signature_key: SshPublicKey,
-    signature: SshSignature,
-    comment: String,
+    pub cert_key_type: SshCertKeyType,
+    pub public_key: SshPublicKey,
+    pub nonce: Vec<u8>,
+    pub serial: u64,
+    pub cert_type: SshCertType,
+    pub key_id: String,
+    pub valid_principals: Vec<String>,
+    pub valid_after: SshTime,
+    pub valid_before: SshTime,
+    pub critical_options: Vec<SshCriticalOption>,
+    pub extensions: Vec<SshExtension>,
+    pub signature_key: SshPublicKey,
+    pub signature: SshSignature,
+    pub comment: String,
 }
 
 impl SshCertificate {
@@ -449,149 +302,11 @@ impl SshCertificate {
     }
 }
 
-impl SshParser for SshCertificate {
-    type Error = SshCertificateError;
-
-    fn decode(mut stream: impl Read) -> Result<Self, Self::Error>
-    where
-        Self: Sized,
-    {
-        let mut cert_type = Vec::new();
-        read_to_buffer_till_whitespace(&mut stream, &mut cert_type)?;
-
-        let _ = SshCertKeyType::try_from(String::from_utf8(cert_type)?)?;
-
-        let mut cert_data = Vec::new();
-        read_to_buffer_till_whitespace(&mut stream, &mut cert_data)?;
-
-        let mut cert_data = cert_data.as_slice();
-        let mut cert_data = Base64Reader::new(&mut cert_data, base64::STANDARD);
-
-        let cert_key_type = cert_data.ssh_string_decode()?;
-        let cert_key_type = SshCertKeyType::try_from(cert_key_type)?;
-
-        let nonce = cert_data.ssh_byte_array_decode()?;
-
-        let inner_public_key = match &cert_key_type {
-            SshCertKeyType::SshRsaV01 | SshCertKeyType::RsaSha2_256V01 | SshCertKeyType::RsaSha2_512v01 => {
-                let e = cert_data.ssh_mpint_decode()?;
-                let n = cert_data.ssh_mpint_decode()?;
-                SshBasePublicKey::Rsa(PublicKey::from_components(&n, &e))
-            }
-            SshCertKeyType::EcdsaSha2Nistp256V01
-            | SshCertKeyType::SshDssV01
-            | SshCertKeyType::EcdsaSha2Nistp384V01
-            | SshCertKeyType::EcdsaSha2Nistp521V01
-            | SshCertKeyType::SshEd25519V01 => {
-                return Err(SshCertificateError::UnsupportedCertificateType(
-                    cert_key_type.as_str().to_owned(),
-                ))
-            }
-        };
-
-        let serial = cert_data.read_u64::<BigEndian>()?;
-        let cert_type: SshCertType = SshParser::decode(&mut cert_data)?;
-
-        let key_id = cert_data.ssh_string_decode()?;
-
-        let valid_principals: Vec<String> = SshParser::decode(&mut cert_data)?;
-
-        let valid_after = cert_data.ssh_time_decode()?;
-        let valid_before = cert_data.ssh_time_decode()?;
-
-        let critical_options: Vec<SshCriticalOption> = SshParser::decode(&mut cert_data)?;
-
-        let extensions: Vec<SshExtension> = SshParser::decode(&mut cert_data)?;
-
-        let _ = cert_data.ssh_byte_array_decode()?; // reserved
-
-        // here is public key
-        let signature_key = cert_data.ssh_byte_array_decode()?;
-        let signature_public_key: SshBasePublicKey = SshParser::decode(signature_key.as_slice())?;
-
-        let signature = SshSignature::decode(cert_data)?;
-
-        let mut comment = Vec::new();
-        read_to_buffer_till_whitespace(&mut stream, &mut comment)?;
-        let comment = String::from_utf8(comment)?.trim_end().to_owned();
-
-        Ok(SshCertificate {
-            cert_key_type,
-            public_key: SshPublicKey {
-                inner_key: inner_public_key,
-                comment: String::new(),
-            },
-            nonce,
-            serial,
-            cert_type,
-            key_id,
-            valid_principals,
-            valid_after,
-            valid_before,
-            critical_options,
-            extensions,
-            signature_key: SshPublicKey {
-                inner_key: signature_public_key,
-                comment: String::new(),
-            },
-            signature,
-            comment,
-        })
-    }
-
-    fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
-        stream.write_all(self.cert_key_type.as_str().as_bytes())?;
-        stream.write_u8(b' ')?;
-
-        let mut cert_data = Base64Writer::new(stream, base64::STANDARD);
-
-        self.cert_key_type.as_str().ssh_string_encode(&mut cert_data)?;
-        self.nonce.ssh_byte_array_encode(&mut cert_data)?;
-        match &self.public_key.inner_key {
-            SshBasePublicKey::Rsa(rsa) => {
-                let rsa = RsaPublicKey::try_from(rsa)?;
-                //SshString("ssh-rsa".to_string()).encode(&mut cert_data)?;
-                rsa.e().ssh_mpint_encode(&mut cert_data)?;
-                rsa.n().ssh_mpint_encode(&mut cert_data)?;
-            }
-        };
-
-        cert_data.write_u64::<BigEndian>(self.serial)?;
-
-        self.cert_type.encode(&mut cert_data)?;
-
-        self.key_id.ssh_string_encode(&mut cert_data)?;
-
-        self.valid_principals.encode(&mut cert_data)?;
-        self.valid_after.ssh_time_encode(&mut cert_data)?;
-        self.valid_before.ssh_time_encode(&mut cert_data)?;
-        self.critical_options.encode(&mut cert_data)?;
-        self.extensions.encode(&mut cert_data)?;
-
-        Vec::new().ssh_byte_array_encode(&mut cert_data)?; // reserved
-
-        let mut rsa_key = Vec::new();
-        self.signature_key.inner_key.encode(&mut rsa_key)?;
-
-        rsa_key.ssh_byte_array_encode(&mut cert_data)?;
-        self.signature.encode(&mut cert_data)?;
-
-        // stream.write_all(cert_data.finish()?.as_slice())?;
-        let mut stream = cert_data.finish().unwrap();
-        stream.write_u8(b' ')?;
-
-        stream.write_all(self.comment.as_bytes())?;
-        stream.write_all("\r\n".as_bytes())?;
-
-        Ok(())
-    }
-}
-
 impl FromStr for SshCertificate {
     type Err = SshCertificateError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        SshParser::decode(s.as_bytes())
+        SshComplexTypeDecode::decode(s.as_bytes())
     }
 }
 
@@ -785,10 +500,10 @@ impl<'a> SshCertificateBuilder<'a> {
             nonce.push(rnd.gen::<u8>());
         }
 
-        let cur_date = DateTime::<Utc>::from(SystemTime::now());
+        let now_timestamp = OffsetDateTime::now_utc().unix_timestamp();
         let valid_after = valid_after.take().ok_or(SshCertificateGenerationError::InvalidTime)?;
         let valid_before = valid_before.take().ok_or(SshCertificateGenerationError::InvalidTime)?;
-        if valid_after.timestamp() > cur_date.timestamp() || cur_date.timestamp() >= valid_before.timestamp() {
+        if valid_after.timestamp() > now_timestamp || now_timestamp >= valid_before.timestamp() {
             return Err(SshCertificateGenerationError::InvalidTime);
         }
 
@@ -850,25 +565,20 @@ impl<'a> SshCertificateBuilder<'a> {
         let compute_raw_signature = || -> Result<Vec<u8>, SshCertificateGenerationError> {
             let mut buff = Vec::with_capacity(1024);
 
-            cert_key_type
-                .as_str()
-                .ssh_string_encode(&mut buff)
+            buff.write_ssh_string(cert_key_type.as_str())
                 .map_err(SshCertificateGenerationError::IoError)?;
 
-            cert_key_type
-                .as_str()
-                .ssh_string_encode(&mut buff)
+            buff.write_ssh_string(cert_key_type.as_str())
                 .map_err(SshCertificateGenerationError::IoError)?;
 
-            nonce
-                .ssh_byte_array_encode(&mut buff)
+            buff.write_ssh_bytes(&nonce)
                 .map_err(SshCertificateGenerationError::IoError)?;
 
             match &public_key.inner_key {
                 SshBasePublicKey::Rsa(rsa) => {
                     let rsa = RsaPublicKey::try_from(rsa).unwrap();
-                    rsa.e().ssh_mpint_encode(&mut buff)?;
-                    rsa.n().ssh_mpint_encode(&mut buff)?;
+                    buff.write_ssh_mpint(rsa.e())?;
+                    buff.write_ssh_mpint(rsa.n())?;
                 }
             };
 
@@ -877,21 +587,21 @@ impl<'a> SshCertificateBuilder<'a> {
 
             cert_type.encode(&mut buff)?;
 
-            key_id.ssh_string_encode(&mut buff)?;
+            buff.write_ssh_string(&key_id)?;
             valid_principals.encode(&mut buff)?;
 
-            valid_after.ssh_time_encode(&mut buff)?;
-            valid_before.ssh_time_encode(&mut buff)?;
+            valid_after.encode(&mut buff)?;
+            valid_before.encode(&mut buff)?;
 
             critical_options.encode(&mut buff)?;
 
             extensions.encode(&mut buff)?;
 
-            Vec::new().ssh_byte_array_encode(&mut buff)?; // reserved
+            buff.write_ssh_bytes(&[])?; // reserved
 
             let mut buff2 = Vec::new();
             signature_key.public_key().inner_key.encode(&mut buff2)?;
-            buff2.ssh_byte_array_encode(&mut buff)?;
+            buff.write_ssh_bytes(&buff2)?;
 
             Ok(buff)
         };
