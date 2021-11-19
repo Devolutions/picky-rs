@@ -100,7 +100,7 @@ impl SshBasePrivateKey {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SshPrivateKey {
-    pub _cipher_name: String,
+    pub cipher_name: String,
     pub kdf: Kdf,
     pub base_key: SshBasePrivateKey,
     pub public_key: SshPublicKey,
@@ -182,7 +182,7 @@ impl SshPrivateKey {
         let base_key = SshBasePrivateKey::Rsa(private_key);
 
         SshPrivateKey {
-            _cipher_name: cipher_name,
+            cipher_name,
             kdf,
             base_key,
             public_key,
@@ -243,7 +243,7 @@ impl SshPrivateKey {
                 name: kdf_name,
                 option: kdf_option,
             },
-            _cipher_name: cipher_name,
+            cipher_name,
             check: check0,
             comment,
         })
@@ -362,7 +362,7 @@ pub mod tests {
 
         assert_eq!("test2@picky.com".to_owned(), private_key.comment);
         assert_eq!(kdf, private_key.kdf);
-        assert_eq!("none", private_key._cipher_name);
+        assert_eq!("none", private_key.cipher_name);
     }
 
     #[test]
@@ -374,7 +374,7 @@ pub mod tests {
         let kdf = Kdf::default();
         assert_eq!("test@picky.com".to_owned(), private_key.comment);
         assert_eq!(kdf, private_key.kdf);
-        assert_eq!("none", private_key._cipher_name);
+        assert_eq!("none", private_key.cipher_name);
     }
 
     #[test]
@@ -425,7 +425,7 @@ pub mod tests {
             },
             private_key.kdf
         );
-        assert_eq!("aes256-ctr", private_key._cipher_name);
+        assert_eq!("aes256-ctr", private_key.cipher_name);
     }
 
     #[test]

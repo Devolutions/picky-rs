@@ -12,11 +12,9 @@ use rsa::{PublicKeyParts, RsaPublicKey};
 use serde::Deserialize;
 use std::cell::RefCell;
 use std::convert::TryFrom;
-use std::io;
 use std::ops::DerefMut;
 use std::str::FromStr;
-use std::string;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{io, string};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -500,10 +498,10 @@ impl<'a> SshCertificateBuilder<'a> {
             nonce.push(rnd.gen::<u8>());
         }
 
-        let now_timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs() as i64;
         let valid_after = valid_after.take().ok_or(SshCertificateGenerationError::InvalidTime)?;
         let valid_before = valid_before.take().ok_or(SshCertificateGenerationError::InvalidTime)?;
-        if valid_after.timestamp() > now_timestamp || now_timestamp >= valid_before.timestamp() {
+
+        if valid_after.timestamp() > valid_before.timestamp() {
             return Err(SshCertificateGenerationError::InvalidTime);
         }
 
@@ -656,6 +654,7 @@ pub mod tests {
     use super::*;
     use crate::ssh::private_key::SshPrivateKey;
     use crate::ssh::sshtime::SshTime;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     const PRIVATE_KEY_PEM: &str = "-----BEGIN OPENSSH PRIVATE KEY-----\n\
                                    b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAACFwAAAAdz\n\
@@ -788,8 +787,7 @@ pub mod tests {
         certificate_builder.valid_before(SshTime::from(valid_before));
 
         certificate_builder.signature_key(&private_key);
-        let cert = certificate_builder.build();
-        assert!(cert.is_ok());
+        certificate_builder.build().unwrap();
     }
 
     #[test]

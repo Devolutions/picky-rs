@@ -99,7 +99,6 @@ mod tests {
     #[test]
     fn read_pem_and_parse_certificate() {
         let pem = parse_pem(crate::test_files::PKCS7.as_bytes()).unwrap();
-        let decoded = Pkcs7::from_pem(&pem);
-        assert!(decoded.is_ok());
+        Pkcs7::from_pem(&pem).unwrap();
     }
 }

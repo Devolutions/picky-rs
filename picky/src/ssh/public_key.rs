@@ -1,9 +1,8 @@
 use crate::key::{KeyError, PublicKey};
 use crate::ssh::decode::SshComplexTypeDecode;
 use crate::ssh::encode::SshComplexTypeEncode;
-use std::io;
 use std::str::FromStr;
-use std::string;
+use std::{io, string};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
