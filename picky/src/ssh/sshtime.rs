@@ -5,7 +5,7 @@ compile_error!(
 );
 
 #[cfg(feature = "time_conversion")]
-mod time_conversion {
+mod ssh_time {
     use time::OffsetDateTime;
 
     #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -18,6 +18,30 @@ mod time_conversion {
 
         pub fn timestamp(&self) -> i64 {
             self.0.unix_timestamp()
+        }
+
+        pub fn month(&self) -> u8 {
+            u8::from(self.0.month())
+        }
+
+        pub fn day(&self) -> u8 {
+            self.0.day()
+        }
+
+        pub fn hour(&self) -> u8 {
+            self.0.hour()
+        }
+
+        pub fn minute(&self) -> u8 {
+            self.0.minute()
+        }
+
+        pub fn second(&self) -> u8 {
+            self.0.second()
+        }
+
+        pub fn year(&self) -> u16 {
+            self.0.year().try_into().unwrap()
         }
     }
 
@@ -47,8 +71,9 @@ mod time_conversion {
 }
 
 #[cfg(all(feature = "chrono_conversion", not(feature = "time_conversion")))]
-mod chrono_conversion {
+mod ssh_time {
     use chrono::{DateTime, Utc};
+    pub use chrono::{Datelike, Timelike};
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
     #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -61,6 +86,30 @@ mod chrono_conversion {
 
         pub fn timestamp(&self) -> i64 {
             self.0.timestamp()
+        }
+
+        pub fn month(&self) -> u8 {
+            self.0.month().try_into().unwrap()
+        }
+
+        pub fn day(&self) -> u8 {
+            self.0.day().try_into().unwrap()
+        }
+
+        pub fn hour(&self) -> u8 {
+            self.0.hour().try_into().unwrap()
+        }
+
+        pub fn minute(&self) -> u8 {
+            self.0.minute().try_into().unwrap()
+        }
+
+        pub fn second(&self) -> u8 {
+            self.0.second().try_into().unwrap()
+        }
+
+        pub fn year(&self) -> u16 {
+            self.0.year().try_into().unwrap()
         }
     }
 
@@ -89,35 +138,4 @@ mod chrono_conversion {
     }
 }
 
-#[cfg(all(feature = "chrono_conversion", not(feature = "time_conversion")))]
-use chrono::{Datelike, Timelike};
-#[cfg(all(feature = "chrono_conversion", not(feature = "time_conversion")))]
-pub use chrono_conversion::SshTime;
-#[cfg(feature = "time_conversion")]
-pub use time_conversion::SshTime;
-
-impl SshTime {
-    pub fn year(&self) -> u16 {
-        self.0.year() as u16
-    }
-
-    pub fn month(&self) -> u8 {
-        self.0.month() as u8
-    }
-
-    pub fn day(&self) -> u8 {
-        self.0.day() as u8
-    }
-
-    pub fn hour(&self) -> u8 {
-        self.0.hour() as u8
-    }
-
-    pub fn minute(&self) -> u8 {
-        self.0.minute() as u8
-    }
-
-    pub fn second(&self) -> u8 {
-        self.0.second() as u8
-    }
-}
+pub use ssh_time::*;

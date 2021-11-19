@@ -150,7 +150,6 @@ impl MongoStorage {
                         .await
                         .expect("drop key identifier store");
                     key_collection.drop(None).await.expect("drop key store");
-                    // ssh_key_collection.drop(None).await.expect("drop ssh key store");
                     name_collection.drop(None).await.expect("drop name store");
                     hash_lookup_collection.drop(None).await.expect("drop hash lookup table");
                     timestamp_collection.drop(None).await.expect("drop timestamp store");

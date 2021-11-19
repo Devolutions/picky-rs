@@ -1,15 +1,15 @@
 use crate::key::{KeyError, PrivateKey};
 use crate::pem::{parse_pem, Pem, PemError};
 use crate::ssh::decode::{SshComplexTypeDecode, SshReadExt};
-use crate::ssh::encode::{SshComplexTypeEncode, SshWriteExt};
+use crate::ssh::encode::SshComplexTypeEncode;
 use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
 use aes::cipher::{NewCipher, StreamCipher};
 use aes::{Aes128, Aes128Ctr, Aes256, Aes256Ctr};
 use block_modes::block_padding::NoPadding;
 use block_modes::BlockMode;
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{BigEndian, ReadBytesExt};
 use rand::Rng;
-use std::io::{Cursor, Read, Write};
+use std::io::{Cursor, Read};
 use std::string;
 use thiserror::Error;
 
@@ -17,25 +17,16 @@ type Aes128Cbc = block_modes::Cbc<Aes128, NoPadding>;
 type Aes256Cbc = block_modes::Cbc<Aes256, NoPadding>;
 
 const SSH_PRIVATE_KEY_LABEL: &str = "OPENSSH PRIVATE KEY";
-const AUTH_MAGIC: &str = "openssh-key-v1";
+pub(crate) const AUTH_MAGIC: &str = "openssh-key-v1";
 
 const AES128_CTR: &str = "aes128-ctr";
-const AES256_CTR: &str = "aes256-ctr";
+pub(crate) const AES256_CTR: &str = "aes256-ctr";
 
 const AES128_CBC: &str = "aes128-cbc";
 const AES256_CBC: &str = "aes256-cbc";
 
-const BCRYPT: &str = "bcrypt";
-const NONE: &str = "none";
-
-pub trait SshPrivateKeyParser {
-    type Error;
-
-    fn decode(stream: impl Read, passphrase: Option<String>) -> Result<Self, Self::Error>
-    where
-        Self: Sized;
-    fn encode(&self, stream: impl Write) -> Result<(), Self::Error>;
-}
+pub(crate) const BCRYPT: &str = "bcrypt";
+pub(crate) const NONE: &str = "none";
 
 #[derive(Debug, Error)]
 pub enum SshPrivateKeyError {
@@ -128,12 +119,12 @@ impl SshPrivateKey {
     }
 
     pub fn from_pem(pem: &Pem, passphrase: Option<String>) -> Result<Self, SshPrivateKeyError> {
-        SshPrivateKeyParser::decode(&mut pem.data(), passphrase)
+        SshPrivateKey::decode(&mut pem.data(), passphrase)
     }
 
     pub fn from_pem_str(pem: &str, passphrase: Option<String>) -> Result<Self, SshPrivateKeyError> {
         let pem = parse_pem(pem)?;
-        SshPrivateKeyParser::decode(&mut pem.data(), passphrase)
+        SshPrivateKey::decode(&mut pem.data(), passphrase)
     }
 
     pub fn to_pem(&self) -> Result<Pem, SshPrivateKeyError> {
@@ -200,18 +191,8 @@ impl SshPrivateKey {
             passphrase,
         }
     }
-}
 
-impl From<PrivateKey> for SshPrivateKey {
-    fn from(private_key: PrivateKey) -> Self {
-        SshPrivateKey::h_picky_private_key_to_ssh_private_key(private_key, None, None)
-    }
-}
-
-impl SshPrivateKeyParser for SshPrivateKey {
-    type Error = SshPrivateKeyError;
-
-    fn decode(mut stream: impl Read, passphrase: Option<String>) -> Result<Self, Self::Error>
+    fn decode(mut stream: impl Read, passphrase: Option<String>) -> Result<Self, SshPrivateKeyError>
     where
         Self: Sized,
     {
@@ -267,75 +248,15 @@ impl SshPrivateKeyParser for SshPrivateKey {
             comment,
         })
     }
+}
 
-    fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
-        stream.write_all(AUTH_MAGIC.as_bytes())?;
-        stream.write_u8(b'\0')?;
-
-        if self.passphrase.is_some() {
-            stream.write_ssh_string(AES256_CTR)?;
-            stream.write_ssh_string(BCRYPT)?;
-
-            let salt = &self.kdf.option.salt;
-            let rounds = self.kdf.option.rounds;
-
-            let mut kdf_options = Vec::new();
-            kdf_options.write_ssh_bytes(salt)?;
-            kdf_options.write_u32::<BigEndian>(rounds)?;
-
-            stream.write_ssh_bytes(&kdf_options)?;
-        } else {
-            stream.write_ssh_string(NONE)?;
-            stream.write_ssh_string(NONE)?;
-            stream.write_ssh_string("")?;
-        }
-
-        stream.write_u32::<BigEndian>(1)?; // keys amount
-
-        let mut public_key = Vec::new();
-        self.public_key().inner_key.encode(&mut public_key)?;
-        stream.write_ssh_bytes(&public_key)?;
-
-        public_key.clear();
-        let mut private_key = public_key;
-
-        private_key.write_u32::<BigEndian>(self.check)?;
-        private_key.write_u32::<BigEndian>(self.check)?;
-        self.base_key.encode(&mut private_key)?;
-
-        private_key.write_ssh_string(&self.comment)?;
-
-        // add padding
-        for i in 1..=(8 - (private_key.len() % 8)) {
-            private_key.push(i as u8);
-        }
-
-        if let Some(passphrase) = &self.passphrase {
-            // encrypt private_key
-            let n = 48;
-            let mut hash = [0; 48];
-
-            let salt = &self.kdf.option.salt;
-            let rounds = self.kdf.option.rounds;
-
-            bcrypt_pbkdf::bcrypt_pbkdf(passphrase, salt, rounds, &mut hash)?;
-
-            let (key, iv) = hash.split_at(n - 16);
-            let mut cipher = Aes256Ctr::new_from_slices(key, iv).unwrap();
-
-            let private_key_len = private_key.len();
-            private_key.resize(private_key_len + 32, 0u8);
-            cipher.apply_keystream(&mut private_key);
-            private_key.truncate(private_key_len);
-        }
-
-        stream.write_ssh_bytes(&private_key)?;
-
-        Ok(())
+impl From<PrivateKey> for SshPrivateKey {
+    fn from(private_key: PrivateKey) -> Self {
+        SshPrivateKey::h_picky_private_key_to_ssh_private_key(private_key, None, None)
     }
 }
 
-fn decrypt(
+pub(crate) fn decrypt(
     cipher_name: &str,
     kdf_name: &str,
     kdf_options: &KdfOption,

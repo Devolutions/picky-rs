@@ -6,7 +6,7 @@ use crate::ssh::certificate::{
 };
 use crate::ssh::private_key::{KdfOption, SshBasePrivateKey, SshPrivateKeyError};
 use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
-use crate::ssh::{read_to_buffer_untill_whitespace, Base64Reader};
+use crate::ssh::{read_to_buffer_until_whitespace, Base64Reader};
 use byteorder::{BigEndian, ReadBytesExt};
 use num_bigint_dig::BigUint;
 use std::io::{self, Cursor, Read};
@@ -57,21 +57,16 @@ where
     }
 }
 
-pub trait SshComplexTypeDecode {
+pub trait SshComplexTypeDecode: Sized {
     type Error;
 
-    fn decode(stream: impl Read) -> Result<Self, Self::Error>
-    where
-        Self: Sized;
+    fn decode(stream: impl Read) -> Result<Self, Self::Error>;
 }
 
 impl SshComplexTypeDecode for SshCertType {
     type Error = SshCertTypeError;
 
-    fn decode(mut stream: impl Read) -> Result<Self, Self::Error>
-    where
-        Self: Sized,
-    {
+    fn decode(mut stream: impl Read) -> Result<Self, Self::Error> {
         SshCertType::try_from(stream.read_u32::<BigEndian>()?)
     }
 }
@@ -79,10 +74,7 @@ impl SshComplexTypeDecode for SshCertType {
 impl SshComplexTypeDecode for SshCriticalOption {
     type Error = SshCriticalOptionError;
 
-    fn decode(mut stream: impl Read) -> Result<Self, Self::Error>
-    where
-        Self: Sized,
-    {
+    fn decode(mut stream: impl Read) -> Result<Self, Self::Error> {
         let option_type: String = stream.read_ssh_string()?;
         let data: String = stream.read_ssh_string()?;
         Ok(SshCriticalOption {
@@ -99,10 +91,7 @@ where
 {
     type Error = T::Error;
 
-    fn decode(mut stream: impl Read) -> Result<Self, Self::Error>
-    where
-        Self: Sized,
-    {
+    fn decode(mut stream: impl Read) -> Result<Self, Self::Error> {
         let data = stream.read_ssh_bytes()?;
         let len = data.len() as u64;
         let mut cursor = Cursor::new(data);
@@ -118,10 +107,7 @@ where
 impl SshComplexTypeDecode for SshExtension {
     type Error = SshExtensionError;
 
-    fn decode(mut stream: impl Read) -> Result<Self, Self::Error>
-    where
-        Self: Sized,
-    {
+    fn decode(mut stream: impl Read) -> Result<Self, Self::Error> {
         let extension_type = stream.read_ssh_string()?;
         let data = stream.read_ssh_string()?;
         Ok(SshExtension {
@@ -134,10 +120,7 @@ impl SshComplexTypeDecode for SshExtension {
 impl SshComplexTypeDecode for Vec<String> {
     type Error = io::Error;
 
-    fn decode(mut stream: impl Read) -> Result<Self, Self::Error>
-    where
-        Self: Sized,
-    {
+    fn decode(mut stream: impl Read) -> Result<Self, Self::Error> {
         let data = stream.read_ssh_bytes()?;
         let len = data.len();
         let mut cursor = Cursor::new(data);
@@ -152,10 +135,7 @@ impl SshComplexTypeDecode for Vec<String> {
 impl SshComplexTypeDecode for SshSignature {
     type Error = SshSignatureError;
 
-    fn decode(mut stream: impl Read) -> Result<Self, Self::Error>
-    where
-        Self: Sized,
-    {
+    fn decode(mut stream: impl Read) -> Result<Self, Self::Error> {
         let _overall_size = stream.read_u32::<BigEndian>()?;
         let format = stream.read_ssh_string()?;
         let blob = stream.read_ssh_bytes()?;
@@ -170,10 +150,7 @@ impl SshComplexTypeDecode for SshSignature {
 impl SshComplexTypeDecode for KdfOption {
     type Error = io::Error;
 
-    fn decode(mut stream: impl Read) -> Result<Self, Self::Error>
-    where
-        Self: Sized,
-    {
+    fn decode(mut stream: impl Read) -> Result<Self, Self::Error> {
         let data = stream.read_ssh_bytes()?;
         if data.is_empty() {
             return Ok(KdfOption::default());
@@ -188,10 +165,7 @@ impl SshComplexTypeDecode for KdfOption {
 impl SshComplexTypeDecode for SshTime {
     type Error = io::Error;
 
-    fn decode(mut stream: impl Read) -> Result<Self, Self::Error>
-    where
-        Self: Sized,
-    {
+    fn decode(mut stream: impl Read) -> Result<Self, Self::Error> {
         let timestamp = stream.read_u64::<BigEndian>()?;
         Ok(SshTime::from(timestamp))
     }
@@ -200,10 +174,7 @@ impl SshComplexTypeDecode for SshTime {
 impl SshComplexTypeDecode for SshBasePublicKey {
     type Error = SshPublicKeyError;
 
-    fn decode(mut stream: impl Read) -> Result<Self, Self::Error>
-    where
-        Self: Sized,
-    {
+    fn decode(mut stream: impl Read) -> Result<Self, Self::Error> {
         let key_type = stream.read_ssh_string()?;
         match key_type.as_str() {
             SSH_RSA_KEY_TYPE => {
@@ -222,14 +193,14 @@ impl SshComplexTypeDecode for SshPublicKey {
     fn decode(mut stream: impl Read) -> Result<Self, Self::Error> {
         let mut buffer = Vec::with_capacity(1024);
 
-        read_to_buffer_untill_whitespace(&mut stream, &mut buffer).unwrap();
+        read_to_buffer_until_whitespace(&mut stream, &mut buffer).unwrap();
 
         let header = String::from_utf8_lossy(&buffer).to_string();
         buffer.clear();
 
         let inner_key = match header.as_str() {
             SSH_RSA_KEY_TYPE => {
-                read_to_buffer_untill_whitespace(&mut stream, &mut buffer)?;
+                read_to_buffer_until_whitespace(&mut stream, &mut buffer)?;
                 let mut slice = buffer.as_slice();
                 let decoder = Base64Reader::new(&mut slice, base64::STANDARD);
                 SshComplexTypeDecode::decode(decoder)?
@@ -238,7 +209,7 @@ impl SshComplexTypeDecode for SshPublicKey {
         };
 
         buffer.clear();
-        read_to_buffer_untill_whitespace(&mut stream, &mut buffer)?;
+        read_to_buffer_until_whitespace(&mut stream, &mut buffer)?;
         let comment = String::from_utf8(buffer)?.trim_end().to_owned();
 
         Ok(SshPublicKey { inner_key, comment })
@@ -248,10 +219,7 @@ impl SshComplexTypeDecode for SshPublicKey {
 impl SshComplexTypeDecode for SshBasePrivateKey {
     type Error = SshPrivateKeyError;
 
-    fn decode(mut stream: impl Read) -> Result<Self, Self::Error>
-    where
-        Self: Sized,
-    {
+    fn decode(mut stream: impl Read) -> Result<Self, Self::Error> {
         let key_type = stream.read_ssh_string()?;
         match key_type.as_str() {
             SSH_RSA_KEY_TYPE => {
@@ -277,17 +245,14 @@ impl SshComplexTypeDecode for SshBasePrivateKey {
 impl SshComplexTypeDecode for SshCertificate {
     type Error = SshCertificateError;
 
-    fn decode(mut stream: impl Read) -> Result<Self, Self::Error>
-    where
-        Self: Sized,
-    {
+    fn decode(mut stream: impl Read) -> Result<Self, Self::Error> {
         let mut cert_type = Vec::new();
-        read_to_buffer_untill_whitespace(&mut stream, &mut cert_type)?;
+        read_to_buffer_until_whitespace(&mut stream, &mut cert_type)?;
 
         let _ = SshCertKeyType::try_from(String::from_utf8(cert_type)?)?;
 
         let mut cert_data = Vec::new();
-        read_to_buffer_untill_whitespace(&mut stream, &mut cert_data)?;
+        read_to_buffer_until_whitespace(&mut stream, &mut cert_data)?;
 
         let mut cert_data = cert_data.as_slice();
         let mut cert_data = Base64Reader::new(&mut cert_data, base64::STANDARD);
@@ -337,7 +302,7 @@ impl SshComplexTypeDecode for SshCertificate {
         let signature = SshSignature::decode(cert_data)?;
 
         let mut comment = Vec::new();
-        read_to_buffer_untill_whitespace(&mut stream, &mut comment)?;
+        read_to_buffer_until_whitespace(&mut stream, &mut comment)?;
         let comment = String::from_utf8(comment)?.trim_end().to_owned();
 
         Ok(SshCertificate {
