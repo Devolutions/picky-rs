@@ -527,7 +527,6 @@ impl<'a> AuthenticodeValidator<'a> {
         self
     }
 
-    #[cfg(feature = "ctl")]
     #[inline]
     pub fn exclude_cert_authorities(&self, excluded_cert_authorities: &'a [DirectoryName]) -> &Self {
         self.inner
@@ -1478,9 +1477,9 @@ mod test {
         let mut auth_raw_data = picky_asn1_der::to_vec(&authenticated_attributes).unwrap();
         auth_raw_data[0] = Tag::SET.inner();
 
-        assert!(signature_algo
+        signature_algo
             .verify(&public_key.into(), auth_raw_data.as_ref(), encrypted_digest)
-            .is_ok());
+            .unwrap();
     }
 
     #[test]

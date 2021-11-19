@@ -7,7 +7,12 @@ use crate::logging::build_logger_config;
 use crate::picky_controller::Picky;
 use crate::utils::{GreedyError, PathOr};
 use log4rs::Handle;
+use picky::key::PrivateKey;
 use picky::pem::{parse_pem, to_pem, Pem};
+use picky::ssh::certificate::{SshCertKeyType, SshCertType, SshCertificateBuilder};
+use picky::ssh::private_key::SshPrivateKey;
+use picky::ssh::public_key::SshPublicKey;
+use picky::ssh::sshtime::SshTime;
 use picky::x509::date::UTCDate;
 use picky::x509::pkcs7::authenticode::{Attribute, AuthenticodeSignatureBuilder};
 use picky::x509::pkcs7::timestamp::TimestampRequest;
@@ -16,6 +21,8 @@ use saphir::prelude::*;
 use saphir::response::Builder as ResponseBuilder;
 use serde_json::{self, Value};
 use std::borrow::Cow;
+use std::convert::TryFrom;
+use time::OffsetDateTime;
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 pub struct ServerController {
@@ -313,6 +320,78 @@ impl ServerController {
 
         Ok(response)
     }
+
+    #[post("/ssh/sign")]
+    async fn sign_ssh_key(&self, req: Request) -> Result<ResponseBuilder, StatusCode> {
+        // nbf and exp never reads but we need them for deserialization
+        #[allow(dead_code)]
+        #[derive(serde::Deserialize)]
+        struct SshSignRequest {
+            key: String,
+            cert_type: SshCertType,
+            key_id: String,
+            principals: Vec<String>,
+            duration_secs: u64,
+            nbf: u64,
+            exp: u64,
+        }
+
+        let sign_request: SshSignRequest = match check_authorization(&*self.read_conf().await, &req) {
+            Ok(token) => serde_json::from_value(token.claims).bad_request()?,
+            Err(e) => {
+                log::error!("authorization failed: {}", e);
+                return Err(StatusCode::UNAUTHORIZED);
+            }
+        };
+
+        let ssh_public_key = SshPublicKey::from_str(&sign_request.key).bad_request()?;
+
+        let config = self.read_conf().await;
+        let (root_key, _) = get_main_private_key(&*self.read_conf().await, self.storage.as_ref())
+            .await
+            .internal_error_desc("Failed to get private key")?;
+        let ssh_private_key = SshPrivateKey::from(root_key);
+
+        let builder = SshCertificateBuilder::init();
+
+        let now = OffsetDateTime::now_utc();
+        let valid_before = (now.unix_timestamp() + i64::try_from(sign_request.duration_secs).bad_request()?) as u64;
+
+        let ssh_cert = builder
+            .cert_key_type(SshCertKeyType::SshRsaV01)
+            .key(&ssh_public_key)
+            .key_id(sign_request.key_id)
+            .cert_type(sign_request.cert_type)
+            .principals(sign_request.principals)
+            .valid_after(SshTime::from(now))
+            .valid_before(SshTime::from(valid_before))
+            .signature_key(&ssh_private_key)
+            .comment(ssh_public_key.comment.clone())
+            .signature_algo(config.signing_algorithm)
+            .build()
+            .internal_error()?;
+
+        let ssh_cert_pem = ssh_cert
+            .to_string()
+            .internal_error_desc("Failed to convert SSH certificate to PEM format")?;
+
+        Ok(ResponseBuilder::new().body(ssh_cert_pem).status(StatusCode::OK))
+    }
+
+    #[get("/ssh/key")]
+    async fn get_public_ssh_key(&self, _req: Request) -> Result<ResponseBuilder, StatusCode> {
+        let (root_key, _) = get_main_private_key(&*self.read_conf().await, self.storage.as_ref())
+            .await
+            .internal_error_desc("Failed to get private key")?;
+        let ssh_key = SshPrivateKey::from(root_key);
+
+        let pub_key = ssh_key
+            .public_key()
+            .to_string()
+            .internal_error_desc("couldn't deserialize SSH public key")?;
+
+        Ok(ResponseBuilder::new().body(pub_key).status(StatusCode::OK))
+    }
 }
 
 impl ServerController {
@@ -348,6 +427,22 @@ impl ServerController {
             Err(e) => Err(format!("couldn't reload config: {}", e)),
         }
     }
+}
+
+async fn get_main_private_key(config: &Config, storage: &dyn PickyStorage) -> Result<(PrivateKey, String), String> {
+    let root_name = format!("{} Root CA", config.realm);
+    let root_hash = storage
+        .get_addressing_hash_by_name(&root_name)
+        .await
+        .map_err(|e| format!("error while fetching root: {}", e))?;
+    let root_key_der = storage
+        .get_key_by_addressing_hash(&root_hash)
+        .await
+        .map_err(|e| format!("couldn't fetch root CA private key: {}", e))?;
+    Ok((
+        Picky::parse_pk_from_magic_der(&root_key_der).map_err(|e| format!("Failed to get root private key: {}", e))?,
+        root_hash,
+    ))
 }
 
 async fn extract_cert_from_request(req: &Request<Bytes>) -> Result<(Cert, Vec<u8>), GreedyError> {
@@ -548,7 +643,6 @@ async fn generate_root_ca(config: &Config, storage: &dyn PickyStorage) -> Result
 }
 
 async fn generate_intermediate_ca(config: &Config, storage: &dyn PickyStorage) -> Result<bool, String> {
-    let root_name = format!("{} Root CA", config.realm);
     let intermediate_name = format!("{} Authority", config.realm);
 
     if let Ok(certs) = storage.get_addressing_hash_by_name(&intermediate_name).await {
@@ -558,24 +652,15 @@ async fn generate_intermediate_ca(config: &Config, storage: &dyn PickyStorage) -
         }
     }
 
-    let root_hash = storage
-        .get_addressing_hash_by_name(&root_name)
-        .await
-        .map_err(|e| format!("error while fetching root: {}", e))?;
+    let (root_key, root_hash) = get_main_private_key(config, storage).await?;
 
     let root_cert_der = storage
         .get_cert_by_addressing_hash(&root_hash)
         .await
         .map_err(|e| format!("couldn't fetch root CA: {}", e))?;
 
-    let root_key_der = storage
-        .get_key_by_addressing_hash(&root_hash)
-        .await
-        .map_err(|e| format!("couldn't fetch root CA private key: {}", e))?;
-
     let pk = Picky::generate_private_key(2048).map_err(|e| e.to_string())?;
     let root_cert = Cert::from_der(&root_cert_der).map_err(|e| format!("couldn't parse root cert from der: {}", e))?;
-    let root_key = Picky::parse_pk_from_magic_der(&root_key_der).map_err(|e| e.to_string())?;
 
     let intermediate_cert = Picky::generate_intermediate(
         &intermediate_name,

@@ -99,13 +99,11 @@ mod tests {
 
     #[test]
     fn parse_certificate_trust_list_in_der() {
-        let pkcs7 = Pkcs7::from_der(crate::test_files::CERTIFICATE_TRUST_LIST);
-        assert!(pkcs7.is_ok());
+        Pkcs7::from_der(crate::test_files::CERTIFICATE_TRUST_LIST).unwrap();
     }
 
     #[test]
     fn create_ctl() {
-        let ctl = CertificateTrustList::fetch();
-        assert!(ctl.is_ok());
+        CertificateTrustList::fetch().unwrap();
     }
 }

@@ -31,6 +31,7 @@ time = { version = "0.3.4", optional = true }
 serde_json = { version = "1.0.68", optional = true }
 http = { version = "0.2.5", optional = true }
 cab = { version = "0.3.0", optional = true }
+lexical-sort = { version = "0.3", optional = true}
 
 # FIXME: either use ureq, or even better: do not require this kind of dependency at all to let user decide which lib to use.
 # (currently users should *really* not forget to use `spawn_blocking` when calling associated functions from async context)
@@ -48,6 +49,9 @@ rsa = "0.5.0"
 rand = "0.8.4"
 num-bigint-dig = "0.7.0"
 aes-gcm = { version = "0.9.4", optional = true }
+bcrypt-pbkdf = { version = "0.6", optional = true }
+block-modes = { version = "0.8", optional = true }
+aes = { version = "0.7.5", features = ["ctr"], default-features = false, optional = true }
 
 [dev-dependencies]
 pretty_assertions = "1.0.0"
@@ -69,6 +73,7 @@ http_timestamp = ["reqwest"]
 ctl = ["picky-asn1-x509/ctl", "pkcs7", "chrono_conversion"]
 ctl_http_fetch = ["reqwest", "cab"]
 wincert = ["byteorder"]
+ssh = ["byteorder", "aes", "block-modes", "bcrypt-pbkdf", "lexical-sort"]
 http_trait_impl = ["http"]
 chrono_conversion = ["chrono", "picky-asn1/chrono_conversion"]
 time_conversion = ["time", "picky-asn1/time_conversion"]
