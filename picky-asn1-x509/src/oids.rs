@@ -44,6 +44,7 @@ define_oid! {
     DSA_WITH_SHA1 => dsa_with_sha1 => "1.2.840.10040.4.3",
     // ANSI-X962
     EC_PUBLIC_KEY => ec_public_key => "1.2.840.10045.2.1",
+    ANSIP521R1 => ansip521r1 => "1.3.132.0.35",
     ECDSA_WITH_SHA256 => ecdsa_with_sha256 => "1.2.840.10045.4.3.2",
     ECDSA_WITH_SHA384 => ecdsa_with_sha384 => "1.2.840.10045.4.3.3",
     ECDSA_WITH_SHA512 => ecdsa_with_sha512 => "1.2.840.10045.4.3.4",

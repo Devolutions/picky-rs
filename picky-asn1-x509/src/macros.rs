@@ -37,6 +37,10 @@ mod tests {
             let encoded = &$encoded[$start..$end];
             check_serde!($item: $type in encoded);
         };
+        ($item:ident: $type:ident in $encoded:ident[$start:literal..]) => {
+            let encoded = &$encoded[$start..];
+            check_serde!($item: $type in encoded);
+        };
         ($item:ident: $type:ident in $encoded:ident) => {
             let encoded = &$encoded[..];
             let encoded_base64 = base64::encode(encoded);

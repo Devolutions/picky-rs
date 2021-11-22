@@ -1,5 +1,9 @@
 use crate::{oids, AlgorithmIdentifier};
-use picky_asn1::wrapper::{IntegerAsn1, OctetStringAsn1Container};
+use picky_asn1::tag::{Tag, TagPeeker};
+use picky_asn1::wrapper::{
+    BitStringAsn1, ExplicitContextTag0, ExplicitContextTag1, IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1,
+    OctetStringAsn1Container,
+};
 #[cfg(not(feature = "legacy"))]
 use serde::Deserialize;
 use serde::{de, ser, Serialize};
@@ -48,7 +52,8 @@ use std::fmt;
 #[derive(Serialize, Debug, Clone, PartialEq)]
 pub struct PrivateKeyInfo {
     pub version: u8,
-    pub private_key_algorithm: AlgorithmIdentifier,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub private_key_algorithm: Option<AlgorithmIdentifier>,
     pub private_key: PrivateKeyValue,
     //pub attributes
 }
@@ -79,7 +84,7 @@ impl PrivateKeyInfo {
 
         Self {
             version: 0,
-            private_key_algorithm: AlgorithmIdentifier::new_rsa_encryption(),
+            private_key_algorithm: Some(AlgorithmIdentifier::new_rsa_encryption()),
             private_key,
         }
     }
@@ -104,25 +109,34 @@ impl<'de> de::Deserialize<'de> for PrivateKeyInfo {
                 A: de::SeqAccess<'de>,
             {
                 let version = seq_next_element!(seq, PrivateKeyInfo, "version");
-                if version != 0 {
-                    return Err(serde_invalid_value!(
-                        PrivateKeyInfo,
-                        "unsupported version (valid version number: 0)",
-                        "a supported PrivateKeyInfo"
-                    ));
-                }
 
-                let private_key_algorithm: AlgorithmIdentifier =
-                    seq_next_element!(seq, PrivateKeyInfo, "private key algorithm");
-                let private_key = if private_key_algorithm.is_a(oids::rsa_encryption()) {
-                    PrivateKeyValue::RSA(seq_next_element!(seq, PrivateKeyInfo, "rsa oid"))
+                let tag_peek: TagPeeker = seq.next_element::<TagPeeker>()?.unwrap();
+                let (private_key, private_key_algorithm) = if tag_peek.next_tag == Tag::OCTET_STRING {
+                    let private_key = PrivateKeyValue::EC(seq_next_element!(seq, PrivateKeyInfo, "elliptic curve oid"));
+                    (private_key, None)
                 } else {
-                    return Err(serde_invalid_value!(
-                        PrivateKeyInfo,
-                        "unsupported algorithm",
-                        "a supported algorithm"
-                    ));
+                    let private_key_algorithm: AlgorithmIdentifier =
+                        seq_next_element!(seq, PrivateKeyInfo, "private key algorithm");
+                    if private_key_algorithm.is_a(oids::rsa_encryption()) {
+                            if version != 0 {
+                                return Err(serde_invalid_value!(
+                                    PrivateKeyInfo,
+                                    "unsupported version (valid version number: 0)",
+                                    "a supported PrivateKeyInfo"
+                                ));
+                            }
+                            let private_key = PrivateKeyValue::RSA(seq_next_element!(seq, PrivateKeyInfo, "rsa oid"));
+                            (private_key, Some(private_key_algorithm))
+                        } else {
+                            return Err(serde_invalid_value!(
+                                PrivateKeyInfo,
+                                "unsupported algorithm",
+                                "a supported algorithm"
+                            ));
+                        }
                 };
+
+                println!("it should be ok");
 
                 Ok(PrivateKeyInfo {
                     version,
@@ -139,6 +153,7 @@ impl<'de> de::Deserialize<'de> for PrivateKeyInfo {
 #[derive(Debug, PartialEq, Clone)]
 pub enum PrivateKeyValue {
     RSA(OctetStringAsn1Container<RsaPrivateKey>),
+    EC(ECPrivateKey),
 }
 
 impl ser::Serialize for PrivateKeyValue {
@@ -148,6 +163,7 @@ impl ser::Serialize for PrivateKeyValue {
     {
         match self {
             PrivateKeyValue::RSA(rsa) => rsa.serialize(serializer),
+            PrivateKeyValue::EC(ec) => serializer.serialize_newtype_struct("HeaderOnly", ec),
         }
     }
 }
@@ -328,9 +344,34 @@ impl RsaPrivateKey {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct ECPrivateKey {
+    private_key: OctetStringAsn1,
+    parameters: ExplicitContextTag0<ObjectIdentifierAsn1>,
+    public_key: ExplicitContextTag1<BitStringAsn1>,
+}
+
+/*
+impl ser::Serialize for ECPrivateKey {
+fn serialize<S>(&self, serializer: S) -> Result<S::Ok, <S as ser::Serializer>::Error>
+    where
+        S: ser::Serializer,
+{
+    use serde::ser::SerializeSeq;
+    let mut seq = serializer.serialize_seq(None)?;
+    seq.serialize_element(&self.private_key)?;
+    seq.serialize_element(&self.parameters)?;
+    seq.serialize_element(&self.public_key)?;
+
+    seq.end()
+}
+}
+ */
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use picky_asn1::bit_string::BitString;
 
     #[test]
     fn pkcs_8_private_key() {
@@ -395,5 +436,32 @@ mod tests {
         .unwrap();
 
         picky_asn1_der::from_bytes::<PrivateKeyInfo>(&encoded).unwrap();
+    }
+
+    #[test]
+    fn decode_ec_key() {
+        let decoded = base64::decode(
+            "\
+        MIHcAgEBBEIBhqphIGu2PmlcEb6xADhhSCpgPUulB0s4L2qOgolRgaBx4fNgINFE\
+        mBsSyHJncsWG8WFEuUzAYy/YKz2lP0Qx6Z2gBwYFK4EEACOhgYkDgYYABABwBevJ\
+        w/+Xh6I98ruzoTX3MNTsbgnc+glenJRCbEJkjbJrObFhbfgqP52r1lAy2RxuShGi\
+        NYJJzNPT6vR1abS32QFtvTH7YbYa6OWk9dtGNY/cYxgx1nQyhUuofdW7qbbfu/Ww\
+        TP2oFsPXRAavZCh4AbWUn8bAHmzNRyuJonQBKlQlVQ==",
+        )
+        .unwrap();
+
+        let ec_key = ECPrivateKey {
+            private_key: OctetStringAsn1::from(decoded[8..74].to_vec()),
+            parameters: ExplicitContextTag0(oids::ansip521r1().into()),
+            public_key: ExplicitContextTag1(BitString::with_bytes(decoded[90..].to_vec()).into()),
+        };
+
+        let private_key = PrivateKeyInfo {
+            version: 1,
+            private_key_algorithm: None,
+            private_key: PrivateKeyValue::EC(ec_key),
+        };
+
+        check_serde!(private_key: PrivateKeyInfo in decoded);
     }
 }
