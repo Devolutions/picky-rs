@@ -566,9 +566,6 @@ impl<'a> SshCertificateBuilder<'a> {
             buff.write_ssh_string(cert_key_type.as_str())
                 .map_err(SshCertificateGenerationError::IoError)?;
 
-            buff.write_ssh_string(cert_key_type.as_str())
-                .map_err(SshCertificateGenerationError::IoError)?;
-
             buff.write_ssh_bytes(&nonce)
                 .map_err(SshCertificateGenerationError::IoError)?;
 
