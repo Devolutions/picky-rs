@@ -1,6 +1,7 @@
 --config
 unix-types
 multi-file
+generate-macro-bindings
 generate-helper-types
 generate-tests-xunit
 --libraryPath
