@@ -2,21 +2,31 @@ use std::os::raw::{c_char, c_int};
 
 /// Picky return status
 #[repr(C)]
-pub enum status {
+pub enum picky_status_t {
     /// Operation ended successfully.
-    Success = 0,
+    PickyStatusSuccess = 0,
 
     /// If a function returns this value,
     /// a detailed error message can be retrieved using `picky_error_message_utf*`.
-    Failure = -1,
+    PickyStatusFailure = -1,
+}
+
+impl picky_status_t {
+    pub fn ok() -> Self {
+        Self::PickyStatusSuccess
+    }
+
+    pub fn err() -> Self {
+        Self::PickyStatusFailure
+    }
 }
 
 /// cbindgen:ignore
-impl ffi_helpers::Nullable for status {
-    const NULL: Self = Self::Failure;
+impl ffi_helpers::Nullable for picky_status_t {
+    const NULL: Self = Self::PickyStatusFailure;
 
     fn is_null(&self) -> bool {
-        matches!(self, Self::Failure)
+        matches!(self, Self::PickyStatusFailure)
     }
 }
 

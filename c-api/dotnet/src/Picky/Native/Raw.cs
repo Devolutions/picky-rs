@@ -28,8 +28,8 @@ namespace Devolutions.Picky.Native
         public static extern picky_pem_t* pem_new([NativeTypeName("const char *")] sbyte* label, int label_sz, [NativeTypeName("const uint8_t *")] byte* data, int data_sz);
 
         [DllImport("picky", CallingConvention = CallingConvention.Cdecl, EntryPoint = "picky_encode_pem", ExactSpelling = true)]
-        [return: NativeTypeName("enum picky_status")]
-        public static extern picky_status encode_pem([NativeTypeName("const uint8_t *")] byte* data, int data_sz, [NativeTypeName("const char *")] sbyte* label, int label_sz, [NativeTypeName("char *")] sbyte* repr, int repr_sz);
+        [return: NativeTypeName("enum picky_status_t")]
+        public static extern picky_status_t encode_pem([NativeTypeName("const uint8_t *")] byte* data, int data_sz, [NativeTypeName("const char *")] sbyte* label, int label_sz, [NativeTypeName("char *")] sbyte* repr, int repr_sz);
 
         [DllImport("picky", CallingConvention = CallingConvention.Cdecl, EntryPoint = "picky_pem_data_length", ExactSpelling = true)]
         public static extern int pem_data_length([NativeTypeName("const struct picky_pem_t *")] picky_pem_t* this_);
@@ -55,5 +55,36 @@ namespace Devolutions.Picky.Native
         [DllImport("picky", CallingConvention = CallingConvention.Cdecl, EntryPoint = "picky_pem_clone", ExactSpelling = true)]
         [return: NativeTypeName("struct picky_pem_t *")]
         public static extern picky_pem_t* pem_clone([NativeTypeName("const struct picky_pem_t *")] picky_pem_t* src);
+
+        [DllImport("picky", CallingConvention = CallingConvention.Cdecl, EntryPoint = "picky_digest", ExactSpelling = true)]
+        [return: NativeTypeName("enum picky_status_t")]
+        public static extern picky_status_t digest([NativeTypeName("picky_hash_algorithm_t")] int algorithm, [NativeTypeName("const uint8_t *")] byte* input, int input_sz, [NativeTypeName("uint8_t *")] byte* digest, int digest_sz);
+
+        [DllImport("picky", CallingConvention = CallingConvention.Cdecl, EntryPoint = "picky_digest_length", ExactSpelling = true)]
+        public static extern int digest_length([NativeTypeName("picky_hash_algorithm_t")] int algorithm);
+
+        [NativeTypeName("#define PICKY_HASH_MD5 0")]
+        public const int PICKY_HASH_MD5 = 0;
+
+        [NativeTypeName("#define PICKY_HASH_SHA1 1")]
+        public const int PICKY_HASH_SHA1 = 1;
+
+        [NativeTypeName("#define PICKY_HASH_SHA2_224 2")]
+        public const int PICKY_HASH_SHA2_224 = 2;
+
+        [NativeTypeName("#define PICKY_HASH_SHA2_256 3")]
+        public const int PICKY_HASH_SHA2_256 = 3;
+
+        [NativeTypeName("#define PICKY_HASH_SHA2_384 4")]
+        public const int PICKY_HASH_SHA2_384 = 4;
+
+        [NativeTypeName("#define PICKY_HASH_SHA2_512 5")]
+        public const int PICKY_HASH_SHA2_512 = 5;
+
+        [NativeTypeName("#define PICKY_HASH_SHA3_384 6")]
+        public const int PICKY_HASH_SHA3_384 = 6;
+
+        [NativeTypeName("#define PICKY_HASH_SHA3_512 7")]
+        public const int PICKY_HASH_SHA3_512 = 7;
     }
 }

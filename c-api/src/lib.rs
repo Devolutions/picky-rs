@@ -5,4 +5,6 @@ extern crate ffi_helpers;
 mod helper;
 
 pub mod error;
+pub mod hash;
+pub mod key;
 pub mod pem;

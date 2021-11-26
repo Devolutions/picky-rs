@@ -7,8 +7,5 @@ include_guard = "PICKY_H"
 no_includes = true
 sys_includes = ["stdint.h"]
 
-[export]
-prefix = "picky_"
-
 [enum]
-rename_variants = "QualifiedScreamingSnakeCase"
+rename_variants = "ScreamingSnakeCase"

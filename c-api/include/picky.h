@@ -10,7 +10,7 @@
 /**
  * Picky return status
  */
-typedef enum picky_status {
+typedef enum picky_status_t {
   /**
    * Operation ended successfully.
    */
@@ -20,12 +20,33 @@ typedef enum picky_status {
    * a detailed error message can be retrieved using `picky_error_message_utf*`.
    */
   PICKY_STATUS_FAILURE = -1,
-} picky_status;
+} picky_status_t;
 
 /**
  * Opaque type for picky PEM object.
  */
 typedef struct picky_pem_t picky_pem_t;
+
+/**
+ * See PICKY_HASH_* constants for possible values.
+ */
+typedef int picky_hash_algorithm_t;
+
+#define PICKY_HASH_MD5 0
+
+#define PICKY_HASH_SHA1 1
+
+#define PICKY_HASH_SHA2_224 2
+
+#define PICKY_HASH_SHA2_256 3
+
+#define PICKY_HASH_SHA2_384 4
+
+#define PICKY_HASH_SHA2_512 5
+
+#define PICKY_HASH_SHA3_384 6
+
+#define PICKY_HASH_SHA3_512 7
 
 #ifdef __cplusplus
 extern "C" {
@@ -78,12 +99,12 @@ struct picky_pem_t *picky_pem_new(const char *label,
 /**
  * Encodes to PEM string without copying the payload.
  */
-enum picky_status picky_encode_pem(const uint8_t *data,
-                                   int data_sz,
-                                   const char *label,
-                                   int label_sz,
-                                   char *repr,
-                                   int repr_sz);
+enum picky_status_t picky_encode_pem(const uint8_t *data,
+                                     int data_sz,
+                                     const char *label,
+                                     int label_sz,
+                                     char *repr,
+                                     int repr_sz);
 
 /**
  * Get the length of the pem data in bytes.
@@ -136,6 +157,22 @@ void picky_pem_drop(struct picky_pem_t*);
  * Returns a cloned version of this PEM object.
  */
 struct picky_pem_t *picky_pem_clone(const struct picky_pem_t *src);
+
+/**
+ * Compute the digest of a given message using the specified hash algorithm.
+ */
+enum picky_status_t picky_digest(picky_hash_algorithm_t algorithm,
+                                 const uint8_t *input,
+                                 int input_sz,
+                                 uint8_t *digest,
+                                 int digest_sz);
+
+/**
+ * Get the length required to write the digest using the specified hash algorithm.
+ *
+ * Returns the number of required bytes, or `-1` if there was an error.
+ */
+int picky_digest_length(picky_hash_algorithm_t algorithm);
 
 #ifdef __cplusplus
 } // extern "C"
