@@ -1,8 +1,11 @@
 use crate::{oids, AlgorithmIdentifier, EcParameters};
-use picky_asn1::{tag::{Tag, TagPeeker}, Asn1Type};
 use picky_asn1::wrapper::{
-    BitStringAsn1, ExplicitContextTag0, ExplicitContextTag1, HeaderOnly, IntegerAsn1,
-    OctetStringAsn1, OctetStringAsn1Container,
+    BitStringAsn1, ExplicitContextTag0, ExplicitContextTag1, HeaderOnly, IntegerAsn1, OctetStringAsn1,
+    OctetStringAsn1Container,
+};
+use picky_asn1::{
+    tag::{Tag, TagPeeker},
+    Asn1Type,
 };
 #[cfg(not(feature = "legacy"))]
 use serde::Deserialize;
