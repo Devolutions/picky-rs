@@ -1,8 +1,8 @@
-use crate::{oids, AlgorithmIdentifier};
-use picky_asn1::tag::{Tag, TagPeeker};
+use crate::{oids, AlgorithmIdentifier, EcParameters};
+use picky_asn1::{tag::{Tag, TagPeeker}, Asn1Type};
 use picky_asn1::wrapper::{
-    BitStringAsn1, ExplicitContextTag0, ExplicitContextTag1, IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1,
-    OctetStringAsn1Container,
+    BitStringAsn1, ExplicitContextTag0, ExplicitContextTag1, HeaderOnly, IntegerAsn1,
+    OctetStringAsn1, OctetStringAsn1Container,
 };
 #[cfg(not(feature = "legacy"))]
 use serde::Deserialize;
@@ -110,33 +110,46 @@ impl<'de> de::Deserialize<'de> for PrivateKeyInfo {
             {
                 let version = seq_next_element!(seq, PrivateKeyInfo, "version");
 
-                let tag_peek: TagPeeker = seq.next_element::<TagPeeker>()?.unwrap();
+                let tag_peek: TagPeeker = seq.next_element::<TagPeeker>()?.expect("I hope TagPeeker never panics");
                 let (private_key, private_key_algorithm) = if tag_peek.next_tag == Tag::OCTET_STRING {
-                    let private_key = PrivateKeyValue::EC(seq_next_element!(seq, PrivateKeyInfo, "elliptic curve oid"));
+                    let private_key = PrivateKeyValue::EC(ECPrivateKey {
+                        private_key: seq_next_element!(seq, OctetStringAsn1, "elliptic curve private key"),
+                        parameters: seq_next_element!(
+                            seq,
+                            ExplicitContextTag0<EcParameters>,
+                            ECPrivateKey,
+                            "elliptic curve parameters"
+                        ),
+                        public_key: seq_next_element!(
+                            seq,
+                            ExplicitContextTag1<BitStringAsn1>,
+                            ECPrivateKey,
+                            "elliptic curve public key"
+                        ),
+                    });
+
                     (private_key, None)
                 } else {
                     let private_key_algorithm: AlgorithmIdentifier =
                         seq_next_element!(seq, PrivateKeyInfo, "private key algorithm");
                     if private_key_algorithm.is_a(oids::rsa_encryption()) {
-                            if version != 0 {
-                                return Err(serde_invalid_value!(
-                                    PrivateKeyInfo,
-                                    "unsupported version (valid version number: 0)",
-                                    "a supported PrivateKeyInfo"
-                                ));
-                            }
-                            let private_key = PrivateKeyValue::RSA(seq_next_element!(seq, PrivateKeyInfo, "rsa oid"));
-                            (private_key, Some(private_key_algorithm))
-                        } else {
+                        if version != 0 {
                             return Err(serde_invalid_value!(
                                 PrivateKeyInfo,
-                                "unsupported algorithm",
-                                "a supported algorithm"
+                                "unsupported version (valid version number: 0)",
+                                "a supported PrivateKeyInfo"
                             ));
                         }
+                        let private_key = PrivateKeyValue::RSA(seq_next_element!(seq, PrivateKeyInfo, "rsa oid"));
+                        (private_key, Some(private_key_algorithm))
+                    } else {
+                        return Err(serde_invalid_value!(
+                            PrivateKeyInfo,
+                            "unsupported algorithm",
+                            "a supported algorithm"
+                        ));
+                    }
                 };
-
-                println!("it should be ok");
 
                 Ok(PrivateKeyInfo {
                     version,
@@ -163,7 +176,7 @@ impl ser::Serialize for PrivateKeyValue {
     {
         match self {
             PrivateKeyValue::RSA(rsa) => rsa.serialize(serializer),
-            PrivateKeyValue::EC(ec) => serializer.serialize_newtype_struct("HeaderOnly", ec),
+            PrivateKeyValue::EC(ec) => serializer.serialize_newtype_struct(HeaderOnly::<()>::NAME, ec),
         }
     }
 }
@@ -344,29 +357,25 @@ impl RsaPrivateKey {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+/// [Elliptic Curve Private Key Structure] (https://datatracker.ietf.org/doc/html/rfc5915#section-3)
+///
+/// EC private key information SHALL have ASN.1 type ECPrivateKey:
+///
+/// ```not_rust
+/// ECPrivateKey ::= SEQUENCE {
+///     version        INTEGER { ecPrivkeyVer1(1) } (ecPrivkeyVer1),
+///      privateKey     OCTET STRING,
+///      parameters [0] ECParameters {{ NamedCurve }} OPTIONAL,
+///      publicKey  [1] BIT STRING OPTIONAL
+///    }
+/// ```
+
+#[derive(Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct ECPrivateKey {
-    private_key: OctetStringAsn1,
-    parameters: ExplicitContextTag0<ObjectIdentifierAsn1>,
-    public_key: ExplicitContextTag1<BitStringAsn1>,
+    pub private_key: OctetStringAsn1,
+    pub parameters: ExplicitContextTag0<EcParameters>,
+    pub public_key: ExplicitContextTag1<BitStringAsn1>,
 }
-
-/*
-impl ser::Serialize for ECPrivateKey {
-fn serialize<S>(&self, serializer: S) -> Result<S::Ok, <S as ser::Serializer>::Error>
-    where
-        S: ser::Serializer,
-{
-    use serde::ser::SerializeSeq;
-    let mut seq = serializer.serialize_seq(None)?;
-    seq.serialize_element(&self.private_key)?;
-    seq.serialize_element(&self.parameters)?;
-    seq.serialize_element(&self.public_key)?;
-
-    seq.end()
-}
-}
- */
 
 #[cfg(test)]
 mod tests {
@@ -452,7 +461,7 @@ mod tests {
 
         let ec_key = ECPrivateKey {
             private_key: OctetStringAsn1::from(decoded[8..74].to_vec()),
-            parameters: ExplicitContextTag0(oids::ansip521r1().into()),
+            parameters: ExplicitContextTag0(EcParameters::NamedCurve(oids::ansip521r1().into())),
             public_key: ExplicitContextTag1(BitString::with_bytes(decoded[90..].to_vec()).into()),
         };
 

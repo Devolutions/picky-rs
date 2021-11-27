@@ -1,4 +1,4 @@
-use crate::{oids, AlgorithmIdentifier};
+use crate::{oids, AlgorithmIdentifier, EcParameters};
 use picky_asn1::wrapper::{BitStringAsn1, BitStringAsn1Container, IntegerAsn1, OctetStringAsn1};
 use serde::{de, ser, Deserialize, Serialize};
 use std::fmt;
@@ -38,6 +38,12 @@ impl SubjectPublicKeyInfo {
                 }
                 .into(),
             ),
+        }
+    }
+    pub fn new_ec_key<A: Into<EcParameters>, P: Into<BitStringAsn1>>(ec_params: A, ec_point: P) -> Self {
+        Self {
+            algorithm: AlgorithmIdentifier::new_elliptic_curve(ec_params),
+            subject_public_key: PublicKey::Ec(ec_point.into()),
         }
     }
 }
