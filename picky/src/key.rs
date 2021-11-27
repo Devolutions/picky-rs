@@ -57,6 +57,7 @@ impl From<PemError> for KeyError {
 
 const PRIVATE_KEY_PEM_LABEL: &str = "PRIVATE KEY";
 const RSA_PRIVATE_KEY_PEM_LABEL: &str = "RSA PRIVATE KEY";
+const EC_PRIVATE_KEY_LABEL: &str = "EC PRIVATE KEY";
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PrivateKey(PrivateKeyInfo);
@@ -79,6 +80,7 @@ impl From<PrivateKey> for SubjectPublicKeyInfo {
             PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => {
                 SubjectPublicKeyInfo::new_rsa_key(key.modulus, key.public_exponent)
             }
+            PrivateKeyValue::EC(ec) => SubjectPublicKeyInfo::new_ec_key(ec.parameters.0, ec.public_key.0),
         }
     }
 }
@@ -98,6 +100,9 @@ impl TryFrom<&'_ PrivateKey> for RsaPrivateKey {
                     vec![p1, p2],
                 ))
             }
+            private_key_info::PrivateKeyValue::EC(_) => Err(KeyError::Rsa {
+                context: "RSA private key cannot be constructed from an EC private key.".to_string(),
+            }),
         }
     }
 }
@@ -111,6 +116,9 @@ impl TryFrom<&'_ PrivateKey> for RsaPublicKey {
                 BigUint::from_bytes_be(key.modulus.as_unsigned_bytes_be()),
                 BigUint::from_bytes_be(key.public_exponent.as_unsigned_bytes_be()),
             )?),
+            private_key_info::PrivateKeyValue::EC(_) => Err(KeyError::Rsa {
+                context: "RSA public key cannot be constructed from an EC private key.".to_string(),
+            }),
         }
     }
 }
@@ -164,7 +172,7 @@ impl PrivateKey {
 
     pub fn from_pem(pem: &Pem) -> Result<Self, KeyError> {
         match pem.label() {
-            PRIVATE_KEY_PEM_LABEL => Self::from_pkcs8(pem.data()),
+            PRIVATE_KEY_PEM_LABEL | EC_PRIVATE_KEY_LABEL => Self::from_pkcs8(pem.data()),
             RSA_PRIVATE_KEY_PEM_LABEL => Self::from_rsa_der(pem.data()),
             _ => Err(KeyError::InvalidPemLabel {
                 label: pem.label().to_owned(),
@@ -197,7 +205,7 @@ impl PrivateKey {
 
         Ok(Self(PrivateKeyInfo {
             version: 0,
-            private_key_algorithm: AlgorithmIdentifier::new_rsa_encryption(),
+            private_key_algorithm: Some(AlgorithmIdentifier::new_rsa_encryption()),
             private_key: PrivateKeyValue::RSA(private_key.into()),
         }))
     }
@@ -217,6 +225,9 @@ impl PrivateKey {
         match &self.0.private_key {
             PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => {
                 SubjectPublicKeyInfo::new_rsa_key(key.modulus.clone(), key.public_exponent.clone()).into()
+            }
+            PrivateKeyValue::EC(ec) => {
+                SubjectPublicKeyInfo::new_ec_key(ec.parameters.0.clone(), ec.public_key.0.clone()).into()
             }
         }
     }
@@ -537,5 +548,28 @@ mod tests {
         let key = PrivateKey::generate_rsa(2048).unwrap();
         let pkcs8 = key.to_pkcs8().unwrap();
         ring::signature::RsaKeyPair::from_pkcs8(&pkcs8).unwrap();
+    }
+
+    const EC_PRIVATE_KEY_PEM: &str = "-----BEGIN EC PRIVATE KEY-----\n\
+                                      MIHcAgEBBEIBhqphIGu2PmlcEb6xADhhSCpgPUulB0s4L2qOgolRgaBx4fNgINFE\n\
+                                      mBsSyHJncsWG8WFEuUzAYy/YKz2lP0Qx6Z2gBwYFK4EEACOhgYkDgYYABABwBevJ\n\
+                                      w/+Xh6I98ruzoTX3MNTsbgnc+glenJRCbEJkjbJrObFhbfgqP52r1lAy2RxuShGi\n\
+                                      NYJJzNPT6vR1abS32QFtvTH7YbYa6OWk9dtGNY/cYxgx1nQyhUuofdW7qbbfu/Ww\n\
+                                      TP2oFsPXRAavZCh4AbWUn8bAHmzNRyuJonQBKlQlVQ==\n\
+                                      -----END EC PRIVATE KEY-----";
+
+    const EC_PUBLIC_KEY_PEM: &str = "-----BEGIN PUBLIC KEY-----\n\
+                                    MFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAE6grzTyQyJdYOaVVwZosUEv02AdwvYQOv\n\
+                                    bJM105PImXUuqTMyqSmX96/m7zFfyh/DQQbyXIo3E07qifCPMw9/oQ==\n\
+                                    -----END PUBLIC KEY-----";
+
+    #[test]
+    fn private_key_from_ec_pem() {
+        PrivateKey::from_pem_str(EC_PRIVATE_KEY_PEM).unwrap();
+    }
+
+    #[test]
+    fn public_key_from_ec_pem() {
+        PublicKey::from_pem_str(EC_PUBLIC_KEY_PEM).unwrap();
     }
 }
