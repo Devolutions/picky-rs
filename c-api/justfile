@@ -1,0 +1,84 @@
+#!/usr/bin/env -S just --justfile
+
+# This is just intended to help developer, no need in CI #
+
+############ `just` is required ##############
+# ------------------------------------------ #
+# https://github.com/casey/just#installation #
+# ------------------------------------------ #
+# Easy way is: cargo install just            #
+##############################################
+
+default: bindings
+
+## Native library ##
+
+target_debug_folder   := "../target/debug/"
+static_lib_path       := target_debug_folder + "libpicky.a"
+shared_lib_path_linux := target_debug_folder + "libpicky.so"
+shared_lib_path_win   := target_debug_folder + "picky.dll"
+
+native-lib-debug:
+    cargo build -p picky-c-api
+    mkdir -p {{dotnet_native_lib_path_linux}}
+    -cp {{shared_lib_path_linux}} {{dotnet_native_lib_path_linux}}
+    mkdir -p {{dotnet_native_lib_path_win}}
+    -cp {{shared_lib_path_win}} {{dotnet_native_lib_path_win}}
+
+## Bindings ##
+
+bindings: c-bindings dotnet-bindings
+
+include_folder       := "./include/"
+header_path          := include_folder + "picky.h"
+cbindgen_config_file := "./cbindgen.toml"
+
+c-bindings:
+    cbindgen --crate picky-c-api --config {{cbindgen_config_file}} --output "{{header_path}}"
+    @echo ">> C header generated at {{header_path}}"
+
+response_file                := "./dotnet_native.rsp"
+dotnet_folder                := "./dotnet/"
+dotnet_lib_path              := dotnet_folder + "src/Picky/"
+dotnet_native_path           := dotnet_lib_path + "Native/"
+dotnet_native_test_path      := dotnet_folder + "tests/Picky.Tests/Native/"
+dotnet_native_lib_path_linux := dotnet_lib_path + "lib/Debug/linux-x64/"
+dotnet_native_lib_path_win   := dotnet_lib_path + "lib/Debug/win-x64/"
+
+dotnet-bindings: c-bindings
+    ClangSharpPInvokeGenerator @{{response_file}} --output {{dotnet_native_path}} --test-output {{dotnet_native_test_path}}
+    @echo ">> Native .NET wrapper generated at {{dotnet_native_path}}"
+    @echo ">> Native .NET wrapper tests generated at {{dotnet_native_test_path}}"
+    @echo ">> Proceeds to code formating…"
+    cd {{dotnet_folder}} && dotnet format
+
+## Examples ##
+
+examples_folder     := "./examples/"
+examples_out_folder := examples_folder + "out/"
+common_gcc_args     := static_lib_path + " -I" + include_folder + " -lm"
+
+examples: pem
+
+pem: native-lib-debug c-bindings make-examples-output-directory
+    gcc {{examples_folder}}pem.c {{common_gcc_args}} -o {{examples_out_folder}}pem
+
+make-examples-output-directory:
+    mkdir -p {{examples_out_folder}}
+
+clean:
+    -rm -rf {{examples_out_folder}}
+    -cd {{dotnet_folder}} && dotnet clean
+
+## Tests ##
+
+test: test-pem test-dotnet
+
+test-dotnet: native-lib-debug dotnet-bindings
+    cd {{dotnet_folder}} && dotnet test
+
+pem_path := "../test_assets/intermediate_ca.crt"
+
+test-pem: pem
+    eval $({{examples_out_folder}}pem {{pem_path}}) && [ "$label" = "CERTIFICATE" ] && [ "$len" -eq 835 ] && echo ">> test_pem: success"
+

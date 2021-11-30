@@ -1,11 +1,13 @@
 [workspace]
+resolver = "2"
 members = [
     "picky",
     "picky-server",
     "picky-asn1",
     "picky-asn1-der",
     "picky-asn1-x509",
-    "picky-signtool"
+    "picky-signtool",
+    "c-api",
 ]
 
 [patch.crates-io]

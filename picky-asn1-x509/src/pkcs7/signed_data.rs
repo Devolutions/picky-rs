@@ -98,7 +98,7 @@ pub struct SignersInfos(pub Asn1SetOf<SignerInfo>);
 /// ``` not_rust
 /// CertificateSet ::= SET OF CertificateChoices
 /// ```
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Default)]
 pub struct CertificateSet(pub Vec<CertificateChoices>);
 
 // This is a workaround for constructed encoding as implicit
@@ -123,12 +123,6 @@ impl<'de> de::Deserialize<'de> for CertificateSet {
         raw_der[0] = Tag::SEQUENCE.inner();
         let vec = picky_asn1_der::from_bytes(&raw_der).unwrap_or_default();
         Ok(CertificateSet(vec))
-    }
-}
-
-impl Default for CertificateSet {
-    fn default() -> Self {
-        Self(Vec::new())
     }
 }
 

@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - (Breaking) Add `SpcStatementType` variant in `AttributeValues` enum
 - (Breaking) Add `SigningTime` variant in `AttributeValues` enum
 - `SpcAttributeAndOptionalValue` now supports both `SpcPeImageData` and `SpcSipInfo` values
+- Bump minimal rustc version to 1.56
 
 ### Fixed
 

@@ -6,37 +6,37 @@ authors = [
     "Benoît CORTIER <benoit.cortier@fried-world.eu>",
     "Johann Dufaud <jdufaud@devolutions.net>",
 ]
-edition = "2018"
+edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Devolutions/picky-rs"
 
 [dependencies]
-picky = { version = "6.4.0", default-features = false, features = ["x509", "jose", "chrono_conversion", "pkcs7" ], path = "../picky" }
+picky = { version = "6.4.0", default-features = false, features = ["x509", "jose", "pkcs7", "ssh", "time_conversion" ], path = "../picky" }
 picky-asn1 = { version = "0.4", path = "../picky-asn1" }
-mongodm = { version = "0.6", features = ["tokio-runtime"] }
-clap = { features = ["yaml"], version = "2.32" }
-saphir = { version = "2.7", features = ["macro"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1.0"
-serde_yaml = "0.8"
-multihash = "0.11" # v0.12 removed support for Sha1 because it's not cryptographically secure, but we need to support it for now
-multibase = "0.9"
-log = "0.4"
-log4rs = "1"
-chrono = "0.4"
-base64 = "0.13"
-hex = "0.4"
-thiserror = "1.0"
-unicase = "2.6"
-rand = { version = "0.8", optional = true }
+mongodm = { version = "0.7.3", features = ["tokio-runtime"] }
+clap = { features = ["yaml"], version = "2.33.3" }
+saphir = { version = "2.8.2", features = ["macro"] }
+serde = { version = "1.0.130", features = ["derive"] }
+serde_json = "1.0.68"
+serde_yaml = "0.8.21"
+multihash = { version = "0.15.0", features = ["sha1", "secure-hashes", "std", "multihash-impl"], default-features = false }
+multibase = "0.9.1"
+log = "0.4.14"
+log4rs = "1.0.0"
+time = "0.3.4"
+base64 = "0.13.0"
+hex = "0.4.3"
+thiserror = "1.0.30"
+unicase = "2.6.0"
+rand = { version = "0.8.4", optional = true }
 tokio = "0.2"
-futures = "0.3"
+futures = "0.3.17"
 
 [dev-dependencies]
-rand = "0.8"
+rand = "0.8.4"
 tokio-test = "0.2"
-criterion = "0.3"
-reqwest = "0.11"
+criterion = "0.3.5"
+reqwest = "0.11.6"
 
 [features]
 pre-gen-pk = ["rand"]

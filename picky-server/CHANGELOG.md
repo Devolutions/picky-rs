@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Bump minimal rustc version to 1.56
+
 ## [4.8.0] 2020-11-20
 
 ### Changed

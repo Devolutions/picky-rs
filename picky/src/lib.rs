@@ -14,6 +14,9 @@ pub mod jose;
 #[cfg(feature = "x509")]
 pub mod x509;
 
+#[cfg(feature = "ssh")]
+pub mod ssh;
+
 pub mod hash;
 pub mod key;
 pub mod pem;

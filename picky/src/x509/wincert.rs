@@ -1,5 +1,4 @@
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use std::convert::TryFrom;
 use std::error;
 use std::io::{self, BufReader, BufWriter, Write};
 use thiserror::Error;
@@ -274,8 +273,7 @@ mod tests {
 
     #[test]
     fn decode_wincert_with_x509_certificate() {
-        let decoded = WinCertificate::decode(WINCERT_WITH_X509_CERTIFICATE.as_ref());
-        assert!(decoded.is_ok());
+        WinCertificate::decode(WINCERT_WITH_X509_CERTIFICATE.as_ref()).unwrap();
     }
 
     #[test]

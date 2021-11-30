@@ -60,9 +60,9 @@ impl Picky {
         signature_hash_type: SignatureAlgorithm,
     ) -> Result<Cert, PickyError> {
         // validity
-        let now = chrono::offset::Utc::now();
+        let now = time::OffsetDateTime::now_utc();
         let valid_from = UTCDate::from(now);
-        let valid_to = UTCDate::from(now + chrono::Duration::days(DEFAULT_ROOT_DURATION_DAYS));
+        let valid_to = UTCDate::from(now + time::Duration::days(DEFAULT_ROOT_DURATION_DAYS));
 
         let mut key_usage = KeyUsage::default();
         key_usage.set_key_cert_sign(true);
@@ -86,9 +86,9 @@ impl Picky {
         signature_hash_type: SignatureAlgorithm,
     ) -> Result<Cert, PickyError> {
         // validity
-        let now = chrono::offset::Utc::now();
+        let now = time::OffsetDateTime::now_utc();
         let valid_from = UTCDate::from(now);
-        let valid_to = UTCDate::from(now + chrono::Duration::days(DEFAULT_INTERMEDIATE_DURATION_DAYS));
+        let valid_to = UTCDate::from(now + time::Duration::days(DEFAULT_INTERMEDIATE_DURATION_DAYS));
 
         let subject_name = DirectoryName::new_common_name(intermediate_name);
 
@@ -115,11 +115,11 @@ impl Picky {
         issuer_key: &PrivateKey,
         signature_hash_type: SignatureAlgorithm,
         dns_name: &str,
-        validity_duration: chrono::Duration,
+        validity_duration: time::Duration,
     ) -> Result<Cert, PickyError> {
         // validity
-        let now = chrono::offset::Utc::now();
-        let valid_from = UTCDate::from(now - chrono::Duration::minutes(INITIAL_VALIDITY_MARGIN_MINUTES));
+        let now = time::OffsetDateTime::now_utc();
+        let valid_from = UTCDate::from(now - time::Duration::minutes(INITIAL_VALIDITY_MARGIN_MINUTES));
         let valid_to = UTCDate::from(now + validity_duration);
 
         let mut key_usage = KeyUsage::default();

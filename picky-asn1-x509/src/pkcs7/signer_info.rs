@@ -215,7 +215,7 @@ pub struct IssuerAndSerialNumber {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct CertificateSerialNumber(pub IntegerAsn1);
 
-#[derive(Deserialize, Debug, PartialEq, Clone)]
+#[derive(Deserialize, Debug, PartialEq, Clone, Default)]
 pub struct UnsignedAttributes(pub Vec<UnsignedAttribute>);
 
 // This is a workaround for constructed encoding as implicit
@@ -227,12 +227,6 @@ impl ser::Serialize for UnsignedAttributes {
         let mut raw_der = picky_asn1_der::to_vec(&self.0).unwrap_or_else(|_| vec![0]);
         raw_der[0] = Tag::context_specific_constructed(1).inner();
         picky_asn1_der::Asn1RawDer(raw_der).serialize(serializer)
-    }
-}
-
-impl Default for UnsignedAttributes {
-    fn default() -> Self {
-        UnsignedAttributes(Vec::new())
     }
 }
 

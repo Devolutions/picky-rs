@@ -1,3 +1,7 @@
+pub use picky_asn1_x509::attribute::Attribute;
+pub use picky_asn1_x509::pkcs7::content_info;
+pub use picky_asn1_x509::ShaVariant;
+
 use crate::hash::{HashAlgorithm, UnsupportedHashAlgorithmError};
 use crate::key::PrivateKey;
 use crate::pem::Pem;
@@ -32,13 +36,7 @@ use picky_asn1_x509::pkcs7::signer_info::{
 };
 use picky_asn1_x509::pkcs7::Pkcs7Certificate;
 use picky_asn1_x509::{oids, AttributeValues, Certificate, DigestInfo, Name};
-
-pub use picky_asn1_x509::attribute::Attribute;
-pub use picky_asn1_x509::pkcs7::content_info;
-pub use picky_asn1_x509::ShaVariant;
-
 use std::cell::RefCell;
-use std::convert::TryFrom;
 use std::ops::DerefMut;
 use thiserror::Error;
 
@@ -338,6 +336,7 @@ impl AuthenticodeSignature {
                 now: None,
                 excluded_cert_authorities: vec![],
                 expected_file_hash: None,
+                #[cfg(feature = "ctl")]
                 ctl: None,
             }),
         }
@@ -425,6 +424,7 @@ struct AuthenticodeValidatorInner<'a> {
     excluded_cert_authorities: Vec<DirectoryName>,
     now: Option<ValidityCheck<'a>>,
     expected_file_hash: Option<Vec<u8>>,
+    #[cfg(feature = "ctl")]
     ctl: Option<&'a CertificateTrustList>,
 }
 
@@ -527,7 +527,6 @@ impl<'a> AuthenticodeValidator<'a> {
         self
     }
 
-    #[cfg(feature = "ctl")]
     #[inline]
     pub fn exclude_cert_authorities(&self, excluded_cert_authorities: &'a [DirectoryName]) -> &Self {
         self.inner
@@ -1009,6 +1008,7 @@ fn h_check_eku_code_signing(certificates: &[Cert]) -> AuthenticodeResult<()> {
     Ok(())
 }
 
+#[cfg(feature = "ctl")]
 fn h_get_ca_name(certificates: &[Cert]) -> Option<DirectoryName> {
     if let Some(root) = certificates.iter().find(|cert| cert.ty() == CertType::Root) {
         Some(root.subject_name())
@@ -1477,9 +1477,9 @@ mod test {
         let mut auth_raw_data = picky_asn1_der::to_vec(&authenticated_attributes).unwrap();
         auth_raw_data[0] = Tag::SET.inner();
 
-        assert!(signature_algo
+        signature_algo
             .verify(&public_key.into(), auth_raw_data.as_ref(), encrypted_digest)
-            .is_ok());
+            .unwrap();
     }
 
     #[test]

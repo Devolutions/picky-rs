@@ -1,0 +1,15 @@
+--config
+unix-types
+multi-file
+generate-helper-types
+generate-tests-xunit
+--libraryPath
+picky
+--file
+./include/picky.h
+--methodClassName
+Raw
+--namespace
+Devolutions.Picky.Native
+--prefixStrip
+picky_

@@ -100,15 +100,14 @@ jobs:
     steps:
       - script: |
           set -e
-          curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-toolchain 1.43
-          rustup toolchain install 1.51
-        displayName: "Install rust 1.43 and 1.51"
-      - script: cargo +1.43 check -p picky-asn1
+          curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-toolchain 1.56
+        displayName: "Install rust 1.56"
+      - script: cargo +1.56 check -p picky-asn1
         displayName: cargo check picky-asn1
-      - script: cargo +1.43 check -p picky-asn1-der
+      - script: cargo +1.56 check -p picky-asn1-der
         displayName: cargo check picky-asn1-der
-      - script: cargo +1.43 check -p picky-asn1-x509
+      - script: cargo +1.56 check -p picky-asn1-x509
         displayName: cargo check picky-asn1-x509
-      - script: cargo +1.51 check -p picky
+      - script: cargo +1.56 check -p picky
         displayName: cargo check picky
 

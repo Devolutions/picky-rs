@@ -14,7 +14,6 @@ use mongodm::mongo::{Client, Database};
 use mongodm::{f, ToRepository};
 use picky::x509::Cert;
 use std::collections::HashMap;
-use std::convert::TryFrom;
 use thiserror::Error;
 
 const DB_CONNECTION_TIMEOUT_SECS: u64 = 15;
