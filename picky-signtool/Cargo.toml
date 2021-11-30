@@ -6,11 +6,11 @@ edition = "2018"
 description = "A signtool like Authenticode sign and verify tool based on picky and lief-rs"
 
 [dependencies]
-anyhow = "1.0"
-clap = "2.33"
-walkdir = "2.3"
-base64 = "0.13"
-encoding = "0.2"
+anyhow = "1.0.45"
+clap = "2.33.3"
+walkdir = "2.3.2"
+base64 = "0.13.0"
+encoding_rs = "0.8"
 lief-rs = { git = "https://github.com/Devolutions/lief-rs.git", rev = "52dca2" }
 
 [dependencies.picky]
