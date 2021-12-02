@@ -155,7 +155,7 @@ impl AlgorithmIdentifier {
         }
     }
 
-    pub fn new_elliptic_curve<P: Into<EcParameters>>(ec_params: P) -> Self {
+    pub fn new_elliptic_curve<P: Into<Option<EcParameters>>>(ec_params: P) -> Self {
         Self {
             algorithm: oids::ec_public_key().into(),
             parameters: AlgorithmIdentifierParameters::Ec(ec_params.into()),
@@ -306,7 +306,7 @@ pub enum AlgorithmIdentifierParameters {
     None,
     Null,
     Aes(AesParameters),
-    Ec(EcParameters),
+    Ec(Option<EcParameters>),
 }
 
 #[derive(Debug, PartialEq, Clone)]

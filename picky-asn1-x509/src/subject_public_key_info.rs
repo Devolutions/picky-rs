@@ -40,9 +40,9 @@ impl SubjectPublicKeyInfo {
             ),
         }
     }
-    pub fn new_ec_key<A: Into<EcParameters>, P: Into<BitStringAsn1>>(ec_params: A, ec_point: P) -> Self {
+    pub fn new_ec_key<P: Into<BitStringAsn1>>(ec_point: P) -> Self {
         Self {
-            algorithm: AlgorithmIdentifier::new_elliptic_curve(ec_params),
+            algorithm: AlgorithmIdentifier::new_elliptic_curve(EcParameters::NamedCurve(oids::ec_public_key().into())),
             subject_public_key: PublicKey::Ec(ec_point.into()),
         }
     }

@@ -33,12 +33,8 @@ macro_rules! seq_next_element {
 #[macro_use]
 mod tests {
     macro_rules! check_serde {
-        ($item:ident: $type:ident in $encoded:ident[$start:literal..$end:literal]) => {
-            let encoded = &$encoded[$start..$end];
-            check_serde!($item: $type in encoded);
-        };
-        ($item:ident: $type:ident in $encoded:ident[$start:literal..]) => {
-            let encoded = &$encoded[$start..];
+        ($item:ident: $type:ident in $encoded:ident[$range:expr]) => {
+            let encoded = &$encoded[$range];
             check_serde!($item: $type in encoded);
         };
         ($item:ident: $type:ident in $encoded:ident) => {

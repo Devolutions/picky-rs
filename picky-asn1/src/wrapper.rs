@@ -239,6 +239,12 @@ define_special_tag! {
     ImplicitContextTag15 => Tag::context_specific_primitive(15),
 }
 
+impl Default for BitStringAsn1 {
+    fn default() -> Self {
+        BitStringAsn1(BitString::default())
+    }
+}
+
 impl Default for IA5StringAsn1 {
     fn default() -> Self {
         IA5StringAsn1::from(IA5String::default())

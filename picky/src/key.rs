@@ -28,6 +28,10 @@ pub enum KeyError {
     #[error("RSA error: {context}")]
     Rsa { context: String },
 
+    /// EC error
+    #[error("EC error: {context}")]
+    EC { context: String },
+
     /// invalid PEM label error
     #[error("invalid PEM label: {label}")]
     InvalidPemLabel { label: String },
@@ -80,7 +84,7 @@ impl From<PrivateKey> for SubjectPublicKeyInfo {
             PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => {
                 SubjectPublicKeyInfo::new_rsa_key(key.modulus, key.public_exponent)
             }
-            PrivateKeyValue::EC(ec) => SubjectPublicKeyInfo::new_ec_key(ec.parameters.0, ec.public_key.0),
+            PrivateKeyValue::EC(OctetStringAsn1Container(key)) => SubjectPublicKeyInfo::new_ec_key(key.public_key.0 .0),
         }
     }
 }
@@ -172,8 +176,9 @@ impl PrivateKey {
 
     pub fn from_pem(pem: &Pem) -> Result<Self, KeyError> {
         match pem.label() {
-            PRIVATE_KEY_PEM_LABEL | EC_PRIVATE_KEY_LABEL => Self::from_pkcs8(pem.data()),
+            PRIVATE_KEY_PEM_LABEL => Self::from_pkcs8(pem.data()),
             RSA_PRIVATE_KEY_PEM_LABEL => Self::from_rsa_der(pem.data()),
+            EC_PRIVATE_KEY_LABEL => Self::from_ec_der(pem.data()),
             _ => Err(KeyError::InvalidPemLabel {
                 label: pem.label().to_owned(),
             }),
@@ -205,8 +210,24 @@ impl PrivateKey {
 
         Ok(Self(PrivateKeyInfo {
             version: 0,
-            private_key_algorithm: Some(AlgorithmIdentifier::new_rsa_encryption()),
+            private_key_algorithm: AlgorithmIdentifier::new_rsa_encryption(),
             private_key: PrivateKeyValue::RSA(private_key.into()),
+        }))
+    }
+
+    pub fn from_ec_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, KeyError> {
+        use picky_asn1_x509::{AlgorithmIdentifier, ECPrivateKey};
+
+        let private_key =
+            picky_asn1_der::from_bytes::<ECPrivateKey>(der.as_ref()).map_err(|e| KeyError::Asn1Deserialization {
+                source: e,
+                element: "ec private key",
+            })?;
+
+        Ok(Self(PrivateKeyInfo {
+            version: 0,
+            private_key_algorithm: AlgorithmIdentifier::new_elliptic_curve(private_key.parameters.0 .0.clone()),
+            private_key: PrivateKeyValue::EC(private_key.into()),
         }))
     }
 
@@ -226,8 +247,8 @@ impl PrivateKey {
             PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => {
                 SubjectPublicKeyInfo::new_rsa_key(key.modulus.clone(), key.public_exponent.clone()).into()
             }
-            PrivateKeyValue::EC(ec) => {
-                SubjectPublicKeyInfo::new_ec_key(ec.parameters.0.clone(), ec.public_key.0.clone()).into()
+            PrivateKeyValue::EC(OctetStringAsn1Container(key)) => {
+                SubjectPublicKeyInfo::new_ec_key(key.public_key.0 .0.clone()).into()
             }
         }
     }
@@ -558,6 +579,12 @@ mod tests {
                                       TP2oFsPXRAavZCh4AbWUn8bAHmzNRyuJonQBKlQlVQ==\n\
                                       -----END EC PRIVATE KEY-----";
 
+    const PKCS8_EC_PRIVATE_KEY_PEM: &str = "-----BEGIN PRIVATE KEY-----\n\
+                                            MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgKZqrmOg/cDZ4tPCn\n\
+                                            4LROs145nxx+ssufvflL8cROxFmhRANCAARmU90fCSTsncefY7hVeKw1WIg/YQmT\n\
+                                            4DGJ7nJPZ+WXAd/xxp4c0bHGlIOju/U95ITPN9dAmro7OUTDJpz+rzGW\n\
+                                            -----END PRIVATE KEY-----";
+
     const EC_PUBLIC_KEY_PEM: &str = "-----BEGIN PUBLIC KEY-----\n\
                                     MFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAE6grzTyQyJdYOaVVwZosUEv02AdwvYQOv\n\
                                     bJM105PImXUuqTMyqSmX96/m7zFfyh/DQQbyXIo3E07qifCPMw9/oQ==\n\
@@ -566,6 +593,11 @@ mod tests {
     #[test]
     fn private_key_from_ec_pem() {
         PrivateKey::from_pem_str(EC_PRIVATE_KEY_PEM).unwrap();
+    }
+
+    #[test]
+    fn private_key_from_pkcs8_ec_pem() {
+        PrivateKey::from_pem_str(PKCS8_EC_PRIVATE_KEY_PEM).unwrap();
     }
 
     #[test]

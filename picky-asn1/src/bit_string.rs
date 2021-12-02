@@ -33,7 +33,7 @@ use serde::{de, ser};
 /// b.set(63, true);
 /// assert_eq!(b.is_set(63), false);
 /// ```
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+#[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct BitString {
     data: Vec<u8>,
 }
