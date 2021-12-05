@@ -503,7 +503,7 @@ mod tests {
     }
 
     #[test]
-    fn decoded_pkcs8_ec_key() {
+    fn decode_pkcs8_ec_key() {
         let decoded = base64::decode("MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgKZqrmOg/cDZ4tPCn\
                                                             4LROs145nxx+ssufvflL8cROxFmhRANCAARmU90fCSTsncefY7hVeKw1WIg/YQmT\
                                                             4DGJ7nJPZ+WXAd/xxp4c0bHGlIOju/U95ITPN9dAmro7OUTDJpz+rzGW").unwrap();

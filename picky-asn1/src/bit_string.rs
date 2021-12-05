@@ -33,7 +33,7 @@ use serde::{de, ser};
 /// b.set(63, true);
 /// assert_eq!(b.is_set(63), false);
 /// ```
-#[derive(Default, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct BitString {
     data: Vec<u8>,
 }
@@ -287,5 +287,11 @@ impl ser::Serialize for BitString {
         S: ser::Serializer,
     {
         serializer.serialize_bytes(&self.data)
+    }
+}
+
+impl Default for BitString {
+    fn default() -> Self {
+        BitString::with_len(0)
     }
 }
