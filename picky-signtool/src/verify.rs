@@ -167,7 +167,7 @@ pub fn authenticode_signature_ps_from_file(file_path: &Path) -> anyhow::Result<A
         encoding_rs::UTF_8.decode(&buffer)
     };
 
-    let signature = extract_ps_authenticode_signature(buffer.to_string())
+    let signature = extract_ps_authenticode_signature(buffer.as_ref())
         .with_context(|| format!("Failed to extract Authenticode signature from {:?}", file_path))?;
 
     let der_signature = base64::decode(signature).context("Failed to convert signature to DER")?;
@@ -178,7 +178,7 @@ pub fn authenticode_signature_ps_from_file(file_path: &Path) -> anyhow::Result<A
     Ok(authenticode_signature)
 }
 
-fn extract_ps_authenticode_signature(content: String) -> anyhow::Result<String> {
+fn extract_ps_authenticode_signature(content: &str) -> anyhow::Result<String> {
     let index = content
         .find(PS_AUTHENTICODE_HEADER)
         .ok_or_else(|| anyhow!("File is not digital signed"))?;
@@ -251,7 +251,7 @@ fn apply_flags<'a>(
 
 pub fn extract_signed_ps_file_content_bytes(raw_content: &[u8]) -> &[u8] {
     // raw_content - utf-16 encoded bytes
-    let find = |haystack: &[u8], needle: &Vec<u8>| -> Option<usize> {
+    let find = |haystack: &[u8], needle: &[u8]| -> Option<usize> {
         if haystack.len() < needle.len() {
             return None;
         }
@@ -283,7 +283,7 @@ mod tests {
         let ps_authenticode_signature = "                     # SIG # Begin signature block\r\n# MIIFjAYJKoZIhvcNAQcCoIIFfTCCBXkCAQExDzANBglghkgBZQMEAgEFADB5Bgor\r\n# BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG\r\n# SIG # End signature block\r\n";
 
         let ps_authenticode_signature =
-            extract_ps_authenticode_signature(ps_authenticode_signature.to_string()).unwrap();
+            extract_ps_authenticode_signature(ps_authenticode_signature).unwrap();
         assert_eq!(ps_authenticode_signature.as_str(), "MIIFjAYJKoZIhvcNAQcCoIIFfTCCBXkCAQExDzANBglghkgBZQMEAgEFADB5BgorBgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG");
     }
 
