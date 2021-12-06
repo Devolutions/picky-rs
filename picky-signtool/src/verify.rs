@@ -282,8 +282,7 @@ mod tests {
     fn try_to_extract_ps_authenticode_signature() {
         let ps_authenticode_signature = "                     # SIG # Begin signature block\r\n# MIIFjAYJKoZIhvcNAQcCoIIFfTCCBXkCAQExDzANBglghkgBZQMEAgEFADB5Bgor\r\n# BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG\r\n# SIG # End signature block\r\n";
 
-        let ps_authenticode_signature =
-            extract_ps_authenticode_signature(ps_authenticode_signature).unwrap();
+        let ps_authenticode_signature = extract_ps_authenticode_signature(ps_authenticode_signature).unwrap();
         assert_eq!(ps_authenticode_signature.as_str(), "MIIFjAYJKoZIhvcNAQcCoIIFfTCCBXkCAQExDzANBglghkgBZQMEAgEFADB5BgorBgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG");
     }
 
