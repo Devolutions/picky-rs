@@ -1503,8 +1503,12 @@ mod tests {
         let root = Cert::from_pem_str(crate::test_files::PSDIAG_ROOT).unwrap();
 
         let chain = [inter, root];
-        let now = UTCDate::now();
+        let unexpired_date = UTCDate::new(2021, 11, 21, 1, 0, 0).unwrap();
 
-        leaf.verifier().exact_date(&now).chain(chain.iter()).verify().unwrap();
+        leaf.verifier()
+            .exact_date(&unexpired_date)
+            .chain(chain.iter())
+            .verify()
+            .unwrap();
     }
 }

@@ -3,6 +3,7 @@ use std::path::Path;
 
 pub mod config;
 pub mod sign;
+pub mod utils;
 pub mod verify;
 
 #[inline]
