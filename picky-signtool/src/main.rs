@@ -4,6 +4,7 @@ use anyhow::bail;
 use walkdir::{DirEntry, WalkDir};
 
 use picky_signtool::config::*;
+use picky_signtool::lief_logging;
 use picky_signtool::sign::sign;
 use picky_signtool::verify::verify;
 
@@ -15,6 +16,8 @@ fn main() -> anyhow::Result<()> {
             let binary_path = matches
                 .value_of(ARG_INPUT)
                 .expect("Path to a Windows executable is required");
+
+            lief_logging(matches.value_of(ARG_LOGGING));
 
             vec![PathBuf::from(binary_path)]
         }

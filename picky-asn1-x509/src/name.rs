@@ -1,5 +1,5 @@
 use crate::{AttributeTypeAndValue, AttributeTypeAndValueParameters, DirectoryString};
-use picky_asn1::tag::{Encoding, TagClass, TagPeeker};
+use picky_asn1::tag::{Encoding, Tag, TagClass, TagPeeker};
 use picky_asn1::wrapper::*;
 use serde::{de, ser, Deserialize, Serialize};
 use std::fmt;
@@ -183,7 +183,7 @@ pub type GeneralNames = Asn1SequenceOf<GeneralName>;
 /// ```
 #[derive(Debug, PartialEq, Clone)]
 pub enum GeneralName {
-    //OtherName(OtherName),
+    OtherName(OtherName),
     Rfc822Name(IA5StringAsn1),
     DnsName(IA5StringAsn1),
     //X400Address(ORAddress),
@@ -219,6 +219,11 @@ impl ser::Serialize for GeneralName {
         S: ser::Serializer,
     {
         match &self {
+            GeneralName::OtherName(name) => {
+                let mut raw_der = picky_asn1_der::to_vec(name).map_err(ser::Error::custom)?;
+                raw_der[0] = Tag::context_specific_constructed(0).inner();
+                picky_asn1_der::Asn1RawDer(raw_der).serialize(serializer)
+            }
             GeneralName::Rfc822Name(name) => ImplicitContextTag1(name).serialize(serializer),
             GeneralName::DnsName(name) => ImplicitContextTag2(name).serialize(serializer),
             GeneralName::DirectoryName(name) => ImplicitContextTag4(name).serialize(serializer),
@@ -250,10 +255,13 @@ impl<'de> de::Deserialize<'de> for GeneralName {
             {
                 let tag_peeker: TagPeeker = seq_next_element!(seq, DirectoryString, "choice tag");
                 match tag_peeker.next_tag.components() {
-                    (TagClass::ContextSpecific, _, 0) => Err(serde_invalid_value!(
+                    (TagClass::ContextSpecific, Encoding::Primitive, 0) => Err(serde_invalid_value!(
                         GeneralName,
-                        "OtherName not supported",
+                        "Primitive encoding for OtherName not supported",
                         "a supported choice"
+                    )),
+                    (TagClass::ContextSpecific, Encoding::Constructed, 0) => Ok(GeneralName::OtherName(
+                        seq_next_element!(seq, OtherName, GeneralName, "OtherName"),
                     )),
                     (TagClass::ContextSpecific, Encoding::Primitive, 1) => Ok(GeneralName::Rfc822Name(
                         seq_next_element!(seq, ImplicitContextTag1<IA5StringAsn1>, GeneralName, "RFC822Name").0,
@@ -341,8 +349,12 @@ impl<'de> de::Deserialize<'de> for GeneralName {
 
 // OtherName ::= SEQUENCE {
 //      type-id    OBJECT IDENTIFIER,
-//      value      [0] EXPLICIT ANY DEFINED BY type-id }
-//pub struct OtherName { ... }
+//      value      [0] EXPLICIT ANY DEFINED BY type-id}
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub struct OtherName {
+    pub type_id: ObjectIdentifierAsn1,
+    pub value: ExplicitContextTag0<picky_asn1_der::Asn1RawDer>,
+}
 
 /// [RFC 5280 #4.2.1.6](https://tools.ietf.org/html/rfc5280#section-4.2.1.6)
 ///
@@ -360,7 +372,9 @@ pub struct EdiPartyName {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use oid::ObjectIdentifier;
     use picky_asn1::restricted_string::IA5String;
+    use picky_asn1_der::Asn1RawDer;
     use std::str::FromStr;
 
     #[test]
@@ -421,6 +435,20 @@ mod tests {
             0x64, 0x65, 0x76, 0x65, 0x6C, 0x2E, 0x65, 0x78, 0x61, 0x6D, 0x70, 0x6C, 0x65, 0x2E, 0x63, 0x6F, 0x6D,
         ];
         let expected = GeneralName::DnsName(IA5String::from_string("devel.example.com".into()).unwrap().into());
+        check_serde!(expected: GeneralName in encoded);
+    }
+
+    #[test]
+    fn general_name_other_name() {
+        let encoded = [
+            160, 24, 6, 8, 43, 6, 1, 5, 5, 7, 8, 3, 160, 12, 48, 10, 12, 8, 65, 69, 45, 57, 52, 51, 52, 57,
+        ];
+
+        let expected = GeneralName::OtherName(OtherName {
+            type_id: ObjectIdentifierAsn1(ObjectIdentifier::try_from("1.3.6.1.5.5.7.8.3").unwrap()),
+            value: ExplicitContextTag0::from(Asn1RawDer(vec![48, 10, 12, 8, 65, 69, 45, 57, 52, 51, 52, 57])),
+        });
+
         check_serde!(expected: GeneralName in encoded);
     }
 }

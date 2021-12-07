@@ -106,7 +106,7 @@ pub fn verify(matches: &ArgMatches, files: &[PathBuf]) -> anyhow::Result<()> {
         .cloned()
         .collect::<Vec<String>>();
 
-    let ctl = if flags.iter().any(|flag| flag.as_str() == ARG_VERIFY_CHAIN) {
+    let ctl = if flags.iter().any(|flag| flag.as_str() == ARG_VERIFY_CA) {
         let ctl = CertificateTrustList::fetch()?;
         Some(ctl)
     } else {
@@ -232,18 +232,18 @@ fn apply_flags<'a>(
     };
 
     let validator = if flags.iter().any(|flag| flag.as_str() == ARG_VERIFY_CHAIN) {
-        let validator = validator.require_chain_check();
-        if let Some(ctl) = ctl {
-            validator.ctl(ctl)
-        } else {
-            validator
-        }
+        validator.require_chain_check()
     } else {
         &validator
     };
 
     if flags.iter().any(|flag| flag.as_str() == ARG_VERIFY_CA) {
-        validator.require_ca_against_ctl_check()
+        let validator = validator.require_ca_against_ctl_check();
+        if let Some(ctl) = ctl {
+            validator.ctl(ctl)
+        } else {
+            validator
+        }
     } else {
         validator
     }
