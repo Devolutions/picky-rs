@@ -267,7 +267,7 @@ pub mod tests {
     }
 
     fn remove_temp_file(filename: &PathBuf) {
-        remove_file(filename);
+        remove_file(filename).unwrap();
     }
 
     fn string_hex_to_bytes(hash: &str) -> Vec<u8> {
