@@ -289,3 +289,9 @@ impl ser::Serialize for BitString {
         serializer.serialize_bytes(&self.data)
     }
 }
+
+impl Default for BitString {
+    fn default() -> Self {
+        BitString::with_len(0)
+    }
+}
