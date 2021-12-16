@@ -269,6 +269,7 @@ impl<'de> de::Deserialize<'de> for AlgorithmIdentifier {
                     }
                     oids::EC_PUBLIC_KEY => AlgorithmIdentifierParameters::Ec(seq_next_element!(
                         seq,
+                        Option<EcParameters>,
                         AlgorithmIdentifier,
                         "elliptic curves parameters"
                     )),
