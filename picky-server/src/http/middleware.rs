@@ -1,3 +1,4 @@
+use saphir::http::header::HeaderValue;
 use saphir::prelude::*;
 
 pub async fn log_middleware(ctx: HttpContext, chain: &dyn MiddlewareChain) -> Result<HttpContext, SaphirError> {
@@ -22,6 +23,8 @@ pub async fn cors_middleware(ctx: HttpContext, chain: &dyn MiddlewareChain) -> R
     if let Some(origin_header) = origin_header {
         let res = ctx.state.response_mut().unwrap(); // should not panic because this is after chain.next(..) call
         res.headers_mut().insert("Access-Control-Allow-Origin", origin_header);
+        res.headers_mut()
+            .insert("Access-Control-Max-Age", HeaderValue::from_static("7200"));
     }
 
     Ok(ctx)
