@@ -58,6 +58,7 @@ impl Tag {
     pub const GENERALIZED_TIME: Self = Tag(0x18);
     pub const SEQUENCE: Self = Tag(0x30);
     pub const SET: Self = Tag(0x31);
+    pub const GENERAL_STRING: Self = Tag(0x1b);
 
     #[inline]
     pub const fn application_primitive(number: u8) -> Self {
@@ -180,6 +181,7 @@ impl fmt::Display for Tag {
             Tag::GENERALIZED_TIME => write!(f, "GeneralizedTime"),
             Tag::SEQUENCE => write!(f, "SEQUENCE"),
             Tag::SET => write!(f, "SET"),
+            Tag::GENERAL_STRING => write!(f, "GeneralString"),
             other => write!(f, "{}({:02X}) {}", other.class(), other.number(), other.encoding()),
         }
     }

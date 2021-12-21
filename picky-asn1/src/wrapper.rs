@@ -200,6 +200,7 @@ asn1_wrapper! { auto struct IA5StringAsn1(IA5String),               Tag::IA5_STR
 asn1_wrapper! { auto struct BMPStringAsn1(BMPString),               Tag::BMP_STRING }
 asn1_wrapper! { auto struct UTCTimeAsn1(UTCTime),                   Tag::UTC_TIME }
 asn1_wrapper! { auto struct GeneralizedTimeAsn1(GeneralizedTime),   Tag::GENERALIZED_TIME }
+asn1_wrapper! { auto struct GeneralStringAsn1(IA5String),           Tag::GENERAL_STRING }
 
 asn1_wrapper! { auto collection struct Asn1SequenceOf<T>, Tag::SEQUENCE }
 asn1_wrapper! { auto collection struct Asn1SetOf<T>,      Tag::SET }

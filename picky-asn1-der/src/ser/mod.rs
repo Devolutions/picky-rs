@@ -284,6 +284,7 @@ impl<'a, 'se> serde::ser::Serializer for &'a mut Serializer<'se> {
             NumericStringAsn1::NAME => self.tag_for_next_bytes = Tag::NUMERIC_STRING,
             IA5StringAsn1::NAME => self.tag_for_next_bytes = Tag::IA5_STRING,
             BMPStringAsn1::NAME => self.tag_for_next_bytes = Tag::BMP_STRING,
+            GeneralStringAsn1::NAME => self.tag_for_next_bytes = Tag::GENERAL_STRING,
             Asn1SetOf::<()>::NAME => self.tag_for_next_seq = Tag::SET,
             Asn1SequenceOf::<()>::NAME => self.tag_for_next_seq = Tag::SEQUENCE,
             BitStringAsn1Container::<()>::NAME => self.h_encapsulate(Tag::BIT_STRING),
