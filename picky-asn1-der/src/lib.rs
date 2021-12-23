@@ -72,8 +72,9 @@
 #[macro_use]
 mod debug_log;
 
+pub mod application_tag;
 mod de;
-mod misc;
+pub(crate) mod misc;
 mod raw_der;
 mod ser;
 

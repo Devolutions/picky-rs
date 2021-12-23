@@ -18,7 +18,7 @@ impl<T: Read> ReadExt for T {
     }
 }
 /// An extension for `io::Write`
-pub trait WriteExt {
+pub(crate) trait WriteExt {
     /// Writes on `byte`
     fn write_one(&mut self, byte: u8) -> io::Result<usize>;
     /// Writes all bytes in `data`
