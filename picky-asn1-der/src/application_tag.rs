@@ -15,45 +15,6 @@ impl<V: Debug + PartialEq, const T: u8> ApplicationTag<V, T> {
     }
 }
 
-#[derive(Debug)]
-struct ApplicationTagInner<V: Debug>(V);
-
-impl<'de, V: de::Deserialize<'de> + Debug + PartialEq> de::Deserialize<'de> for ApplicationTagInner<V> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, <D as de::Deserializer<'de>>::Error>
-    where
-        D: de::Deserializer<'de>,
-    {
-        struct Visitor<E>(Option<E>);
-
-        impl<E> Visitor<E> {
-            pub fn new() -> Self {
-                Self(None)
-            }
-        }
-
-        impl<'de, E: de::Deserialize<'de> + Debug> de::Visitor<'de> for Visitor<E> {
-            type Value = ApplicationTagInner<E>;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("A valid DER-encoded ApplicationTag")
-            }
-
-            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-            where
-                A: SeqAccess<'de>,
-            {
-                let res: E = seq
-                    .next_element()?
-                    .ok_or_else(|| A::Error::missing_field("ApplicationTagInner"))?;
-
-                Ok(ApplicationTagInner(res))
-            }
-        }
-
-        deserializer.deserialize_seq(Visitor::<V>::new())
-    }
-}
-
 impl<'de, V: de::Deserialize<'de> + Debug + PartialEq, const T: u8> de::Deserialize<'de> for ApplicationTag<V, T> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -99,12 +60,17 @@ impl<'de, V: de::Deserialize<'de> + Debug + PartialEq, const T: u8> de::Deserial
                     )));
                 }
 
+                #[derive(Debug, serde::Deserialize)]
+                struct ApplicationTagInner<V: Debug> {
+                    value: V,
+                }
+
                 let rest: ApplicationTagInner<E> = seq
                     .next_element()
                     .map_err(|e| A::Error::custom(format!("Cannot deserialize application tag inner value: {:?}", e)))?
                     .ok_or_else(|| A::Error::missing_field("ApplicationInnerValue"))?;
 
-                Ok(rest.0)
+                Ok(rest.value)
             }
         }
 
