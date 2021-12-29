@@ -35,7 +35,7 @@ impl<'de, V: de::Deserialize<'de> + Debug + PartialEq> de::Deserialize<'de> for 
             type Value = ApplicationTagInner<E>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("Error inner")
+                formatter.write_str("A valid DER-encoded ApplicationTag")
             }
 
             fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
@@ -44,7 +44,7 @@ impl<'de, V: de::Deserialize<'de> + Debug + PartialEq> de::Deserialize<'de> for 
             {
                 let res: E = seq
                     .next_element()?
-                    .ok_or(A::Error::missing_field("ApplicationTagInner"))?;
+                    .ok_or_else(|| A::Error::missing_field("ApplicationTagInner"))?;
 
                 Ok(ApplicationTagInner(res))
             }
@@ -71,7 +71,7 @@ impl<'de, V: de::Deserialize<'de> + Debug + PartialEq, const T: u8> de::Deserial
             type Value = E;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("Error inner")
+                formatter.write_str(&format!("A valid DER-encoded ApplicationTag{}", self.1))
             }
 
             fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
@@ -81,7 +81,7 @@ impl<'de, V: de::Deserialize<'de> + Debug + PartialEq, const T: u8> de::Deserial
                 let tag_peeker: TagPeeker = seq
                     .next_element()
                     .map_err(|e| A::Error::custom(format!("Cannot deserialize application tag: {:?}", e)))?
-                    .ok_or(A::Error::missing_field("ApplicationTag"))?;
+                    .ok_or_else(|| A::Error::missing_field("ApplicationTag"))?;
                 let tag = tag_peeker.next_tag;
 
                 if !tag.is_application() {
@@ -102,7 +102,7 @@ impl<'de, V: de::Deserialize<'de> + Debug + PartialEq, const T: u8> de::Deserial
                 let rest: ApplicationTagInner<E> = seq
                     .next_element()
                     .map_err(|e| A::Error::custom(format!("Cannot deserialize application tag inner value: {:?}", e)))?
-                    .ok_or(A::Error::missing_field("ApplicationInnerValue"))?;
+                    .ok_or_else(|| A::Error::missing_field("ApplicationInnerValue"))?;
 
                 Ok(rest.0)
             }
@@ -110,7 +110,7 @@ impl<'de, V: de::Deserialize<'de> + Debug + PartialEq, const T: u8> de::Deserial
 
         let inner = deserializer
             .deserialize_enum("ApplicationTag", &["ApplicationTag"], Visitor::<V>::new(T))
-            .map_err(|e| D::Error::custom(e))?;
+            .map_err(D::Error::custom)?;
 
         Ok(Self(inner))
     }
@@ -144,15 +144,20 @@ impl<V: ser::Serialize + Debug + PartialEq, const T: u8> ser::Serialize for Appl
 #[cfg(test)]
 mod tests {
     use crate::application_tag::ApplicationTag;
+    use picky_asn1::restricted_string::Utf8String;
     use picky_asn1::wrapper::Utf8StringAsn1;
 
     #[test]
     fn test_application_tag() {
-        let expected = vec![106, 13, 12, 11, 101, 120, 97, 109, 112, 108, 101, 46, 99, 111, 109];
+        let expected_raw = vec![106, 13, 12, 11, 101, 120, 97, 109, 112, 108, 101, 46, 99, 111, 109];
+        let expected: ApplicationTag<Utf8StringAsn1, 10> = ApplicationTag::from(Utf8StringAsn1::from(
+            Utf8String::from_string("example.com".to_owned()).unwrap(),
+        ));
 
-        let app_10: ApplicationTag<Utf8StringAsn1, 10> = crate::from_bytes(&expected).unwrap();
+        let app_10: ApplicationTag<Utf8StringAsn1, 10> = crate::from_bytes(&expected_raw).unwrap();
         let app_10_raw = crate::to_vec(&app_10).unwrap();
 
-        assert_eq!(expected, app_10_raw);
+        assert_eq!(expected, app_10);
+        assert_eq!(expected_raw, app_10_raw);
     }
 }
