@@ -642,6 +642,12 @@ impls! { OctetStringAsn1Container<Encapsulated>, Tag::OCTET_STRING }
 #[derive(Debug, PartialEq, PartialOrd, Hash, Clone)]
 pub struct Optional<T>(pub T);
 
+impl<T: Default> Default for Optional<T> {
+    fn default() -> Self {
+        Optional(T::default())
+    }
+}
+
 impl<T> Optional<T>
 where
     T: Default + PartialEq,

@@ -39,6 +39,11 @@ impl<'de, V: de::Deserialize<'de> + Debug + PartialEq, const T: u8> de::Deserial
             where
                 A: SeqAccess<'de>,
             {
+                #[derive(Debug, serde::Deserialize)]
+                struct ApplicationTagInner<V: Debug> {
+                    value: V,
+                }
+
                 let tag_peeker: TagPeeker = seq
                     .next_element()
                     .map_err(|e| A::Error::custom(format!("Cannot deserialize application tag: {:?}", e)))?
@@ -58,11 +63,6 @@ impl<'de, V: de::Deserialize<'de> + Debug + PartialEq, const T: u8> de::Deserial
                         self.1,
                         tag.number()
                     )));
-                }
-
-                #[derive(Debug, serde::Deserialize)]
-                struct ApplicationTagInner<V: Debug> {
-                    value: V,
                 }
 
                 let rest: ApplicationTagInner<E> = seq
