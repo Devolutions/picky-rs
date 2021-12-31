@@ -186,6 +186,8 @@ impl<'de> Deserializer<'de> {
                         tag,
                         encapsulator_tag
                     );
+                    // we need to clear the stack otherwise it'll contain unwanted tags on the next serialization
+                    self.encapsulator_tag_stack.clear();
                     return Err(Asn1DerError::InvalidData);
                 }
 
