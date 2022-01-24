@@ -777,11 +777,11 @@ pub mod tests {
         certificate_builder.cert_type(SshCertType::Host);
 
         let now_timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
-        certificate_builder.valid_after(SshTime::from(now_timestamp));
+        certificate_builder.valid_after(SshTime::from_timestamp(now_timestamp));
 
         // 10 minutes = 600 seconds
         let valid_before = now_timestamp + 600;
-        certificate_builder.valid_before(SshTime::from(valid_before));
+        certificate_builder.valid_before(SshTime::from_timestamp(valid_before));
 
         certificate_builder.signature_key(&private_key);
         certificate_builder.build().unwrap();
@@ -803,9 +803,9 @@ pub mod tests {
         let after = now_timestamp + 600;
         let before = now_timestamp - 600;
 
-        certificate_builder.valid_after(SshTime::from(after));
+        certificate_builder.valid_after(SshTime::from_timestamp(after));
 
-        certificate_builder.valid_before(SshTime::from(before));
+        certificate_builder.valid_before(SshTime::from_timestamp(before));
 
         certificate_builder.signature_key(&private_key);
 
@@ -825,11 +825,11 @@ pub mod tests {
         certificate_builder.cert_type(SshCertType::Host);
 
         let now_timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
-        certificate_builder.valid_after(SshTime::from(now_timestamp));
+        certificate_builder.valid_after(SshTime::from_timestamp(now_timestamp));
 
         // 10 minutes = 600 seconds
         let valid_before = now_timestamp + 600;
-        certificate_builder.valid_before(SshTime::from(valid_before));
+        certificate_builder.valid_before(SshTime::from_timestamp(valid_before));
 
         certificate_builder.signature_key(&private_key);
 
