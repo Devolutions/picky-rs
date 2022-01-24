@@ -41,11 +41,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `AuthenticodeBuilder` for easier `AuthenticodeSignature` creation
 - Add `SignatureAlgorithm::hash_algorithm`
 - Support for `time 0.3` types conversions behind `time_conversion` feature gate
+- `PrivateKey::to_pem_str`
+- `PublicKey::to_pem_str`
 
 ### Changed
 
 - (Breaking) Move Authenticode related code from `picky::x509::wincert` to `picky::x509::pkcs7::authenticode` module
 - (Breaking) Authenticode implementation is now behind `pkcs7` feature
+- (Breaking) `PrivateKey::to_pem` and `PublicKey::to_pem` now return a `Pem`
 - Bump minimal rustc version to 1.56
 
 ### Fixed

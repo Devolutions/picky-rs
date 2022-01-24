@@ -298,7 +298,7 @@ impl AuthenticodeSignature {
         Ok(to_der(&self.0 .0, pkcs7::ELEMENT_NAME)?)
     }
 
-    pub fn to_pem(&self) -> AuthenticodeResult<Pem> {
+    pub fn to_pem(&self) -> AuthenticodeResult<Pem<'static>> {
         Ok(to_pem(&self.0 .0, pkcs7::PKCS7_PEM_LABEL, pkcs7::ELEMENT_NAME)?)
     }
 

@@ -238,8 +238,13 @@ impl PrivateKey {
         })
     }
 
-    pub fn to_pem(&self) -> Result<String, KeyError> {
-        Ok(to_pem(PRIVATE_KEY_PEM_LABEL, &self.to_pkcs8()?))
+    pub fn to_pem(&self) -> Result<Pem<'static>, KeyError> {
+        let pkcs8 = self.to_pkcs8()?;
+        Ok(Pem::new(PRIVATE_KEY_PEM_LABEL, pkcs8))
+    }
+
+    pub fn to_pem_str(&self) -> Result<String, KeyError> {
+        self.to_pem().map(|pem| pem.to_string())
     }
 
     pub fn to_public_key(&self) -> PublicKey {
@@ -366,8 +371,13 @@ impl PublicKey {
         })
     }
 
-    pub fn to_pem(&self) -> Result<String, KeyError> {
-        Ok(to_pem(PUBLIC_KEY_PEM_LABEL, &self.to_der()?))
+    pub fn to_pem(&self) -> Result<Pem<'static>, KeyError> {
+        let der = self.to_der()?;
+        Ok(Pem::new(PUBLIC_KEY_PEM_LABEL, der))
+    }
+
+    pub fn to_pem_str(&self) -> Result<String, KeyError> {
+        self.to_pem().map(|pem| pem.to_string())
     }
 
     pub fn from_pem(pem: &Pem) -> Result<Self, KeyError> {

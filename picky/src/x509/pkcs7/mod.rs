@@ -48,7 +48,7 @@ impl Pkcs7 {
         Ok(to_der(&self.0, ELEMENT_NAME)?)
     }
 
-    pub fn to_pem(&self) -> Pkcs7Result<Pem> {
+    pub fn to_pem(&self) -> Pkcs7Result<Pem<'static>> {
         Ok(to_pem(&self.0, PKCS7_PEM_LABEL, ELEMENT_NAME)?)
     }
 
