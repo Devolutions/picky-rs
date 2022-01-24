@@ -345,9 +345,9 @@ pub enum SshCertificateGenerationError {
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
-struct SshCertificateBuilderInner<'a> {
+struct SshCertificateBuilderInner {
     cert_key_type: Option<SshCertKeyType>,
-    public_key: Option<&'a SshPublicKey>,
+    public_key: Option<SshPublicKey>,
     serial: Option<u64>,
     cert_type: Option<SshCertType>,
     key_id: Option<String>,
@@ -357,15 +357,15 @@ struct SshCertificateBuilderInner<'a> {
     critical_options: Option<Vec<SshCriticalOption>>,
     extensions: Option<Vec<SshExtension>>,
     signature_algo: Option<SignatureAlgorithm>,
-    signature_key: Option<&'a SshPrivateKey>,
+    signature_key: Option<SshPrivateKey>,
     comment: Option<String>,
 }
 
-pub struct SshCertificateBuilder<'a> {
-    inner: RefCell<SshCertificateBuilderInner<'a>>,
+pub struct SshCertificateBuilder {
+    inner: RefCell<SshCertificateBuilderInner>,
 }
 
-impl<'a> SshCertificateBuilder<'a> {
+impl SshCertificateBuilder {
     pub fn init() -> Self {
         Self {
             inner: RefCell::new(SshCertificateBuilderInner::default()),
@@ -379,7 +379,7 @@ impl<'a> SshCertificateBuilder<'a> {
     }
 
     /// Required
-    pub fn key(&self, key: &'a SshPublicKey) -> &Self {
+    pub fn key(&self, key: SshPublicKey) -> &Self {
         self.inner.borrow_mut().public_key = Some(key);
         self
     }
@@ -433,7 +433,7 @@ impl<'a> SshCertificateBuilder<'a> {
     }
 
     /// Required
-    pub fn signature_key(&self, signature_key: &'a SshPrivateKey) -> &Self {
+    pub fn signature_key(&self, signature_key: SshPrivateKey) -> &Self {
         self.inner.borrow_mut().signature_key = Some(signature_key);
         self
     }
@@ -629,7 +629,7 @@ impl<'a> SshCertificateBuilder<'a> {
 
         Ok(SshCertificate {
             cert_key_type,
-            public_key: public_key.clone(),
+            public_key,
             nonce,
             serial,
             cert_type,
@@ -639,7 +639,7 @@ impl<'a> SshCertificateBuilder<'a> {
             valid_before,
             critical_options,
             extensions,
-            signature_key: signature_key.public_key().clone(),
+            signature_key: signature_key.public_key,
             signature,
             comment,
         })
@@ -772,7 +772,7 @@ pub mod tests {
         certificate_builder.cert_key_type(SshCertKeyType::RsaSha2_256V01);
 
         let private_key: SshPrivateKey = SshPrivateKey::from_pem_str(PRIVATE_KEY_PEM, None).unwrap();
-        certificate_builder.key(private_key.public_key());
+        certificate_builder.key(private_key.public_key().clone());
 
         certificate_builder.cert_type(SshCertType::Host);
 
@@ -783,7 +783,7 @@ pub mod tests {
         let valid_before = now_timestamp + 600;
         certificate_builder.valid_before(SshTime::from_timestamp(valid_before));
 
-        certificate_builder.signature_key(&private_key);
+        certificate_builder.signature_key(private_key);
         certificate_builder.build().unwrap();
     }
 
@@ -794,7 +794,7 @@ pub mod tests {
         certificate_builder.cert_key_type(SshCertKeyType::RsaSha2_256V01);
 
         let private_key: SshPrivateKey = SshPrivateKey::from_pem_str(PRIVATE_KEY_PEM, None).unwrap();
-        certificate_builder.key(private_key.public_key());
+        certificate_builder.key(private_key.public_key().clone());
 
         certificate_builder.cert_type(SshCertType::Host);
 
@@ -807,7 +807,7 @@ pub mod tests {
 
         certificate_builder.valid_before(SshTime::from_timestamp(before));
 
-        certificate_builder.signature_key(&private_key);
+        certificate_builder.signature_key(private_key);
 
         let cert = certificate_builder.build();
         assert!(matches!(cert.unwrap_err(), SshCertificateGenerationError::InvalidTime));
@@ -820,7 +820,7 @@ pub mod tests {
         certificate_builder.cert_key_type(SshCertKeyType::RsaSha2_256V01);
 
         let private_key: SshPrivateKey = SshPrivateKey::from_pem_str(PRIVATE_KEY_PEM, None).unwrap();
-        certificate_builder.key(private_key.public_key());
+        certificate_builder.key(private_key.public_key().clone());
 
         certificate_builder.cert_type(SshCertType::Host);
 
@@ -831,7 +831,7 @@ pub mod tests {
         let valid_before = now_timestamp + 600;
         certificate_builder.valid_before(SshTime::from_timestamp(valid_before));
 
-        certificate_builder.signature_key(&private_key);
+        certificate_builder.signature_key(private_key);
 
         certificate_builder.principals(vec!["example".to_owned()]);
 
