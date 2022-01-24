@@ -43,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for `time 0.3` types conversions behind `time_conversion` feature gate
 - `PrivateKey::to_pem_str`
 - `PublicKey::to_pem_str`
+- Support SSH keys and certificates
 
 ### Changed
 
