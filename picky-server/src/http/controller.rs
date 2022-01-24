@@ -359,14 +359,14 @@ impl ServerController {
 
         let ssh_cert = builder
             .cert_key_type(SshCertKeyType::SshRsaV01)
-            .key(&ssh_public_key)
+            .comment(ssh_public_key.comment.clone())
+            .key(ssh_public_key)
             .key_id(sign_request.key_id)
             .cert_type(sign_request.cert_type)
             .principals(sign_request.principals)
             .valid_after(SshTime::from(now))
             .valid_before(SshTime::from_timestamp(valid_before))
-            .signature_key(&ssh_private_key)
-            .comment(ssh_public_key.comment.clone())
+            .signature_key(ssh_private_key)
             .signature_algo(config.signing_algorithm)
             .build()
             .internal_error()?;
