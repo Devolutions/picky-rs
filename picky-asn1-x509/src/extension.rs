@@ -97,7 +97,7 @@ impl Extension {
     }
 
     /// Marking this extension as critical is always acceptable.
-    /// Check details here: https://tools.ietf.org/html/rfc5280#section-4.2.1.9
+    /// Check details here: <https://tools.ietf.org/html/rfc5280#section-4.2.1.9>
     /// You may change this value using `into_non_critical` or `set_critical` methods.
     ///
     /// Default is critical.

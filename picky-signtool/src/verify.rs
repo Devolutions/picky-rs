@@ -122,7 +122,7 @@ pub fn verify(matches: &ArgMatches, files: &[PathBuf]) -> anyhow::Result<()> {
         match validator.verify() {
             Ok(()) => println!("{} has valid digital signature", file_name),
             Err(err) => {
-                eprintln!("{} has invalid digital signature: {}", file_name, err.to_string());
+                eprintln!("{} has invalid digital signature: {}", file_name, err);
                 at_least_one_error = true;
             }
         }

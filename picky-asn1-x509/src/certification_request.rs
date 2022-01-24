@@ -26,7 +26,7 @@ pub struct CertificationRequestInfo {
 ///
 /// For some reason, openssl is producing an "implicit context tag" but with coding `0xA0`
 ///
-/// In appendix A of the RFC (https://datatracker.ietf.org/doc/html/rfc2986#appendix-A)
+/// In [appendix A of the RFC](https://datatracker.ietf.org/doc/html/rfc2986#appendix-A)
 /// ```not_rust
 /// DEFINITIONS IMPLICIT TAGS ::=
 /// ```

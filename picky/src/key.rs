@@ -1,6 +1,6 @@
 //! Wrappers around public and private keys raw data providing an easy to use API
 
-use crate::pem::{parse_pem, to_pem, Pem, PemError};
+use crate::pem::{parse_pem, Pem, PemError};
 use num_bigint_dig::traits::ModInverse;
 use picky_asn1::wrapper::{BitStringAsn1Container, IntegerAsn1, OctetStringAsn1Container};
 use picky_asn1_der::Asn1DerError;

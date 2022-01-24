@@ -239,6 +239,7 @@ define_special_tag! {
     ImplicitContextTag15 => Tag::context_specific_primitive(15),
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for BitStringAsn1 {
     fn default() -> Self {
         BitStringAsn1(BitString::default())

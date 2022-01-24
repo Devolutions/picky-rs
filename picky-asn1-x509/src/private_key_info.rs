@@ -335,7 +335,7 @@ impl RsaPrivateKey {
     }
 }
 
-/// [Elliptic Curve Private Key Structure] (https://datatracker.ietf.org/doc/html/rfc5915#section-3)
+/// [Elliptic Curve Private Key Structure](https://datatracker.ietf.org/doc/html/rfc5915#section-3)
 ///
 /// EC private key information SHALL have ASN.1 type ECPrivateKey:
 ///

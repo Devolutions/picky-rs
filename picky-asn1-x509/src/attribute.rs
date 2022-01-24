@@ -14,8 +14,7 @@ pub type Attributes = Asn1SequenceOf<Attribute>;
 ///
 /// `spcSpOpusInfo` is behind the `pkcs7` feature.
 ///
-/// `contentType`, `messageDigest`, `spcSpOpusInfo` and `SigningTime` are used for [microsoft authenticode]
-/// (http://download.microsoft.com/download/9/c/5/9c5b2167-8017-4bae-9fde-d599bac8184a/Authenticode_PE.docx)
+/// `contentType`, `messageDigest`, `spcSpOpusInfo` and `SigningTime` are used for [microsoft authenticode](http://download.microsoft.com/download/9/c/5/9c5b2167-8017-4bae-9fde-d599bac8184a/Authenticode_PE.docx)
 #[derive(Clone, Debug, PartialEq)]
 pub enum AttributeValues {
     /// `extensionRequest`
