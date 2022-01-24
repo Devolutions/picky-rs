@@ -364,7 +364,7 @@ impl ServerController {
             .cert_type(sign_request.cert_type)
             .principals(sign_request.principals)
             .valid_after(SshTime::from(now))
-            .valid_before(SshTime::from(valid_before))
+            .valid_before(SshTime::from_timestamp(valid_before))
             .signature_key(&ssh_private_key)
             .comment(ssh_public_key.comment.clone())
             .signature_algo(config.signing_algorithm)

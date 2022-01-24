@@ -4,8 +4,10 @@ compile_error!(
     "Either feature \"chrono_conversion\" or \"time_conversion\" must be enabled when the feature \"ssh\" is set."
 );
 
+pub use time_impl::SshTime;
+
 #[cfg(feature = "time_conversion")]
-mod ssh_time {
+mod time_impl {
     use time::OffsetDateTime;
 
     #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -13,11 +15,15 @@ mod ssh_time {
 
     impl SshTime {
         pub fn now() -> Self {
-            SshTime(OffsetDateTime::now_utc())
+            Self(OffsetDateTime::now_utc())
         }
 
-        pub fn timestamp(&self) -> i64 {
-            self.0.unix_timestamp()
+        pub fn from_timestamp(timestamp: u64) -> Self {
+            Self(OffsetDateTime::from_unix_timestamp(timestamp as i64).unwrap())
+        }
+
+        pub fn timestamp(&self) -> u64 {
+            self.0.unix_timestamp() as u64
         }
 
         pub fn month(&self) -> u8 {
@@ -53,7 +59,7 @@ mod ssh_time {
 
     impl From<OffsetDateTime> for SshTime {
         fn from(time: OffsetDateTime) -> Self {
-            Self::from(time.unix_timestamp() as u64)
+            Self::from_timestamp(time.unix_timestamp() as u64)
         }
     }
 
@@ -62,16 +68,10 @@ mod ssh_time {
             time.0.unix_timestamp() as u64
         }
     }
-
-    impl From<u64> for SshTime {
-        fn from(timestamp: u64) -> Self {
-            Self(OffsetDateTime::from_unix_timestamp(timestamp as i64).unwrap())
-        }
-    }
 }
 
 #[cfg(all(feature = "chrono_conversion", not(feature = "time_conversion")))]
-mod ssh_time {
+mod time_impl {
     use chrono::{DateTime, Utc};
     pub use chrono::{Datelike, Timelike};
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -84,8 +84,12 @@ mod ssh_time {
             SshTime(DateTime::<Utc>::from(SystemTime::now()))
         }
 
-        pub fn timestamp(&self) -> i64 {
-            self.0.timestamp()
+        pub fn from_timestamp(timestamp: u64) -> Self {
+            Self(DateTime::<Utc>::from(UNIX_EPOCH + Duration::from_secs(timestamp)))
+        }
+
+        pub fn timestamp(&self) -> u64 {
+            self.0.timestamp() as u64
         }
 
         pub fn month(&self) -> u8 {
@@ -124,18 +128,4 @@ mod ssh_time {
             time.0
         }
     }
-
-    impl From<SshTime> for u64 {
-        fn from(time: SshTime) -> u64 {
-            time.0.timestamp() as u64
-        }
-    }
-
-    impl From<u64> for SshTime {
-        fn from(timestamp: u64) -> Self {
-            Self(DateTime::<Utc>::from(UNIX_EPOCH + Duration::from_secs(timestamp)))
-        }
-    }
 }
-
-pub use ssh_time::*;

@@ -167,7 +167,8 @@ impl SshComplexTypeDecode for SshTime {
 
     fn decode(mut stream: impl Read) -> Result<Self, Self::Error> {
         let timestamp = stream.read_u64::<BigEndian>()?;
-        Ok(SshTime::from(timestamp))
+        let time = SshTime::from_timestamp(timestamp);
+        Ok(time)
     }
 }
 
