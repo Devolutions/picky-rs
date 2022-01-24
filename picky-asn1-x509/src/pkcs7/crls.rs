@@ -47,6 +47,7 @@ impl<'de> de::Deserialize<'de> for RevocationInfoChoices {
 ///    other [1] IMPLICIT OtherRevocationInfoFormat }
 ///
 /// ```
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, PartialEq, Clone)]
 pub enum RevocationInfoChoice {
     Crl(CertificateList),

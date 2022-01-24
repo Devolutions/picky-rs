@@ -578,7 +578,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
         visitor.visit_newtype_struct(self)
     }
 
-    fn deserialize_seq<V: Visitor<'de>>(mut self, visitor: V) -> Result<V::Value> {
+    fn deserialize_seq<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         debug_log!("deserialize_seq");
 
         self.h_decapsulate()?;
@@ -591,7 +591,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
             return Err(Asn1DerError::InvalidData);
         }
 
-        visitor.visit_seq(Sequence::deserialize_lazy(&mut self, len))
+        visitor.visit_seq(Sequence::deserialize_lazy(self, len))
     }
     fn deserialize_tuple<V: Visitor<'de>>(self, _len: usize, visitor: V) -> Result<V::Value> {
         debug_log!("deserialize_tuple: {}", _len);
@@ -624,7 +624,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
     }
 
     fn deserialize_enum<V: Visitor<'de>>(
-        mut self,
+        self,
         _name: &'static str,
         _variants: &'static [&'static str],
         visitor: V,
@@ -637,7 +637,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
         }
         let payload_len = Length::deserialized(&mut Cursor::new(&peeked.buffer()[1..]))?;
         let len = 1 + payload_len + Length::encoded_len(payload_len);
-        visitor.visit_seq(Sequence::deserialize_lazy(&mut self, len))
+        visitor.visit_seq(Sequence::deserialize_lazy(self, len))
     }
 
     fn deserialize_identifier<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
