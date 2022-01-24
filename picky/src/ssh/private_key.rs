@@ -110,7 +110,11 @@ pub struct SshPrivateKey {
 }
 
 impl SshPrivateKey {
-    pub fn new(bits: usize, passphrase: Option<String>, comment: Option<String>) -> Result<Self, SshPrivateKeyError> {
+    pub fn generate_rsa(
+        bits: usize,
+        passphrase: Option<String>,
+        comment: Option<String>,
+    ) -> Result<Self, SshPrivateKeyError> {
         Ok(SshPrivateKey::h_picky_private_key_to_ssh_private_key(
             PrivateKey::generate_rsa(bits)?,
             passphrase,
@@ -510,7 +514,7 @@ pub mod tests {
 
     #[test]
     fn test_private_key_generation() {
-        let private_key = SshPrivateKey::new(2048, Option::Some("123".to_string()), None).unwrap();
+        let private_key = SshPrivateKey::generate_rsa(2048, Option::Some("123".to_string()), None).unwrap();
         let data = private_key.to_pem().unwrap();
         let _: SshPrivateKey = SshPrivateKey::from_pem(&data, Option::Some("123".to_string())).unwrap();
     }
