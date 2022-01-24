@@ -127,7 +127,7 @@ impl SshPrivateKey {
         SshPrivateKey::decode(&mut pem.data(), passphrase)
     }
 
-    pub fn to_pem(&self) -> Result<Pem, SshPrivateKeyError> {
+    pub fn to_pem(&self) -> Result<Pem<'static>, SshPrivateKeyError> {
         let mut buffer = Vec::with_capacity(2048);
         self.encode(&mut buffer)?;
         Ok(Pem::new(SSH_PRIVATE_KEY_LABEL, buffer))
