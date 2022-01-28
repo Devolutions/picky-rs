@@ -1,71 +1,50 @@
-use crate::error::picky_status_t;
-use crate::helper::copy_slice_to_c;
-use anyhow::Context;
 use picky::hash::HashAlgorithm;
-use std::os::raw::c_int;
 
-/// See PICKY_HASH_* constants for possible values.
-#[derive(PartialEq, Eq)]
-#[allow(non_camel_case_types)]
-#[repr(transparent)]
-pub struct picky_hash_algorithm_t {
-    pub id: c_int,
-}
+impl TryFrom<ffi::PickyHashAlgorithm> for HashAlgorithm {
+    type Error = ();
 
-pub const PICKY_HASH_MD5: picky_hash_algorithm_t = picky_hash_algorithm_t { id: 0 };
-pub const PICKY_HASH_SHA1: picky_hash_algorithm_t = picky_hash_algorithm_t { id: 1 };
-pub const PICKY_HASH_SHA2_224: picky_hash_algorithm_t = picky_hash_algorithm_t { id: 2 };
-pub const PICKY_HASH_SHA2_256: picky_hash_algorithm_t = picky_hash_algorithm_t { id: 3 };
-pub const PICKY_HASH_SHA2_384: picky_hash_algorithm_t = picky_hash_algorithm_t { id: 4 };
-pub const PICKY_HASH_SHA2_512: picky_hash_algorithm_t = picky_hash_algorithm_t { id: 5 };
-pub const PICKY_HASH_SHA3_384: picky_hash_algorithm_t = picky_hash_algorithm_t { id: 6 };
-pub const PICKY_HASH_SHA3_512: picky_hash_algorithm_t = picky_hash_algorithm_t { id: 7 };
-
-impl TryFrom<picky_hash_algorithm_t> for HashAlgorithm {
-    type Error = anyhow::Error;
-
-    fn try_from(value: picky_hash_algorithm_t) -> Result<Self, Self::Error> {
-        let algo = match value {
-            PICKY_HASH_MD5 => HashAlgorithm::MD5,
-            PICKY_HASH_SHA1 => HashAlgorithm::SHA1,
-            PICKY_HASH_SHA2_224 => HashAlgorithm::SHA2_224,
-            PICKY_HASH_SHA2_256 => HashAlgorithm::SHA2_256,
-            PICKY_HASH_SHA2_384 => HashAlgorithm::SHA2_384,
-            PICKY_HASH_SHA2_512 => HashAlgorithm::SHA2_512,
-            PICKY_HASH_SHA3_384 => HashAlgorithm::SHA3_384,
-            PICKY_HASH_SHA3_512 => HashAlgorithm::SHA3_512,
-            _ => anyhow::bail!("unknown hash algorithm code"),
-        };
-        Ok(algo)
+    fn try_from(ty: ffi::PickyHashAlgorithm) -> Result<Self, ()> {
+        match ty {
+            ffi::PickyHashAlgorithm::MD5 => Ok(HashAlgorithm::MD5),
+            ffi::PickyHashAlgorithm::SHA1 => Ok(HashAlgorithm::SHA1),
+            ffi::PickyHashAlgorithm::SHA2_224 => Ok(HashAlgorithm::SHA2_224),
+            ffi::PickyHashAlgorithm::SHA2_256 => Ok(HashAlgorithm::SHA2_256),
+            ffi::PickyHashAlgorithm::SHA2_384 => Ok(HashAlgorithm::SHA2_384),
+            ffi::PickyHashAlgorithm::SHA2_512 => Ok(HashAlgorithm::SHA2_512),
+            ffi::PickyHashAlgorithm::SHA3_384 => Ok(HashAlgorithm::SHA3_384),
+            ffi::PickyHashAlgorithm::SHA3_512 => Ok(HashAlgorithm::SHA3_512),
+            ffi::PickyHashAlgorithm::Unknown => Err(()),
+        }
     }
 }
 
-/// Compute the digest of a given message using the specified hash algorithm.
-#[allow(clippy::missing_safety_doc)]
-#[no_mangle]
-pub unsafe extern "C" fn picky_digest(
-    algorithm: picky_hash_algorithm_t,
-    input: *const u8,
-    input_sz: c_int,
-    digest: *mut u8,
-    digest_sz: c_int,
-) -> picky_status_t {
-    let algorithm = err_check!(HashAlgorithm::try_from(algorithm).context("bad `algorithm` argument"));
-    let input = ptr_to_buffer!(@u8 input, input_sz);
-    let digest = ptr_to_buffer!(mut @u8 digest, digest_sz);
-    err_check!(copy_slice_to_c(algorithm.digest(input), digest));
-    picky_status_t::ok()
+impl From<HashAlgorithm> for ffi::PickyHashAlgorithm {
+    fn from(ty: HashAlgorithm) -> Self {
+        match ty {
+            HashAlgorithm::MD5 => ffi::PickyHashAlgorithm::MD5,
+            HashAlgorithm::SHA1 => ffi::PickyHashAlgorithm::SHA1,
+            HashAlgorithm::SHA2_224 => ffi::PickyHashAlgorithm::SHA2_224,
+            HashAlgorithm::SHA2_256 => ffi::PickyHashAlgorithm::SHA2_256,
+            HashAlgorithm::SHA2_384 => ffi::PickyHashAlgorithm::SHA2_384,
+            HashAlgorithm::SHA2_512 => ffi::PickyHashAlgorithm::SHA2_512,
+            HashAlgorithm::SHA3_384 => ffi::PickyHashAlgorithm::SHA3_384,
+            HashAlgorithm::SHA3_512 => ffi::PickyHashAlgorithm::SHA3_512,
+            _ => ffi::PickyHashAlgorithm::Unknown,
+        }
+    }
 }
 
-/// Get the length required to write the digest using the specified hash algorithm.
-///
-/// Returns the number of required bytes, or `-1` if there was an error.
-#[no_mangle]
-pub extern "C" fn picky_digest_length(algorithm: picky_hash_algorithm_t) -> c_int {
-    let algorithm = err_check!(
-        HashAlgorithm::try_from(algorithm).context("bad `algorithm` argument"),
-        -1
-    );
-    let length = algorithm.output_size();
-    err_check!(c_int::try_from(length), -1)
+#[diplomat::bridge]
+pub mod ffi {
+    pub enum PickyHashAlgorithm {
+        MD5,
+        SHA1,
+        SHA2_224,
+        SHA2_256,
+        SHA2_384,
+        SHA2_512,
+        SHA3_384,
+        SHA3_512,
+        Unknown,
+    }
 }
