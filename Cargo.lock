@@ -716,6 +716,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "diplomat"
+version = "0.2.0"
+source = "git+https://github.com/CBenoit/diplomat.git?branch=csharp-backend#6838b8d6f24855d65a4248141eb25a79c86223b9"
+dependencies = [
+ "diplomat_core",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "diplomat-runtime"
+version = "0.2.0"
+source = "git+https://github.com/CBenoit/diplomat.git?branch=csharp-backend#6838b8d6f24855d65a4248141eb25a79c86223b9"
+
+[[package]]
+name = "diplomat_core"
+version = "0.2.0"
+source = "git+https://github.com/CBenoit/diplomat.git?branch=csharp-backend#6838b8d6f24855d65a4248141eb25a79c86223b9"
+dependencies = [
+ "impls",
+ "lazy_static",
+ "proc-macro2",
+ "quote",
+ "serde",
+ "syn",
+]
+
+[[package]]
 name = "dtoa"
 version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -760,16 +789,6 @@ dependencies = [
  "rustversion",
  "syn",
  "synstructure",
-]
-
-[[package]]
-name = "ffi_helpers"
-version = "0.3.0"
-source = "git+https://github.com/Michael-F-Bryan/ffi_helpers?rev=4a1d448#4a1d4481d5800fcc9e2e92ce3b432e419f03f9db"
-dependencies = [
- "anyhow",
- "libc",
- "thiserror",
 ]
 
 [[package]]
@@ -1222,6 +1241,12 @@ dependencies = [
  "num-traits",
  "png",
 ]
+
+[[package]]
+name = "impls"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a46645bbd70538861a90d0f26c31537cdf1e44aae99a794fb75a664b70951bc"
 
 [[package]]
 name = "indexmap"
@@ -2067,11 +2092,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "picky-c-api"
+name = "picky-ffi"
 version = "0.1.0"
 dependencies = [
- "anyhow",
- "ffi_helpers",
+ "diplomat",
+ "diplomat-runtime",
  "picky 6.4.0",
 ]
 

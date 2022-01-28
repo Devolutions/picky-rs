@@ -11,74 +11,53 @@
 
 default: bindings
 
+## Diplomat installation ##
+
+install-diplomat:
+    cargo install --git https://github.com/CBenoit/diplomat.git --branch "csharp-backend" diplomat-tool -f
+
 ## Native library ##
 
 target_debug_folder   := "../target/debug/"
-static_lib_path       := target_debug_folder + "libpicky.a"
-shared_lib_path_linux := target_debug_folder + "libpicky.so"
-shared_lib_path_win   := target_debug_folder + "picky.dll"
+target_release_folder := "../target/release/"
+shared_lib_name_linux := "libpicky.so"
+shared_lib_name_win   := "picky.dll"
+
+dotnet_diplomat_config        := "./dotnet-interop-conf.toml"
+dotnet_path                   := "./dotnet/"
+dotnet_lib_path               := dotnet_path + "src/Picky/"
+dotnet_generated_path         := dotnet_lib_path + "Generated/"
+dotnet_debug_lib_path_linux   := dotnet_lib_path + "lib/Debug/linux-x64/"
+dotnet_debug_lib_path_win     := dotnet_lib_path + "lib/Debug/win-x64/"
+dotnet_release_lib_path_linux := dotnet_lib_path + "lib/Release/linux-x64/"
+dotnet_release_lib_path_win   := dotnet_lib_path + "lib/Release/win-x64/"
 
 native-lib-debug:
-    cargo build -p picky-c-api
-    mkdir -p {{dotnet_native_lib_path_linux}}
-    -cp {{shared_lib_path_linux}} {{dotnet_native_lib_path_linux}}
-    mkdir -p {{dotnet_native_lib_path_win}}
-    -cp {{shared_lib_path_win}} {{dotnet_native_lib_path_win}}
+    cargo build -p picky-ffi
+    mkdir -p {{dotnet_debug_lib_path_linux}}
+    -cp {{target_debug_folder}}{{shared_lib_name_linux}} {{dotnet_debug_lib_path_linux}}
+    mkdir -p {{dotnet_debug_lib_path_win}}
+    -cp {{target_debug_folder}}{{shared_lib_name_win}} {{dotnet_debug_lib_path_win}}
+
+native-lib-release:
+    cargo build -p picky-ffi --release
+    mkdir -p {{dotnet_release_lib_path_linux}}
+    -cp {{target_release_folder}}{{shared_lib_name_linux}} {{dotnet_release_lib_path_linux}}
+    mkdir -p {{dotnet_release_lib_path_win}}
+    -cp {{target_release_folder}}{{shared_lib_name_win}} {{dotnet_release_lib_path_win}}
 
 ## Bindings ##
 
-bindings: c-bindings dotnet-bindings
+bindings: dotnet-bindings
 
-include_folder       := "./include/"
-header_path          := include_folder + "picky.h"
-cbindgen_config_file := "./cbindgen.toml"
-
-c-bindings:
-    cbindgen --crate picky-c-api --config {{cbindgen_config_file}} --output "{{header_path}}"
-    @echo ">> C header generated at {{header_path}}"
-
-response_file                := "./dotnet_native.rsp"
-dotnet_folder                := "./dotnet/"
-dotnet_lib_path              := dotnet_folder + "src/Picky/"
-dotnet_native_path           := dotnet_lib_path + "Native/"
-dotnet_native_test_path      := dotnet_folder + "tests/Picky.Tests/Native/"
-dotnet_native_lib_path_linux := dotnet_lib_path + "lib/Debug/linux-x64/"
-dotnet_native_lib_path_win   := dotnet_lib_path + "lib/Debug/win-x64/"
-
-dotnet-bindings: c-bindings
-    ClangSharpPInvokeGenerator @{{response_file}} --output {{dotnet_native_path}} --test-output {{dotnet_native_test_path}}
-    @echo ">> Native .NET wrapper generated at {{dotnet_native_path}}"
-    @echo ">> Native .NET wrapper tests generated at {{dotnet_native_test_path}}"
-    @echo ">> Proceeds to code formating…"
-    cd {{dotnet_folder}} && dotnet format
-
-## Examples ##
-
-examples_folder     := "./examples/"
-examples_out_folder := examples_folder + "out/"
-common_gcc_args     := static_lib_path + " -I" + include_folder + " -lm"
-
-examples: pem
-
-pem: native-lib-debug c-bindings make-examples-output-directory
-    gcc {{examples_folder}}pem.c {{common_gcc_args}} -o {{examples_out_folder}}pem
-
-make-examples-output-directory:
-    mkdir -p {{examples_out_folder}}
-
-clean:
-    -rm -rf {{examples_out_folder}}
-    -cd {{dotnet_folder}} && dotnet clean
+dotnet-bindings:
+    rm {{dotnet_generated_path}}*.cs
+    diplomat-tool dotnet {{dotnet_generated_path}} -l {{dotnet_diplomat_config}}
+    @echo ">> .NET wrapper generated at {{dotnet_generated_path}}"
 
 ## Tests ##
 
-test: test-pem test-dotnet
+test: test-dotnet
 
 test-dotnet: native-lib-debug dotnet-bindings
-    cd {{dotnet_folder}} && dotnet test
-
-pem_path := "../test_assets/intermediate_ca.crt"
-
-test-pem: pem
-    eval $({{examples_out_folder}}pem {{pem_path}}) && [ "$label" = "CERTIFICATE" ] && [ "$len" -eq 835 ] && echo ">> test_pem: success"
-
+    cd {{dotnet_path}} && dotnet test

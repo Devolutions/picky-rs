@@ -1,0 +1,10 @@
+namespace = "Devolutions.Picky"
+native_lib = "picky"
+
+[exceptions]
+trim_suffix = "Error"
+error_message_method = "ToDisplay"
+
+[properties]
+setters_prefix = "set_"
+getters_prefix = "get_"

@@ -1,5 +1,5 @@
 [package]
-name = "picky-c-api"
+name = "picky-ffi"
 version = "0.1.0"
 edition = "2021"
 publish = false
@@ -12,6 +12,6 @@ test = false
 doctest = false
 
 [dependencies]
-picky = { version = "6.4.0", default-features = false, features = ["x509", "jose", "http_signature", "time_conversion"], path = "../picky" }
-ffi_helpers = { version = "0.3", git = "https://github.com/Michael-F-Bryan/ffi_helpers", rev = "4a1d448" } # TODO: use published version when it's published
-anyhow = "1"
+picky = { version = "6.4.0", default-features = false, features = ["ssh", "time_conversion"], path = "../picky/" }
+diplomat = { git = "https://github.com/CBenoit/diplomat.git", branch = "csharp-backend" }
+diplomat-runtime = { git = "https://github.com/CBenoit/diplomat.git", branch = "csharp-backend" }
