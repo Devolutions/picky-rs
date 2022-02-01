@@ -1973,8 +1973,8 @@ dependencies = [
  "md-5",
  "num-bigint-dig",
  "oid",
- "picky-asn1 0.4.0",
- "picky-asn1-der 0.2.5",
+ "picky-asn1 0.5.0",
+ "picky-asn1-der 0.3.0",
  "picky-asn1-x509 0.6.1",
  "pretty_assertions",
  "rand 0.8.4",
@@ -2003,8 +2003,8 @@ dependencies = [
  "md-5",
  "num-bigint-dig",
  "oid",
- "picky-asn1 0.4.0 (git+https://github.com/Devolutions/picky-rs.git?rev=a0a0d1)",
- "picky-asn1-der 0.2.5 (git+https://github.com/Devolutions/picky-rs.git?rev=a0a0d1)",
+ "picky-asn1 0.4.0",
+ "picky-asn1-der 0.2.5",
  "picky-asn1-x509 0.6.1 (git+https://github.com/Devolutions/picky-rs.git?rev=a0a0d1)",
  "rand 0.8.4",
  "rsa",
@@ -2019,45 +2019,45 @@ dependencies = [
 [[package]]
 name = "picky-asn1"
 version = "0.4.0"
+source = "git+https://github.com/Devolutions/picky-rs.git?rev=a0a0d1#a0a0d1216d86aa46693e0e78b137a233db2f872f"
+dependencies = [
+ "oid",
+ "serde",
+ "serde_bytes",
+]
+
+[[package]]
+name = "picky-asn1"
+version = "0.5.0"
 dependencies = [
  "chrono",
  "oid",
- "picky-asn1-der 0.2.5",
+ "picky-asn1-der 0.3.0",
  "serde",
  "serde_bytes",
  "time 0.3.5",
 ]
 
 [[package]]
-name = "picky-asn1"
-version = "0.4.0"
+name = "picky-asn1-der"
+version = "0.2.5"
 source = "git+https://github.com/Devolutions/picky-rs.git?rev=a0a0d1#a0a0d1216d86aa46693e0e78b137a233db2f872f"
 dependencies = [
- "oid",
+ "picky-asn1 0.4.0",
  "serde",
  "serde_bytes",
 ]
 
 [[package]]
 name = "picky-asn1-der"
-version = "0.2.5"
+version = "0.3.0"
 dependencies = [
  "base64 0.13.0",
  "lazy_static",
  "num-bigint-dig",
  "oid",
- "picky-asn1 0.4.0",
+ "picky-asn1 0.5.0",
  "pretty_assertions",
- "serde",
- "serde_bytes",
-]
-
-[[package]]
-name = "picky-asn1-der"
-version = "0.2.5"
-source = "git+https://github.com/Devolutions/picky-rs.git?rev=a0a0d1#a0a0d1216d86aa46693e0e78b137a233db2f872f"
-dependencies = [
- "picky-asn1 0.4.0 (git+https://github.com/Devolutions/picky-rs.git?rev=a0a0d1)",
  "serde",
  "serde_bytes",
 ]
@@ -2070,8 +2070,8 @@ dependencies = [
  "hex",
  "num-bigint-dig",
  "oid",
- "picky-asn1 0.4.0",
- "picky-asn1-der 0.2.5",
+ "picky-asn1 0.5.0",
+ "picky-asn1-der 0.3.0",
  "pretty_assertions",
  "serde",
  "widestring 0.5.1",
@@ -2085,8 +2085,8 @@ dependencies = [
  "base64 0.13.0",
  "num-bigint-dig",
  "oid",
- "picky-asn1 0.4.0 (git+https://github.com/Devolutions/picky-rs.git?rev=a0a0d1)",
- "picky-asn1-der 0.2.5 (git+https://github.com/Devolutions/picky-rs.git?rev=a0a0d1)",
+ "picky-asn1 0.4.0",
+ "picky-asn1-der 0.2.5",
  "serde",
  "widestring 0.4.3",
 ]
@@ -2115,7 +2115,7 @@ dependencies = [
  "multibase",
  "multihash",
  "picky 6.4.0",
- "picky-asn1 0.4.0",
+ "picky-asn1 0.5.0",
  "rand 0.8.4",
  "reqwest 0.11.7",
  "saphir",
