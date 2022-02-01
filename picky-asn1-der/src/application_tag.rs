@@ -5,6 +5,7 @@ use serde::de::{Error, SeqAccess};
 use serde::{de, ser};
 use std::fmt;
 use std::fmt::Debug;
+use std::marker::PhantomData;
 
 #[derive(Debug, PartialEq)]
 pub struct ApplicationTag<V: Debug + PartialEq, const T: u8>(V);
@@ -20,19 +21,13 @@ impl<'de, V: de::Deserialize<'de> + Debug + PartialEq, const T: u8> de::Deserial
     where
         D: de::Deserializer<'de>,
     {
-        struct Visitor<E>(Option<E>, u8);
+        struct Visitor<E, const T: u8>(PhantomData<E>);
 
-        impl<E> Visitor<E> {
-            pub fn new(tag: u8) -> Self {
-                Self(None, tag)
-            }
-        }
-
-        impl<'de, E: de::Deserialize<'de> + Debug + PartialEq> de::Visitor<'de> for Visitor<E> {
+        impl<'de, E: de::Deserialize<'de> + Debug + PartialEq, const T: u8> de::Visitor<'de> for Visitor<E, T> {
             type Value = E;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str(&format!("A valid DER-encoded ApplicationTag{}", self.1))
+                formatter.write_str(&format!("A valid DER-encoded ApplicationTag{:02x}", T))
             }
 
             fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
@@ -57,10 +52,10 @@ impl<'de, V: de::Deserialize<'de> + Debug + PartialEq, const T: u8> de::Deserial
                     )));
                 }
 
-                if tag.number() != self.1 {
+                if tag.number() != T {
                     return Err(A::Error::custom(format!(
                         "Expected Application number tag {} but got: {}",
-                        self.1,
+                        T,
                         tag.number()
                     )));
                 }
@@ -75,7 +70,7 @@ impl<'de, V: de::Deserialize<'de> + Debug + PartialEq, const T: u8> de::Deserial
         }
 
         let inner = deserializer
-            .deserialize_enum("ApplicationTag", &["ApplicationTag"], Visitor::<V>::new(T))
+            .deserialize_enum("ApplicationTag", &["ApplicationTag"], Visitor::<V, T>(PhantomData))
             .map_err(D::Error::custom)?;
 
         Ok(Self(inner))
