@@ -186,6 +186,8 @@ impl<'de> Deserializer<'de> {
                         tag,
                         encapsulator_tag
                     );
+                    // we need to clear the stack otherwise it'll contain unwanted tags on the next serialization
+                    self.encapsulator_tag_stack.clear();
                     return Err(Asn1DerError::InvalidData);
                 }
 
@@ -229,6 +231,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Tag::PRINTABLE_STRING => self.deserialize_byte_buf(visitor),
             Tag::NUMERIC_STRING => self.deserialize_byte_buf(visitor),
             Tag::IA5_STRING => self.deserialize_byte_buf(visitor),
+            Tag::GENERAL_STRING => self.deserialize_byte_buf(visitor),
             ExplicitContextTag0::<()>::TAG => self.deserialize_newtype_struct(ExplicitContextTag0::<()>::NAME, visitor),
             ExplicitContextTag1::<()>::TAG => self.deserialize_newtype_struct(ExplicitContextTag1::<()>::NAME, visitor),
             ExplicitContextTag2::<()>::TAG => self.deserialize_newtype_struct(ExplicitContextTag2::<()>::NAME, visitor),
@@ -498,6 +501,7 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
             Tag::PRINTABLE_STRING => {}
             Tag::NUMERIC_STRING => {}
             Tag::IA5_STRING => {}
+            Tag::GENERAL_STRING => {}
             tag if (tag.is_primitive() && !tag.is_universal()) || self.raw_der => {}
             _tag => {
                 debug_log!("deserialize_byte_buf: INVALID (found {})", _tag);

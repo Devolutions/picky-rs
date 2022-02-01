@@ -200,6 +200,12 @@ asn1_wrapper! { auto struct IA5StringAsn1(IA5String),               Tag::IA5_STR
 asn1_wrapper! { auto struct BMPStringAsn1(BMPString),               Tag::BMP_STRING }
 asn1_wrapper! { auto struct UTCTimeAsn1(UTCTime),                   Tag::UTC_TIME }
 asn1_wrapper! { auto struct GeneralizedTimeAsn1(GeneralizedTime),   Tag::GENERALIZED_TIME }
+// [RFC 4120 5.2.1](https://www.rfc-editor.org/rfc/rfc4120.txt)
+// Kerberos specification declares General String as IA5String
+// ```not-rust
+// KerberosString  ::= GeneralString (IA5String)
+// ```
+asn1_wrapper! { auto struct GeneralStringAsn1(IA5String),           Tag::GENERAL_STRING }
 
 asn1_wrapper! { auto collection struct Asn1SequenceOf<T>, Tag::SEQUENCE }
 asn1_wrapper! { auto collection struct Asn1SetOf<T>,      Tag::SET }
@@ -640,6 +646,12 @@ impls! { OctetStringAsn1Container<Encapsulated>, Tag::OCTET_STRING }
 /// ```
 #[derive(Debug, PartialEq, PartialOrd, Hash, Clone)]
 pub struct Optional<T>(pub T);
+
+impl<T: Default> Default for Optional<T> {
+    fn default() -> Self {
+        Optional(T::default())
+    }
+}
 
 impl<T> Optional<T>
 where
