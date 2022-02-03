@@ -1,0 +1,77 @@
+name: nuget package
+on: workflow_dispatch
+jobs:
+  build-native:
+    name: native build
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ windows, macos, linux ]
+        arch: [ x64, arm64 ]
+        include:
+          - os: windows
+            runner: windows-2022
+          - os: macos
+            runner: macos-10.15
+          - os: linux
+            runner: ubuntu-18.04
+
+    steps:
+      - name: Check out ${{ github.repository }}
+        uses: actions/checkout@v2
+
+      - name: Build picky (${{matrix.arch}})
+        shell: pwsh
+        run: |
+          $RustArch = @{'x64'='x86_64';'arm64'='aarch64'}['${{matrix.arch}}']
+          $RustPlatform = @{'windows'='pc-windows-msvc';'macos'='apple-darwin';'linux'='unknown-linux-gnu'}['${{matrix.os}}']
+          $SharedLibExt = @{'windows'='dll';'macos'='dylib';'linux'='so'}['${{matrix.os}}']
+          $RustTarget = "$RustArch-$RustPlatform"
+          & rustup target add $RustTarget
+          & cargo build -p picky-ffi --release --target $RustTarget
+          $LibraryName = "picky.$SharedLibExt"
+          $OutputLibrary = Join-Path "target" $RustTarget 'release' $LibraryName
+          New-Item -ItemType Directory -Path "dependencies/native" | Out-Null
+          Copy-Item $OutputLibrary $(Join-Path "dependencies/native" $LibraryName)
+
+      - name: Upload native components
+        uses: actions/upload-artifact@v2
+        with:
+          name: picky-${{matrix.arch}}
+          path: native/${{matrix.arch}}
+
+  build-managed:
+    name: managed build
+    runs-on: windows-2022
+    needs: build-native
+
+    steps:
+      - name: Check out ${{ github.repository }}
+        uses: actions/checkout@v2
+
+      - name: Prepare dependencies
+        run: |
+          New-Item -ItemType Directory -Path "dependencies/native" | Out-Null
+
+      - name: Download native components
+        uses: actions/download-artifact@v2
+        with:
+          path: dependencies/native
+
+      - name: Rename dependencies
+        run: |
+          Set-Location "dependencies/native"
+          $(Get-Item ".\picky-*") | ForEach-Object { ($p1,$p2) = $_.Name -Split '-'; Rename-Item $_ $p2 }
+          Get-ChildItem * -Recurse
+
+      - name: Build picky (managed)
+        shell: pwsh
+        run: |
+          & dotnet pack .\c-api\dotnet\Picky.sln -o package
+
+      - name: Upload managed components
+        uses: actions/upload-artifact@v2
+        with:
+          name: picky-nupkg
+          path: package/*.nupkg
