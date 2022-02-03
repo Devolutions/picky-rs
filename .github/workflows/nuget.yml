@@ -29,6 +29,16 @@ jobs:
           $SharedLibExt = @{'windows'='dll';'macos'='dylib';'linux'='so'}['${{matrix.os}}']
           $RustTarget = "$RustArch-$RustPlatform"
           & rustup target add $RustTarget
+
+          if ('${{matrix.os}}' -eq 'linux') {
+            & sudo apt install gcc
+          }
+
+          if ($RustTarget -eq 'aarch64-unknown-linux-gnu') {
+            & sudo apt install gcc-aarch64-linux-gnu
+            $Env:RUSTFLAGS="-C linker=aarch64-linux-gnu-gcc"
+          }
+
           & cargo build -p picky-ffi --release --target $RustTarget
           $LibraryName = "picky.$SharedLibExt"
           $OutputLibrary = Join-Path "target" $RustTarget 'release' $LibraryName
