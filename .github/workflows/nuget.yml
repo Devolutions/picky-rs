@@ -27,7 +27,7 @@ jobs:
           $DotNetOs = '${{matrix.os}}'
           $DotNetArch = '${{matrix.arch}}'
           $DotNetRid = '${{matrix.os}}-${{matrix.arch}}'
-          $RustArch = @{'x64'='x86_64';'arm64'='aarch64'}[$DotNetOs]
+          $RustArch = @{'x64'='x86_64';'arm64'='aarch64'}[$DotNetArch]
           $RustPlatform = @{'win'='pc-windows-msvc';'osx'='apple-darwin';'linux'='unknown-linux-gnu'}[$DotNetOs]
           $LibPrefix = @{'win'='';'osx'='lib';'linux'='lib'}[$DotNetOs]
           $SharedLibExt = @{'win'='dll';'osx'='dylib';'linux'='so'}[$DotNetOs]
