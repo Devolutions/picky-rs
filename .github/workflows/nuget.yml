@@ -40,8 +40,9 @@ jobs:
           & cargo build -p picky-ffi --release --target $RustTarget
           $LibraryName = "${LibPrefix}picky.$SharedLibExt"
           $OutputLibrary = Join-Path "target" $RustTarget 'release' $LibraryName
-          New-Item -ItemType Directory -Path "dependencies/native" | Out-Null
-          Copy-Item $OutputLibrary $(Join-Path "dependencies/native" $LibraryName)
+          $OutputPath = Join-Path "dependencies" "native" ${{matrix.arch}}
+          New-Item -ItemType Directory -Path $OutputPath | Out-Null
+          Copy-Item $OutputLibrary $(Join-Path $OutputPath $LibraryName)
 
       - name: Upload native components
         uses: actions/upload-artifact@v2
