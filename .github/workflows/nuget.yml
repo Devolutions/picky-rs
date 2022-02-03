@@ -47,7 +47,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: picky-${{matrix.arch}}
-          path: native/${{matrix.arch}}
+          path: dependencies/native/${{matrix.arch}}
 
   build-managed:
     name: managed build
