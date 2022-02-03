@@ -3,17 +3,17 @@ on: workflow_dispatch
 jobs:
   build-native:
     name: native build
-    runs-on: windows-2022
+    runs-on: ${{matrix.runner}}
     strategy:
       fail-fast: false
       matrix:
-        os: [ windows, macos, linux ]
+        os: [ win, osx, linux ]
         arch: [ x64, arm64 ]
         include:
-          - os: windows
+          - os: win
             runner: windows-2022
-          - os: macos
-            runner: macos-10.15
+          - os: osx
+            runner: macos-11
           - os: linux
             runner: ubuntu-18.04
 
@@ -21,25 +21,41 @@ jobs:
       - name: Check out ${{ github.repository }}
         uses: actions/checkout@v2
 
-      - name: Build picky (${{matrix.arch}})
+      - name: Build picky (${{matrix.os}}-${{matrix.arch}})
         shell: pwsh
         run: |
-          $RustArch = @{'x64'='x86_64';'arm64'='aarch64'}['${{matrix.arch}}']
-          $RustPlatform = @{'windows'='pc-windows-msvc';'macos'='apple-darwin';'linux'='unknown-linux-gnu'}['${{matrix.os}}']
-          $SharedLibExt = @{'windows'='dll';'macos'='dylib';'linux'='so'}['${{matrix.os}}']
+          $DotNetOs = '${{matrix.os}}'
+          $DotNetArch = '${{matrix.arch}}'
+          $DotNetRid = '${{matrix.os}}-${{matrix.arch}}'
+          $RustArch = @{'x64'='x86_64';'arm64'='aarch64'}[$DotNetArch]
+          $RustPlatform = @{'win'='pc-windows-msvc';'osx'='apple-darwin';'linux'='unknown-linux-gnu'}[$DotNetOs]
+          $LibPrefix = @{'win'='';'osx'='lib';'linux'='lib'}[$DotNetOs]
+          $SharedLibExt = @{'win'='dll';'osx'='dylib';'linux'='so'}[$DotNetOs]
           $RustTarget = "$RustArch-$RustPlatform"
+
           & rustup target add $RustTarget
+
+          if ($DotNetOs -eq 'win') {
+            $Env:RUSTFLAGS = "-C target-feature=+crt-static"
+          }
+
+          if ($RustTarget -eq 'aarch64-unknown-linux-gnu') {
+            & sudo apt install gcc-aarch64-linux-gnu
+            $Env:RUSTFLAGS="-C linker=aarch64-linux-gnu-gcc"
+          }
+
           & cargo build -p picky-ffi --release --target $RustTarget
-          $LibraryName = "picky.$SharedLibExt"
+          $LibraryName = "${LibPrefix}picky.$SharedLibExt"
           $OutputLibrary = Join-Path "target" $RustTarget 'release' $LibraryName
-          New-Item -ItemType Directory -Path "dependencies/native" | Out-Null
-          Copy-Item $OutputLibrary $(Join-Path "dependencies/native" $LibraryName)
+          $OutputPath = Join-Path "dependencies" "native" $DotNetRid
+          New-Item -ItemType Directory -Path $OutputPath | Out-Null
+          Copy-Item $OutputLibrary $(Join-Path $OutputPath $LibraryName)
 
       - name: Upload native components
         uses: actions/upload-artifact@v2
         with:
-          name: picky-${{matrix.arch}}
-          path: native/${{matrix.arch}}
+          name: picky-${{matrix.os}}-${{matrix.arch}}
+          path: dependencies/native/${{matrix.os}}-${{matrix.arch}}
 
   build-managed:
     name: managed build
@@ -62,7 +78,7 @@ jobs:
       - name: Rename dependencies
         run: |
           Set-Location "dependencies/native"
-          $(Get-Item ".\picky-*") | ForEach-Object { ($p1,$p2) = $_.Name -Split '-'; Rename-Item $_ $p2 }
+          $(Get-Item ".\picky-*") | ForEach-Object { Rename-Item $_ $_.Name.Replace("picky-", "") }
           Get-ChildItem * -Recurse
 
       - name: Build picky (managed)
