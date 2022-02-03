@@ -3,7 +3,7 @@ on: workflow_dispatch
 jobs:
   build-native:
     name: native build
-    runs-on: windows-2022
+    runs-on: ${{matrix.runner}}
     strategy:
       fail-fast: false
       matrix:
@@ -21,13 +21,6 @@ jobs:
       - name: Check out ${{ github.repository }}
         uses: actions/checkout@v2
 
-      - name: Configure Linux runner
-        if: matrix.os == 'linux'
-        shell: pwsh
-        run: |
-          sudo apt update
-          sudo apt install gcc gcc-aarch64-linux-gnu
-
       - name: Build picky (${{matrix.arch}})
         shell: pwsh
         run: |
@@ -35,10 +28,11 @@ jobs:
           $RustPlatform = @{'windows'='pc-windows-msvc';'macos'='apple-darwin';'linux'='unknown-linux-gnu'}['${{matrix.os}}']
           $SharedLibExt = @{'windows'='dll';'macos'='dylib';'linux'='so'}['${{matrix.os}}']
           $RustTarget = "$RustArch-$RustPlatform"
-          
+
           & rustup target add $RustTarget
 
           if ($RustTarget -eq 'aarch64-unknown-linux-gnu') {
+            & sudo apt install gcc-aarch64-linux-gnu
             $Env:RUSTFLAGS="-C linker=aarch64-linux-gnu-gcc"
           }
 
