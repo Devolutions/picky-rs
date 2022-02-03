@@ -1,6 +1,8 @@
 .idea/
 target/
 database/
+dependencies/
+package/
 **/*.rs.bk
 c-api/examples/out
 picky_server_conf.yaml
