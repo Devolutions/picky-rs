@@ -47,7 +47,7 @@ jobs:
           & cargo build -p picky-ffi --release --target $RustTarget
           $LibraryName = "${LibPrefix}picky.$SharedLibExt"
           $OutputLibrary = Join-Path "target" $RustTarget 'release' $LibraryName
-          $OutputPath = Join-Path "dependencies" "native" $DotNetRid
+          $OutputPath = Join-Path "dependencies" "runtimes" $DotNetRid "native"
           New-Item -ItemType Directory -Path $OutputPath | Out-Null
           Copy-Item $OutputLibrary $(Join-Path $OutputPath $LibraryName)
 
@@ -55,7 +55,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: picky-${{matrix.os}}-${{matrix.arch}}
-          path: dependencies/native/${{matrix.os}}-${{matrix.arch}}
+          path: dependencies/runtimes/${{matrix.os}}-${{matrix.arch}}
 
   build-managed:
     name: managed build
@@ -68,16 +68,16 @@ jobs:
 
       - name: Prepare dependencies
         run: |
-          New-Item -ItemType Directory -Path "dependencies/native" | Out-Null
+          New-Item -ItemType Directory -Path "dependencies/runtimes" | Out-Null
 
       - name: Download native components
         uses: actions/download-artifact@v2
         with:
-          path: dependencies/native
+          path: dependencies/runtimes
 
       - name: Rename dependencies
         run: |
-          Set-Location "dependencies/native"
+          Set-Location "dependencies/runtimes"
           $(Get-Item ".\picky-*") | ForEach-Object { Rename-Item $_ $_.Name.Replace("picky-", "") }
           Get-ChildItem * -Recurse
 
