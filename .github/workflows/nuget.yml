@@ -13,7 +13,7 @@ jobs:
           - os: windows
             runner: windows-2022
           - os: macos
-            runner: macos-10.15
+            runner: macos-11
           - os: linux
             runner: ubuntu-18.04
 
@@ -26,6 +26,7 @@ jobs:
         run: |
           $RustArch = @{'x64'='x86_64';'arm64'='aarch64'}['${{matrix.arch}}']
           $RustPlatform = @{'windows'='pc-windows-msvc';'macos'='apple-darwin';'linux'='unknown-linux-gnu'}['${{matrix.os}}']
+          $LibPrefix = @{'windows'='';'macos'='lib';'linux'='lib'}['${{matrix.os}}']
           $SharedLibExt = @{'windows'='dll';'macos'='dylib';'linux'='so'}['${{matrix.os}}']
           $RustTarget = "$RustArch-$RustPlatform"
 
@@ -37,7 +38,7 @@ jobs:
           }
 
           & cargo build -p picky-ffi --release --target $RustTarget
-          $LibraryName = "picky.$SharedLibExt"
+          $LibraryName = "${LibPrefix}picky.$SharedLibExt"
           $OutputLibrary = Join-Path "target" $RustTarget 'release' $LibraryName
           New-Item -ItemType Directory -Path "dependencies/native" | Out-Null
           Copy-Item $OutputLibrary $(Join-Path "dependencies/native" $LibraryName)
