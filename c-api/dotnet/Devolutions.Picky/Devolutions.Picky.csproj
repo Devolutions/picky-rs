@@ -5,7 +5,7 @@
     <Description>Bindings to Rust picky native library</Description>
     <TargetFrameworks>net472;net48;net6.0</TargetFrameworks>
     <LangVersion>latest</LangVersion>
-    <Version>0.1.0</Version>
+    <Version>2022.2.3.0</Version>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -13,7 +13,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <RuntimesPath>../../../../dependencies/runtimes</RuntimesPath>
+    <RuntimesPath>../../../dependencies/runtimes</RuntimesPath>
     <NativeLibPath_win_x64>$(RuntimesPath)/win-x64/native/picky.dll</NativeLibPath_win_x64>
     <NativeLibPath_win_arm64>$(RuntimesPath)/win-arm64/native/picky.dll</NativeLibPath_win_arm64>
     <NativeLibPath_osx_x64>$(RuntimesPath)/osx-x64/native/picky.dylib</NativeLibPath_osx_x64>
@@ -74,6 +74,10 @@
       <Pack>true</Pack>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Devolutions.Picky.targets" PackagePath="build/Devolutions.Picky.targets" Pack="true" />
   </ItemGroup>
 
 </Project>
