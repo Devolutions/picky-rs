@@ -84,6 +84,7 @@ jobs:
       - name: Build picky (managed)
         shell: pwsh
         run: |
+          & dotnet build .\c-api\dotnet\Picky.sln -o package
           & dotnet pack .\c-api\dotnet\Picky.sln -o package
 
       - name: Upload managed components
