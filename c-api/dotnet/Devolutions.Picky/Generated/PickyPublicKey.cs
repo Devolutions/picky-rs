@@ -36,7 +36,6 @@ public partial class PickyPublicKey: IDisposable
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PickyPublicKey</c> allocated on Rust side.
-    /// If a custom Drop implementation is implemented on Rust side, it WILL run on destruction.
     /// </returns>
     public static PickyPublicKey FromPem(PickyPem pem)
     {
@@ -64,7 +63,6 @@ public partial class PickyPublicKey: IDisposable
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PickyPublicKey</c> allocated on Rust side.
-    /// If a custom Drop implementation is implemented on Rust side, it WILL run on destruction.
     /// </returns>
     public static PickyPublicKey FromDer(byte[] der)
     {
@@ -90,7 +88,6 @@ public partial class PickyPublicKey: IDisposable
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PickyPem</c> allocated on Rust side.
-    /// If a custom Drop implementation is implemented on Rust side, it WILL run on destruction.
     /// </returns>
     public PickyPem ToPem()
     {
@@ -116,29 +113,6 @@ public partial class PickyPublicKey: IDisposable
     public unsafe Raw.PickyPublicKey* AsFFI()
     {
         return _inner;
-    }
-
-    /// <summary>
-    /// Marks this object as moved into Rust side.
-    /// </summary>
-    public void MarkAsMoved()
-    {
-        unsafe
-        {
-            if (_inner == null)
-            {
-                throw new ObjectDisposedException("PickyPublicKey");
-            }
-            _inner = null;
-        }
-    }
-
-    /// <summary>
-    /// Restores unmanaged ressource handle to this object.
-    /// </summary>
-    public unsafe void RestoreHandle(Raw.PickyPublicKey* handle)
-    {
-        _inner = handle;
     }
 
     /// <summary>

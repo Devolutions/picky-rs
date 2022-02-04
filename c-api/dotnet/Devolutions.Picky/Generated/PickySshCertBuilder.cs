@@ -115,7 +115,6 @@ public partial class PickySshCertBuilder: IDisposable
 
     /// <returns>
     /// A <c>PickySshCertBuilder</c> allocated on Rust side.
-    /// If a custom Drop implementation is implemented on Rust side, it WILL run on destruction.
     /// </returns>
     public static PickySshCertBuilder Init()
     {
@@ -323,7 +322,6 @@ public partial class PickySshCertBuilder: IDisposable
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PickySshCert</c> allocated on Rust side.
-    /// If a custom Drop implementation is implemented on Rust side, it WILL run on destruction.
     /// </returns>
     public PickySshCert Build()
     {
@@ -349,29 +347,6 @@ public partial class PickySshCertBuilder: IDisposable
     public unsafe Raw.PickySshCertBuilder* AsFFI()
     {
         return _inner;
-    }
-
-    /// <summary>
-    /// Marks this object as moved into Rust side.
-    /// </summary>
-    public void MarkAsMoved()
-    {
-        unsafe
-        {
-            if (_inner == null)
-            {
-                throw new ObjectDisposedException("PickySshCertBuilder");
-            }
-            _inner = null;
-        }
-    }
-
-    /// <summary>
-    /// Restores unmanaged ressource handle to this object.
-    /// </summary>
-    public unsafe void RestoreHandle(Raw.PickySshCertBuilder* handle)
-    {
-        _inner = handle;
     }
 
     /// <summary>

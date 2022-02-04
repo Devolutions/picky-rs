@@ -96,7 +96,6 @@ public partial class PickySshCert: IDisposable
 
     /// <returns>
     /// A <c>PickySshCertBuilder</c> allocated on Rust side.
-    /// If a custom Drop implementation is implemented on Rust side, it WILL run on destruction.
     /// </returns>
     public static PickySshCertBuilder Builder()
     {
@@ -113,7 +112,6 @@ public partial class PickySshCert: IDisposable
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PickySshCert</c> allocated on Rust side.
-    /// If a custom Drop implementation is implemented on Rust side, it WILL run on destruction.
     /// </returns>
     public static PickySshCert Parse(string repr)
     {
@@ -180,7 +178,6 @@ public partial class PickySshCert: IDisposable
 
     /// <returns>
     /// A <c>PickySshPublicKey</c> allocated on Rust side.
-    /// If a custom Drop implementation is implemented on Rust side, it WILL run on destruction.
     /// </returns>
     public PickySshPublicKey GetPublicKey()
     {
@@ -197,7 +194,6 @@ public partial class PickySshCert: IDisposable
 
     /// <returns>
     /// A <c>PickySshCertKeyType</c> allocated on C# side.
-    /// If a custom Drop implementation is implemented on Rust side, it will NOT run on destruction.
     /// </returns>
     public PickySshCertKeyType GetSshKeyType()
     {
@@ -214,7 +210,6 @@ public partial class PickySshCert: IDisposable
 
     /// <returns>
     /// A <c>PickySshCertType</c> allocated on C# side.
-    /// If a custom Drop implementation is implemented on Rust side, it will NOT run on destruction.
     /// </returns>
     public PickySshCertType GetCertType()
     {
@@ -231,7 +226,6 @@ public partial class PickySshCert: IDisposable
 
     /// <returns>
     /// A <c>PickySshTime</c> allocated on Rust side.
-    /// If a custom Drop implementation is implemented on Rust side, it WILL run on destruction.
     /// </returns>
     public PickySshTime GetValidAfter()
     {
@@ -248,7 +242,6 @@ public partial class PickySshCert: IDisposable
 
     /// <returns>
     /// A <c>PickySshTime</c> allocated on Rust side.
-    /// If a custom Drop implementation is implemented on Rust side, it WILL run on destruction.
     /// </returns>
     public PickySshTime GetValidBefore()
     {
@@ -265,7 +258,6 @@ public partial class PickySshCert: IDisposable
 
     /// <returns>
     /// A <c>PickySshPublicKey</c> allocated on Rust side.
-    /// If a custom Drop implementation is implemented on Rust side, it WILL run on destruction.
     /// </returns>
     public PickySshPublicKey GetSignatureKey()
     {
@@ -362,29 +354,6 @@ public partial class PickySshCert: IDisposable
     public unsafe Raw.PickySshCert* AsFFI()
     {
         return _inner;
-    }
-
-    /// <summary>
-    /// Marks this object as moved into Rust side.
-    /// </summary>
-    public void MarkAsMoved()
-    {
-        unsafe
-        {
-            if (_inner == null)
-            {
-                throw new ObjectDisposedException("PickySshCert");
-            }
-            _inner = null;
-        }
-    }
-
-    /// <summary>
-    /// Restores unmanaged ressource handle to this object.
-    /// </summary>
-    public unsafe void RestoreHandle(Raw.PickySshCert* handle)
-    {
-        _inner = handle;
     }
 
     /// <summary>

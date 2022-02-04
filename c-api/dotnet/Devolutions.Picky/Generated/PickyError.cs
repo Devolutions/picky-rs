@@ -91,29 +91,6 @@ public partial class PickyError: IDisposable
     }
 
     /// <summary>
-    /// Marks this object as moved into Rust side.
-    /// </summary>
-    public void MarkAsMoved()
-    {
-        unsafe
-        {
-            if (_inner == null)
-            {
-                throw new ObjectDisposedException("PickyError");
-            }
-            _inner = null;
-        }
-    }
-
-    /// <summary>
-    /// Restores unmanaged ressource handle to this object.
-    /// </summary>
-    public unsafe void RestoreHandle(Raw.PickyError* handle)
-    {
-        _inner = handle;
-    }
-
-    /// <summary>
     /// Destroys the underlying object immediately.
     /// </summary>
     public void Dispose()

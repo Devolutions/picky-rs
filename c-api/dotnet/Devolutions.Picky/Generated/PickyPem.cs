@@ -55,7 +55,6 @@ public partial class PickyPem: IDisposable
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PickyPem</c> allocated on Rust side.
-    /// If a custom Drop implementation is implemented on Rust side, it WILL run on destruction.
     /// </returns>
     public static PickyPem New(string label, byte[] data)
     {
@@ -86,7 +85,6 @@ public partial class PickyPem: IDisposable
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PickyPem</c> allocated on Rust side.
-    /// If a custom Drop implementation is implemented on Rust side, it WILL run on destruction.
     /// </returns>
     public static PickyPem LoadFromFile(string path)
     {
@@ -138,7 +136,6 @@ public partial class PickyPem: IDisposable
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PickyPem</c> allocated on Rust side.
-    /// If a custom Drop implementation is implemented on Rust side, it WILL run on destruction.
     /// </returns>
     public static PickyPem Parse(string input)
     {
@@ -269,29 +266,6 @@ public partial class PickyPem: IDisposable
     public unsafe Raw.PickyPem* AsFFI()
     {
         return _inner;
-    }
-
-    /// <summary>
-    /// Marks this object as moved into Rust side.
-    /// </summary>
-    public void MarkAsMoved()
-    {
-        unsafe
-        {
-            if (_inner == null)
-            {
-                throw new ObjectDisposedException("PickyPem");
-            }
-            _inner = null;
-        }
-    }
-
-    /// <summary>
-    /// Restores unmanaged ressource handle to this object.
-    /// </summary>
-    public unsafe void RestoreHandle(Raw.PickyPem* handle)
-    {
-        _inner = handle;
     }
 
     /// <summary>

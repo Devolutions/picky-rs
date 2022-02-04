@@ -33,7 +33,6 @@ public partial class PickySignatureAlgorithm: IDisposable
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PickySignatureAlgorithm</c> allocated on Rust side.
-    /// If a custom Drop implementation is implemented on Rust side, it WILL run on destruction.
     /// </returns>
     public static PickySignatureAlgorithm NewRsaPkcs1v15(PickyHashAlgorithm hashAlgorithm)
     {
@@ -88,29 +87,6 @@ public partial class PickySignatureAlgorithm: IDisposable
     public unsafe Raw.PickySignatureAlgorithm* AsFFI()
     {
         return _inner;
-    }
-
-    /// <summary>
-    /// Marks this object as moved into Rust side.
-    /// </summary>
-    public void MarkAsMoved()
-    {
-        unsafe
-        {
-            if (_inner == null)
-            {
-                throw new ObjectDisposedException("PickySignatureAlgorithm");
-            }
-            _inner = null;
-        }
-    }
-
-    /// <summary>
-    /// Restores unmanaged ressource handle to this object.
-    /// </summary>
-    public unsafe void RestoreHandle(Raw.PickySignatureAlgorithm* handle)
-    {
-        _inner = handle;
     }
 
     /// <summary>

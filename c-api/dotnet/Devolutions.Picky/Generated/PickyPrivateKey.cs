@@ -36,7 +36,6 @@ public partial class PickyPrivateKey: IDisposable
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PickyPrivateKey</c> allocated on Rust side.
-    /// If a custom Drop implementation is implemented on Rust side, it WILL run on destruction.
     /// </returns>
     public static PickyPrivateKey FromPem(PickyPem pem)
     {
@@ -64,7 +63,6 @@ public partial class PickyPrivateKey: IDisposable
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PickyPrivateKey</c> allocated on Rust side.
-    /// If a custom Drop implementation is implemented on Rust side, it WILL run on destruction.
     /// </returns>
     public static PickyPrivateKey FromPkcs8(byte[] pkcs8)
     {
@@ -93,7 +91,6 @@ public partial class PickyPrivateKey: IDisposable
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PickyPrivateKey</c> allocated on Rust side.
-    /// If a custom Drop implementation is implemented on Rust side, it WILL run on destruction.
     /// </returns>
     public static PickyPrivateKey GenerateRsa(nuint bits)
     {
@@ -115,7 +112,6 @@ public partial class PickyPrivateKey: IDisposable
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PickyPem</c> allocated on Rust side.
-    /// If a custom Drop implementation is implemented on Rust side, it WILL run on destruction.
     /// </returns>
     public PickyPem ToPem()
     {
@@ -140,7 +136,6 @@ public partial class PickyPrivateKey: IDisposable
     /// </summary>
     /// <returns>
     /// A <c>PickyPublicKey</c> allocated on Rust side.
-    /// If a custom Drop implementation is implemented on Rust side, it WILL run on destruction.
     /// </returns>
     public PickyPublicKey ToPublicKey()
     {
@@ -161,29 +156,6 @@ public partial class PickyPrivateKey: IDisposable
     public unsafe Raw.PickyPrivateKey* AsFFI()
     {
         return _inner;
-    }
-
-    /// <summary>
-    /// Marks this object as moved into Rust side.
-    /// </summary>
-    public void MarkAsMoved()
-    {
-        unsafe
-        {
-            if (_inner == null)
-            {
-                throw new ObjectDisposedException("PickyPrivateKey");
-            }
-            _inner = null;
-        }
-    }
-
-    /// <summary>
-    /// Restores unmanaged ressource handle to this object.
-    /// </summary>
-    public unsafe void RestoreHandle(Raw.PickyPrivateKey* handle)
-    {
-        _inner = handle;
     }
 
     /// <summary>

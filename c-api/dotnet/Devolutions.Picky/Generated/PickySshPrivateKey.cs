@@ -64,7 +64,6 @@ public partial class PickySshPrivateKey: IDisposable
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PickySshPrivateKey</c> allocated on Rust side.
-    /// If a custom Drop implementation is implemented on Rust side, it WILL run on destruction.
     /// </returns>
     public static PickySshPrivateKey GenerateRsa(nuint bits, string passphrase, string comment)
     {
@@ -99,7 +98,6 @@ public partial class PickySshPrivateKey: IDisposable
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PickySshPrivateKey</c> allocated on Rust side.
-    /// If a custom Drop implementation is implemented on Rust side, it WILL run on destruction.
     /// </returns>
     public static PickySshPrivateKey FromPem(PickyPem pem, string passphrase)
     {
@@ -128,7 +126,6 @@ public partial class PickySshPrivateKey: IDisposable
 
     /// <returns>
     /// A <c>PickySshPrivateKey</c> allocated on Rust side.
-    /// If a custom Drop implementation is implemented on Rust side, it WILL run on destruction.
     /// </returns>
     public static PickySshPrivateKey FromPrivateKey(PickyPrivateKey key)
     {
@@ -151,7 +148,6 @@ public partial class PickySshPrivateKey: IDisposable
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PickyPem</c> allocated on Rust side.
-    /// If a custom Drop implementation is implemented on Rust side, it WILL run on destruction.
     /// </returns>
     public PickyPem ToPem()
     {
@@ -296,7 +292,6 @@ public partial class PickySshPrivateKey: IDisposable
     /// </summary>
     /// <returns>
     /// A <c>PickySshPublicKey</c> allocated on Rust side.
-    /// If a custom Drop implementation is implemented on Rust side, it WILL run on destruction.
     /// </returns>
     public PickySshPublicKey ToPublicKey()
     {
@@ -317,29 +312,6 @@ public partial class PickySshPrivateKey: IDisposable
     public unsafe Raw.PickySshPrivateKey* AsFFI()
     {
         return _inner;
-    }
-
-    /// <summary>
-    /// Marks this object as moved into Rust side.
-    /// </summary>
-    public void MarkAsMoved()
-    {
-        unsafe
-        {
-            if (_inner == null)
-            {
-                throw new ObjectDisposedException("PickySshPrivateKey");
-            }
-            _inner = null;
-        }
-    }
-
-    /// <summary>
-    /// Restores unmanaged ressource handle to this object.
-    /// </summary>
-    public unsafe void RestoreHandle(Raw.PickySshPrivateKey* handle)
-    {
-        _inner = handle;
     }
 
     /// <summary>

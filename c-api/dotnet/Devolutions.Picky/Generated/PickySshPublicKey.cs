@@ -47,7 +47,6 @@ public partial class PickySshPublicKey: IDisposable
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PickySshPublicKey</c> allocated on Rust side.
-    /// If a custom Drop implementation is implemented on Rust side, it WILL run on destruction.
     /// </returns>
     public static PickySshPublicKey Parse(string repr)
     {
@@ -166,29 +165,6 @@ public partial class PickySshPublicKey: IDisposable
     public unsafe Raw.PickySshPublicKey* AsFFI()
     {
         return _inner;
-    }
-
-    /// <summary>
-    /// Marks this object as moved into Rust side.
-    /// </summary>
-    public void MarkAsMoved()
-    {
-        unsafe
-        {
-            if (_inner == null)
-            {
-                throw new ObjectDisposedException("PickySshPublicKey");
-            }
-            _inner = null;
-        }
-    }
-
-    /// <summary>
-    /// Restores unmanaged ressource handle to this object.
-    /// </summary>
-    public unsafe void RestoreHandle(Raw.PickySshPublicKey* handle)
-    {
-        _inner = handle;
     }
 
     /// <summary>

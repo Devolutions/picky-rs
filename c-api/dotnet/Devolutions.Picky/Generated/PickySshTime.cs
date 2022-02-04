@@ -91,7 +91,6 @@ public partial class PickySshTime: IDisposable
 
     /// <returns>
     /// A <c>PickySshTime</c> allocated on Rust side.
-    /// If a custom Drop implementation is implemented on Rust side, it WILL run on destruction.
     /// </returns>
     public static PickySshTime Now()
     {
@@ -104,7 +103,6 @@ public partial class PickySshTime: IDisposable
 
     /// <returns>
     /// A <c>PickySshTime</c> allocated on Rust side.
-    /// If a custom Drop implementation is implemented on Rust side, it WILL run on destruction.
     /// </returns>
     public static PickySshTime FromTimestamp(ulong timestamp)
     {
@@ -212,29 +210,6 @@ public partial class PickySshTime: IDisposable
     public unsafe Raw.PickySshTime* AsFFI()
     {
         return _inner;
-    }
-
-    /// <summary>
-    /// Marks this object as moved into Rust side.
-    /// </summary>
-    public void MarkAsMoved()
-    {
-        unsafe
-        {
-            if (_inner == null)
-            {
-                throw new ObjectDisposedException("PickySshTime");
-            }
-            _inner = null;
-        }
-    }
-
-    /// <summary>
-    /// Restores unmanaged ressource handle to this object.
-    /// </summary>
-    public unsafe void RestoreHandle(Raw.PickySshTime* handle)
-    {
-        _inner = handle;
     }
 
     /// <summary>
