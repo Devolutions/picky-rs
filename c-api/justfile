@@ -13,8 +13,10 @@ default: bindings
 
 ## Diplomat installation ##
 
+diplomat_rev := "b971915368f81df83e92f843ddb537ce1b21d8f4"
+
 install-diplomat:
-    cargo install --git https://github.com/CBenoit/diplomat.git --branch "csharp-backend" diplomat-tool -f
+    cargo install --git https://github.com/rust-diplomat/diplomat.git --rev {{diplomat_rev}} diplomat-tool -f
 
 ## Native library ##
 
