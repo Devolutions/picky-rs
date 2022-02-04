@@ -23,6 +23,10 @@ jobs:
         exclude:
           - arch: x64
             os: ios
+          - arch: x64
+            os: android
+          - arch: arm64
+            os: android
 
     steps:
       - name: Check out ${{ github.repository }}
