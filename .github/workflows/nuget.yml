@@ -32,14 +32,6 @@ jobs:
       - name: Check out ${{ github.repository }}
         uses: actions/checkout@v2
 
-      - name: Install Android NDK
-        if: matrix.os == 'android'
-        run: |
-          wget -q https://dl.google.com/android/repository/android-ndk-r21e-linux-x86_64.zip
-          unzip -q android-ndk-r21e-linux-x86_64.zip -d /tmp
-          sudo mv /tmp/android-ndk-r21e /opt/android-ndk
-          echo "ANDROID_NDK=/opt/android-ndk" >> $GITHUB_ENV
-
       - name: Build picky (${{matrix.os}}-${{matrix.arch}})
         shell: pwsh
         run: |
