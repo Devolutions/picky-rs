@@ -30,7 +30,7 @@ Od8i323fM5dQS1qQpBjBc/5fPw==
     [Fact]
     public void Parse()
     {
-        PickyPem pem = PickyPem.Parse(certPemRepr);
+        Pem pem = Pem.Parse(certPemRepr);
         Assert.Equal("CERTIFICATE", pem.Label);
         Assert.Equal((ulong)835, pem.DataLength);
         Assert.Equal(certPemRepr, pem.ToRepr());
@@ -39,16 +39,16 @@ Od8i323fM5dQS1qQpBjBc/5fPw==
     [Fact]
     public void Smoke()
     {
-        PickyPem fromReprPem = PickyPem.Parse(certPemRepr);
+        Pem fromReprPem = Pem.Parse(certPemRepr);
         // TODO: need support for returning buffer of bytes
-        // PickyPem fromDataPem = PickyPem.New(fromReprPem.Label, fromReprPem.ToData());
+        // Pem fromDataPem = Pem.New(fromReprPem.Label, fromReprPem.ToData());
         // Assert.Equal(certPemRepr, fromDataPem.ToRepr());
     }
 
     [Fact]
     public void LoadFromFileFailure()
     {
-        Action act = () => PickyPem.LoadFromFile("path/to/nowhere");
+        Action act = () => Pem.LoadFromFile("path/to/nowhere");
         Assert.Throws<PickyException>(act);
     }
 }

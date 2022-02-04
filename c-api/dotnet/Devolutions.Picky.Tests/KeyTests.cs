@@ -48,9 +48,9 @@ vQIDAQAB
     [Fact]
     public void PrivateToPublic()
     {
-        PickyPem pem = PickyPem.Parse(privKeyPemRepr);
-        PickyPrivateKey priv = PickyPrivateKey.FromPem(pem);
-        PickyPublicKey pub = priv.ToPublicKey();
+        Pem pem = Pem.Parse(privKeyPemRepr);
+        PrivateKey priv = PrivateKey.FromPem(pem);
+        PublicKey pub = priv.ToPublicKey();
         Assert.Equal(pubKeyPemRepr, pub.ToPem().ToRepr());
     }
 }

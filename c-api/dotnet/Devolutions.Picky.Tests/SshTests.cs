@@ -63,8 +63,8 @@ AAXJx0RWF7EDQVJtlTfSrUCm+SSFoD0AAAAOdGVzdEBwaWNreS5jb20BAgMEBQ==
     [Fact]
     public void PrivateKeyParse()
     {
-        var pem = PickyPem.Parse(privateKeyPemRepr);
-        var key = PickySshPrivateKey.FromPem(pem, "");
+        var pem = Pem.Parse(privateKeyPemRepr);
+        var key = SshPrivateKey.FromPem(pem, "");
         Assert.Equal("test@picky.com", key.Comment);
         Assert.Equal("none", key.CipherName);
     }
@@ -74,8 +74,8 @@ AAXJx0RWF7EDQVJtlTfSrUCm+SSFoD0AAAAOdGVzdEBwaWNreS5jb20BAgMEBQ==
     [Fact]
     public void CertSmoke()
     {
-        var cert = PickySshCert.Parse(hostCertStrRepr);
-        Assert.Equal(PickySshCertType.Host, cert.CertType);
+        var cert = SshCert.Parse(hostCertStrRepr);
+        Assert.Equal(SshCertType.Host, cert.CertType);
         Assert.Equal("picky", cert.KeyId);
         Assert.Equal("sasha@kubuntu", cert.Comment);
         Assert.Equal(hostCertStrRepr, cert.ToRepr());
@@ -84,22 +84,22 @@ AAXJx0RWF7EDQVJtlTfSrUCm+SSFoD0AAAAOdGVzdEBwaWNreS5jb20BAgMEBQ==
     [Fact]
     public void CertBuilder()
     {
-        var privateKey = PickySshPrivateKey.FromPem(PickyPem.Parse(privateKeyPemRepr), "");
-        var validAfter = PickySshTime.FromTimestamp(1000);
-        var validBefore = PickySshTime.FromTimestamp(2000);
+        var privateKey = SshPrivateKey.FromPem(Pem.Parse(privateKeyPemRepr), "");
+        var validAfter = SshTime.FromTimestamp(1000);
+        var validBefore = SshTime.FromTimestamp(2000);
 
-        var builder = PickySshCert.Builder();
-        builder.CertKeyType = PickySshCertKeyType.RsaSha2_256V01;
+        var builder = SshCert.Builder();
+        builder.CertKeyType = SshCertKeyType.RsaSha2_256V01;
         builder.Key = privateKey.ToPublicKey();
-        builder.CertType = PickySshCertType.Host;
+        builder.CertType = SshCertType.Host;
         builder.ValidAfter = validAfter;
         builder.ValidBefore = validBefore;
         builder.SignatureKey = privateKey;
         builder.Comment = "hello!";
         var cert = builder.Build();
 
-        Assert.Equal(PickySshCertKeyType.RsaSha2_256V01, cert.SshKeyType);
-        Assert.Equal(PickySshCertType.Host, cert.CertType);
+        Assert.Equal(SshCertKeyType.RsaSha2_256V01, cert.SshKeyType);
+        Assert.Equal(SshCertType.Host, cert.CertType);
         Assert.Equal((ulong)1000, cert.ValidAfter.Timestamp);
         Assert.Equal((ulong)2000, cert.ValidBefore.Timestamp);
         Assert.Equal("hello!", cert.Comment);
