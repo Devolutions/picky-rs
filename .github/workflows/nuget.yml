@@ -23,10 +23,6 @@ jobs:
         exclude:
           - arch: x64
             os: ios
-          - arch: x64
-            os: android
-          - arch: arm64
-            os: android
 
     steps:
       - name: Check out ${{ github.repository }}
@@ -38,7 +34,8 @@ jobs:
           $DotNetOs = '${{matrix.os}}'
           $DotNetArch = '${{matrix.arch}}'
           $DotNetRid = '${{matrix.os}}-${{matrix.arch}}'
-          $RustArch = @{'x64'='x86_64';'arm'='arm';'arm64'='aarch64'}[$DotNetArch]
+          $RustArch = @{'x64'='x86_64';'arm64'='aarch64';
+            'x86'='i686';'arm'='armv7'}[$DotNetArch]
           $RustPlatform = @{'win'='pc-windows-msvc';
             'osx'='apple-darwin';'ios'='apple-ios';
             'linux'='unknown-linux-gnu';'android'='linux-android'}[$DotNetOs]
