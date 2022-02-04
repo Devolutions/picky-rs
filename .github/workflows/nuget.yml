@@ -25,6 +25,14 @@ jobs:
       - name: Check out ${{ github.repository }}
         uses: actions/checkout@v2
 
+      - name: Install Android NDK
+        if: matrix.os == 'android'
+        run: |
+          wget -q https://dl.google.com/android/repository/android-ndk-r21e-linux-x86_64.zip
+          unzip -q android-ndk-r21e-linux-x86_64.zip -d /tmp
+          sudo mv /tmp/android-ndk-r21e /opt/android-ndk
+          echo "ANDROID_NDK=/opt/android-ndk" >> $GITHUB_ENV
+
       - name: Build picky (${{matrix.os}}-${{matrix.arch}})
         shell: pwsh
         run: |
@@ -44,13 +52,19 @@ jobs:
           & rustup target add $RustTarget
 
           if ($DotNetOs -eq 'win') {
-            $Env:RUSTFLAGS = "-C target-feature=+crt-static"
+            $Env:RUSTFLAGS="-C target-feature=+crt-static"
+          }
+
+          if ($DotNetOs -eq 'ios') {
+            $Env:RUSTFLAGS="--crate-type staticlib"
           }
 
           if ($RustTarget -eq 'aarch64-unknown-linux-gnu') {
             & sudo apt install gcc-aarch64-linux-gnu
             $Env:RUSTFLAGS="-C linker=aarch64-linux-gnu-gcc"
           }
+
+          & rustup update
 
           & cargo build -p picky-ffi --release --target $RustTarget
           $LibraryName = "${LibPrefix}picky.$SharedLibExt"
