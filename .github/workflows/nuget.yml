@@ -59,7 +59,11 @@ jobs:
           }
 
           if ($DotNetOs -eq 'ios') {
-            $Env:RUSTFLAGS="--crate-type staticlib"
+            $CargoToml = Get-Content .\c-api\Cargo.toml
+            $CargoToml = $CargoToml | ForEach-Object {
+              if ($_.StartsWith("crate-type")) { "crate-type = [`"staticlib`"]" } else { $_ }
+            }
+            Set-Content -Path .\c-api\Cargo.toml -Value $CargoToml
           }
 
           if ($RustTarget -eq 'aarch64-unknown-linux-gnu') {
