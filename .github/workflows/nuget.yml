@@ -45,8 +45,8 @@ jobs:
             'linux'='unknown-linux-gnu';'android'='linux-android'}[$DotNetOs]
           $LibPrefix = @{'win'='';'osx'='lib';'ios'='lib';
             'linux'='lib';'android'='lib'}[$DotNetOs]
-          $SharedLibExt = @{'win'='dll';'osx'='dylib';'ios'='dylib';
-            'linux'='so';'android'='so'}[$DotNetOs]
+          $LibSuffix = @{'win'='.dll';'osx'='.dylib';'ios'='.a';
+            'linux'='.so';'android'='.so'}[$DotNetOs]
           $RustTarget = "$RustArch-$RustPlatform"
 
           & rustup target add $RustTarget
@@ -67,7 +67,7 @@ jobs:
           & rustup update
 
           & cargo build -p picky-ffi --release --target $RustTarget
-          $LibraryName = "${LibPrefix}picky.$SharedLibExt"
+          $LibraryName = "${LibPrefix}picky$LibSuffix"
           $OutputLibrary = Join-Path "target" $RustTarget 'release' $LibraryName
           $OutputPath = Join-Path "dependencies" "runtimes" $DotNetRid "native"
           New-Item -ItemType Directory -Path $OutputPath | Out-Null
