@@ -20,6 +20,9 @@ jobs:
             runner: macos-11
           - os: android
             runner: ubuntu-20.04
+        exclude:
+          - arch: x64
+            os: ios
 
     steps:
       - name: Check out ${{ github.repository }}
@@ -67,6 +70,7 @@ jobs:
           & rustup update
 
           & cargo build -p picky-ffi --release --target $RustTarget
+
           $LibraryName = "${LibPrefix}picky$LibSuffix"
           $OutputLibrary = Join-Path "target" $RustTarget 'release' $LibraryName
           $OutputPath = Join-Path "dependencies" "runtimes" $DotNetRid "native"
