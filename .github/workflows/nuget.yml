@@ -7,7 +7,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ win, osx, linux ]
+        os: [ win, osx, linux, ios, android ]
         arch: [ x64, arm64 ]
         include:
           - os: win
@@ -16,6 +16,10 @@ jobs:
             runner: macos-11
           - os: linux
             runner: ubuntu-18.04
+          - os: ios
+            runner: macos-11
+          - os: android
+            runner: ubuntu-20.04
 
     steps:
       - name: Check out ${{ github.repository }}
@@ -27,10 +31,14 @@ jobs:
           $DotNetOs = '${{matrix.os}}'
           $DotNetArch = '${{matrix.arch}}'
           $DotNetRid = '${{matrix.os}}-${{matrix.arch}}'
-          $RustArch = @{'x64'='x86_64';'arm64'='aarch64'}[$DotNetArch]
-          $RustPlatform = @{'win'='pc-windows-msvc';'osx'='apple-darwin';'linux'='unknown-linux-gnu'}[$DotNetOs]
-          $LibPrefix = @{'win'='';'osx'='lib';'linux'='lib'}[$DotNetOs]
-          $SharedLibExt = @{'win'='dll';'osx'='dylib';'linux'='so'}[$DotNetOs]
+          $RustArch = @{'x64'='x86_64';'arm'='arm';'arm64'='aarch64'}[$DotNetArch]
+          $RustPlatform = @{'win'='pc-windows-msvc';
+            'osx'='apple-darwin';'ios'='apple-ios';
+            'linux'='unknown-linux-gnu';'android'='linux-android'}[$DotNetOs]
+          $LibPrefix = @{'win'='';'osx'='lib';'ios'='lib';
+            'linux'='lib';'android'='lib'}[$DotNetOs]
+          $SharedLibExt = @{'win'='dll';'osx'='dylib';'ios'='dylib';
+            linux'='so';'android'='so'}[$DotNetOs]
           $RustTarget = "$RustArch-$RustPlatform"
 
           & rustup target add $RustTarget
