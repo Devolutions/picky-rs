@@ -5,6 +5,11 @@ pub mod private_key;
 pub mod public_key;
 pub mod sshtime;
 
+pub use certificate::{SshCertKeyType, SshCertType, SshCertificate, SshCertificateBuilder};
+pub use private_key::SshPrivateKey;
+pub use public_key::SshPublicKey;
+pub use sshtime::SshTime;
+
 use base64::read::DecoderReader;
 use base64::write::EncoderWriter;
 use byteorder::ReadBytesExt;
