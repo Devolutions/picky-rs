@@ -7,8 +7,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ win, osx, linux ]
-        arch: [ x64, arm64 ]
+        os: [ win, osx, linux, ios, android ]
+        arch: [ x86, x64, arm, arm64 ]
         include:
           - os: win
             runner: windows-2022
@@ -16,10 +16,50 @@ jobs:
             runner: macos-11
           - os: linux
             runner: ubuntu-18.04
+          - os: ios
+            runner: macos-11
+          - os: android
+            runner: ubuntu-20.04
+        exclude:
+          - arch: arm
+            os: win
+          - arch: arm
+            os: osx
+          - arch: arm
+            os: linux
+          - arch: arm
+            os: ios
+          - arch: x86
+            os: win
+          - arch: x86
+            os: osx
+          - arch: x86
+            os: linux
+          - arch: x86
+            os: ios
 
     steps:
       - name: Check out ${{ github.repository }}
         uses: actions/checkout@v2
+
+      - name: Install Android NDK
+        if: runner.os == 'linux'
+        shell: pwsh
+        run: |
+          $CargoConfigFile = "~/.cargo/config"
+          $AndroidToolchainBin="${Env:ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          
+          echo "[target.i686-linux-android]" >> $CargoConfigFile
+          echo "linker=`"$AndroidToolchainBin/i686-linux-android16-clang`"" >> $CargoConfigFile
+
+          echo "[target.x86_64-linux-android]" >> $CargoConfigFile
+          echo "linker=`"$AndroidToolchainBin/x86_64-linux-android21-clang`"" >> $CargoConfigFile
+
+          echo "[target.armv7-linux-androideabi]" >> $CargoConfigFile
+          echo "linker=`"$AndroidToolchainBin/armv7a-linux-androideabi21-clang`"" >> $CargoConfigFile
+
+          echo "[target.aarch64-linux-android]" >> $CargoConfigFile
+          echo "linker=`"$AndroidToolchainBin/aarch64-linux-android21-clang`"" >> $CargoConfigFile
 
       - name: Build picky (${{matrix.os}}-${{matrix.arch}})
         shell: pwsh
@@ -27,16 +67,33 @@ jobs:
           $DotNetOs = '${{matrix.os}}'
           $DotNetArch = '${{matrix.arch}}'
           $DotNetRid = '${{matrix.os}}-${{matrix.arch}}'
-          $RustArch = @{'x64'='x86_64';'arm64'='aarch64'}[$DotNetArch]
-          $RustPlatform = @{'win'='pc-windows-msvc';'osx'='apple-darwin';'linux'='unknown-linux-gnu'}[$DotNetOs]
-          $LibPrefix = @{'win'='';'osx'='lib';'linux'='lib'}[$DotNetOs]
-          $SharedLibExt = @{'win'='dll';'osx'='dylib';'linux'='so'}[$DotNetOs]
+          $RustArch = @{'x64'='x86_64';'arm64'='aarch64';
+            'x86'='i686';'arm'='armv7'}[$DotNetArch]
+          $RustPlatform = @{'win'='pc-windows-msvc';
+            'osx'='apple-darwin';'ios'='apple-ios';
+            'linux'='unknown-linux-gnu';'android'='linux-android'}[$DotNetOs]
+          $LibPrefix = @{'win'='';'osx'='lib';'ios'='lib';
+            'linux'='lib';'android'='lib'}[$DotNetOs]
+          $LibSuffix = @{'win'='.dll';'osx'='.dylib';'ios'='.a';
+            'linux'='.so';'android'='.so'}[$DotNetOs]
           $RustTarget = "$RustArch-$RustPlatform"
+
+          if (($DotNetOs -eq 'android') -and ($DotNetArch -eq 'arm')) {
+            $RustTarget = "armv7-linux-androideabi"
+          }
 
           & rustup target add $RustTarget
 
           if ($DotNetOs -eq 'win') {
-            $Env:RUSTFLAGS = "-C target-feature=+crt-static"
+            $Env:RUSTFLAGS="-C target-feature=+crt-static"
+          }
+
+          if ($DotNetOs -eq 'ios') {
+            $CargoToml = Get-Content .\c-api\Cargo.toml
+            $CargoToml = $CargoToml | ForEach-Object {
+              if ($_.StartsWith("crate-type")) { "crate-type = [`"staticlib`"]" } else { $_ }
+            }
+            Set-Content -Path .\c-api\Cargo.toml -Value $CargoToml
           }
 
           if ($RustTarget -eq 'aarch64-unknown-linux-gnu') {
@@ -45,7 +102,8 @@ jobs:
           }
 
           & cargo build -p picky-ffi --release --target $RustTarget
-          $LibraryName = "${LibPrefix}picky.$SharedLibExt"
+
+          $LibraryName = "${LibPrefix}picky$LibSuffix"
           $OutputLibrary = Join-Path "target" $RustTarget 'release' $LibraryName
           $OutputPath = Join-Path "dependencies" "runtimes" $DotNetRid "native"
           New-Item -ItemType Directory -Path $OutputPath | Out-Null
