@@ -8,7 +8,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ win, osx, linux, ios, android ]
-        arch: [ x64, arm, arm64 ]
+        arch: [ x86, x64, arm, arm64 ]
         include:
           - os: win
             runner: windows-2022
@@ -27,6 +27,16 @@ jobs:
             os: osx
           - arch: arm
             os: linux
+          - arch: arm
+            os: ios
+          - arch: x86
+            os: win
+          - arch: x86
+            os: osx
+          - arch: x86
+            os: linux
+          - arch: x86
+            os: ios
 
     steps:
       - name: Check out ${{ github.repository }}
