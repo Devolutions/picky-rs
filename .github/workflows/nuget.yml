@@ -7,7 +7,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ win, osx, linux, ios ]
+        os: [ win, osx, linux, ios, android ]
         arch: [ x64, arm64 ]
         include:
           - os: win
@@ -26,6 +26,25 @@ jobs:
       - name: Check out ${{ github.repository }}
         uses: actions/checkout@v2
 
+      - name: Install Android NDK
+        if: runner.os == 'linux'
+        shell: pwsh
+        run: |
+          $CargoConfigFile = "~/.cargo/config"
+          $AndroidToolchainBin="$Env:{ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          
+          echo "[target.i686-linux-android]" >> $CargoConfigFile
+          echo "linker=`"$AndroidToolchainBin/i686-linux-android16-clang`"" >> $CargoConfigFile
+
+          echo "[target.x86_64-linux-android]" >> $CargoConfigFile
+          echo "linker=`"$AndroidToolchainBin/x86_64-linux-android21-clang`"" >> $CargoConfigFile
+
+          echo "[target.armv7-linux-androideabi]" >> $CargoConfigFile
+          echo "linker=`"$AndroidToolchainBin/armv7a-linux-androideabi21-clang`"" >> $CargoConfigFile
+
+          echo "[target.aarch64-linux-android]" >> $CargoConfigFile
+          echo "linker=`"$AndroidToolchainBin/aarch64-linux-android21-clang`"" >> $CargoConfigFile
+
       - name: Build picky (${{matrix.os}}-${{matrix.arch}})
         shell: pwsh
         run: |
@@ -42,6 +61,10 @@ jobs:
           $LibSuffix = @{'win'='.dll';'osx'='.dylib';'ios'='.a';
             'linux'='.so';'android'='.so'}[$DotNetOs]
           $RustTarget = "$RustArch-$RustPlatform"
+
+          if (($DotNetOs -eq 'android') -and ($DotNetArch -eq 'arm')) {
+            $RustTarget = "armv7-linux-androideabi"
+          }
 
           & rustup target add $RustTarget
 
