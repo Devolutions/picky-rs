@@ -7,7 +7,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ win, osx, linux, ios, android ]
+        os: [ win, osx, linux, ios ]
         arch: [ x64, arm64 ]
         include:
           - os: win
@@ -18,8 +18,6 @@ jobs:
             runner: ubuntu-18.04
           - os: ios
             runner: macos-11
-          - os: android
-            runner: ubuntu-20.04
         exclude:
           - arch: x64
             os: ios
@@ -27,12 +25,6 @@ jobs:
     steps:
       - name: Check out ${{ github.repository }}
         uses: actions/checkout@v2
-
-      - name: Install Android NDK
-        if: matrix.os == 'android'
-        shell: pwsh
-        run: |
-          Get-ChildItem Env:ANDROID_*
 
       - name: Build picky (${{matrix.os}}-${{matrix.arch}})
         shell: pwsh
