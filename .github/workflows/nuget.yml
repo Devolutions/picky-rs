@@ -33,7 +33,7 @@ jobs:
         shell: pwsh
         run: |
           $CargoConfigFile = "~/.cargo/config"
-          $AndroidToolchainBin="$Env:{ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          $AndroidToolchainBin="${Env:ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin"
           
           echo "[target.i686-linux-android]" >> $CargoConfigFile
           echo "linker=`"$AndroidToolchainBin/i686-linux-android16-clang`"" >> $CargoConfigFile
