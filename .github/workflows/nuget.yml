@@ -18,6 +18,8 @@ jobs:
             runner: ubuntu-18.04
           - os: ios
             runner: macos-11
+          - os: android
+            runner: ubuntu-20.04
         exclude:
           - arch: x64
             os: ios
