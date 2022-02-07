@@ -63,7 +63,7 @@ public partial class SshCert: IDisposable
         }
     }
 
-    public SshTime ValidAfter
+    public ulong ValidAfter
     {
         get
         {
@@ -71,7 +71,7 @@ public partial class SshCert: IDisposable
         }
     }
 
-    public SshTime ValidBefore
+    public ulong ValidBefore
     {
         get
         {
@@ -224,10 +224,7 @@ public partial class SshCert: IDisposable
         }
     }
 
-    /// <returns>
-    /// A <c>SshTime</c> allocated on Rust side.
-    /// </returns>
-    public SshTime GetValidAfter()
+    public ulong GetValidAfter()
     {
         unsafe
         {
@@ -235,15 +232,12 @@ public partial class SshCert: IDisposable
             {
                 throw new ObjectDisposedException("SshCert");
             }
-            Raw.SshTime* retVal = Raw.SshCert.GetValidAfter(_inner);
-            return new SshTime(retVal);
+            ulong retVal = Raw.SshCert.GetValidAfter(_inner);
+            return retVal;
         }
     }
 
-    /// <returns>
-    /// A <c>SshTime</c> allocated on Rust side.
-    /// </returns>
-    public SshTime GetValidBefore()
+    public ulong GetValidBefore()
     {
         unsafe
         {
@@ -251,8 +245,8 @@ public partial class SshCert: IDisposable
             {
                 throw new ObjectDisposedException("SshCert");
             }
-            Raw.SshTime* retVal = Raw.SshCert.GetValidBefore(_inner);
-            return new SshTime(retVal);
+            ulong retVal = Raw.SshCert.GetValidBefore(_inner);
+            return retVal;
         }
     }
 

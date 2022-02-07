@@ -82,7 +82,7 @@ public partial class SshCertBuilder: IDisposable
         }
     }
 
-    public SshTime ValidAfter
+    public ulong ValidAfter
     {
         set
         {
@@ -90,7 +90,7 @@ public partial class SshCertBuilder: IDisposable
         }
     }
 
-    public SshTime ValidBefore
+    public ulong ValidBefore
     {
         set
         {
@@ -218,7 +218,7 @@ public partial class SshCertBuilder: IDisposable
     /// <summary>
     /// Required
     /// </summary>
-    public void SetValidBefore(SshTime validBefore)
+    public void SetValidBefore(ulong validBefore)
     {
         unsafe
         {
@@ -226,20 +226,14 @@ public partial class SshCertBuilder: IDisposable
             {
                 throw new ObjectDisposedException("SshCertBuilder");
             }
-            Raw.SshTime* validBeforeRaw;
-            validBeforeRaw = validBefore.AsFFI();
-            if (validBeforeRaw == null)
-            {
-                throw new ObjectDisposedException("SshTime");
-            }
-            Raw.SshCertBuilder.SetValidBefore(_inner, validBeforeRaw);
+            Raw.SshCertBuilder.SetValidBefore(_inner, validBefore);
         }
     }
 
     /// <summary>
     /// Required
     /// </summary>
-    public void SetValidAfter(SshTime validAfter)
+    public void SetValidAfter(ulong validAfter)
     {
         unsafe
         {
@@ -247,13 +241,7 @@ public partial class SshCertBuilder: IDisposable
             {
                 throw new ObjectDisposedException("SshCertBuilder");
             }
-            Raw.SshTime* validAfterRaw;
-            validAfterRaw = validAfter.AsFFI();
-            if (validAfterRaw == null)
-            {
-                throw new ObjectDisposedException("SshTime");
-            }
-            Raw.SshCertBuilder.SetValidAfter(_inner, validAfterRaw);
+            Raw.SshCertBuilder.SetValidAfter(_inner, validAfter);
         }
     }
 

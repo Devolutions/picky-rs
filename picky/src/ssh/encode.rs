@@ -1,3 +1,4 @@
+use super::certificate::Timestamp;
 use crate::ssh::certificate::{
     SshCertType, SshCertTypeError, SshCertificate, SshCertificateError, SshCriticalOption, SshCriticalOptionError,
     SshExtension, SshExtensionError, SshSignature, SshSignatureError,
@@ -6,7 +7,6 @@ use crate::ssh::private_key::{
     KdfOption, SshBasePrivateKey, SshPrivateKey, SshPrivateKeyError, AES256_CTR, AUTH_MAGIC, BCRYPT, NONE,
 };
 use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
-use crate::ssh::sshtime::SshTime;
 use crate::ssh::{Base64Writer, SSH_RSA_KEY_TYPE};
 use aes::cipher::{NewCipher, StreamCipher};
 use aes::Aes256Ctr;
@@ -147,11 +147,11 @@ impl SshComplexTypeEncode for KdfOption {
     }
 }
 
-impl SshComplexTypeEncode for SshTime {
+impl SshComplexTypeEncode for Timestamp {
     type Error = io::Error;
 
     fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
-        stream.write_u64::<BigEndian>(self.timestamp() as u64)?;
+        stream.write_u64::<BigEndian>(self.0 as u64)?;
         Ok(())
     }
 }

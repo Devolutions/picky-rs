@@ -56,13 +56,13 @@ public partial struct SshCertBuilder
     /// Required
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshCertBuilder_set_valid_before", ExactSpelling = true)]
-    public static unsafe extern void SetValidBefore(SshCertBuilder* self, SshTime* validBefore);
+    public static unsafe extern void SetValidBefore(SshCertBuilder* self, ulong validBefore);
 
     /// <summary>
     /// Required
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshCertBuilder_set_valid_after", ExactSpelling = true)]
-    public static unsafe extern void SetValidAfter(SshCertBuilder* self, SshTime* validAfter);
+    public static unsafe extern void SetValidAfter(SshCertBuilder* self, ulong validAfter);
 
     /// <summary>
     /// Required

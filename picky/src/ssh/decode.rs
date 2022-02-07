@@ -1,3 +1,4 @@
+use super::certificate::Timestamp;
 use crate::key::{PrivateKey, PublicKey};
 use crate::ssh::certificate::{
     SshCertKeyType, SshCertType, SshCertTypeError, SshCertificate, SshCertificateError, SshCriticalOption,
@@ -6,13 +7,10 @@ use crate::ssh::certificate::{
 };
 use crate::ssh::private_key::{KdfOption, SshBasePrivateKey, SshPrivateKeyError};
 use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
-use crate::ssh::{read_to_buffer_until_whitespace, Base64Reader};
+use crate::ssh::{read_to_buffer_until_whitespace, Base64Reader, SSH_RSA_KEY_TYPE};
 use byteorder::{BigEndian, ReadBytesExt};
 use num_bigint_dig::BigUint;
 use std::io::{self, Cursor, Read};
-
-use crate::ssh::sshtime::SshTime;
-use crate::ssh::SSH_RSA_KEY_TYPE;
 
 pub trait SshReadExt {
     type Error;
@@ -162,12 +160,12 @@ impl SshComplexTypeDecode for KdfOption {
     }
 }
 
-impl SshComplexTypeDecode for SshTime {
+impl SshComplexTypeDecode for Timestamp {
     type Error = io::Error;
 
     fn decode(mut stream: impl Read) -> Result<Self, Self::Error> {
         let timestamp = stream.read_u64::<BigEndian>()?;
-        let time = SshTime::from_timestamp(timestamp);
+        let time = Timestamp::from(timestamp);
         Ok(time)
     }
 }
@@ -287,8 +285,8 @@ impl SshComplexTypeDecode for SshCertificate {
 
         let valid_principals: Vec<String> = SshComplexTypeDecode::decode(&mut cert_data)?;
 
-        let valid_after: SshTime = SshComplexTypeDecode::decode(&mut cert_data)?;
-        let valid_before: SshTime = SshComplexTypeDecode::decode(&mut cert_data)?;
+        let valid_after: Timestamp = SshComplexTypeDecode::decode(&mut cert_data)?;
+        let valid_before: Timestamp = SshComplexTypeDecode::decode(&mut cert_data)?;
 
         let critical_options: Vec<SshCriticalOption> = SshComplexTypeDecode::decode(&mut cert_data)?;
 

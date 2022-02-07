@@ -12,6 +12,6 @@ test = false
 doctest = false
 
 [dependencies]
-picky = { version = "6.4.0", default-features = false, features = ["ssh", "time_conversion"], path = "../picky/" }
+picky = { version = "6.4.0", default-features = false, features = ["ssh"], path = "../picky/" }
 diplomat = { git = "https://github.com/CBenoit/diplomat.git", branch = "csharp-backend" }
 diplomat-runtime = { git = "https://github.com/CBenoit/diplomat.git", branch = "csharp-backend" }

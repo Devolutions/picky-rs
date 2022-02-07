@@ -12,7 +12,6 @@ use picky::pem::{parse_pem, to_pem, Pem};
 use picky::ssh::certificate::{SshCertKeyType, SshCertType, SshCertificateBuilder};
 use picky::ssh::private_key::SshPrivateKey;
 use picky::ssh::public_key::SshPublicKey;
-use picky::ssh::sshtime::SshTime;
 use picky::x509::date::UTCDate;
 use picky::x509::pkcs7::authenticode::{Attribute, AuthenticodeSignatureBuilder};
 use picky::x509::pkcs7::timestamp::TimestampRequest;
@@ -354,8 +353,8 @@ impl ServerController {
 
         let builder = SshCertificateBuilder::init();
 
-        let now = OffsetDateTime::now_utc();
-        let valid_before = (now.unix_timestamp() + i64::try_from(sign_request.duration_secs).bad_request()?) as u64;
+        let now = u64::try_from(OffsetDateTime::now_utc().unix_timestamp()).unwrap();
+        let valid_before = now + sign_request.duration_secs;
 
         let ssh_cert = builder
             .cert_key_type(SshCertKeyType::SshRsaV01)
@@ -364,8 +363,8 @@ impl ServerController {
             .key_id(sign_request.key_id)
             .cert_type(sign_request.cert_type)
             .principals(sign_request.principals)
-            .valid_after(SshTime::from(now))
-            .valid_before(SshTime::from_timestamp(valid_before))
+            .valid_after(now)
+            .valid_before(valid_before)
             .signature_key(ssh_private_key)
             .signature_algo(config.signing_algorithm)
             .build()

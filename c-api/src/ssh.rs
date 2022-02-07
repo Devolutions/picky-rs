@@ -192,48 +192,6 @@ pub mod ffi {
         Host,
     }
 
-    /// SSH datetime.
-    #[diplomat::opaque]
-    pub struct SshTime(pub ssh::SshTime);
-
-    impl SshTime {
-        pub fn now() -> Box<SshTime> {
-            Box::new(Self(ssh::SshTime::now()))
-        }
-
-        pub fn from_timestamp(timestamp: u64) -> Box<SshTime> {
-            Box::new(Self(ssh::SshTime::from_timestamp(timestamp)))
-        }
-
-        pub fn get_timestamp(&self) -> u64 {
-            self.0.timestamp()
-        }
-
-        pub fn get_month(&self) -> u8 {
-            self.0.month()
-        }
-
-        pub fn get_day(&self) -> u8 {
-            self.0.day()
-        }
-
-        pub fn get_hour(&self) -> u8 {
-            self.0.hour()
-        }
-
-        pub fn get_minute(&self) -> u8 {
-            self.0.minute()
-        }
-
-        pub fn get_second(&self) -> u8 {
-            self.0.second()
-        }
-
-        pub fn get_year(&self) -> u16 {
-            self.0.year()
-        }
-    }
-
     /// SSH Certificate Builder.
     #[diplomat::opaque]
     pub struct SshCertBuilder(pub ssh::SshCertificateBuilder);
@@ -269,13 +227,13 @@ pub mod ffi {
         }
 
         /// Required
-        pub fn set_valid_before(&self, valid_before: &SshTime) {
-            self.0.valid_before(valid_before.0);
+        pub fn set_valid_before(&self, valid_before: u64) {
+            self.0.valid_before(valid_before);
         }
 
         /// Required
-        pub fn set_valid_after(&self, valid_after: &SshTime) {
-            self.0.valid_after(valid_after.0);
+        pub fn set_valid_after(&self, valid_after: u64) {
+            self.0.valid_after(valid_after);
         }
 
         /// Required
@@ -333,12 +291,12 @@ pub mod ffi {
             self.0.cert_type.into()
         }
 
-        pub fn get_valid_after(&self) -> Box<SshTime> {
-            Box::new(SshTime(self.0.valid_after))
+        pub fn get_valid_after(&self) -> u64 {
+            self.0.valid_after.0
         }
 
-        pub fn get_valid_before(&self) -> Box<SshTime> {
-            Box::new(SshTime(self.0.valid_before))
+        pub fn get_valid_before(&self) -> u64 {
+            self.0.valid_before.0
         }
 
         pub fn get_signature_key(&self) -> Box<SshPublicKey> {

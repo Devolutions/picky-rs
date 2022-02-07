@@ -41,10 +41,10 @@ public partial struct SshCert
     public static unsafe extern SshCertType GetCertType(SshCert* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshCert_get_valid_after", ExactSpelling = true)]
-    public static unsafe extern SshTime* GetValidAfter(SshCert* self);
+    public static unsafe extern ulong GetValidAfter(SshCert* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshCert_get_valid_before", ExactSpelling = true)]
-    public static unsafe extern SshTime* GetValidBefore(SshCert* self);
+    public static unsafe extern ulong GetValidBefore(SshCert* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshCert_get_signature_key", ExactSpelling = true)]
     public static unsafe extern SshPublicKey* GetSignatureKey(SshCert* self);
