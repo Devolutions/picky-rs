@@ -7,7 +7,7 @@ use clap::ArgMatches;
 use lief::Binary;
 
 use picky::hash::HashAlgorithm;
-use picky::x509::date::UTCDate;
+use picky::x509::date::UtcDate;
 use picky::x509::pkcs7::authenticode::{AuthenticodeSignature, AuthenticodeValidator, ShaVariant};
 use picky::x509::pkcs7::ctl::http_fetch::CtlHttpFetch;
 use picky::x509::pkcs7::ctl::CertificateTrustList;
@@ -116,7 +116,7 @@ pub fn verify(matches: &ArgMatches, files: &[PathBuf]) -> anyhow::Result<()> {
     for (authenticode_signature, file_name, file_hash) in authenticode_signatures {
         let validator = authenticode_signature.authenticode_verifier();
 
-        let now = UTCDate::now();
+        let now = UtcDate::now();
         let validator = apply_flags(&validator, &flags, &now, file_hash, ctl.as_ref());
 
         match validator.verify() {
@@ -201,7 +201,7 @@ fn extract_ps_authenticode_signature(content: &str) -> anyhow::Result<String> {
 fn apply_flags<'a>(
     validator: &'a AuthenticodeValidator<'a>,
     flags: &[String],
-    time: &'a UTCDate,
+    time: &'a UtcDate,
     file_hash: Vec<u8>,
     ctl: Option<&'a CertificateTrustList>,
 ) -> &'a AuthenticodeValidator<'a> {

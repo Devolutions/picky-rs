@@ -12,7 +12,7 @@ use picky::pem::{parse_pem, to_pem, Pem};
 use picky::ssh::certificate::{SshCertKeyType, SshCertType, SshCertificateBuilder};
 use picky::ssh::private_key::SshPrivateKey;
 use picky::ssh::public_key::SshPublicKey;
-use picky::x509::date::UTCDate;
+use picky::x509::date::UtcDate;
 use picky::x509::pkcs7::authenticode::{Attribute, AuthenticodeSignatureBuilder};
 use picky::x509::pkcs7::timestamp::TimestampRequest;
 use picky::x509::{Cert, Csr};
@@ -287,7 +287,7 @@ impl ServerController {
 
         let attributes = vec![
             Attribute::new_content_type_pkcs7(),
-            Attribute::new_signing_time(UTCDate::now().into()),
+            Attribute::new_signing_time(UtcDate::now().into()),
             Attribute::new_message_digest(picky_server_hash.digest(digest)),
         ];
 
@@ -812,7 +812,7 @@ mod tests {
     use crate::config::BackendType;
     use picky::hash::HashAlgorithm;
     use picky::signature::SignatureAlgorithm;
-    use picky::x509::date::UTCDate;
+    use picky::x509::date::UtcDate;
     use picky::x509::name::DirectoryName;
     use tokio_test::block_on;
 
@@ -868,7 +868,7 @@ mod tests {
         signed_cert
             .verifier()
             .chain(chain.iter())
-            .exact_date(&UTCDate::now())
+            .exact_date(&UtcDate::now())
             .verify()
             .expect("couldn't validate ca chain");
     }

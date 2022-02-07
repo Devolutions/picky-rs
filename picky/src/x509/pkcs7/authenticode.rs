@@ -7,7 +7,7 @@ use crate::key::PrivateKey;
 use crate::pem::Pem;
 use crate::signature::{SignatureAlgorithm, SignatureError};
 use crate::x509::certificate::{Cert, CertError, CertType, ValidityCheck};
-use crate::x509::date::UTCDate;
+use crate::x509::date::UtcDate;
 use crate::x509::name::DirectoryName;
 #[cfg(feature = "ctl")]
 use crate::x509::pkcs7::ctl::{self, CTLEntryAttributeValues, CertificateTrustList};
@@ -49,9 +49,9 @@ pub enum AuthenticodeError {
     #[error("CA certificate was revoked")]
     CaCertificateRevoked,
     #[error("CA certificate was revoked(since: {not_after}, now: {now})")]
-    CaCertificateExpired { not_after: UTCDate, now: UTCDate },
+    CaCertificateExpired { not_after: UtcDate, now: UtcDate },
     #[error("CA certificate is not yet valid(not before:  {not_before}, now: {now})")]
-    CaCertificateNotYetValid { not_before: UTCDate, now: UTCDate },
+    CaCertificateNotYetValid { not_before: UtcDate, now: UtcDate },
     #[error(transparent)]
     CertError(#[from] CertError),
     #[error("Digest algorithm mismatch: {description}")]
@@ -435,13 +435,13 @@ pub struct AuthenticodeValidator<'a> {
 
 impl<'a> AuthenticodeValidator<'a> {
     #[inline]
-    pub fn exact_date(&self, exact: &'a UTCDate) -> &Self {
+    pub fn exact_date(&self, exact: &'a UtcDate) -> &Self {
         self.inner.borrow_mut().now = Some(ValidityCheck::Exact(exact));
         self
     }
 
     #[inline]
-    pub fn interval_date(&self, lower: &'a UTCDate, upper: &'a UTCDate) -> &Self {
+    pub fn interval_date(&self, lower: &'a UtcDate, upper: &'a UtcDate) -> &Self {
         self.inner.borrow_mut().now = Some(ValidityCheck::Interval { lower, upper });
         self
     }
@@ -1604,7 +1604,7 @@ mod test {
         validator
             .require_basic_authenticode_validation(file_hash)
             .require_signing_certificate_check()
-            .exact_date(&UTCDate::new(2021, 8, 7, 0, 0, 0).unwrap())
+            .exact_date(&UtcDate::new(2021, 8, 7, 0, 0, 0).unwrap())
             .ignore_chain_check()
             .verify()
             .unwrap();
@@ -1761,8 +1761,8 @@ mod test {
             .require_signing_certificate_check()
             .require_chain_check()
             .interval_date(
-                &UTCDate::new(2021, 7, 8, 11, 56, 49).unwrap(),
-                &UTCDate::new(2022, 7, 8, 11, 56, 49).unwrap(),
+                &UtcDate::new(2021, 7, 8, 11, 56, 49).unwrap(),
+                &UtcDate::new(2022, 7, 8, 11, 56, 49).unwrap(),
             )
             .require_not_before_check()
             .require_not_after_check()
@@ -1980,7 +1980,7 @@ mod test {
             .require_basic_authenticode_validation(file_hash)
             .require_signing_certificate_check()
             .require_chain_check()
-            .exact_date(&UTCDate::new(2021, 3, 3, 18, 39, 47).unwrap())
+            .exact_date(&UtcDate::new(2021, 3, 3, 18, 39, 47).unwrap())
             .require_not_after_check()
             .require_not_before_check()
             .ctl(&ctl)
@@ -2072,8 +2072,8 @@ mod test {
             .require_signing_certificate_check()
             .require_chain_check()
             .interval_date(
-                &UTCDate::new(2021, 7, 9, 7, 48, 3).unwrap(),
-                &UTCDate::new(2022, 7, 9, 7, 48, 3).unwrap(),
+                &UtcDate::new(2021, 7, 9, 7, 48, 3).unwrap(),
+                &UtcDate::new(2022, 7, 9, 7, 48, 3).unwrap(),
             )
             .require_not_before_check()
             .ctl(&ctl)
@@ -2176,7 +2176,7 @@ mod test {
             .require_basic_authenticode_validation(file_hash)
             .require_signing_certificate_check()
             .require_chain_check()
-            .exact_date(&UTCDate::new(2021, 9, 7, 12, 50, 40).unwrap())
+            .exact_date(&UtcDate::new(2021, 9, 7, 12, 50, 40).unwrap())
             .require_not_before_check()
             .require_not_after_check()
             .ctl(&ctl)
@@ -2199,7 +2199,7 @@ mod test {
         let leaf_key = parse_key(crate::test_files::RSA_2048_PK_3);
 
         let root = CertificateBuilder::new()
-            .validity(UTCDate::ymd(2065, 6, 15).unwrap(), UTCDate::ymd(2070, 6, 15).unwrap())
+            .validity(UtcDate::ymd(2065, 6, 15).unwrap(), UtcDate::ymd(2070, 6, 15).unwrap())
             .self_signed(DirectoryName::new_common_name("TheFuture.usodakedo Root CA"), &root_key)
             .ca(true)
             .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_512))
@@ -2209,7 +2209,7 @@ mod test {
         assert_eq!(root.ty(), CertType::Root);
 
         let intermediate = CertificateBuilder::new()
-            .validity(UTCDate::ymd(2068, 1, 1).unwrap(), UTCDate::ymd(2071, 1, 1).unwrap())
+            .validity(UtcDate::ymd(2068, 1, 1).unwrap(), UtcDate::ymd(2071, 1, 1).unwrap())
             .subject(
                 DirectoryName::new_common_name("TheFuture.usodakedo Authority"),
                 intermediate_key.to_public_key(),
@@ -2231,7 +2231,7 @@ mod test {
         .unwrap();
 
         let signed_leaf = CertificateBuilder::new()
-            .validity(UTCDate::ymd(2069, 1, 1).unwrap(), UTCDate::ymd(2072, 1, 1).unwrap())
+            .validity(UtcDate::ymd(2069, 1, 1).unwrap(), UtcDate::ymd(2072, 1, 1).unwrap())
             .subject_from_csr(csr)
             .issuer_cert(&intermediate, &intermediate_key)
             .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_384))
@@ -2384,7 +2384,7 @@ mod test {
         let der_signature = base64::decode(signature).unwrap();
         let authenticode_signature = AuthenticodeSignature::from_der(&der_signature).unwrap();
 
-        let time = UTCDate::now();
+        let time = UtcDate::now();
         let validator = authenticode_signature.authenticode_verifier();
         let validator = validator
             .ignore_basic_authenticode_validation()
@@ -2490,7 +2490,7 @@ mod test {
         let der_signature = base64::decode(signature).unwrap();
         let authenticode_signature = AuthenticodeSignature::from_der(&der_signature).unwrap();
 
-        let time = UTCDate::now();
+        let time = UtcDate::now();
         let validator = authenticode_signature.authenticode_verifier();
         let validator = validator
             .ignore_basic_authenticode_validation()

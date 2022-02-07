@@ -3,7 +3,7 @@ use picky::oids;
 use picky::signature::SignatureAlgorithm;
 use picky::x509::certificate::{Cert, CertError, CertificateBuilder};
 use picky::x509::csr::Csr;
-use picky::x509::date::UTCDate;
+use picky::x509::date::UtcDate;
 use picky::x509::extension::KeyUsage;
 use picky::x509::name::{DirectoryName, GeneralName, GeneralNames};
 use picky_asn1::restricted_string::CharSetError;
@@ -61,8 +61,8 @@ impl Picky {
     ) -> Result<Cert, PickyError> {
         // validity
         let now = time::OffsetDateTime::now_utc();
-        let valid_from = UTCDate::from(now);
-        let valid_to = UTCDate::from(now + time::Duration::days(DEFAULT_ROOT_DURATION_DAYS));
+        let valid_from = UtcDate::from(now);
+        let valid_to = UtcDate::from(now + time::Duration::days(DEFAULT_ROOT_DURATION_DAYS));
 
         let mut key_usage = KeyUsage::default();
         key_usage.set_key_cert_sign(true);
@@ -87,8 +87,8 @@ impl Picky {
     ) -> Result<Cert, PickyError> {
         // validity
         let now = time::OffsetDateTime::now_utc();
-        let valid_from = UTCDate::from(now);
-        let valid_to = UTCDate::from(now + time::Duration::days(DEFAULT_INTERMEDIATE_DURATION_DAYS));
+        let valid_from = UtcDate::from(now);
+        let valid_to = UtcDate::from(now + time::Duration::days(DEFAULT_INTERMEDIATE_DURATION_DAYS));
 
         let subject_name = DirectoryName::new_common_name(intermediate_name);
 
@@ -119,8 +119,8 @@ impl Picky {
     ) -> Result<Cert, PickyError> {
         // validity
         let now = time::OffsetDateTime::now_utc();
-        let valid_from = UTCDate::from(now - time::Duration::minutes(INITIAL_VALIDITY_MARGIN_MINUTES));
-        let valid_to = UTCDate::from(now + validity_duration);
+        let valid_from = UtcDate::from(now - time::Duration::minutes(INITIAL_VALIDITY_MARGIN_MINUTES));
+        let valid_to = UtcDate::from(now + validity_duration);
 
         let mut key_usage = KeyUsage::default();
         key_usage.set_digital_signature(true);

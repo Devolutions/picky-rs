@@ -4,7 +4,7 @@ use crate::key::{PrivateKey, PublicKey};
 use crate::pem::{Pem, PemError};
 use crate::signature::{SignatureAlgorithm, SignatureError};
 use crate::x509::csr::{Csr, CsrError};
-use crate::x509::date::UTCDate;
+use crate::x509::date::UtcDate;
 use crate::x509::key_id_gen_method::{KeyIdGenError, KeyIdGenMethod};
 use crate::x509::name::{DirectoryName, GeneralNames};
 use picky_asn1::bit_string::BitString;
@@ -70,11 +70,11 @@ pub enum CertError {
 
     /// certificate is not yet valid
     #[error("certificate is not yet valid (not before: {not_before}, now: {now})")]
-    CertificateNotYetValid { not_before: UTCDate, now: UTCDate },
+    CertificateNotYetValid { not_before: UtcDate, now: UtcDate },
 
     /// certificate expired
     #[error("certificate expired (not after: {not_after}, now: {now})")]
-    CertificateExpired { not_after: UTCDate, now: UTCDate },
+    CertificateExpired { not_after: UtcDate, now: UtcDate },
 
     /// invalid PEM label error
     #[error("invalid PEM label: {label}")]
@@ -231,11 +231,11 @@ impl Cert {
         &self.details.tbs_certificate.signature
     }
 
-    pub fn valid_not_before(&self) -> UTCDate {
+    pub fn valid_not_before(&self) -> UtcDate {
         self.details.tbs_certificate.validity.not_before.clone().into()
     }
 
-    pub fn valid_not_after(&self) -> UTCDate {
+    pub fn valid_not_after(&self) -> UtcDate {
         self.details.tbs_certificate.validity.not_after.clone().into()
     }
 
@@ -349,8 +349,8 @@ impl Cert {
 
 #[derive(Debug, Clone)]
 pub(super) enum ValidityCheck<'a> {
-    Interval { lower: &'a UTCDate, upper: &'a UTCDate },
-    Exact(&'a UTCDate),
+    Interval { lower: &'a UtcDate, upper: &'a UtcDate },
+    Exact(&'a UtcDate),
 }
 
 #[derive(Debug, Clone)]
@@ -388,13 +388,13 @@ pub struct CertValidator<'a, 'b, Chain: Iterator<Item = &'b Cert>> {
 
 impl<'a, 'b, Chain: Iterator<Item = &'b Cert>> CertValidator<'a, 'b, Chain> {
     #[inline]
-    pub fn exact_date(&self, exact: &'a UTCDate) -> &Self {
+    pub fn exact_date(&self, exact: &'a UtcDate) -> &Self {
         self.inner.borrow_mut().now = Some(ValidityCheck::Exact(exact));
         self
     }
 
     #[inline]
-    pub fn interval_date(&self, lower: &'a UTCDate, upper: &'a UTCDate) -> &Self {
+    pub fn interval_date(&self, lower: &'a UtcDate, upper: &'a UtcDate) -> &Self {
         self.inner.borrow_mut().now = Some(ValidityCheck::Interval { lower, upper });
         self
     }
@@ -547,8 +547,8 @@ impl<'a, 'b, Chain: Iterator<Item = &'b Cert>> CertValidator<'a, 'b, Chain> {
 
 fn verify_cert_validity(cert: &Cert, strictness: &CheckStrictness, now: ValidityCheck<'_>) -> Result<(), CertError> {
     let validity = &cert.details.tbs_certificate.validity;
-    let not_before: UTCDate = validity.not_before.clone().into();
-    let not_after: UTCDate = validity.not_after.clone().into();
+    let not_before: UtcDate = validity.not_before.clone().into();
+    let not_after: UtcDate = validity.not_after.clone().into();
 
     match now {
         ValidityCheck::Interval { lower, upper } => {
@@ -613,8 +613,8 @@ macro_rules! field_str {
 
 #[derive(Default, Clone, Debug)]
 struct CertificateBuilderInner<'a> {
-    valid_from: Option<UTCDate>,
-    valid_to: Option<UTCDate>,
+    valid_from: Option<UtcDate>,
+    valid_to: Option<UtcDate>,
     subject_infos: Option<SubjectInfos>,
     issuer_infos: Option<IssuerInfos<'a>>,
     authority_key_identifier: Option<Vec<u8>>,
@@ -642,7 +642,7 @@ impl<'a> CertificateBuilder<'a> {
 
     /// Required
     #[inline]
-    pub fn validity(&self, valid_from: UTCDate, valid_to: UTCDate) -> &Self {
+    pub fn validity(&self, valid_from: UtcDate, valid_to: UtcDate) -> &Self {
         let mut inner_mut = self.inner.borrow_mut();
         inner_mut.valid_from = Some(valid_from);
         inner_mut.valid_to = Some(valid_to);
@@ -1016,8 +1016,8 @@ mod tests {
             Into::<String>::into(cert.signature_algorithm().oid()).as_str(),
             oids::SHA1_WITH_RSA_ENCRYPTION
         );
-        assert_eq!(cert.valid_not_before(), UTCDate::new(2011, 2, 12, 14, 44, 6).unwrap());
-        assert_eq!(cert.valid_not_after(), UTCDate::new(2021, 2, 12, 14, 44, 6).unwrap());
+        assert_eq!(cert.valid_not_before(), UtcDate::new(2011, 2, 12, 14, 44, 6).unwrap());
+        assert_eq!(cert.valid_not_after(), UtcDate::new(2021, 2, 12, 14, 44, 6).unwrap());
 
         assert_eq!(cert.issuer_name().to_string(), "C=NL,O=PolarSSL,CN=PolarSSL Test CA");
     }
@@ -1030,8 +1030,8 @@ mod tests {
         let private_key = PrivateKey::from_pkcs8(pem.data()).expect("couldn't extract private key from pkcs8");
 
         // validity
-        let valid_from = UTCDate::ymd(2019, 10, 10).unwrap();
-        let valid_to = UTCDate::ymd(2019, 10, 11).unwrap();
+        let valid_from = UtcDate::ymd(2019, 10, 10).unwrap();
+        let valid_to = UtcDate::ymd(2019, 10, 11).unwrap();
 
         let root = CertificateBuilder::new()
             .validity(valid_from, valid_to)
@@ -1072,7 +1072,7 @@ mod tests {
         let leaf_key = parse_key(crate::test_files::RSA_2048_PK_3);
 
         let root = CertificateBuilder::new()
-            .validity(UTCDate::ymd(2065, 6, 15).unwrap(), UTCDate::ymd(2070, 6, 15).unwrap())
+            .validity(UtcDate::ymd(2065, 6, 15).unwrap(), UtcDate::ymd(2070, 6, 15).unwrap())
             .self_signed(DirectoryName::new_common_name("TheFuture.usodakedo Root CA"), &root_key)
             .ca(true)
             .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_512))
@@ -1082,7 +1082,7 @@ mod tests {
         assert_eq!(root.ty(), CertType::Root);
 
         let intermediate = CertificateBuilder::new()
-            .validity(UTCDate::ymd(2068, 1, 1).unwrap(), UTCDate::ymd(2071, 1, 1).unwrap())
+            .validity(UtcDate::ymd(2068, 1, 1).unwrap(), UtcDate::ymd(2071, 1, 1).unwrap())
             .subject(
                 DirectoryName::new_common_name("TheFuture.usodakedo Authority"),
                 intermediate_key.to_public_key(),
@@ -1104,7 +1104,7 @@ mod tests {
         .unwrap();
 
         let signed_leaf = CertificateBuilder::new()
-            .validity(UTCDate::ymd(2069, 1, 1).unwrap(), UTCDate::ymd(2072, 1, 1).unwrap())
+            .validity(UtcDate::ymd(2069, 1, 1).unwrap(), UtcDate::ymd(2072, 1, 1).unwrap())
             .subject_from_csr(csr)
             .issuer_cert(&intermediate, &intermediate_key)
             .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_384))
@@ -1120,7 +1120,7 @@ mod tests {
         signed_leaf
             .verifier()
             .chain(chain.iter())
-            .exact_date(&UTCDate::ymd(2069, 10, 1).unwrap())
+            .exact_date(&UtcDate::ymd(2069, 10, 1).unwrap())
             .verify()
             .expect("couldn't verify chain");
 
@@ -1129,8 +1129,8 @@ mod tests {
             .verifier()
             .chain(chain.iter())
             .interval_date(
-                &UTCDate::new(2068, 12, 31, 23, 59, 59).unwrap(),
-                &UTCDate::ymd(2069, 1, 1).unwrap(),
+                &UtcDate::new(2068, 12, 31, 23, 59, 59).unwrap(),
+                &UtcDate::ymd(2069, 1, 1).unwrap(),
             )
             .verify()
             .expect("couldn't verify chain with interval date");
@@ -1139,7 +1139,7 @@ mod tests {
         signed_leaf
             .verifier()
             .chain(chain.iter())
-            .exact_date(&UTCDate::new(2068, 12, 31, 23, 59, 59).unwrap())
+            .exact_date(&UtcDate::new(2068, 12, 31, 23, 59, 59).unwrap())
             .ignore_not_before_check()
             .verify()
             .expect("couldn't verify chain with interval date");
@@ -1156,7 +1156,7 @@ mod tests {
         let expired_err = signed_leaf
             .verifier()
             .chain(chain.iter())
-            .exact_date(&UTCDate::ymd(2080, 10, 1).unwrap())
+            .exact_date(&UtcDate::ymd(2080, 10, 1).unwrap())
             .verify()
             .unwrap_err();
         assert_eq!(
@@ -1168,7 +1168,7 @@ mod tests {
         let intermediate_expired_err = signed_leaf
             .verifier()
             .chain(chain.iter())
-            .exact_date(&UTCDate::ymd(2071, 6, 1).unwrap())
+            .exact_date(&UtcDate::ymd(2071, 6, 1).unwrap())
             .verify()
             .unwrap_err();
         assert_eq!(
@@ -1180,7 +1180,7 @@ mod tests {
         let root_expired_err = signed_leaf
             .verifier()
             .chain(chain.iter())
-            .exact_date(&UTCDate::ymd(2070, 6, 16).unwrap())
+            .exact_date(&UtcDate::ymd(2070, 6, 16).unwrap())
             .verify()
             .unwrap_err();
         assert_eq!(
@@ -1192,7 +1192,7 @@ mod tests {
         let still_in_2019_err = signed_leaf
             .verifier()
             .chain(chain.iter())
-            .exact_date(&UTCDate::ymd(2019, 11, 14).unwrap())
+            .exact_date(&UtcDate::ymd(2019, 11, 14).unwrap())
             .verify()
             .unwrap_err();
         assert_eq!(
@@ -1205,8 +1205,8 @@ mod tests {
             .verifier()
             .chain(chain.iter())
             .interval_date(
-                &UTCDate::ymd(2068, 12, 30).unwrap(),
-                &UTCDate::ymd(2068, 12, 31).unwrap(),
+                &UtcDate::ymd(2068, 12, 30).unwrap(),
+                &UtcDate::ymd(2068, 12, 31).unwrap(),
             )
             .verify()
             .unwrap_err();
@@ -1231,7 +1231,7 @@ mod tests {
         let malicious_root_key = parse_key(crate::test_files::RSA_2048_PK_4);
 
         let root = CertificateBuilder::new()
-            .validity(UTCDate::ymd(2065, 6, 15).unwrap(), UTCDate::ymd(2070, 6, 15).unwrap())
+            .validity(UtcDate::ymd(2065, 6, 15).unwrap(), UtcDate::ymd(2070, 6, 15).unwrap())
             .self_signed(DirectoryName::new_common_name("VerySafe Root CA"), &root_key)
             .ca(true)
             .pathlen(1)
@@ -1241,7 +1241,7 @@ mod tests {
             .expect("couldn't build root ca");
 
         let intermediate = CertificateBuilder::new()
-            .validity(UTCDate::ymd(2068, 1, 1).unwrap(), UTCDate::ymd(2071, 1, 1).unwrap())
+            .validity(UtcDate::ymd(2068, 1, 1).unwrap(), UtcDate::ymd(2071, 1, 1).unwrap())
             .subject(
                 DirectoryName::new_common_name("V.E.R.Y Legitimate VerySafe Authority"),
                 intermediate_key.to_public_key(),
@@ -1262,7 +1262,7 @@ mod tests {
         .unwrap();
 
         let signed_leaf = CertificateBuilder::new()
-            .validity(UTCDate::ymd(2069, 1, 1).unwrap(), UTCDate::ymd(2072, 1, 1).unwrap())
+            .validity(UtcDate::ymd(2069, 1, 1).unwrap(), UtcDate::ymd(2072, 1, 1).unwrap())
             .subject_from_csr(csr)
             .issuer_cert(&intermediate, &intermediate_key)
             .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_224))
@@ -1275,7 +1275,7 @@ mod tests {
         let root_missing_err = signed_leaf
             .verifier()
             .chain(chain[..1].iter())
-            .exact_date(&UTCDate::ymd(2069, 10, 1).unwrap())
+            .exact_date(&UtcDate::ymd(2069, 10, 1).unwrap())
             .verify()
             .unwrap_err();
         assert_eq!(
@@ -1286,7 +1286,7 @@ mod tests {
         let invalid_sig_err = signed_leaf
             .verifier()
             .chain(chain.iter())
-            .exact_date(&UTCDate::ymd(2069, 10, 1).unwrap())
+            .exact_date(&UtcDate::ymd(2069, 10, 1).unwrap())
             .verify()
             .unwrap_err();
         assert_eq!(
@@ -1302,7 +1302,7 @@ mod tests {
         let leaf_key = parse_key(crate::test_files::RSA_2048_PK_3);
 
         let root = CertificateBuilder::new()
-            .validity(UTCDate::ymd(2065, 6, 15).unwrap(), UTCDate::ymd(2070, 6, 15).unwrap())
+            .validity(UtcDate::ymd(2065, 6, 15).unwrap(), UtcDate::ymd(2070, 6, 15).unwrap())
             .self_signed(DirectoryName::new_common_name("VerySafe Root CA"), &root_key)
             .ca(true)
             .pathlen(0)
@@ -1310,7 +1310,7 @@ mod tests {
             .expect("couldn't build root ca");
 
         let intermediate = CertificateBuilder::new()
-            .validity(UTCDate::ymd(2068, 1, 1).unwrap(), UTCDate::ymd(2071, 1, 1).unwrap())
+            .validity(UtcDate::ymd(2068, 1, 1).unwrap(), UtcDate::ymd(2071, 1, 1).unwrap())
             .subject(
                 DirectoryName::new_common_name("V.E.R.Y Legitimate VerySafe Authority"),
                 intermediate_key.to_public_key(),
@@ -1329,7 +1329,7 @@ mod tests {
         .unwrap();
 
         let signed_leaf = CertificateBuilder::new()
-            .validity(UTCDate::ymd(2069, 1, 1).unwrap(), UTCDate::ymd(2072, 1, 1).unwrap())
+            .validity(UtcDate::ymd(2069, 1, 1).unwrap(), UtcDate::ymd(2072, 1, 1).unwrap())
             .subject_from_csr(csr.clone())
             .issuer_cert(&intermediate, &intermediate_key)
             .build()
@@ -1340,7 +1340,7 @@ mod tests {
         let invalid_pathlen_err = signed_leaf
             .verifier()
             .chain(chain.iter())
-            .exact_date(&UTCDate::ymd(2069, 10, 1).unwrap())
+            .exact_date(&UtcDate::ymd(2069, 10, 1).unwrap())
             .verify()
             .unwrap_err();
         assert_eq!(
@@ -1350,7 +1350,7 @@ mod tests {
         );
 
         let invalid_issuer_signed_leaf = CertificateBuilder::new()
-            .validity(UTCDate::ymd(2069, 1, 1).unwrap(), UTCDate::ymd(2072, 1, 1).unwrap())
+            .validity(UtcDate::ymd(2069, 1, 1).unwrap(), UtcDate::ymd(2072, 1, 1).unwrap())
             .subject_from_csr(csr)
             .issuer_cert(&signed_leaf, &leaf_key)
             .build()
@@ -1361,7 +1361,7 @@ mod tests {
         let invalid_issuer_err = invalid_issuer_signed_leaf
             .verifier()
             .chain(chain.iter())
-            .exact_date(&UTCDate::ymd(2069, 10, 1).unwrap())
+            .exact_date(&UtcDate::ymd(2069, 10, 1).unwrap())
             .verify()
             .unwrap_err();
         assert_eq!(
@@ -1377,7 +1377,7 @@ mod tests {
         let unsigned_integer_bytes = [21, 84, 58, 122];
 
         let cert = CertificateBuilder::new()
-            .validity(UTCDate::ymd(2065, 6, 15).unwrap(), UTCDate::ymd(2070, 6, 15).unwrap())
+            .validity(UtcDate::ymd(2065, 6, 15).unwrap(), UtcDate::ymd(2070, 6, 15).unwrap())
             .self_signed(DirectoryName::new_common_name("TheFuture.usodakedo Root CA"), &root_key)
             .ca(true)
             .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_512))
@@ -1396,7 +1396,7 @@ mod tests {
         let root_key = parse_key(crate::test_files::RSA_2048_PK_1);
 
         let cert = CertificateBuilder::new()
-            .validity(UTCDate::ymd(2045, 6, 15).unwrap(), UTCDate::ymd(2055, 6, 15).unwrap())
+            .validity(UtcDate::ymd(2045, 6, 15).unwrap(), UtcDate::ymd(2055, 6, 15).unwrap())
             .self_signed(DirectoryName::new_common_name("Am I valid"), &root_key)
             .ca(true)
             .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA1))
@@ -1418,7 +1418,7 @@ mod tests {
         let leaf_key = parse_key(crate::test_files::RSA_2048_PK_3);
 
         let root = CertificateBuilder::new()
-            .validity(UTCDate::ymd(2065, 6, 15).unwrap(), UTCDate::ymd(2070, 6, 15).unwrap())
+            .validity(UtcDate::ymd(2065, 6, 15).unwrap(), UtcDate::ymd(2070, 6, 15).unwrap())
             .self_signed(DirectoryName::new_common_name("VerySafe Root CA"), &root_key)
             .ca(true)
             .pathlen(0)
@@ -1437,7 +1437,7 @@ mod tests {
         .unwrap();
 
         let signed_leaf = CertificateBuilder::new()
-            .validity(UTCDate::ymd(2069, 1, 1).unwrap(), UTCDate::ymd(2072, 1, 1).unwrap())
+            .validity(UtcDate::ymd(2069, 1, 1).unwrap(), UtcDate::ymd(2072, 1, 1).unwrap())
             .subject_from_csr(csr)
             .issuer_cert(&root, &root_key)
             .inherit_extensions_from_csr_attributes(true)
@@ -1503,7 +1503,7 @@ mod tests {
         let root = Cert::from_pem_str(crate::test_files::PSDIAG_ROOT).unwrap();
 
         let chain = [inter, root];
-        let unexpired_date = UTCDate::new(2021, 11, 21, 1, 0, 0).unwrap();
+        let unexpired_date = UtcDate::new(2021, 11, 21, 1, 0, 0).unwrap();
 
         leaf.verifier()
             .exact_date(&unexpired_date)
