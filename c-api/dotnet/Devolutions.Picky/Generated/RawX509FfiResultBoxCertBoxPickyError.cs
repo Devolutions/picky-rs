@@ -12,7 +12,7 @@ namespace Devolutions.Picky.Raw;
 #nullable enable
 
 [StructLayout(LayoutKind.Sequential)]
-public partial struct KeyFfiResultBoxPrivateKeyBoxPickyError
+public partial struct X509FfiResultBoxCertBoxPickyError
 {
     private const string NativeLib = "picky";
 
@@ -20,7 +20,7 @@ public partial struct KeyFfiResultBoxPrivateKeyBoxPickyError
     private unsafe struct InnerUnion
     {
         [FieldOffset(0)]
-        internal PrivateKey* ok;
+        internal Cert* ok;
         [FieldOffset(0)]
         internal PickyError* err;
     }
@@ -30,7 +30,7 @@ public partial struct KeyFfiResultBoxPrivateKeyBoxPickyError
     [MarshalAs(UnmanagedType.U1)]
     public bool isOk;
 
-    public unsafe PrivateKey* Ok
+    public unsafe Cert* Ok
     {
         get
         {
@@ -46,6 +46,6 @@ public partial struct KeyFfiResultBoxPrivateKeyBoxPickyError
         }
     }
 
-    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "result_box_PrivateKey_box_PickyError_destroy", ExactSpelling = true)]
-    public static unsafe extern void Destroy(KeyFfiResultBoxPrivateKeyBoxPickyError* self);
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "result_box_Cert_box_PickyError_destroy", ExactSpelling = true)]
+    public static unsafe extern void Destroy(X509FfiResultBoxCertBoxPickyError* self);
 }

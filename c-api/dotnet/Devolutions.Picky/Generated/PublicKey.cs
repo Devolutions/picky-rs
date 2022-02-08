@@ -47,7 +47,10 @@ public partial class PublicKey: IDisposable
             {
                 throw new ObjectDisposedException("Pem");
             }
-            Raw.KeyFfiResultBoxPublicKeyBoxPickyError result = Raw.PublicKey.FromPem(pemRaw);
+            Raw.KeyFfiResultBoxPublicKeyBoxPickyError* resultPtr = Raw.PublicKey.FromPem(pemRaw);
+            Raw.KeyFfiResultBoxPublicKeyBoxPickyError result = Marshal.PtrToStructure<Raw.KeyFfiResultBoxPublicKeyBoxPickyError>((IntPtr)resultPtr);
+            Raw.KeyFfiResultBoxPublicKeyBoxPickyError.Destroy(resultPtr);
+            resultPtr = null;
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -71,7 +74,10 @@ public partial class PublicKey: IDisposable
             nuint derLength = (nuint)der.Length;
             fixed (byte* derPtr = der)
             {
-                Raw.KeyFfiResultBoxPublicKeyBoxPickyError result = Raw.PublicKey.FromDer(derPtr, derLength);
+                Raw.KeyFfiResultBoxPublicKeyBoxPickyError* resultPtr = Raw.PublicKey.FromDer(derPtr, derLength);
+                Raw.KeyFfiResultBoxPublicKeyBoxPickyError result = Marshal.PtrToStructure<Raw.KeyFfiResultBoxPublicKeyBoxPickyError>((IntPtr)resultPtr);
+                Raw.KeyFfiResultBoxPublicKeyBoxPickyError.Destroy(resultPtr);
+                resultPtr = null;
                 if (!result.isOk)
                 {
                     throw new PickyException(new PickyError(result.Err));
@@ -97,7 +103,10 @@ public partial class PublicKey: IDisposable
             {
                 throw new ObjectDisposedException("PublicKey");
             }
-            Raw.KeyFfiResultBoxPemBoxPickyError result = Raw.PublicKey.ToPem(_inner);
+            Raw.KeyFfiResultBoxPemBoxPickyError* resultPtr = Raw.PublicKey.ToPem(_inner);
+            Raw.KeyFfiResultBoxPemBoxPickyError result = Marshal.PtrToStructure<Raw.KeyFfiResultBoxPemBoxPickyError>((IntPtr)resultPtr);
+            Raw.KeyFfiResultBoxPemBoxPickyError.Destroy(resultPtr);
+            resultPtr = null;
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));

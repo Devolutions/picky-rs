@@ -20,19 +20,19 @@ public partial struct PublicKey
     /// Extracts public key from PEM object.
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PublicKey_from_pem", ExactSpelling = true)]
-    public static unsafe extern KeyFfiResultBoxPublicKeyBoxPickyError FromPem(Pem* pem);
+    public static unsafe extern KeyFfiResultBoxPublicKeyBoxPickyError* FromPem(Pem* pem);
 
     /// <summary>
     /// Reads a public key from its DER encoding.
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PublicKey_from_der", ExactSpelling = true)]
-    public static unsafe extern KeyFfiResultBoxPublicKeyBoxPickyError FromDer(byte* der, nuint derSz);
+    public static unsafe extern KeyFfiResultBoxPublicKeyBoxPickyError* FromDer(byte* der, nuint derSz);
 
     /// <summary>
     /// Exports the public key into a PEM object
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PublicKey_to_pem", ExactSpelling = true)]
-    public static unsafe extern KeyFfiResultBoxPemBoxPickyError ToPem(PublicKey* self);
+    public static unsafe extern KeyFfiResultBoxPemBoxPickyError* ToPem(PublicKey* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PublicKey_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(PublicKey* self);

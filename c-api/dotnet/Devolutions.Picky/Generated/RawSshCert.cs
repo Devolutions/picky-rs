@@ -23,13 +23,13 @@ public partial struct SshCert
     /// Parses string representation of a SSH Certificate.
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshCert_parse", ExactSpelling = true)]
-    public static unsafe extern SshFfiResultBoxSshCertBoxPickyError Parse(byte* repr, nuint reprSz);
+    public static unsafe extern SshFfiResultBoxSshCertBoxPickyError* Parse(byte* repr, nuint reprSz);
 
     /// <summary>
     /// Returns the SSH Certificate string representation.
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshCert_to_repr", ExactSpelling = true)]
-    public static unsafe extern SshFfiResultVoidBoxPickyError ToRepr(SshCert* self, DiplomatWriteable* writeable);
+    public static unsafe extern SshFfiResultVoidBoxPickyError* ToRepr(SshCert* self, DiplomatWriteable* writeable);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshCert_get_public_key", ExactSpelling = true)]
     public static unsafe extern SshPublicKey* GetPublicKey(SshCert* self);
@@ -50,10 +50,10 @@ public partial struct SshCert
     public static unsafe extern SshPublicKey* GetSignatureKey(SshCert* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshCert_get_key_id", ExactSpelling = true)]
-    public static unsafe extern SshFfiResultVoidBoxPickyError GetKeyId(SshCert* self, DiplomatWriteable* writeable);
+    public static unsafe extern SshFfiResultVoidBoxPickyError* GetKeyId(SshCert* self, DiplomatWriteable* writeable);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshCert_get_comment", ExactSpelling = true)]
-    public static unsafe extern SshFfiResultVoidBoxPickyError GetComment(SshCert* self, DiplomatWriteable* writeable);
+    public static unsafe extern SshFfiResultVoidBoxPickyError* GetComment(SshCert* self, DiplomatWriteable* writeable);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshCert_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(SshCert* self);
