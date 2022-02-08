@@ -5,7 +5,6 @@ use crate::ssh::decode::SshComplexTypeDecode;
 use crate::ssh::encode::{SshComplexTypeEncode, SshWriteExt};
 use crate::ssh::private_key::{SshBasePrivateKey, SshPrivateKey, SshPrivateKeyError};
 use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
-use crate::ssh::sshtime::SshTime;
 use byteorder::{BigEndian, WriteBytesExt};
 use rand::Rng;
 use rsa::{PublicKeyParts, RsaPublicKey};
@@ -270,6 +269,22 @@ pub struct SshSignature {
     pub blob: Vec<u8>,
 }
 
+/// Elapsed seconds since UNIX epoch
+#[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
+pub struct Timestamp(pub u64);
+
+impl Timestamp {
+    pub fn secs(self) -> u64 {
+        self.0
+    }
+}
+
+impl From<u64> for Timestamp {
+    fn from(v: u64) -> Self {
+        Self(v)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct SshCertificate {
     pub cert_key_type: SshCertKeyType,
@@ -279,8 +294,8 @@ pub struct SshCertificate {
     pub cert_type: SshCertType,
     pub key_id: String,
     pub valid_principals: Vec<String>,
-    pub valid_after: SshTime,
-    pub valid_before: SshTime,
+    pub valid_after: Timestamp,
+    pub valid_before: Timestamp,
     pub critical_options: Vec<SshCriticalOption>,
     pub extensions: Vec<SshExtension>,
     pub signature_key: SshPublicKey,
@@ -352,8 +367,8 @@ struct SshCertificateBuilderInner {
     cert_type: Option<SshCertType>,
     key_id: Option<String>,
     valid_principals: Option<Vec<String>>,
-    valid_after: Option<SshTime>,
-    valid_before: Option<SshTime>,
+    valid_after: Option<Timestamp>,
+    valid_before: Option<Timestamp>,
     critical_options: Option<Vec<SshCriticalOption>>,
     extensions: Option<Vec<SshExtension>>,
     signature_algo: Option<SignatureAlgorithm>,
@@ -409,14 +424,14 @@ impl SshCertificateBuilder {
     }
 
     /// Required
-    pub fn valid_before(&self, valid_before: SshTime) -> &Self {
-        self.inner.borrow_mut().valid_before = Some(valid_before);
+    pub fn valid_before(&self, valid_before: impl Into<Timestamp>) -> &Self {
+        self.inner.borrow_mut().valid_before = Some(valid_before.into());
         self
     }
 
     /// Required
-    pub fn valid_after(&self, valid_after: SshTime) -> &Self {
-        self.inner.borrow_mut().valid_after = Some(valid_after);
+    pub fn valid_after(&self, valid_after: impl Into<Timestamp>) -> &Self {
+        self.inner.borrow_mut().valid_after = Some(valid_after.into());
         self
     }
 
@@ -501,7 +516,7 @@ impl SshCertificateBuilder {
         let valid_after = valid_after.take().ok_or(SshCertificateGenerationError::InvalidTime)?;
         let valid_before = valid_before.take().ok_or(SshCertificateGenerationError::InvalidTime)?;
 
-        if valid_after.timestamp() > valid_before.timestamp() {
+        if valid_after.secs() > valid_before.secs() {
             return Err(SshCertificateGenerationError::InvalidTime);
         }
 
@@ -650,7 +665,6 @@ impl SshCertificateBuilder {
 pub mod tests {
     use super::*;
     use crate::ssh::private_key::SshPrivateKey;
-    use crate::ssh::sshtime::SshTime;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     const PRIVATE_KEY_PEM: &str = "-----BEGIN OPENSSH PRIVATE KEY-----\n\
@@ -777,11 +791,11 @@ pub mod tests {
         certificate_builder.cert_type(SshCertType::Host);
 
         let now_timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
-        certificate_builder.valid_after(SshTime::from_timestamp(now_timestamp));
+        certificate_builder.valid_after(now_timestamp);
 
         // 10 minutes = 600 seconds
         let valid_before = now_timestamp + 600;
-        certificate_builder.valid_before(SshTime::from_timestamp(valid_before));
+        certificate_builder.valid_before(valid_before);
 
         certificate_builder.signature_key(private_key);
         certificate_builder.build().unwrap();
@@ -803,9 +817,9 @@ pub mod tests {
         let after = now_timestamp + 600;
         let before = now_timestamp - 600;
 
-        certificate_builder.valid_after(SshTime::from_timestamp(after));
+        certificate_builder.valid_after(after);
 
-        certificate_builder.valid_before(SshTime::from_timestamp(before));
+        certificate_builder.valid_before(before);
 
         certificate_builder.signature_key(private_key);
 
@@ -825,11 +839,11 @@ pub mod tests {
         certificate_builder.cert_type(SshCertType::Host);
 
         let now_timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
-        certificate_builder.valid_after(SshTime::from_timestamp(now_timestamp));
+        certificate_builder.valid_after(now_timestamp);
 
         // 10 minutes = 600 seconds
         let valid_before = now_timestamp + 600;
-        certificate_builder.valid_before(SshTime::from_timestamp(valid_before));
+        certificate_builder.valid_before(valid_before);
 
         certificate_builder.signature_key(private_key);
 

@@ -13,8 +13,10 @@ default: bindings
 
 ## Diplomat installation ##
 
+diplomat_rev := "743010519808721e8c2fe3e3a2fda7d099518925"
+
 install-diplomat:
-    cargo install --git https://github.com/CBenoit/diplomat.git --branch "csharp-backend" diplomat-tool -f
+    cargo install --git https://github.com/CBenoit/diplomat.git --rev {{diplomat_rev}} diplomat-tool -f
 
 ## Native library ##
 
@@ -23,35 +25,35 @@ target_release_folder := "../target/release/"
 shared_lib_name_linux := "libpicky.so"
 shared_lib_name_win   := "picky.dll"
 
-dotnet_diplomat_config        := "./dotnet-interop-conf.toml"
-dotnet_path                   := "./dotnet/"
-dotnet_lib_path               := dotnet_path + "src/Picky/"
-dotnet_generated_path         := dotnet_lib_path + "Generated/"
-dotnet_debug_lib_path_linux   := dotnet_lib_path + "lib/Debug/linux-x64/"
-dotnet_debug_lib_path_win     := dotnet_lib_path + "lib/Debug/win-x64/"
-dotnet_release_lib_path_linux := dotnet_lib_path + "lib/Release/linux-x64/"
-dotnet_release_lib_path_win   := dotnet_lib_path + "lib/Release/win-x64/"
+dotnet_diplomat_config := "./dotnet-interop-conf.toml"
+dotnet_path            := "./dotnet/"
+dotnet_lib_path        := dotnet_path + "Devolutions.Picky/"
+dotnet_generated_path  := dotnet_lib_path + "Generated/"
+
+runtimes_path  := "../dependencies/runtimes/"
+lib_path_linux := runtimes_path + "linux-x64/native/"
+lib_path_win   := runtimes_path + "win-x64/native/"
 
 native-lib-debug:
     cargo build -p picky-ffi
-    mkdir -p {{dotnet_debug_lib_path_linux}}
-    -cp {{target_debug_folder}}{{shared_lib_name_linux}} {{dotnet_debug_lib_path_linux}}
-    mkdir -p {{dotnet_debug_lib_path_win}}
-    -cp {{target_debug_folder}}{{shared_lib_name_win}} {{dotnet_debug_lib_path_win}}
+    mkdir -p {{lib_path_linux}}
+    -cp {{target_debug_folder}}{{shared_lib_name_linux}} {{lib_path_linux}}
+    mkdir -p {{lib_path_win}}
+    -cp {{target_debug_folder}}{{shared_lib_name_win}} {{lib_path_win}}
 
 native-lib-release:
     cargo build -p picky-ffi --release
-    mkdir -p {{dotnet_release_lib_path_linux}}
-    -cp {{target_release_folder}}{{shared_lib_name_linux}} {{dotnet_release_lib_path_linux}}
-    mkdir -p {{dotnet_release_lib_path_win}}
-    -cp {{target_release_folder}}{{shared_lib_name_win}} {{dotnet_release_lib_path_win}}
+    mkdir -p {{lib_path_linux}}
+    -cp {{target_release_folder}}{{shared_lib_name_linux}} {{lib_path_linux}}
+    mkdir -p {{lib_path_win}}
+    -cp {{target_release_folder}}{{shared_lib_name_win}} {{lib_path_win}}
 
 ## Bindings ##
 
 bindings: dotnet-bindings
 
 dotnet-bindings:
-    rm {{dotnet_generated_path}}*.cs
+    -rm {{dotnet_generated_path}}*.cs
     diplomat-tool dotnet {{dotnet_generated_path}} -l {{dotnet_diplomat_config}}
     @echo ">> .NET wrapper generated at {{dotnet_generated_path}}"
 

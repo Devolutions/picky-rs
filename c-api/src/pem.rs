@@ -5,20 +5,20 @@ pub mod ffi {
     use std::fmt::Write as _;
     use std::io::Write as _;
 
-    /// Picky PEM object.
+    ///  PEM object.
     #[diplomat::opaque]
-    pub struct PickyPem(pub picky::pem::Pem<'static>);
+    pub struct Pem(pub picky::pem::Pem<'static>);
 
-    impl PickyPem {
+    impl Pem {
         /// Creates a PEM object with the given label and data.
-        pub fn new(label: &str, data: &[u8]) -> DiplomatResult<Box<PickyPem>, Box<PickyError>> {
+        pub fn new(label: &str, data: &[u8]) -> DiplomatResult<Box<Pem>, Box<PickyError>> {
             let data = data.to_owned();
             let pem = picky::pem::Pem::new(label, data);
-            Ok(Box::new(PickyPem(pem))).into()
+            Ok(Box::new(Pem(pem))).into()
         }
 
         /// Loads a PEM from the filesystem.
-        pub fn load_from_file(path: &str) -> DiplomatResult<Box<PickyPem>, Box<PickyError>> {
+        pub fn load_from_file(path: &str) -> DiplomatResult<Box<Pem>, Box<PickyError>> {
             let contents = err_check!(std::fs::read_to_string(path));
             Self::parse(&contents)
         }
@@ -31,9 +31,9 @@ pub mod ffi {
         }
 
         /// Parses a PEM-encoded string representation.
-        pub fn parse(input: &str) -> DiplomatResult<Box<PickyPem>, Box<PickyError>> {
+        pub fn parse(input: &str) -> DiplomatResult<Box<Pem>, Box<PickyError>> {
             let pem = err_check!(picky::pem::parse_pem(input));
-            Ok(Box::new(PickyPem(pem))).into()
+            Ok(Box::new(Pem(pem))).into()
         }
 
         // TODO(diplomat): support for returning buffers

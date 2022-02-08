@@ -3,9 +3,9 @@ use picky_asn1_x509::validity::Time;
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct UTCDate(GeneralizedTime);
+pub struct UtcDate(GeneralizedTime);
 
-impl UTCDate {
+impl UtcDate {
     #[inline]
     pub fn new(year: u16, month: u8, day: u8, hour: u8, minute: u8, second: u8) -> Option<Self> {
         Some(Self(GeneralizedTime::new(year, month, day, hour, minute, second)?))
@@ -60,8 +60,8 @@ impl UTCDate {
     }
 }
 
-impl From<UTCDate> for UTCTime {
-    fn from(date: UTCDate) -> Self {
+impl From<UtcDate> for UTCTime {
+    fn from(date: UtcDate) -> Self {
         unsafe {
             UTCTime::new_unchecked(
                 date.0.year(),
@@ -75,7 +75,7 @@ impl From<UTCDate> for UTCTime {
     }
 }
 
-impl From<UTCTime> for UTCDate {
+impl From<UTCTime> for UtcDate {
     fn from(date: Date<UTCTimeRepr>) -> Self {
         Self(unsafe {
             GeneralizedTime::new_unchecked(
@@ -90,20 +90,20 @@ impl From<UTCTime> for UTCDate {
     }
 }
 
-impl From<UTCDate> for GeneralizedTime {
-    fn from(date: UTCDate) -> GeneralizedTime {
+impl From<UtcDate> for GeneralizedTime {
+    fn from(date: UtcDate) -> GeneralizedTime {
         date.0
     }
 }
 
-impl From<GeneralizedTime> for UTCDate {
+impl From<GeneralizedTime> for UtcDate {
     fn from(date: GeneralizedTime) -> Self {
         Self(date)
     }
 }
 
-impl From<UTCDate> for Time {
-    fn from(date: UTCDate) -> Self {
+impl From<UtcDate> for Time {
+    fn from(date: UtcDate) -> Self {
         // Time is used to encode validity period.
         // As per RFC 5280,
         // > CAs conforming to this profile MUST always encode certificate
@@ -119,7 +119,7 @@ impl From<UTCDate> for Time {
     }
 }
 
-impl From<Time> for UTCDate {
+impl From<Time> for UtcDate {
     fn from(time: Time) -> Self {
         match time {
             Time::Utc(utc) => utc.0.into(),
@@ -128,7 +128,7 @@ impl From<Time> for UTCDate {
     }
 }
 
-impl fmt::Display for UTCDate {
+impl fmt::Display for UtcDate {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -148,16 +148,16 @@ mod time_convert {
     use super::*;
     use time::OffsetDateTime;
 
-    impl From<OffsetDateTime> for UTCDate {
+    impl From<OffsetDateTime> for UtcDate {
         fn from(dt: OffsetDateTime) -> Self {
             Self(dt.into())
         }
     }
 
-    impl TryFrom<UTCDate> for OffsetDateTime {
+    impl TryFrom<UtcDate> for OffsetDateTime {
         type Error = time::error::ComponentRange;
 
-        fn try_from(date: UTCDate) -> Result<Self, Self::Error> {
+        fn try_from(date: UtcDate) -> Result<Self, Self::Error> {
             date.0.try_into()
         }
     }
@@ -168,14 +168,14 @@ mod chrono_convert {
     use super::*;
     use chrono::{DateTime, Utc};
 
-    impl From<DateTime<Utc>> for UTCDate {
+    impl From<DateTime<Utc>> for UtcDate {
         fn from(dt: DateTime<Utc>) -> Self {
             Self(dt.into())
         }
     }
 
-    impl From<UTCDate> for DateTime<Utc> {
-        fn from(date: UTCDate) -> Self {
+    impl From<UtcDate> for DateTime<Utc> {
+        fn from(date: UtcDate) -> Self {
             date.0.into()
         }
     }

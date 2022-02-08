@@ -432,12 +432,12 @@ mod tests {
     use rsa::PublicKeyParts;
 
     cfg_if::cfg_if! { if #[cfg(feature = "x509")] {
-        use crate::x509::{certificate::CertificateBuilder, date::UTCDate, name::DirectoryName};
+        use crate::x509::{certificate::CertificateBuilder, date::UtcDate, name::DirectoryName};
 
         fn generate_certificate_from_pk(private_key: PrivateKey) {
             // validity
-            let valid_from = UTCDate::ymd(2019, 10, 10).unwrap();
-            let valid_to = UTCDate::ymd(2019, 10, 11).unwrap();
+            let valid_from = UtcDate::ymd(2019, 10, 10).unwrap();
+            let valid_to = UtcDate::ymd(2019, 10, 11).unwrap();
 
             CertificateBuilder::new()
                 .validity(valid_from, valid_to)

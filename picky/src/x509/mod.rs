@@ -8,7 +8,7 @@
 //! use picky::{signature::SignatureAlgorithm, hash::HashAlgorithm};
 //! use picky::x509::key_id_gen_method::{KeyIdGenError, KeyIdGenMethod};
 //! use picky::x509::{certificate::CertType, csr::Csr};
-//! use picky::x509::{name::DirectoryName, date::UTCDate};
+//! use picky::x509::{name::DirectoryName, date::UtcDate};
 //! use picky::x509::certificate::CertificateBuilder;
 //!
 //!# use std::error::Error;
@@ -51,7 +51,7 @@
 //! let root_key = PrivateKey::from_pem_str(root_key_pem_str)?;
 //!
 //! let root = CertificateBuilder::new()
-//!     .validity(UTCDate::ymd(2020, 9, 28).unwrap(), UTCDate::ymd(2023, 9, 28).unwrap())
+//!     .validity(UtcDate::ymd(2020, 9, 28).unwrap(), UtcDate::ymd(2023, 9, 28).unwrap())
 //!     .self_signed(DirectoryName::new_common_name("My Root CA"), &root_key)
 //!     .ca(true)
 //!     .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_512))
@@ -65,7 +65,7 @@
 //! let intermediate_key = PrivateKey::from_pem_str(intermediate_key_pem_str)?;
 //!
 //! let intermediate = CertificateBuilder::new()
-//!     .validity(UTCDate::ymd(2020, 10, 15).unwrap(), UTCDate::ymd(2021, 10, 15).unwrap())
+//!     .validity(UtcDate::ymd(2020, 10, 15).unwrap(), UtcDate::ymd(2021, 10, 15).unwrap())
 //!     .subject(DirectoryName::new_common_name("My Authority"), intermediate_key.to_public_key())
 //!     .issuer_cert(&root, &root_key)
 //!     .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_224))
@@ -88,7 +88,7 @@
 //! )?;
 //!
 //! let signed_leaf = CertificateBuilder::new()
-//!     .validity(UTCDate::ymd(2020, 11, 1).unwrap(), UTCDate::ymd(2021, 1, 1).unwrap())
+//!     .validity(UtcDate::ymd(2020, 11, 1).unwrap(), UtcDate::ymd(2021, 1, 1).unwrap())
 //!     .subject_from_csr(csr)
 //!     .issuer_cert(&intermediate, &intermediate_key)
 //!     .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_384))
@@ -104,7 +104,7 @@
 //! signed_leaf
 //!     .verifier()
 //!     .chain(chain.iter())
-//!     .exact_date(&UTCDate::ymd(2020, 12, 20).unwrap())
+//!     .exact_date(&UtcDate::ymd(2020, 12, 20).unwrap())
 //!     .verify()?;
 //!
 //! // If `not_after` date is behind…
@@ -112,7 +112,7 @@
 //! let err = signed_leaf
 //!     .verifier()
 //!     .chain(chain.iter())
-//!     .exact_date(&UTCDate::ymd(2021, 1, 2).unwrap())
+//!     .exact_date(&UtcDate::ymd(2021, 1, 2).unwrap())
 //!     .verify()
 //!     .err()
 //!     .unwrap();

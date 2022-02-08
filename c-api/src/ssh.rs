@@ -1,49 +1,49 @@
-use picky::ssh::certificate::{SshCertKeyType, SshCertType};
+use picky::ssh;
 
-impl From<ffi::PickySshCertKeyType> for SshCertKeyType {
-    fn from(ty: ffi::PickySshCertKeyType) -> Self {
+impl From<ffi::SshCertKeyType> for ssh::SshCertKeyType {
+    fn from(ty: ffi::SshCertKeyType) -> Self {
         match ty {
-            ffi::PickySshCertKeyType::SshRsaV01 => SshCertKeyType::SshRsaV01,
-            ffi::PickySshCertKeyType::SshDssV01 => SshCertKeyType::SshDssV01,
-            ffi::PickySshCertKeyType::RsaSha2_256V01 => SshCertKeyType::RsaSha2_256V01,
-            ffi::PickySshCertKeyType::RsaSha2_512v01 => SshCertKeyType::RsaSha2_512v01,
-            ffi::PickySshCertKeyType::EcdsaSha2Nistp256V01 => SshCertKeyType::EcdsaSha2Nistp256V01,
-            ffi::PickySshCertKeyType::EcdsaSha2Nistp384V01 => SshCertKeyType::EcdsaSha2Nistp384V01,
-            ffi::PickySshCertKeyType::EcdsaSha2Nistp521V01 => SshCertKeyType::EcdsaSha2Nistp521V01,
-            ffi::PickySshCertKeyType::SshEd25519V01 => SshCertKeyType::SshEd25519V01,
+            ffi::SshCertKeyType::SshRsaV01 => ssh::SshCertKeyType::SshRsaV01,
+            ffi::SshCertKeyType::SshDssV01 => ssh::SshCertKeyType::SshDssV01,
+            ffi::SshCertKeyType::RsaSha2_256V01 => ssh::SshCertKeyType::RsaSha2_256V01,
+            ffi::SshCertKeyType::RsaSha2_512v01 => ssh::SshCertKeyType::RsaSha2_512v01,
+            ffi::SshCertKeyType::EcdsaSha2Nistp256V01 => ssh::SshCertKeyType::EcdsaSha2Nistp256V01,
+            ffi::SshCertKeyType::EcdsaSha2Nistp384V01 => ssh::SshCertKeyType::EcdsaSha2Nistp384V01,
+            ffi::SshCertKeyType::EcdsaSha2Nistp521V01 => ssh::SshCertKeyType::EcdsaSha2Nistp521V01,
+            ffi::SshCertKeyType::SshEd25519V01 => ssh::SshCertKeyType::SshEd25519V01,
         }
     }
 }
 
-impl From<SshCertKeyType> for ffi::PickySshCertKeyType {
-    fn from(ty: SshCertKeyType) -> Self {
+impl From<ssh::SshCertKeyType> for ffi::SshCertKeyType {
+    fn from(ty: ssh::SshCertKeyType) -> Self {
         match ty {
-            SshCertKeyType::SshRsaV01 => ffi::PickySshCertKeyType::SshRsaV01,
-            SshCertKeyType::SshDssV01 => ffi::PickySshCertKeyType::SshDssV01,
-            SshCertKeyType::RsaSha2_256V01 => ffi::PickySshCertKeyType::RsaSha2_256V01,
-            SshCertKeyType::RsaSha2_512v01 => ffi::PickySshCertKeyType::RsaSha2_512v01,
-            SshCertKeyType::EcdsaSha2Nistp256V01 => ffi::PickySshCertKeyType::EcdsaSha2Nistp256V01,
-            SshCertKeyType::EcdsaSha2Nistp384V01 => ffi::PickySshCertKeyType::EcdsaSha2Nistp384V01,
-            SshCertKeyType::EcdsaSha2Nistp521V01 => ffi::PickySshCertKeyType::EcdsaSha2Nistp521V01,
-            SshCertKeyType::SshEd25519V01 => ffi::PickySshCertKeyType::SshEd25519V01,
+            ssh::SshCertKeyType::SshRsaV01 => ffi::SshCertKeyType::SshRsaV01,
+            ssh::SshCertKeyType::SshDssV01 => ffi::SshCertKeyType::SshDssV01,
+            ssh::SshCertKeyType::RsaSha2_256V01 => ffi::SshCertKeyType::RsaSha2_256V01,
+            ssh::SshCertKeyType::RsaSha2_512v01 => ffi::SshCertKeyType::RsaSha2_512v01,
+            ssh::SshCertKeyType::EcdsaSha2Nistp256V01 => ffi::SshCertKeyType::EcdsaSha2Nistp256V01,
+            ssh::SshCertKeyType::EcdsaSha2Nistp384V01 => ffi::SshCertKeyType::EcdsaSha2Nistp384V01,
+            ssh::SshCertKeyType::EcdsaSha2Nistp521V01 => ffi::SshCertKeyType::EcdsaSha2Nistp521V01,
+            ssh::SshCertKeyType::SshEd25519V01 => ffi::SshCertKeyType::SshEd25519V01,
         }
     }
 }
 
-impl From<ffi::PickySshCertType> for SshCertType {
-    fn from(ty: ffi::PickySshCertType) -> Self {
+impl From<ffi::SshCertType> for ssh::SshCertType {
+    fn from(ty: ffi::SshCertType) -> Self {
         match ty {
-            ffi::PickySshCertType::Client => SshCertType::Client,
-            ffi::PickySshCertType::Host => SshCertType::Host,
+            ffi::SshCertType::Client => ssh::SshCertType::Client,
+            ffi::SshCertType::Host => ssh::SshCertType::Host,
         }
     }
 }
 
-impl From<SshCertType> for ffi::PickySshCertType {
-    fn from(ty: SshCertType) -> Self {
+impl From<ssh::SshCertType> for ffi::SshCertType {
+    fn from(ty: ssh::SshCertType) -> Self {
         match ty {
-            SshCertType::Client => ffi::PickySshCertType::Client,
-            SshCertType::Host => ffi::PickySshCertType::Host,
+            ssh::SshCertType::Client => ffi::SshCertType::Client,
+            ssh::SshCertType::Host => ffi::SshCertType::Host,
         }
     }
 }
@@ -51,27 +51,24 @@ impl From<SshCertType> for ffi::PickySshCertType {
 #[diplomat::bridge]
 pub mod ffi {
     use crate::error::ffi::PickyError;
-    use crate::key::ffi::PickyPrivateKey;
-    use crate::pem::ffi::PickyPem;
-    use crate::signature::ffi::PickySignatureAlgorithm;
+    use crate::key::ffi::PrivateKey;
+    use crate::pem::ffi::Pem;
+    use crate::signature::ffi::SignatureAlgorithm;
     use diplomat_runtime::{DiplomatResult, DiplomatWriteable};
-    use picky::ssh::certificate::{SshCertificate, SshCertificateBuilder};
-    use picky::ssh::private_key::SshPrivateKey;
-    use picky::ssh::public_key::SshPublicKey;
-    use picky::ssh::sshtime::SshTime;
+    use picky::ssh;
     use std::borrow::ToOwned;
     use std::fmt::Write as _;
     use std::str::FromStr;
 
     /// SSH Public Key.
     #[diplomat::opaque]
-    pub struct PickySshPublicKey(pub SshPublicKey);
+    pub struct SshPublicKey(pub ssh::SshPublicKey);
 
-    impl PickySshPublicKey {
+    impl SshPublicKey {
         /// Parses string representation of a SSH Public Key.
-        pub fn parse(repr: &str) -> DiplomatResult<Box<PickySshPublicKey>, Box<PickyError>> {
-            let key = err_check!(SshPublicKey::from_str(repr));
-            Ok(Box::new(PickySshPublicKey(key))).into()
+        pub fn parse(repr: &str) -> DiplomatResult<Box<SshPublicKey>, Box<PickyError>> {
+            let key = err_check!(ssh::SshPublicKey::from_str(repr));
+            Ok(Box::new(SshPublicKey(key))).into()
         }
 
         /// Returns the SSH Public Key string representation.
@@ -95,9 +92,9 @@ pub mod ffi {
 
     /// SSH Private Key.
     #[diplomat::opaque]
-    pub struct PickySshPrivateKey(pub SshPrivateKey);
+    pub struct SshPrivateKey(pub ssh::SshPrivateKey);
 
-    impl PickySshPrivateKey {
+    impl SshPrivateKey {
         /// Generates a new SSH RSA Private Key.
         ///
         /// No passphrase is set if `passphrase` is empty.
@@ -109,7 +106,7 @@ pub mod ffi {
             bits: usize,
             passphrase: &str,
             comment: &str,
-        ) -> DiplomatResult<Box<PickySshPrivateKey>, Box<PickyError>> {
+        ) -> DiplomatResult<Box<SshPrivateKey>, Box<PickyError>> {
             let passphrase = if passphrase.is_empty() {
                 None
             } else {
@@ -122,33 +119,33 @@ pub mod ffi {
                 Some(comment.to_owned())
             };
 
-            let key = err_check!(SshPrivateKey::generate_rsa(bits, passphrase, comment));
-            Ok(Box::new(PickySshPrivateKey(key))).into()
+            let key = err_check!(ssh::SshPrivateKey::generate_rsa(bits, passphrase, comment));
+            Ok(Box::new(SshPrivateKey(key))).into()
         }
 
         /// Extracts SSH Private Key from PEM object.
         ///
         /// No passphrase is set if `passphrase` is empty.
-        pub fn from_pem(pem: &PickyPem, passphrase: &str) -> DiplomatResult<Box<PickySshPrivateKey>, Box<PickyError>> {
+        pub fn from_pem(pem: &Pem, passphrase: &str) -> DiplomatResult<Box<SshPrivateKey>, Box<PickyError>> {
             let passphrase = if passphrase.is_empty() {
                 None
             } else {
                 Some(passphrase.to_owned())
             };
 
-            let key = err_check!(SshPrivateKey::from_pem(&pem.0, passphrase));
-            Ok(Box::new(PickySshPrivateKey(key))).into()
+            let key = err_check!(ssh::SshPrivateKey::from_pem(&pem.0, passphrase));
+            Ok(Box::new(SshPrivateKey(key))).into()
         }
 
-        pub fn from_private_key(key: &PickyPrivateKey) -> Box<PickySshPrivateKey> {
-            let key = SshPrivateKey::from(key.0.clone());
-            Box::new(PickySshPrivateKey(key))
+        pub fn from_private_key(key: &PrivateKey) -> Box<SshPrivateKey> {
+            let key = ssh::SshPrivateKey::from(key.0.clone());
+            Box::new(SshPrivateKey(key))
         }
 
         /// Exports the SSH Private Key into a PEM object
-        pub fn to_pem(&self) -> DiplomatResult<Box<PickyPem>, Box<PickyError>> {
+        pub fn to_pem(&self) -> DiplomatResult<Box<Pem>, Box<PickyError>> {
             let pem = err_check!(self.0.to_pem());
-            Ok(Box::new(PickyPem(pem))).into()
+            Ok(Box::new(Pem(pem))).into()
         }
 
         /// Returns the SSH Private Key string representation.
@@ -172,13 +169,13 @@ pub mod ffi {
         }
 
         /// Extracts the public part of this private key
-        pub fn to_public_key(&self) -> Box<PickySshPublicKey> {
-            Box::new(PickySshPublicKey(self.0.public_key().clone()))
+        pub fn to_public_key(&self) -> Box<SshPublicKey> {
+            Box::new(SshPublicKey(self.0.public_key().clone()))
         }
     }
 
     /// SSH key type.
-    pub enum PickySshCertKeyType {
+    pub enum SshCertKeyType {
         SshRsaV01,
         SshDssV01,
         RsaSha2_256V01,
@@ -190,69 +187,27 @@ pub mod ffi {
     }
 
     /// SSH certificate type.
-    pub enum PickySshCertType {
+    pub enum SshCertType {
         Client,
         Host,
     }
 
-    /// SSH datetime.
-    #[diplomat::opaque]
-    pub struct PickySshTime(pub SshTime);
-
-    impl PickySshTime {
-        pub fn now() -> Box<PickySshTime> {
-            Box::new(Self(SshTime::now()))
-        }
-
-        pub fn from_timestamp(timestamp: u64) -> Box<PickySshTime> {
-            Box::new(Self(SshTime::from_timestamp(timestamp)))
-        }
-
-        pub fn get_timestamp(&self) -> u64 {
-            self.0.timestamp()
-        }
-
-        pub fn get_month(&self) -> u8 {
-            self.0.month()
-        }
-
-        pub fn get_day(&self) -> u8 {
-            self.0.day()
-        }
-
-        pub fn get_hour(&self) -> u8 {
-            self.0.hour()
-        }
-
-        pub fn get_minute(&self) -> u8 {
-            self.0.minute()
-        }
-
-        pub fn get_second(&self) -> u8 {
-            self.0.second()
-        }
-
-        pub fn get_year(&self) -> u16 {
-            self.0.year()
-        }
-    }
-
     /// SSH Certificate Builder.
     #[diplomat::opaque]
-    pub struct PickySshCertBuilder(pub SshCertificateBuilder);
+    pub struct SshCertBuilder(pub ssh::SshCertificateBuilder);
 
-    impl PickySshCertBuilder {
-        pub fn init() -> Box<PickySshCertBuilder> {
-            Box::new(Self(SshCertificateBuilder::init()))
+    impl SshCertBuilder {
+        pub fn init() -> Box<SshCertBuilder> {
+            Box::new(Self(ssh::SshCertificateBuilder::init()))
         }
 
         /// Required
-        pub fn set_cert_key_type(&self, key_type: PickySshCertKeyType) {
+        pub fn set_cert_key_type(&self, key_type: SshCertKeyType) {
             self.0.cert_key_type(key_type.into());
         }
 
         /// Required
-        pub fn set_key(&self, key: &PickySshPublicKey) {
+        pub fn set_key(&self, key: &SshPublicKey) {
             self.0.key(key.0.clone());
         }
 
@@ -262,7 +217,7 @@ pub mod ffi {
         }
 
         /// Required
-        pub fn set_cert_type(&self, cert_type: PickySshCertType) {
+        pub fn set_cert_type(&self, cert_type: SshCertType) {
             self.0.cert_type(cert_type.into());
         }
 
@@ -272,22 +227,22 @@ pub mod ffi {
         }
 
         /// Required
-        pub fn set_valid_before(&self, valid_before: &PickySshTime) {
-            self.0.valid_before(valid_before.0);
+        pub fn set_valid_before(&self, valid_before: u64) {
+            self.0.valid_before(valid_before);
         }
 
         /// Required
-        pub fn set_valid_after(&self, valid_after: &PickySshTime) {
-            self.0.valid_after(valid_after.0);
+        pub fn set_valid_after(&self, valid_after: u64) {
+            self.0.valid_after(valid_after);
         }
 
         /// Required
-        pub fn set_signature_key(&self, signature_key: &PickySshPrivateKey) {
+        pub fn set_signature_key(&self, signature_key: &SshPrivateKey) {
             self.0.signature_key(signature_key.0.clone());
         }
 
         /// Optional. RsaPkcs1v15 with SHA256 is used by default.
-        pub fn set_signature_algo(&self, signature_algo: &PickySignatureAlgorithm) {
+        pub fn set_signature_algo(&self, signature_algo: &SignatureAlgorithm) {
             self.0.signature_algo(signature_algo.0);
         }
 
@@ -296,24 +251,24 @@ pub mod ffi {
             self.0.comment(comment.to_owned());
         }
 
-        pub fn build(&self) -> DiplomatResult<Box<PickySshCert>, Box<PickyError>> {
+        pub fn build(&self) -> DiplomatResult<Box<SshCert>, Box<PickyError>> {
             let cert = err_check!(self.0.build());
-            Ok(Box::new(PickySshCert(cert))).into()
+            Ok(Box::new(SshCert(cert))).into()
         }
     }
 
     #[diplomat::opaque]
-    pub struct PickySshCert(pub SshCertificate);
+    pub struct SshCert(pub ssh::SshCertificate);
 
-    impl PickySshCert {
-        pub fn builder() -> Box<PickySshCertBuilder> {
-            PickySshCertBuilder::init()
+    impl SshCert {
+        pub fn builder() -> Box<SshCertBuilder> {
+            SshCertBuilder::init()
         }
 
         /// Parses string representation of a SSH Certificate.
-        pub fn parse(repr: &str) -> DiplomatResult<Box<PickySshCert>, Box<PickyError>> {
-            let cert = err_check!(SshCertificate::from_str(repr));
-            Ok(Box::new(PickySshCert(cert))).into()
+        pub fn parse(repr: &str) -> DiplomatResult<Box<SshCert>, Box<PickyError>> {
+            let cert = err_check!(ssh::SshCertificate::from_str(repr));
+            Ok(Box::new(SshCert(cert))).into()
         }
 
         /// Returns the SSH Certificate string representation.
@@ -324,28 +279,28 @@ pub mod ffi {
             Ok(()).into()
         }
 
-        pub fn get_public_key(&self) -> Box<PickySshPublicKey> {
-            Box::new(PickySshPublicKey(self.0.public_key.clone()))
+        pub fn get_public_key(&self) -> Box<SshPublicKey> {
+            Box::new(SshPublicKey(self.0.public_key.clone()))
         }
 
-        pub fn get_ssh_key_type(&self) -> PickySshCertKeyType {
+        pub fn get_ssh_key_type(&self) -> SshCertKeyType {
             self.0.cert_key_type.into()
         }
 
-        pub fn get_cert_type(&self) -> PickySshCertType {
+        pub fn get_cert_type(&self) -> SshCertType {
             self.0.cert_type.into()
         }
 
-        pub fn get_valid_after(&self) -> Box<PickySshTime> {
-            Box::new(PickySshTime(self.0.valid_after))
+        pub fn get_valid_after(&self) -> u64 {
+            self.0.valid_after.0
         }
 
-        pub fn get_valid_before(&self) -> Box<PickySshTime> {
-            Box::new(PickySshTime(self.0.valid_before))
+        pub fn get_valid_before(&self) -> u64 {
+            self.0.valid_before.0
         }
 
-        pub fn get_signature_key(&self) -> Box<PickySshPublicKey> {
-            Box::new(PickySshPublicKey(self.0.signature_key.clone()))
+        pub fn get_signature_key(&self) -> Box<SshPublicKey> {
+            Box::new(SshPublicKey(self.0.signature_key.clone()))
         }
 
         pub fn get_key_id(&self, writeable: &mut DiplomatWriteable) -> DiplomatResult<(), Box<PickyError>> {
