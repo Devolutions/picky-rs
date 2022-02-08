@@ -13,10 +13,10 @@ default: bindings
 
 ## Diplomat installation ##
 
-diplomat_rev := "b971915368f81df83e92f843ddb537ce1b21d8f4"
+diplomat_rev := "743010519808721e8c2fe3e3a2fda7d099518925"
 
 install-diplomat:
-    cargo install --git https://github.com/rust-diplomat/diplomat.git --rev {{diplomat_rev}} diplomat-tool -f
+    cargo install --git https://github.com/CBenoit/diplomat.git --rev {{diplomat_rev}} diplomat-tool -f
 
 ## Native library ##
 
@@ -53,7 +53,7 @@ native-lib-release:
 bindings: dotnet-bindings
 
 dotnet-bindings:
-    rm {{dotnet_generated_path}}*.cs
+    -rm {{dotnet_generated_path}}*.cs
     diplomat-tool dotnet {{dotnet_generated_path}} -l {{dotnet_diplomat_config}}
     @echo ">> .NET wrapper generated at {{dotnet_generated_path}}"
 

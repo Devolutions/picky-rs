@@ -718,9 +718,10 @@ dependencies = [
 [[package]]
 name = "diplomat"
 version = "0.2.0"
-source = "git+https://github.com/CBenoit/diplomat.git?branch=csharp-backend#6838b8d6f24855d65a4248141eb25a79c86223b9"
+source = "git+https://github.com/CBenoit/diplomat.git?rev=743010519808721e8c2fe3e3a2fda7d099518925#743010519808721e8c2fe3e3a2fda7d099518925"
 dependencies = [
  "diplomat_core",
+ "lazy_static",
  "proc-macro2",
  "quote",
  "syn",
@@ -729,12 +730,12 @@ dependencies = [
 [[package]]
 name = "diplomat-runtime"
 version = "0.2.0"
-source = "git+https://github.com/CBenoit/diplomat.git?branch=csharp-backend#6838b8d6f24855d65a4248141eb25a79c86223b9"
+source = "git+https://github.com/CBenoit/diplomat.git?rev=743010519808721e8c2fe3e3a2fda7d099518925#743010519808721e8c2fe3e3a2fda7d099518925"
 
 [[package]]
 name = "diplomat_core"
 version = "0.2.0"
-source = "git+https://github.com/CBenoit/diplomat.git?branch=csharp-backend#6838b8d6f24855d65a4248141eb25a79c86223b9"
+source = "git+https://github.com/CBenoit/diplomat.git?rev=743010519808721e8c2fe3e3a2fda7d099518925#743010519808721e8c2fe3e3a2fda7d099518925"
 dependencies = [
  "impls",
  "lazy_static",
@@ -2097,7 +2098,9 @@ version = "0.1.0"
 dependencies = [
  "diplomat",
  "diplomat-runtime",
+ "hex",
  "picky 6.4.0",
+ "time 0.3.5",
 ]
 
 [[package]]
