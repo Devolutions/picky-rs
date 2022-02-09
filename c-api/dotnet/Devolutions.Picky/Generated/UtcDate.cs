@@ -141,10 +141,9 @@ public partial class UtcDate: IDisposable
     {
         unsafe
         {
-            Raw.DateFfiResultBoxUtcDateBoxPickyError* resultPtr = Raw.UtcDate.FromTimestamp(timestamp);
-            Raw.DateFfiResultBoxUtcDateBoxPickyError result = Marshal.PtrToStructure<Raw.DateFfiResultBoxUtcDateBoxPickyError>((IntPtr)resultPtr);
+            IntPtr resultPtr = Raw.UtcDate.FromTimestamp(timestamp);
+            Raw.DateFfiResultBoxUtcDateBoxPickyError result = Marshal.PtrToStructure<Raw.DateFfiResultBoxUtcDateBoxPickyError>(resultPtr);
             Raw.DateFfiResultBoxUtcDateBoxPickyError.Destroy(resultPtr);
-            resultPtr = null;
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -163,10 +162,9 @@ public partial class UtcDate: IDisposable
             {
                 throw new ObjectDisposedException("UtcDate");
             }
-            Raw.DateFfiResultI64BoxPickyError* resultPtr = Raw.UtcDate.GetTimestamp(_inner);
-            Raw.DateFfiResultI64BoxPickyError result = Marshal.PtrToStructure<Raw.DateFfiResultI64BoxPickyError>((IntPtr)resultPtr);
+            IntPtr resultPtr = Raw.UtcDate.GetTimestamp(_inner);
+            Raw.DateFfiResultI64BoxPickyError result = Marshal.PtrToStructure<Raw.DateFfiResultI64BoxPickyError>(resultPtr);
             Raw.DateFfiResultI64BoxPickyError.Destroy(resultPtr);
-            resultPtr = null;
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));

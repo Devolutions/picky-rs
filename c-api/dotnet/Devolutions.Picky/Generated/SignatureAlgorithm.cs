@@ -40,10 +40,9 @@ public partial class SignatureAlgorithm: IDisposable
         {
             Raw.HashAlgorithm hashAlgorithmRaw;
             hashAlgorithmRaw = (Raw.HashAlgorithm)hashAlgorithm;
-            Raw.SignatureFfiResultBoxSignatureAlgorithmBoxPickyError* resultPtr = Raw.SignatureAlgorithm.NewRsaPkcs1v15(hashAlgorithmRaw);
-            Raw.SignatureFfiResultBoxSignatureAlgorithmBoxPickyError result = Marshal.PtrToStructure<Raw.SignatureFfiResultBoxSignatureAlgorithmBoxPickyError>((IntPtr)resultPtr);
+            IntPtr resultPtr = Raw.SignatureAlgorithm.NewRsaPkcs1v15(hashAlgorithmRaw);
+            Raw.SignatureFfiResultBoxSignatureAlgorithmBoxPickyError result = Marshal.PtrToStructure<Raw.SignatureFfiResultBoxSignatureAlgorithmBoxPickyError>(resultPtr);
             Raw.SignatureFfiResultBoxSignatureAlgorithmBoxPickyError.Destroy(resultPtr);
-            resultPtr = null;
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -74,10 +73,9 @@ public partial class SignatureAlgorithm: IDisposable
             {
                 fixed (byte* signaturePtr = signature)
                 {
-                    Raw.SignatureFfiResultVoidBoxPickyError* resultPtr = Raw.SignatureAlgorithm.Verify(_inner, publicKeyRaw, msgPtr, msgLength, signaturePtr, signatureLength);
-                    Raw.SignatureFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.SignatureFfiResultVoidBoxPickyError>((IntPtr)resultPtr);
+                    IntPtr resultPtr = Raw.SignatureAlgorithm.Verify(_inner, publicKeyRaw, msgPtr, msgLength, signaturePtr, signatureLength);
+                    Raw.SignatureFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.SignatureFfiResultVoidBoxPickyError>(resultPtr);
                     Raw.SignatureFfiResultVoidBoxPickyError.Destroy(resultPtr);
-                    resultPtr = null;
                     if (!result.isOk)
                     {
                         throw new PickyException(new PickyError(result.Err));

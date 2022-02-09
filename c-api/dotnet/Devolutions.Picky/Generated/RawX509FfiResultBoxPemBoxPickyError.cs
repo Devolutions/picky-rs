@@ -47,5 +47,5 @@ public partial struct X509FfiResultBoxPemBoxPickyError
     }
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "result_box_Pem_box_PickyError_destroy", ExactSpelling = true)]
-    public static unsafe extern void Destroy(X509FfiResultBoxPemBoxPickyError* self);
+    public static unsafe extern void Destroy(IntPtr self);
 }

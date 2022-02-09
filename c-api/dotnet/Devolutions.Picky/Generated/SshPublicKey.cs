@@ -56,10 +56,9 @@ public partial class SshPublicKey: IDisposable
             nuint reprBufLength = (nuint)reprBuf.Length;
             fixed (byte* reprBufPtr = reprBuf)
             {
-                Raw.SshFfiResultBoxSshPublicKeyBoxPickyError* resultPtr = Raw.SshPublicKey.Parse(reprBufPtr, reprBufLength);
-                Raw.SshFfiResultBoxSshPublicKeyBoxPickyError result = Marshal.PtrToStructure<Raw.SshFfiResultBoxSshPublicKeyBoxPickyError>((IntPtr)resultPtr);
+                IntPtr resultPtr = Raw.SshPublicKey.Parse(reprBufPtr, reprBufLength);
+                Raw.SshFfiResultBoxSshPublicKeyBoxPickyError result = Marshal.PtrToStructure<Raw.SshFfiResultBoxSshPublicKeyBoxPickyError>(resultPtr);
                 Raw.SshFfiResultBoxSshPublicKeyBoxPickyError.Destroy(resultPtr);
-                resultPtr = null;
                 if (!result.isOk)
                 {
                     throw new PickyException(new PickyError(result.Err));
@@ -87,10 +86,9 @@ public partial class SshPublicKey: IDisposable
             {
                 throw new ObjectDisposedException("SshPublicKey");
             }
-            Raw.SshFfiResultVoidBoxPickyError* resultPtr = Raw.SshPublicKey.ToRepr(_inner, &writeable);
-            Raw.SshFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.SshFfiResultVoidBoxPickyError>((IntPtr)resultPtr);
+            IntPtr resultPtr = Raw.SshPublicKey.ToRepr(_inner, &writeable);
+            Raw.SshFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.SshFfiResultVoidBoxPickyError>(resultPtr);
             Raw.SshFfiResultVoidBoxPickyError.Destroy(resultPtr);
-            resultPtr = null;
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -116,10 +114,9 @@ public partial class SshPublicKey: IDisposable
                 throw new ObjectDisposedException("SshPublicKey");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            Raw.SshFfiResultVoidBoxPickyError* resultPtr = Raw.SshPublicKey.ToRepr(_inner, &writeable);
-            Raw.SshFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.SshFfiResultVoidBoxPickyError>((IntPtr)resultPtr);
+            IntPtr resultPtr = Raw.SshPublicKey.ToRepr(_inner, &writeable);
+            Raw.SshFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.SshFfiResultVoidBoxPickyError>(resultPtr);
             Raw.SshFfiResultVoidBoxPickyError.Destroy(resultPtr);
-            resultPtr = null;
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -139,10 +136,9 @@ public partial class SshPublicKey: IDisposable
             {
                 throw new ObjectDisposedException("SshPublicKey");
             }
-            Raw.SshFfiResultVoidBoxPickyError* resultPtr = Raw.SshPublicKey.GetComment(_inner, &writeable);
-            Raw.SshFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.SshFfiResultVoidBoxPickyError>((IntPtr)resultPtr);
+            IntPtr resultPtr = Raw.SshPublicKey.GetComment(_inner, &writeable);
+            Raw.SshFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.SshFfiResultVoidBoxPickyError>(resultPtr);
             Raw.SshFfiResultVoidBoxPickyError.Destroy(resultPtr);
-            resultPtr = null;
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -160,10 +156,9 @@ public partial class SshPublicKey: IDisposable
                 throw new ObjectDisposedException("SshPublicKey");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            Raw.SshFfiResultVoidBoxPickyError* resultPtr = Raw.SshPublicKey.GetComment(_inner, &writeable);
-            Raw.SshFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.SshFfiResultVoidBoxPickyError>((IntPtr)resultPtr);
+            IntPtr resultPtr = Raw.SshPublicKey.GetComment(_inner, &writeable);
+            Raw.SshFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.SshFfiResultVoidBoxPickyError>(resultPtr);
             Raw.SshFfiResultVoidBoxPickyError.Destroy(resultPtr);
-            resultPtr = null;
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));

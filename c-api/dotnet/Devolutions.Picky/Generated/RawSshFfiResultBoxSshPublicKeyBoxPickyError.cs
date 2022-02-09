@@ -47,5 +47,5 @@ public partial struct SshFfiResultBoxSshPublicKeyBoxPickyError
     }
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "result_box_SshPublicKey_box_PickyError_destroy", ExactSpelling = true)]
-    public static unsafe extern void Destroy(SshFfiResultBoxSshPublicKeyBoxPickyError* self);
+    public static unsafe extern void Destroy(IntPtr self);
 }
