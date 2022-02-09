@@ -47,5 +47,5 @@ public partial struct KeyFfiResultBoxPublicKeyBoxPickyError
     }
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "result_box_PublicKey_box_PickyError_destroy", ExactSpelling = true)]
-    public static unsafe extern void Destroy(KeyFfiResultBoxPublicKeyBoxPickyError* self);
+    public static unsafe extern void Destroy(IntPtr self);
 }

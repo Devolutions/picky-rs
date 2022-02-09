@@ -47,5 +47,5 @@ public partial struct DateFfiResultI64BoxPickyError
     }
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "result_i64_box_PickyError_destroy", ExactSpelling = true)]
-    public static unsafe extern void Destroy(DateFfiResultI64BoxPickyError* self);
+    public static unsafe extern void Destroy(IntPtr self);
 }
