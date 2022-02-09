@@ -1,0 +1,19 @@
+[package]
+name = "picky-ffi"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "picky"
+crate-type = ["staticlib", "cdylib"]
+doc = false
+test = false
+doctest = false
+
+[dependencies]
+picky = { path = "../picky/", default-features = false, features = ["ssh", "x509", "time_conversion"] }
+diplomat = { git = "https://github.com/CBenoit/diplomat.git", rev = "6f569bd27bc1c2e919fe09f36a5053009593a7bd" }
+diplomat-runtime = { git = "https://github.com/CBenoit/diplomat.git", rev = "6f569bd27bc1c2e919fe09f36a5053009593a7bd" }
+time = "0.3.4"
+hex = "0.4.3"
