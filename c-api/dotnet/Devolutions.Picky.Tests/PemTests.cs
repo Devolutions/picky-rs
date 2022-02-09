@@ -33,7 +33,7 @@ Od8i323fM5dQS1qQpBjBc/5fPw==
         Pem pem = Pem.Parse(certPemRepr);
         Assert.Equal("CERTIFICATE", pem.Label);
         Assert.Equal((ulong)835, pem.DataLength);
-        Assert.Equal(certPemRepr, pem.ToRepr());
+        Assert.Equal(certPemRepr.Replace("\n", ""), pem.ToRepr());
     }
 
     [Fact]
