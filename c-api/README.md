@@ -44,3 +44,9 @@ Sanity tests are run with:
 ```
 $ just test
 ```
+
+On Windows, run `just` with `--shell powershell.exe --shell-arg -c`.
+For instance:
+```
+$ just --shell powershell.exe --shell-arg -c test
+```

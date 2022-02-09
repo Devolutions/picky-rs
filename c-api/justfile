@@ -27,6 +27,7 @@ shared_lib_name_win   := "picky.dll"
 
 dotnet_diplomat_config := "./dotnet-interop-conf.toml"
 dotnet_path            := "./dotnet/"
+dotnet_solution_path   := dotnet_path + "Devolutions.Picky.sln"
 dotnet_lib_path        := dotnet_path + "Devolutions.Picky/"
 dotnet_generated_path  := dotnet_lib_path + "Generated/"
 
@@ -36,16 +37,16 @@ lib_path_win   := runtimes_path + "win-x64/native/"
 
 native-lib-debug:
     cargo build -p picky-ffi
-    mkdir -p {{lib_path_linux}}
+    -mkdir -p {{lib_path_linux}}
     -cp {{target_debug_folder}}{{shared_lib_name_linux}} {{lib_path_linux}}
-    mkdir -p {{lib_path_win}}
+    -mkdir -p {{lib_path_win}}
     -cp {{target_debug_folder}}{{shared_lib_name_win}} {{lib_path_win}}
 
 native-lib-release:
     cargo build -p picky-ffi --release
-    mkdir -p {{lib_path_linux}}
+    -mkdir -p {{lib_path_linux}}
     -cp {{target_release_folder}}{{shared_lib_name_linux}} {{lib_path_linux}}
-    mkdir -p {{lib_path_win}}
+    -mkdir -p {{lib_path_win}}
     -cp {{target_release_folder}}{{shared_lib_name_win}} {{lib_path_win}}
 
 ## Bindings ##
@@ -62,4 +63,4 @@ dotnet-bindings:
 test: test-dotnet
 
 test-dotnet: native-lib-debug dotnet-bindings
-    cd {{dotnet_path}} && dotnet test
+    dotnet test {{dotnet_solution_path}} --arch win-x64
