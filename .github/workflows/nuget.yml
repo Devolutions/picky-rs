@@ -103,11 +103,12 @@ jobs:
 
           & cargo build -p picky-ffi --release --target $RustTarget
 
-          $LibraryName = "${LibPrefix}DevolutionsPicky$LibSuffix"
-          $OutputLibrary = Join-Path "target" $RustTarget 'release' $LibraryName
+          $OutputLibraryName = "${LibPrefix}picky$LibSuffix"
+          $RenamedLibraryName = "${LibPrefix}DevolutionsPicky$LibSuffix"
+          $OutputLibrary = Join-Path "target" $RustTarget 'release' $OutputLibraryName
           $OutputPath = Join-Path "dependencies" "runtimes" $DotNetRid "native"
           New-Item -ItemType Directory -Path $OutputPath | Out-Null
-          Copy-Item $OutputLibrary $(Join-Path $OutputPath $LibraryName)
+          Copy-Item $OutputLibrary $(Join-Path $OutputPath $RenamedLibraryName)
 
       - name: Upload native components
         uses: actions/upload-artifact@v2
