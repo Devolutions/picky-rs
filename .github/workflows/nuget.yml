@@ -101,6 +101,16 @@ jobs:
             $Env:RUSTFLAGS="-C linker=aarch64-linux-gnu-gcc"
           }
 
+          $CsprojXml = [Xml] (Get-Content .\ffi\dotnet\Devolutions.Picky\Devolutions.Picky.csproj)
+          $ProjectVersion = $CsprojXml.Project.PropertyGroup.Version | Select-Object -First 1
+          $PackageVersion = $ProjectVersion -Replace "^(\d+)\.(\d+)\.(\d+)(\.0)$", "`$1.`$2.`$3"
+
+          $CargoToml = Get-Content .\ffi\Cargo.toml
+          $CargoToml = $CargoToml | ForEach-Object {
+            if ($_.StartsWith("version =")) { "version = `"$PackageVersion`"" } else { $_ }
+          }
+          Set-Content -Path .\ffi\Cargo.toml -Value $CargoToml
+
           & cargo build -p picky-ffi --release --target $RustTarget
 
           $OutputLibraryName = "${LibPrefix}picky$LibSuffix"
