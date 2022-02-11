@@ -1,0 +1,68 @@
+#!/usr/bin/env -S just --justfile
+
+# This is just intended to help developer, no need in CI #
+
+############ `just` is required ##############
+# ------------------------------------------ #
+# https://github.com/casey/just#installation #
+# ------------------------------------------ #
+# Easy way is: cargo install just            #
+##############################################
+
+default: bindings
+
+## Diplomat installation ##
+
+diplomat_rev := "6f569bd27bc1c2e919fe09f36a5053009593a7bd"
+
+install-diplomat:
+    cargo install --git https://github.com/CBenoit/diplomat.git --rev {{diplomat_rev}} diplomat-tool -f
+
+## Native library ##
+
+target_debug_folder   := "../target/debug/"
+target_release_folder := "../target/release/"
+output_lib_linux      := "libpicky.so"
+output_lib_win        := "picky.dll"
+
+dotnet_diplomat_config := "./dotnet-interop-conf.toml"
+dotnet_path            := "./dotnet/"
+dotnet_solution_path   := dotnet_path + "Devolutions.Picky.sln"
+dotnet_lib_path        := dotnet_path + "Devolutions.Picky/"
+dotnet_generated_path  := dotnet_lib_path + "Generated/"
+
+dotnet_runtimes_path    := "../dependencies/runtimes/"
+dotnet_lib_folder_linux := dotnet_runtimes_path + "linux-x64/native/"
+dotnet_native_lib_linux := dotnet_lib_folder_linux + "libDevolutionsPicky.so"
+dotnet_lib_folder_win   := dotnet_runtimes_path + "win-x64/native/"
+dotnet_native_lib_win   := dotnet_lib_folder_win + "DevolutionsPicky.dll"
+
+native-lib-debug:
+    cargo build -p picky-ffi
+    -mkdir -p {{dotnet_lib_folder_linux}}
+    -cp {{target_debug_folder}}{{output_lib_linux}} {{dotnet_native_lib_linux}}
+    -mkdir -p {{dotnet_lib_folder_win}}
+    -cp {{target_debug_folder}}{{output_lib_win}} {{dotnet_native_lib_win}}
+
+native-lib-release:
+    cargo build -p picky-ffi --release
+    -mkdir -p {{dotnet_lib_folder_linux}}
+    -cp {{target_release_folder}}{{output_lib_linux}} {{dotnet_native_lib_linux}}
+    -mkdir -p {{dotnet_lib_folder_win}}
+    -cp {{target_release_folder}}{{output_lib_win}} {{dotnet_native_lib_win}}
+
+## Bindings ##
+
+bindings: dotnet-bindings
+
+dotnet-bindings:
+    -rm {{dotnet_generated_path}}*.cs
+    diplomat-tool dotnet {{dotnet_generated_path}} -l {{dotnet_diplomat_config}}
+    @echo ">> .NET wrapper generated at {{dotnet_generated_path}}"
+
+## Tests ##
+
+test: test-dotnet
+
+test-dotnet: native-lib-debug dotnet-bindings
+    dotnet test {{dotnet_solution_path}} --arch win-x64

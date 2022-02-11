@@ -89,11 +89,11 @@ jobs:
           }
 
           if ($DotNetOs -eq 'ios') {
-            $CargoToml = Get-Content .\c-api\Cargo.toml
+            $CargoToml = Get-Content .\ffi\Cargo.toml
             $CargoToml = $CargoToml | ForEach-Object {
               if ($_.StartsWith("crate-type")) { "crate-type = [`"staticlib`"]" } else { $_ }
             }
-            Set-Content -Path .\c-api\Cargo.toml -Value $CargoToml
+            Set-Content -Path .\ffi\Cargo.toml -Value $CargoToml
           }
 
           if ($RustTarget -eq 'aarch64-unknown-linux-gnu') {
@@ -103,11 +103,12 @@ jobs:
 
           & cargo build -p picky-ffi --release --target $RustTarget
 
-          $LibraryName = "${LibPrefix}picky$LibSuffix"
-          $OutputLibrary = Join-Path "target" $RustTarget 'release' $LibraryName
+          $OutputLibraryName = "${LibPrefix}picky$LibSuffix"
+          $RenamedLibraryName = "${LibPrefix}DevolutionsPicky$LibSuffix"
+          $OutputLibrary = Join-Path "target" $RustTarget 'release' $OutputLibraryName
           $OutputPath = Join-Path "dependencies" "runtimes" $DotNetRid "native"
           New-Item -ItemType Directory -Path $OutputPath | Out-Null
-          Copy-Item $OutputLibrary $(Join-Path $OutputPath $LibraryName)
+          Copy-Item $OutputLibrary $(Join-Path $OutputPath $RenamedLibraryName)
 
       - name: Upload native components
         uses: actions/upload-artifact@v2
@@ -142,7 +143,7 @@ jobs:
       - name: Build picky (managed)
         shell: pwsh
         run: |
-          & dotnet build .\c-api\dotnet\Devolutions.Picky.sln -o package
+          & dotnet build .\ffi\dotnet\Devolutions.Picky.sln -o package
 
       - name: Upload managed components
         uses: actions/upload-artifact@v2
