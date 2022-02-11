@@ -11,6 +11,9 @@ doc = false
 test = false
 doctest = false
 
+[target.'cfg(windows)'.build-dependencies]
+embed-resource = "1.6.5"
+
 [dependencies]
 picky = { path = "../picky/", default-features = false, features = ["ssh", "x509", "time_conversion"] }
 diplomat = { git = "https://github.com/CBenoit/diplomat.git", rev = "6f569bd27bc1c2e919fe09f36a5053009593a7bd" }
