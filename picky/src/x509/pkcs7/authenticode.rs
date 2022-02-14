@@ -280,7 +280,7 @@ impl AuthenticodeSignature {
 
     pub fn from_pem(pem: &Pem) -> AuthenticodeResult<Self> {
         Ok(
-            from_pem::<Pkcs7Certificate>(pem, pkcs7::PKCS7_PEM_LABEL, pkcs7::ELEMENT_NAME)
+            from_pem::<Pkcs7Certificate>(pem, &[pkcs7::PKCS7_PEM_LABEL], pkcs7::ELEMENT_NAME)
                 .map(Pkcs7::from)
                 .map(Self)?,
         )
@@ -288,7 +288,7 @@ impl AuthenticodeSignature {
 
     pub fn from_pem_str(pem_str: &str) -> AuthenticodeResult<Self> {
         Ok(
-            from_pem_str::<Pkcs7Certificate>(pem_str, pkcs7::PKCS7_PEM_LABEL, pkcs7::ELEMENT_NAME)
+            from_pem_str::<Pkcs7Certificate>(pem_str, &[pkcs7::PKCS7_PEM_LABEL], pkcs7::ELEMENT_NAME)
                 .map(Pkcs7::from)
                 .map(Self)?,
         )

@@ -124,7 +124,7 @@ pub enum CertType {
     Unknown,
 }
 
-const CERT_PEM_LABEL: &str = "CERTIFICATE";
+const CERT_PEM_LABELS: &[&str] = &["CERTIFICATE", "TRUSTED CERTIFICATE"];
 
 /// CertificateOverview is used to validate signatures (using tbs_certificate der encoding) and encode back original certificate as is.
 /// Refer PSDiagnostics PowerShell module authenticode test for details as to why this is useful.
@@ -187,15 +187,15 @@ impl Cert {
 
     pub fn from_pem(pem: &Pem) -> Result<Self, CertError> {
         Ok(Self {
-            details: from_pem(pem, CERT_PEM_LABEL, ELEMENT_NAME)?,
-            overview: from_pem(pem, CERT_PEM_LABEL, ELEMENT_NAME)?,
+            details: from_pem(pem, CERT_PEM_LABELS, ELEMENT_NAME)?,
+            overview: from_pem(pem, CERT_PEM_LABELS, ELEMENT_NAME)?,
         })
     }
 
     pub fn from_pem_str(pem_str: &str) -> Result<Self, CertError> {
         Ok(Self {
-            details: from_pem_str(pem_str, CERT_PEM_LABEL, ELEMENT_NAME)?,
-            overview: from_pem_str(pem_str, CERT_PEM_LABEL, ELEMENT_NAME)?,
+            details: from_pem_str(pem_str, CERT_PEM_LABELS, ELEMENT_NAME)?,
+            overview: from_pem_str(pem_str, CERT_PEM_LABELS, ELEMENT_NAME)?,
         })
     }
 
@@ -204,7 +204,7 @@ impl Cert {
     }
 
     pub fn to_pem(&self) -> Result<Pem<'static>, CertError> {
-        to_pem(&self.overview, CERT_PEM_LABEL, ELEMENT_NAME)
+        to_pem(&self.overview, CERT_PEM_LABELS[0], ELEMENT_NAME)
     }
 
     pub fn ty(&self) -> CertType {

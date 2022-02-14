@@ -72,11 +72,11 @@ impl Csr {
     }
 
     pub fn from_pem_str(pem_str: &str) -> Result<Self, CsrError> {
-        Ok(from_pem_str(pem_str, CSR_PEM_LABEL, ELEMENT_NAME).map(Self)?)
+        Ok(from_pem_str(pem_str, &[CSR_PEM_LABEL], ELEMENT_NAME).map(Self)?)
     }
 
     pub fn from_pem(pem: &Pem) -> Result<Self, CsrError> {
-        Ok(from_pem(pem, CSR_PEM_LABEL, ELEMENT_NAME).map(Self)?)
+        Ok(from_pem(pem, &[CSR_PEM_LABEL], ELEMENT_NAME).map(Self)?)
     }
 
     pub fn to_der(&self) -> Result<Vec<u8>, CsrError> {

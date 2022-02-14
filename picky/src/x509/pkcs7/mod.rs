@@ -37,11 +37,11 @@ impl Pkcs7 {
     }
 
     pub fn from_pem(pem: &Pem) -> Pkcs7Result<Self> {
-        Ok(from_pem(pem, PKCS7_PEM_LABEL, ELEMENT_NAME).map(Self)?)
+        Ok(from_pem(pem, &[PKCS7_PEM_LABEL], ELEMENT_NAME).map(Self)?)
     }
 
     pub fn from_pem_str(pem_str: &str) -> Pkcs7Result<Self> {
-        Ok(from_pem_str(pem_str, PKCS7_PEM_LABEL, ELEMENT_NAME).map(Self)?)
+        Ok(from_pem_str(pem_str, &[PKCS7_PEM_LABEL], ELEMENT_NAME).map(Self)?)
     }
 
     pub fn to_der(&self) -> Pkcs7Result<Vec<u8>> {
