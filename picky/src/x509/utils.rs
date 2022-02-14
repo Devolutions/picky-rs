@@ -13,10 +13,10 @@ where
 
 pub(super) fn from_pem<'a, T: Deserialize<'a>>(
     pem: &'a Pem,
-    expected_pem_label: &'a str,
+    valid_pem_labels: &[&str],
     element: &'static str,
 ) -> Result<T, CertError> {
-    if pem.label() == expected_pem_label {
+    if valid_pem_labels.iter().any(|&label| pem.label() == label) {
         from_der(pem.data(), element)
     } else {
         Err(CertError::InvalidPemLabel {
@@ -25,22 +25,18 @@ pub(super) fn from_pem<'a, T: Deserialize<'a>>(
     }
 }
 
-pub(super) fn from_pem_str<T>(pem_str: &str, expected_pem_label: &str, element: &'static str) -> Result<T, CertError>
+pub(super) fn from_pem_str<T>(pem_str: &str, valid_pem_labels: &[&str], element: &'static str) -> Result<T, CertError>
 where
     for<'a> T: Deserialize<'a>,
 {
     let pem = parse_pem(pem_str)?;
-    from_pem(&pem, expected_pem_label, element)
+    from_pem(&pem, valid_pem_labels, element)
 }
 
 pub(super) fn to_der<T: Serialize>(val: &T, element: &'static str) -> Result<Vec<u8>, CertError> {
     picky_asn1_der::to_vec(val).map_err(|e| CertError::Asn1Serialization { source: e, element })
 }
 
-pub(super) fn to_pem<T: Serialize>(
-    val: &T,
-    expected_pem_label: &str,
-    element: &'static str,
-) -> Result<Pem<'static>, CertError> {
-    Ok(Pem::new(expected_pem_label, to_der(val, element)?))
+pub(super) fn to_pem<T: Serialize>(val: &T, pem_label: &str, element: &'static str) -> Result<Pem<'static>, CertError> {
+    Ok(Pem::new(pem_label, to_der(val, element)?))
 }
