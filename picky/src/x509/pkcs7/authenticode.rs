@@ -37,6 +37,7 @@ use picky_asn1_x509::pkcs7::signer_info::{
 use picky_asn1_x509::pkcs7::Pkcs7Certificate;
 use picky_asn1_x509::{oids, AttributeValues, Certificate, DigestInfo, Name};
 use std::cell::RefCell;
+use std::iter::Iterator;
 use std::ops::DerefMut;
 use thiserror::Error;
 
@@ -169,11 +170,18 @@ impl AuthenticodeSignature {
             content: Some(ContentValue::SpcIndirectDataContent(content).into()),
         };
 
-        // The signing certificate must contain either the extended key usage (EKU) value for code signing,
-        // or the entire certificate chain must contain no EKUs
         let certificates = pkcs7.decode_certificates();
 
-        h_check_eku_code_signing(&certificates)?;
+        let signing_cert = certificates.get(0).ok_or(AuthenticodeError::NoCertificates)?;
+
+        let issuer_and_serial_number = IssuerAndSerialNumber {
+            issuer: signing_cert.issuer_name().into(),
+            serial_number: CertificateSerialNumber(signing_cert.serial_number().clone()),
+        };
+
+        // The signing certificate must contain either the extended key usage (EKU) value for code signing,
+        // or the entire certificate chain must contain no EKUs
+        h_check_eku_code_signing(&certificates, signing_cert)?;
 
         // certificates contains the signer certificate and any intermediate certificates,
         // but typically does not contain the root certificate
@@ -190,13 +198,6 @@ impl AuthenticodeSignature {
                     }
                 })
                 .collect::<Vec<Certificate>>()
-        };
-
-        let signing_cert = certificates.get(0).ok_or(AuthenticodeError::NoCertificates)?;
-
-        let issuer_and_serial_number = IssuerAndSerialNumber {
-            issuer: signing_cert.tbs_certificate.issuer.clone(),
-            serial_number: CertificateSerialNumber(signing_cert.tbs_certificate.serial_number.clone()),
         };
 
         let digest_encryption_algorithm = AlgorithmIdentifier::new_rsa_encryption_with_sha(hash_algo)
@@ -676,7 +677,7 @@ impl<'a> AuthenticodeValidator<'a> {
 
         // 9. The signing certificate must contain either the extended key usage (EKU) value for code signing,
         // or the entire certificate chain must contain no EKUs
-        h_check_eku_code_signing(certificates)?;
+        h_check_eku_code_signing(certificates, signing_certificate)?;
 
         Ok(())
     }
@@ -706,17 +707,12 @@ impl<'a> AuthenticodeValidator<'a> {
         };
 
         let cert_validator = if inner.strictness.require_chain_check {
-            // Authenticode has the signer certificate and any intermediate certificates,
-            // but typically does not contain the root
-            let mut prev_issuer_name = signing_certificate.issuer_name();
-
+            let certificate_iter = SignatureCertificatesIterator::new(signing_certificate, certificates.iter());
             cert_validator
+                // Authenticode has the signer certificate and any intermediate certificates,
+                // but typically does not contain the root
                 .chain_should_contains_root_certificate(false)
-                .chain(certificates.iter().filter(move |cert| {
-                    let should_be_validated = cert.subject_name() == prev_issuer_name;
-                    prev_issuer_name = cert.issuer_name();
-                    should_be_validated
-                }))
+                .chain(certificate_iter.filter(|cert| cert.subject_name() != signing_certificate.subject_name()))
         } else {
             cert_validator.ignore_chain_check()
         };
@@ -809,7 +805,7 @@ impl<'a> AuthenticodeValidator<'a> {
                                             #[cfg(feature = "ctl")]
                                             {
                                                 if let Some(ctl) = self.inner.borrow().ctl {
-                                                    let ca_name = h_get_ca_name(&certificates).unwrap();
+                                                    let ca_name = h_get_ca_name(certificates.iter()).unwrap();
                                                     self.h_verify_ca_certificate_against_ctl(ctl, &ca_name)?;
                                                 }
                                             }
@@ -967,7 +963,10 @@ impl<'a> AuthenticodeValidator<'a> {
 
         #[cfg(feature = "ctl")]
         if self.inner.borrow().strictness.require_ca_verification_against_ctl {
-            let ca_name = h_get_ca_name(&certificates).unwrap();
+            let signing_certificate = self.authenticode_signature.signing_certificate(&certificates)?;
+            let certificates_iter = SignatureCertificatesIterator::new(signing_certificate, certificates.iter());
+
+            let ca_name = h_get_ca_name(certificates_iter).unwrap();
 
             if let Some(ctl) = self.inner.borrow().ctl {
                 match self.h_verify_ca_certificate_against_ctl(ctl, &ca_name) {
@@ -991,40 +990,71 @@ impl<'a> AuthenticodeValidator<'a> {
     }
 }
 
-fn h_check_eku_code_signing(certificates: &[Cert]) -> AuthenticodeResult<()> {
-    if certificates
-        .iter()
+fn h_check_eku_code_signing(certificates: &[Cert], signing_certificate: &Cert) -> AuthenticodeResult<()> {
+    let certificates_iter = SignatureCertificatesIterator::new(signing_certificate, certificates.iter());
+
+    if certificates_iter
         .flat_map(|cert| cert.extensions().iter())
         .any(|extension| matches!(extension.extn_value(), ExtensionView::ExtendedKeyUsage(_)))
-    {
-        let signing_cert = certificates.first().ok_or(AuthenticodeError::NoCertificates)?;
-        if !signing_cert
+        && !signing_certificate
             .extensions()
             .iter()
             .any(|extension| match extension.extn_value() {
                 ExtensionView::ExtendedKeyUsage(eku) => eku.contains(oids::kp_code_signing()),
                 _ => false,
             })
-        {
-            return Err(AuthenticodeError::NoEKUCodeSigning);
-        }
+    {
+        return Err(AuthenticodeError::NoEKUCodeSigning);
     }
 
     Ok(())
 }
 
 #[cfg(feature = "ctl")]
-fn h_get_ca_name(certificates: &[Cert]) -> Option<DirectoryName> {
-    if let Some(root) = certificates.iter().find(|cert| cert.ty() == CertType::Root) {
-        Some(root.subject_name())
-    } else {
-        let intermediate_certificates = certificates.iter().filter(|cert| cert.ty() == CertType::Intermediate);
+fn h_get_ca_name<'i, I: Iterator<Item = &'i Cert>>(mut certificates: I) -> Option<DirectoryName> {
+    let first_certificate = certificates.next().map(|cert| cert.issuer_name());
 
-        if let Some(inter) = intermediate_certificates.last() {
-            Some(inter.issuer_name())
+    let certificates_iter =
+        certificates.filter(|cert| cert.ty() == CertType::Intermediate || cert.ty() == CertType::Root);
+    if let Some(certificate) = certificates_iter.last() {
+        if certificate.ty() == CertType::Root {
+            Some(certificate.subject_name())
         } else {
-            certificates.get(0).map(|cert| cert.issuer_name())
+            Some(certificate.issuer_name())
         }
+    } else {
+        first_certificate
+    }
+}
+
+struct SignatureCertificatesIterator<'i> {
+    iter: Box<dyn Iterator<Item = &'i Cert> + 'i>,
+}
+
+impl<'i> SignatureCertificatesIterator<'i> {
+    fn new<I: Iterator<Item = &'i Cert> + 'i + Clone>(singing_certificate: &'i Cert, certificates: I) -> Self {
+        let mut prev_issuer_name = singing_certificate.subject_name();
+
+        // Authenticode signature contains timestamp certificate beside the signature certificates.
+        // That makes a mess if we try to validate the signature certificates, so let's filter out certificates
+        // to not include timestamp related certificates :)
+        let iter = Box::new(certificates.filter(move |cert| {
+            let should_be_validated = cert.subject_name() == prev_issuer_name;
+            if should_be_validated {
+                prev_issuer_name = cert.issuer_name();
+            }
+            should_be_validated
+        }));
+
+        Self { iter }
+    }
+}
+
+impl<'i> Iterator for SignatureCertificatesIterator<'i> {
+    type Item = &'i Cert;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next()
     }
 }
 
@@ -1159,21 +1189,24 @@ impl<'a> AuthenticodeSignatureBuilder<'a> {
             .take()
             .ok_or(AuthenticodeSignatureBuilderError::MissingCertificatesRequired)?;
 
+        let signing_certificate = certificates
+            .iter()
+            .find(|cert| {
+                Name::from(cert.issuer_name()) == issuer_and_serial_number.issuer
+                    && cert.serial_number() == &issuer_and_serial_number.serial_number.0
+            })
+            .ok_or_else(
+                || AuthenticodeError::NoCertificatesAssociatedWithIssuerAndSerialNumber {
+                    issuer: issuer_and_serial_number.issuer.clone(),
+                    serial_number: issuer_and_serial_number.serial_number.0 .0.clone(),
+                },
+            )
+            .map_err(AuthenticodeSignatureBuilderError::AuthenticodeError)?;
+
         // The signing certificate must contain either the extended key usage (EKU) value for code signing,
         // or the entire certificate chain must contain no EKUs
-        h_check_eku_code_signing(&certificates).map_err(AuthenticodeSignatureBuilderError::AuthenticodeError)?;
-
-        if !certificates.iter().any(|cert| {
-            Name::from(cert.issuer_name()) == issuer_and_serial_number.issuer
-                && cert.serial_number() == &issuer_and_serial_number.serial_number.0
-        }) {
-            return Err(AuthenticodeSignatureBuilderError::AuthenticodeError(
-                AuthenticodeError::NoCertificatesAssociatedWithIssuerAndSerialNumber {
-                    issuer: issuer_and_serial_number.issuer,
-                    serial_number: issuer_and_serial_number.serial_number.0 .0,
-                },
-            ));
-        }
+        h_check_eku_code_signing(&certificates, signing_certificate)
+            .map_err(AuthenticodeSignatureBuilderError::AuthenticodeError)?;
 
         // certificates contains the signer certificate and any intermediate certificates,
         // but typically does not contain the root certificate
