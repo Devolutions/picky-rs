@@ -996,17 +996,15 @@ fn h_check_eku_code_signing(certificates: &[Cert], signing_certificate: &Cert) -
     if certificates_iter
         .flat_map(|cert| cert.extensions().iter())
         .any(|extension| matches!(extension.extn_value(), ExtensionView::ExtendedKeyUsage(_)))
-    {
-        let signing_certificate_extensions = signing_certificate.extensions();
-        if !signing_certificate_extensions
+        && !signing_certificate
+            .extensions()
             .iter()
             .any(|extension| match extension.extn_value() {
                 ExtensionView::ExtendedKeyUsage(eku) => eku.contains(oids::kp_code_signing()),
                 _ => false,
             })
-        {
-            return Err(AuthenticodeError::NoEKUCodeSigning);
-        }
+    {
+        return Err(AuthenticodeError::NoEKUCodeSigning);
     }
 
     Ok(())
@@ -1197,10 +1195,12 @@ impl<'a> AuthenticodeSignatureBuilder<'a> {
                 Name::from(cert.issuer_name()) == issuer_and_serial_number.issuer
                     && cert.serial_number() == &issuer_and_serial_number.serial_number.0
             })
-            .ok_or(AuthenticodeError::NoCertificatesAssociatedWithIssuerAndSerialNumber {
-                issuer: issuer_and_serial_number.issuer.clone(),
-                serial_number: issuer_and_serial_number.serial_number.0 .0.clone(),
-            })
+            .ok_or_else(
+                || AuthenticodeError::NoCertificatesAssociatedWithIssuerAndSerialNumber {
+                    issuer: issuer_and_serial_number.issuer.clone(),
+                    serial_number: issuer_and_serial_number.serial_number.0 .0.clone(),
+                },
+            )
             .map_err(AuthenticodeSignatureBuilderError::AuthenticodeError)?;
 
         // The signing certificate must contain either the extended key usage (EKU) value for code signing,
