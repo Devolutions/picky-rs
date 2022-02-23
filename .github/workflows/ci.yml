@@ -8,6 +8,9 @@ on:
     types: [ opened, synchronize, reopened ]
   workflow_dispatch:
 
+env:
+   conan-version: 1.43.4
+
 jobs:
   formatting:
     name: Check formatting
@@ -53,14 +56,9 @@ jobs:
           sudo apt update
           sudo apt install python3-wget python3-setuptools
 
-      - name: Configure runner
-        if: matrix.os == 'windows'
-        run: |
-          pip install markupsafe==2.0.1
-
       - name: Install conan
         run: |
-          pip3 install conan==1.40.0 invoke Jinja2 --upgrade
+          pip3 install conan==${{ env.conan-version }} invoke Jinja2 --upgrade
 
       - name: Configure conan
         run: |
