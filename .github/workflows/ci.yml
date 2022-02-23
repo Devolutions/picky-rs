@@ -8,6 +8,9 @@ on:
     types: [ opened, synchronize, reopened ]
   workflow_dispatch:
 
+env:
+   conan-version: 1.43.4
+
 jobs:
   formatting:
     name: Check formatting
@@ -55,7 +58,7 @@ jobs:
 
       - name: Install conan
         run: |
-          pip3 install conan==1.40.0 invoke Jinja2 --upgrade
+          pip3 install conan==${{ env.conan-version }} invoke Jinja2 --upgrade
 
       - name: Configure conan
         run: |
