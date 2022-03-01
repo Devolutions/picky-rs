@@ -829,6 +829,9 @@ const HTTP_SIG_ALGO_RSA_SHA2_512: &str = "rsa-sha2-512";
 const HTTP_SIG_ALGO_RSA_SHA3_384: &str = "rsa-sha3-384";
 const HTTP_SIG_ALGO_RSA_SHA3_512: &str = "rsa-sha3-512";
 
+const HTTP_SIG_ALGO_ECDSA_SHA_256: &str = "ecdsa-sha256";
+const HTTP_SIG_ALGO_ECDSA_SHA_384: &str = "ecdsa-sha384";
+
 fn to_http_sig_algo_str(algo: SignatureAlgorithm) -> &'static str {
     match algo {
         SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::MD5) => HTTP_SIG_ALGO_RSA_MD5,
@@ -839,6 +842,9 @@ fn to_http_sig_algo_str(algo: SignatureAlgorithm) -> &'static str {
         SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_512) => HTTP_SIG_ALGO_RSA_SHA_512,
         SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA3_384) => HTTP_SIG_ALGO_RSA_SHA3_384,
         SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA3_512) => HTTP_SIG_ALGO_RSA_SHA3_512,
+        SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_256) => HTTP_SIG_ALGO_ECDSA_SHA_256,
+        SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_384) => HTTP_SIG_ALGO_ECDSA_SHA_384,
+        SignatureAlgorithm::Ecdsa(_) => "ECDSA unsupported algorithm",
     }
 }
 
@@ -860,6 +866,8 @@ fn from_http_sig_algo_str(s: &str) -> Option<SignatureAlgorithm> {
         }
         HTTP_SIG_ALGO_RSA_SHA3_384 => Some(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA3_384)),
         HTTP_SIG_ALGO_RSA_SHA3_512 => Some(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA3_512)),
+        HTTP_SIG_ALGO_ECDSA_SHA_256 => Some(SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_256)),
+        HTTP_SIG_ALGO_ECDSA_SHA_384 => Some(SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_384)),
         _ => None,
     }
 }

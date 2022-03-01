@@ -159,9 +159,13 @@ fn h_generate_from_cri(
             .map_err(|e| CsrError::Signature { source: e })?,
     );
 
+    let signature_algorithm = signature_hash_type
+        .try_into()
+        .map_err(|e| CsrError::Signature { source: e })?;
+
     Ok(Csr(CertificationRequest {
         certification_request_info: cri,
-        signature_algorithm: signature_hash_type.into(),
+        signature_algorithm,
         signature: signature.into(),
     }))
 }
