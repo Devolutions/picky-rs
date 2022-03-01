@@ -8,9 +8,6 @@ on:
     types: [ opened, synchronize, reopened ]
   workflow_dispatch:
 
-env:
-   conan-version: 1.43.4
-
 jobs:
   formatting:
     name: Check formatting
@@ -33,9 +30,6 @@ jobs:
     name: picky ${{ matrix.type }} [${{ matrix.os }}]
     runs-on: ${{ matrix.runner }}
     needs: formatting
-    env:
-      CONAN_LOGIN_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
-      CONAN_PASSWORD: ${{ secrets.ARTIFACTORY_READ_TOKEN }}
     strategy:
       fail-fast: false
       matrix:
@@ -56,31 +50,15 @@ jobs:
           sudo apt update
           sudo apt install python3-wget python3-setuptools
 
-      - name: Install conan
-        run: |
-          pip3 install conan==${{ env.conan-version }} invoke Jinja2 --upgrade
-
-      - name: Configure conan
-        run: |
-          conan config install --type=git -sf settings https://github.com/Devolutions/conan-public
-          conan remote clean
-          conan remote add artifactory https://devolutions.jfrog.io/devolutions/api/conan/conan-local
-
       - name: Build [${{ matrix.os }}]
         if: matrix.os == 'linux' && matrix.type == 'build'
-        run: |
-         conan install openssl/1.1.1l@devolutions/stable -g virtualenv -pr ${{ matrix.os }}-x86_64 -s build_type=Release
-         . activate.sh
-         cargo build --release
+        run: cargo build --release
 
       - name: Build [${{ matrix.os }}]
         if: matrix.os == 'windows' && matrix.type == 'build'
         env:
           RUSTFLAGS: '-C target-feature=+crt-static'
-        run: |
-         conan install openssl/1.1.1l@devolutions/stable -g virtualenv -pr ${{ matrix.os }}-x86_64 -s build_type=Release
-         .\activate.ps1
-         cargo build --release --target=x86_64-pc-windows-msvc
+        run: cargo build --release --target=x86_64-pc-windows-msvc
 
       - name: Test [${{ matrix.os }}]
         if: matrix.type == 'test'
