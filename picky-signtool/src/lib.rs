@@ -14,8 +14,7 @@ use config::{
 #[inline]
 pub fn get_utf8_file_name(file: &Path) -> anyhow::Result<&str> {
     file.file_name()
-        .map(|name| name.to_str())
-        .flatten()
+        .and_then(|name| name.to_str())
         .ok_or_else(|| anyhow!("Invalid file name: {:?}", file))
 }
 
