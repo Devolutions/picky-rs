@@ -1,6 +1,6 @@
 [package]
 name = "picky"
-version = "6.4.0"
+version = "7.0.0-rc.1"
 authors = [
     "Benoît CORTIER <benoit.cortier@fried-world.eu>",
     "Jonathan Trepanier <jtrepanier@devolutions.net>",
