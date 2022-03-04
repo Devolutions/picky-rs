@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = [ "Alexandr Yusuk <aleksandr.yusuk@apriorit.com>" ]
 edition = "2021"
 description = "A signtool like Authenticode sign and verify tool based on picky and lief-rs"
+publish = false
 
 [dependencies]
 anyhow = "1.0.45"

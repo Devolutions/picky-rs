@@ -9,6 +9,7 @@ authors = [
 edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Devolutions/picky-rs"
+publish = false
 
 [dependencies]
 picky = { version = "6.4.0", default-features = false, features = ["x509", "jose", "pkcs7", "ssh", "time_conversion" ], path = "../picky" }
