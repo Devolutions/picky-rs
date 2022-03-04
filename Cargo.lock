@@ -1987,7 +1987,7 @@ dependencies = [
  "oid",
  "picky-asn1 0.5.0",
  "picky-asn1-der 0.3.0",
- "picky-asn1-x509 0.6.1",
+ "picky-asn1-x509 0.7.0",
  "pretty_assertions",
  "rand 0.8.4",
  "reqwest 0.11.7",
@@ -2018,7 +2018,7 @@ dependencies = [
  "oid",
  "picky-asn1 0.4.0",
  "picky-asn1-der 0.2.5",
- "picky-asn1-x509 0.6.1 (git+https://github.com/Devolutions/picky-rs.git?rev=a0a0d1)",
+ "picky-asn1-x509 0.6.1",
  "rand 0.8.4",
  "rsa",
  "serde",
@@ -2078,6 +2078,20 @@ dependencies = [
 [[package]]
 name = "picky-asn1-x509"
 version = "0.6.1"
+source = "git+https://github.com/Devolutions/picky-rs.git?rev=a0a0d1#a0a0d1216d86aa46693e0e78b137a233db2f872f"
+dependencies = [
+ "base64 0.13.0",
+ "num-bigint-dig",
+ "oid",
+ "picky-asn1 0.4.0",
+ "picky-asn1-der 0.2.5",
+ "serde",
+ "widestring 0.4.3",
+]
+
+[[package]]
+name = "picky-asn1-x509"
+version = "0.7.0"
 dependencies = [
  "base64 0.13.0",
  "hex",
@@ -2088,20 +2102,6 @@ dependencies = [
  "pretty_assertions",
  "serde",
  "widestring 0.5.1",
-]
-
-[[package]]
-name = "picky-asn1-x509"
-version = "0.6.1"
-source = "git+https://github.com/Devolutions/picky-rs.git?rev=a0a0d1#a0a0d1216d86aa46693e0e78b137a233db2f872f"
-dependencies = [
- "base64 0.13.0",
- "num-bigint-dig",
- "oid",
- "picky-asn1 0.4.0",
- "picky-asn1-der 0.2.5",
- "serde",
- "widestring 0.4.3",
 ]
 
 [[package]]
