@@ -5,10 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+<!-- next-header -->
+
+## [Unreleased] – ReleaseDate
 
 ### Added
 
+- Support for ECDSA p256 and ECDSA p384 signatures (#132)
 - Support for MD5 hashing
 - CTL implementation behind `ctl` feature
 - CTL fetching over HTTP is behind `ctl_http_fetch` feature
@@ -18,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Pkcs7::decode_certificates`
 - `impl From<Pkcs7Certificate> for Pkcs7`
 - `impl From<Pkcs7> for Pkcs7Certificate`
-- Add `AuthenticodeSignature` struct
+- `AuthenticodeSignature` struct
 - `AuthenticodeSignature::new`
 - `AuthenticodeSignature::from_der`
 - `AuthenticodeSignature::from_pem`
@@ -37,9 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Method `timestamp` to `AuthenticodeSignature`
   - `Timestamper` trait.
   - Timestamping implementation using reqwest is behind `http_timestamp` feature
-- Add  Authenticode timestamp request struct - `TimestampRequest`
-- Add `AuthenticodeBuilder` for easier `AuthenticodeSignature` creation
-- Add `SignatureAlgorithm::hash_algorithm`
+- Authenticode timestamp request struct - `TimestampRequest`
+- `AuthenticodeBuilder` for easier `AuthenticodeSignature` creation
+- `SignatureAlgorithm::hash_algorithm`
 - Support for `time 0.3` types conversions behind `time_conversion` feature gate
 - `PrivateKey::to_pem_str`
 - `PublicKey::to_pem_str`
@@ -53,10 +56,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump minimal rustc version to 1.56
 
 ### Fixed
+
 - Fix `BufReader` panic in `WinCertificate::decode` and `WinCertificate::encode` if data len is bigger than default capacity.
 - Fix `WinCertificate` encoding: `length` wasn’t correct.
 
-## [6.4.0] 2021-08-10
+## [6.4.0] – 2021-08-10
 
 ### Changed
 
@@ -65,7 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update `picky-asn1` dependency to `0.4`
 - More robust certification validation (see commit [f5f8cb60e41](https://github.com/Devolutions/picky-rs/commit/f5f8cb60e410ffe49aabace131f7b802e206ced0) for details)
 
-## [6.3.0] 2021-05-27
+## [6.3.0] – 2021-05-27
 
 ### Added
 
@@ -76,7 +80,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Update `aes-gcm` dependency to `0.9`
 
-## [6.2.0] 2021-03-04
+## [6.2.0] – 2021-03-04
 
 ### Added
 
@@ -84,13 +88,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CertificateBuilder::inherit_extensions_from_csr_attributes` to allow certificate to inherit extensions requested by CSR attribute.
 - Various API additions to `GeneralNames` for improved ergonomics.
 
-## [6.1.2] 2021-01-11
+## 6.1.2 – 2021-01-11
 
 ### Fixed
 
 - Fix bad `use`s statements to `serde::export`
 
-## [6.1.1] 2020-12-11
+## 6.1.1 – 2020-12-11
 
 ### Fixed
 
@@ -98,7 +102,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix certificate validity period that MUST be encoded as `UTCTime` through the year 2049 as per RFC 5280.
   Previously, they were always encoded as `GeneralizedTime`.
 
-## [6.1.0] 2020-10-21
+## 6.1.0 – 2020-10-21
 
 ### Added
 
@@ -109,7 +113,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bad generation for second exponent (`pq`) when generating PKCS#8 structure.
 - Serial number was sometimes generated as negative.
 
-## [6.0.0] 2020-10-13
+## 6.0.0 – 2020-10-13
 
 ### Added
 
@@ -134,13 +138,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - RSA private key generation ([#53](https://github.com/Devolutions/picky-rs/issues/53)).
 
-## [5.1.1] 2020-07-13
+## 5.1.1 – 2020-07-13
 
 ### Changed
 
 - Better `CaChainError::AuthorityKeyIdMismatch` display.
 
-## [5.1.0] 2020-07-07
+## 5.1.0 – 2020-07-07
 
 ### Added
 
@@ -151,7 +155,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Some internal types are moved to a new `picky_asn1_x509` crate but API is unchanged.
 - Dependencies clean up.
 
-## [5.0.0] 2020-05-06
+## 5.0.0 – 2020-05-06
 
 ### Added
 
@@ -171,7 +175,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add missing parameters for AES and SHA object identifiers ([668c06e8d](https://github.com/Devolutions/picky-rs/commit/668c06e8d8e8a0caae8bd13cf81c189bbc2e4918))
 
-## [4.7.0] 2020-04-16
+## 4.7.0 – 2020-04-16
 
 ### Added
 
@@ -182,3 +186,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated
 
 - `Cert::verify` and `Cert::verify_chain` methods in favor of the `Cert::verifier` method.
+
+<!-- next-url -->
+[Unreleased]: https://github.com/Devolutions/picky-rs/compare/picky-6.4.0...HEAD
+[6.4.0]: https://github.com/Devolutions/picky-rs/compare/picky-6.3.0...picky-6.4.0
+[6.3.0]: https://github.com/Devolutions/picky-rs/compare/picky-6.2.0...picky-6.3.0
+[6.2.0]: https://github.com/Devolutions/picky-rs/compare/picky-6.1.1...picky-6.2.0
