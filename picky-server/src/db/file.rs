@@ -204,7 +204,7 @@ impl PickyStorage for FileStorage {
                 })?;
 
             self.name
-                .insert(&format!("{}{}", name.replace(" ", "_"), TXT_EXT), &addressing_hash)
+                .insert(&format!("{}{}", name.replace(' ', "_"), TXT_EXT), &addressing_hash)
                 .await?;
             self.cert
                 .insert(&format!("{}{}", addressing_hash, DER_EXT), &cert.to_vec())
@@ -247,7 +247,7 @@ impl PickyStorage for FileStorage {
     }
 
     fn get_addressing_hash_by_name(&self, name: &str) -> BoxFuture<'_, Result<String, StorageError>> {
-        let name = format!("{}{}", name, TXT_EXT).replace(" ", "_");
+        let name = format!("{}{}", name, TXT_EXT).replace(' ', "_");
         async move {
             let file = self
                 .name

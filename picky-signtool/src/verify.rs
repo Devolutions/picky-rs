@@ -217,7 +217,7 @@ fn apply_flags<'a>(
     let validator = if flags.iter().any(|flag| flag.as_str() == ARG_VERIFY_BASIC) {
         validator.require_basic_authenticode_validation(file_hash)
     } else {
-        &validator
+        validator
     };
 
     let validator = if flags.iter().any(|flag| flag.as_str() == ARG_VERIFY_SIGNING_CERTIFICATE) {
@@ -227,13 +227,13 @@ fn apply_flags<'a>(
             .require_not_before_check()
             .exact_date(time)
     } else {
-        &validator
+        validator
     };
 
     let validator = if flags.iter().any(|flag| flag.as_str() == ARG_VERIFY_CHAIN) {
         validator.require_chain_check()
     } else {
-        &validator
+        validator
     };
 
     if flags.iter().any(|flag| flag.as_str() == ARG_VERIFY_CA) {

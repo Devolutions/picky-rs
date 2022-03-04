@@ -45,16 +45,13 @@ fn main() -> anyhow::Result<()> {
                     .contents_first(true)
                     .into_iter()
                     .filter_map(|entry| {
-                        entry
-                            .ok()
-                            .map(|entry| {
-                                if is_ps_file(&entry) {
-                                    Some(entry.into_path())
-                                } else {
-                                    None
-                                }
-                            })
-                            .flatten()
+                        entry.ok().and_then(|entry| {
+                            if is_ps_file(&entry) {
+                                Some(entry.into_path())
+                            } else {
+                                None
+                            }
+                        })
                     })
                     .collect::<Vec<PathBuf>>()
             }

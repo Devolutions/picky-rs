@@ -34,7 +34,7 @@ pub const ARG_LOGGING_CRITICAL: &str = "critical";
 
 pub fn config() -> ArgMatches<'static> {
     let validate_executable_postfix =
-        |file: String| match Path::new(file.as_str()).extension().map(|ext| ext.to_str()).flatten() {
+        |file: String| match Path::new(file.as_str()).extension().and_then(|ext| ext.to_str()) {
             Some("exe") => Ok(()),
             _ => Err(format!("`{}` is not a Windows executable", file)),
         };
