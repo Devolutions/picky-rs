@@ -935,10 +935,13 @@ impl<'a> CertificateBuilder<'a> {
             Extensions(extensions)
         };
 
+        let signature =
+            AlgorithmIdentifier::try_from(signature_hash_type).map_err(|e| CertError::Signature { source: e })?;
+
         let tbs_certificate = TbsCertificate {
             version: ExplicitContextTag0(Version::V3),
             serial_number,
-            signature: AlgorithmIdentifier::from(signature_hash_type),
+            signature,
             issuer: Name::from(issuer_name),
             validity,
             subject: Name::from(subject_name),
@@ -946,7 +949,9 @@ impl<'a> CertificateBuilder<'a> {
             extensions: ExplicitContextTag3(extensions),
         };
 
-        let signature_algorithm = signature_hash_type.into();
+        let signature_algorithm = signature_hash_type
+            .try_into()
+            .map_err(|e| CertError::Signature { source: e })?;
 
         let tbs_der = picky_asn1_der::to_vec(&tbs_certificate)
             .map_err(|e| CertError::Asn1Serialization {

@@ -52,12 +52,14 @@ aes-gcm = { version = "0.9.4", optional = true }
 bcrypt-pbkdf = { version = "0.6", optional = true }
 block-modes = { version = "0.8", optional = true }
 aes = { version = "0.7.5", features = ["ctr"], default-features = false, optional = true }
+ring = "0.16.20"
 
 [dev-dependencies]
 pretty_assertions = "1.0.0"
 hex = "0.4.3"
 cfg-if = "1.0.0"
 ring = "0.16.20"
+rstest = "0.12.0"
 
 [features]
 default = ["x509", "jose", "http_signature", "http_trait_impl"]

@@ -630,6 +630,11 @@ impl SshCertificateBuilder {
                             )))
                         }
                     },
+                    SignatureAlgorithm::Ecdsa(_) => {
+                        return Err(SshCertificateGenerationError::IncorrectSignatureAlgorithm(
+                            "Ecdsa signatures for SSH certificates are not yet supported".to_owned(),
+                        ))
+                    }
                 };
 
                 let signature = signature_algo.sign(&raw_signature, rsa)?;
