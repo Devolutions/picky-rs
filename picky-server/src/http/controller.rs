@@ -115,7 +115,7 @@ impl ServerController {
     async fn cert_signature_request(&self, req: Request) -> Result<ResponseBuilder, StatusCode> {
         let (locked_subject_name, x509_duration_secs) = match check_authorization(&*self.read_conf().await, &req) {
             Ok(token) => {
-                let provider_claims: ProviderClaims = serde_json::from_value(token.claims).bad_request()?;
+                let provider_claims: ProviderClaims = serde_json::from_value(token.state.claims).bad_request()?;
                 (provider_claims.sub, provider_claims.x509_duration_secs)
             }
             Err(e) => {
@@ -336,7 +336,7 @@ impl ServerController {
         }
 
         let sign_request: SshSignRequest = match check_authorization(&*self.read_conf().await, &req) {
-            Ok(token) => serde_json::from_value(token.claims).bad_request()?,
+            Ok(token) => serde_json::from_value(token.state.claims).bad_request()?,
             Err(e) => {
                 log::error!("authorization failed: {}", e);
                 return Err(StatusCode::UNAUTHORIZED);
