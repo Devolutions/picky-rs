@@ -50,10 +50,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Bump minimal rustc version to 1.56
 - (Breaking) Move Authenticode related code from `picky::x509::wincert` to `picky::x509::pkcs7::authenticode` module
 - (Breaking) Authenticode implementation is now behind `pkcs7` feature
 - (Breaking) `PrivateKey::to_pem` and `PublicKey::to_pem` now return a `Pem`
-- Bump minimal rustc version to 1.56
+- (Breaking) Separate JWT validation from decoding in JOSE API (this makes API more convenient to first process header
+    and then decide what kind of validation should be applied, or what claims type to deserialize into)
 
 ### Fixed
 
