@@ -1,12 +1,12 @@
 # picky-rs
 
 Collection of crates related to cryptographic primitives, ASN.1 and PKI.
-See each folder for indivial description.
+See each folder for individual description.
 
 ## Release workflow
 
 - Create a new branch
-- Make sure dependencies are up to date
+- Make sure dependencies are up to date (`cargo upgrade` from [cargo-edit](https://crates.io/crates/cargo-edit#cargo-upgrade) companion will help)
 - Make sure CHANGELOG.md files are up to date
 - Open Pull Request for review
 - Once CI is green and PR is approved, use [cargo-release](https://github.com/crate-ci/cargo-release) for each crate to release
