@@ -63,6 +63,37 @@ impl From<JweError> for JwtError {
     }
 }
 
+// === Validation states === //
+
+pub struct CheckedState<C> {
+    pub claims: C,
+}
+
+impl<C> Clone for CheckedState<C>
+where
+    C: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            claims: self.claims.clone(),
+        }
+    }
+}
+
+impl<C> fmt::Debug for CheckedState<C>
+where
+    C: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ValidatedClaims({:?})", self.claims)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct UncheckedState {
+    payload: Vec<u8>,
+}
+
 // === JWT date === //
 
 /// Represent date as defined by [RFC7519](https://tools.ietf.org/html/rfc7519#section-2).
@@ -207,48 +238,59 @@ const JWT_TYPE: &str = "JWT";
 const EXPIRATION_TIME_CLAIM: &str = "exp";
 const NOT_BEFORE_CLAIM: &str = "nbf";
 
-pub struct Jwt<H, C> {
+pub struct Jwt<H, State> {
     pub header: H,
-    pub claims: C,
+    pub state: State,
 }
 
-pub type JwtSig<C> = Jwt<JwsHeader, C>;
-pub type JwtEnc<C> = Jwt<JweHeader, C>;
+pub type JwtSig = Jwt<JwsHeader, UncheckedState>;
+pub type CheckedJwtSig<C> = Jwt<JwsHeader, CheckedState<C>>;
+pub type JwtEnc = Jwt<JweHeader, UncheckedState>;
+pub type CheckedJwtEnc<C> = Jwt<JweHeader, CheckedState<C>>;
 
-impl<H, C> Clone for Jwt<H, C>
+impl<H, State> Clone for Jwt<H, State>
 where
     H: Clone,
-    C: Clone,
+    State: Clone,
 {
     fn clone(&self) -> Self {
         Self {
             header: self.header.clone(),
-            claims: self.claims.clone(),
+            state: self.state.clone(),
         }
     }
 }
 
-impl<H, C> fmt::Debug for Jwt<H, C>
+impl<H, State> fmt::Debug for Jwt<H, State>
 where
     H: fmt::Debug,
-    C: fmt::Debug,
+    State: fmt::Debug,
 {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("Jwt")
             .field("header", &self.header)
-            .field("claims", &self.claims)
+            .field("state", &self.state)
             .finish()
     }
 }
 
-impl<C> Jwt<JwsHeader, C> {
+impl<H, C> Jwt<H, CheckedState<C>> {
+    pub fn new_with_header(header: H, claims: C) -> Self {
+        Jwt {
+            header,
+            state: CheckedState { claims },
+        }
+    }
+}
+
+impl<C> CheckedJwtSig<C> {
     pub fn new(alg: JwsAlg, claims: C) -> Self {
         Jwt {
             header: JwsHeader {
                 typ: Some(JWT_TYPE.to_owned()),
                 ..JwsHeader::new(alg)
             },
-            claims,
+            state: CheckedState { claims },
         }
     }
 
@@ -257,14 +299,59 @@ impl<C> Jwt<JwsHeader, C> {
     }
 }
 
-impl<C> Jwt<JweHeader, C> {
+impl<C> CheckedJwtSig<C>
+where
+    C: Serialize,
+{
+    pub fn encode(self, private_key: &PrivateKey) -> Result<String, JwtError> {
+        let jws = Jws {
+            header: self.header,
+            payload: serde_json::to_vec(&self.state.claims)?,
+        };
+        let encoded = jws.encode(private_key)?;
+        Ok(encoded)
+    }
+}
+
+impl JwtSig {
+    pub fn encode(self, private_key: &PrivateKey) -> Result<String, JwtError> {
+        let jws = Jws {
+            header: self.header,
+            payload: self.state.payload,
+        };
+        let encoded = jws.encode(private_key)?;
+        Ok(encoded)
+    }
+}
+
+impl JwtSig {
+    /// Decode JWT and check signature using provided public key.
+    pub fn decode(encoded_token: &str, public_key: &PublicKey) -> Result<Self, JwtError> {
+        let jws = Jws::decode(encoded_token, public_key)?;
+        Ok(Jwt {
+            header: jws.header,
+            state: UncheckedState { payload: jws.payload },
+        })
+    }
+
+    /// Dangerous JWT decoding method. Signature isn't checked at all.
+    pub fn decode_dangerous(encoded_token: &str) -> Result<Self, JwtError> {
+        let jws = Jws::decode_without_validation(encoded_token)?;
+        Ok(Jwt {
+            header: jws.header,
+            state: UncheckedState { payload: jws.payload },
+        })
+    }
+}
+
+impl<C> CheckedJwtEnc<C> {
     pub fn new(alg: JweAlg, enc: JweEnc, claims: C) -> Self {
         Jwt {
             header: JweHeader {
                 typ: Some(JWT_TYPE.to_owned()),
                 ..JweHeader::new(alg, enc)
             },
-            claims,
+            state: CheckedState { claims },
         }
     }
 
@@ -273,50 +360,7 @@ impl<C> Jwt<JweHeader, C> {
     }
 }
 
-impl<H, C> Jwt<H, C> {
-    pub fn new_with_header(header: H, claims: C) -> Self {
-        Jwt { header, claims }
-    }
-}
-
-impl<C> Jwt<JwsHeader, C>
-where
-    C: Serialize,
-{
-    pub fn encode(self, private_key: &PrivateKey) -> Result<String, JwtError> {
-        let jws = Jws {
-            header: self.header,
-            payload: serde_json::to_vec(&self.claims)?,
-        };
-        let encoded = jws.encode(private_key)?;
-        Ok(encoded)
-    }
-}
-
-impl<C> Jwt<JwsHeader, C>
-where
-    C: DeserializeOwned,
-{
-    /// Validate using validator and public key.
-    pub fn decode(encoded_token: &str, public_key: &PublicKey, validator: &JwtValidator) -> Result<Self, JwtError> {
-        let jws = Jws::decode(encoded_token, public_key)?;
-        Ok(Jwt {
-            header: jws.header,
-            claims: h_decode_and_validate_claims(&jws.payload, validator)?,
-        })
-    }
-
-    /// Unsafe JWT decoding method. Signature isn't checked at all.
-    pub fn decode_dangerous(encoded_token: &str, validator: &JwtValidator) -> Result<Self, JwtError> {
-        let jws = Jws::decode_without_validation(encoded_token)?;
-        Ok(Jwt {
-            header: jws.header,
-            claims: h_decode_and_validate_claims(&jws.payload, validator)?,
-        })
-    }
-}
-
-impl<C> Jwt<JweHeader, C>
+impl<C> CheckedJwtEnc<C>
 where
     C: Serialize,
 {
@@ -324,7 +368,7 @@ where
     pub fn encode(self, asymmetric_key: &PublicKey) -> Result<String, JwtError> {
         let jwe = Jwe {
             header: self.header,
-            payload: serde_json::to_vec(&self.claims)?,
+            payload: serde_json::to_vec(&self.state.claims)?,
         };
         let encoded = jwe.encode(asymmetric_key)?;
         Ok(encoded)
@@ -334,32 +378,44 @@ where
     pub fn encode_direct(self, cek: &[u8]) -> Result<String, JweError> {
         let jwe = Jwe {
             header: self.header,
-            payload: serde_json::to_vec(&self.claims)?,
+            payload: serde_json::to_vec(&self.state.claims)?,
         };
         let encoded = jwe.encode_direct(cek)?;
         Ok(encoded)
     }
 }
 
-impl<C> Jwt<JweHeader, C>
-where
-    C: DeserializeOwned,
-{
-    /// Encode with CEK encrypted and included in the token using asymmetric cryptography.
-    pub fn decode(encoded_token: &str, key: &PrivateKey, validator: &JwtValidator) -> Result<Self, JwtError> {
+impl JwtEnc {
+    /// Decode using asymmetric cryptography.
+    pub fn decode(encoded_token: &str, key: &PrivateKey) -> Result<Self, JwtError> {
         let jwe = Jwe::decode(encoded_token, key)?;
         Ok(Jwt {
             header: jwe.header,
-            claims: h_decode_and_validate_claims(&jwe.payload, validator)?,
+            state: UncheckedState { payload: jwe.payload },
         })
     }
 
     /// Decode with provided CEK (a symmetric key).
-    pub fn decode_direct(encoded_token: &str, cek: &[u8], validator: &JwtValidator) -> Result<Self, JwtError> {
+    pub fn decode_direct(encoded_token: &str, cek: &[u8]) -> Result<Self, JwtError> {
         let jwe = Jwe::decode_direct(encoded_token, cek)?;
         Ok(Jwt {
             header: jwe.header,
-            claims: h_decode_and_validate_claims(&jwe.payload, validator)?,
+            state: UncheckedState { payload: jwe.payload },
+        })
+    }
+}
+
+impl<H> Jwt<H, UncheckedState> {
+    /// Validate JWT claims using validator and convert payload to a user-defined typed struct.
+    pub fn validate<C>(self, validator: &JwtValidator) -> Result<Jwt<H, CheckedState<C>>, JwtError>
+    where
+        C: DeserializeOwned,
+    {
+        Ok(Jwt {
+            header: self.header,
+            state: CheckedState {
+                claims: h_decode_and_validate_claims(&self.state.payload, validator)?,
+            },
         })
     }
 }
@@ -463,7 +519,7 @@ mod tests {
     #[test]
     fn encode_jws_rsa_sha256() {
         let claims = get_strongly_typed_claims();
-        let jwt = JwtSig::new(JwsAlg::RS256, claims);
+        let jwt = CheckedJwtSig::new(JwsAlg::RS256, claims);
         let encoded = jwt.encode(&get_private_key_1()).unwrap();
         assert_eq!(encoded, crate::test_files::JOSE_JWT_SIG_EXAMPLE);
     }
@@ -471,22 +527,18 @@ mod tests {
     #[test]
     fn decode_jws_rsa_sha256() {
         let public_key = get_private_key_1().to_public_key();
-        let jwt = JwtSig::<MyClaims>::decode(
-            crate::test_files::JOSE_JWT_SIG_EXAMPLE,
-            &public_key,
-            &JwtValidator::no_check(),
-        )
-        .unwrap();
-        assert_eq!(jwt.claims, get_strongly_typed_claims());
+        let jwt = JwtSig::decode(crate::test_files::JOSE_JWT_SIG_EXAMPLE, &public_key)
+            .unwrap()
+            .validate::<MyClaims>(&JwtValidator::no_check())
+            .unwrap();
+        assert_eq!(jwt.state.claims, get_strongly_typed_claims());
 
         // exp and nbf claims aren't present but this should pass with lenient validator
         let now = JwtDate::new(0);
-        JwtSig::<MyClaims>::decode(
-            crate::test_files::JOSE_JWT_SIG_EXAMPLE,
-            &public_key,
-            &JwtValidator::lenient(&now),
-        )
-        .unwrap();
+        JwtSig::decode(crate::test_files::JOSE_JWT_SIG_EXAMPLE, &public_key)
+            .unwrap()
+            .validate::<MyClaims>(&JwtValidator::lenient(&now))
+            .unwrap();
     }
 
     #[test]
@@ -495,7 +547,9 @@ mod tests {
         let validator = JwtValidator::no_check()
             .expiration_check_required()
             .not_before_check_optional();
-        let err = JwtSig::<MyClaims>::decode(crate::test_files::JOSE_JWT_SIG_EXAMPLE, &public_key, &validator)
+        let err = JwtSig::decode(crate::test_files::JOSE_JWT_SIG_EXAMPLE, &public_key)
+            .unwrap()
+            .validate::<MyClaims>(&validator)
             .err()
             .unwrap();
         assert_eq!(err.to_string(), "invalid validator: current date is missing");
@@ -506,7 +560,9 @@ mod tests {
         let public_key = get_private_key_1().to_public_key();
         let now = JwtDate::new(0);
         let validator = JwtValidator::strict(&now);
-        let err = JwtSig::<MyClaims>::decode(crate::test_files::JOSE_JWT_SIG_EXAMPLE, &public_key, &validator)
+        let err = JwtSig::decode(crate::test_files::JOSE_JWT_SIG_EXAMPLE, &public_key)
+            .unwrap()
+            .validate::<MyClaims>(&validator)
             .err()
             .unwrap();
         assert_eq!(err.to_string(), "required claim `nbf` is missing");
@@ -516,12 +572,14 @@ mod tests {
     fn decode_jws_rsa_sha256_using_json_value_claims() {
         let public_key = get_private_key_1().to_public_key();
         let validator = JwtValidator::no_check();
-        let jwt = JwtSig::<serde_json::Value>::decode(crate::test_files::JOSE_JWT_SIG_EXAMPLE, &public_key, &validator)
+        let jwt = JwtSig::decode(crate::test_files::JOSE_JWT_SIG_EXAMPLE, &public_key)
+            .unwrap()
+            .validate::<serde_json::Value>(&validator)
             .unwrap();
-        assert_eq!(jwt.claims["sub"].as_str().expect("sub"), "1234567890");
-        assert_eq!(jwt.claims["name"].as_str().expect("name"), "John Doe");
-        assert_eq!(jwt.claims["admin"].as_bool().expect("sub"), true);
-        assert_eq!(jwt.claims["iat"].as_i64().expect("iat"), 1516239022);
+        assert_eq!(jwt.state.claims["sub"].as_str().expect("sub"), "1234567890");
+        assert_eq!(jwt.state.claims["name"].as_str().expect("name"), "John Doe");
+        assert_eq!(jwt.state.claims["admin"].as_bool().expect("sub"), true);
+        assert_eq!(jwt.state.claims["iat"].as_i64().expect("iat"), 1516239022);
     }
 
     #[test]
@@ -530,11 +588,14 @@ mod tests {
         let key = crate::hash::HashAlgorithm::SHA2_256.digest(b"magic_password");
         let jwt = Jwt::new_encrypted(JweAlg::Direct, JweEnc::Aes256Gcm, claims);
         let encoded = jwt.encode_direct(&key).unwrap();
-        let decoded = Jwt::<_, MyClaims>::decode_direct(&encoded, &key, &NO_CHECK_VALIDATOR).unwrap();
-        assert_eq!(decoded.claims, get_strongly_typed_claims());
+        let decoded = JwtEnc::decode_direct(&encoded, &key)
+            .unwrap()
+            .validate::<MyClaims>(&NO_CHECK_VALIDATOR)
+            .unwrap();
+        assert_eq!(decoded.state.claims, get_strongly_typed_claims());
     }
 
-    #[derive(Serialize, Deserialize)]
+    #[derive(Deserialize)]
     struct MyExpirableClaims {
         exp: i64,
         nbf: i64,
@@ -545,57 +606,47 @@ mod tests {
     fn decode_jws_not_expired() {
         let public_key = get_private_key_1().to_public_key();
 
-        let jwt = JwtSig::<MyExpirableClaims>::decode(
-            crate::test_files::JOSE_JWT_SIG_WITH_EXP,
-            &public_key,
-            &JwtValidator::strict(&JwtDate::new(1545263999)),
-        )
-        .expect("couldn't decode jwt without leeway");
+        let jwt = JwtSig::decode(crate::test_files::JOSE_JWT_SIG_WITH_EXP, &public_key)
+            .unwrap()
+            .validate::<MyExpirableClaims>(&JwtValidator::strict(&JwtDate::new(1545263999)))
+            .expect("couldn't decode jwt without leeway");
 
-        assert_eq!(jwt.claims.exp, 1545264000);
-        assert_eq!(jwt.claims.nbf, 1545263000);
-        assert_eq!(jwt.claims.msg, "THIS IS TIME SENSITIVE DATA");
+        assert_eq!(jwt.state.claims.exp, 1545264000);
+        assert_eq!(jwt.state.claims.nbf, 1545263000);
+        assert_eq!(jwt.state.claims.msg, "THIS IS TIME SENSITIVE DATA");
 
         // alternatively, a leeway can account for small clock skew
-        JwtSig::<MyExpirableClaims>::decode(
-            crate::test_files::JOSE_JWT_SIG_WITH_EXP,
-            &public_key,
-            &JwtValidator::strict(&JwtDate::new_with_leeway(1545264001, 10)),
-        )
-        .expect("couldn't decode jwt with leeway for exp");
+        JwtSig::decode(crate::test_files::JOSE_JWT_SIG_WITH_EXP, &public_key)
+            .unwrap()
+            .validate::<MyExpirableClaims>(&JwtValidator::strict(&JwtDate::new_with_leeway(1545264001, 10)))
+            .expect("couldn't decode jwt with leeway for exp");
 
-        JwtSig::<MyExpirableClaims>::decode(
-            crate::test_files::JOSE_JWT_SIG_WITH_EXP,
-            &public_key,
-            &JwtValidator::strict(&JwtDate::new_with_leeway(1545262999, 10)),
-        )
-        .expect("couldn't decode jwt with leeway for nbf");
+        JwtSig::decode(crate::test_files::JOSE_JWT_SIG_WITH_EXP, &public_key)
+            .unwrap()
+            .validate::<MyExpirableClaims>(&JwtValidator::strict(&JwtDate::new_with_leeway(1545262999, 10)))
+            .expect("couldn't decode jwt with leeway for nbf");
     }
 
     #[test]
     fn decode_jws_invalid_date_err() {
         let public_key = get_private_key_1().to_public_key();
 
-        let err = JwtSig::<MyExpirableClaims>::decode(
-            crate::test_files::JOSE_JWT_SIG_WITH_EXP,
-            &public_key,
-            &JwtValidator::strict(&JwtDate::new(1545264001)),
-        )
-        .err()
-        .unwrap();
+        let err = JwtSig::decode(crate::test_files::JOSE_JWT_SIG_WITH_EXP, &public_key)
+            .unwrap()
+            .validate::<MyExpirableClaims>(&JwtValidator::strict(&JwtDate::new(1545264001)))
+            .err()
+            .unwrap();
 
         assert_eq!(
             err.to_string(),
             "token expired (not after: 1545264000, now: 1545264001 [leeway: 0])"
         );
 
-        let err = JwtSig::<MyExpirableClaims>::decode(
-            crate::test_files::JOSE_JWT_SIG_WITH_EXP,
-            &public_key,
-            &JwtValidator::strict(&JwtDate::new_with_leeway(1545262998, 1)),
-        )
-        .err()
-        .unwrap();
+        let err = JwtSig::decode(crate::test_files::JOSE_JWT_SIG_WITH_EXP, &public_key)
+            .unwrap()
+            .validate::<MyExpirableClaims>(&JwtValidator::strict(&JwtDate::new_with_leeway(1545262998, 1)))
+            .err()
+            .unwrap();
 
         assert_eq!(
             err.to_string(),
@@ -619,10 +670,13 @@ mod tests {
         }
 
         let payload = core::str::from_utf8(&jwe.payload).unwrap();
-        let jwk = JwtSig::<SomeJetClaims>::decode_dangerous(payload, &JwtValidator::no_check()).unwrap();
+        let jwk = JwtSig::decode_dangerous(payload)
+            .unwrap()
+            .validate::<SomeJetClaims>(&JwtValidator::no_check())
+            .unwrap();
 
-        assert_eq!(jwk.claims.jet_ap, "rdp");
-        assert_eq!(jwk.claims.prx_usr, "username");
-        assert_eq!(jwk.claims.nbf, 1600373587);
+        assert_eq!(jwk.state.claims.jet_ap, "rdp");
+        assert_eq!(jwk.state.claims.prx_usr, "username");
+        assert_eq!(jwk.state.claims.nbf, 1600373587);
     }
 }

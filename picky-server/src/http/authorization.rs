@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::utils::{unix_epoch, PathOr};
-use picky::jose::jwt::{JwtDate, JwtSig, JwtValidator};
+use picky::jose::jwt::{CheckedJwtSig, JwtDate, JwtSig, JwtValidator};
 use picky::key::PublicKey;
 use picky::pem::Pem;
 use saphir::body::Body;
@@ -33,7 +33,7 @@ impl From<&str> for AuthorizationMethod {
     }
 }
 
-pub fn check_authorization(config: &Config, req: &Request<Body>) -> Result<JwtSig<serde_json::Value>, String> {
+pub fn check_authorization(config: &Config, req: &Request<Body>) -> Result<CheckedJwtSig<serde_json::Value>, String> {
     let header = match req.headers().get(header::AUTHORIZATION) {
         Some(h) => h,
         None => return Err("Authorization header is missing".to_owned()),
@@ -70,12 +70,14 @@ pub fn check_authorization(config: &Config, req: &Request<Body>) -> Result<JwtSi
                 PathOr::Some(key) => Cow::Borrowed(key),
             };
 
-            Ok(JwtSig::decode(
-                auth_vec[1],
-                &public_key,
-                &JwtValidator::strict(&JwtDate::new_with_leeway(unix_epoch() as i64, 10)),
-            )
-            .map_err(|e| format!("couldn't validate json web token: {}", e))?)
+            Ok(JwtSig::decode(auth_vec[1], &public_key)
+                .and_then(|jwt| {
+                    jwt.validate(&JwtValidator::strict(&JwtDate::new_with_leeway(
+                        unix_epoch() as i64,
+                        10,
+                    )))
+                })
+                .map_err(|e| format!("couldn't validate json web token: {}", e))?)
         }
         AuthorizationMethod::Unknown => Err(format!("Unknown authorization method: {}", auth_vec[0])),
     }
@@ -112,7 +114,7 @@ mod tests {
             nbf: unix_epoch(),
             exp: unix_epoch() + 10,
         };
-        let jwt = JwtSig::new(JwsAlg::RS256, claims);
+        let jwt = CheckedJwtSig::new(JwsAlg::RS256, claims);
         jwt.encode(&private_key).expect("jwt encode")
     }
 
