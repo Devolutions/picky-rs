@@ -2,10 +2,11 @@
 
 use crate::pem::{parse_pem, Pem, PemError};
 use num_bigint_dig::traits::ModInverse;
+use num_bigint_dig::BigUint;
 use picky_asn1::wrapper::{BitStringAsn1, BitStringAsn1Container, IntegerAsn1, OctetStringAsn1Container};
 use picky_asn1_der::Asn1DerError;
 use picky_asn1_x509::{oids, private_key_info, PrivateKeyInfo, PrivateKeyValue, SubjectPublicKeyInfo};
-use rsa::{BigUint, RsaPrivateKey, RsaPublicKey};
+use rsa::{RsaPrivateKey, RsaPublicKey};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -198,15 +199,14 @@ impl PrivateKey {
         private_exponent: &BigUint,
         primes: &[BigUint],
     ) -> Result<Self, KeyError> {
-        if primes.len() != 2 {
-            // to be really safe
-            return Err(KeyError::Rsa {
-                context: format!("invalid number of primes generated: expected 2, got: {}", primes.len()),
-            });
-        }
+        let mut primes_it = primes.iter();
+        let prime_1 = primes_it.next().ok_or_else(|| KeyError::Rsa {
+            context: format!("invalid number of primes provided: expected 2, got: {}", primes.len()),
+        })?;
+        let prime_2 = primes_it.next().ok_or_else(|| KeyError::Rsa {
+            context: format!("invalid number of primes provided: expected 2, got: {}", primes.len()),
+        })?;
 
-        let prime_1 = primes.get(0).unwrap();
-        let prime_2 = primes.get(1).unwrap();
         let exponent_1 = private_exponent.clone() % (prime_1 - 1u8);
         let exponent_2 = private_exponent.clone() % (prime_2 - 1u8);
 
@@ -643,7 +643,7 @@ mod tests {
 
     #[test]
     fn rsa_crate_private_key_conversion() {
-        use rsa::pkcs8::FromPrivateKey;
+        use rsa::pkcs8::DecodePrivateKey;
 
         let pk_pem = crate::test_files::RSA_2048_PK_1.parse::<crate::pem::Pem>().unwrap();
         let pk = PrivateKey::from_pem(&pk_pem).unwrap();

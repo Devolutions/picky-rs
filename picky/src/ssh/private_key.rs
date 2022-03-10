@@ -3,18 +3,18 @@ use crate::pem::{parse_pem, Pem, PemError};
 use crate::ssh::decode::{SshComplexTypeDecode, SshReadExt};
 use crate::ssh::encode::SshComplexTypeEncode;
 use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
-use aes::cipher::{NewCipher, StreamCipher};
-use aes::{Aes128, Aes128Ctr, Aes256, Aes256Ctr};
-use block_modes::block_padding::NoPadding;
-use block_modes::BlockMode;
+use aes::cipher::block_padding::NoPadding;
+use aes::cipher::{BlockDecryptMut, KeyIvInit, StreamCipher};
 use byteorder::{BigEndian, ReadBytesExt};
 use rand::Rng;
 use std::io::{Cursor, Read};
 use std::string;
 use thiserror::Error;
 
-type Aes128Cbc = block_modes::Cbc<Aes128, NoPadding>;
-type Aes256Cbc = block_modes::Cbc<Aes256, NoPadding>;
+pub type Aes128CbcDec = cbc::Decryptor<aes::Aes128>;
+pub type Aes256CbcDec = cbc::Decryptor<aes::Aes256>;
+pub type Aes128Ctr = ctr::Ctr32BE<aes::Aes128>;
+pub type Aes256Ctr = ctr::Ctr32BE<aes::Aes256>;
 
 const SSH_PRIVATE_KEY_LABEL: &str = "OPENSSH PRIVATE KEY";
 pub(crate) const AUTH_MAGIC: &str = "openssh-key-v1";
@@ -52,8 +52,8 @@ pub enum SshPrivateKeyError {
     InvalidPublicKey(#[from] SshPublicKeyError),
     #[error("Invalid key format")]
     InvalidKeyFormat,
-    #[error("Can not decrypt private key: {0:?}")]
-    DecryptionError(#[from] block_modes::BlockModeError),
+    #[error("Can not decrypt private key: {0}")]
+    DecryptionError(String),
     #[error("Can not hash the passphrase: {0:?}")]
     HashingError(#[from] bcrypt_pbkdf::Error),
     #[error("Passphrase required for encrypted private key")]
@@ -294,14 +294,20 @@ pub(crate) fn decrypt(
         data.resize(data.len() + 32, 0u8);
         match cipher_name {
             AES128_CBC => {
-                let cipher = Aes128Cbc::new_from_slices(key, iv).unwrap();
-                let n = cipher.decrypt(&mut data)?.len();
+                let cipher = Aes128CbcDec::new_from_slices(key, iv).unwrap();
+                let n = cipher
+                    .decrypt_padded_mut::<NoPadding>(&mut data)
+                    .map_err(|e| SshPrivateKeyError::DecryptionError(e.to_string()))?
+                    .len();
                 data.truncate(n);
                 Ok(data)
             }
             AES256_CBC => {
-                let cipher = Aes256Cbc::new_from_slices(key, iv).unwrap();
-                let n = cipher.decrypt(&mut data)?.len();
+                let cipher = Aes256CbcDec::new_from_slices(key, iv).unwrap();
+                let n = cipher
+                    .decrypt_padded_mut::<NoPadding>(&mut data)
+                    .map_err(|e| SshPrivateKeyError::DecryptionError(e.to_string()))?
+                    .len();
                 data.truncate(n);
                 Ok(data)
             }
