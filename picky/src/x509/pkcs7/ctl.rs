@@ -93,7 +93,6 @@ pub mod http_fetch {
 
 #[cfg(test)]
 mod tests {
-    use super::http_fetch::CtlHttpFetch;
     use super::*;
     use crate::x509::pkcs7::Pkcs7;
 
@@ -102,8 +101,10 @@ mod tests {
         Pkcs7::from_der(crate::test_files::CERTIFICATE_TRUST_LIST).unwrap();
     }
 
+    #[cfg(feature = "ctl_http_fetch")]
     #[test]
     fn create_ctl() {
+        use super::http_fetch::CtlHttpFetch;
         CertificateTrustList::fetch().unwrap();
     }
 }
