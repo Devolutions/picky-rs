@@ -102,16 +102,15 @@ impl HashAlgorithm {
     }
 
     pub fn output_size(self) -> usize {
-        use digest::generic_array::typenum::Unsigned;
         match self {
-            Self::MD5 => <md5::Md5 as Digest>::OutputSize::to_usize(),
-            Self::SHA1 => <sha1::Sha1 as Digest>::OutputSize::to_usize(),
-            Self::SHA2_224 => <sha2::Sha224 as Digest>::OutputSize::to_usize(),
-            Self::SHA2_256 => <sha2::Sha256 as Digest>::OutputSize::to_usize(),
-            Self::SHA2_384 => <sha2::Sha384 as Digest>::OutputSize::to_usize(),
-            Self::SHA2_512 => <sha2::Sha512 as Digest>::OutputSize::to_usize(),
-            Self::SHA3_384 => <sha3::Sha3_384 as Digest>::OutputSize::to_usize(),
-            Self::SHA3_512 => <sha3::Sha3_512 as Digest>::OutputSize::to_usize(),
+            Self::MD5 => md5::Md5::output_size(),
+            Self::SHA1 => sha1::Sha1::output_size(),
+            Self::SHA2_224 => sha2::Sha224::output_size(),
+            Self::SHA2_256 => sha2::Sha256::output_size(),
+            Self::SHA2_384 => sha2::Sha384::output_size(),
+            Self::SHA2_512 => sha2::Sha512::output_size(),
+            Self::SHA3_384 => sha3::Sha3_384::output_size(),
+            Self::SHA3_512 => sha3::Sha3_512::output_size(),
         }
     }
 }

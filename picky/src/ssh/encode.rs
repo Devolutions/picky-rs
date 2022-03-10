@@ -4,12 +4,11 @@ use crate::ssh::certificate::{
     SshExtension, SshExtensionError, SshSignature, SshSignatureError,
 };
 use crate::ssh::private_key::{
-    KdfOption, SshBasePrivateKey, SshPrivateKey, SshPrivateKeyError, AES256_CTR, AUTH_MAGIC, BCRYPT, NONE,
+    Aes256Ctr, KdfOption, SshBasePrivateKey, SshPrivateKey, SshPrivateKeyError, AES256_CTR, AUTH_MAGIC, BCRYPT, NONE,
 };
 use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
 use crate::ssh::{Base64Writer, SSH_RSA_KEY_TYPE};
-use aes::cipher::{NewCipher, StreamCipher};
-use aes::Aes256Ctr;
+use aes::cipher::{KeyIvInit, StreamCipher};
 use byteorder::{BigEndian, WriteBytesExt};
 use num_bigint_dig::{BigUint, ModInverse};
 use rsa::{PublicKeyParts, RsaPrivateKey, RsaPublicKey};

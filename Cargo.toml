@@ -2,13 +2,8 @@
 resolver = "2"
 members = [
     "picky",
-    "picky-server",
     "picky-asn1",
     "picky-asn1-der",
     "picky-asn1-x509",
-    "picky-signtool",
     "ffi",
 ]
-
-[patch.crates-io]
-backtrace = { git = "https://github.com/Devolutions/backtrace-rs", branch = "wayk" }

@@ -19,15 +19,15 @@ repository = "https://github.com/Devolutions/picky-rs"
 [dependencies]
 picky-asn1 = { version = "0.5", path = "../picky-asn1" }
 picky-asn1-der = { version = "0.3", path = "../picky-asn1-der" }
-serde = { version = "1.0.130", features = ["derive"] }
+serde = { version = "1.0.136", features = ["derive"] }
 oid = { version = "0.2.1", features = ["serde_support"] }
 base64 = "0.13.0"
-num-bigint-dig = { version = "0.7.0", optional = true }
+num-bigint-dig = { version = "0.8.1", optional = true }
 widestring = { version = "0.5.1", default-features = false, features = ["alloc"], optional = true }
 
 [dev-dependencies]
-num-bigint-dig = "0.7.0"
-pretty_assertions = "1.0.0"
+num-bigint-dig = "0.8.1"
+pretty_assertions = "1.1.0"
 hex = "0.4.3"
 
 [features]
