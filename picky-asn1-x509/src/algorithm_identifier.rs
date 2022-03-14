@@ -512,6 +512,7 @@ impl<'de> de::Deserialize<'de> for AesParameters {
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[allow(non_camel_case_types)] // 'SHA2_512_224' is clearer than 'SHA2512224' or 'Sha2512224' imo
 pub enum ShaVariant {
+    // TODO: rename enum (breaking)
     MD5,
     SHA1,
     SHA2_224,
