@@ -12,7 +12,7 @@ clap = "2.33.3"
 walkdir = "2.3.2"
 base64 = "0.13.0"
 encoding_rs = "0.8.30"
-lief-rs = { git = "https://github.com/Devolutions/lief-rs.git", rev = "52dca2" }
+lief-rs = { git = "https://github.com/Devolutions/lief-rs.git", rev = "b82714d" }
 
 [dependencies.picky]
 path = "../picky"
