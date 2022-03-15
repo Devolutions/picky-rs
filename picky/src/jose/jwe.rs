@@ -322,6 +322,13 @@ impl JweHeader {
             x5t_s256: None,
         }
     }
+
+    pub fn new_with_cty(alg: JweAlg, enc: JweEnc, cty: impl Into<String>) -> Self {
+        Self {
+            cty: Some(cty.into()),
+            ..Self::new(alg, enc)
+        }
+    }
 }
 
 // === json web encryption === //

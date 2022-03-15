@@ -294,8 +294,14 @@ impl<C> CheckedJwtSig<C> {
         }
     }
 
-    pub fn new_signed(alg: JwsAlg, claims: C) -> Self {
-        Self::new(alg, claims)
+    pub fn new_with_cty(alg: JwsAlg, cty: impl Into<String>, claims: C) -> Self {
+        Jwt {
+            header: JwsHeader {
+                typ: Some(JWT_TYPE.to_owned()),
+                ..JwsHeader::new_with_cty(alg, cty)
+            },
+            state: CheckedState { claims },
+        }
     }
 }
 
@@ -355,8 +361,14 @@ impl<C> CheckedJwtEnc<C> {
         }
     }
 
-    pub fn new_encrypted(alg: JweAlg, enc: JweEnc, claims: C) -> Self {
-        Self::new(alg, enc, claims)
+    pub fn new_with_cty(alg: JweAlg, enc: JweEnc, cty: impl Into<String>, claims: C) -> Self {
+        Jwt {
+            header: JweHeader {
+                typ: Some(JWT_TYPE.to_owned()),
+                ..JweHeader::new_with_cty(alg, enc, cty)
+            },
+            state: CheckedState { claims },
+        }
     }
 }
 
@@ -586,7 +598,7 @@ mod tests {
     fn jwe_direct_aes_256_gcm() {
         let claims = get_strongly_typed_claims();
         let key = crate::hash::HashAlgorithm::SHA2_256.digest(b"magic_password");
-        let jwt = Jwt::new_encrypted(JweAlg::Direct, JweEnc::Aes256Gcm, claims);
+        let jwt = CheckedJwtEnc::new(JweAlg::Direct, JweEnc::Aes256Gcm, claims);
         let encoded = jwt.encode_direct(&key).unwrap();
         let decoded = JwtEnc::decode_direct(&encoded, &key)
             .unwrap()
@@ -670,13 +682,13 @@ mod tests {
         }
 
         let payload = core::str::from_utf8(&jwe.payload).unwrap();
-        let jwk = JwtSig::decode_dangerous(payload)
+        let jws = JwtSig::decode_dangerous(payload)
             .unwrap()
             .validate::<SomeJetClaims>(&JwtValidator::no_check())
             .unwrap();
 
-        assert_eq!(jwk.state.claims.jet_ap, "rdp");
-        assert_eq!(jwk.state.claims.prx_usr, "username");
-        assert_eq!(jwk.state.claims.nbf, 1600373587);
+        assert_eq!(jws.state.claims.jet_ap, "rdp");
+        assert_eq!(jws.state.claims.prx_usr, "username");
+        assert_eq!(jws.state.claims.nbf, 1600373587);
     }
 }

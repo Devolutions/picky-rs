@@ -47,6 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `PrivateKey::to_pem_str`
 - `PublicKey::to_pem_str`
 - Support SSH keys and certificates
+- `CheckedJwtEnc::new_with_cty`
+- `CheckedJwtSig::new_with_cty`
 
 ### Changed
 
@@ -61,6 +63,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fix `BufReader` panic in `WinCertificate::decode` and `WinCertificate::encode` if data len is bigger than default capacity.
 - Fix `WinCertificate` encoding: `length` wasn’t correct.
+
+### Removed
+
+- (Breaking) `Jwt::new_encrypted`
+- (Breaking) `Jwt::new_signed`
 
 ## [6.4.0] – 2021-08-10
 
