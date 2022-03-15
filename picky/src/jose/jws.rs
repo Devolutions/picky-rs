@@ -232,6 +232,13 @@ impl JwsHeader {
             x5t_s256: None,
         }
     }
+
+    pub fn new_with_cty(alg: JwsAlg, cty: impl Into<String>) -> Self {
+        Self {
+            cty: Some(cty.into()),
+            ..Self::new(alg)
+        }
+    }
 }
 
 // === json web signature === //
