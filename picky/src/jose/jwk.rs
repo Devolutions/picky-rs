@@ -6,6 +6,7 @@ use crate::jose::jwe::{JweAlg, JweEnc};
 use crate::jose::jws::JwsAlg;
 use crate::key::PublicKey;
 use base64::DecodeError;
+use picky_asn1::wrapper::IntegerAsn1;
 use picky_asn1_x509::SubjectPublicKeyInfo;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -65,13 +66,26 @@ pub enum JwkKeyType {
 }
 
 impl JwkKeyType {
+    /// Build a JWK key from RSA components.
+    ///
+    /// Each argument is the unsigned big-endian representation as an octet sequence of the value.
+    /// If a signed representation is provided, leading zero is removed for any number bigger than 0x7F.
     pub fn new_rsa_key(modulus: &[u8], public_exponent: &[u8]) -> Self {
+        let modulus = Self::h_strip_unrequired_leading_zero(modulus);
+        let public_exponent = Self::h_strip_unrequired_leading_zero(public_exponent);
         Self::Rsa(JwkPublicRsaKey {
             n: base64::encode_config(modulus, base64::URL_SAFE_NO_PAD),
             e: base64::encode_config(public_exponent, base64::URL_SAFE_NO_PAD),
         })
     }
 
+    /// Build a JWK key from RSA components already encoded following base64 url format.
+    ///
+    /// Each argument is the unsigned big-endian representation as an octet sequence of the value.
+    /// The octet sequence MUST utilize the minimum number of octets needed to represent the value.
+    /// That is: **no leading zero** must be present.
+    ///
+    /// See definition for term `Base64urlUInt` in [RFC7518 section 2](https://datatracker.ietf.org/doc/html/rfc7518#section-2)
     pub fn new_rsa_key_from_base64_url(modulus: String, public_exponent: String) -> Self {
         Self::Rsa(JwkPublicRsaKey {
             n: modulus,
@@ -88,6 +102,15 @@ impl JwkKeyType {
 
     pub fn is_rsa(&self) -> bool {
         self.as_rsa().is_some()
+    }
+
+    /// Strips leading zero for any number bigger than 0x7F.
+    fn h_strip_unrequired_leading_zero(value: &[u8]) -> &[u8] {
+        if let [0x00, rest @ ..] = value {
+            rest
+        } else {
+            value
+        }
     }
 }
 
@@ -220,10 +243,11 @@ impl Jwk {
         use picky_asn1_x509::PublicKey as SerdePublicKey;
 
         match &public_key.as_inner().subject_public_key {
-            SerdePublicKey::Rsa(BitStringAsn1Container(rsa)) => Ok(Self::new(JwkKeyType::new_rsa_key(
-                rsa.modulus.as_signed_bytes_be(),
-                rsa.public_exponent.as_signed_bytes_be(),
-            ))),
+            SerdePublicKey::Rsa(BitStringAsn1Container(rsa)) => {
+                let modulus = rsa.modulus.as_signed_bytes_be();
+                let public_exponent = rsa.public_exponent.as_signed_bytes_be();
+                Ok(Self::new(JwkKeyType::new_rsa_key(modulus, public_exponent)))
+            }
             SerdePublicKey::Ec(_) => Err(JwkError::UnsupportedAlgorithm {
                 algorithm: "elliptic curves",
             }),
@@ -244,7 +268,9 @@ impl Jwk {
     pub fn to_public_key(&self) -> Result<PublicKey, JwkError> {
         match &self.key {
             JwkKeyType::Rsa(rsa) => {
-                let spki = SubjectPublicKeyInfo::new_rsa_key(rsa.modulus()?.into(), rsa.public_exponent()?.into());
+                let modulus = IntegerAsn1::from_bytes_be_signed(rsa.modulus_signed_bytes_be()?);
+                let public_exponent = IntegerAsn1::from_bytes_be_signed(rsa.public_exponent_signed_bytes_be()?);
+                let spki = SubjectPublicKeyInfo::new_rsa_key(modulus, public_exponent);
                 Ok(spki.into())
             }
             JwkKeyType::Ec => Err(JwkError::UnsupportedAlgorithm {
@@ -287,12 +313,41 @@ pub struct JwkPublicRsaKey {
 }
 
 impl JwkPublicRsaKey {
-    pub fn modulus(&self) -> Result<Vec<u8>, JwkError> {
+    pub fn modulus_signed_bytes_be(&self) -> Result<Vec<u8>, JwkError> {
+        let mut buf = Self::h_allocate_signed_big_int_buffer(&self.n);
+        base64::decode_config_buf(&self.n, base64::URL_SAFE_NO_PAD, &mut buf).map_err(JwkError::from)?;
+        Ok(buf)
+    }
+
+    pub fn modulus_unsigned_bytes_be(&self) -> Result<Vec<u8>, JwkError> {
         base64::decode_config(&self.n, base64::URL_SAFE_NO_PAD).map_err(JwkError::from)
     }
 
-    pub fn public_exponent(&self) -> Result<Vec<u8>, JwkError> {
+    pub fn public_exponent_signed_bytes_be(&self) -> Result<Vec<u8>, JwkError> {
+        let mut buf = Self::h_allocate_signed_big_int_buffer(&self.e);
+        base64::decode_config_buf(&self.e, base64::URL_SAFE_NO_PAD, &mut buf).map_err(JwkError::from)?;
+        Ok(buf)
+    }
+
+    pub fn public_exponent_unsigned_bytes_be(&self) -> Result<Vec<u8>, JwkError> {
         base64::decode_config(&self.e, base64::URL_SAFE_NO_PAD).map_err(JwkError::from)
+    }
+
+    fn h_allocate_signed_big_int_buffer(base64_url_encoding: &str) -> Vec<u8> {
+        // Big integers from 0x00 to 0x7F are all base64-encoded using two ASCII characters ranging from "AA" to "fw".
+        // We know the required capacity is _exactly_ of one byte.
+        // The value 0 is valid and is represented as the array [0x00] ("AA").
+        // For numbers greater than 0x7F, logic is a bit more complex.
+        // There is no leading zero in JWK keys because _unsigned_ numbers are used.
+        // As such, there is no need to disambiguate the high-order bit (0x80)
+        // which is used as the sign bit for _signed_ numbers.
+        // The high-order bit is set when base64 encoding's leading character matches [g-z0-9_-].
+        match base64_url_encoding.chars().next() {
+            // The leading zero is re-introduced for any number whose high-order bit is set
+            Some('g'..='z' | '0'..='9' | '_' | '-') => vec![0],
+            // Otherwise, there is nothing more to do
+            _ => Vec::with_capacity(1),
+        }
     }
 }
 
@@ -300,6 +355,7 @@ impl JwkPublicRsaKey {
 mod tests {
     use super::*;
     use crate::jose::jws::JwsAlg;
+    use crate::pem::Pem;
 
     const RSA_MODULUS: &str = "rpJjxW0nNZiq1mPC3ZAxqf9qNjmKurP7XuKrpWrfv3IOUldqChQVPNg8zCvDOMZIO-ZDuRmVH\
                                EZ5E1vz5auHNACnpl6AvDGJ-4qyX42vfUDMNZx8i86d7bQpwJkO_MVMLj8qMGmTVbQ8zqVw2z\
@@ -402,5 +458,31 @@ mod tests {
         let encoded = expected.to_json_pretty().unwrap();
         let decoded = JwkSet::from_json(&encoded).unwrap();
         pretty_assertions::assert_eq!(decoded, expected);
+    }
+
+    const PUBLIC_KEY_PEM: &str = r#"-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA61BjmfXGEvWmegnBGSuS
++rU9soUg2FnODva32D1AqhwdziwHINFaD1MVlcrYG6XRKfkcxnaXGfFDWHLEvNBS
+EVCgJjtHAGZIm5GL/KA86KDp/CwDFMSwluowcXwDwoyinmeOY9eKyh6aY72xJh7n
+oLBBq1N0bWi1e2i+83txOCg4yV2oVXhBo8pYEJ8LT3el6Smxol3C1oFMVdwPgc0v
+Tl25XucMcG/ALE/KNY6pqC2AQ6R2ERlVgPiUWOPatVkt7+Bs3h5Ramxh7XjBOXeu
+lmCpGSynXNcpZ/06+vofGi/2MlpQZNhHAo8eayMp6FcvNucIpUndo1X8dKMv3Y26
+ZQIDAQAB
+-----END PUBLIC KEY-----"#;
+
+    #[test]
+    fn x509_and_jwk_conversion() {
+        let initial_key = PublicKey::from_pem(&PUBLIC_KEY_PEM.parse::<Pem>().expect("pem")).expect("public key");
+        let jwk = Jwk::from_public_key(&initial_key).unwrap();
+        if let JwkKeyType::Rsa(rsa_key) = &jwk.key {
+            let modulus = base64::decode_config(&rsa_key.n, base64::URL_SAFE_NO_PAD).unwrap();
+            assert_ne!(modulus[0], 0x00);
+            let public_exponent = base64::decode_config(&rsa_key.e, base64::URL_SAFE_NO_PAD).unwrap();
+            assert_ne!(public_exponent[0], 0x00);
+        } else {
+            panic!("Unexpected key type");
+        }
+        let from_jwk_key = jwk.to_public_key().unwrap();
+        assert_eq!(from_jwk_key, initial_key);
     }
 }

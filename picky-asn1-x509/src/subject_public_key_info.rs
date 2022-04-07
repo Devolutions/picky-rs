@@ -15,6 +15,7 @@ pub struct RsaPublicKey {
     pub modulus: IntegerAsn1,         // n
     pub public_exponent: IntegerAsn1, // e
 }
+
 pub type EncapsulatedRsaPublicKey = BitStringAsn1Container<RsaPublicKey>;
 
 pub type EcPoint = OctetStringAsn1;
