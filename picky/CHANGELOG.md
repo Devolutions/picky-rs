@@ -63,6 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fix `BufReader` panic in `WinCertificate::decode` and `WinCertificate::encode` if data len is bigger than default capacity.
 - Fix `WinCertificate` encoding: `length` wasn’t correct.
+- Fix leading zeros in JWK encoding (see issue [#140](https://github.com/Devolutions/picky-rs/issues/140)).
 
 ### Removed
 
