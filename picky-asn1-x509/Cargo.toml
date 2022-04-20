@@ -27,7 +27,7 @@ widestring = { version = "0.5.1", default-features = false, features = ["alloc"]
 
 [dev-dependencies]
 num-bigint-dig = "0.8.1"
-pretty_assertions = "1.1.0"
+pretty_assertions = "1.2.1"
 hex = "0.4.3"
 
 [features]
