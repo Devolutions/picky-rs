@@ -146,6 +146,28 @@ impl<'a> TryFrom<&'a PrivateKey> for EcdsaKeypair<'a> {
     type Error = KeyError;
 
     fn try_from(v: &'a PrivateKey) -> Result<Self, Self::Error> {
+        let curve = match v.0.private_key_algorithm.parameters() {
+            picky_asn1_x509::AlgorithmIdentifierParameters::Ec(params) => match params {
+                Some(ec_parameters) => match ec_parameters {
+                    picky_asn1_x509::EcParameters::NamedCurve(curve) => {
+                        let oid = Into::<String>::into(&curve.0);
+                        match oid.as_str() {
+                            oids::SECP256R1 => Ok(EcdsaCurve::Nist256),
+                            oids::SECP384R1 => Ok(EcdsaCurve::Nist384),
+                            oids::SECP521R1 => Ok(EcdsaCurve::Nist512),
+                            unknown => Err(KeyError::EC {
+                                context: format!("Unknown curve type: {}", unknown),
+                            }),
+                        }
+                    }
+                },
+                None => Err(KeyError::EC {
+                    context: "EC keypair cannot be built when curve type is not provided by private key".to_string(),
+                }),
+            }?,
+            _ => todo!(),
+        };
+
         match &v.as_inner().private_key {
             private_key_info::PrivateKeyValue::RSA(_) => Err(KeyError::EC {
                 context: "EC keypair cannot be built from RSA private key".to_string(),
@@ -154,25 +176,25 @@ impl<'a> TryFrom<&'a PrivateKey> for EcdsaKeypair<'a> {
                 let private_key_data = private_key.private_key.to_vec();
                 let public_key_data = private_key.public_key.payload_view();
 
-                let curve = match &private_key.parameters.0 .0 {
-                    Some(ec_parameters) => match ec_parameters {
-                        picky_asn1_x509::EcParameters::NamedCurve(curve) => {
-                            let oid = Into::<String>::into(&curve.0);
-                            match oid.as_str() {
-                                oids::SECP256R1 => Ok(EcdsaCurve::Nist256),
-                                oids::SECP384R1 => Ok(EcdsaCurve::Nist384),
-                                oids::SECP521R1 => Ok(EcdsaCurve::Nist512),
-                                unknown => Err(KeyError::EC {
-                                    context: format!("Unknown curve type: {}", unknown),
-                                }),
-                            }
-                        }
-                    },
-                    None => Err(KeyError::EC {
-                        context: "EC keypair cannot be built when curve type is not provided by private key"
-                            .to_string(),
-                    }),
-                }?;
+                // let curve = match &private_key.parameters.0 .0 {
+                //     Some(ec_parameters) => match ec_parameters {
+                //         picky_asn1_x509::EcParameters::NamedCurve(curve) => {
+                //             let oid = Into::<String>::into(&curve.0);
+                //             match oid.as_str() {
+                //                 oids::SECP256R1 => Ok(EcdsaCurve::Nist256),
+                //                 oids::SECP384R1 => Ok(EcdsaCurve::Nist384),
+                //                 oids::SECP521R1 => Ok(EcdsaCurve::Nist512),
+                //                 unknown => Err(KeyError::EC {
+                //                     context: format!("Unknown curve type: {}", unknown),
+                //                 }),
+                //             }
+                //         }
+                //     },
+                //     None => Err(KeyError::EC {
+                //         context: "EC keypair cannot be built when curve type is not provided by private key"
+                //             .to_string(),
+                //     }),
+                // }?;
 
                 if public_key_data.is_empty() {
                     Err(KeyError::EC {
