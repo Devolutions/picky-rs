@@ -146,7 +146,7 @@ impl<'a> TryFrom<&'a PrivateKey> for EcdsaKeypair<'a> {
     type Error = KeyError;
 
     fn try_from(v: &'a PrivateKey) -> Result<Self, Self::Error> {
-        let curve = match v.0.private_key_algorithm.parameters() {
+        let curve = match &v.as_inner().private_key_algorithm.parameters() {
             picky_asn1_x509::AlgorithmIdentifierParameters::Ec(params) => match params {
                 Some(ec_parameters) => match ec_parameters {
                     picky_asn1_x509::EcParameters::NamedCurve(curve) => {
@@ -164,9 +164,11 @@ impl<'a> TryFrom<&'a PrivateKey> for EcdsaKeypair<'a> {
                 None => Err(KeyError::EC {
                     context: "EC keypair cannot be built when curve type is not provided by private key".to_string(),
                 }),
-            }?,
-            _ => todo!(),
-        };
+            },
+            _ => Err(KeyError::EC {
+                context: format!("No Ec parameters found in private_key_algorithm"),
+            }),
+        }?;
 
         match &v.as_inner().private_key {
             private_key_info::PrivateKeyValue::RSA(_) => Err(KeyError::EC {
