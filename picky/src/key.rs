@@ -170,7 +170,7 @@ impl<'a> TryFrom<&'a PrivateKey> for EcdsaKeypair<'a> {
             }),
         }?;
 
-        match &v.as_inner().private_key {
+        let (private_key_data, public_key_data) = match &v.as_inner().private_key {
             private_key_info::PrivateKeyValue::RSA(_) => Err(KeyError::EC {
                 context: "EC keypair cannot be built from RSA private key".to_string(),
             }),
@@ -185,14 +185,16 @@ impl<'a> TryFrom<&'a PrivateKey> for EcdsaKeypair<'a> {
                                 .to_string(),
                     })
                 } else {
-                    Ok(EcdsaKeypair {
-                        private_key: private_key_data,
-                        public_key: public_key_data,
-                        curve,
-                    })
+                    Ok((private_key_data, public_key_data))
                 }
             }
-        }
+        }?;
+
+        Ok(EcdsaKeypair {
+            private_key: private_key_data,
+            public_key: public_key_data,
+            curve,
+        })
     }
 }
 
