@@ -146,6 +146,26 @@ impl<'a> TryFrom<&'a PrivateKey> for EcdsaKeypair<'a> {
     type Error = KeyError;
 
     fn try_from(v: &'a PrivateKey) -> Result<Self, Self::Error> {
+        let (private_key_data, public_key_data) = match &v.as_inner().private_key {
+            private_key_info::PrivateKeyValue::RSA(_) => Err(KeyError::EC {
+                context: "EC keypair cannot be built from RSA private key".to_string(),
+            }),
+            private_key_info::PrivateKeyValue::EC(OctetStringAsn1Container(private_key)) => {
+                let private_key_data = private_key.private_key.to_vec();
+                let public_key_data = private_key.public_key.payload_view();
+
+                if public_key_data.is_empty() {
+                    Err(KeyError::EC {
+                        context:
+                            "EC keypair cannot be built from EC private key that doesn't have a bundled private key"
+                                .to_string(),
+                    })
+                } else {
+                    Ok((private_key_data, public_key_data))
+                }
+            }
+        }?;
+
         let curve = match &v.as_inner().private_key_algorithm.parameters() {
             picky_asn1_x509::AlgorithmIdentifierParameters::Ec(params) => match params {
                 Some(ec_parameters) => match ec_parameters {
@@ -168,26 +188,6 @@ impl<'a> TryFrom<&'a PrivateKey> for EcdsaKeypair<'a> {
             _ => Err(KeyError::EC {
                 context: format!("No Ec parameters found in private_key_algorithm"),
             }),
-        }?;
-
-        let (private_key_data, public_key_data) = match &v.as_inner().private_key {
-            private_key_info::PrivateKeyValue::RSA(_) => Err(KeyError::EC {
-                context: "EC keypair cannot be built from RSA private key".to_string(),
-            }),
-            private_key_info::PrivateKeyValue::EC(OctetStringAsn1Container(private_key)) => {
-                let private_key_data = private_key.private_key.to_vec();
-                let public_key_data = private_key.public_key.payload_view();
-
-                if public_key_data.is_empty() {
-                    Err(KeyError::EC {
-                        context:
-                            "EC keypair cannot be built from EC private key that doesn't have a bundled private key"
-                                .to_string(),
-                    })
-                } else {
-                    Ok((private_key_data, public_key_data))
-                }
-            }
         }?;
 
         Ok(EcdsaKeypair {
