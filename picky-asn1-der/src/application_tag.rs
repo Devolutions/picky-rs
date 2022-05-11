@@ -8,11 +8,17 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 
 #[derive(Debug, PartialEq)]
-pub struct ApplicationTag<V: Debug + PartialEq, const T: u8>(V);
+pub struct ApplicationTag<V: Debug + PartialEq, const T: u8>(pub V);
 
 impl<V: Debug + PartialEq, const T: u8> ApplicationTag<V, T> {
     pub fn from(value: V) -> Self {
         Self(value)
+    }
+}
+
+impl<V: Clone + PartialEq + Debug, const T: u8> Clone for ApplicationTag<V, T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
     }
 }
 
@@ -77,7 +83,7 @@ impl<'de, V: de::Deserialize<'de> + Debug + PartialEq, const T: u8> de::Deserial
     }
 }
 
-impl<V: ser::Serialize + Debug + PartialEq, const T: u8> ser::Serialize for ApplicationTag<V, T> {
+impl<V: ser::Serialize + Debug + PartialEq + Clone, const T: u8> ser::Serialize for ApplicationTag<V, T> {
     fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, S::Error>
     where
         S: ser::Serializer,
