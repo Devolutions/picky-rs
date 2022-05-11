@@ -206,4 +206,11 @@ define_oid! {
     UNKNOWN_RESERVED_PROP_ID_127 => unknown_reserved_prop_id_127 => "1.3.6.1.4.1.311.10.11.127",
 
     AUTO_UPDATE_END_REVOCATION => auto_update_end_revocation => "1.3.6.1.4.1.311.60.3.2",
+
+    // NLA protocols
+    KRB5 => krb5 => "1.2.840.113554.1.2.2",
+    MS_KRB5 => ms_krb5 => "1.2.840.48018.1.2.2",
+    KRB5_USER_TO_USER => krb5_user_to_user => "1.2.840.113554.1.2.2.3",
+    NTLM_SSP => ntlm_ssp => "1.3.6.1.4.1.311.2.2.10",
+    SPNEGO => spnego => "1.3.6.1.5.5.2",
 }
