@@ -186,7 +186,7 @@ impl<'a> TryFrom<&'a PrivateKey> for EcdsaKeypair<'a> {
                 }),
             },
             _ => Err(KeyError::EC {
-                context: format!("No Ec parameters found in private_key_algorithm"),
+                context: "No Ec parameters found in private_key_algorithm".to_string(),
             }),
         }?;
 
