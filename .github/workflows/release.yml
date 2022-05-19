@@ -13,7 +13,7 @@ jobs:
   preflight:
     name: Preflight
     runs-on: ubuntu-18.04
-    outputs: 
+    outputs:
       commit: ${{ steps.get-commit.outputs.commit }}
 
     steps:
@@ -114,5 +114,5 @@ jobs:
       - name: Push container
         shell: pwsh
         run: |
-          echo ${{ secrets.DOCKER_HUB_BOT_PASSWORD }} | docker login -u devolutionsbot --password-stdin
+          echo ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }} | docker login -u devolutionsbot --password-stdin
           docker push ${{ steps.build-container.outputs.image-name }}
