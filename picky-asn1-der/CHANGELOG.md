@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.3.1] 2022-05-19
+
+### Changed
+
+- Make `ApplicationTag`’s inner value public
+- Update dependencies
+
 ## [0.3.0] 2022-02-02
 
 ### Added
