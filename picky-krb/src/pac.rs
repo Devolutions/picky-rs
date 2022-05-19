@@ -190,7 +190,7 @@ impl Pac {
             buffer.serialize(&mut c)?;
         }
 
-        data.write_all(&c.get_ref())?;
+        data.write_all(c.get_ref())?;
 
         Ok(())
     }
