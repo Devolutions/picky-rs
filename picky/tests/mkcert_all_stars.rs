@@ -9,18 +9,10 @@ use std::fs;
 
 const ALL_STARS_FILE_PATH: &str = "../test_assets/mkcert_all_root_ca_2019_10.txt";
 
-fn substract_no_underflow(val: usize, sub: usize) -> usize {
-    if sub > val {
-        0
-    } else {
-        val - sub
-    }
-}
-
 fn print_context(contents: &str, cursor: usize) {
     eprintln!(
         "==== Context ====\n{}\n>>>>>>>>>> CURSOR HERE <<<<<<<<<<\n{}",
-        &contents[substract_no_underflow(cursor, 1000)..cursor],
+        &contents[cursor.saturating_sub(1000)..cursor],
         &contents[cursor..min(cursor + 1500, contents.len())],
     );
 }

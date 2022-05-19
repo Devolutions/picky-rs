@@ -350,7 +350,7 @@ impl Jwe {
 
     /// Encode with CEK encrypted and included in the token using asymmetric cryptography.
     pub fn encode(self, asymmetric_key: &PublicKey) -> Result<String, JweError> {
-        encode_impl(self, EncoderMode::Asymetric(asymmetric_key))
+        encode_impl(self, EncoderMode::Asymmetric(asymmetric_key))
     }
 
     /// Encode with provided CEK (a symmetric key). This will ignore `alg` value and override it with "dir".
@@ -373,7 +373,7 @@ impl Jwe {
 
 #[derive(Debug, Clone)]
 enum EncoderMode<'a> {
-    Asymetric(&'a PublicKey),
+    Asymmetric(&'a PublicKey),
     Direct(&'a [u8]),
 }
 
@@ -399,7 +399,7 @@ fn encode_impl(jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
                 Cow::Borrowed(symmetric_key),
             )
         }
-        EncoderMode::Asymetric(public_key) => {
+        EncoderMode::Asymmetric(public_key) => {
             // Currently, only rsa is supported
             let rsa_public_key = RsaPublicKey::try_from(public_key)?;
 
