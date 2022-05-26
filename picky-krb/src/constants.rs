@@ -10,8 +10,15 @@ pub mod types {
 
     pub const KRB_ERROR_MSG_TYPE: u8 = 0x1e;
 
+    pub const NT_UNKNOWN: u8 = 0x00;
     pub const NT_PRINCIPAL: u8 = 0x01;
     pub const NT_SRV_INST: u8 = 0x02;
+    pub const NT_SRV_HST: u8 = 0x03;
+    pub const NT_SRV_XHST: u8 = 0x04;
+    pub const NT_UID: u8 = 0x05;
+    pub const NT_X500_PRINCIPAL: u8 = 0x06;
+    pub const NT_SMTP_NAME: u8 = 0x07;
+    pub const NT_ENTERPRISE: u8 = 0x0A;
 
     pub const PA_ENC_TIMESTAMP: [u8; 1] = [0x02];
     pub const PA_ENC_TIMESTAMP_KEY_USAGE: i32 = 1;
