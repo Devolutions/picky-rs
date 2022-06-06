@@ -2,7 +2,7 @@
 name = "picky-server"
 version = "4.9.0"
 authors = [
-    "jtrepanier-devolutions <jtrepanier@devolutions.net>",
+    "Jonathan Trépanier <jtrepanier@devolutions.net",
     "Benoît CORTIER <benoit.cortier@fried-world.eu>",
     "Johann Dufaud <jdufaud@devolutions.net>",
 ]
