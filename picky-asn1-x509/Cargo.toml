@@ -24,6 +24,7 @@ oid = { version = "0.2.1", features = ["serde_support"] }
 base64 = "0.13.0"
 num-bigint-dig = { version = "0.8.1", optional = true }
 widestring = { version = "0.5.1", default-features = false, features = ["alloc"], optional = true }
+zeroize = { version = "^1.5", optional = true }
 
 [dev-dependencies]
 num-bigint-dig = "0.8.1"
@@ -34,4 +35,5 @@ hex = "0.4.3"
 legacy = ["num-bigint-dig"]
 pkcs7 = ["widestring"]
 ctl = ["pkcs7"]
+zeroize = ["dep:zeroize", "picky-asn1/zeroize"]
 

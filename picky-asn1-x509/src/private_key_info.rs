@@ -6,7 +6,10 @@ use picky_asn1::wrapper::{
 #[cfg(not(feature = "legacy"))]
 use serde::Deserialize;
 use serde::{de, ser, Serialize};
+
 use std::fmt;
+#[cfg(feature = "zeroize")]
+use zeroize::Zeroize;
 
 /// [Public-Key Cryptography Standards (PKCS) #8](https://tools.ietf.org/html/rfc5208#section-5)
 ///
@@ -193,6 +196,13 @@ pub struct RsaPrivateKey {
     pub coefficient: IntegerAsn1,
 }
 
+#[cfg(feature = "zeroize")]
+impl Drop for RsaPrivateKey {
+    fn drop(&mut self) {
+        self.private_exponent.zeroize();
+    }
+}
+
 #[cfg(feature = "legacy")]
 impl<'de> de::Deserialize<'de> for RsaPrivateKey {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -329,6 +339,16 @@ impl RsaPrivateKey {
         &self.coefficient
     }
 
+    #[cfg(feature = "zeroize")]
+    #[deprecated(note = "field is now public")]
+    pub fn into_public_components(mut self) -> (IntegerAsn1, IntegerAsn1) {
+        (
+            std::mem::take(&mut self.modulus),
+            std::mem::take(&mut self.public_exponent),
+        )
+    }
+
+    #[cfg(not(feature = "zeroize"))]
     #[deprecated(note = "field is now public")]
     pub fn into_public_components(self) -> (IntegerAsn1, IntegerAsn1) {
         (self.modulus, self.public_exponent)
@@ -405,6 +425,13 @@ impl<'de> serde::Deserialize<'de> for ECPrivateKey {
         }
 
         deserializer.deserialize_seq(Visitor)
+    }
+}
+
+#[cfg(feature = "zeroize")]
+impl Drop for ECPrivateKey {
+    fn drop(&mut self) {
+        self.private_key.zeroize();
     }
 }
 
