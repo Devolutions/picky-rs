@@ -218,17 +218,17 @@ impl JweEnc {
 
     pub fn nonce_size(self) -> usize {
         match self {
-            Self::Aes128CbcHmacSha256 | Self::Aes128Gcm => <Aes128Gcm as AeadCore>::NonceSize::to_usize(),
-            Self::Aes192CbcHmacSha384 | Self::Aes192Gcm => <Aes192Gcm as AeadCore>::NonceSize::to_usize(),
-            Self::Aes256CbcHmacSha512 | Self::Aes256Gcm => <Aes256Gcm as AeadCore>::NonceSize::to_usize(),
+            Self::Aes128Gcm | Self::Aes192Gcm | Self::Aes256Gcm => 12usize,
+            Self::Aes128CbcHmacSha256 | Self::Aes192CbcHmacSha384 | Self::Aes256CbcHmacSha512 => 16usize,
         }
     }
 
     pub fn tag_size(self) -> usize {
         match self {
-            Self::Aes128CbcHmacSha256 | Self::Aes128Gcm => <Aes128Gcm as AeadCore>::TagSize::to_usize(),
-            Self::Aes192CbcHmacSha384 | Self::Aes192Gcm => <Aes192Gcm as AeadCore>::TagSize::to_usize(),
-            Self::Aes256CbcHmacSha512 | Self::Aes256Gcm => <Aes256Gcm as AeadCore>::TagSize::to_usize(),
+            Self::Aes128Gcm | Self::Aes192Gcm | Self::Aes256Gcm => 16usize,
+            Self::Aes128CbcHmacSha256 => 32usize,
+            Self::Aes192CbcHmacSha384 => 48usize,
+            Self::Aes256CbcHmacSha512 => 64usize,
         }
     }
 }
@@ -358,7 +358,7 @@ impl Jwe {
         encode_impl(self, EncoderMode::Direct(cek))
     }
 
-    /// Encode with CEK encrypted and included in the token using asymmetric cryptography.
+    /// Decode with CEK encrypted and included in the token using asymmetric cryptography.
     pub fn decode(encoded_token: &str, key: &PrivateKey) -> Result<Jwe, JweError> {
         decode_impl(encoded_token, DecoderMode::Normal(key))
     }
@@ -394,10 +394,7 @@ fn encode_impl(jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
             // Override `alg` header with "dir"
             header.alg = JweAlg::Direct;
 
-            (
-                base64::encode_config(&[], base64::URL_SAFE_NO_PAD),
-                Cow::Borrowed(symmetric_key),
-            )
+            (String::new(), Cow::Borrowed(symmetric_key))
         }
         EncoderMode::Asymmetric(public_key) => {
             // Currently, only rsa is supported
