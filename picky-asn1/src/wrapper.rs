@@ -323,7 +323,7 @@ impls! { OctetStringAsn1(VecU8), Tag::OCTET_STRING }
 ///
 /// For underlying implementation,
 /// see this [Microsoft's documentation](https://docs.microsoft.com/en-us/windows/win32/seccertenroll/about-integer).
-#[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, PartialOrd, Hash, Clone)]
 pub struct IntegerAsn1(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 impls! { IntegerAsn1(VecU8), Tag::INTEGER }
@@ -384,6 +384,16 @@ impl IntegerAsn1 {
             bytes.insert(0, 0x00);
         }
         Self(bytes)
+    }
+}
+
+#[cfg(feature = "zeroize")]
+use zeroize::Zeroize;
+
+#[cfg(feature = "zeroize")]
+impl Zeroize for IntegerAsn1 {
+    fn zeroize(&mut self) {
+        self.0.zeroize();
     }
 }
 
