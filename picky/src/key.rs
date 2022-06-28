@@ -80,7 +80,6 @@ impl From<PrivateKey> for PrivateKeyInfo {
 }
 
 impl From<PrivateKey> for SubjectPublicKeyInfo {
-    #[cfg(feature = "zeroize")]
     fn from(key: PrivateKey) -> Self {
         match key.0.private_key {
             PrivateKeyValue::RSA(OctetStringAsn1Container(mut key)) => SubjectPublicKeyInfo::new_rsa_key(
@@ -90,16 +89,6 @@ impl From<PrivateKey> for SubjectPublicKeyInfo {
             PrivateKeyValue::EC(OctetStringAsn1Container(mut key)) => {
                 SubjectPublicKeyInfo::new_ec_key(std::mem::take(&mut key.public_key.0 .0))
             }
-        }
-    }
-
-    #[cfg(not(feature = "zeroize"))]
-    fn from(key: PrivateKey) -> Self {
-        match key.0.private_key {
-            PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => {
-                SubjectPublicKeyInfo::new_rsa_key(key.modulus, key.public_exponent)
-            }
-            PrivateKeyValue::EC(OctetStringAsn1Container(key)) => SubjectPublicKeyInfo::new_ec_key(key.public_key.0 .0),
         }
     }
 }

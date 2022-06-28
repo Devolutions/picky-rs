@@ -339,19 +339,12 @@ impl RsaPrivateKey {
         &self.coefficient
     }
 
-    #[cfg(feature = "zeroize")]
     #[deprecated(note = "field is now public")]
     pub fn into_public_components(mut self) -> (IntegerAsn1, IntegerAsn1) {
         (
             std::mem::take(&mut self.modulus),
             std::mem::take(&mut self.public_exponent),
         )
-    }
-
-    #[cfg(not(feature = "zeroize"))]
-    #[deprecated(note = "field is now public")]
-    pub fn into_public_components(self) -> (IntegerAsn1, IntegerAsn1) {
-        (self.modulus, self.public_exponent)
     }
 }
 
