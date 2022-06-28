@@ -388,10 +388,7 @@ impl IntegerAsn1 {
 }
 
 #[cfg(feature = "zeroize")]
-use zeroize::Zeroize;
-
-#[cfg(feature = "zeroize")]
-impl Zeroize for IntegerAsn1 {
+impl zeroize::Zeroize for IntegerAsn1 {
     fn zeroize(&mut self) {
         self.0.zeroize();
     }
