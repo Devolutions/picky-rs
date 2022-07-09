@@ -10,11 +10,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::constants::types::{
     AP_REP_MSG_TYPE, AP_REQ_MSG_TYPE, AS_REP_MSG_TYPE, AS_REQ_MSG_TYPE, ENC_AS_REP_PART_TYPE, ENC_TGS_REP_PART_TYPE,
-    KRB_ERROR_MSG_TYPE, TGS_REP_MSG_TYPE, TGS_REQ_MSG_TYPE,
+    KRB_ERROR_MSG_TYPE, KRB_PRIV, TGS_REP_MSG_TYPE, TGS_REQ_MSG_TYPE,
 };
 use crate::data_types::{
-    ApOptions, EncryptedData, EncryptionKey, HostAddress, KerberosFlags, KerberosStringAsn1, KerberosTime, LastReq,
-    Microseconds, PaData, PrincipalName, Realm, Ticket,
+    ApOptions, EncKrbPrivPart, EncryptedData, EncryptionKey, HostAddress, KerberosFlags, KerberosStringAsn1,
+    KerberosTime, LastReq, Microseconds, PaData, PrincipalName, Realm, Ticket,
 };
 
 /// [2.2.2 KDC_PROXY_MESSAGE](https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-kkdcp/5778aff5-b182-4b97-a970-29c7f911eef2)
@@ -308,6 +308,37 @@ pub struct TgtRep {
     pub pvno: ExplicitContextTag0<IntegerAsn1>,
     pub msg_type: ExplicitContextTag1<IntegerAsn1>,
     pub ticket: ExplicitContextTag2<Ticket>,
+}
+
+/// [RFC 4120](https://datatracker.ietf.org/doc/html/rfc4120#section-5.7.1)
+///
+/// ```not_rust
+/// KRB-PRIV        ::= [APPLICATION 21] SEQUENCE {
+///         pvno            [0] INTEGER (5),
+///         msg-type        [1] INTEGER (21),
+///                         -- NOTE: there is no [2] tag
+///         enc-part        [3] EncryptedData -- EncKrbPrivPart
+/// }
+/// ```
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+pub struct KrbPrivInner {
+    pub pvno: ExplicitContextTag0<IntegerAsn1>,
+    pub msg_type: ExplicitContextTag1<IntegerAsn1>,
+    pub enc_part: ExplicitContextTag3<EncKrbPrivPart>,
+}
+
+pub type KrbPriv = ApplicationTag<KrbPrivInner, KRB_PRIV>;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct KrbPrivRequest {
+    pub ap_req: ApReq,
+    pub krb_priv: KrbPriv,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct KrbPrivResponse {
+    pub ap_req: ApRep,
+    pub krb_priv: KrbPriv,
 }
 
 #[cfg(test)]

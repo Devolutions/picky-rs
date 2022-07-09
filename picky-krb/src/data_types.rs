@@ -10,7 +10,7 @@ use std::fmt;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
-use crate::constants::types::{AUTHENTICATOR_TYPE, ENC_AP_REP_PART_TYPE, TICKET_TYPE};
+use crate::constants::types::{AUTHENTICATOR_TYPE, ENC_AP_REP_PART_TYPE, KRB_PRIV_ENC_PART, TICKET_TYPE};
 use crate::messages::KrbError;
 
 /// [RFC 4120 5.2.1](https://www.rfc-editor.org/rfc/rfc4120.txt)
@@ -326,6 +326,31 @@ pub struct EtypeInfo2Entry {
 /// ETYPE-INFO2              ::= SEQUENCE SIZE (1..MAX) OF ETYPE-INFO2-ENTRY
 /// ```
 pub type EtypeInfo2 = Asn1SequenceOf<EtypeInfo2Entry>;
+
+/// [RFC 4120](https://datatracker.ietf.org/doc/html/rfc4120#section-5.7.1)
+///
+/// ```not_rust
+/// EncKrbPrivPart  ::= [APPLICATION 28] SEQUENCE {
+///         user-data       [0] OCTET STRING,
+///         timestamp       [1] KerberosTime OPTIONAL,
+///         usec            [2] Microseconds OPTIONAL,
+///         seq-number      [3] UInt32 OPTIONAL,
+///         s-address       [4] HostAddress -- sender's addr --,
+///         r-address       [5] HostAddress OPTIONAL -- recip's addr
+/// }
+/// ```
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+pub struct EncKrbPrivPartInner {
+    user_data: ExplicitContextTag0<OctetStringAsn1>,
+    timestamp: Optional<Option<ExplicitContextTag1<KerberosTime>>>,
+    usec: Optional<Option<ExplicitContextTag2<KerberosTime>>>,
+    seq_number: Optional<Option<ExplicitContextTag3<IntegerAsn1>>>,
+    s_address: ExplicitContextTag4<HostAddress>,
+    #[serde(default)]
+    r_address: Optional<Option<ExplicitContextTag5<HostAddress>>>,
+}
+
+pub type EncKrbPrivPart = ApplicationTag<EncKrbPrivPartInner, KRB_PRIV_ENC_PART>;
 
 pub trait ResultExt<'a, T>
 where

@@ -8,6 +8,9 @@ pub mod types {
     pub const TGT_REQ_MSG_TYPE: u8 = 0x10;
     pub const TGT_REP_MSG_TYPE: u8 = 0x11;
 
+    pub const KRB_PRIV: u8 = 21;
+    pub const KRB_PRIV_ENC_PART: u8 = 28;
+
     pub const KRB_ERROR_MSG_TYPE: u8 = 0x1e;
 
     pub const NT_UNKNOWN: u8 = 0x00;
