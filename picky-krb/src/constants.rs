@@ -37,14 +37,14 @@ pub mod types {
     pub const ENC_AP_REP_PART_TYPE: u8 = 27;
 
     pub const IP_V4_ADDR_TYPE: u8 = 2;
-    pub const DIRECTIONAL_ADDR_TYPE: u8 = 2;
-    pub const CHAOS_NET_ADDR_TYPE: u8 = 2;
-    pub const XNS_ADDR_TYPE: u8 = 2;
-    pub const ISO_ADDR_TYPE: u8 = 2;
-    pub const DECNET_PHASE_IV_ADDR_TYPE: u8 = 2;
-    pub const APPLETALK_DDP_ADDR_TYPE: u8 = 2;
-    pub const NET_BIOS_ADDR_TYPE: u8 = 2;
-    pub const IP_V6_ADDR_TYPE: u8 = 2;
+    pub const DIRECTIONAL_ADDR_TYPE: u8 = 3;
+    pub const CHAOS_NET_ADDR_TYPE: u8 = 5;
+    pub const XNS_ADDR_TYPE: u8 = 6;
+    pub const ISO_ADDR_TYPE: u8 = 7;
+    pub const DECNET_PHASE_IV_ADDR_TYPE: u8 = 12;
+    pub const APPLETALK_DDP_ADDR_TYPE: u8 = 16;
+    pub const NET_BIOS_ADDR_TYPE: u8 = 20;
+    pub const IP_V6_ADDR_TYPE: u8 = 24;
 }
 
 pub mod key_usages {

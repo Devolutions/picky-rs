@@ -6,7 +6,7 @@ use picky_asn1::wrapper::{
 };
 use picky_asn1_der::application_tag::ApplicationTag;
 use picky_asn1_der::Asn1DerError;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, ser};
 
 use crate::constants::types::{
     AP_REP_MSG_TYPE, AP_REQ_MSG_TYPE, AS_REP_MSG_TYPE, AS_REQ_MSG_TYPE, ENC_AS_REP_PART_TYPE, ENC_TGS_REP_PART_TYPE,
@@ -324,7 +324,7 @@ pub struct TgtRep {
 pub struct KrbPrivInner {
     pub pvno: ExplicitContextTag0<IntegerAsn1>,
     pub msg_type: ExplicitContextTag1<IntegerAsn1>,
-    pub enc_part: ExplicitContextTag3<EncKrbPrivPart>,
+    pub enc_part: ExplicitContextTag3<EncryptedData>,
 }
 
 pub type KrbPriv = ApplicationTag<KrbPrivInner, KRB_PRIV>;
@@ -333,6 +333,27 @@ pub type KrbPriv = ApplicationTag<KrbPrivInner, KRB_PRIV>;
 pub struct KrbPrivRequest {
     pub ap_req: ApReq,
     pub krb_priv: KrbPriv,
+}
+
+impl ser::Serialize for KrbPrivRequest {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
+    where
+        S: ser::Serializer,
+    {
+        // 2 /* message len */ + 2 /* ap_req len */ + 2 /* krb_priv len */
+        let mut message = vec![0, 0, 0, 0, 0, 0];
+
+        let ap_req_len = picky_asn1_der::to_writer(&self.ap_req, &mut message).unwrap();
+        let krb_priv_len = picky_asn1_der::to_writer(&self.krb_priv, &mut message).unwrap();
+
+        let message_len = 6 + ap_req_len + krb_priv_len;
+
+        message[0..2].copy_from_slice(&(message_len as u16).to_be_bytes());
+        message[2..4].copy_from_slice(&(ap_req_len as u16).to_be_bytes());
+        message[4..6].copy_from_slice(&(krb_priv_len as u16).to_be_bytes());
+
+        serializer.serialize_bytes(&message)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

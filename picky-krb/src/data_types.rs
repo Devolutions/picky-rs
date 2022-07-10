@@ -341,16 +341,32 @@ pub type EtypeInfo2 = Asn1SequenceOf<EtypeInfo2Entry>;
 /// ```
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct EncKrbPrivPartInner {
-    user_data: ExplicitContextTag0<OctetStringAsn1>,
-    timestamp: Optional<Option<ExplicitContextTag1<KerberosTime>>>,
-    usec: Optional<Option<ExplicitContextTag2<KerberosTime>>>,
-    seq_number: Optional<Option<ExplicitContextTag3<IntegerAsn1>>>,
-    s_address: ExplicitContextTag4<HostAddress>,
+    pub user_data: ExplicitContextTag0<OctetStringAsn1>,
+    pub timestamp: Optional<Option<ExplicitContextTag1<KerberosTime>>>,
+    pub usec: Optional<Option<ExplicitContextTag2<KerberosTime>>>,
+    pub seq_number: Optional<Option<ExplicitContextTag3<IntegerAsn1>>>,
+    pub s_address: ExplicitContextTag4<HostAddress>,
     #[serde(default)]
-    r_address: Optional<Option<ExplicitContextTag5<HostAddress>>>,
+    pub r_address: Optional<Option<ExplicitContextTag5<HostAddress>>>,
 }
 
 pub type EncKrbPrivPart = ApplicationTag<EncKrbPrivPartInner, KRB_PRIV_ENC_PART>;
+
+/// [RF C 3244](https://datatracker.ietf.org/doc/html/rfc3244.html#section-2)
+///
+/// ```not_rust
+/// ChangePasswdData ::=  SEQUENCE {
+///     newpasswd[0]   OCTET STRING,
+///     targname[1]    PrincipalName OPTIONAL,
+///     targrealm[2]   Realm OPTIONAL
+/// }
+/// ```
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+pub struct ChangePasswdData {
+    pub new_passwd: ExplicitContextTag0<OctetStringAsn1>,
+    pub target_name: Optional<Option<ExplicitContextTag1<PrincipalName>>>,
+    pub target_realm: Optional<Option<ExplicitContextTag1<Realm>>>,
+}
 
 pub trait ResultExt<'a, T>
 where
