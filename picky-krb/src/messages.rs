@@ -5,8 +5,8 @@ use picky_asn1::wrapper::{
     Optional,
 };
 use picky_asn1_der::application_tag::ApplicationTag;
-use picky_asn1_der::Asn1DerError;
-use serde::{Deserialize, Serialize, ser};
+use picky_asn1_der::{Asn1DerError, Asn1RawDer};
+use serde::{ser, Deserialize, Serialize};
 
 use crate::constants::types::{
     AP_REP_MSG_TYPE, AP_REQ_MSG_TYPE, AS_REP_MSG_TYPE, AS_REQ_MSG_TYPE, ENC_AS_REP_PART_TYPE, ENC_TGS_REP_PART_TYPE,
@@ -340,19 +340,25 @@ impl ser::Serialize for KrbPrivRequest {
     where
         S: ser::Serializer,
     {
-        // 2 /* message len */ + 2 /* ap_req len */ + 2 /* krb_priv len */
+        // 2 /* message len */ + 2 /* version */ + 2 /* ap_req len */
         let mut message = vec![0, 0, 0, 0, 0, 0];
 
         let ap_req_len = picky_asn1_der::to_writer(&self.ap_req, &mut message).unwrap();
+        println!("message 1 {:?}", message);
         let krb_priv_len = picky_asn1_der::to_writer(&self.krb_priv, &mut message).unwrap();
+        println!("message 2 {:?}", message);
 
-        let message_len = 6 + ap_req_len + krb_priv_len;
+        let message_len = 6 + ap_req_len + krb_priv_len
+        //  + 4
+            ;
 
         message[0..2].copy_from_slice(&(message_len as u16).to_be_bytes());
-        message[2..4].copy_from_slice(&(ap_req_len as u16).to_be_bytes());
-        message[4..6].copy_from_slice(&(krb_priv_len as u16).to_be_bytes());
+        message[2..4].copy_from_slice(&[0x00, 0x01]);
+        message[4..6].copy_from_slice(&(ap_req_len as u16).to_be_bytes());
 
-        serializer.serialize_bytes(&message)
+        println!("message 3 {:0x?}", message);
+
+        Asn1RawDer(message).serialize(serializer)
     }
 }
 
