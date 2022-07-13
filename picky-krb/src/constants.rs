@@ -1,4 +1,5 @@
 pub mod types {
+    /// [Kerberos Message Types](https://datatracker.ietf.org/doc/html/rfc4120#section-7.5.7)
     pub const AS_REQ_MSG_TYPE: u8 = 0x0a;
     pub const AS_REP_MSG_TYPE: u8 = 0x0b;
     pub const TGS_REQ_MSG_TYPE: u8 = 0x0c;
@@ -13,6 +14,7 @@ pub mod types {
 
     pub const KRB_ERROR_MSG_TYPE: u8 = 0x1e;
 
+    /// [Principal Names](https://datatracker.ietf.org/doc/html/rfc4120#section-6.2)
     pub const NT_UNKNOWN: u8 = 0x00;
     pub const NT_PRINCIPAL: u8 = 0x01;
     pub const NT_SRV_INST: u8 = 0x02;
@@ -23,6 +25,7 @@ pub mod types {
     pub const NT_SMTP_NAME: u8 = 0x07;
     pub const NT_ENTERPRISE: u8 = 0x0A;
 
+    /// [PreAuthentication Data Types](https://datatracker.ietf.org/doc/html/rfc4120#section-7.5.2)
     pub const PA_ENC_TIMESTAMP: [u8; 1] = [0x02];
     pub const PA_ENC_TIMESTAMP_KEY_USAGE: i32 = 1;
     pub const PA_PAC_REQUEST_TYPE: [u8; 2] = [0x00, 0x80];
@@ -36,6 +39,7 @@ pub mod types {
     pub const ENC_TGS_REP_PART_TYPE: u8 = 26;
     pub const ENC_AP_REP_PART_TYPE: u8 = 27;
 
+    /// [Address Types](https://datatracker.ietf.org/doc/html/rfc4120#section-7.5.3)
     pub const IP_V4_ADDR_TYPE: u8 = 2;
     pub const DIRECTIONAL_ADDR_TYPE: u8 = 3;
     pub const CHAOS_NET_ADDR_TYPE: u8 = 5;
@@ -48,13 +52,16 @@ pub mod types {
 }
 
 pub mod key_usages {
+    /// [GSS API Key Usages](https://datatracker.ietf.org/doc/html/rfc4121#section-2)
     pub const ACCEPTOR_SEAL: i32 = 22;
     pub const ACCEPTOR_SIGN: i32 = 23;
     pub const INITIATOR_SEAL: i32 = 24;
     pub const INITIATOR_SIGN: i32 = 25;
+    /// [Key Usage Numbers](https://datatracker.ietf.org/doc/html/rfc4120#section-6.2)
     pub const KRB_PRIV_ENC_PART: i32 = 13;
 }
 
+/// [The Kerberos Version 5 GSS API](https://datatracker.ietf.org/doc/html/rfc4121)
 pub mod gss_api {
     pub const AP_REQ_TOKEN_ID: [u8; 2] = [0x01, 0x00];
     pub const TGT_REQ_TOKEN_ID: [u8; 2] = [0x04, 0x00];
@@ -66,6 +73,12 @@ pub mod gss_api {
 
     pub const WRAP_TOKEN_ID: [u8; 2] = [0x05, 0x04];
     pub const WRAP_FILLER: u8 = 0xff;
+
+    /// [Authenticator Checksum](https://datatracker.ietf.org/doc/html/rfc4121#section-4.1.1)
+    pub const AUTHENTICATOR_CHECKSUM_TYPE: [u8; 3] = [0x00, 0x80, 0x03];
 }
 
-pub const KRB_PRIV_VERSION: [u8; 2] = [0x00, 0x01];
+/// [Kerberos Change Password and Set Password Protocols](https://datatracker.ietf.org/doc/html/rfc3244)
+pub mod krb_priv {
+    pub const KRB_PRIV_VERSION: [u8; 2] = [0x00, 0x01];
+}

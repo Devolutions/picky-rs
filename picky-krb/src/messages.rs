@@ -1,5 +1,7 @@
+use std::fmt;
 use std::io::{self, Read};
 
+use picky_asn1::tag::{TagClass, TagPeeker};
 use picky_asn1::wrapper::{
     Asn1SequenceOf, ExplicitContextTag0, ExplicitContextTag1, ExplicitContextTag10, ExplicitContextTag11,
     ExplicitContextTag12, ExplicitContextTag2, ExplicitContextTag3, ExplicitContextTag4, ExplicitContextTag5,
@@ -8,16 +10,17 @@ use picky_asn1::wrapper::{
 };
 use picky_asn1_der::application_tag::ApplicationTag;
 use picky_asn1_der::{Asn1DerError, Asn1RawDer};
+use serde::ser::Error;
 use serde::{de, ser, Deserialize, Serialize};
 
+use crate::constants::krb_priv::KRB_PRIV_VERSION;
 use crate::constants::types::{
     AP_REP_MSG_TYPE, AP_REQ_MSG_TYPE, AS_REP_MSG_TYPE, AS_REQ_MSG_TYPE, ENC_AS_REP_PART_TYPE, ENC_TGS_REP_PART_TYPE,
     KRB_ERROR_MSG_TYPE, KRB_PRIV, TGS_REP_MSG_TYPE, TGS_REQ_MSG_TYPE,
 };
-use crate::constants::KRB_PRIV_VERSION;
 use crate::data_types::{
-    ApOptions, EncKrbPrivPart, EncryptedData, EncryptionKey, HostAddress, KerberosFlags, KerberosStringAsn1,
-    KerberosTime, LastReq, Microseconds, PaData, PrincipalName, Realm, Ticket,
+    ApOptions, EncryptedData, EncryptionKey, HostAddress, KerberosFlags, KerberosStringAsn1, KerberosTime, LastReq,
+    Microseconds, PaData, PrincipalName, Realm, Ticket,
 };
 
 /// [2.2.2 KDC_PROXY_MESSAGE](https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-kkdcp/5778aff5-b182-4b97-a970-29c7f911eef2)
@@ -333,40 +336,73 @@ pub struct KrbPrivInner {
 pub type KrbPriv = ApplicationTag<KrbPrivInner, KRB_PRIV>;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct KrbPrivRequest {
-    pub ap_req: ApReq,
-    pub krb_priv: KrbPriv,
+pub enum ApMessage {
+    ApReq(ApReq),
+    ApRep(ApRep),
 }
 
-impl ser::Serialize for KrbPrivRequest {
-    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, <S as ser::Serializer>::Error>
+impl<'de> de::Deserialize<'de> for ApMessage {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        use serde::de::Error;
+
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = ApMessage;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a valid DER-encoded ApMessage")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let tag_peeker: TagPeeker = seq
+                    .next_element()
+                    .map_err(|e| A::Error::custom(format!("Cannot deserialize application tag: {:?}", e)))?
+                    .ok_or_else(|| A::Error::missing_field("ApplicationTag"))?;
+
+                match tag_peeker.next_tag.class_and_number() {
+                    (TagClass::Application, AP_REQ_MSG_TYPE) => seq
+                        .next_element()?
+                        .ok_or_else(|| A::Error::missing_field("Missing ApMessage::ApReq value"))
+                        .map(ApMessage::ApReq),
+                    (TagClass::Application, AP_REP_MSG_TYPE) => seq
+                        .next_element::<ApRep>()?
+                        .ok_or_else(|| A::Error::missing_field("Missing ApMessage::ApRep value"))
+                        .map(ApMessage::ApRep),
+                    _ => Err(A::Error::custom("Invalid tag for ApMessage. Expected ApReq or ApRep")),
+                }
+            }
+        }
+
+        deserializer.deserialize_enum("ApMessage", &["ApReq", "ApRep"], Visitor)
+    }
+}
+
+impl ser::Serialize for ApMessage {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, S::Error>
     where
         S: ser::Serializer,
     {
-        // 2 /* message len */ + 2 /* version */ + 2 /* ap_req len */
-        let mut message = vec![0, 0, 0, 0, 0, 0];
-
-        let ap_req_len = picky_asn1_der::to_writer(&self.ap_req, &mut message).unwrap();
-        let _krb_priv_len = picky_asn1_der::to_writer(&self.krb_priv, &mut message).unwrap();
-
-        let message_len = message.len();
-        debug_assert_eq!(message_len, 6 + ap_req_len + _krb_priv_len);
-
-        message[0..2].copy_from_slice(&(message_len as u16).to_be_bytes());
-        message[2..4].copy_from_slice(&KRB_PRIV_VERSION);
-        message[4..6].copy_from_slice(&(ap_req_len as u16).to_be_bytes());
-
-        Asn1RawDer(message).serialize(serializer)
+        match self {
+            ApMessage::ApReq(ap_req) => ap_req.serialize(serializer),
+            ApMessage::ApRep(ap_rep) => ap_rep.serialize(serializer),
+        }
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct KrbPrivResponse {
-    pub ap_rep: ApRep,
+pub struct KrbPrivMessage {
+    pub ap_message: ApMessage,
     pub krb_priv: KrbPriv,
 }
 
-impl KrbPrivResponse {
+impl KrbPrivMessage {
     pub fn deserialize(mut data: impl Read) -> io::Result<Self> {
         let mut buf = [0, 0];
 
@@ -380,15 +416,39 @@ impl KrbPrivResponse {
             return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid KRB_PRIV_VERSION"));
         }
 
-        // read ap_rep len
+        // read ap_message len
         data.read_exact(&mut buf)?;
 
         Ok(Self {
-            ap_rep: picky_asn1_der::from_reader(&mut data)
+            ap_message: picky_asn1_der::from_reader(&mut data)
                 .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, format!("{:?}", err)))?,
             krb_priv: picky_asn1_der::from_reader(&mut data)
                 .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, format!("{:?}", err)))?,
         })
+    }
+}
+
+impl ser::Serialize for KrbPrivMessage {
+    fn serialize<S>(&self, serializer: S) -> Result<<S as ser::Serializer>::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        // 2 /* message len */ + 2 /* version */ + 2 /* ap_req len */
+        let mut message = vec![0, 0, 0, 0, 0, 0];
+
+        let ap_len = picky_asn1_der::to_writer(&self.ap_message, &mut message)
+            .map_err(|err| S::Error::custom(format!("Cannot serialize ap_req: {:?}", err)))?;
+        let _krb_priv_len = picky_asn1_der::to_writer(&self.krb_priv, &mut message)
+            .map_err(|err| S::Error::custom(format!("Cannot serialize krb_priv: {:?}", err)))?;
+
+        let message_len = message.len();
+        debug_assert_eq!(message_len, 6 + ap_len + _krb_priv_len);
+
+        message[0..2].copy_from_slice(&(message_len as u16).to_be_bytes());
+        message[2..4].copy_from_slice(&KRB_PRIV_VERSION);
+        message[4..6].copy_from_slice(&(ap_len as u16).to_be_bytes());
+
+        Asn1RawDer(message).serialize(serializer)
     }
 }
 
@@ -399,8 +459,8 @@ mod tests {
         Ticket, TicketInner,
     };
     use crate::messages::{
-        ApRep, ApRepInner, ApReq, ApReqInner, AsRep, AsReq, KdcProxyMessage, KdcRep, KdcReq, KdcReqBody, KrbError,
-        KrbErrorInner, KrbPriv, KrbPrivInner, KrbPrivResponse, TgsReq,
+        ApMessage, ApRep, ApRepInner, ApReq, ApReqInner, AsRep, AsReq, KdcProxyMessage, KdcRep, KdcReq, KdcReqBody,
+        KrbError, KrbErrorInner, KrbPriv, KrbPrivInner, KrbPrivMessage, TgsReq,
     };
 
     use picky_asn1::bit_string::BitString;
@@ -412,8 +472,6 @@ mod tests {
         ExplicitContextTag6, ExplicitContextTag7, ExplicitContextTag8, ExplicitContextTag9, GeneralStringAsn1,
         GeneralizedTimeAsn1, IntegerAsn1, OctetStringAsn1, Optional,
     };
-
-    use super::KrbPrivRequest;
 
     #[test]
     fn krb_priv_request_serialization() {
@@ -475,8 +533,8 @@ mod tests {
             233, 123, 86, 147, 182, 0, 66, 194, 77, 248, 33, 51, 10, 48, 206, 216, 214, 47, 12, 39, 238, 115, 28, 137,
             254, 178, 188, 52, 173, 216, 110, 145, 49, 159,
         ];
-        let krb_priv_request = KrbPrivRequest {
-            ap_req: ApReq::from(ApReqInner {
+        let expected = KrbPrivMessage {
+            ap_message: ApMessage::ApReq(ApReq::from(ApReqInner {
                 pvno: ExplicitContextTag0::from(IntegerAsn1::from(vec![0x05])),
                 msg_type: ExplicitContextTag1::from(IntegerAsn1::from(vec![0x0e])),
                 ap_options: ExplicitContextTag2::from(ApOptions::from(BitString::with_bytes(vec![0, 0, 0, 0]))),
@@ -559,7 +617,7 @@ mod tests {
                         245, 236, 76, 93, 132, 236, 29, 64, 66, 99, 239, 20, 245, 115, 173, 214, 16, 19, 44, 74,
                     ])),
                 }),
-            }),
+            })),
             krb_priv: KrbPriv::from(KrbPrivInner {
                 pvno: ExplicitContextTag0::from(IntegerAsn1::from(vec![0x05])),
                 msg_type: ExplicitContextTag1::from(IntegerAsn1::from(vec![0x15])),
@@ -576,9 +634,11 @@ mod tests {
             }),
         };
 
-        let serialized_krb_priv_request = picky_asn1_der::to_vec(&krb_priv_request).unwrap();
+        let krb_priv_request = KrbPrivMessage::deserialize(&expected_raw as &[u8]).unwrap();
+        let raw_krb_priv_request = picky_asn1_der::to_vec(&krb_priv_request).unwrap();
 
-        assert_eq!(serialized_krb_priv_request, expected_raw);
+        assert_eq!(krb_priv_request, expected);
+        assert_eq!(raw_krb_priv_request, expected_raw);
     }
 
     #[test]
@@ -592,8 +652,8 @@ mod tests {
             87, 59, 79, 72, 138, 41, 183, 39, 148, 25, 196, 189, 182, 26, 48, 252, 101, 54, 24, 238, 24, 228, 212, 69,
             37, 151, 225, 49, 193, 172, 32, 236, 245, 125, 139, 33, 149, 71, 31, 65, 220, 230, 121, 86,
         ];
-        let expected = KrbPrivResponse {
-            ap_rep: ApRep::from(ApRepInner {
+        let expected = KrbPrivMessage {
+            ap_message: ApMessage::ApRep(ApRep::from(ApRepInner {
                 pvno: ExplicitContextTag0::from(IntegerAsn1::from(vec![0x05])),
                 msg_type: ExplicitContextTag1::from(IntegerAsn1::from(vec![0x0f])),
                 enc_part: ExplicitContextTag2::from(EncryptedData {
@@ -605,7 +665,7 @@ mod tests {
                         52, 68, 37, 60, 28, 215, 252, 225, 97, 29, 147, 62, 127, 19, 216,
                     ])),
                 }),
-            }),
+            })),
             krb_priv: KrbPriv::from(KrbPrivInner {
                 pvno: ExplicitContextTag0::from(IntegerAsn1::from(vec![0x05])),
                 msg_type: ExplicitContextTag1::from(IntegerAsn1::from(vec![0x15])),
@@ -621,9 +681,11 @@ mod tests {
             }),
         };
 
-        let krb_priv_response = KrbPrivResponse::deserialize(&expected_raw as &[u8]).unwrap();
+        let krb_priv_response = KrbPrivMessage::deserialize(&expected_raw as &[u8]).unwrap();
+        let raw_krb_priv_response = picky_asn1_der::to_vec(&krb_priv_response).unwrap();
 
         assert_eq!(expected, krb_priv_response);
+        assert_eq!(raw_krb_priv_response, expected_raw);
     }
 
     #[test]

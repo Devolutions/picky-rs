@@ -352,7 +352,7 @@ pub struct EncKrbPrivPartInner {
 
 pub type EncKrbPrivPart = ApplicationTag<EncKrbPrivPartInner, KRB_PRIV_ENC_PART>;
 
-/// [RF C 3244](https://datatracker.ietf.org/doc/html/rfc3244.html#section-2)
+/// [RFC 3244](https://datatracker.ietf.org/doc/html/rfc3244.html#section-2)
 ///
 /// ```not_rust
 /// ChangePasswdData ::=  SEQUENCE {
@@ -365,7 +365,7 @@ pub type EncKrbPrivPart = ApplicationTag<EncKrbPrivPartInner, KRB_PRIV_ENC_PART>
 pub struct ChangePasswdData {
     pub new_passwd: ExplicitContextTag0<OctetStringAsn1>,
     pub target_name: Optional<Option<ExplicitContextTag1<PrincipalName>>>,
-    pub target_realm: Optional<Option<ExplicitContextTag1<Realm>>>,
+    pub target_realm: Optional<Option<ExplicitContextTag2<Realm>>>,
 }
 
 pub trait ResultExt<'a, T>
@@ -421,8 +421,8 @@ pub type KrbResult<T> = Result<T, KrbError>;
 mod tests {
     use crate::data_types::{
         AuthenticatorInner, AuthorizationData, AuthorizationDataInner, Checksum, EncApRepPart, EncApRepPartInner,
-        EncryptedData, EncryptionKey, EtypeInfo2Entry, HostAddress, KerbPaPacRequest, KerberosStringAsn1, KerberosTime,
-        LastReqInner, PaData, PrincipalName,
+        EncKrbPrivPart, EncKrbPrivPartInner, EncryptedData, EncryptionKey, EtypeInfo2Entry, HostAddress,
+        KerbPaPacRequest, KerberosStringAsn1, KerberosTime, LastReqInner, PaData, PrincipalName,
     };
     use crate::messages::{AsReq, KdcReq, KdcReqBody, KrbError, KrbErrorInner};
     use picky_asn1::bit_string::BitString;
@@ -436,7 +436,60 @@ mod tests {
     };
     use picky_asn1_der::application_tag::ApplicationTag;
 
-    use super::{Microseconds, PaEncTsEnc};
+    use super::{ChangePasswdData, Microseconds, PaEncTsEnc};
+
+    #[test]
+    fn change_passwd_data() {
+        let expected_raw = [
+            48, 47, 160, 14, 4, 12, 113, 119, 101, 81, 87, 69, 49, 50, 51, 33, 64, 35, 161, 14, 48, 12, 160, 2, 2, 0,
+            161, 6, 48, 4, 27, 2, 101, 51, 162, 13, 27, 11, 69, 88, 65, 77, 80, 76, 69, 46, 67, 79, 77,
+        ];
+        let expected = ChangePasswdData {
+            // qweQWE123!@#
+            new_passwd: ExplicitContextTag0::from(OctetStringAsn1::from(vec![
+                113, 119, 101, 81, 87, 69, 49, 50, 51, 33, 64, 35,
+            ])),
+            target_name: Optional::from(Some(ExplicitContextTag1::from(PrincipalName {
+                name_type: ExplicitContextTag0::from(IntegerAsn1::from(vec![])),
+                name_string: ExplicitContextTag1::from(Asn1SequenceOf::from(vec![KerberosStringAsn1::from(
+                    IA5String::from_string("e3".into()).unwrap(),
+                )])),
+            }))),
+            target_realm: Optional::from(Some(ExplicitContextTag2::from(KerberosStringAsn1::from(
+                IA5String::from_string("EXAMPLE.COM".into()).unwrap(),
+            )))),
+        };
+
+        let change_password_data: ChangePasswdData = picky_asn1_der::from_bytes(&expected_raw).unwrap();
+        let raw_change_password_data = picky_asn1_der::to_vec(&change_password_data).unwrap();
+
+        assert_eq!(change_password_data, expected);
+        assert_eq!(raw_change_password_data, expected_raw);
+    }
+
+    #[test]
+    fn enc_krb_priv_part() {
+        let expected_raw = [
+            124, 25, 48, 23, 160, 4, 4, 2, 0, 0, 164, 15, 48, 13, 160, 3, 2, 1, 2, 161, 6, 4, 4, 192, 168, 0, 108,
+        ];
+        let expected = EncKrbPrivPart::from(EncKrbPrivPartInner {
+            user_data: ExplicitContextTag0::from(OctetStringAsn1::from(vec![0, 0])),
+            timestamp: Optional::from(None),
+            usec: Optional::from(None),
+            seq_number: Optional::from(None),
+            s_address: ExplicitContextTag4::from(HostAddress {
+                addr_type: ExplicitContextTag0::from(IntegerAsn1::from(vec![0x02])),
+                address: ExplicitContextTag1::from(OctetStringAsn1::from(vec![0xc0, 0xa8, 0x00, 0x6c])),
+            }),
+            r_address: Optional::from(None),
+        });
+
+        let enc_krb_priv: EncKrbPrivPart = picky_asn1_der::from_bytes(&expected_raw).unwrap();
+        let raw_enc_krb_priv = picky_asn1_der::to_vec(&enc_krb_priv).unwrap();
+
+        assert_eq!(enc_krb_priv, expected);
+        assert_eq!(raw_enc_krb_priv, expected_raw);
+    }
 
     #[test]
     fn kerberos_string_decode() {
