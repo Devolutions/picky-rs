@@ -52,6 +52,7 @@ pub mod key_usages {
     pub const ACCEPTOR_SIGN: i32 = 23;
     pub const INITIATOR_SEAL: i32 = 24;
     pub const INITIATOR_SIGN: i32 = 25;
+    pub const KRB_PRIV_ENC_PART: i32 = 13;
 }
 
 pub mod gss_api {
@@ -66,3 +67,5 @@ pub mod gss_api {
     pub const WRAP_TOKEN_ID: [u8; 2] = [0x05, 0x04];
     pub const WRAP_FILLER: u8 = 0xff;
 }
+
+pub const KRB_PRIV_VERSION: [u8; 2] = [0x00, 0x01];
