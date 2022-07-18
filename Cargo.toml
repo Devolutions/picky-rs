@@ -10,3 +10,8 @@ members = [
     "picky-server",
     "picky-signtool",
 ]
+
+[profile.release-opt-size]
+inherits = "release"
+lto = true
+opt-level = "s"

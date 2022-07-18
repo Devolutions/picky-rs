@@ -62,14 +62,54 @@ native-lib-release: diplomat-sanity
     -mkdir -p {{dotnet_lib_folder_win}}
     -cp {{target_release_folder}}{{output_lib_win}} {{dotnet_native_lib_win}}
 
+## Wasm ##
+
+target_wasm_folder := "../target/wasm32-unknown-unknown/release-opt-size/"
+output_lib_wasm    := "picky.wasm"
+
+js_path             := "./js/"
+js_generated_path   := js_path + "api/"
+js_docs_path        := js_path + "docs/"
+js_wasm_pkg_dir     := js_path + "wasmpkg/"
+js_wasm_lib         := js_wasm_pkg_dir + "picky.wasm"
+js_wasm_twiggy_dir  := js_wasm_pkg_dir + "twiggy/"
+js_wasm_pkg_opt_dir := js_wasm_pkg_dir + "wasm-opt/"
+js_wasm_twiggy_out  := js_wasm_twiggy_dir + "picky+twiggy.txt"
+js_wasm_lib_opt     := js_wasm_pkg_opt_dir + "picky.wasm"
+
+wasm-opt-install:
+    sudo npm install -g wasm-opt
+        
+twiggy-install:
+    cargo install twiggy
+
+wasm-lib: wasm-lib-build
+    -mkdir -p {{js_wasm_pkg_dir}}
+    -cp {{target_wasm_folder}}{{output_lib_wasm}} {{js_wasm_lib}}
+    -mkdir -p {{js_wasm_pkg_opt_dir}}
+    wasm-opt -Os {{js_wasm_lib}} -o {{js_wasm_lib_opt}}
+    -mkdir -p {{js_wasm_twiggy_dir}}
+    twiggy dominators {{js_wasm_lib}} -o {{js_wasm_twiggy_out}}
+
+wasm-lib-build: diplomat-sanity
+    RUSTFLAGS='-C panic=abort -C opt-level=s' cargo build --target wasm32-unknown-unknown --profile=release-opt-size -p picky-ffi
+
 ## Bindings ##
 
 bindings: dotnet-bindings
 
 dotnet-bindings:
     -rm {{dotnet_generated_path}}*.cs
+    -rm {{dotnet_generated_path}}*.d.ts
     diplomat-tool dotnet {{dotnet_generated_path}} -l {{dotnet_diplomat_config}}
     @echo ">> .NET wrapper generated at {{dotnet_generated_path}}"
+
+# FIXME: js bindings not yet ready
+js-bindings:
+    -rm {{js_generated_path}}*.js
+    -rm {{js_docs_path}}*.rst
+
+    diplomat-tool js {{js_generated_path}} --docs {{js_docs_path}}
 
 ## Tests ##
 
@@ -77,3 +117,8 @@ test: test-dotnet
 
 test-dotnet: native-lib-debug dotnet-bindings
     dotnet test {{dotnet_solution_path}} --arch win-x64
+    
+# FIXME: js bindings not yet ready
+test-js: wasm-lib js-bindings
+    cd js && npm install
+    cd js && npm test

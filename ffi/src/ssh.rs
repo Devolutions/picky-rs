@@ -74,8 +74,8 @@ pub mod ffi {
         /// Returns the SSH Public Key string representation.
         ///
         /// It is generally represented as:
-        /// "<algorithm> <der for the key> <comment>"
-        /// where <comment> is usually an email address.
+        /// "(algorithm) (der for the key) (comment)"
+        /// where (comment) is usually an email address.
         pub fn to_repr(&self, writeable: &mut DiplomatWriteable) -> DiplomatResult<(), Box<PickyError>> {
             let repr = err_check!(self.0.to_string());
             err_check!(writeable.write_str(&repr));
