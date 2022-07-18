@@ -13,10 +13,21 @@ default: bindings
 
 ## Diplomat installation ##
 
-diplomat_rev := "6f569bd27bc1c2e919fe09f36a5053009593a7bd"
+# For now, we need to use a custom diplomat revision
+# supporting dotnet framework 4.7.
+# Indeed, in older frameworks a few important types
+# are not blittables, causing Result types to not be
+# correctly send at the FFI boundary. 
+diplomat_repo := "https://github.com/CBenoit/diplomat.git"
+diplomat_rev  := "574ea6d2216501aef8efcb5f605192f75aaacc44"
 
-install-diplomat:
-    cargo install --git https://github.com/CBenoit/diplomat.git --rev {{diplomat_rev}} diplomat-tool -f
+diplomat-install:
+    cargo install --git {{diplomat_repo}} --rev {{diplomat_rev}} diplomat-tool -f
+
+diplomat-sanity:
+    @echo ">> Check Diplomat revision"
+    grep "{{diplomat_repo}}" ./Cargo.toml | grep "{{diplomat_rev}}" | wc -l | xargs -I '{}' test {} -eq 2
+    @echo ">> Cargo.toml is in sync with justfile"
 
 ## Native library ##
 
@@ -37,14 +48,14 @@ dotnet_native_lib_linux := dotnet_lib_folder_linux + "libDevolutionsPicky.so"
 dotnet_lib_folder_win   := dotnet_runtimes_path + "win-x64/native/"
 dotnet_native_lib_win   := dotnet_lib_folder_win + "DevolutionsPicky.dll"
 
-native-lib-debug:
+native-lib-debug: diplomat-sanity
     cargo build -p picky-ffi
     -mkdir -p {{dotnet_lib_folder_linux}}
     -cp {{target_debug_folder}}{{output_lib_linux}} {{dotnet_native_lib_linux}}
     -mkdir -p {{dotnet_lib_folder_win}}
     -cp {{target_debug_folder}}{{output_lib_win}} {{dotnet_native_lib_win}}
 
-native-lib-release:
+native-lib-release: diplomat-sanity
     cargo build -p picky-ffi --release
     -mkdir -p {{dotnet_lib_folder_linux}}
     -cp {{target_release_folder}}{{output_lib_linux}} {{dotnet_native_lib_linux}}
