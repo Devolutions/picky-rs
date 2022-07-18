@@ -5,7 +5,7 @@
 use crate::jose::jwk::Jwk;
 use crate::key::{PrivateKey, PublicKey};
 use aes_gcm::aead::generic_array::typenum::Unsigned;
-use aes_gcm::{AeadCore, AeadInPlace, Aes128Gcm, Aes256Gcm, NewAead};
+use aes_gcm::{AeadInPlace, Aes128Gcm, Aes256Gcm, NewAead};
 use base64::DecodeError;
 use digest::generic_array::GenericArray;
 use rand::RngCore;

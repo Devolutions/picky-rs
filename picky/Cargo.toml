@@ -46,7 +46,7 @@ rand = "0.8.5"
 num-bigint-dig = "0.8.1"
 
 # Use Ring for now (https://github.com/Devolutions/picky-rs/pull/132#issuecomment-1058224365)
-ring = "0.16.20"
+ring = { version = "0.16.20", optional = true }
 rsa = "0.6.1"
 
 digest = "0.10.3"
@@ -69,20 +69,21 @@ ring = "0.16.20"
 rstest = "0.12.0"
 
 [features]
-default = ["x509", "jose", "http_signature", "http_trait_impl"]
+default = ["x509", "ec", "jose", "http_signature", "http_trait_impl"]
 
 # main features
 x509 = []
-jose = ["serde_json", "aes-gcm", "cbc"]
+jose = ["dep:serde_json", "dep:aes-gcm", "dep:cbc"]
 http_signature = []
 
 # secondary features
 pkcs7 = ["x509", "picky-asn1-x509/pkcs7"]
-http_timestamp = ["reqwest"]
+http_timestamp = ["dep:reqwest"]
 ctl = ["picky-asn1-x509/ctl", "pkcs7", "chrono_conversion"]
-ctl_http_fetch = ["reqwest", "cab", "ctl"]
-wincert = ["x509", "byteorder"]
-ssh = ["byteorder", "aes", "ctr", "cbc", "bcrypt-pbkdf", "lexical-sort"]
-http_trait_impl = ["http"]
-chrono_conversion = ["chrono", "picky-asn1/chrono_conversion"]
-time_conversion = ["time", "picky-asn1/time_conversion"]
+ctl_http_fetch = ["dep:reqwest", "dep:cab", "ctl"]
+wincert = ["x509", "dep:byteorder"]
+ssh = ["dep:byteorder", "dep:aes", "dep:ctr", "dep:cbc", "dep:bcrypt-pbkdf", "dep:lexical-sort"]
+http_trait_impl = ["dep:http"]
+chrono_conversion = ["dep:chrono", "picky-asn1/chrono_conversion"]
+time_conversion = ["dep:time", "picky-asn1/time_conversion"]
+ec = ["dep:ring"]

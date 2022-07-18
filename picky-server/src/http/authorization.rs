@@ -71,12 +71,7 @@ pub fn check_authorization(config: &Config, req: &Request<Body>) -> Result<Check
             };
 
             Ok(JwtSig::decode(auth_vec[1], &public_key)
-                .and_then(|jwt| {
-                    jwt.validate(&JwtValidator::strict(&JwtDate::new_with_leeway(
-                        unix_epoch() as i64,
-                        10,
-                    )))
-                })
+                .and_then(|jwt| jwt.validate(&JwtValidator::strict(JwtDate::new_with_leeway(unix_epoch() as i64, 10))))
                 .map_err(|e| format!("couldn't validate json web token: {}", e))?)
         }
         AuthorizationMethod::Unknown => Err(format!("Unknown authorization method: {}", auth_vec[0])),

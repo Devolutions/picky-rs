@@ -1,7 +1,7 @@
 //! Signature algorithms supported by picky
 
 use crate::hash::HashAlgorithm;
-use crate::key::{EcdsaCurve, EcdsaKeypair, EcdsaPublicKey, KeyError, PrivateKey, PublicKey};
+use crate::key::{KeyError, PrivateKey, PublicKey};
 use picky_asn1_x509::{oids, AlgorithmIdentifier};
 use rsa::{PublicKey as _, RsaPrivateKey, RsaPublicKey};
 use serde::{Deserialize, Serialize};
@@ -126,32 +126,49 @@ impl SignatureAlgorithm {
                 let padding_scheme = rsa::PaddingScheme::new_pkcs1v15_sign(Some(rsa_hash_algo));
                 rsa_private_key.sign_blinded(&mut rand::rngs::OsRng, padding_scheme, &digest)?
             }
+
+            #[cfg(not(feature = "ec"))]
+            SignatureAlgorithm::Ecdsa(_) => {
+                return Err(SignatureError::UnsupportedAlgorithm {
+                    algorithm: "ECDSA curves are not supported in this build (you need to enable the `ec` feature)"
+                        .to_owned(),
+                })
+            }
+            #[cfg(feature = "ec")]
             SignatureAlgorithm::Ecdsa(picky_hash_algo) => {
+                use crate::key::ec::{EcdsaCurve, EcdsaKeypair};
+
                 let ec_keypair = EcdsaKeypair::try_from(private_key)?;
 
                 let signing_algorithm = match ec_keypair.curve {
                     EcdsaCurve::Nist256 => match picky_hash_algo {
-                        HashAlgorithm::SHA2_256 => Ok(&ring::signature::ECDSA_P256_SHA256_ASN1_SIGNING),
-                        _ => Err(SignatureError::UnsupportedAlgorithm {
-                            algorithm: format!(
-                                "ECDSA P-256 curve with {:?} hash algorithm is not supported",
-                                picky_hash_algo
-                            ),
-                        }),
+                        HashAlgorithm::SHA2_256 => &ring::signature::ECDSA_P256_SHA256_ASN1_SIGNING,
+                        _ => {
+                            return Err(SignatureError::UnsupportedAlgorithm {
+                                algorithm: format!(
+                                    "ECDSA P-256 curve with {:?} hash algorithm is not supported",
+                                    picky_hash_algo
+                                ),
+                            })
+                        }
                     },
                     EcdsaCurve::Nist384 => match picky_hash_algo {
-                        HashAlgorithm::SHA2_384 => Ok(&ring::signature::ECDSA_P384_SHA384_ASN1_SIGNING),
-                        _ => Err(SignatureError::UnsupportedAlgorithm {
-                            algorithm: format!(
-                                "ECDSA P-384 curve with {:?} hash algorithm is not supported",
-                                picky_hash_algo
-                            ),
-                        }),
+                        HashAlgorithm::SHA2_384 => &ring::signature::ECDSA_P384_SHA384_ASN1_SIGNING,
+                        _ => {
+                            return Err(SignatureError::UnsupportedAlgorithm {
+                                algorithm: format!(
+                                    "ECDSA P-384 curve with {:?} hash algorithm is not supported",
+                                    picky_hash_algo
+                                ),
+                            })
+                        }
                     },
-                    EcdsaCurve::Nist512 => Err(SignatureError::UnsupportedAlgorithm {
-                        algorithm: "ECDSA P-512 curve is not yet supported".to_string(),
-                    }),
-                }?;
+                    EcdsaCurve::Nist512 => {
+                        return Err(SignatureError::UnsupportedAlgorithm {
+                            algorithm: "ECDSA P-512 curve is not yet supported".to_string(),
+                        })
+                    }
+                };
 
                 let keypair = ring::signature::EcdsaKeyPair::from_private_key_and_public_key(
                     signing_algorithm,
@@ -184,14 +201,27 @@ impl SignatureAlgorithm {
                     .verify(padding_scheme, &digest, signature)
                     .map_err(|_| SignatureError::BadSignature)?;
             }
+
+            #[cfg(not(feature = "ec"))]
+            SignatureAlgorithm::Ecdsa(_) => {
+                return Err(SignatureError::UnsupportedAlgorithm {
+                    algorithm: "ECDSA curves are not supported in this build (you need to enable the `ec` feature)"
+                        .to_owned(),
+                })
+            }
+            #[cfg(feature = "ec")]
             SignatureAlgorithm::Ecdsa(picky_hash_algo) => {
+                use crate::key::ec::EcdsaPublicKey;
+
                 let verification_algorithm = match picky_hash_algo {
-                    HashAlgorithm::SHA2_256 => Ok(&ring::signature::ECDSA_P256_SHA256_ASN1),
-                    HashAlgorithm::SHA2_384 => Ok(&ring::signature::ECDSA_P384_SHA384_ASN1),
-                    _ => Err(SignatureError::UnsupportedAlgorithm {
-                        algorithm: format!("ECDSA with {:?} hash algorithm is not supported", picky_hash_algo),
-                    }),
-                }?;
+                    HashAlgorithm::SHA2_256 => &ring::signature::ECDSA_P256_SHA256_ASN1,
+                    HashAlgorithm::SHA2_384 => &ring::signature::ECDSA_P384_SHA384_ASN1,
+                    _ => {
+                        return Err(SignatureError::UnsupportedAlgorithm {
+                            algorithm: format!("ECDSA with {:?} hash algorithm is not supported", picky_hash_algo),
+                        })
+                    }
+                };
 
                 let ec_pub_key = EcdsaPublicKey::try_from(public_key)?;
                 let verification_key = ring::signature::UnparsedPublicKey::new(verification_algorithm, ec_pub_key.data);
