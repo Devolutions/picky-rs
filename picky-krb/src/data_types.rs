@@ -10,7 +10,7 @@ use std::fmt;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
-use crate::constants::types::{AUTHENTICATOR_TYPE, ENC_AP_REP_PART_TYPE, TICKET_TYPE};
+use crate::constants::types::{AUTHENTICATOR_TYPE, ENC_AP_REP_PART_TYPE, KRB_PRIV_ENC_PART, TICKET_TYPE};
 use crate::messages::KrbError;
 
 /// [RFC 4120 5.2.1](https://www.rfc-editor.org/rfc/rfc4120.txt)
@@ -327,6 +327,47 @@ pub struct EtypeInfo2Entry {
 /// ```
 pub type EtypeInfo2 = Asn1SequenceOf<EtypeInfo2Entry>;
 
+/// [RFC 4120](https://datatracker.ietf.org/doc/html/rfc4120#section-5.7.1)
+///
+/// ```not_rust
+/// EncKrbPrivPart  ::= [APPLICATION 28] SEQUENCE {
+///         user-data       [0] OCTET STRING,
+///         timestamp       [1] KerberosTime OPTIONAL,
+///         usec            [2] Microseconds OPTIONAL,
+///         seq-number      [3] UInt32 OPTIONAL,
+///         s-address       [4] HostAddress -- sender's addr --,
+///         r-address       [5] HostAddress OPTIONAL -- recip's addr
+/// }
+/// ```
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+pub struct EncKrbPrivPartInner {
+    pub user_data: ExplicitContextTag0<OctetStringAsn1>,
+    pub timestamp: Optional<Option<ExplicitContextTag1<KerberosTime>>>,
+    pub usec: Optional<Option<ExplicitContextTag2<KerberosTime>>>,
+    pub seq_number: Optional<Option<ExplicitContextTag3<IntegerAsn1>>>,
+    pub s_address: ExplicitContextTag4<HostAddress>,
+    #[serde(default)]
+    pub r_address: Optional<Option<ExplicitContextTag5<HostAddress>>>,
+}
+
+pub type EncKrbPrivPart = ApplicationTag<EncKrbPrivPartInner, KRB_PRIV_ENC_PART>;
+
+/// [RFC 3244](https://datatracker.ietf.org/doc/html/rfc3244.html#section-2)
+///
+/// ```not_rust
+/// ChangePasswdData ::=  SEQUENCE {
+///     newpasswd[0]   OCTET STRING,
+///     targname[1]    PrincipalName OPTIONAL,
+///     targrealm[2]   Realm OPTIONAL
+/// }
+/// ```
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+pub struct ChangePasswdData {
+    pub new_passwd: ExplicitContextTag0<OctetStringAsn1>,
+    pub target_name: Optional<Option<ExplicitContextTag1<PrincipalName>>>,
+    pub target_realm: Optional<Option<ExplicitContextTag2<Realm>>>,
+}
+
 pub trait ResultExt<'a, T>
 where
     T: Deserialize<'a>,
@@ -380,8 +421,8 @@ pub type KrbResult<T> = Result<T, KrbError>;
 mod tests {
     use crate::data_types::{
         AuthenticatorInner, AuthorizationData, AuthorizationDataInner, Checksum, EncApRepPart, EncApRepPartInner,
-        EncryptedData, EncryptionKey, EtypeInfo2Entry, HostAddress, KerbPaPacRequest, KerberosStringAsn1, KerberosTime,
-        LastReqInner, PaData, PrincipalName,
+        EncKrbPrivPart, EncKrbPrivPartInner, EncryptedData, EncryptionKey, EtypeInfo2Entry, HostAddress,
+        KerbPaPacRequest, KerberosStringAsn1, KerberosTime, LastReqInner, PaData, PrincipalName,
     };
     use crate::messages::{AsReq, KdcReq, KdcReqBody, KrbError, KrbErrorInner};
     use picky_asn1::bit_string::BitString;
@@ -395,7 +436,60 @@ mod tests {
     };
     use picky_asn1_der::application_tag::ApplicationTag;
 
-    use super::{Microseconds, PaEncTsEnc};
+    use super::{ChangePasswdData, Microseconds, PaEncTsEnc};
+
+    #[test]
+    fn change_passwd_data() {
+        let expected_raw = [
+            48, 47, 160, 14, 4, 12, 113, 119, 101, 81, 87, 69, 49, 50, 51, 33, 64, 35, 161, 14, 48, 12, 160, 2, 2, 0,
+            161, 6, 48, 4, 27, 2, 101, 51, 162, 13, 27, 11, 69, 88, 65, 77, 80, 76, 69, 46, 67, 79, 77,
+        ];
+        let expected = ChangePasswdData {
+            // qweQWE123!@#
+            new_passwd: ExplicitContextTag0::from(OctetStringAsn1::from(vec![
+                113, 119, 101, 81, 87, 69, 49, 50, 51, 33, 64, 35,
+            ])),
+            target_name: Optional::from(Some(ExplicitContextTag1::from(PrincipalName {
+                name_type: ExplicitContextTag0::from(IntegerAsn1::from(vec![])),
+                name_string: ExplicitContextTag1::from(Asn1SequenceOf::from(vec![KerberosStringAsn1::from(
+                    IA5String::from_string("e3".into()).unwrap(),
+                )])),
+            }))),
+            target_realm: Optional::from(Some(ExplicitContextTag2::from(KerberosStringAsn1::from(
+                IA5String::from_string("EXAMPLE.COM".into()).unwrap(),
+            )))),
+        };
+
+        let change_password_data: ChangePasswdData = picky_asn1_der::from_bytes(&expected_raw).unwrap();
+        let raw_change_password_data = picky_asn1_der::to_vec(&change_password_data).unwrap();
+
+        assert_eq!(change_password_data, expected);
+        assert_eq!(raw_change_password_data, expected_raw);
+    }
+
+    #[test]
+    fn enc_krb_priv_part() {
+        let expected_raw = [
+            124, 25, 48, 23, 160, 4, 4, 2, 0, 0, 164, 15, 48, 13, 160, 3, 2, 1, 2, 161, 6, 4, 4, 192, 168, 0, 108,
+        ];
+        let expected = EncKrbPrivPart::from(EncKrbPrivPartInner {
+            user_data: ExplicitContextTag0::from(OctetStringAsn1::from(vec![0, 0])),
+            timestamp: Optional::from(None),
+            usec: Optional::from(None),
+            seq_number: Optional::from(None),
+            s_address: ExplicitContextTag4::from(HostAddress {
+                addr_type: ExplicitContextTag0::from(IntegerAsn1::from(vec![0x02])),
+                address: ExplicitContextTag1::from(OctetStringAsn1::from(vec![0xc0, 0xa8, 0x00, 0x6c])),
+            }),
+            r_address: Optional::from(None),
+        });
+
+        let enc_krb_priv: EncKrbPrivPart = picky_asn1_der::from_bytes(&expected_raw).unwrap();
+        let raw_enc_krb_priv = picky_asn1_der::to_vec(&enc_krb_priv).unwrap();
+
+        assert_eq!(enc_krb_priv, expected);
+        assert_eq!(raw_enc_krb_priv, expected_raw);
+    }
 
     #[test]
     fn kerberos_string_decode() {
