@@ -7,11 +7,13 @@ members = [
     "picky-asn1-x509",
     "picky-krb",
     "ffi",
+    "ffi/wasm",
     "picky-server",
     "picky-signtool",
 ]
 
-[profile.release-opt-size]
-inherits = "release"
+[profile.release]
+# Configured that way mostly for the wasm build
 lto = true
 opt-level = "s"
+strip = "debuginfo"
