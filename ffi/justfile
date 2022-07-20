@@ -100,13 +100,13 @@ bindings: dotnet-bindings
 
 dotnet-bindings:
     -rm {{dotnet_generated_path}}*.cs
-    -rm {{dotnet_generated_path}}*.d.ts
     diplomat-tool dotnet {{dotnet_generated_path}} -l {{dotnet_diplomat_config}}
     @echo ">> .NET wrapper generated at {{dotnet_generated_path}}"
 
 # FIXME: js bindings not yet ready
 js-bindings:
     -rm {{js_generated_path}}*.js
+    -rm {{js_generated_path}}*.d.ts
     -rm {{js_docs_path}}*.rst
 
     diplomat-tool js {{js_generated_path}} --docs {{js_docs_path}}

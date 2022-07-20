@@ -1,5 +1,5 @@
 import test from 'ava';
-import { PrivateKey, PublicKey, Pem } from "@devolutions/picky";
+import { PrivateKey, PublicKey, Pem, JwtSig, JwtValidator, JwsAlg } from "@devolutions/picky";
 
 const privKeyPemRepr =
 	[
@@ -33,25 +33,46 @@ const privKeyPemRepr =
 		'-----END PRIVATE KEY-----'
 ].join('\n');
 
-const pubKeyPemRepr = 
+const CLAIMS = 
 	[
-		'-----BEGIN PUBLIC KEY-----',
-		'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA5Kz4i/+XZhiE+fyrgtx/',
-		'4yI3i6C6HXbC4QJYpDuSUEKN2bO9RsE+Fnds/FizHtJVWbvya9ktvKdDPBdy58+C',
-		'IM46HEKJhYLnBVlkEcg9N2RNgR3xHnpRbKfv+BmWjOpSmWrmJSDLY0dbw5X5YL8T',
-		'U69ImoouCUfStyCgrpwkctR0GD3GfcGjbZRucV7VvVH9bS1jyaT/9yORyzPOSTwb',
-		'+K9vOr6XlJX0CGvzQeIOcOimejHxACFOCnhEKXiwMsmL8FMz0drkGeMuCODY/OHV',
-		'mAdXDE5UhroL0oDhSmIrdZ8CxngOxHr1WD2yC0X0jAVP/mrxjSSfBwmmqhSMmONl',
-		'vQIDAQAB',
-		'-----END PUBLIC KEY-----',
+		'{',
+		'  "admin": true,',
+		'  "exp": 1516539022,',
+		'  "iat": 1516239022,',
+		'  "name": "John Doe",',
+		'  "nbf": 1516239022',
+		'}'
 	].join('\n');
 
-test('Private Key to Public Key', t => {
+const HEADER_SECTION = "eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCIsImN0eSI6IkFVVEgifQ";
+
+const PAYLOAD_SECTION = "eyJhZG1pbiI6dHJ1ZSwiZXhwIjoxNTE2NTM5MDIyLCJpYXQiOjE1MTYyMzkwMjIsIm5hbWUiOiJKb2huIERvZSIsIm5iZiI6MTUxNjIzOTAyMn0";
+
+const SIGNED_JWT = "eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCIsImN0eSI6IkFVVEgifQ.eyJhZG1pbiI6dHJ1ZSwiZXhwIjoxNTE2NTM5MDIyLCJpYXQiOjE1MTYyMzkwMjIsIm5hbWUiOiJKb2huIERvZSIsIm5iZiI6MTUxNjIzOTAyMn0.lA5Phya8h9LcaK0_wF84PULgDuv48pp1O9dykHGeYG0aSLgNNdsOw8_jUTlpmnzNAXGn1HCww2Xl8NwHvdn3Q_6GphvwAqR12HSB9SAum8icAOp3NHsv-bYy2es7cCgkJq0O2m6vud-SBJUOO-VUg42glZgFDTnvAvYnRRjv_zyaeN7CUmS9cQnXaK_FkUPbC-R9WpBvPoAx9NhOgFkDfwEPIYKyEPP10YeXgpVTCkiOOBK80A53xvt1m03rn1hlgnfCPXLXXnZIxcgL8poTNbD1lXSRzTu3Ogt2-4v6pPsoTn4z783ttnUZSFHlDfhpz0-iMu8lkIrKBNPcIQoikQ";
+
+test('Smoke', t => {
 	try {
+		const builder = JwtSig.builder();
+		builder.set_algorithm(JwsAlg.RS512);
+		builder.set_content_type("AUTH");
+		builder.set_claims(JSON.stringify({
+		  admin: true,
+		  exp: 1516539022,
+		  iat: 1516239022,
+		  name: "John Doe",
+		  nbf: 1516239022,
+		}));
+
+		const jwt = builder.build();
+		t.is(jwt.get_content_type(), "AUTH");
+		t.is(jwt.get_claims(), CLAIMS);
+
 		const pem = Pem.parse(privKeyPemRepr);
 		const priv = PrivateKey.from_pem(pem);
-		const pub = priv.to_public_key();
-		t.is(pubKeyPemRepr, pub.to_pem().to_repr());
+		const encoded = jwt.encode(priv);
+		const parts = encoded.split('.');
+		t.is(parts[0], HEADER_SECTION);
+		t.is(parts[1], PAYLOAD_SECTION);
 	} catch(e) {
 		if (typeof(e.to_display) === 'undefined') {
 			throw e;
@@ -61,11 +82,14 @@ test('Private Key to Public Key', t => {
 	}
 });
 
-test('Generate RSA keypair', t => {
+test('Decode Signed JWT', t => {
 	try {
-		const key = PrivateKey.generate_rsa(2048);
-		const pem = key.to_pem();
-		t.is(pem.get_label(), "PRIVATE KEY");
+		const pem = Pem.parse(privKeyPemRepr);
+		const key = PrivateKey.from_pem(pem).to_public_key();
+		const validator = JwtValidator.strict(BigInt(1516259022), 0);
+		const jwt = JwtSig.decode(SIGNED_JWT, key, validator);
+		t.is(jwt.get_content_type(), "AUTH");
+		t.is(jwt.get_claims(), CLAIMS);
 	} catch(e) {
 		if (typeof(e.to_display) === 'undefined') {
 			throw e;
@@ -73,4 +97,4 @@ test('Generate RSA keypair', t => {
 			throw e.to_display();
 		}
 	}
-});
+})

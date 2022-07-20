@@ -145,17 +145,17 @@ enum CheckStrictness {
 }
 
 #[derive(Debug, Clone)]
-pub struct JwtValidator<'a> {
-    current_date: Option<&'a JwtDate>,
+pub struct JwtValidator {
+    current_date: Option<JwtDate>,
     expiration_claim: CheckStrictness,
     not_before_claim: CheckStrictness,
 }
 
-pub const NO_CHECK_VALIDATOR: JwtValidator<'static> = JwtValidator::no_check();
+pub const NO_CHECK_VALIDATOR: JwtValidator = JwtValidator::no_check();
 
-impl<'a> JwtValidator<'a> {
+impl JwtValidator {
     /// Check signature and the registered exp and nbf claims. If a claim is missing token is rejected.
-    pub const fn strict(current_date: &'a JwtDate) -> Self {
+    pub const fn strict(current_date: JwtDate) -> Self {
         Self {
             current_date: Some(current_date),
             expiration_claim: CheckStrictness::Required,
@@ -164,7 +164,7 @@ impl<'a> JwtValidator<'a> {
     }
 
     /// Check signature and the registered exp and nbf claims. Token isn't rejected if a claim is missing.
-    pub const fn lenient(current_date: &'a JwtDate) -> Self {
+    pub const fn lenient(current_date: JwtDate) -> Self {
         Self {
             current_date: Some(current_date),
             expiration_claim: CheckStrictness::Optional,
@@ -181,7 +181,7 @@ impl<'a> JwtValidator<'a> {
         }
     }
 
-    pub fn current_date(self, current_date: &'a JwtDate) -> Self {
+    pub fn current_date(self, current_date: JwtDate) -> Self {
         Self {
             current_date: Some(current_date),
             expiration_claim: CheckStrictness::Required,
@@ -437,7 +437,7 @@ fn h_decode_and_validate_claims<C: DeserializeOwned>(
     validator: &JwtValidator,
 ) -> Result<C, JwtError> {
     let claims = match (
-        validator.current_date,
+        &validator.current_date,
         validator.not_before_claim,
         validator.expiration_claim,
     ) {
@@ -549,7 +549,7 @@ mod tests {
         let now = JwtDate::new(0);
         JwtSig::decode(crate::test_files::JOSE_JWT_SIG_EXAMPLE, &public_key)
             .unwrap()
-            .validate::<MyClaims>(&JwtValidator::lenient(&now))
+            .validate::<MyClaims>(&JwtValidator::lenient(now))
             .unwrap();
     }
 
@@ -571,7 +571,7 @@ mod tests {
     fn decode_jws_required_claim_missing_err() {
         let public_key = get_private_key_1().to_public_key();
         let now = JwtDate::new(0);
-        let validator = JwtValidator::strict(&now);
+        let validator = JwtValidator::strict(now);
         let err = JwtSig::decode(crate::test_files::JOSE_JWT_SIG_EXAMPLE, &public_key)
             .unwrap()
             .validate::<MyClaims>(&validator)
@@ -620,7 +620,7 @@ mod tests {
 
         let jwt = JwtSig::decode(crate::test_files::JOSE_JWT_SIG_WITH_EXP, &public_key)
             .unwrap()
-            .validate::<MyExpirableClaims>(&JwtValidator::strict(&JwtDate::new(1545263999)))
+            .validate::<MyExpirableClaims>(&JwtValidator::strict(JwtDate::new(1545263999)))
             .expect("couldn't decode jwt without leeway");
 
         assert_eq!(jwt.state.claims.exp, 1545264000);
@@ -630,12 +630,12 @@ mod tests {
         // alternatively, a leeway can account for small clock skew
         JwtSig::decode(crate::test_files::JOSE_JWT_SIG_WITH_EXP, &public_key)
             .unwrap()
-            .validate::<MyExpirableClaims>(&JwtValidator::strict(&JwtDate::new_with_leeway(1545264001, 10)))
+            .validate::<MyExpirableClaims>(&JwtValidator::strict(JwtDate::new_with_leeway(1545264001, 10)))
             .expect("couldn't decode jwt with leeway for exp");
 
         JwtSig::decode(crate::test_files::JOSE_JWT_SIG_WITH_EXP, &public_key)
             .unwrap()
-            .validate::<MyExpirableClaims>(&JwtValidator::strict(&JwtDate::new_with_leeway(1545262999, 10)))
+            .validate::<MyExpirableClaims>(&JwtValidator::strict(JwtDate::new_with_leeway(1545262999, 10)))
             .expect("couldn't decode jwt with leeway for nbf");
     }
 
@@ -645,7 +645,7 @@ mod tests {
 
         let err = JwtSig::decode(crate::test_files::JOSE_JWT_SIG_WITH_EXP, &public_key)
             .unwrap()
-            .validate::<MyExpirableClaims>(&JwtValidator::strict(&JwtDate::new(1545264001)))
+            .validate::<MyExpirableClaims>(&JwtValidator::strict(JwtDate::new(1545264001)))
             .err()
             .unwrap();
 
@@ -656,7 +656,7 @@ mod tests {
 
         let err = JwtSig::decode(crate::test_files::JOSE_JWT_SIG_WITH_EXP, &public_key)
             .unwrap()
-            .validate::<MyExpirableClaims>(&JwtValidator::strict(&JwtDate::new_with_leeway(1545262998, 1)))
+            .validate::<MyExpirableClaims>(&JwtValidator::strict(JwtDate::new_with_leeway(1545262998, 1)))
             .err()
             .unwrap();
 

@@ -2191,6 +2191,7 @@ dependencies = [
  "getrandom",
  "hex",
  "picky 7.0.0-rc.2",
+ "serde_json",
  "time 0.3.11",
 ]
 
@@ -2254,6 +2255,7 @@ dependencies = [
  "console_error_panic_hook",
  "getrandom",
  "picky 7.0.0-rc.2",
+ "serde_json",
  "wasm-bindgen",
  "wasm-bindgen-test",
  "wee_alloc",

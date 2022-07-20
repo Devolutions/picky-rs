@@ -15,7 +15,7 @@ doctest = false
 embed-resource = "1.7.2"
 
 [dependencies]
-picky = { path = "../picky/", default-features = false, features = ["ssh", "x509", "time_conversion"] }
+picky = { path = "../picky/", default-features = false, features = ["ssh", "x509", "time_conversion", "jose"] }
 
 # FFI
 diplomat = { git = "https://github.com/CBenoit/diplomat.git", rev = "574ea6d2216501aef8efcb5f605192f75aaacc44" }
@@ -23,6 +23,7 @@ diplomat-runtime = { git = "https://github.com/CBenoit/diplomat.git", rev = "574
 
 time = "0.3.9"
 hex = "0.4.3"
+serde_json = "1.0.82"
 
 # WASM support
 [target.'cfg(target_arch = "wasm32")'.dependencies]
