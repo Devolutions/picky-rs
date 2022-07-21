@@ -27,7 +27,7 @@ jobs:
           }
 
   check:
-    name: check [${{ matrix.os }}]
+    name: picky build [${{ matrix.os }}]
     runs-on: ${{ matrix.runner }}
     needs: formatting
     strategy:
@@ -47,7 +47,7 @@ jobs:
         run: cargo check
 
   test:
-    name: test [${{ matrix.os }}]
+    name: picky test [${{ matrix.os }}]
     runs-on: ${{ matrix.runner }}
     needs: formatting
     strategy:
@@ -79,13 +79,13 @@ jobs:
         crate: [ picky-asn1, picky-asn1-der, picky-asn1-x509, picky ]
         include:
           - crate: picky-asn1
-            msvc: 1.56
+            msvc: "1.60"
           - crate: picky-asn1-der
-            msvc: 1.56
+            msvc: "1.60"
           - crate: picky-asn1-x509
-            msvc: 1.56
+            msvc: "1.60"
           - crate: picky
-            msvc: 1.56
+            msvc: "1.60"
 
     steps:
       - uses: actions/checkout@v2
