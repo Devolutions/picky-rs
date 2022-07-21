@@ -15,7 +15,7 @@ wasm-pack publish
 
 if ($LastExitCode -ne 0)
 {
-    throw "ava tests failed"
+    throw "wasm-pack publish failed"
 }
 
 Write-Host "Success!"
