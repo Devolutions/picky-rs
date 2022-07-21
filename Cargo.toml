@@ -2,18 +2,26 @@
 resolver = "2"
 members = [
     "picky",
+    "picky-krb",
     "picky-asn1",
     "picky-asn1-der",
     "picky-asn1-x509",
-    "picky-krb",
     "ffi",
     "ffi/wasm",
     "picky-server",
     "picky-signtool",
+]
+default-members = [
+    "picky",
+    "picky-krb",
+    "picky-asn1",
+    "picky-asn1-der",
+    "picky-asn1-x509",
+    "ffi",
+    "ffi/wasm",
 ]
 
 [profile.release]
 # Configured that way mostly for the wasm build
 lto = true
 opt-level = "s"
-strip = "debuginfo"
