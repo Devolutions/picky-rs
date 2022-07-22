@@ -52,16 +52,16 @@ jobs:
           $AndroidToolchainBin="${AndroidNdkHome}\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin"
 
           echo "[target.i686-linux-android]" >> $CargoConfigFile
-          echo "linker=`"$AndroidToolchainBin\\i686-linux-android16-clang`"" >> $CargoConfigFile
+          echo "linker=`"$AndroidToolchainBin\\i686-linux-android16-clang.exe`"" >> $CargoConfigFile
 
           echo "[target.x86_64-linux-android]" >> $CargoConfigFile
-          echo "linker=`"$AndroidToolchainBin\\x86_64-linux-android21-clang`"" >> $CargoConfigFile
+          echo "linker=`"$AndroidToolchainBin\\x86_64-linux-android21-clang.exe`"" >> $CargoConfigFile
 
           echo "[target.armv7-linux-androideabi]" >> $CargoConfigFile
-          echo "linker=`"$AndroidToolchainBin\\armv7a-linux-androideabi21-clang`"" >> $CargoConfigFile
+          echo "linker=`"$AndroidToolchainBin\\armv7a-linux-androideabi21-clang.exe`"" >> $CargoConfigFile
 
           echo "[target.aarch64-linux-android]" >> $CargoConfigFile
-          echo "linker=`"$AndroidToolchainBin\\aarch64-linux-android21-clang`"" >> $CargoConfigFile
+          echo "linker=`"$AndroidToolchainBin\\aarch64-linux-android21-clang.exe`"" >> $CargoConfigFile
       
       - name: Work around ndk-bundle symlink issue
         if: matrix.os == 'android'
