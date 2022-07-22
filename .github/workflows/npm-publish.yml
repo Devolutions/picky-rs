@@ -7,6 +7,7 @@ jobs:
   publish:
     name: Build and publish npm package
     runs-on: ubuntu-latest
+    environment: npm-publish
 
     steps:
       - name: Checkout
@@ -19,17 +20,20 @@ jobs:
         with:
           node-version: 16
       
-      - name: Go to wasm directory
+      - name: Setup wasm-pack
         shell: bash
-        run: cd ./ffi/wasm
+        run: |
+          curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh      
 
       - name: Tests
         shell: pwsh
-        run: ./run_tests.ps1
+        run: |
+          Set-Location ./ffi/wasm
+          ./run_tests.ps1
 
       - name: Build & Publish
         shell: pwsh
-        env:
-          # FIXME: provide a token in env vvvv
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: ./publish.ps1
+        run: |
+          Set-Location ./ffi/wasm
+          npm config set "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}"
+          ./publish.ps1
