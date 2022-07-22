@@ -11,7 +11,7 @@ if ($LastExitCode -ne 0)
 
 (Get-Content ./pkg/package.json) -Replace '@devolutions/picky-wasm', '@devolutions/picky' | Set-Content ./pkg/package.json
 
-wasm-pack publish
+wasm-pack publish --access=public
 
 if ($LastExitCode -ne 0)
 {
