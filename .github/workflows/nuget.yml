@@ -51,6 +51,8 @@ jobs:
           $AndroidNdkHome = ${Env:ANDROID_NDK_HOME} -Replace '\\', '\\'
           $AndroidToolchainBin="${AndroidNdkHome}\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin"
 
+          Get-ChildItem $AndroidToolchainBin -Recurse
+
           echo "[target.i686-linux-android]" >> $CargoConfigFile
           echo "linker=`"$AndroidToolchainBin\\i686-linux-android16-clang.exe`"" >> $CargoConfigFile
 
