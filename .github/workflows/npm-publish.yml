@@ -33,8 +33,7 @@ jobs:
 
       - name: Build & Publish
         shell: pwsh
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           Set-Location ./ffi/wasm
+          npm config set "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}"
           ./publish.ps1
