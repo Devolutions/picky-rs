@@ -1,4 +1,5 @@
 name: nuget package
+# name: Publish NuGet package
 on: workflow_dispatch
 jobs:
   build-native:
@@ -19,7 +20,7 @@ jobs:
           - os: ios
             runner: macos-11
           - os: android
-            runner: ubuntu-20.04
+            runner: windows-2022
         exclude:
           - arch: arm
             os: win
@@ -43,27 +44,42 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Install Android NDK
-        if: runner.os == 'linux'
+        if: matrix.os == 'android'
         shell: pwsh
         run: |
           $CargoConfigFile = "~/.cargo/config"
-          $AndroidToolchainBin="${Env:ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          
+          $AndroidNdkHome = ${Env:ANDROID_NDK_HOME} -Replace '\\', '\\'
+          $AndroidToolchainBin="${AndroidNdkHome}\\toolchains\\llvm\\prebuilt\\linux-x86_64\\bin"
+
           echo "[target.i686-linux-android]" >> $CargoConfigFile
-          echo "linker=`"$AndroidToolchainBin/i686-linux-android16-clang`"" >> $CargoConfigFile
+          echo "linker=`"$AndroidToolchainBin\\i686-linux-android16-clang`"" >> $CargoConfigFile
 
           echo "[target.x86_64-linux-android]" >> $CargoConfigFile
-          echo "linker=`"$AndroidToolchainBin/x86_64-linux-android21-clang`"" >> $CargoConfigFile
+          echo "linker=`"$AndroidToolchainBin\\x86_64-linux-android21-clang`"" >> $CargoConfigFile
 
           echo "[target.armv7-linux-androideabi]" >> $CargoConfigFile
-          echo "linker=`"$AndroidToolchainBin/armv7a-linux-androideabi21-clang`"" >> $CargoConfigFile
+          echo "linker=`"$AndroidToolchainBin\\armv7a-linux-androideabi21-clang`"" >> $CargoConfigFile
 
           echo "[target.aarch64-linux-android]" >> $CargoConfigFile
-          echo "linker=`"$AndroidToolchainBin/aarch64-linux-android21-clang`"" >> $CargoConfigFile
-
+          echo "linker=`"$AndroidToolchainBin\\aarch64-linux-android21-clang`"" >> $CargoConfigFile
+      
+      - name: Work around ndk-bundle symlink issue
+        if: matrix.os == 'android'
+        shell: pwsh
+        run: |
+          $sdkRoot = "C:\Android\android-sdk"
+          $sdkManager = "$sdkRoot\cmdline-tools\latest\bin\sdkmanager.bat"
+          Install-AndroidSDKPackages -AndroidSDKManagerPath $sdkManager `
+                                    -AndroidSDKRootPath $sdkRoot `
+                                    -AndroidPackages "ndk;21.4.7075529"
+          $ndkRoot = "$sdkRoot\ndk-bundle"
+          New-Item -Path $ndkRoot -ItemType SymbolicLink -Value "$sdkRoot\ndk\21.4.7075529" -Force
+  
       - name: Build picky (${{matrix.os}}-${{matrix.arch}})
         shell: pwsh
         run: |
+          Set-PSDebug -Trace 1
+
           $DotNetOs = '${{matrix.os}}'
           $DotNetArch = '${{matrix.arch}}'
           $DotNetRid = '${{matrix.os}}-${{matrix.arch}}'
@@ -82,7 +98,7 @@ jobs:
             $RustTarget = "armv7-linux-androideabi"
           }
 
-          & rustup target add $RustTarget
+          rustup target add $RustTarget
 
           if ($DotNetOs -eq 'win') {
             $Env:RUSTFLAGS="-C target-feature=+crt-static"
@@ -97,7 +113,7 @@ jobs:
           }
 
           if ($RustTarget -eq 'aarch64-unknown-linux-gnu') {
-            & sudo apt install gcc-aarch64-linux-gnu
+            sudo apt install gcc-aarch64-linux-gnu
             $Env:RUSTFLAGS="-C linker=aarch64-linux-gnu-gcc"
           }
 
@@ -111,7 +127,7 @@ jobs:
           }
           Set-Content -Path .\ffi\Cargo.toml -Value $CargoToml
 
-          & cargo build -p picky-ffi --release --target $RustTarget
+          cargo build -p picky-ffi --release --target $RustTarget
 
           $OutputLibraryName = "${LibPrefix}picky$LibSuffix"
           $RenamedLibraryName = "${LibPrefix}DevolutionsPicky$LibSuffix"
@@ -153,7 +169,7 @@ jobs:
       - name: Build picky (managed)
         shell: pwsh
         run: |
-          & dotnet build .\ffi\dotnet\Devolutions.Picky.sln -o package
+          dotnet build .\ffi\dotnet\Devolutions.Picky.sln -o package
 
       - name: Upload managed components
         uses: actions/upload-artifact@v2
