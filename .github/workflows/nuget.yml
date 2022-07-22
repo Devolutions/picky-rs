@@ -49,7 +49,7 @@ jobs:
         run: |
           $CargoConfigFile = "~/.cargo/config"
           $AndroidNdkHome = ${Env:ANDROID_NDK_HOME} -Replace '\\', '\\'
-          $AndroidToolchainBin="${AndroidNdkHome}\\toolchains\\llvm\\prebuilt\\linux-x86_64\\bin"
+          $AndroidToolchainBin="${AndroidNdkHome}\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin"
 
           echo "[target.i686-linux-android]" >> $CargoConfigFile
           echo "linker=`"$AndroidToolchainBin\\i686-linux-android16-clang`"" >> $CargoConfigFile
