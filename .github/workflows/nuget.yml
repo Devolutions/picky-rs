@@ -65,17 +65,17 @@ jobs:
           echo "[target.aarch64-linux-android]" >> $CargoConfigFile
           echo "linker=`"$AndroidToolchainBin\\aarch64-linux-android21-clang.cmd`"" >> $CargoConfigFile
       
-      # - name: Work around ndk-bundle symlink issue
-      #   if: matrix.os == 'android'
-      #   shell: pwsh
-      #   run: |
-      #     $sdkRoot = "C:\Android\android-sdk"
-      #     $sdkManager = "$sdkRoot\cmdline-tools\latest\bin\sdkmanager.bat"
-      #     Install-AndroidSDKPackages -AndroidSDKManagerPath $sdkManager `
-      #                               -AndroidSDKRootPath $sdkRoot `
-      #                               -AndroidPackages "ndk;21.4.7075529"
-      #     $ndkRoot = "$sdkRoot\ndk-bundle"
-      #     New-Item -Path $ndkRoot -ItemType SymbolicLink -Value "$sdkRoot\ndk\21.4.7075529" -Force
+      - name: Work around ndk-bundle symlink issue
+        if: matrix.os == 'android'
+        shell: pwsh
+        run: |
+          $sdkRoot = "C:\Android\android-sdk"
+          $sdkManager = "$sdkRoot\cmdline-tools\latest\bin\sdkmanager.bat"
+          Install-AndroidSDKPackages -AndroidSDKManagerPath $sdkManager `
+                                    -AndroidSDKRootPath $sdkRoot `
+                                    -AndroidPackages "ndk;21.4.7075529"
+          $ndkRoot = "$sdkRoot\ndk-bundle"
+          New-Item -Path $ndkRoot -ItemType SymbolicLink -Value "$sdkRoot\ndk\21.4.7075529" -Force
   
       - name: Build picky (${{matrix.os}}-${{matrix.arch}})
         shell: pwsh
