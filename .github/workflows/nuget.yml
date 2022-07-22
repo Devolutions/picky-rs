@@ -56,7 +56,6 @@ jobs:
       
       - name: Install NDK21
         if: matrix.os == 'android'
-        shell: pwsh
         run: |
           ANDROID_ROOT=/usr/local/lib/android
           ANDROID_SDK_ROOT=${ANDROID_ROOT}/sdk
@@ -65,7 +64,6 @@ jobs:
 
       - name: Make NDK21 default
         if: matrix.os == 'android'
-        shell: pwsh
         run: |
           ANDROID_ROOT=/usr/local/lib/android
           ANDROID_SDK_ROOT=${ANDROID_ROOT}/sdk
