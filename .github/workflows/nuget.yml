@@ -185,7 +185,6 @@ jobs:
     name: publish
     runs-on: ubuntu-18.04
     needs: build-managed
-    environment: artifactory-publish      
     if: github.event_name != 'schedule'
   
     steps:
