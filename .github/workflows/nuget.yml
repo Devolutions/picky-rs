@@ -205,7 +205,7 @@ jobs:
           ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
           ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
         run: |
-          $Files = Get-ChildItem -Recurse package/*.toml
+          $Files = Get-ChildItem -Recurse package/*.nupkg
     
           foreach ($File in $Files) {
             $UploadCmd = @(
@@ -213,7 +213,8 @@ jobs:
               'rt', 
               'upload', 
               "$File",
-              'nuget', 
+              'nuget',
+              '--fail-no-op',
               '--url=https://devolutions.jfrog.io/artifactory/',
               "--user=$Env:ARTIFACTORY_USERNAME",
               "--password=$Env:ARTIFACTORY_PASSWORD"
