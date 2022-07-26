@@ -1,10 +1,6 @@
-use crate::key::KeyError;
-use crate::key::PrivateKey;
-use crate::key::PublicKey;
-use picky_asn1::wrapper::BitStringAsn1;
-use picky_asn1::wrapper::OctetStringAsn1Container;
-use picky_asn1_x509::oids;
-use picky_asn1_x509::private_key_info;
+use crate::key::{KeyError, PrivateKey, PublicKey};
+use picky_asn1::wrapper::{BitStringAsn1, OctetStringAsn1Container};
+use picky_asn1_x509::{oids, private_key_info};
 
 pub(crate) struct EcdsaKeypair<'a> {
     pub(crate) private_key: Vec<u8>,
