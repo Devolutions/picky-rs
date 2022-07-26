@@ -47,8 +47,8 @@ pub(crate) struct SigBuilderInner {
 
 #[diplomat::bridge]
 pub mod ffi {
-    use crate::key::ffi::PrivateKey;
-    use crate::{error::ffi::PickyError, key::ffi::PublicKey};
+    use crate::error::ffi::PickyError;
+    use crate::key::ffi::{PrivateKey, PublicKey};
     use diplomat_runtime::{DiplomatResult, DiplomatWriteable};
     use picky::jose::jwt;
     use std::fmt::Write as _;

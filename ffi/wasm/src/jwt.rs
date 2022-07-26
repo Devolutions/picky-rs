@@ -1,6 +1,5 @@
 use crate::key::{PrivateKey, PublicKey};
-use picky::jose::jws;
-use picky::jose::jwt;
+use picky::jose::{jws, jwt};
 use wasm_bindgen::prelude::*;
 
 define_error!(JwtError, picky::jose::jwt::JwtError);
