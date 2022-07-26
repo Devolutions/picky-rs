@@ -1,5 +1,10 @@
-name: nuget package
-on: workflow_dispatch
+name: Publish NuGet package
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '21 3 * * 1' # 3:21 AM UTC every Monday
+
 jobs:
   build-native:
     name: native build
@@ -42,28 +47,44 @@ jobs:
       - name: Check out ${{ github.repository }}
         uses: actions/checkout@v2
 
-      - name: Install Android NDK
+      - name: Install NDK21
+        if: matrix.os == 'android'
+        run: |
+          ANDROID_ROOT=/usr/local/lib/android
+          ANDROID_SDK_ROOT=${ANDROID_ROOT}/sdk
+          SDKMANAGER=${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager
+          echo "y" | $SDKMANAGER "ndk;21.4.7075529"
+
+      - name: Make NDK21 default
+        if: matrix.os == 'android'
+        run: |
+          ANDROID_ROOT=/usr/local/lib/android
+          ANDROID_SDK_ROOT=${ANDROID_ROOT}/sdk
+          ANDROID_NDK_ROOT=${ANDROID_SDK_ROOT}/ndk-bundle
+          ln -sfn $ANDROID_SDK_ROOT/ndk/21.4.7075529 $ANDROID_NDK_ROOT
+          echo "ANDROID_NDK_HOME=${ANDROID_NDK_ROOT}" >> $GITHUB_ENV
+
+      - name: Configure Android NDK
         if: runner.os == 'linux'
         shell: pwsh
         run: |
           $CargoConfigFile = "~/.cargo/config"
           $AndroidToolchainBin="${Env:ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          
+
           echo "[target.i686-linux-android]" >> $CargoConfigFile
           echo "linker=`"$AndroidToolchainBin/i686-linux-android16-clang`"" >> $CargoConfigFile
-
           echo "[target.x86_64-linux-android]" >> $CargoConfigFile
           echo "linker=`"$AndroidToolchainBin/x86_64-linux-android21-clang`"" >> $CargoConfigFile
-
           echo "[target.armv7-linux-androideabi]" >> $CargoConfigFile
           echo "linker=`"$AndroidToolchainBin/armv7a-linux-androideabi21-clang`"" >> $CargoConfigFile
-
           echo "[target.aarch64-linux-android]" >> $CargoConfigFile
           echo "linker=`"$AndroidToolchainBin/aarch64-linux-android21-clang`"" >> $CargoConfigFile
 
       - name: Build picky (${{matrix.os}}-${{matrix.arch}})
         shell: pwsh
         run: |
+          Set-PSDebug -Trace 1
+
           $DotNetOs = '${{matrix.os}}'
           $DotNetArch = '${{matrix.arch}}'
           $DotNetRid = '${{matrix.os}}-${{matrix.arch}}'
@@ -82,7 +103,7 @@ jobs:
             $RustTarget = "armv7-linux-androideabi"
           }
 
-          & rustup target add $RustTarget
+          rustup target add $RustTarget
 
           if ($DotNetOs -eq 'win') {
             $Env:RUSTFLAGS="-C target-feature=+crt-static"
@@ -97,7 +118,7 @@ jobs:
           }
 
           if ($RustTarget -eq 'aarch64-unknown-linux-gnu') {
-            & sudo apt install gcc-aarch64-linux-gnu
+            sudo apt install gcc-aarch64-linux-gnu
             $Env:RUSTFLAGS="-C linker=aarch64-linux-gnu-gcc"
           }
 
@@ -111,7 +132,7 @@ jobs:
           }
           Set-Content -Path .\ffi\Cargo.toml -Value $CargoToml
 
-          & cargo build -p picky-ffi --release --target $RustTarget
+          cargo build -p picky-ffi --release --target $RustTarget
 
           $OutputLibraryName = "${LibPrefix}picky$LibSuffix"
           $RenamedLibraryName = "${LibPrefix}DevolutionsPicky$LibSuffix"
@@ -133,7 +154,7 @@ jobs:
 
     steps:
       - name: Check out ${{ github.repository }}
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Prepare dependencies
         run: |
@@ -153,10 +174,54 @@ jobs:
       - name: Build picky (managed)
         shell: pwsh
         run: |
-          & dotnet build .\ffi\dotnet\Devolutions.Picky.sln -o package
+          dotnet build .\ffi\dotnet\Devolutions.Picky.sln -o package
 
       - name: Upload managed components
         uses: actions/upload-artifact@v2
         with:
           name: picky-nupkg
           path: package/*.nupkg
+
+  publish:
+    name: publish
+    runs-on: ubuntu-18.04
+    needs: build-managed
+    if: github.event_name != 'schedule'
+  
+    steps:
+      - name: Configure runner
+        run: |
+          curl -fL https://getcli.jfrog.io/v2 | sh
+          echo "$PWD" >> $GITHUB_PATH
+
+      - name: Download NuGet package artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: picky-nupkg
+          path: package
+
+      - name: Publish to artifactory
+        shell: pwsh
+        env:
+          ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
+          ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
+        run: |
+          $Files = Get-ChildItem -Recurse package/*.nupkg
+    
+          foreach ($File in $Files) {
+            $UploadCmd = @(
+              'jfrog', 
+              'rt', 
+              'upload', 
+              "$File",
+              'nuget',
+              '--fail-no-op',
+              '--url=https://devolutions.jfrog.io/artifactory/',
+              "--user=$Env:ARTIFACTORY_USERNAME",
+              "--password=$Env:ARTIFACTORY_PASSWORD"
+            )
+
+            Write-Host "Publishing $($File.Name)..."
+            $UploadCmd = $UploadCmd -Join ' '
+            Invoke-Expression $UploadCmd
+          }
