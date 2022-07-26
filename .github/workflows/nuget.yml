@@ -78,6 +78,7 @@ jobs:
           ANDROID_SDK_ROOT=${ANDROID_ROOT}/sdk
           ANDROID_NDK_ROOT=${ANDROID_SDK_ROOT}/ndk-bundle
           ln -sfn $ANDROID_SDK_ROOT/ndk/21.4.7075529 $ANDROID_NDK_ROOT
+          echo "ANDROID_NDK_HOME=${ANDROID_NDK_ROOT}" >> $GITHUB_ENV
   
       - name: Build picky (${{matrix.os}}-${{matrix.arch}})
         shell: pwsh
