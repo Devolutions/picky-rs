@@ -32,6 +32,12 @@ public partial struct JwtSig
     public static unsafe extern IntPtr GetContentType(JwtSig* self, DiplomatWriteable* writeable);
 
     /// <summary>
+    /// Returns the header as a JSON encoded payload.
+    /// </summary>
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "JwtSig_get_header", ExactSpelling = true)]
+    public static unsafe extern IntPtr GetHeader(JwtSig* self, DiplomatWriteable* writeable);
+
+    /// <summary>
     /// Returns the claims as a JSON encoded payload.
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "JwtSig_get_claims", ExactSpelling = true)]

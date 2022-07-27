@@ -8,6 +8,7 @@ use crate::key::{PrivateKey, PublicKey};
 use crate::signature::{SignatureAlgorithm, SignatureError};
 use base64::DecodeError;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use thiserror::Error;
 
 // === error type === //
@@ -150,9 +151,9 @@ impl TryFrom<JwsAlg> for SignatureAlgorithm {
 // === JWS header === //
 
 /// JOSE header of a JWS
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct JwsHeader {
-    // -- specific to JWK -- //
+    // -- specific to JWS -- //
     /// Algorithm Header
     ///
     /// identifies the cryptographic algorithm used to secure the JWS.
@@ -215,6 +216,11 @@ pub struct JwsHeader {
     /// base64url-encoded SHA-256 thumbprint (a.k.a. digest) of the DER encoding of an X.509 certificate.
     #[serde(rename = "x5t#S256", alias = "x5t#s256", skip_serializing_if = "Option::is_none")]
     pub x5t_s256: Option<String>,
+
+    // -- extra parameters -- //
+    /// Additional header parameters (both public and private)
+    #[serde(flatten)]
+    pub additional: HashMap<String, serde_json::Value>,
 }
 
 impl JwsHeader {
@@ -230,6 +236,7 @@ impl JwsHeader {
             x5c: None,
             x5t: None,
             x5t_s256: None,
+            additional: HashMap::new(),
         }
     }
 

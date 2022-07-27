@@ -42,7 +42,8 @@ impl From<JwsAlg> for jws::JwsAlg {
 pub(crate) struct SigBuilderInner {
     pub(crate) alg: JwsAlg,
     pub(crate) cty: Option<String>,
-    pub(crate) claims: String,
+    pub(crate) claims: serde_json::Value,
+    pub(crate) additional_headers: std::collections::HashMap<String, serde_json::Value>,
 }
 
 #[diplomat::bridge]
@@ -94,15 +95,24 @@ pub mod ffi {
         }
 
         /// Returns the content type.
+        // TODO: support for optional string in return position
         pub fn get_content_type(&self, writeable: &mut DiplomatWriteable) -> DiplomatResult<(), Box<PickyError>> {
             err_check!(write!(writeable, "{}", self.0.header.cty.as_deref().unwrap_or("")));
             writeable.flush();
             Ok(()).into()
         }
 
+        /// Returns the header as a JSON encoded payload.
+        pub fn get_header(&self, writeable: &mut DiplomatWriteable) -> DiplomatResult<(), Box<PickyError>> {
+            let header = err_check!(serde_json::to_string(&self.0.header));
+            err_check!(write!(writeable, "{header}"));
+            writeable.flush();
+            Ok(()).into()
+        }
+
         /// Returns the claims as a JSON encoded payload.
         pub fn get_claims(&self, writeable: &mut DiplomatWriteable) -> DiplomatResult<(), Box<PickyError>> {
-            let claims = err_check!(serde_json::to_string_pretty(&self.0.state.claims));
+            let claims = err_check!(serde_json::to_string(&self.0.state.claims));
             err_check!(write!(writeable, "{claims}"));
             writeable.flush();
             Ok(()).into()
@@ -150,7 +160,8 @@ pub mod ffi {
             Box::new(Self(super::SigBuilderInner {
                 alg: JwsAlg::RS256,
                 cty: None,
-                claims: String::from("{}"),
+                claims: serde_json::Value::Null,
+                additional_headers: std::collections::HashMap::new(),
             }))
         }
 
@@ -162,16 +173,74 @@ pub mod ffi {
             self.0.cty = Some(cty.to_owned());
         }
 
-        /// Claims should be a valid JSON payload.
-        pub fn set_claims(&mut self, claims: &str) {
-            self.0.claims = claims.to_owned();
+        /// Adds a JSON object as additional header parameter.
+        ///
+        /// This additional header parameter may be either public or private.
+        pub fn add_additional_parameter_object(
+            &mut self,
+            name: &str,
+            obj: &str,
+        ) -> DiplomatResult<(), Box<PickyError>> {
+            let parameter = err_check!(serde_json::from_str(obj));
+            self.0.additional_headers.insert(name.to_owned(), parameter);
+            Ok(()).into()
         }
 
-        pub fn build(&self) -> DiplomatResult<Box<JwtSig>, Box<PickyError>> {
-            let claims = err_check!(serde_json::from_str(&self.0.claims));
+        /// Adds a boolean as additional header parameter.
+        ///
+        /// This additional header parameter may be either public or private.
+        pub fn add_additional_parameter_bool(&mut self, name: &str, value: bool) {
+            let parameter = serde_json::Value::Bool(value);
+            self.0.additional_headers.insert(name.to_owned(), parameter);
+        }
+
+        /// Adds a positive number as additional header parameter.
+        ///
+        /// This additional header parameter may be either public or private.
+        pub fn add_additional_parameter_pos_int(&mut self, name: &str, value: u64) {
+            let parameter = serde_json::Value::from(value);
+            self.0.additional_headers.insert(name.to_owned(), parameter);
+        }
+
+        /// Adds a possibly negative number as additional header parameter.
+        ///
+        /// This additional header parameter may be either public or private.
+        pub fn add_additional_parameter_neg_int(&mut self, name: &str, value: i64) {
+            let parameter = serde_json::Value::from(value);
+            self.0.additional_headers.insert(name.to_owned(), parameter);
+        }
+
+        /// Adds a float as additional header parameter.
+        ///
+        /// This additional header parameter may be either public or private.
+        pub fn add_additional_parameter_float(&mut self, name: &str, value: i64) {
+            let parameter = serde_json::Value::from(value);
+            self.0.additional_headers.insert(name.to_owned(), parameter);
+        }
+
+        /// Adds a float as additional header parameter.
+        ///
+        /// This additional header parameter may be either public or private.
+        pub fn add_additional_parameter_string(&mut self, name: &str, value: &str) {
+            let parameter = serde_json::Value::String(value.to_owned());
+            self.0.additional_headers.insert(name.to_owned(), parameter);
+        }
+
+        /// Sets the given JSON payload.
+        ///
+        /// Claims should be a valid JSON payload.
+        pub fn set_claims(&mut self, claims: &str) -> DiplomatResult<(), Box<PickyError>> {
+            let claims = err_check!(serde_json::from_str(claims));
+            self.0.claims = claims;
+            Ok(()).into()
+        }
+
+        pub fn build(&self) -> Box<JwtSig> {
+            let claims = self.0.claims.clone();
             let mut jwt = jwt::CheckedJwtSig::new(self.0.alg.into(), claims);
             jwt.header.cty = self.0.cty.clone();
-            Ok(Box::new(JwtSig(jwt))).into()
+            jwt.header.additional = self.0.additional_headers.clone();
+            Box::new(JwtSig(jwt))
         }
     }
 

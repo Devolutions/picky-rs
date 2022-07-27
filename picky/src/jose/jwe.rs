@@ -12,6 +12,7 @@ use rand::RngCore;
 use rsa::{PaddingScheme, PublicKey as RsaPublicKeyInterface, RsaPrivateKey, RsaPublicKey};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+use std::collections::HashMap;
 use thiserror::Error;
 
 type Aes192Gcm = aes_gcm::AesGcm<aes_gcm::aes::Aes192, aes_gcm::aead::generic_array::typenum::U12>;
@@ -236,7 +237,7 @@ impl JweEnc {
 // === JWE header === //
 
 /// JWE specific part of JOSE header
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct JweHeader {
     // -- specific to JWE -- //
     /// Algorithm used to encrypt or determine the Content Encryption Key (CEK) (key wrapping...)
@@ -304,6 +305,11 @@ pub struct JweHeader {
     /// base64url-encoded SHA-256 thumbprint (a.k.a. digest) of the DER encoding of an X.509 certificate.
     #[serde(rename = "x5t#S256", alias = "x5t#s256", skip_serializing_if = "Option::is_none")]
     pub x5t_s256: Option<String>,
+
+    // -- extra parameters -- //
+    /// Additional header parameters (both public and private)
+    #[serde(flatten)]
+    pub additional: HashMap<String, serde_json::Value>,
 }
 
 impl JweHeader {
@@ -320,6 +326,7 @@ impl JweHeader {
             x5c: None,
             x5t: None,
             x5t_s256: None,
+            additional: HashMap::default(),
         }
     }
 

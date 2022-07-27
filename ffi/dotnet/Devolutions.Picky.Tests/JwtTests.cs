@@ -1,4 +1,5 @@
 using System;
+using System.Text.Json;
 
 using Xunit;
 
@@ -45,25 +46,18 @@ mAdXDE5UhroL0oDhSmIrdZ8CxngOxHr1WD2yC0X0jAVP/mrxjSSfBwmmqhSMmONl
 vQIDAQAB
 -----END PUBLIC KEY-----";
 
-    private static readonly string claims = @"{
-  ""admin"": true,
-  ""exp"": 1516539022,
-  ""iat"": 1516239022,
-  ""name"": ""John Doe"",
-  ""nbf"": 1516239022
-}";
+    private static readonly string claims = @"{""admin"":true,""exp"":1516539022,""iat"":1516239022,""name"":""John Doe"",""nbf"":1516239022}";
 
-    private static readonly string headerSection = "eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCIsImN0eSI6IkFVVEgifQ";
+    private static readonly string headerSection = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImN0eSI6IkFVVEgifQ";
 
     private static readonly string payloadSection = "eyJhZG1pbiI6dHJ1ZSwiZXhwIjoxNTE2NTM5MDIyLCJpYXQiOjE1MTYyMzkwMjIsIm5hbWUiOiJKb2huIERvZSIsIm5iZiI6MTUxNjIzOTAyMn0";
 
-    private static readonly string signedJwt = "eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCIsImN0eSI6IkFVVEgifQ.eyJhZG1pbiI6dHJ1ZSwiZXhwIjoxNTE2NTM5MDIyLCJpYXQiOjE1MTYyMzkwMjIsIm5hbWUiOiJKb2huIERvZSIsIm5iZiI6MTUxNjIzOTAyMn0.lA5Phya8h9LcaK0_wF84PULgDuv48pp1O9dykHGeYG0aSLgNNdsOw8_jUTlpmnzNAXGn1HCww2Xl8NwHvdn3Q_6GphvwAqR12HSB9SAum8icAOp3NHsv-bYy2es7cCgkJq0O2m6vud-SBJUOO-VUg42glZgFDTnvAvYnRRjv_zyaeN7CUmS9cQnXaK_FkUPbC-R9WpBvPoAx9NhOgFkDfwEPIYKyEPP10YeXgpVTCkiOOBK80A53xvt1m03rn1hlgnfCPXLXXnZIxcgL8poTNbD1lXSRzTu3Ogt2-4v6pPsoTn4z783ttnUZSFHlDfhpz0-iMu8lkIrKBNPcIQoikQ";
+    private static readonly string signedJwt = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImN0eSI6IkFVVEgifQ.eyJhZG1pbiI6dHJ1ZSwiZXhwIjoxNTE2NTM5MDIyLCJpYXQiOjE1MTYyMzkwMjIsIm5hbWUiOiJKb2huIERvZSIsIm5iZiI6MTUxNjIzOTAyMn0.Lw5hpVuV9BkH6rmz8xqFqtfUs1bxPIIldoqA88z9QKbgDdSE4zgvqTOaiBvTfp5fprB-O_RHjhdS9D4vR38MyGfwvLiQDh2Xv0EsdIMnlZdtGKi4d_lNOreKpXc6GIzl1iMNx-R4SiA0eJm4I0mLkOV-BQgEDYaCRofRdSnsqQokb218qjoE8zahCuZJRW-FNgukxwYSFy_mT3RXnKzXtU38Rmhso30itQfesFig3vzctc9bZGrX5vmmqJEmkGJXfiZ7pz9OuYKNLGz-Bd1hehwz5OpE6WuuSA1YF3fVZ7xg3d61m2X6NMgOxO6zdMoAunkRGoK0nQeO7GgtQ9qBzA";
 
     [Fact]
     public void Smoke()
     {
         JwtSigBuilder builder = JwtSig.Builder();
-        builder.Algorithm = JwsAlg.RS512;
         builder.ContentType = "AUTH";
         builder.Claims = claims;
 
@@ -88,5 +82,56 @@ vQIDAQAB
         JwtSig jwt = JwtSig.Decode(signedJwt, key, validator);
         Assert.Equal("AUTH", jwt.ContentType);
         Assert.Equal(claims, jwt.Claims);
+    }
+
+    [Fact]
+    public void AdditionalHeaderParameters()
+    {
+        string additionalObject = @"{""answer"":42,""foo"":""bar""}";
+
+        JwtSigBuilder builder = JwtSig.Builder();
+        builder.Algorithm = JwsAlg.RS512;
+        builder.Claims = claims;
+        builder.AddAdditionalParameterString("additional_token", "abcd.efgh.ijklm");
+        builder.AddAdditionalParameterObject("additional_object", additionalObject);
+        builder.AddAdditionalParameterPosInt("additional_number", 64);
+        builder.AddAdditionalParameterNegInt("additional_negative_number", -64);
+
+        JwtSig jwt = builder.Build();
+
+        {
+            Assert.Equal(claims, jwt.Claims);
+
+            JsonElement header = JsonDocument.Parse(jwt.Header).RootElement;
+            Assert.Equal("RS512", header.GetProperty("alg").GetString());
+            Assert.Equal("JWT", header.GetProperty("typ").GetString());
+            Assert.Equal("abcd.efgh.ijklm", header.GetProperty("additional_token").GetString());
+            Assert.Equal(42, header.GetProperty("additional_object").GetProperty("answer").GetInt32());
+            Assert.Equal("bar", header.GetProperty("additional_object").GetProperty("foo").GetString());
+            Assert.Equal((ulong)64, header.GetProperty("additional_number").GetUInt64());
+            Assert.Equal(-64, header.GetProperty("additional_negative_number").GetInt64());
+        }
+
+        Pem pem = Pem.Parse(privKeyPemRepr);
+        PrivateKey priv = PrivateKey.FromPem(pem);
+        string encoded = jwt.Encode(priv);
+
+        {
+            string[] parts = encoded.Split('.');
+            Assert.Equal(payloadSection, parts[1]);
+
+            // Decode header part (url-safe base64-encoded)
+            byte[] headerPartBytes = Convert.FromBase64String(parts[0].Replace('-', '+').Replace('_', '/') + "==");
+            string headerPart = System.Text.Encoding.UTF8.GetString(headerPartBytes);
+
+            JsonElement header = JsonDocument.Parse(headerPart).RootElement;
+            Assert.Equal("RS512", header.GetProperty("alg").GetString());
+            Assert.Equal("JWT", header.GetProperty("typ").GetString());
+            Assert.Equal("abcd.efgh.ijklm", header.GetProperty("additional_token").GetString());
+            Assert.Equal(42, header.GetProperty("additional_object").GetProperty("answer").GetInt32());
+            Assert.Equal("bar", header.GetProperty("additional_object").GetProperty("foo").GetString());
+            Assert.Equal((ulong)64, header.GetProperty("additional_number").GetUInt64());
+            Assert.Equal(-64, header.GetProperty("additional_negative_number").GetInt64());
+        }
     }
 }

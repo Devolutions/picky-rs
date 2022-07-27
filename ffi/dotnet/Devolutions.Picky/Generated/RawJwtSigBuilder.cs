@@ -26,13 +26,70 @@ public partial struct JwtSigBuilder
     public static unsafe extern void SetContentType(JwtSigBuilder* self, byte* cty, nuint ctySz);
 
     /// <summary>
-    /// Claims should be a valid JSON payload.
+    /// Adds a JSON object as additional header parameter.
     /// </summary>
+    /// <remarks>
+    /// This additional header parameter may be either public or private.
+    /// </remarks>
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "JwtSigBuilder_add_additional_parameter_object", ExactSpelling = true)]
+    public static unsafe extern IntPtr AddAdditionalParameterObject(JwtSigBuilder* self, byte* name, nuint nameSz, byte* obj, nuint objSz);
+
+    /// <summary>
+    /// Adds a boolean as additional header parameter.
+    /// </summary>
+    /// <remarks>
+    /// This additional header parameter may be either public or private.
+    /// </remarks>
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "JwtSigBuilder_add_additional_parameter_bool", ExactSpelling = true)]
+    public static unsafe extern void AddAdditionalParameterBool(JwtSigBuilder* self, byte* name, nuint nameSz, [MarshalAs(UnmanagedType.U1)] bool value);
+
+    /// <summary>
+    /// Adds a positive number as additional header parameter.
+    /// </summary>
+    /// <remarks>
+    /// This additional header parameter may be either public or private.
+    /// </remarks>
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "JwtSigBuilder_add_additional_parameter_pos_int", ExactSpelling = true)]
+    public static unsafe extern void AddAdditionalParameterPosInt(JwtSigBuilder* self, byte* name, nuint nameSz, ulong value);
+
+    /// <summary>
+    /// Adds a possibly negative number as additional header parameter.
+    /// </summary>
+    /// <remarks>
+    /// This additional header parameter may be either public or private.
+    /// </remarks>
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "JwtSigBuilder_add_additional_parameter_neg_int", ExactSpelling = true)]
+    public static unsafe extern void AddAdditionalParameterNegInt(JwtSigBuilder* self, byte* name, nuint nameSz, long value);
+
+    /// <summary>
+    /// Adds a float as additional header parameter.
+    /// </summary>
+    /// <remarks>
+    /// This additional header parameter may be either public or private.
+    /// </remarks>
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "JwtSigBuilder_add_additional_parameter_float", ExactSpelling = true)]
+    public static unsafe extern void AddAdditionalParameterFloat(JwtSigBuilder* self, byte* name, nuint nameSz, long value);
+
+    /// <summary>
+    /// Adds a float as additional header parameter.
+    /// </summary>
+    /// <remarks>
+    /// This additional header parameter may be either public or private.
+    /// </remarks>
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "JwtSigBuilder_add_additional_parameter_string", ExactSpelling = true)]
+    public static unsafe extern void AddAdditionalParameterString(JwtSigBuilder* self, byte* name, nuint nameSz, byte* value, nuint valueSz);
+
+    /// <summary>
+    /// Sets the given JSON payload.
+    /// </summary>
+    /// <remarks>
+    /// Claims should be a valid JSON payload.
+    /// </remarks>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "JwtSigBuilder_set_claims", ExactSpelling = true)]
-    public static unsafe extern void SetClaims(JwtSigBuilder* self, byte* claims, nuint claimsSz);
+    public static unsafe extern IntPtr SetClaims(JwtSigBuilder* self, byte* claims, nuint claimsSz);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "JwtSigBuilder_build", ExactSpelling = true)]
-    public static unsafe extern IntPtr Build(JwtSigBuilder* self);
+    public static unsafe extern JwtSig* Build(JwtSigBuilder* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "JwtSigBuilder_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(JwtSigBuilder* self);
