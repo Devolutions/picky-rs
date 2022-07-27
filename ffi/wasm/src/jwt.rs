@@ -89,9 +89,14 @@ impl JwtSig {
         Ok(self.0.header.cty.as_deref().unwrap_or("").into())
     }
 
+    /// Returns the header as a JSON encoded payload.
+    pub fn get_header(&self) -> Result<String, JwtError> {
+        serde_json::to_string(&self.0.header).map_err(|e| JwtError(e.into()))
+    }
+
     /// Returns the claims as a JSON encoded payload.
     pub fn get_claims(&self) -> Result<String, JwtError> {
-        serde_json::to_string_pretty(&self.0.state.claims).map_err(|e| JwtError(e.into()))
+        serde_json::to_string(&self.0.state.claims).map_err(|e| JwtError(e.into()))
     }
 
     /// Decode JWT and check signature using provided public key.
@@ -117,7 +122,8 @@ impl JwtSig {
 pub(crate) struct SigBuilderInner {
     pub(crate) alg: JwsAlg,
     pub(crate) cty: Option<String>,
-    pub(crate) claims: String,
+    pub(crate) claims: serde_json::Value,
+    pub(crate) additional_headers: std::collections::HashMap<String, serde_json::Value>,
 }
 
 #[wasm_bindgen]
@@ -129,7 +135,8 @@ impl JwtSigBuilder {
         Self(SigBuilderInner {
             alg: JwsAlg::RS256,
             cty: None,
-            claims: String::from("{}"),
+            claims: serde_json::Value::Null,
+            additional_headers: std::collections::HashMap::new(),
         })
     }
 
@@ -141,15 +148,66 @@ impl JwtSigBuilder {
         self.0.cty = Some(cty.to_owned());
     }
 
+    /// Adds a JSON object as additional header parameter.
+    ///
+    /// This additional header parameter may be either public or private.
+    pub fn add_additional_parameter_object(&mut self, name: &str, obj: &str) -> Result<(), JwtError> {
+        let parameter = serde_json::from_str(obj).map_err(|e| JwtError(e.into()))?;
+        self.0.additional_headers.insert(name.to_owned(), parameter);
+        Ok(())
+    }
+
+    /// Adds a boolean as additional header parameter.
+    ///
+    /// This additional header parameter may be either public or private.
+    pub fn add_additional_parameter_bool(&mut self, name: &str, value: bool) {
+        let parameter = serde_json::Value::Bool(value);
+        self.0.additional_headers.insert(name.to_owned(), parameter);
+    }
+
+    /// Adds a positive number as additional header parameter.
+    ///
+    /// This additional header parameter may be either public or private.
+    pub fn add_additional_parameter_pos_int(&mut self, name: &str, value: u64) {
+        let parameter = serde_json::Value::from(value);
+        self.0.additional_headers.insert(name.to_owned(), parameter);
+    }
+
+    /// Adds a possibly negative number as additional header parameter.
+    ///
+    /// This additional header parameter may be either public or private.
+    pub fn add_additional_parameter_neg_int(&mut self, name: &str, value: i64) {
+        let parameter = serde_json::Value::from(value);
+        self.0.additional_headers.insert(name.to_owned(), parameter);
+    }
+
+    /// Adds a float as additional header parameter.
+    ///
+    /// This additional header parameter may be either public or private.
+    pub fn add_additional_parameter_float(&mut self, name: &str, value: i64) {
+        let parameter = serde_json::Value::from(value);
+        self.0.additional_headers.insert(name.to_owned(), parameter);
+    }
+
+    /// Adds a float as additional header parameter.
+    ///
+    /// This additional header parameter may be either public or private.
+    pub fn add_additional_parameter_string(&mut self, name: &str, value: &str) {
+        let parameter = serde_json::Value::String(value.to_owned());
+        self.0.additional_headers.insert(name.to_owned(), parameter);
+    }
+
     /// Claims should be a valid JSON payload.
-    pub fn set_claims(&mut self, claims: &str) {
-        self.0.claims = claims.to_owned();
+    pub fn set_claims(&mut self, claims: &str) -> Result<(), JwtError> {
+        self.0.claims = serde_json::from_str(claims).map_err(|e| JwtError(e.into()))?;
+        Ok(())
     }
 
     pub fn build(&self) -> Result<JwtSig, JwtError> {
-        let claims = serde_json::from_str(&self.0.claims).map_err(|e| JwtError(e.into()))?;
+        let claims = self.0.claims.clone();
         let mut jwt = jwt::CheckedJwtSig::new(self.0.alg.into(), claims);
         jwt.header.cty = self.0.cty.clone();
+        jwt.header.additional = self.0.additional_headers.clone();
         Ok(JwtSig(jwt))
     }
 }

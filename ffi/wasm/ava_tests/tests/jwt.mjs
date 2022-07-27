@@ -1,7 +1,7 @@
 import test from 'ava';
 import { PrivateKey, PublicKey, Pem, JwtSig, JwtValidator, JwsAlg } from "@devolutions/picky";
 
-const privKeyPemRepr =
+const PRIV_KEY_PEM_REPR =
 	[
 		'-----BEGIN PRIVATE KEY-----',
 		'MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDkrPiL/5dmGIT5',
@@ -33,41 +33,31 @@ const privKeyPemRepr =
 		'-----END PRIVATE KEY-----'
 ].join('\n');
 
-const CLAIMS = 
-	[
-		'{',
-		'  "admin": true,',
-		'  "exp": 1516539022,',
-		'  "iat": 1516239022,',
-		'  "name": "John Doe",',
-		'  "nbf": 1516239022',
-		'}'
-	].join('\n');
+const CLAIMS = JSON.stringify({
+  admin: true,
+  exp: 1516539022,
+  iat: 1516239022,
+  name: "John Doe",
+  nbf: 1516239022,
+});
 
-const HEADER_SECTION = "eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCIsImN0eSI6IkFVVEgifQ";
+const HEADER_SECTION = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImN0eSI6IkFVVEgifQ";
 
 const PAYLOAD_SECTION = "eyJhZG1pbiI6dHJ1ZSwiZXhwIjoxNTE2NTM5MDIyLCJpYXQiOjE1MTYyMzkwMjIsIm5hbWUiOiJKb2huIERvZSIsIm5iZiI6MTUxNjIzOTAyMn0";
 
-const SIGNED_JWT = "eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCIsImN0eSI6IkFVVEgifQ.eyJhZG1pbiI6dHJ1ZSwiZXhwIjoxNTE2NTM5MDIyLCJpYXQiOjE1MTYyMzkwMjIsIm5hbWUiOiJKb2huIERvZSIsIm5iZiI6MTUxNjIzOTAyMn0.lA5Phya8h9LcaK0_wF84PULgDuv48pp1O9dykHGeYG0aSLgNNdsOw8_jUTlpmnzNAXGn1HCww2Xl8NwHvdn3Q_6GphvwAqR12HSB9SAum8icAOp3NHsv-bYy2es7cCgkJq0O2m6vud-SBJUOO-VUg42glZgFDTnvAvYnRRjv_zyaeN7CUmS9cQnXaK_FkUPbC-R9WpBvPoAx9NhOgFkDfwEPIYKyEPP10YeXgpVTCkiOOBK80A53xvt1m03rn1hlgnfCPXLXXnZIxcgL8poTNbD1lXSRzTu3Ogt2-4v6pPsoTn4z783ttnUZSFHlDfhpz0-iMu8lkIrKBNPcIQoikQ";
+const SIGNED_JWT = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImN0eSI6IkFVVEgifQ.eyJhZG1pbiI6dHJ1ZSwiZXhwIjoxNTE2NTM5MDIyLCJpYXQiOjE1MTYyMzkwMjIsIm5hbWUiOiJKb2huIERvZSIsIm5iZiI6MTUxNjIzOTAyMn0.Lw5hpVuV9BkH6rmz8xqFqtfUs1bxPIIldoqA88z9QKbgDdSE4zgvqTOaiBvTfp5fprB-O_RHjhdS9D4vR38MyGfwvLiQDh2Xv0EsdIMnlZdtGKi4d_lNOreKpXc6GIzl1iMNx-R4SiA0eJm4I0mLkOV-BQgEDYaCRofRdSnsqQokb218qjoE8zahCuZJRW-FNgukxwYSFy_mT3RXnKzXtU38Rmhso30itQfesFig3vzctc9bZGrX5vmmqJEmkGJXfiZ7pz9OuYKNLGz-Bd1hehwz5OpE6WuuSA1YF3fVZ7xg3d61m2X6NMgOxO6zdMoAunkRGoK0nQeO7GgtQ9qBzA";
 
 test('Smoke', t => {
 	try {
 		const builder = JwtSig.builder();
-		builder.set_algorithm(JwsAlg.RS512);
 		builder.set_content_type("AUTH");
-		builder.set_claims(JSON.stringify({
-		  admin: true,
-		  exp: 1516539022,
-		  iat: 1516239022,
-		  name: "John Doe",
-		  nbf: 1516239022,
-		}));
+		builder.set_claims(CLAIMS);
 
 		const jwt = builder.build();
 		t.is(jwt.get_content_type(), "AUTH");
 		t.is(jwt.get_claims(), CLAIMS);
 
-		const pem = Pem.parse(privKeyPemRepr);
+		const pem = Pem.parse(PRIV_KEY_PEM_REPR);
 		const priv = PrivateKey.from_pem(pem);
 		const encoded = jwt.encode(priv);
 		const parts = encoded.split('.');
@@ -84,13 +74,70 @@ test('Smoke', t => {
 
 test('Decode Signed JWT', t => {
 	try {
-		const pem = Pem.parse(privKeyPemRepr);
+		const pem = Pem.parse(PRIV_KEY_PEM_REPR);
 		const key = PrivateKey.from_pem(pem).to_public_key();
 		const validator = JwtValidator.strict(BigInt(1516259022), 0);
 		const jwt = JwtSig.decode(SIGNED_JWT, key, validator);
 		t.is(jwt.get_content_type(), "AUTH");
 		t.is(jwt.get_claims(), CLAIMS);
 	} catch(e) {
+		if (typeof(e.to_display) === 'undefined') {
+			throw e;
+		} else {
+			throw e.to_display();
+		}
+	}
+})
+
+test('Additional Header Parameters', t => {
+	try {
+		const additionalObject = {
+			answer: 42,
+			foo: "bar"
+		};
+
+		const builder = JwtSig.builder();
+		builder.set_algorithm(JwsAlg.RS512);
+		builder.set_claims(CLAIMS);
+		builder.add_additional_parameter_string("additional_token", "abcd.efgh.ijklm");
+		builder.add_additional_parameter_object("additional_object", JSON.stringify(additionalObject));
+		builder.add_additional_parameter_pos_int("additional_number", BigInt(64));
+		builder.add_additional_parameter_neg_int("additional_negative_number", BigInt(-64));
+
+		const jwt = builder.build();
+
+		{
+			t.is(jwt.get_claims(), CLAIMS);
+
+			const header = JSON.parse(jwt.get_header());
+			t.deepEqual(header.additional_object, additionalObject);
+			t.is(header.alg, "RS512");
+			t.is(header.typ, "JWT");
+			t.is(header.additional_token, "abcd.efgh.ijklm");
+			t.is(header.additional_number, 64);
+			t.is(header.additional_negative_number, -64);
+		}
+
+		const pem = Pem.parse(PRIV_KEY_PEM_REPR);
+		const priv = PrivateKey.from_pem(pem);
+		const encoded = jwt.encode(priv);
+
+		{
+			const parts = encoded.split('.');
+			t.is(PAYLOAD_SECTION, parts[1]);
+
+			// Decode header part (url-safe base64-encoded)
+			const headerPart = atob(parts[0].replace('-', '+').replace('_', '/'));
+			const header = JSON.parse(headerPart);
+
+			t.deepEqual(header.additional_object, additionalObject);
+			t.is(header.alg, "RS512");
+			t.is(header.typ, "JWT");
+			t.is(header.additional_token, "abcd.efgh.ijklm");
+			t.is(header.additional_number, 64);
+			t.is(header.additional_negative_number, -64);
+		}
+	} catch (e) {
 		if (typeof(e.to_display) === 'undefined') {
 			throw e;
 		} else {

@@ -97,8 +97,167 @@ public partial class JwtSigBuilder: IDisposable
     }
 
     /// <summary>
-    /// Claims should be a valid JSON payload.
+    /// Adds a JSON object as additional header parameter.
     /// </summary>
+    /// <remarks>
+    /// This additional header parameter may be either public or private.
+    /// </remarks>
+    /// <exception cref="PickyException"></exception>
+    public void AddAdditionalParameterObject(string name, string obj)
+    {
+        unsafe
+        {
+            if (_inner == null)
+            {
+                throw new ObjectDisposedException("JwtSigBuilder");
+            }
+            byte[] nameBuf = DiplomatUtils.StringToUtf8(name);
+            byte[] objBuf = DiplomatUtils.StringToUtf8(obj);
+            nuint nameBufLength = (nuint)nameBuf.Length;
+            nuint objBufLength = (nuint)objBuf.Length;
+            fixed (byte* nameBufPtr = nameBuf)
+            {
+                fixed (byte* objBufPtr = objBuf)
+                {
+                    IntPtr resultPtr = Raw.JwtSigBuilder.AddAdditionalParameterObject(_inner, nameBufPtr, nameBufLength, objBufPtr, objBufLength);
+                    Raw.JwtFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.JwtFfiResultVoidBoxPickyError>(resultPtr);
+                    Raw.JwtFfiResultVoidBoxPickyError.Destroy(resultPtr);
+                    if (!result.isOk)
+                    {
+                        throw new PickyException(new PickyError(result.Err));
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Adds a boolean as additional header parameter.
+    /// </summary>
+    /// <remarks>
+    /// This additional header parameter may be either public or private.
+    /// </remarks>
+    public void AddAdditionalParameterBool(string name, bool value)
+    {
+        unsafe
+        {
+            if (_inner == null)
+            {
+                throw new ObjectDisposedException("JwtSigBuilder");
+            }
+            byte[] nameBuf = DiplomatUtils.StringToUtf8(name);
+            nuint nameBufLength = (nuint)nameBuf.Length;
+            fixed (byte* nameBufPtr = nameBuf)
+            {
+                Raw.JwtSigBuilder.AddAdditionalParameterBool(_inner, nameBufPtr, nameBufLength, value);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Adds a positive number as additional header parameter.
+    /// </summary>
+    /// <remarks>
+    /// This additional header parameter may be either public or private.
+    /// </remarks>
+    public void AddAdditionalParameterPosInt(string name, ulong value)
+    {
+        unsafe
+        {
+            if (_inner == null)
+            {
+                throw new ObjectDisposedException("JwtSigBuilder");
+            }
+            byte[] nameBuf = DiplomatUtils.StringToUtf8(name);
+            nuint nameBufLength = (nuint)nameBuf.Length;
+            fixed (byte* nameBufPtr = nameBuf)
+            {
+                Raw.JwtSigBuilder.AddAdditionalParameterPosInt(_inner, nameBufPtr, nameBufLength, value);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Adds a possibly negative number as additional header parameter.
+    /// </summary>
+    /// <remarks>
+    /// This additional header parameter may be either public or private.
+    /// </remarks>
+    public void AddAdditionalParameterNegInt(string name, long value)
+    {
+        unsafe
+        {
+            if (_inner == null)
+            {
+                throw new ObjectDisposedException("JwtSigBuilder");
+            }
+            byte[] nameBuf = DiplomatUtils.StringToUtf8(name);
+            nuint nameBufLength = (nuint)nameBuf.Length;
+            fixed (byte* nameBufPtr = nameBuf)
+            {
+                Raw.JwtSigBuilder.AddAdditionalParameterNegInt(_inner, nameBufPtr, nameBufLength, value);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Adds a float as additional header parameter.
+    /// </summary>
+    /// <remarks>
+    /// This additional header parameter may be either public or private.
+    /// </remarks>
+    public void AddAdditionalParameterFloat(string name, long value)
+    {
+        unsafe
+        {
+            if (_inner == null)
+            {
+                throw new ObjectDisposedException("JwtSigBuilder");
+            }
+            byte[] nameBuf = DiplomatUtils.StringToUtf8(name);
+            nuint nameBufLength = (nuint)nameBuf.Length;
+            fixed (byte* nameBufPtr = nameBuf)
+            {
+                Raw.JwtSigBuilder.AddAdditionalParameterFloat(_inner, nameBufPtr, nameBufLength, value);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Adds a float as additional header parameter.
+    /// </summary>
+    /// <remarks>
+    /// This additional header parameter may be either public or private.
+    /// </remarks>
+    public void AddAdditionalParameterString(string name, string value)
+    {
+        unsafe
+        {
+            if (_inner == null)
+            {
+                throw new ObjectDisposedException("JwtSigBuilder");
+            }
+            byte[] nameBuf = DiplomatUtils.StringToUtf8(name);
+            byte[] valueBuf = DiplomatUtils.StringToUtf8(value);
+            nuint nameBufLength = (nuint)nameBuf.Length;
+            nuint valueBufLength = (nuint)valueBuf.Length;
+            fixed (byte* nameBufPtr = nameBuf)
+            {
+                fixed (byte* valueBufPtr = valueBuf)
+                {
+                    Raw.JwtSigBuilder.AddAdditionalParameterString(_inner, nameBufPtr, nameBufLength, valueBufPtr, valueBufLength);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Sets the given JSON payload.
+    /// </summary>
+    /// <remarks>
+    /// Claims should be a valid JSON payload.
+    /// </remarks>
+    /// <exception cref="PickyException"></exception>
     public void SetClaims(string claims)
     {
         unsafe
@@ -111,12 +270,17 @@ public partial class JwtSigBuilder: IDisposable
             nuint claimsBufLength = (nuint)claimsBuf.Length;
             fixed (byte* claimsBufPtr = claimsBuf)
             {
-                Raw.JwtSigBuilder.SetClaims(_inner, claimsBufPtr, claimsBufLength);
+                IntPtr resultPtr = Raw.JwtSigBuilder.SetClaims(_inner, claimsBufPtr, claimsBufLength);
+                Raw.JwtFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.JwtFfiResultVoidBoxPickyError>(resultPtr);
+                Raw.JwtFfiResultVoidBoxPickyError.Destroy(resultPtr);
+                if (!result.isOk)
+                {
+                    throw new PickyException(new PickyError(result.Err));
+                }
             }
         }
     }
 
-    /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>JwtSig</c> allocated on Rust side.
     /// </returns>
@@ -128,14 +292,7 @@ public partial class JwtSigBuilder: IDisposable
             {
                 throw new ObjectDisposedException("JwtSigBuilder");
             }
-            IntPtr resultPtr = Raw.JwtSigBuilder.Build(_inner);
-            Raw.JwtFfiResultBoxJwtSigBoxPickyError result = Marshal.PtrToStructure<Raw.JwtFfiResultBoxJwtSigBoxPickyError>(resultPtr);
-            Raw.JwtFfiResultBoxJwtSigBoxPickyError.Destroy(resultPtr);
-            if (!result.isOk)
-            {
-                throw new PickyException(new PickyError(result.Err));
-            }
-            Raw.JwtSig* retVal = result.Ok;
+            Raw.JwtSig* retVal = Raw.JwtSigBuilder.Build(_inner);
             return new JwtSig(retVal);
         }
     }
