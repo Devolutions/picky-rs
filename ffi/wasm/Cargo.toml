@@ -1,6 +1,6 @@
 [package]
 name = "picky-wasm"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Benoît CORTIER <bcortier@proton.me>"]
 edition = "2021"
 publish = false
