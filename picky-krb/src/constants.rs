@@ -50,7 +50,7 @@ pub mod types {
     pub const NET_BIOS_ADDR_TYPE: u8 = 20;
     pub const IP_V6_ADDR_TYPE: u8 = 24;
 
-    //= [3.2.5.8 AP Exchange](https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-KILE/%5bMS-KILE%5d.pdf#%5B%7B%22num%22%3A148%2C%22gen%22%3A0%7D%2C%7B%22name%22%3A%22XYZ%22%7D%2C69%2C168%2C0%5D) =//
+    //= [3.2.5.8 AP Exchange](https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-kile/b15648e2-439a-4d04-b8a2-2f34c45690f9) =//
     pub const AD_AUTH_DATA_AP_OPTION_TYPE: [u8; 2] = [0x00, 0x8f];
     pub const KERB_AP_OPTIONS_CBT: [u8; 2] = [0x40, 0x00];
 }
