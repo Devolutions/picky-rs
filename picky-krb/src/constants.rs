@@ -49,6 +49,10 @@ pub mod types {
     pub const APPLETALK_DDP_ADDR_TYPE: u8 = 16;
     pub const NET_BIOS_ADDR_TYPE: u8 = 20;
     pub const IP_V6_ADDR_TYPE: u8 = 24;
+
+    //= [3.2.5.8 AP Exchange](https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-kile/b15648e2-439a-4d04-b8a2-2f34c45690f9) =//
+    pub const AD_AUTH_DATA_AP_OPTION_TYPE: [u8; 2] = [0x00, 0x8f];
+    pub const KERB_AP_OPTIONS_CBT: [u8; 2] = [0x40, 0x00];
 }
 
 pub mod key_usages {
