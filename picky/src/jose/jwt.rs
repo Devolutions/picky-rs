@@ -331,22 +331,19 @@ impl JwtSig {
 }
 
 impl JwtSig {
-    /// Decode JWT and check signature using provided public key.
+    /// Verifies signature and returns decoded JWS payload.
     pub fn decode(encoded_token: &str, public_key: &PublicKey) -> Result<Self, JwtError> {
         let jws = Jws::decode(encoded_token, public_key)?;
-        Ok(Jwt {
-            header: jws.header,
-            state: UncheckedState { payload: jws.payload },
-        })
+        Ok(Self::from(jws))
     }
+}
 
-    /// Dangerous JWT decoding method. Signature isn't checked at all.
-    pub fn decode_dangerous(encoded_token: &str) -> Result<Self, JwtError> {
-        let jws = Jws::decode_without_validation(encoded_token)?;
-        Ok(Jwt {
+impl From<Jws> for JwtSig {
+    fn from(jws: Jws) -> Self {
+        Self {
             header: jws.header,
             state: UncheckedState { payload: jws.payload },
-        })
+        }
     }
 }
 
@@ -401,19 +398,22 @@ impl JwtEnc {
     /// Decode using asymmetric cryptography.
     pub fn decode(encoded_token: &str, key: &PrivateKey) -> Result<Self, JwtError> {
         let jwe = Jwe::decode(encoded_token, key)?;
-        Ok(Jwt {
-            header: jwe.header,
-            state: UncheckedState { payload: jwe.payload },
-        })
+        Ok(Self::from(jwe))
     }
 
     /// Decode with provided CEK (a symmetric key).
     pub fn decode_direct(encoded_token: &str, cek: &[u8]) -> Result<Self, JwtError> {
         let jwe = Jwe::decode_direct(encoded_token, cek)?;
-        Ok(Jwt {
+        Ok(Self::from(jwe))
+    }
+}
+
+impl From<Jwe> for JwtEnc {
+    fn from(jwe: Jwe) -> Self {
+        Self {
             header: jwe.header,
             state: UncheckedState { payload: jwe.payload },
-        })
+        }
     }
 }
 
@@ -502,7 +502,7 @@ fn h_decode_and_validate_claims<C: DeserializeOwned>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pem::Pem;
+    use crate::{jose::jws::RawJws, pem::Pem};
     use serde::Deserialize;
     use std::borrow::Cow;
 
@@ -668,12 +668,6 @@ mod tests {
 
     #[test]
     fn decode_step_cli_generated_token() {
-        let pk_pem = crate::test_files::RSA_2048_PK_7.parse::<Pem>().unwrap();
-        let pk = PrivateKey::from_pem(&pk_pem).expect("private_key 7");
-
-        let token: &str = "eyJhbGciOiJSU0EtT0FFUC0yNTYiLCJlbmMiOiJBMjU2R0NNIiwia2lkIjoiekZIVnNNOWRjNE9sSEl3dkVuVnFmS3pSajF1anFZR3NablhBY2duX0NxSSJ9.nYfNbetIs-ot-lc2_kWdDATEduiY-uEjF6FWUwYgsKHCrrqwbgKnx0qu7gdhghqJ3-WwgOywlwyQL8EUSxhYFJqkBuISTpyUEdBmcEAjKgdG9wDiajzsHF32awTmVQCVKbS45knI4rnNQj6o37h7JX1IU9p0ZLl5s8SQ4HhwwD6yRRdFgrCk811LIfSWhBOadQNX2AqODGAKU9Dz30BqZMlmrrh0yoGltandsYsNcsQTCgP6a6kFW9tSIx2PN7ox7PpPL2DIos6VS-7qpGgxHwvhxGmsBYLWqE9D3Q0oqx-oiAdxEgknU355Ld6PiJm_Q2K8SnS0Fk83laRDU2FRuQ.OP91ilVez0ErRRXt._Q2yVghXSubt44LbhS4iIF5A8vohaVasnsa_Xnx3cH6LU5kPr_gtSVNT5ZXV67mBz9xY2QNTlArtmR7z1yJrx2yftePxxDOBqz9Bdo189h1iQ_QrzLaGQogkuCFf2BuOAv4wYh6kJ4S835MXM6afNmItQcLV45LX_Bu02GuUa7syx9n4UU0KMKKpyEt79Fx-WN9BDrrQ-P-6eJTuiGi4x7d5O1Dp7ocV4CxgIA4faZznMi05fZsY4ebEP2O9VZ2zfMyv_KT7WeGyB2pcBfpupMGmKybqXweT8QdoFSMnfmE_vqnIxQzFHHVOYrrrUKu9T-294TicUdmgohqIAWzBq0_dm9HFrdD_BnHfOtfnFJn_uHdtsTPPA7L54Mb_81ijLrooZvbrIPXZsJc_YLq65vkYWtdbfA5JDZIK8jDZr-79YyBIrqsYgn3w2LwgNHuKU0Ro-zheV208xCsKYbOooX4E86YAgeltwt_W-VyD-06fKpADUyN2p8ck3AG5k2FV2LUJ7ZSkesixprcOmzDDIjmMrKFyqsbEj0Fwm4kk-RNO3M8T2b00IEdcrP3EUoDm6CG-Ur7NNOosR-7xuK4wnH9KN8x9ePRJeil3G0zWNpIsV9dQhDQaP42HdYfyJ28LLn1tBn9aG_L8Erp7_Yv0Y21VrpoNLLnsptms4N82le3iYXN6Rlk-R6Mv04SupNEOoOFG3NpPa7NF-phcoR65BIFgjonTLPabEanAxu3vBhqGiX9N9A57N1av10cjVhqiOY-FxUTlubIDaw00F1974AuDGhx5bWllVr-68qXEpmatyee8j7tJd1XlEvHy6CpDrOFh-fEFKuwy_e0iMKPEF_Jj2vdX5sb8DAriAkoUY_m9zL29RNZzhdsbWamUMlIFlObkj09f_Db1P-FdolZga3xfdteUOB5Ig9vecEm7B9iE4hBJ4HcJY8yMGT1XS1_b9MSmWkUz4wf_3DHbgK6EUlDjqrLfHWBWZr7--stcFlVmxChu5wL5zAqIDoIcoAT_yIU8DgeRknZImbRAhXBtGoGvcCoRktLTNwoul4I.5SToM5GtHWm-beaADd1uhg";
-        let jwe = Jwe::decode(token, &pk).unwrap();
-
         #[derive(Deserialize)]
         struct SomeJetClaims {
             jet_ap: String,
@@ -681,14 +675,15 @@ mod tests {
             nbf: i64,
         }
 
-        let payload = core::str::from_utf8(&jwe.payload).unwrap();
-        let jws = JwtSig::decode_dangerous(payload)
+        let jws = RawJws::decode("eyJhbGciOiJSUzI1NiIsImtpZCI6InUzQkF1b3lrZ21FY0F2Z21ydm5PVWxNZUYxN2JjS09EbGYweFdHcDhMY2MiLCJ0eXAiOiJKV1QifQ.eyJpYXQiOjE2NTkxMTg1NjMsImpldF9hcCI6InJkcCIsImp0aSI6IjY1YjkwZmQwMjM2YWU3Mjg1OWE1YWZlZTM3MTEzOTdjOWU4NTI1YzA4YzIyNjE4N2NlNjJjOWQwNTEzNDUzOTUiLCJuYmYiOjE2NTkxMTg1NjMsInByeF91c3IiOiJ1c2VybmFtZSJ9.MzULmkNyVY48nOgN7zbtN9q8Ni8JRavpkbw34aD-lMfqJzl5pFEJQPV9G1iM1HCbcMPRJfMDjVP31dAHOVtsu-gqGRx9qw1ogpNffcJI0nh5-VPPnqBbT5u8H2rJ7WeXO5kx4KAnD2Fbc45Nb6YEM-f_s9RyFipub0LI5AwiUHcbicJno0Lxz0dFKMiSA4cTNOe22vY7STf-E52LnsdHhnTt3JKDPP-7i5FzL1wOdBHzvxhRpyLqNU1kcSXrV_1L07XekeR6Kp3JoWaaJsIWm1Sk27W13Q575gS0a9OJgGX0bumq9fCneOJgLU8HrelUP8-qRM2IaGV81NRAr5HasQ")
+            .map(RawJws::discard_signature)
+            .map(JwtSig::from)
             .unwrap()
             .validate::<SomeJetClaims>(&JwtValidator::no_check())
             .unwrap();
 
         assert_eq!(jws.state.claims.jet_ap, "rdp");
         assert_eq!(jws.state.claims.prx_usr, "username");
-        assert_eq!(jws.state.claims.nbf, 1600373587);
+        assert_eq!(jws.state.claims.nbf, 1659118563);
     }
 }

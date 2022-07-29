@@ -355,25 +355,96 @@ impl Jwe {
         }
     }
 
-    /// Encode with CEK encrypted and included in the token using asymmetric cryptography.
+    /// Encodes with CEK encrypted and included in the token using asymmetric cryptography.
     pub fn encode(self, asymmetric_key: &PublicKey) -> Result<String, JweError> {
         encode_impl(self, EncoderMode::Asymmetric(asymmetric_key))
     }
 
-    /// Encode with provided CEK (a symmetric key). This will ignore `alg` value and override it with "dir".
+    /// Encodes with provided CEK (a symmetric key). This will ignore `alg` value and override it with "dir".
     pub fn encode_direct(self, cek: &[u8]) -> Result<String, JweError> {
         encode_impl(self, EncoderMode::Direct(cek))
     }
 
-    /// Decode with CEK encrypted and included in the token using asymmetric cryptography.
-    pub fn decode(encoded_token: &str, key: &PrivateKey) -> Result<Jwe, JweError> {
-        decode_impl(encoded_token, DecoderMode::Normal(key))
+    /// Decodes with CEK encrypted and included in the token using asymmetric cryptography.
+    pub fn decode(compact_repr: &str, key: &PrivateKey) -> Result<Jwe, JweError> {
+        RawJwe::decode(compact_repr).and_then(|jwe| jwe.decrypt(key))
     }
 
-    /// Decode with provided CEK (a symmetric key).
-    pub fn decode_direct(encoded_token: &str, cek: &[u8]) -> Result<Jwe, JweError> {
-        decode_impl(encoded_token, DecoderMode::Direct(cek))
+    /// Decodes with provided CEK (a symmetric key).
+    pub fn decode_direct(compact_repr: &str, cek: &[u8]) -> Result<Jwe, JweError> {
+        RawJwe::decode(compact_repr).and_then(|jwe| jwe.decrypt_direct(cek))
     }
+}
+
+/// Raw low-level interface to the yet to be decoded JWE token.
+///
+/// This is useful to inspect the structure before performing further processing.
+/// For most usecases, use `Jwe` directly.
+#[derive(Debug, Clone)]
+pub struct RawJwe<'repr> {
+    pub compact_repr: Cow<'repr, str>,
+    pub header: JweHeader,
+    pub encrypted_key: Vec<u8>,
+    pub initialization_vector: Vec<u8>,
+    pub ciphertext: Vec<u8>,
+    pub authentication_tag: Vec<u8>,
+}
+
+/// An owned `RawJws` for convenience.
+pub type OwnedRawJwe = RawJwe<'static>;
+
+impl<'repr> RawJwe<'repr> {
+    /// Decodes a JWE in compact representation.
+    pub fn decode(compact_repr: impl Into<Cow<'repr, str>>) -> Result<Self, JweError> {
+        decode_impl(compact_repr.into())
+    }
+
+    /// Decrypts the ciphertext using asymmetric cryptography and returns a verified `Jwe` structure.
+    pub fn decrypt(self, key: &PrivateKey) -> Result<Jwe, JweError> {
+        decrypt_impl(self, DecoderMode::Normal(key))
+    }
+
+    /// Decrypts the ciphertext using the provided CEK (a symmetric key).
+    pub fn decrypt_direct(self, cek: &[u8]) -> Result<Jwe, JweError> {
+        decrypt_impl(self, DecoderMode::Direct(cek))
+    }
+}
+
+fn decode_impl(compact_repr: Cow<'_, str>) -> Result<RawJwe<'_>, JweError> {
+    fn parse_compact_repr(compact_repr: &str) -> Option<(&str, &str, &str, &str, &str)> {
+        let mut split = compact_repr.splitn(5, '.');
+
+        let protected_header = split.next()?;
+        let encrypted_key = split.next()?;
+        let initialization_vector = split.next()?;
+        let ciphertext = split.next()?;
+        let authentication_tag = split.next()?;
+
+        Some((
+            protected_header,
+            encrypted_key,
+            initialization_vector,
+            ciphertext,
+            authentication_tag,
+        ))
+    }
+
+    let (protected_header, encrypted_key, initialization_vector, ciphertext, authentication_tag) =
+        parse_compact_repr(&compact_repr).ok_or_else(|| JweError::InvalidEncoding {
+            input: compact_repr.clone().into_owned(),
+        })?;
+
+    let protected_header = base64::decode_config(protected_header, base64::URL_SAFE_NO_PAD)?;
+    let header = serde_json::from_slice::<JweHeader>(&protected_header)?;
+
+    Ok(RawJwe {
+        header,
+        encrypted_key: base64::decode_config(encrypted_key, base64::URL_SAFE_NO_PAD)?,
+        initialization_vector: base64::decode_config(initialization_vector, base64::URL_SAFE_NO_PAD)?,
+        ciphertext: base64::decode_config(ciphertext, base64::URL_SAFE_NO_PAD)?,
+        authentication_tag: base64::decode_config(authentication_tag, base64::URL_SAFE_NO_PAD)?,
+        compact_repr,
+    })
 }
 
 // encoder
@@ -474,36 +545,22 @@ enum DecoderMode<'a> {
     Direct(&'a [u8]),
 }
 
-struct Parts<'a> {
-    protected_header_base64: &'a str,
-    protected_header: Vec<u8>,
-    encrypted_key: Vec<u8>,
-    initialization_vector: Vec<u8>,
-    ciphertext: Vec<u8>,
-    authentication_tag: Vec<u8>,
-}
+fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError> {
+    let RawJwe {
+        compact_repr,
+        header,
+        encrypted_key,
+        initialization_vector,
+        ciphertext,
+        authentication_tag,
+    } = raw;
 
-impl<'a> Parts<'a> {
-    fn break_down(encoded_token: &'a str) -> Option<Self> {
-        let mut split = encoded_token.splitn(5, '.');
-        let protected_header_base64 = split.next()?;
-        Some(Parts {
-            protected_header_base64,
-            protected_header: base64::decode_config(protected_header_base64, base64::URL_SAFE_NO_PAD).ok()?,
-            encrypted_key: base64::decode_config(split.next()?, base64::URL_SAFE_NO_PAD).ok()?,
-            initialization_vector: base64::decode_config(split.next()?, base64::URL_SAFE_NO_PAD).ok()?,
-            ciphertext: base64::decode_config(split.next()?, base64::URL_SAFE_NO_PAD).ok()?,
-            authentication_tag: base64::decode_config(split.next()?, base64::URL_SAFE_NO_PAD).ok()?,
-        })
-    }
-}
-
-fn decode_impl(encoded_token: &str, mode: DecoderMode<'_>) -> Result<Jwe, JweError> {
-    let parts = Parts::break_down(encoded_token).ok_or_else(|| JweError::InvalidEncoding {
-        input: encoded_token.to_owned(),
-    })?;
-
-    let header = serde_json::from_slice::<JweHeader>(&parts.protected_header)?;
+    let protected_header_base64 = compact_repr
+        .split('.')
+        .next()
+        .ok_or_else(|| JweError::InvalidEncoding {
+            input: compact_repr.clone().into_owned(),
+        })?;
 
     let jwe_cek = match mode {
         DecoderMode::Direct(symmetric_key) => Cow::Borrowed(symmetric_key),
@@ -521,7 +578,7 @@ fn decode_impl(encoded_token: &str, mode: DecoderMode<'_>) -> Result<Jwe, JweErr
                 }
             };
 
-            let decrypted_key = rsa_private_key.decrypt(padding, &parts.encrypted_key)?;
+            let decrypted_key = rsa_private_key.decrypt(padding, &encrypted_key)?;
 
             Cow::Owned(decrypted_key)
         }
@@ -535,43 +592,43 @@ fn decode_impl(encoded_token: &str, mode: DecoderMode<'_>) -> Result<Jwe, JweErr
         });
     }
 
-    if parts.initialization_vector.len() != header.enc.nonce_size() {
+    if initialization_vector.len() != header.enc.nonce_size() {
         return Err(JweError::InvalidSize {
             ty: "initialization vector (nonce)",
             expected: header.enc.nonce_size(),
-            got: parts.initialization_vector.len(),
+            got: initialization_vector.len(),
         });
     }
 
-    if parts.authentication_tag.len() != header.enc.tag_size() {
+    if authentication_tag.len() != header.enc.tag_size() {
         return Err(JweError::InvalidSize {
             ty: "authentication tag",
             expected: header.enc.tag_size(),
-            got: parts.authentication_tag.len(),
+            got: authentication_tag.len(),
         });
     }
 
-    let mut buffer = parts.ciphertext;
-    let nonce = GenericArray::from_slice(&parts.initialization_vector);
-    let aad = parts.protected_header_base64.as_bytes(); // The Additional Authenticated Data value used for AES-GCM.
+    let mut buffer = ciphertext;
+    let nonce = GenericArray::from_slice(&initialization_vector);
+    let aad = protected_header_base64.as_bytes(); // The Additional Authenticated Data value used for AES-GCM.
     match header.enc {
         JweEnc::Aes128Gcm => Aes128Gcm::new(GenericArray::from_slice(&jwe_cek)).decrypt_in_place_detached(
             nonce,
             aad,
             &mut buffer,
-            GenericArray::from_slice(&parts.authentication_tag),
+            GenericArray::from_slice(&authentication_tag),
         )?,
         JweEnc::Aes192Gcm => Aes192Gcm::new(GenericArray::from_slice(&jwe_cek)).decrypt_in_place_detached(
             nonce,
             aad,
             &mut buffer,
-            GenericArray::from_slice(&parts.authentication_tag),
+            GenericArray::from_slice(&authentication_tag),
         )?,
         JweEnc::Aes256Gcm => Aes256Gcm::new(GenericArray::from_slice(&jwe_cek)).decrypt_in_place_detached(
             nonce,
             aad,
             &mut buffer,
-            GenericArray::from_slice(&parts.authentication_tag),
+            GenericArray::from_slice(&authentication_tag),
         )?,
         unsupported => {
             return Err(JweError::UnsupportedAlgorithm {
