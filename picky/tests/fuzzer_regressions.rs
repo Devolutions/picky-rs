@@ -4,7 +4,7 @@
 
 use picky::jose::jwe::Jwe;
 use picky::jose::jwk::Jwk;
-use picky::jose::jws::Jws;
+use picky::jose::jws::RawJws;
 use picky::key::{PrivateKey, PublicKey};
 use picky::pem::{parse_pem, Pem};
 use picky::x509::certificate::Cert;
@@ -46,7 +46,7 @@ fn fuzz_target(data: &[u8]) {
 
     println!("JOSE...");
     if let Ok(s) = std::str::from_utf8(data) {
-        let _ = Jws::decode_without_validation(s);
+        let _ = RawJws::decode(s);
         let _ = Jwe::decode_direct(s, s.as_bytes());
         let _ = Jwk::from_json(s);
     }

@@ -8,6 +8,7 @@ use crate::key::{PrivateKey, PublicKey};
 use crate::signature::{SignatureAlgorithm, SignatureError};
 use base64::DecodeError;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::collections::HashMap;
 use thiserror::Error;
 
@@ -265,24 +266,6 @@ impl Jws {
         }
     }
 
-    pub fn check_signature(&self, encoded_token: &str, public_key: &PublicKey) -> Result<(), JwsError> {
-        let last_dot_idx = encoded_token.rfind('.').ok_or_else(|| JwsError::InvalidEncoding {
-            input: encoded_token.to_owned(),
-        })?;
-
-        if encoded_token.ends_with('.') {
-            return Err(JwsError::InvalidEncoding {
-                input: encoded_token.to_owned(),
-            });
-        }
-
-        let signature = base64::decode_config(&encoded_token[last_dot_idx + 1..], base64::URL_SAFE_NO_PAD)?;
-        let signature_algo = SignatureAlgorithm::try_from(self.header.alg)?;
-        signature_algo.verify(public_key, encoded_token[..last_dot_idx].as_bytes(), &signature)?;
-
-        Ok(())
-    }
-
     pub fn encode(&self, private_key: &PrivateKey) -> Result<String, JwsError> {
         let header_base64 = base64::encode_config(&serde_json::to_vec(&self.header)?, base64::URL_SAFE_NO_PAD);
         let payload_base64 = base64::encode_config(&self.payload, base64::URL_SAFE_NO_PAD);
@@ -293,44 +276,102 @@ impl Jws {
         Ok([header_and_payload, signature_base64].join("."))
     }
 
-    /// Validate using validator and returns decoded JWS payload.
+    /// Verifies signature and returns decoded JWS payload.
     pub fn decode(encoded_token: &str, public_key: &PublicKey) -> Result<Self, JwsError> {
-        decode_impl(encoded_token, Some(public_key))
-    }
-
-    /// Unsafe JWS decoding method. Signature isn't checked at all.
-    pub fn decode_without_validation(encoded_token: &str) -> Result<Self, JwsError> {
-        decode_impl(encoded_token, None)
+        RawJws::decode(encoded_token).and_then(|raw_jws| raw_jws.verify(public_key))
     }
 }
 
-fn decode_impl(encoded_token: &str, public_key: Option<&PublicKey>) -> Result<Jws, JwsError> {
-    let first_dot_idx = encoded_token.find('.').ok_or_else(|| JwsError::InvalidEncoding {
-        input: encoded_token.to_owned(),
+/// Raw low-level interface to the yet to be verified JWS token.
+///
+/// This is useful to inspect the structure before performing further processing.
+/// For most usecases, use `Jws` directly.
+#[derive(Debug, Clone)]
+pub struct RawJws<'repr> {
+    pub compact_repr: Cow<'repr, str>,
+    pub header: JwsHeader,
+    payload: Vec<u8>,
+    pub signature: Vec<u8>,
+}
+
+/// An owned `RawJws` for convenience.
+pub type OwnedRawJws = RawJws<'static>;
+
+impl<'repr> RawJws<'repr> {
+    /// Decodes a JWS in compact representation.
+    pub fn decode(compact_repr: impl Into<Cow<'repr, str>>) -> Result<Self, JwsError> {
+        decode_impl(compact_repr.into())
+    }
+
+    /// Peeks the payload before signature verification.
+    pub fn peek_payload(&self) -> &[u8] {
+        &self.payload
+    }
+
+    /// Verifies signature and returns a verified `Jws` structure.
+    pub fn verify(self, public_key: &PublicKey) -> Result<Jws, JwsError> {
+        verify_signature(&self.compact_repr, public_key, self.header.alg)?;
+        Ok(self.discard_signature())
+    }
+
+    /// Discards the signature without verifying it and hands a `Jws` structure.
+    ///
+    /// Generally, you should not do that.
+    pub fn discard_signature(self) -> Jws {
+        Jws {
+            header: self.header,
+            payload: self.payload,
+        }
+    }
+}
+
+fn decode_impl(compact_repr: Cow<'_, str>) -> Result<RawJws<'_>, JwsError> {
+    let first_dot_idx = compact_repr.find('.').ok_or_else(|| JwsError::InvalidEncoding {
+        input: compact_repr.clone().into_owned(),
     })?;
 
+    let last_dot_idx = compact_repr.rfind('.').ok_or_else(|| JwsError::InvalidEncoding {
+        input: compact_repr.clone().into_owned(),
+    })?;
+
+    if first_dot_idx == last_dot_idx || compact_repr.starts_with('.') || compact_repr.ends_with('.') {
+        return Err(JwsError::InvalidEncoding {
+            input: compact_repr.into_owned(),
+        });
+    }
+
+    let header_json = base64::decode_config(&compact_repr[..first_dot_idx], base64::URL_SAFE_NO_PAD)?;
+    let header = serde_json::from_slice::<JwsHeader>(&header_json)?;
+
+    let signature = base64::decode_config(&compact_repr[last_dot_idx + 1..], base64::URL_SAFE_NO_PAD)?;
+
+    let payload = base64::decode_config(&compact_repr[first_dot_idx + 1..last_dot_idx], base64::URL_SAFE_NO_PAD)?;
+
+    Ok(RawJws {
+        compact_repr,
+        header,
+        payload,
+        signature,
+    })
+}
+
+/// JWS verification primitive
+pub fn verify_signature(encoded_token: &str, public_key: &PublicKey, algorithm: JwsAlg) -> Result<(), JwsError> {
     let last_dot_idx = encoded_token.rfind('.').ok_or_else(|| JwsError::InvalidEncoding {
         input: encoded_token.to_owned(),
     })?;
 
-    if first_dot_idx == last_dot_idx || encoded_token.starts_with('.') || encoded_token.ends_with('.') {
+    if encoded_token.ends_with('.') {
         return Err(JwsError::InvalidEncoding {
             input: encoded_token.to_owned(),
         });
     }
 
-    let header_json = base64::decode_config(&encoded_token[..first_dot_idx], base64::URL_SAFE_NO_PAD)?;
-    let header = serde_json::from_slice::<JwsHeader>(&header_json)?;
+    let signature = base64::decode_config(&encoded_token[last_dot_idx + 1..], base64::URL_SAFE_NO_PAD)?;
+    let signature_algo = SignatureAlgorithm::try_from(algorithm)?;
+    signature_algo.verify(public_key, encoded_token[..last_dot_idx].as_bytes(), &signature)?;
 
-    if let Some(public_key) = public_key {
-        let signature = base64::decode_config(&encoded_token[last_dot_idx + 1..], base64::URL_SAFE_NO_PAD)?;
-        let signature_algo = SignatureAlgorithm::try_from(header.alg)?;
-        signature_algo.verify(public_key, encoded_token[..last_dot_idx].as_bytes(), &signature)?;
-    }
-
-    let payload = base64::decode_config(&encoded_token[first_dot_idx + 1..last_dot_idx], base64::URL_SAFE_NO_PAD)?;
-
-    Ok(Jws { header, payload })
+    Ok(())
 }
 
 #[cfg(test)]
@@ -372,15 +413,12 @@ mod tests {
 
     #[test]
     fn decode_rsa_sha256_delayed_signature_check() {
-        let jws = Jws::decode_without_validation(crate::test_files::JOSE_JWT_SIG_EXAMPLE).unwrap();
+        let jws = RawJws::decode(crate::test_files::JOSE_JWT_SIG_EXAMPLE).unwrap();
         println!("{}", String::from_utf8_lossy(&jws.payload));
-        assert_eq!(jws.payload.as_slice(), PAYLOAD.as_bytes());
+        assert_eq!(jws.peek_payload(), PAYLOAD.as_bytes());
 
         let public_key = get_private_key_2().to_public_key();
-        let err = jws
-            .check_signature(crate::test_files::JOSE_JWT_SIG_EXAMPLE, &public_key)
-            .err()
-            .unwrap();
+        let err = jws.verify(&public_key).err().unwrap();
         assert_eq!(err.to_string(), "signature error: invalid signature");
     }
 
