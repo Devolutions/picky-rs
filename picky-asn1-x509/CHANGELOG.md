@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.8.0] 2022-08-01
+
+### Added
+
+- Implement `Zeroize` on `ECPrivateKey` and `RsaPrivateKey` (behind feature `zeroize`)
+
+### Changed
+
+- Bump minimal rustc version to 1.60
+
 ## [0.7.1] 2022-05-20
 
 ### Added
