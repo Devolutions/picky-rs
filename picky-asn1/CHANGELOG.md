@@ -7,7 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-## [0.4.0] 2022-02-02
+## [0.6.0] 2022-08-01
+
+## Added
+
+- Implement `Zeroize` for `IntegerAsn1` (behind the `zeroize` feature)
+
+## Changed
+
+- Bump minimal rustc version to 1.60
+
+## [0.5.0] 2022-02-02
 
 ### Added
 
