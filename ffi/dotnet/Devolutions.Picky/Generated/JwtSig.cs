@@ -222,12 +222,12 @@ public partial class JwtSig: IDisposable
     /// <returns>
     /// A <c>JwtSig</c> allocated on Rust side.
     /// </returns>
-    public static JwtSig Decode(string encodedToken, PublicKey publicKey, JwtValidator validator)
+    public static JwtSig Decode(string compactRepr, PublicKey publicKey, JwtValidator validator)
     {
         unsafe
         {
-            byte[] encodedTokenBuf = DiplomatUtils.StringToUtf8(encodedToken);
-            nuint encodedTokenBufLength = (nuint)encodedTokenBuf.Length;
+            byte[] compactReprBuf = DiplomatUtils.StringToUtf8(compactRepr);
+            nuint compactReprBufLength = (nuint)compactReprBuf.Length;
             Raw.PublicKey* publicKeyRaw;
             publicKeyRaw = publicKey.AsFFI();
             if (publicKeyRaw == null)
@@ -240,43 +240,9 @@ public partial class JwtSig: IDisposable
             {
                 throw new ObjectDisposedException("JwtValidator");
             }
-            fixed (byte* encodedTokenBufPtr = encodedTokenBuf)
+            fixed (byte* compactReprBufPtr = compactReprBuf)
             {
-                IntPtr resultPtr = Raw.JwtSig.Decode(encodedTokenBufPtr, encodedTokenBufLength, publicKeyRaw, validatorRaw);
-                Raw.JwtFfiResultBoxJwtSigBoxPickyError result = Marshal.PtrToStructure<Raw.JwtFfiResultBoxJwtSigBoxPickyError>(resultPtr);
-                Raw.JwtFfiResultBoxJwtSigBoxPickyError.Destroy(resultPtr);
-                if (!result.isOk)
-                {
-                    throw new PickyException(new PickyError(result.Err));
-                }
-                Raw.JwtSig* retVal = result.Ok;
-                return new JwtSig(retVal);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Dangerous JWT decoding method. Signature isn't checked at all.
-    /// </summary>
-    /// <exception cref="PickyException"></exception>
-    /// <returns>
-    /// A <c>JwtSig</c> allocated on Rust side.
-    /// </returns>
-    public static JwtSig DecodeDangerous(string encodedToken, JwtValidator validator)
-    {
-        unsafe
-        {
-            byte[] encodedTokenBuf = DiplomatUtils.StringToUtf8(encodedToken);
-            nuint encodedTokenBufLength = (nuint)encodedTokenBuf.Length;
-            Raw.JwtValidator* validatorRaw;
-            validatorRaw = validator.AsFFI();
-            if (validatorRaw == null)
-            {
-                throw new ObjectDisposedException("JwtValidator");
-            }
-            fixed (byte* encodedTokenBufPtr = encodedTokenBuf)
-            {
-                IntPtr resultPtr = Raw.JwtSig.DecodeDangerous(encodedTokenBufPtr, encodedTokenBufLength, validatorRaw);
+                IntPtr resultPtr = Raw.JwtSig.Decode(compactReprBufPtr, compactReprBufLength, publicKeyRaw, validatorRaw);
                 Raw.JwtFfiResultBoxJwtSigBoxPickyError result = Marshal.PtrToStructure<Raw.JwtFfiResultBoxJwtSigBoxPickyError>(resultPtr);
                 Raw.JwtFfiResultBoxJwtSigBoxPickyError.Destroy(resultPtr);
                 if (!result.isOk)

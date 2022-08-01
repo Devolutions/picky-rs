@@ -100,15 +100,8 @@ impl JwtSig {
     }
 
     /// Decode JWT and check signature using provided public key.
-    pub fn decode(encoded_token: &str, public_key: &PublicKey, validator: &JwtValidator) -> Result<JwtSig, JwtError> {
-        let jwt = picky::jose::jwt::JwtSig::decode(encoded_token, &public_key.0)
-            .and_then(|jwt| jwt.validate::<serde_json::Value>(&validator.0))?;
-        Ok(JwtSig(jwt))
-    }
-
-    /// Dangerous JWT decoding method. Signature isn't checked at all.
-    pub fn decode_dangerous(encoded_token: &str, validator: &JwtValidator) -> Result<JwtSig, JwtError> {
-        let jwt = picky::jose::jwt::JwtSig::decode_dangerous(encoded_token)
+    pub fn decode(compact_repr: &str, public_key: &PublicKey, validator: &JwtValidator) -> Result<JwtSig, JwtError> {
+        let jwt = picky::jose::jwt::JwtSig::decode(compact_repr, &public_key.0)
             .and_then(|jwt| jwt.validate::<serde_json::Value>(&validator.0))?;
         Ok(JwtSig(jwt))
     }

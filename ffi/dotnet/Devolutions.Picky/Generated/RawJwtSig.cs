@@ -47,13 +47,7 @@ public partial struct JwtSig
     /// Decode JWT and check signature using provided public key.
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "JwtSig_decode", ExactSpelling = true)]
-    public static unsafe extern IntPtr Decode(byte* encodedToken, nuint encodedTokenSz, PublicKey* publicKey, JwtValidator* validator);
-
-    /// <summary>
-    /// Dangerous JWT decoding method. Signature isn't checked at all.
-    /// </summary>
-    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "JwtSig_decode_dangerous", ExactSpelling = true)]
-    public static unsafe extern IntPtr DecodeDangerous(byte* encodedToken, nuint encodedTokenSz, JwtValidator* validator);
+    public static unsafe extern IntPtr Decode(byte* compactRepr, nuint compactReprSz, PublicKey* publicKey, JwtValidator* validator);
 
     /// <summary>
     /// Encode using the given private key and returns the compact representation of this token.
