@@ -1427,7 +1427,7 @@ dependencies = [
  "bitflags",
  "image",
  "lief-sys",
- "picky 7.0.0-rc.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "picky 7.0.0-rc.2",
  "thiserror",
  "widestring",
 ]
@@ -2039,6 +2039,31 @@ checksum = "d4fd5641d01c8f18a23da7b6fe29298ff4b55afcccdf78973b24cf3175fee32e"
 [[package]]
 name = "picky"
 version = "7.0.0-rc.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4d3b395af6b8f9c4d159644dcbecb750b671f7161de1f76c2931957127dd6998"
+dependencies = [
+ "base64",
+ "byteorder",
+ "digest 0.10.3",
+ "md-5",
+ "num-bigint-dig",
+ "oid",
+ "picky-asn1 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "picky-asn1-der 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "picky-asn1-x509 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand",
+ "ring",
+ "rsa",
+ "serde",
+ "sha-1 0.10.0",
+ "sha2 0.10.2",
+ "sha3 0.10.1",
+ "thiserror",
+]
+
+[[package]]
+name = "picky"
+version = "7.0.0-rc.3"
 dependencies = [
  "aes 0.8.1",
  "aes-gcm",
@@ -2073,31 +2098,6 @@ dependencies = [
  "sha3 0.10.1",
  "thiserror",
  "time 0.3.11",
-]
-
-[[package]]
-name = "picky"
-version = "7.0.0-rc.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d3b395af6b8f9c4d159644dcbecb750b671f7161de1f76c2931957127dd6998"
-dependencies = [
- "base64",
- "byteorder",
- "digest 0.10.3",
- "md-5",
- "num-bigint-dig",
- "oid",
- "picky-asn1 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "picky-asn1-der 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "picky-asn1-x509 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "rand",
- "ring",
- "rsa",
- "serde",
- "sha-1 0.10.0",
- "sha2 0.10.2",
- "sha3 0.10.1",
- "thiserror",
 ]
 
 [[package]]
@@ -2190,7 +2190,7 @@ dependencies = [
  "embed-resource",
  "getrandom",
  "hex",
- "picky 7.0.0-rc.2",
+ "picky 7.0.0-rc.3",
  "serde_json",
  "time 0.3.11",
 ]
@@ -2220,7 +2220,7 @@ dependencies = [
  "mongodm",
  "multibase",
  "multihash",
- "picky 7.0.0-rc.2",
+ "picky 7.0.0-rc.3",
  "picky-asn1 0.5.0",
  "rand",
  "reqwest",
@@ -2244,7 +2244,7 @@ dependencies = [
  "clap",
  "encoding_rs",
  "lief-rs",
- "picky 7.0.0-rc.2",
+ "picky 7.0.0-rc.3",
  "walkdir",
 ]
 
@@ -2254,7 +2254,7 @@ version = "0.3.0"
 dependencies = [
  "console_error_panic_hook",
  "getrandom",
- "picky 7.0.0-rc.2",
+ "picky 7.0.0-rc.3",
  "serde_json",
  "wasm-bindgen",
  "wasm-bindgen-test",

@@ -12,7 +12,7 @@ repository = "https://github.com/Devolutions/picky-rs"
 publish = false
 
 [dependencies]
-picky = { version = "7.0.0-rc.2", default-features = false, features = ["x509", "jose", "pkcs7", "ssh", "time_conversion" ], path = "../picky" }
+picky = { version = "7.0.0-rc.3", default-features = false, features = ["x509", "jose", "pkcs7", "ssh", "time_conversion" ], path = "../picky" }
 picky-asn1 = { version = "0.5", path = "../picky-asn1" }
 mongodm = { version = "0.8.0", features = ["tokio-runtime"] }
 clap = { version = "2.33.3", features = ["yaml"] }
