@@ -12,36 +12,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ win, osx, linux, ios, android ]
+        os: [ android ]
         arch: [ x86, x64, arm, arm64 ]
         include:
-          - os: win
-            runner: windows-2022
-          - os: osx
-            runner: macos-11
-          - os: linux
-            runner: ubuntu-18.04
-          - os: ios
-            runner: macos-11
           - os: android
             runner: ubuntu-20.04
-        exclude:
-          - arch: arm
-            os: win
-          - arch: arm
-            os: osx
-          - arch: arm
-            os: linux
-          - arch: arm
-            os: ios
-          - arch: x86
-            os: win
-          - arch: x86
-            os: osx
-          - arch: x86
-            os: linux
-          - arch: x86
-            os: ios
 
     steps:
       - name: Check out ${{ github.repository }}
@@ -63,7 +38,7 @@ jobs:
           $AndroidToolchainBin="${Env:ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin"
 
           echo "[target.i686-linux-android]" >> $CargoConfigFile
-          echo "linker=`"$AndroidToolchainBin/i686-linux-android16-clang`"" >> $CargoConfigFile
+          echo "linker=`"$AndroidToolchainBin/i686-linux-android19-clang`"" >> $CargoConfigFile
           echo "[target.x86_64-linux-android]" >> $CargoConfigFile
           echo "linker=`"$AndroidToolchainBin/x86_64-linux-android21-clang`"" >> $CargoConfigFile
           echo "[target.armv7-linux-androideabi]" >> $CargoConfigFile
@@ -137,38 +112,3 @@ jobs:
         with:
           name: picky-${{matrix.os}}-${{matrix.arch}}
           path: dependencies/runtimes/${{matrix.os}}-${{matrix.arch}}
-
-  build-managed:
-    name: managed build
-    runs-on: windows-2022
-    needs: build-native
-
-    steps:
-      - name: Check out ${{ github.repository }}
-        uses: actions/checkout@v3
-
-      - name: Prepare dependencies
-        run: |
-          New-Item -ItemType Directory -Path "dependencies/runtimes" | Out-Null
-
-      - name: Download native components
-        uses: actions/download-artifact@v2
-        with:
-          path: dependencies/runtimes
-
-      - name: Rename dependencies
-        run: |
-          Set-Location "dependencies/runtimes"
-          $(Get-Item ".\picky-*") | ForEach-Object { Rename-Item $_ $_.Name.Replace("picky-", "") }
-          Get-ChildItem * -Recurse
-
-      - name: Build picky (managed)
-        shell: pwsh
-        run: |
-          dotnet build .\ffi\dotnet\Devolutions.Picky.sln -o package
-
-      - name: Upload managed components
-        uses: actions/upload-artifact@v2
-        with:
-          name: picky-nupkg
-          path: package/*.nupkg
