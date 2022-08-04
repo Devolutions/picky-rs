@@ -47,38 +47,30 @@ jobs:
       - name: Check out ${{ github.repository }}
         uses: actions/checkout@v2
 
-      - name: Install NDK21
-        if: matrix.os == 'android'
-        run: |
-          ANDROID_ROOT=/usr/local/lib/android
-          ANDROID_SDK_ROOT=${ANDROID_ROOT}/sdk
-          SDKMANAGER=${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager
-          echo "y" | $SDKMANAGER "ndk;21.4.7075529"
-
-      - name: Make NDK21 default
-        if: matrix.os == 'android'
-        run: |
-          ANDROID_ROOT=/usr/local/lib/android
-          ANDROID_SDK_ROOT=${ANDROID_ROOT}/sdk
-          ANDROID_NDK_ROOT=${ANDROID_SDK_ROOT}/ndk-bundle
-          ln -sfn $ANDROID_SDK_ROOT/ndk/21.4.7075529 $ANDROID_NDK_ROOT
-          echo "ANDROID_NDK_HOME=${ANDROID_NDK_ROOT}" >> $GITHUB_ENV
-
       - name: Configure Android NDK
         if: runner.os == 'linux'
         shell: pwsh
         run: |
           $CargoConfigFile = "~/.cargo/config"
-          $AndroidToolchainBin="${Env:ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          $AndroidToolchain="${Env:ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64"
+
+          Get-ChildItem -Path $AndroidToolchain "libunwind.a" -Recurse | ForEach-Object {
+            $libunwind = $_.FullName
+            $libgcc = Join-Path $_.DirectoryName "libgcc.a"
+            if (-Not (Test-Path $libgcc)) {
+                Write-Host $libgcc
+                Copy-Item $libunwind $libgcc
+            }
+          }
 
           echo "[target.i686-linux-android]" >> $CargoConfigFile
-          echo "linker=`"$AndroidToolchainBin/i686-linux-android16-clang`"" >> $CargoConfigFile
+          echo "linker=`"$AndroidToolchain/bin/i686-linux-android19-clang`"" >> $CargoConfigFile
           echo "[target.x86_64-linux-android]" >> $CargoConfigFile
-          echo "linker=`"$AndroidToolchainBin/x86_64-linux-android21-clang`"" >> $CargoConfigFile
+          echo "linker=`"$AndroidToolchain/bin/x86_64-linux-android21-clang`"" >> $CargoConfigFile
           echo "[target.armv7-linux-androideabi]" >> $CargoConfigFile
-          echo "linker=`"$AndroidToolchainBin/armv7a-linux-androideabi21-clang`"" >> $CargoConfigFile
+          echo "linker=`"$AndroidToolchain/bin/armv7a-linux-androideabi21-clang`"" >> $CargoConfigFile
           echo "[target.aarch64-linux-android]" >> $CargoConfigFile
-          echo "linker=`"$AndroidToolchainBin/aarch64-linux-android21-clang`"" >> $CargoConfigFile
+          echo "linker=`"$AndroidToolchain/bin/aarch64-linux-android21-clang`"" >> $CargoConfigFile
 
       - name: Build picky (${{matrix.os}}-${{matrix.arch}})
         shell: pwsh
