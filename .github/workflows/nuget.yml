@@ -22,20 +22,13 @@ jobs:
       - name: Check out ${{ github.repository }}
         uses: actions/checkout@v2
 
-      - name: Android NDK environment
-        if: matrix.os == 'android'
-        run: |
-          ANDROID_HOME="/usr/local/lib/android/sdk"
-          ANDROID_NDK_HOME="${ANDROID_HOME}/ndk-bundle"
-          echo "ANDROID_HOME=${ANDROID_HOME}" >> $GITHUB_ENV
-          echo "ANDROID_NDK_HOME=${ANDROID_NDK_HOME}" >> $GITHUB_ENV
-
       - name: Configure Android NDK
         if: runner.os == 'linux'
         shell: pwsh
         run: |
           $CargoConfigFile = "~/.cargo/config"
           $AndroidToolchainBin="${Env:ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          ls -1 $AndroidToolchainBin
 
           echo "[target.i686-linux-android]" >> $CargoConfigFile
           echo "linker=`"$AndroidToolchainBin/i686-linux-android19-clang`"" >> $CargoConfigFile
