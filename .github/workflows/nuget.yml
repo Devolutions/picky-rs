@@ -28,9 +28,8 @@ jobs:
         run: |
           $CargoConfigFile = "~/.cargo/config"
           $AndroidToolchain="${Env:ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64"
-          rustc --version
 
-          Get-ChildItem "libunwind.a" -Recurse | ForEach-Object {
+          Get-ChildItem -Path $AndroidToolchain "libunwind.a" -Recurse | ForEach-Object {
             $libunwind = $_.FullName
             $libgcc = Join-Path $_.DirectoryName "libgcc.a"
             if (-Not (Test-Path $libgcc)) {
