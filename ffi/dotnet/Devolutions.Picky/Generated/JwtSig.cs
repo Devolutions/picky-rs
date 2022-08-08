@@ -45,6 +45,14 @@ public partial class JwtSig: IDisposable
         }
     }
 
+    public string Kid
+    {
+        get
+        {
+            return GetKid();
+        }
+    }
+
     /// <summary>
     /// Creates a managed <c>JwtSig</c> from a raw handle.
     /// </summary>
@@ -107,6 +115,54 @@ public partial class JwtSig: IDisposable
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
             IntPtr resultPtr = Raw.JwtSig.GetContentType(_inner, &writeable);
+            Raw.JwtFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.JwtFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.JwtFfiResultVoidBoxPickyError.Destroy(resultPtr);
+            if (!result.isOk)
+            {
+                throw new PickyException(new PickyError(result.Err));
+            }
+            string retVal = writeable.ToUnicode();
+            writeable.Dispose();
+            return retVal;
+        }
+    }
+
+    /// <summary>
+    /// Returns the key ID.
+    /// </summary>
+    /// <exception cref="PickyException"></exception>
+    public void GetKid(DiplomatWriteable writeable)
+    {
+        unsafe
+        {
+            if (_inner == null)
+            {
+                throw new ObjectDisposedException("JwtSig");
+            }
+            IntPtr resultPtr = Raw.JwtSig.GetKid(_inner, &writeable);
+            Raw.JwtFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.JwtFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.JwtFfiResultVoidBoxPickyError.Destroy(resultPtr);
+            if (!result.isOk)
+            {
+                throw new PickyException(new PickyError(result.Err));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Returns the key ID.
+    /// </summary>
+    /// <exception cref="PickyException"></exception>
+    public string GetKid()
+    {
+        unsafe
+        {
+            if (_inner == null)
+            {
+                throw new ObjectDisposedException("JwtSig");
+            }
+            DiplomatWriteable writeable = new DiplomatWriteable();
+            IntPtr resultPtr = Raw.JwtSig.GetKid(_inner, &writeable);
             Raw.JwtFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.JwtFfiResultVoidBoxPickyError>(resultPtr);
             Raw.JwtFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
