@@ -48,20 +48,22 @@ vQIDAQAB
 
     private static readonly string claims = @"{""admin"":true,""exp"":1516539022,""iat"":1516239022,""name"":""John Doe"",""nbf"":1516239022}";
 
-    private static readonly string headerSection = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImN0eSI6IkFVVEgifQ";
+    private static readonly string headerSection = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImN0eSI6IkFVVEgiLCJraWQiOiJtYXN0ZXIta2V5In0";
 
     private static readonly string payloadSection = "eyJhZG1pbiI6dHJ1ZSwiZXhwIjoxNTE2NTM5MDIyLCJpYXQiOjE1MTYyMzkwMjIsIm5hbWUiOiJKb2huIERvZSIsIm5iZiI6MTUxNjIzOTAyMn0";
 
-    private static readonly string signedJwt = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImN0eSI6IkFVVEgifQ.eyJhZG1pbiI6dHJ1ZSwiZXhwIjoxNTE2NTM5MDIyLCJpYXQiOjE1MTYyMzkwMjIsIm5hbWUiOiJKb2huIERvZSIsIm5iZiI6MTUxNjIzOTAyMn0.Lw5hpVuV9BkH6rmz8xqFqtfUs1bxPIIldoqA88z9QKbgDdSE4zgvqTOaiBvTfp5fprB-O_RHjhdS9D4vR38MyGfwvLiQDh2Xv0EsdIMnlZdtGKi4d_lNOreKpXc6GIzl1iMNx-R4SiA0eJm4I0mLkOV-BQgEDYaCRofRdSnsqQokb218qjoE8zahCuZJRW-FNgukxwYSFy_mT3RXnKzXtU38Rmhso30itQfesFig3vzctc9bZGrX5vmmqJEmkGJXfiZ7pz9OuYKNLGz-Bd1hehwz5OpE6WuuSA1YF3fVZ7xg3d61m2X6NMgOxO6zdMoAunkRGoK0nQeO7GgtQ9qBzA";
+    private static readonly string signedJwt = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImN0eSI6IkFVVEgiLCJraWQiOiJtYXN0ZXIta2V5In0.eyJhZG1pbiI6dHJ1ZSwiZXhwIjoxNTE2NTM5MDIyLCJpYXQiOjE1MTYyMzkwMjIsIm5hbWUiOiJKb2huIERvZSIsIm5iZiI6MTUxNjIzOTAyMn0.wqZcddQCA2UZj8-pT5GRj1GCTJWwVlE6uHgjMq18vctvmzNVYD34ri4-61qW460J64JmG5ZYwqOedNSlSqCl3lY63BkXrSRYOKnwWJTwoljz3BrLKx4t6jeBTJVMFLs7JiiCoxNc2uq33qh8F08cV_2fjALvgBdm3pkFgm-y-P07fBYLnXcuP5-OOMvynQmoqXd2zm-XH1YbwTW_8LYoJH_Aqfgyqfrcs1BEzJEGJUtL-HPictnswutW9c1dvwgI5Tr7PdltTu7hRuJof7ojZYDADg_aaecjzsI1zXu0NU_-DwAzrPaR5QTaDTTNyJRPwDjr7l0Dtdq5USMt48bSNg";
 
     [Fact]
     public void Smoke()
     {
         JwtSigBuilder builder = JwtSig.Builder();
+        builder.Kid = "master-key";
         builder.ContentType = "AUTH";
         builder.Claims = claims;
 
         JwtSig jwt = builder.Build();
+        Assert.Equal("master-key", jwt.Kid);
         Assert.Equal("AUTH", jwt.ContentType);
         Assert.Equal(claims, jwt.Claims);
 
@@ -80,6 +82,7 @@ vQIDAQAB
         PublicKey key = PublicKey.FromPem(pem);
         JwtValidator validator = JwtValidator.Strict(1516259022, 0);
         JwtSig jwt = JwtSig.Decode(signedJwt, key, validator);
+        Assert.Equal("master-key", jwt.Kid);
         Assert.Equal("AUTH", jwt.ContentType);
         Assert.Equal(claims, jwt.Claims);
     }

@@ -89,6 +89,11 @@ impl JwtSig {
         Ok(self.0.header.cty.as_deref().unwrap_or("").into())
     }
 
+    /// Returns the key ID.
+    pub fn get_kid(&self) -> Result<String, JwtError> {
+        Ok(self.0.header.kid.as_deref().unwrap_or("").into())
+    }
+
     /// Returns the header as a JSON encoded payload.
     pub fn get_header(&self) -> Result<String, JwtError> {
         serde_json::to_string(&self.0.header).map_err(|e| JwtError(e.into()))
@@ -115,6 +120,7 @@ impl JwtSig {
 pub(crate) struct SigBuilderInner {
     pub(crate) alg: JwsAlg,
     pub(crate) cty: Option<String>,
+    pub(crate) kid: Option<String>,
     pub(crate) claims: serde_json::Value,
     pub(crate) additional_headers: std::collections::HashMap<String, serde_json::Value>,
 }
@@ -128,6 +134,7 @@ impl JwtSigBuilder {
         Self(SigBuilderInner {
             alg: JwsAlg::RS256,
             cty: None,
+            kid: None,
             claims: serde_json::Value::Null,
             additional_headers: std::collections::HashMap::new(),
         })
@@ -139,6 +146,10 @@ impl JwtSigBuilder {
 
     pub fn set_content_type(&mut self, cty: &str) {
         self.0.cty = Some(cty.to_owned());
+    }
+
+    pub fn set_kid(&mut self, kid: &str) {
+        self.0.kid = Some(kid.to_owned());
     }
 
     /// Adds a JSON object as additional header parameter.
@@ -200,6 +211,7 @@ impl JwtSigBuilder {
         let claims = self.0.claims.clone();
         let mut jwt = jwt::CheckedJwtSig::new(self.0.alg.into(), claims);
         jwt.header.cty = self.0.cty.clone();
+        jwt.header.kid = self.0.kid.clone();
         jwt.header.additional = self.0.additional_headers.clone();
         Ok(JwtSig(jwt))
     }

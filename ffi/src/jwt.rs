@@ -42,6 +42,7 @@ impl From<JwsAlg> for jws::JwsAlg {
 pub(crate) struct SigBuilderInner {
     pub(crate) alg: JwsAlg,
     pub(crate) cty: Option<String>,
+    pub(crate) kid: Option<String>,
     pub(crate) claims: serde_json::Value,
     pub(crate) additional_headers: std::collections::HashMap<String, serde_json::Value>,
 }
@@ -102,6 +103,14 @@ pub mod ffi {
             Ok(()).into()
         }
 
+        /// Returns the key ID.
+        // TODO: support for optional string in return position
+        pub fn get_kid(&self, writeable: &mut DiplomatWriteable) -> DiplomatResult<(), Box<PickyError>> {
+            err_check!(write!(writeable, "{}", self.0.header.kid.as_deref().unwrap_or("")));
+            writeable.flush();
+            Ok(()).into()
+        }
+
         /// Returns the header as a JSON encoded payload.
         pub fn get_header(&self, writeable: &mut DiplomatWriteable) -> DiplomatResult<(), Box<PickyError>> {
             let header = err_check!(serde_json::to_string(&self.0.header));
@@ -150,6 +159,7 @@ pub mod ffi {
             Box::new(Self(super::SigBuilderInner {
                 alg: JwsAlg::RS256,
                 cty: None,
+                kid: None,
                 claims: serde_json::Value::Null,
                 additional_headers: std::collections::HashMap::new(),
             }))
@@ -161,6 +171,10 @@ pub mod ffi {
 
         pub fn set_content_type(&mut self, cty: &str) {
             self.0.cty = Some(cty.to_owned());
+        }
+
+        pub fn set_kid(&mut self, kid: &str) {
+            self.0.kid = Some(kid.to_owned());
         }
 
         /// Adds a JSON object as additional header parameter.
@@ -229,6 +243,7 @@ pub mod ffi {
             let claims = self.0.claims.clone();
             let mut jwt = jwt::CheckedJwtSig::new(self.0.alg.into(), claims);
             jwt.header.cty = self.0.cty.clone();
+            jwt.header.kid = self.0.kid.clone();
             jwt.header.additional = self.0.additional_headers.clone();
             Box::new(JwtSig(jwt))
         }

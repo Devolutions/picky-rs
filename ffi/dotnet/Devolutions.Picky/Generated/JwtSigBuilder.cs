@@ -39,6 +39,14 @@ public partial class JwtSigBuilder: IDisposable
         }
     }
 
+    public string Kid
+    {
+        set
+        {
+            SetKid(value);
+        }
+    }
+
     /// <summary>
     /// Creates a managed <c>JwtSigBuilder</c> from a raw handle.
     /// </summary>
@@ -92,6 +100,23 @@ public partial class JwtSigBuilder: IDisposable
             fixed (byte* ctyBufPtr = ctyBuf)
             {
                 Raw.JwtSigBuilder.SetContentType(_inner, ctyBufPtr, ctyBufLength);
+            }
+        }
+    }
+
+    public void SetKid(string kid)
+    {
+        unsafe
+        {
+            if (_inner == null)
+            {
+                throw new ObjectDisposedException("JwtSigBuilder");
+            }
+            byte[] kidBuf = DiplomatUtils.StringToUtf8(kid);
+            nuint kidBufLength = (nuint)kidBuf.Length;
+            fixed (byte* kidBufPtr = kidBuf)
+            {
+                Raw.JwtSigBuilder.SetKid(_inner, kidBufPtr, kidBufLength);
             }
         }
     }

@@ -25,6 +25,9 @@ public partial struct JwtSigBuilder
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "JwtSigBuilder_set_content_type", ExactSpelling = true)]
     public static unsafe extern void SetContentType(JwtSigBuilder* self, byte* cty, nuint ctySz);
 
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "JwtSigBuilder_set_kid", ExactSpelling = true)]
+    public static unsafe extern void SetKid(JwtSigBuilder* self, byte* kid, nuint kidSz);
+
     /// <summary>
     /// Adds a JSON object as additional header parameter.
     /// </summary>
