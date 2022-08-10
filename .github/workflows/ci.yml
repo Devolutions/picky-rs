@@ -21,13 +21,14 @@ jobs:
         run: |
           Write-Host "Check formatting"
           cargo fmt --all -- --check
+          cargo fmt --manifest-path ./ffi/wasm/Cargo.toml -- --check
 
           if ($LastExitCode -eq 1) {   
             throw "Bad formatting, please run 'cargo +stable fmt --all'"
           }
 
-  check:
-    name: picky build [${{ matrix.os }}]
+  lints:
+    name: Lints [${{ matrix.os }}]
     runs-on: ${{ matrix.runner }}
     needs: formatting
     strategy:
@@ -43,11 +44,11 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - name: Check compilation
-        run: cargo check
+      - name: Run clippy
+        run: cargo clippy --locked --workspace --all-features -- -D warnings
 
-  test:
-    name: picky test [${{ matrix.os }}]
+  tests:
+    name: Tests [${{ matrix.os }}]
     runs-on: ${{ matrix.runner }}
     needs: formatting
     strategy:
@@ -64,7 +65,7 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Run tests
-        run: cargo test --features "wincert","ctl","pkcs7","ssh","ec","time_conversion","ctl_http_fetch"
+        run: cargo test --locked --verbose --workspace --all-features
 
   msrv:
     # Minimum supported Rust version check for published crates.
@@ -97,3 +98,14 @@ jobs:
 
       - name: cargo check ${{ matrix.crate }}
         run: cargo +${{ matrix.msvc }} check -p picky-asn1
+
+  lints-wasm:
+    name: Lints WASM
+    runs-on: ubuntu-20.04
+    needs: formatting
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Run clippy
+        run: cargo clippy --locked --all-features --manifest-path ./ffi/wasm/Cargo.toml -- -D warnings
