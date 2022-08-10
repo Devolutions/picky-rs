@@ -1,5 +1,5 @@
 [package]
-name = "picky-wasm"
+name = "picky"
 version = "0.4.0"
 authors = ["Benoît CORTIER <bcortier@proton.me>"]
 edition = "2021"
@@ -9,8 +9,16 @@ keywords = ["x509", "jwt", "signature", "jose", "pki"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Devolutions/picky-rs"
 
+[workspace]
+members = ["."]
+
 [lib]
 crate-type = ["cdylib", "rlib"]
+
+[profile.release]
+lto = "fat"
+opt-level = "s"
+strip = "debuginfo"
 
 [features]
 default = ["console_error_panic_hook"]

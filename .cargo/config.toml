@@ -1,5 +1,5 @@
 [target.wasm32-unknown-unknown]
 rustflags = [
   # 20 KiB heap size, to fit in 2 pages.
-  "-C", "link-args=-z stack-size=20480"
+  "-C", "link-args=-z stack-size=20480",
 ]

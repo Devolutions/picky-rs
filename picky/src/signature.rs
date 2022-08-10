@@ -243,8 +243,9 @@ impl SignatureAlgorithm {
     }
 }
 
+#[cfg(feature = "ec")]
 #[cfg(test)]
-mod tests {
+mod ec_tests {
     use super::*;
     use rstest::*;
 
@@ -278,7 +279,7 @@ TP2oFsPXRAavZCh4AbWUn8bAHmzNRyuJonQBKlQlVQ==
     #[case(HashAlgorithm::SHA2_512, true)]
     #[case(HashAlgorithm::SHA3_384, false)]
     #[case(HashAlgorithm::SHA3_512, false)]
-    fn ec_algorithm_identifier_conversions(#[case] hash: HashAlgorithm, #[case] success: bool) {
+    fn algorithm_identifier_conversions(#[case] hash: HashAlgorithm, #[case] success: bool) {
         let signature_algorithm = SignatureAlgorithm::Ecdsa(hash);
         let algorithm_identifier = AlgorithmIdentifier::try_from(signature_algorithm);
         if success {
@@ -289,7 +290,7 @@ TP2oFsPXRAavZCh4AbWUn8bAHmzNRyuJonQBKlQlVQ==
     }
 
     #[test]
-    fn ec_verify_bad_signature() {
+    fn verify_bad_signature() {
         let private_key_signature = PrivateKey::from_pem_str(EC_PRIVATE_KEY_NIST256_PEM).unwrap();
         let signature_algorithm = SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_256);
 
@@ -314,7 +315,7 @@ csaQwO9jFvbQFIpCvcMRjaunLfhIWiYDdg==
     #[case(EC_PRIVATE_KEY_NIST256_PEM, HashAlgorithm::SHA2_256, true)]
     #[case(EC_PRIVATE_KEY_NIST384_PEM, HashAlgorithm::SHA2_384, true)]
     #[case(EC_PRIVATE_KEY_NIST512_PEM, HashAlgorithm::SHA2_512, false)] // EC Nist 512 is not supported by ring yet
-    fn ec_sign_and_verify(#[case] key_pem: &str, #[case] hash: HashAlgorithm, #[case] sign_successful: bool) {
+    fn sign_and_verify(#[case] key_pem: &str, #[case] hash: HashAlgorithm, #[case] sign_successful: bool) {
         let private_key = PrivateKey::from_pem_str(key_pem).unwrap();
         let signature_algorithm = SignatureAlgorithm::Ecdsa(hash);
 
