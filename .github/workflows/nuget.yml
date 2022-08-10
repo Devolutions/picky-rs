@@ -20,7 +20,7 @@ jobs:
           - os: osx
             runner: macos-11
           - os: linux
-            runner: ubuntu-18.04
+            runner: ubuntu-20.04
           - os: ios
             runner: macos-11
           - os: android
@@ -176,7 +176,7 @@ jobs:
 
   publish:
     name: publish
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     needs: build-managed
     if: github.event_name != 'schedule'
   
