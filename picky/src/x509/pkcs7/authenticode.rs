@@ -400,6 +400,7 @@ struct AuthenticodeStrictness {
     require_signing_certificate_check: bool,
     require_not_before_check: bool,
     require_not_after_check: bool,
+    #[cfg(feature = "ctl")]
     require_ca_verification_against_ctl: bool,
     require_chain_check: bool,
     exclude_specific_cert_authorities_from_ctl_check: bool,
@@ -413,6 +414,7 @@ impl Default for AuthenticodeStrictness {
             require_not_before_check: true,
             require_not_after_check: true,
             require_chain_check: true,
+            #[cfg(feature = "ctl")]
             require_ca_verification_against_ctl: true,
             exclude_specific_cert_authorities_from_ctl_check: true,
         }
@@ -2219,7 +2221,7 @@ mod test {
     }
 
     #[test]
-    fn validate_authenticode_singature_create_by_authenticode_builder() {
+    fn validate_authenticode_signature_create_by_authenticode_builder() {
         let parse_key = |pem_str: &str| -> PrivateKey {
             let pem = pem_str.parse::<Pem>().unwrap();
             PrivateKey::from_pkcs8(pem.data()).unwrap()
@@ -2345,6 +2347,7 @@ mod test {
             .unwrap();
     }
 
+    #[cfg(feature = "ctl")]
     #[test]
     fn test_timestamped_signature_with_simple_chain_verification() {
         // this signature signed using Root -> End certificates chain
@@ -2432,6 +2435,7 @@ mod test {
         validator.verify().unwrap();
     }
 
+    #[cfg(feature = "ctl")]
     #[test]
     fn test_timestamped_signature_with_full_chain_verification() {
         // this signature signed using Root -> Intermediate -> End certificates chain

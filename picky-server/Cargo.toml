@@ -11,6 +11,9 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/Devolutions/picky-rs"
 publish = false
 
+[workspace]
+# picky-server has been discontinued, so this crate is not in the main workspace anymore
+
 [dependencies]
 picky = { version = "7.0.0-rc.3", default-features = false, features = ["x509", "jose", "pkcs7", "ssh", "time_conversion" ], path = "../picky" }
 picky-asn1 = { version = "0.6", path = "../picky-asn1" }

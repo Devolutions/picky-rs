@@ -1,15 +1,16 @@
-use anyhow::anyhow;
-use lief::LogLevel;
-use std::path::Path;
+extern crate lief_cwal as lief;
 
 pub mod config;
 pub mod sign;
 pub mod utils;
 pub mod verify;
 
+use anyhow::anyhow;
 use config::{
     ARG_LOGGING_CRITICAL, ARG_LOGGING_DEBUG, ARG_LOGGING_ERR, ARG_LOGGING_INFO, ARG_LOGGING_TRACE, ARG_LOGGING_WARN,
 };
+use lief::LogLevel;
+use std::path::Path;
 
 #[inline]
 pub fn get_utf8_file_name(file: &Path) -> anyhow::Result<&str> {
