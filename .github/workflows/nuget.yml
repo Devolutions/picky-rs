@@ -3,6 +3,7 @@ name: Publish NuGet package
 on:
   workflow_dispatch:
     dry-run:
+      description: 'Dry run'
       required: true
       type: boolean
       default: 'true'
@@ -21,7 +22,7 @@ jobs:
         id: get-dry-run
         shell: pwsh
         run: |
-          $IsDryRun = ${{ github.event.inputs.dry-run }} -Eq 'true' -Or ${{ github.event_name }} -Eq 'schedule'
+          $IsDryRun = '${{ github.event.inputs.dry-run }}' -Eq 'true' -Or '${{ github.event_name }}' -Eq 'schedule'
 
           if ($IsDryRun) {
             Write-Host '::set-output name=dry-run::true'
