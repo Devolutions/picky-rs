@@ -2,20 +2,40 @@ name: Publish npm package
 
 on:
   workflow_dispatch:
+    dry-run:
+      required: true
+      type: boolean
+      default: 'true'
   schedule:
     - cron: '48 3 * * 1' # 3:48 AM UTC every Monday
 
 jobs:
-  publish:
-    name: Build and publish npm package
-    runs-on: ubuntu-latest
-    environment: npm-publish
+  preflight:
+    name: Preflight
+    runs-on: ubuntu-20.04
+    outputs:
+      dry-run: ${{ steps.get-dry-run.outputs.dry-run }}
+
+    steps:
+      - name: Get dry run
+        id: get-dry-run
+        shell: pwsh
+        run: |
+          $IsDryRun = ${{ github.event.inputs.dry-run }} -Eq 'true' -Or ${{ github.event_name }} -Eq 'schedule'
+
+          if ($IsDryRun) {
+            Write-Host '::set-output name=dry-run::true'
+          } else {
+            Write-Host '::set-output name=dry-run::false'
+          }
+
+  tests:
+    name: Tests
+    runs-on: ubuntu-20.04
 
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-        with:
-          token: ${{ secrets.DEVOLUTIONSBOT_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v3
@@ -33,8 +53,25 @@ jobs:
           Set-Location ./ffi/wasm
           ./run_tests.ps1
 
+  publish:
+    name: Publish package
+    runs-on: ubuntu-20.04
+    environment: npm-publish
+    needs:
+      - preflight
+      - tests
+    if: needs.preflight.outputs.dry-run == 'false'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup wasm-pack
+        shell: bash
+        run: |
+          curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh      
+
       - name: Build & Publish
-        if: github.event_name != 'schedule'
         shell: pwsh
         run: |
           Set-Location ./ffi/wasm
