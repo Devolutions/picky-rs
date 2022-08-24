@@ -67,7 +67,7 @@ const PRIVATE_KEY_PEM_LABEL: &str = "PRIVATE KEY";
 const RSA_PRIVATE_KEY_PEM_LABEL: &str = "RSA PRIVATE KEY";
 const EC_PRIVATE_KEY_LABEL: &str = "EC PRIVATE KEY";
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PrivateKey(PrivateKeyInfo);
 
 impl From<PrivateKeyInfo> for PrivateKey {
@@ -288,7 +288,7 @@ impl PrivateKey {
 const PUBLIC_KEY_PEM_LABEL: &str = "PUBLIC KEY";
 const RSA_PUBLIC_KEY_PEM_LABEL: &str = "RSA PUBLIC KEY";
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct PublicKey(SubjectPublicKeyInfo);
 
@@ -530,14 +530,12 @@ mod tests {
 
     #[test]
     fn public_key_from_garbage_pem_err() {
-        let err = PublicKey::from_pem(&GARBAGE_PEM.parse::<Pem>().expect("pem"))
-            .err()
-            .expect("key error");
+        let err = PublicKey::from_pem(&GARBAGE_PEM.parse::<Pem>().expect("pem")).expect_err("key error");
         assert_eq!(err.to_string(), "invalid PEM label: GARBAGE");
     }
 
     fn check_pk(pem_str: &str) {
-        const MSG: &'static [u8] = b"abcde";
+        const MSG: &[u8] = b"abcde";
 
         let pem = pem_str.parse::<Pem>().expect("pem");
         let pk = PrivateKey::from_pem(&pem).expect("private key");

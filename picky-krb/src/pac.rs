@@ -18,7 +18,7 @@ pub enum PacError {
 
 /// [MS-PAC](https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-PAC/%5bMS-PAC%5d.pdf)
 /// Section 2.4 PAC_INFO_BUFFER ulType
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum PacBufferType {
     KerbValidationInfo,
     Credentials,
@@ -74,7 +74,7 @@ impl From<PacBufferType> for u32 {
 
 /// [MS-PAC](https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-PAC/%5bMS-PAC%5d.pdf)
 /// Section 2.4 PAC_INFO_BUFFER
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct PacInfoBuffer {
     ul_type: PacBufferType,
     cb_buffer_size: u32,
@@ -99,7 +99,7 @@ impl PacInfoBuffer {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct PacBuffer {
     info_buffer: PacInfoBuffer,
     data: Vec<u8>,
@@ -138,7 +138,7 @@ impl PacBuffer {
 
 /// [MS-PAC](https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-PAC/%5bMS-PAC%5d.pdf)
 /// Section 2.3 PACTYPE
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Pac {
     c_buffers: u32,
     buffers: Vec<PacBuffer>,

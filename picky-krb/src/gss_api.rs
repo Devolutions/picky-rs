@@ -139,7 +139,7 @@ pub struct GssApiNegInit {
 // this ApplicationTag0 is different from the ApplicationTag<T, 0>
 // ApplicationTag works as a wrapper over the inner value
 // but ApplicationTag0 decodes/encodes inner type fields as its own fields
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct ApplicationTag0<T>(pub T);
 
 impl<T: ser::Serialize + Debug + PartialEq> ser::Serialize for ApplicationTag0<T> {
@@ -173,7 +173,7 @@ impl<T: ser::Serialize + Debug + PartialEq> ser::Serialize for ApplicationTag0<T
 /// 3..7     Filler     Contains five octets of hex value FF.
 /// 8..15    SND_SEQ    Sequence number expressed in big-endian order.
 /// 16..last SGN_CKSUM  Checksum
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct MicToken {
     pub flags: u8,
     pub seq_num: u64,
@@ -286,7 +286,7 @@ impl MicToken {
 ///  6..7     RRC       Contains the "right rotation count" in big-endian order
 ///  8..15    SND_SEQ   Sequence number field expressed in big-endian order.
 ///  16..last Data      Encrypted data for Wrap tokens
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct WrapToken {
     pub flags: u8,
     pub ec: u16,

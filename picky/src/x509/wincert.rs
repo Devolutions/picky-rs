@@ -23,7 +23,7 @@ pub enum WinCertificateError {
 
 pub type WinCertificateResult<T> = Result<T, WinCertificateError>;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WinCertificate {
     length: u32,
     revision: RevisionType,
@@ -113,7 +113,7 @@ impl WinCertificate {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 #[repr(u16)]
 pub enum RevisionType {
     WinCertificateRevision10 = 0x0100,
@@ -134,7 +134,7 @@ impl TryFrom<u16> for RevisionType {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 #[repr(u16)]
 pub enum CertificateType {
     WinCertTypeX509 = 0x0001,

@@ -17,7 +17,7 @@ use std::fmt;
 ///      utf8String          UTF8String      (SIZE (1..MAX)),
 ///      bmpString           BMPString       (SIZE (1..MAX)) }
 /// ```
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum DirectoryString {
     //TeletexString,
     PrintableString(PrintableStringAsn1),

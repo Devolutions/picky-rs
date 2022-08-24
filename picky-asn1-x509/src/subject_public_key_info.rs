@@ -3,14 +3,14 @@ use picky_asn1::wrapper::{BitStringAsn1, BitStringAsn1Container, IntegerAsn1, Oc
 use serde::{de, ser, Deserialize, Serialize};
 use std::fmt;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum PublicKey {
     Rsa(EncapsulatedRsaPublicKey),
     Ec(EncapsulatedEcPoint),
     Ed(EncapsulatedEcPoint),
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct RsaPublicKey {
     pub modulus: IntegerAsn1,         // n
     pub public_exponent: IntegerAsn1, // e
@@ -22,7 +22,7 @@ pub type EcPoint = OctetStringAsn1;
 
 pub type EncapsulatedEcPoint = BitStringAsn1;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct SubjectPublicKeyInfo {
     pub algorithm: AlgorithmIdentifier,
     pub subject_public_key: PublicKey,

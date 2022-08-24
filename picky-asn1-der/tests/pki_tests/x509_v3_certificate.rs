@@ -87,7 +87,7 @@ struct TbsCertificate {
     pub extensions: ExplicitContextTag3<Extensions>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct AttributeTypeAndValue {
     ty: ObjectIdentifierAsn1,
     value: String, // hardcoded for ty = 2.5.4.3 (commonName)
@@ -95,7 +95,7 @@ pub struct AttributeTypeAndValue {
 pub type RelativeDistinguishedName = Asn1SetOf<AttributeTypeAndValue>;
 pub type Name = Asn1SequenceOf<RelativeDistinguishedName>;
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct Validity {
     not_before: UTCTimeAsn1,
     not_after: UTCTimeAsn1,

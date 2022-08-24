@@ -51,7 +51,7 @@ use zeroize::Zeroize;
 /// `attributes` is a set of attributes.  These are the extended
 /// information that is encrypted along with the private-key
 /// information.
-#[derive(Serialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Debug, Clone, PartialEq, Eq)]
 pub struct PrivateKeyInfo {
     pub version: u8,
     pub private_key_algorithm: AlgorithmIdentifier,
@@ -144,7 +144,7 @@ impl<'de> de::Deserialize<'de> for PrivateKeyInfo {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum PrivateKeyValue {
     RSA(OctetStringAsn1Container<RsaPrivateKey>),
     EC(OctetStringAsn1Container<ECPrivateKey>),
@@ -182,7 +182,7 @@ impl ser::Serialize for PrivateKeyValue {
 ///          otherPrimeInfos   OtherPrimeInfos OPTIONAL
 ///      }
 /// ```
-#[derive(Serialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(not(feature = "legacy"), derive(Deserialize))]
 pub struct RsaPrivateKey {
     pub version: IntegerAsn1,
@@ -361,7 +361,7 @@ impl RsaPrivateKey {
 ///    }
 /// ```
 
-#[derive(Serialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Debug, Clone, PartialEq, Eq)]
 pub struct ECPrivateKey {
     pub version: IntegerAsn1,
     pub private_key: OctetStringAsn1,

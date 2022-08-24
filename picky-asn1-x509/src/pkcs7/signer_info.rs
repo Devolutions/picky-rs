@@ -103,7 +103,7 @@ impl ser::Serialize for Attributes {
 ///          issuerAndSerialNumber IssuerAndSerialNumber,
 ///          subjectKeyIdentifier [0] SubjectKeyIdentifier }
 /// ```
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum SignerIdentifier {
     IssuerAndSerialNumber(IssuerAndSerialNumber),
     SubjectKeyIdentifier(ImplicitContextTag0<SubjectKeyIdentifier>),
@@ -179,21 +179,21 @@ impl<'de> Deserialize<'de> for SignerIdentifier {
 /// ``` not_rust
 /// SignatureValue ::= OCTET STRING
 /// ```
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct SignatureValue(pub OctetStringAsn1);
 
 /// [RFC 5652 #10.1.1](https://datatracker.ietf.org/doc/html/rfc5652#section-10.1.1)
 /// ``` not_rust
 /// DigestAlgorithmIdentifier ::= AlgorithmIdentifier
 /// ```
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct DigestAlgorithmIdentifier(pub AlgorithmIdentifier);
 
 /// [RFC 5652 #10.1.2](https://datatracker.ietf.org/doc/html/rfc5652#section-10.1.2)
 /// ``` not_rust
 /// SignatureAlgorithmIdentifier ::= AlgorithmIdentifier
 /// ```
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct SignatureAlgorithmIdentifier(pub AlgorithmIdentifier);
 
 /// [RFC 5652 #10.2.4](https://datatracker.ietf.org/doc/html/rfc5652#section-10.2.4)
@@ -202,7 +202,7 @@ pub struct SignatureAlgorithmIdentifier(pub AlgorithmIdentifier);
 ///      issuer Name,
 ///      serialNumber CertificateSerialNumber }
 /// ```
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct IssuerAndSerialNumber {
     pub issuer: Name,
     pub serial_number: CertificateSerialNumber,
@@ -212,7 +212,7 @@ pub struct IssuerAndSerialNumber {
 /// ``` not_rust
 /// CertificateSerialNumber ::= INTEGER
 /// ```
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct CertificateSerialNumber(pub IntegerAsn1);
 
 #[derive(Deserialize, Debug, PartialEq, Clone, Default)]

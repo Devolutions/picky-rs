@@ -262,7 +262,7 @@ impl<'de> de::Deserialize<'de> for RevokedCertificate {
 ///    otherRevInfoFormat OBJECT IDENTIFIER,
 ///    otherRevInfo ANY DEFINED BY otherRevInfoFormat }
 /// ```
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct OtherRevocationInfoFormat {
     other_rev_info_format: ObjectIdentifierAsn1,
     other_rev_info: (),

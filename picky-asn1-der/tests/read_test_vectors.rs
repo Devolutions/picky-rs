@@ -32,7 +32,6 @@ impl ParseStr for () {
         if to_parse != "()" {
             panic!("Test vector contains invalid unit type @{}", line)
         }
-        ()
     }
 }
 impl ParseStr for Vec<u8> {

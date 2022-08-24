@@ -52,7 +52,7 @@ use serde::{Deserialize, Serialize};
 /// let deserialized_b: B = picky_asn1_der::from_bytes(&serialized_a).expect("B from bytes");
 /// assert_eq!(deserialized_b, plain_b);
 /// ```
-#[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Hash, Clone)]
 pub struct Asn1RawDer(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 impl Asn1RawDer {

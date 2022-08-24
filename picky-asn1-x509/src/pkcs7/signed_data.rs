@@ -84,7 +84,7 @@ impl<'de> de::Deserialize<'de> for SignedData {
 /// ``` not_rust
 /// DigestAlgorithmIdentifiers ::= SET OF DigestAlgorithmIdentifier
 /// ```
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct DigestAlgorithmIdentifiers(pub Asn1SetOf<AlgorithmIdentifier>);
 
 /// [RFC 5652 #5.1](https://datatracker.ietf.org/doc/html/rfc5652#section-5.1)
@@ -98,7 +98,7 @@ pub struct SignersInfos(pub Asn1SetOf<SignerInfo>);
 /// ``` not_rust
 /// CertificateSet ::= SET OF CertificateChoices
 /// ```
-#[derive(Debug, PartialEq, Clone, Default)]
+#[derive(Debug, PartialEq, Eq, Clone, Default)]
 pub struct CertificateSet(pub Vec<CertificateChoices>);
 
 // This is a workaround for constructed encoding as implicit
@@ -126,7 +126,7 @@ impl<'de> de::Deserialize<'de> for CertificateSet {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum CertificateChoices {
     Certificate(Asn1RawDer),
     Other(Asn1RawDer),

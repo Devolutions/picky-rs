@@ -20,7 +20,7 @@ impl fmt::Display for UnsupportedAlgorithmError {
 
 impl Error for UnsupportedAlgorithmError {}
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct AlgorithmIdentifier {
     algorithm: ObjectIdentifierAsn1,
     parameters: AlgorithmIdentifierParameters,
@@ -302,7 +302,7 @@ impl<'de> de::Deserialize<'de> for AlgorithmIdentifier {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum AlgorithmIdentifierParameters {
     None,
     Null,
@@ -310,7 +310,7 @@ pub enum AlgorithmIdentifierParameters {
     Ec(Option<EcParameters>),
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum EcParameters {
     NamedCurve(ObjectIdentifierAsn1),
     // -- implicitCurve and specifiedCurve MUST NOT be used in PKIX.
@@ -379,7 +379,7 @@ impl<'de> de::Deserialize<'de> for EcParameters {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum AesMode {
     Ecb,
     Cbc,
@@ -391,14 +391,14 @@ pub enum AesMode {
     WrapPad,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum AesParameters {
     Null,
     InitializationVector(OctetStringAsn1),
     AuthenticatedEncryptionParameters(AesAuthEncParams),
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct AesAuthEncParams {
     nonce: OctetStringAsn1,
     icv_len: IntegerAsn1,
@@ -509,7 +509,7 @@ impl<'de> de::Deserialize<'de> for AesParameters {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[allow(non_camel_case_types)] // 'SHA2_512_224' is clearer than 'SHA2512224' or 'Sha2512224' imo
 pub enum ShaVariant {
     // TODO: rename enum (breaking)
@@ -589,7 +589,7 @@ impl TryFrom<ObjectIdentifierAsn1> for ShaVariant {
 ///        digest OCTET STRING
 ///    }
 /// ```
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct DigestInfo {
     pub oid: AlgorithmIdentifier,
     pub digest: OctetStringAsn1,

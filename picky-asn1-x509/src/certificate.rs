@@ -195,7 +195,7 @@ mod tests {
 
         // Issuer
 
-        let issuer: Name = DirectoryName::new_common_name("contoso.local Authority").into();
+        let issuer: Name = DirectoryName::new_common_name("contoso.local Authority");
         check_serde!(issuer: Name in encoded[34..70]);
 
         // Validity
@@ -208,7 +208,7 @@ mod tests {
 
         // Subject
 
-        let subject: Name = DirectoryName::new_common_name("test.contoso.local").into();
+        let subject: Name = DirectoryName::new_common_name("test.contoso.local");
         check_serde!(subject: Name in encoded[102..133]);
 
         // SubjectPublicKeyInfo
@@ -241,7 +241,7 @@ mod tests {
         // TbsCertificate
 
         let tbs_certificate = TbsCertificate {
-            version: ExplicitContextTag0(Version::V3).into(),
+            version: ExplicitContextTag0(Version::V3),
             serial_number: BigInt::from(935548868).to_signed_bytes_be().into(),
             signature: signature_algorithm.clone(),
             issuer,

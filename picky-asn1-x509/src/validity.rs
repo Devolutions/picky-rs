@@ -5,13 +5,13 @@ use picky_asn1::Asn1Type;
 use serde::{de, ser, Deserialize, Serialize};
 use std::fmt;
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Validity {
     pub not_before: Time,
     pub not_after: Time,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Time {
     Utc(UTCTimeAsn1),
     Generalized(GeneralizedTimeAsn1),

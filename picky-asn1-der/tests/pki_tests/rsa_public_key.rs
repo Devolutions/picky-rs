@@ -20,13 +20,13 @@ use oid::prelude::*;
 use picky_asn1::wrapper::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct SubjectPublicKeyInfoRsa {
     pub algorithm: AlgorithmIdentifier,
     pub subject_public_key: EncapsulatedRSAPublicKey,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct RSAPublicKey {
     pub modulus: IntegerAsn1,         // n
     pub public_exponent: IntegerAsn1, // e

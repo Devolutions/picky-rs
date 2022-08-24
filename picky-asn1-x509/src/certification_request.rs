@@ -139,7 +139,7 @@ mod tests {
         .expect("invalid base64");
 
         let certification_request_info = CertificationRequestInfo::new(
-            DirectoryName::new_common_name(PrintableString::from_str("test.contoso.local").unwrap()).into(),
+            DirectoryName::new_common_name(PrintableString::from_str("test.contoso.local").unwrap()),
             SubjectPublicKeyInfo::new_rsa_key(
                 IntegerAsn1::from(encoded[74..331].to_vec()),
                 IntegerAsn1::from(encoded[333..336].to_vec()),
@@ -187,7 +187,7 @@ mod tests {
         dn.add_attr(NameAttr::CommonName, Utf8String::from_str("sometest").unwrap());
 
         let certification_request_info = CertificationRequestInfo::new(
-            dn.into(),
+            dn,
             SubjectPublicKeyInfo::new_rsa_key(
                 IntegerAsn1::from(encoded[77..334].to_vec()),
                 IntegerAsn1::from(encoded[336..339].to_vec()),

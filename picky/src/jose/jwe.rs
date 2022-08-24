@@ -687,7 +687,7 @@ mod tests {
         let public_key = get_private_key_2().to_public_key();
 
         let jwe = Jwe::new(JweAlg::RsaPkcs1v15, JweEnc::Aes128Gcm, payload);
-        let encoded = jwe.clone().encode(&public_key).unwrap();
+        let encoded = jwe.encode(&public_key).unwrap();
 
         let err = Jwe::decode(&encoded, &private_key).err().unwrap();
         assert_eq!(err.to_string(), "RSA error: decryption error");
@@ -713,7 +713,7 @@ mod tests {
         let payload = "和解をしよう？ 俺が？ 真っ平だ！ 真っ平御免だ！".as_bytes().to_vec();
 
         let jwe = Jwe::new(JweAlg::Direct, JweEnc::Aes192Gcm, payload);
-        let encoded = jwe.clone().encode_direct(b"abcdefghabcdefghabcdefgh").unwrap();
+        let encoded = jwe.encode_direct(b"abcdefghabcdefghabcdefgh").unwrap();
 
         let err = Jwe::decode_direct(&encoded, b"zzzzzzzzabcdefghzzzzzzzz").err().unwrap();
         assert_eq!(err.to_string(), "AES-GCM error (opaque)");

@@ -43,22 +43,22 @@ use oid::prelude::*;
 use picky_asn1::wrapper::{ObjectIdentifierAsn1, OctetStringAsn1};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct OcspRequest {
     pub tbs_request: TbsRequest,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct TbsRequest {
     pub request_list: Vec<Request>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct Request {
     pub req_cert: CertId,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct CertId {
     pub algorithm: AlgorithmIdentifier,
     pub issuer_name_hash: OctetStringAsn1,
@@ -66,7 +66,7 @@ pub struct CertId {
     pub serial_number: u32,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct AlgorithmIdentifier {
     pub algorithm: ObjectIdentifierAsn1,
     pub parameters: (),

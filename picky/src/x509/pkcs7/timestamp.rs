@@ -45,7 +45,7 @@ pub mod http_timestamp {
     use reqwest::header::{CACHE_CONTROL, CONTENT_LENGTH, CONTENT_TYPE};
     use reqwest::{Method, StatusCode, Url};
 
-    #[derive(Clone, Debug, PartialEq)]
+    #[derive(Clone, Debug, PartialEq, Eq)]
     pub struct AuthenticodeTimestamper {
         url: Url,
     }
@@ -127,7 +127,7 @@ pub mod http_timestamp {
 
 const ELEMENT_NAME: &str = "TimestampRequest";
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TimestampRequest(picky_asn1_x509::timestamp::TimestampRequest);
 
 impl TimestampRequest {
