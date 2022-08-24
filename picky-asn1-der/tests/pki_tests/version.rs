@@ -2,7 +2,7 @@ use picky_asn1::wrapper::{ExplicitContextTag0, Optional};
 use serde::{de, ser, Deserialize, Serialize};
 use std::fmt;
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 #[repr(u8)]
 pub enum Version {
     V1 = 0x00,

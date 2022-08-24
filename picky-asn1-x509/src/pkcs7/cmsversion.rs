@@ -6,7 +6,7 @@ use std::fmt;
 /// CmsVersion ::= INTEGER
 ///                      { v0(0), v1(1), v2(2), v3(3), v4(4), v5(5) }
 /// ```
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 #[repr(u8)]
 pub enum CmsVersion {
     V0 = 0x00,

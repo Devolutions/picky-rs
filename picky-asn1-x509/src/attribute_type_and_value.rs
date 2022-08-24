@@ -3,7 +3,7 @@ use picky_asn1::wrapper::{IA5StringAsn1, ObjectIdentifierAsn1};
 use serde::{de, ser};
 use std::fmt;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum AttributeTypeAndValueParameters {
     CommonName(DirectoryString),
     Surname(DirectoryString),
@@ -18,7 +18,7 @@ pub enum AttributeTypeAndValueParameters {
     Custom(picky_asn1_der::Asn1RawDer),
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct AttributeTypeAndValue {
     pub ty: ObjectIdentifierAsn1,
     pub value: AttributeTypeAndValueParameters,

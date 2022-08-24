@@ -18,7 +18,7 @@ fn check<'de, T>(buffer: &'de [u8], expected: T)
 where
     T: Serialize + Deserialize<'de> + PartialEq + Debug,
 {
-    let parsed: T = picky_asn1_der::from_bytes(&buffer).expect("deserialization failed");
+    let parsed: T = picky_asn1_der::from_bytes(buffer).expect("deserialization failed");
     assert_eq!(parsed, expected);
 
     let encoded = picky_asn1_der::to_vec(&expected).expect("serialization failed");
@@ -56,7 +56,7 @@ fn bit_string() {
 fn encapsulated_types() {
     {
         let buffer = [0x03, 0x6, 0x00, 0x02, 0x03, 0x3c, 0x1c, 0x37];
-        let encapsulated: BitStringAsn1Container<u64> = u64::from(3939383u64).into();
+        let encapsulated: BitStringAsn1Container<u64> = 3939383u64.into();
         check(&buffer, encapsulated);
     }
 
@@ -151,7 +151,7 @@ fn generalized_time() {
     let buffer = [
         0x18, 0x0F, 0x32, 0x30, 0x31, 0x31, 0x31, 0x30, 0x30, 0x36, 0x30, 0x38, 0x33, 0x39, 0x35, 0x36, 0x5A,
     ];
-    let time: GeneralizedTimeAsn1 = GeneralizedTime::new(2011, 10, 06, 08, 39, 56).unwrap().into();
+    let time: GeneralizedTimeAsn1 = GeneralizedTime::new(2011, 10, 6, 8, 39, 56).unwrap().into();
     check(&buffer, time);
 }
 
@@ -250,6 +250,6 @@ fn restricted_strings() {
 #[test]
 fn nested_encapsulators() {
     let buffer = [0xA1, 0x5, 0xA4, 0x3, 0x02, 0x01, 0x05];
-    let expected = ExplicitContextTag1(ExplicitContextTag4(u8::from(5)));
+    let expected = ExplicitContextTag1(ExplicitContextTag4(5u8));
     check(&buffer, expected);
 }

@@ -1044,8 +1044,7 @@ mod tests {
             )
             .generate_signing_string_using_http_request(&parts)
             .verify()
-            .err()
-            .expect("verify");
+            .expect_err("verify");
         assert_eq!(err.to_string(), "signature error: invalid signature");
 
         let err = http_signature
@@ -1057,8 +1056,7 @@ mod tests {
             )
             .generate_signing_string_using_http_request(&parts)
             .verify()
-            .err()
-            .expect("verify");
+            .expect_err("verify");
         assert_eq!(
             err.to_string(),
             "incompatible \'algorithm\' parameter: RsaPkcs1v15(SHA2_256)"
@@ -1073,8 +1071,7 @@ mod tests {
             )
             .generate_signing_string_using_http_request(&parts)
             .verify()
-            .err()
-            .expect("verify");
+            .expect_err("verify");
         assert_eq!(
             err.to_string(),
             "signature expired (not after: 1402170705, now: 1402170710)"
@@ -1089,8 +1086,7 @@ mod tests {
             )
             .generate_signing_string_using_http_request(&parts)
             .verify()
-            .err()
-            .expect("verify");
+            .expect_err("verify");
         assert_eq!(
             err.to_string(),
             "signature is not yet valid (created: 1402170695, now: 1402170600)"
@@ -1113,11 +1109,10 @@ mod tests {
             )
             .generate_signing_string_using_http_request(&parts_2)
             .verify()
-            .err()
-            .expect("verify");
+            .expect_err("verify");
         assert_eq!(err.to_string(), "signature error: invalid signature");
 
-        let mut invalid_algorithm_http_sig = http_signature.clone();
+        let mut invalid_algorithm_http_sig = http_signature;
         invalid_algorithm_http_sig.algorithm = None;
         let err = invalid_algorithm_http_sig
             .verifier()
@@ -1128,8 +1123,7 @@ mod tests {
             )
             .generate_signing_string_using_http_request(&parts)
             .verify()
-            .err()
-            .expect("verify");
+            .expect_err("verify");
         assert_eq!(err.to_string(), "signature error: invalid signature");
     }
 
@@ -1185,8 +1179,7 @@ mod tests {
     fn parse_err(http_signature: &str) -> String {
         http_signature
             .parse::<HttpSignature>()
-            .err()
-            .expect("no parse error")
+            .expect_err("no parse error")
             .to_string()
     }
 
@@ -1291,8 +1284,7 @@ mod tests {
             )
             .generate_signing_string_using_http_request(&parts)
             .verify()
-            .err()
-            .expect("verify");
+            .expect_err("verify");
         assert_eq!(
             err.to_string(),
             "incompatible 'algorithm' parameter: RsaPkcs1v15(SHA2_384)"

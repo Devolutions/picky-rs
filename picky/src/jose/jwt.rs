@@ -502,7 +502,8 @@ fn h_decode_and_validate_claims<C: DeserializeOwned>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{jose::jws::RawJws, pem::Pem};
+    use crate::jose::jws::RawJws;
+    use crate::pem::Pem;
     use serde::Deserialize;
     use std::borrow::Cow;
 
@@ -590,7 +591,7 @@ mod tests {
             .unwrap();
         assert_eq!(jwt.state.claims["sub"].as_str().expect("sub"), "1234567890");
         assert_eq!(jwt.state.claims["name"].as_str().expect("name"), "John Doe");
-        assert_eq!(jwt.state.claims["admin"].as_bool().expect("sub"), true);
+        assert!(jwt.state.claims["admin"].as_bool().expect("sub"));
         assert_eq!(jwt.state.claims["iat"].as_i64().expect("iat"), 1516239022);
     }
 

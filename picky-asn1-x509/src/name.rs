@@ -4,7 +4,7 @@ use picky_asn1::wrapper::*;
 use serde::{de, ser, Deserialize, Serialize};
 use std::fmt;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NameAttr {
     CommonName,
     Surname,
@@ -44,7 +44,7 @@ pub type DirectoryName = Name;
 /// Name ::= CHOICE { -- only one possibility for now --
 ///       rdnSequence  RDNSequence }
 /// ```
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Name(pub RdnSequence);
 
 impl Default for Name {
@@ -181,7 +181,7 @@ pub type GeneralNames = Asn1SequenceOf<GeneralName>;
 ///       iPAddress                       [7]     OCTET STRING,
 ///       registeredID                    [8]     OBJECT IDENTIFIER }
 /// ```
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum GeneralName {
     OtherName(OtherName),
     Rfc822Name(IA5StringAsn1),
@@ -350,7 +350,7 @@ impl<'de> de::Deserialize<'de> for GeneralName {
 // OtherName ::= SEQUENCE {
 //      type-id    OBJECT IDENTIFIER,
 //      value      [0] EXPLICIT ANY DEFINED BY type-id}
-#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
 pub struct OtherName {
     pub type_id: ObjectIdentifierAsn1,
     pub value: ExplicitContextTag0<picky_asn1_der::Asn1RawDer>,
@@ -363,7 +363,7 @@ pub struct OtherName {
 ///      nameAssigner            [0]     DirectoryString OPTIONAL,
 ///      partyName               [1]     DirectoryString }
 /// ```
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct EdiPartyName {
     pub name_assigner: Optional<Option<ImplicitContextTag0<DirectoryString>>>,
     pub party_name: ImplicitContextTag1<DirectoryString>,

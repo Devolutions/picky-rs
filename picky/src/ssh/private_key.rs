@@ -85,7 +85,7 @@ impl Default for Kdf {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SshBasePrivateKey {
     Rsa(PrivateKey),
 }
@@ -98,7 +98,7 @@ impl SshBasePrivateKey {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SshPrivateKey {
     pub cipher_name: String,
     pub kdf: Kdf,

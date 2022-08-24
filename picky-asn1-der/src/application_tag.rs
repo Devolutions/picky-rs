@@ -7,7 +7,7 @@ use std::fmt;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct ApplicationTag<V: Debug + PartialEq, const T: u8>(pub V);
 
 impl<V: Debug + PartialEq, const T: u8> ApplicationTag<V, T> {

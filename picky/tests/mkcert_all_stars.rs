@@ -47,7 +47,7 @@ fn all_stars_parsing() {
 
         match Cert::from_der(pem.data()) {
             Ok(cert) => {
-                println!("Decoded CA: {}", cert.issuer_name().to_string());
+                println!("Decoded CA: {}", cert.issuer_name());
                 number_decoded += 1;
             }
             Err(e) => {

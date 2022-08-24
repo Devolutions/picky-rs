@@ -250,7 +250,7 @@ impl<'de> de::Deserialize<'de> for Extension {
 }
 
 /// A view on an Extension's value designed to be easier to match on
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ExtensionView<'a> {
     AuthorityKeyIdentifier(&'a AuthorityKeyIdentifier),
     SubjectKeyIdentifier(&'a SubjectKeyIdentifier),
@@ -327,7 +327,7 @@ impl ser::Serialize for ExtensionValue {
 ///     authorityCertIssuer       [1] GeneralNames            OPTIONAL,
 ///     authorityCertSerialNumber [2] CertificateSerialNumber OPTIONAL  }
 /// ```
-#[derive(Serialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Debug, PartialEq, Eq, Clone)]
 pub struct AuthorityKeyIdentifier {
     key_identifier: Option<ImplicitContextTag0<KeyIdentifier>>,
     authority_cert_issuer: Option<ExplicitContextTag1<GeneralName>>,
@@ -384,7 +384,7 @@ impl<'de> de::Deserialize<'de> for AuthorityKeyIdentifier {
 pub type SubjectKeyIdentifier = OctetStringAsn1;
 
 /// [RFC 5280 #4.2.1.3](https://tools.ietf.org/html/rfc5280#section-4.2.1.3)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct KeyUsage(BitStringAsn1);
 
 impl Default for KeyUsage {
@@ -446,7 +446,7 @@ type IssuerAltName = GeneralNames;
 ///      cA                      BOOLEAN DEFAULT FALSE,
 ///      pathLenConstraint       INTEGER (0..MAX) OPTIONAL }
 /// ```
-#[derive(Serialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Debug, PartialEq, Eq, Clone)]
 pub struct BasicConstraints {
     ca: Optional<Option<bool>>, // default is false
     path_len_constraint: Optional<Option<u8>>,
@@ -492,7 +492,7 @@ impl<'de> de::Deserialize<'de> for BasicConstraints {
 }
 
 /// [RFC 5280 #4.2.1.12](https://tools.ietf.org/html/rfc5280#section-4.2.1.12)
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct ExtendedKeyUsage(Asn1SequenceOf<ObjectIdentifierAsn1>);
 
 impl<OID: Into<ObjectIdentifierAsn1>> From<Vec<OID>> for ExtendedKeyUsage {

@@ -14,7 +14,7 @@ use serde::{de, ser, Deserialize, Deserializer, Serialize};
 ///     ctlEntries: SEQUENCE OF CTLEntry
 /// }
 /// ```
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct Ctl {
     pub signers: Asn1SequenceOf<ObjectIdentifierAsn1>,
     pub sequence_number: IntegerAsn1,
@@ -29,7 +29,7 @@ pub struct Ctl {
 ///     attributes SET OF CTLEntryAttribute
 /// }
 /// ```
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct CTLEntry {
     pub cert_fingerprint: OctetStringAsn1,
     pub attributes: Asn1SetOf<CTLEntryAttribute>,
@@ -40,7 +40,7 @@ pub struct CTLEntry {
 ///     oid OBJECT IDENTIFIER
 /// }
 /// ```
-#[derive(Serialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Debug, PartialEq, Eq, Clone)]
 pub struct CTLEntryAttribute {
     pub oid: ObjectIdentifierAsn1,
     pub value: CTLEntryAttributeValues,
@@ -147,7 +147,7 @@ impl<'de> de::Deserialize<'de> for CTLEntryAttribute {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum CTLEntryAttributeValues {
     CertAuthRootSha256HashPropId(Asn1SetOf<OctetStringAsn1>),
     CertDisallowedFileTimePropId(Asn1SetOf<OctetStringAsn1>), // A 64-bit little-endian Windows FILETIME that indicates when the certificate was revoked. It can be empty, which indicates since epoch
@@ -198,7 +198,7 @@ impl Serialize for CTLEntryAttributeValues {
 ///     oid OBJECT IDENTIFIER
 /// }
 /// ```
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct RootProgramChainPolicy {
     pub oid: ObjectIdentifierAsn1,
 }
@@ -209,7 +209,7 @@ pub struct RootProgramChainPolicy {
 ///     qualifier SEQUENCE OF PolicyQualifier
 /// }
 /// ```
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct CertPolicy {
     pub oid: ObjectIdentifierAsn1,
     pub qualifier: Asn1SequenceOf<PolicyQualifier>,
@@ -221,7 +221,7 @@ pub struct CertPolicy {
 ///     bits BIT STRING
 /// }
 /// ```
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct PolicyQualifier {
     pub oid: ObjectIdentifierAsn1,
     pub bits: BitStringAsn1,

@@ -285,7 +285,7 @@ impl From<u64> for Timestamp {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SshCertificate {
     pub cert_key_type: SshCertKeyType,
     pub public_key: SshPublicKey,

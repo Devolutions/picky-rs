@@ -20,21 +20,21 @@ macro_rules! asn1_wrapper {
     };
     (auto struct $wrapper_ty:ident ( $wrapped_ty:ident ), $tag:expr) => {
         /// Wrapper type
-        #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+        #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
         pub struct $wrapper_ty(pub $wrapped_ty);
 
         impls! { $wrapper_ty ( $wrapped_ty ), $tag }
     };
     (special tag struct $wrapper_ty:ident < $generic:ident >, $tag:expr) => {
         /// Wrapper type for special tag
-        #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+        #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
         pub struct $wrapper_ty<$generic>(pub $generic);
 
         impls! { $wrapper_ty < $generic >, $tag }
     };
     (auto collection struct $wrapper_ty:ident < T >, $tag:expr) => {
         /// Asn1 wrapper around a collection of elements of the same type.
-        #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+        #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
         pub struct $wrapper_ty<T>(
             #[serde(
                 serialize_with = "serialize_vec",
@@ -311,7 +311,7 @@ where
 }
 
 /// A Vec<u8> wrapper for Asn1 encoding as OctetString.
-#[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd, Hash, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Hash, Clone, Default)]
 pub struct OctetStringAsn1(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 type VecU8 = Vec<u8>;
@@ -323,7 +323,7 @@ impls! { OctetStringAsn1(VecU8), Tag::OCTET_STRING }
 ///
 /// For underlying implementation,
 /// see this [Microsoft's documentation](https://docs.microsoft.com/en-us/windows/win32/seccertenroll/about-integer).
-#[derive(Serialize, Deserialize, Debug, Default, PartialEq, PartialOrd, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq, PartialOrd, Hash, Clone)]
 pub struct IntegerAsn1(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 impls! { IntegerAsn1(VecU8), Tag::INTEGER }
@@ -416,7 +416,7 @@ impl zeroize::Zeroize for IntegerAsn1 {
 ///     tag_only,
 /// );
 /// ```
-#[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd, Hash, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Hash, Clone, Default)]
 pub struct HeaderOnly<T: Asn1Type>(
     #[serde(
         serialize_with = "serialize_header_only",
@@ -539,7 +539,7 @@ where
 ///     encapsulated,
 /// );
 /// ```
-#[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Hash, Clone)]
 pub struct BitStringAsn1Container<Encapsulated>(pub Encapsulated);
 
 impls! { BitStringAsn1Container<Encapsulated>, Tag::BIT_STRING }
@@ -591,7 +591,7 @@ impls! { BitStringAsn1Container<Encapsulated>, Tag::BIT_STRING }
 ///     encapsulated,
 /// );
 /// ```
-#[derive(Serialize, Deserialize, Debug, PartialEq, PartialOrd, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Hash, Clone)]
 pub struct OctetStringAsn1Container<Encapsulated>(pub Encapsulated);
 
 impls! { OctetStringAsn1Container<Encapsulated>, Tag::OCTET_STRING }
@@ -651,7 +651,7 @@ impls! { OctetStringAsn1Container<Encapsulated>, Tag::OCTET_STRING }
 ///     complex_type,
 /// );
 /// ```
-#[derive(Debug, PartialEq, PartialOrd, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Hash, Clone)]
 pub struct Optional<T>(pub T);
 
 impl<T: Default> Default for Optional<T> {

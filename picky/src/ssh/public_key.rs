@@ -21,12 +21,12 @@ pub enum SshPublicKeyError {
     KeyError(#[from] KeyError),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SshBasePublicKey {
     Rsa(PublicKey),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SshPublicKey {
     pub inner_key: SshBasePublicKey,
     pub comment: String,

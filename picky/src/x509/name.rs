@@ -11,7 +11,7 @@ use std::fmt;
 
 pub use picky_asn1_x509::NameAttr;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DirectoryName(Name);
 
 impl Default for DirectoryName {
@@ -65,7 +65,7 @@ impl From<DirectoryName> for Name {
 
 // === GeneralNames === //
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum GeneralName {
     OtherName(OtherName),
     RFC822Name(IA5String),
@@ -170,7 +170,7 @@ impl From<GeneralName> for SerdeGeneralNames {
 /// let dns_name = GeneralName::new_dns_name("localhost").expect("invalid name string");
 /// let names = GeneralNames::from(vec![common_name, dns_name]);
 /// ```
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GeneralNames(SerdeGeneralNames);
 
 impl GeneralNames {

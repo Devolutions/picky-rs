@@ -21,7 +21,7 @@ use crate::{oids, DigestInfo};
 ///
 ///  ContentType ::= OBJECT IDENTIFIER
 /// ```
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ContentValue {
     SpcIndirectDataContent(SpcIndirectDataContent),
     OctetString(OctetStringAsn1),
@@ -47,7 +47,7 @@ impl Serialize for ContentValue {
     }
 }
 
-#[derive(Serialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Debug, PartialEq, Eq, Clone)]
 pub struct EncapsulatedContentInfo {
     pub content_type: ObjectIdentifierAsn1,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -138,7 +138,7 @@ impl<'de> de::Deserialize<'de> for EncapsulatedContentInfo {
 }
 
 // https://github.com/sassoftware/relic/blob/master/lib/authenticode/structs.go#L46
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct SpcSipInfo {
     pub version: IntegerAsn1,
     pub uuid: OctetStringAsn1,
@@ -156,7 +156,7 @@ pub struct SpcSipInfo {
 ///     messageDigest           DigestInfo
 /// }
 /// ```
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct SpcIndirectDataContent {
     pub data: SpcAttributeAndOptionalValue,
     pub message_digest: DigestInfo,
@@ -169,7 +169,7 @@ pub struct SpcIndirectDataContent {
 ///     value                   [0] EXPLICIT ANY OPTIONAL
 /// }
 /// ```
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum SpcAttributeAndOptionalValueValue {
     SpcPeImageData(SpcPeImageData),
     SpcSipInfo(SpcSipInfo),
@@ -189,7 +189,7 @@ impl Serialize for SpcAttributeAndOptionalValueValue {
     }
 }
 
-#[derive(Serialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Debug, PartialEq, Eq, Clone)]
 pub struct SpcAttributeAndOptionalValue {
     pub ty: ObjectIdentifierAsn1,
     pub value: SpcAttributeAndOptionalValueValue,
@@ -253,7 +253,7 @@ impl<'de> de::Deserialize<'de> for SpcAttributeAndOptionalValue {
 ///    file                    SpcLink
 /// }
 /// ```
-#[derive(Serialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Debug, PartialEq, Eq, Clone)]
 pub struct SpcPeImageData {
     pub flags: SpcPeImageFlags,
     pub file: ExplicitContextTag0<SpcLink>, // According to Authenticode_PE.docx, there is  no ExplicitContextTag0, but otherwise created Authenticode signature won't be valid
@@ -298,7 +298,7 @@ impl<'de> de::Deserialize<'de> for SpcPeImageData {
 ///     includeImportAddressTable   (2)
 /// }
 /// ```
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct SpcPeImageFlags(pub BitStringAsn1);
 
 impl Default for SpcPeImageFlags {
@@ -319,7 +319,7 @@ impl Default for SpcPeImageFlags {
 ///     file                    [2] EXPLICIT SpcString
 /// }
 /// ```
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum SpcLink {
     Url(Url),
     Moniker(Moniker),
@@ -402,13 +402,13 @@ impl Default for SpcLink {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct Url(pub Optional<ImplicitContextTag0<IA5StringAsn1>>);
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct Moniker(pub Optional<ImplicitContextTag1<SpcSerializedObject>>);
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct File(pub ExplicitContextTag2<SpcString>);
 
 impl Default for File {
@@ -419,7 +419,7 @@ impl Default for File {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct SpcUuid(pub OctetStringAsn1);
 
 impl Default for SpcUuid {
@@ -439,7 +439,7 @@ impl Default for SpcUuid {
 ///
 /// SpcUuid ::= OCTETSTRING
 /// ```
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Default)]
 pub struct SpcSerializedObject {
     pub class_id: SpcUuid,
     pub serialized_data: OctetStringAsn1,
@@ -452,7 +452,7 @@ pub struct SpcSerializedObject {
 ///     ascii                   [1] IMPLICIT IA5STRING
 /// }
 /// ```
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum SpcString {
     Unicode(Optional<ImplicitContextTag0<BMPStringAsn1>>),
     Ancii(Optional<ImplicitContextTag1<IA5StringAsn1>>),
@@ -541,7 +541,7 @@ impl TryFrom<String> for SpcString {
 ///     moreInfo                [1] EXPLICIT SpcLink OPTIONAL,
 /// }
 /// ```
-#[derive(Serialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Debug, PartialEq, Eq, Clone)]
 pub struct SpcSpOpusInfo {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub program_name: Option<ExplicitContextTag0<SpcString>>,

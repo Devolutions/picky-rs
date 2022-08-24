@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 /// }
 /// ```
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct TimestampRequest {
     pub countersignature_type: ObjectIdentifierAsn1,
     // MSDN: No attributes are currently included in the time stamp request.

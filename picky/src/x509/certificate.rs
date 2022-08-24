@@ -1361,7 +1361,7 @@ mod tests {
             .build()
             .expect("couldn't build invalid issuer signed leaf");
 
-        let chain = [signed_leaf, intermediate.clone(), root.clone()];
+        let chain = [signed_leaf, intermediate, root];
 
         let invalid_issuer_err = invalid_issuer_signed_leaf
             .verifier()
