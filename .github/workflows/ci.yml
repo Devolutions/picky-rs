@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-20.04
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Check formatting
         shell: pwsh
@@ -42,7 +42,7 @@ jobs:
             runner: ubuntu-20.04
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Run clippy
         run: cargo clippy --locked --workspace --all-features -- -D warnings
@@ -62,7 +62,7 @@ jobs:
             runner: ubuntu-20.04
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Run tests
         run: cargo test --locked --verbose --workspace --all-features
@@ -89,7 +89,7 @@ jobs:
             msvc: "1.60"
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Configure runner 
         run: |
@@ -105,7 +105,14 @@ jobs:
     needs: formatting
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Run clippy
         run: cargo clippy --locked --all-features --manifest-path ./ffi/wasm/Cargo.toml -- -D warnings
+
+      - name: Lint picky-ava-tests
+        shell: pwsh
+        run: |
+          Set-Location ./ffi/wasm/ava_tests
+          npm install
+          npm run ci
