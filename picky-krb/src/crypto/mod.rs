@@ -2,9 +2,10 @@ mod aes;
 pub(crate) mod nfold;
 pub(crate) mod utils;
 
+use crypto::symmetriccipher::SymmetricCipherError;
 use thiserror::Error;
 
-use crate::constants::etypes::{AES256_CTS_HMAC_SHA1_96, AES128_CTS_HMAC_SHA1_96, DES3_CBC_SHA1_KD};
+use crate::constants::etypes::{AES128_CTS_HMAC_SHA1_96, AES256_CTS_HMAC_SHA1_96, DES3_CBC_SHA1_KD};
 
 /// https://www.rfc-editor.org/rfc/rfc3962.html#section-4
 /// the 8-octet ASCII string "kerberos"
@@ -20,15 +21,25 @@ pub enum KerberosCryptoError {
     AlgorithmIdentifier(usize),
     #[error("Bad integrity: calculates hmac is different than provided")]
     IntegrityCheck,
+    #[error("cipher error: {0}")]
+    CipherError(String),
 }
+
+impl From<SymmetricCipherError> for KerberosCryptoError {
+    fn from(error: SymmetricCipherError) -> Self {
+        Self::CipherError(format!("{:?}", error))
+    }
+}
+
+pub type KerberosCryptoResult<T> = Result<T, KerberosCryptoError>;
 
 pub trait Cipher {
     fn key_size(&self) -> usize;
     fn cipher_type(&self) -> CipherSuites;
     fn confounder_byte_size(&self) -> usize;
-    fn encrypt(&self, key: &[u8], key_usage: i32, payload: &[u8]) -> Result<Vec<u8>, KerberosCryptoError>;
-    fn decrypt(&self, key: &[u8], key_usage: i32, cipher_data: &[u8]) -> Result<Vec<u8>, KerberosCryptoError>;
-    fn checksum(&self, key: &[u8], key_usage: i32, payload: &[u8]) -> Result<Vec<u8>, KerberosCryptoError>;
+    fn encrypt(&self, key: &[u8], key_usage: i32, payload: &[u8]) -> KerberosCryptoResult<Vec<u8>>;
+    fn decrypt(&self, key: &[u8], key_usage: i32, cipher_data: &[u8]) -> KerberosCryptoResult<Vec<u8>>;
+    fn checksum(&self, key: &[u8], key_usage: i32, payload: &[u8]) -> KerberosCryptoResult<Vec<u8>>;
 }
 
 #[derive(Debug, Clone, PartialEq)]

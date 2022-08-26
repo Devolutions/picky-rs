@@ -1,4 +1,3 @@
-
 /// usage | 0xAA
 pub fn usage_ke(usage: i32) -> [u8; 5] {
     key_usage(usage, 0xAA)

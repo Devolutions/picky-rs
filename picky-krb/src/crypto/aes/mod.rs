@@ -1,7 +1,7 @@
-pub mod key_derivation;
 pub mod aes256_cts_hmac_sha1_96;
-pub mod encrypt;
 pub mod decrypt;
+pub mod encrypt;
+pub mod key_derivation;
 
 use crypto::hmac::Hmac;
 use crypto::mac::Mac;
@@ -43,7 +43,6 @@ impl AesSize {
         self.key_length() * 8
     }
 }
-
 
 pub fn swap_two_last_blocks(data: &mut [u8]) {
     let len = data.len();
