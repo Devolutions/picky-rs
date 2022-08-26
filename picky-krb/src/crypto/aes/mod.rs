@@ -1,3 +1,4 @@
+pub mod aes128_cts_hmac_sha1_96;
 pub mod aes256_cts_hmac_sha1_96;
 pub mod decrypt;
 pub mod encrypt;
@@ -42,6 +43,10 @@ impl AesSize {
     pub fn seed_bit_len(&self) -> usize {
         self.key_length() * 8
     }
+
+    fn confounder_byte_size(&self) -> usize {
+        AES_BLOCK_SIZE
+    }
 }
 
 pub fn swap_two_last_blocks(data: &mut [u8]) {
@@ -56,8 +61,6 @@ pub fn swap_two_last_blocks(data: &mut [u8]) {
 }
 
 pub fn hmac_sha1(key: &[u8], payload: &[u8]) -> Vec<u8> {
-    println!("hmac key: {:?}", key);
-
     let mut hmacker = Hmac::new(Sha1::new(), &key);
     hmacker.input(payload);
 

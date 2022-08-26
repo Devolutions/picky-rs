@@ -36,7 +36,6 @@ pub type KerberosCryptoResult<T> = Result<T, KerberosCryptoError>;
 pub trait Cipher {
     fn key_size(&self) -> usize;
     fn cipher_type(&self) -> CipherSuites;
-    fn confounder_byte_size(&self) -> usize;
     fn encrypt(&self, key: &[u8], key_usage: i32, payload: &[u8]) -> KerberosCryptoResult<Vec<u8>>;
     fn decrypt(&self, key: &[u8], key_usage: i32, cipher_data: &[u8]) -> KerberosCryptoResult<Vec<u8>>;
     fn checksum(&self, key: &[u8], key_usage: i32, payload: &[u8]) -> KerberosCryptoResult<Vec<u8>>;

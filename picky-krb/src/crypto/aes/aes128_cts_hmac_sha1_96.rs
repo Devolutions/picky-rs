@@ -2,20 +2,20 @@ use crate::crypto::{Cipher, CipherSuites, KerberosCryptoError, KerberosCryptoRes
 
 use super::decrypt::decrypt;
 use super::encrypt::encrypt;
-use super::{AesSize, AES256_KEY_SIZE};
+use super::{AesSize, AES128_KEY_SIZE};
 
 #[derive(Clone, Debug)]
-pub struct Aes256CtsHmacSha196;
+pub struct Aes128CtsHmacSha196;
 
-impl Aes256CtsHmacSha196 {
+impl Aes128CtsHmacSha196 {
     pub fn new() -> Self {
         Self {}
     }
 }
 
-impl Cipher for Aes256CtsHmacSha196 {
+impl Cipher for Aes128CtsHmacSha196 {
     fn key_size(&self) -> usize {
-        AES256_KEY_SIZE
+        AES128_KEY_SIZE
     }
 
     fn cipher_type(&self) -> CipherSuites {
@@ -23,11 +23,11 @@ impl Cipher for Aes256CtsHmacSha196 {
     }
 
     fn encrypt(&self, key: &[u8], key_usage: i32, payload: &[u8]) -> Result<Vec<u8>, KerberosCryptoError> {
-        encrypt(key, key_usage, payload, &AesSize::Aes256)
+        encrypt(key, key_usage, payload, &AesSize::Aes128)
     }
 
     fn decrypt(&self, key: &[u8], key_usage: i32, cipher_data: &[u8]) -> KerberosCryptoResult<Vec<u8>> {
-        decrypt(key, key_usage, cipher_data, &AesSize::Aes256)
+        decrypt(key, key_usage, cipher_data, &AesSize::Aes128)
     }
 
     fn checksum(&self, _key: &[u8], _key_usage: i32, _payload: &[u8]) -> Result<Vec<u8>, KerberosCryptoError> {
@@ -43,7 +43,7 @@ mod tests {
     use crate::crypto::aes::AesSize;
     use crate::crypto::Cipher;
 
-    use super::Aes256CtsHmacSha196;
+    use super::Aes128CtsHmacSha196;
 
     #[test]
     fn aes256_cts_hmac_sha1_96_encrypt() {
@@ -52,7 +52,7 @@ mod tests {
         ];
         let key = derive_key_from_password("test", "EXAMPLEp1", &AesSize::Aes256).unwrap();
         println!("key: {:?}", key);
-        let cipher = Aes256CtsHmacSha196::new();
+        let cipher = Aes128CtsHmacSha196::new();
 
         let encrypted = cipher.encrypt(&key, 5, &plaintext).unwrap();
 
@@ -75,7 +75,7 @@ mod tests {
         ];
         let key = derive_key_from_password("test", "EXAMPLEp1", &AesSize::Aes256).unwrap();
         println!("key: {:?}", key);
-        let cipher = Aes256CtsHmacSha196::new();
+        let cipher = Aes128CtsHmacSha196::new();
 
         let plaintext = cipher.decrypt(&key, 5, &cipher_data).unwrap();
 
@@ -92,7 +92,7 @@ mod tests {
             18, 26, 10, 139, 245, 156, 28, 218, 173, 28, 10, 164, 28, 60, 222, 116, 184, 96, 153, 3, 46, 220, 113, 173,
             31, 154, 73, 236, 25,
         ];
-        let c = new_kerberos_cipher(18).unwrap();
+        let c = new_kerberos_cipher(17).unwrap();
         let key = c.generate_key_from_string("test", "EXAMPLEp1".as_bytes());
         println!("key: {:?}", key);
 
@@ -107,7 +107,7 @@ mod tests {
         let plaintext = [
             97, 101, 115, 50, 53, 54, 95, 99, 116, 115, 95, 104, 109, 97, 99, 95, 115, 104, 97, 49, 95, 57, 54,
         ];
-        let c = new_kerberos_cipher(18).unwrap();
+        let c = new_kerberos_cipher(17).unwrap();
         let key = c.generate_key_from_string("test", "EXAMPLEp1".as_bytes());
         println!("key: {:?}", key);
 
