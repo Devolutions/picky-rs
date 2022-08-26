@@ -20,10 +20,11 @@ byteorder = "1.1.0"
 thiserror = "1.0.30"
 
 pbkdf2 = { version = "0.11", features = ["sha1"] }
-# kerberos_crypto = "0.1.0"
+kerberos_crypto = "0.1.0"
 hmac = "0.12.1"
 sha1 = "0.10.1"
 aes = "0.8.1"
 cbc = "0.1.2"
+rand = "0.8.5"
 
 rust-crypto = "0.2.36"

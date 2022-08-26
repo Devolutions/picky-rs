@@ -1,11 +1,20 @@
 pub mod key_derivation;
+pub mod aes256_cts_hmac_sha1_96;
+pub mod encrypt;
+pub mod decrypt;
 
-use crypto::aes::cbc_encryptor;
-use crypto::blockmodes;
-use crypto::buffer::{RefReadBuffer, RefWriteBuffer};
+use crypto::hmac::Hmac;
+use crypto::mac::Mac;
+use crypto::sha1::Sha1;
 
+/// [Kerberos Algorithm Profile Parameters](https://www.rfc-editor.org/rfc/rfc3962.html#section-6)
+/// cipher block size 16 octets
 const AES_BLOCK_SIZE: usize = 16;
+/// [Kerberos Algorithm Profile Parameters](https://www.rfc-editor.org/rfc/rfc3962.html#section-6)
+/// HMAC output size = 12 octets
+const AES_MAC_SIZE: usize = 12;
 
+/// [Assigned Numbers](https://www.rfc-editor.org/rfc/rfc3962.html#section-7)
 pub const AES128_KEY_SIZE: usize = 128 / 8;
 pub const AES256_KEY_SIZE: usize = 256 / 8;
 
@@ -35,21 +44,26 @@ impl AesSize {
     }
 }
 
-pub fn encrypt_aes(key: &[u8], plaintext: &[u8], aes_size: AesSize) -> Vec<u8> {
-    let mut cipher = cbc_encryptor(
-        crypto::aes::KeySize::KeySize256,
-        key,
-        &vec![0; aes_size.block_bit_len() / 8],
-        blockmodes::NoPadding,
-    );
 
-    let mut cipher_data = vec![0; plaintext.len()];
+pub fn swap_two_last_blocks(data: &mut [u8]) {
+    let len = data.len();
 
-    cipher.encrypt(
-        &mut RefReadBuffer::new(plaintext),
-        &mut RefWriteBuffer::new(&mut cipher_data),
-        true,
-    );
+    for i in 0..AES_BLOCK_SIZE {
+        let temp = data[i + len - 2 * AES_BLOCK_SIZE];
 
-    cipher_data
+        data[i + len - 2 * AES_BLOCK_SIZE] = data[i + len - AES_BLOCK_SIZE];
+        data[i + len - AES_BLOCK_SIZE] = temp;
+    }
+}
+
+pub fn hmac_sha1(key: &[u8], payload: &[u8]) -> Vec<u8> {
+    println!("hmac key: {:?}", key);
+
+    let mut hmacker = Hmac::new(Sha1::new(), &key);
+    hmacker.input(payload);
+
+    let mut hmac = hmacker.result().code().to_vec();
+    hmac.resize(AES_MAC_SIZE, 0);
+
+    hmac
 }

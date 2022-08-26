@@ -5,25 +5,24 @@ use sha1::Sha1;
 use crate::crypto::nfold::n_fold;
 use crate::crypto::KERBEROS;
 
-/// https://www.rfc-editor.org/rfc/rfc3962.html#section-4
-/// Default iteration count (rounds) for pbkdf2 function:
-/// 00 00 10 00 (decimal 4,096, indicating 4,096 iterations)
-const AES_ITERATION_COUNT: u32 = 0x1000;
+use super::AesSize;
+use super::encrypt::encrypt_aes;
 
-use super::{encrypt_aes, AesSize};
+/// https://www.rfc-editor.org/rfc/rfc3962.html#section-6
+/// Default iteration count (rounds) for pbkdf2 function:
+/// default string-to-key parameters        00 00 10 00
+const AES_ITERATION_COUNT: u32 = 0x1000;
 
 // as given
 fn random_to_key(data: Vec<u8>) -> Vec<u8> {
     data
 }
 
-fn derive_key(key: &[u8], well_known: &[u8], aes_size: AesSize) -> Vec<u8> {
+pub fn derive_key(key: &[u8], well_known: &[u8], aes_size: AesSize) -> Vec<u8> {
     let block_bit_len = aes_size.block_bit_len();
-    let seed_bit_len = aes_size.seed_bit_len();
 
     let mut n_fold_usage = n_fold(well_known, block_bit_len);
 
-    // let mut out = vec![0; seed_bit_len / 8];
     let key_len = aes_size.key_length();
     let mut out = Vec::with_capacity(key_len);
 
@@ -47,8 +46,6 @@ pub fn derive_key_from_password<P: AsRef<[u8]>, S: AsRef<[u8]>>(password: P, sal
 
 #[cfg(test)]
 mod tests {
-    // use kerberos_crypto::new_kerberos_cipher;
-
     use crate::crypto::aes::AesSize;
 
     use super::derive_key_from_password;
@@ -68,13 +65,4 @@ mod tests {
             key.as_slice()
         );
     }
-
-    // #[test]
-    // fn ex() {
-    //     let password = "5hYYSAfFJp";
-    //     let salt = "EXAMPLE.COMtest1";
-
-    //     let c = new_kerberos_cipher(18).unwrap();
-    //     println!("key: {:?}", c.generate_key_from_string(password, salt.as_bytes()));
-    // }
 }

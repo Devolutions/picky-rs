@@ -86,3 +86,15 @@ pub mod gss_api {
 pub mod krb_priv {
     pub const KRB_PRIV_VERSION: [u8; 2] = [0x00, 0x01];
 }
+
+pub mod etypes {
+    //= [AES Encryption for Kerberos 5](https://www.rfc-editor.org/rfc/rfc3962.html#section-7) =//
+    pub const AES256_CTS_HMAC_SHA1_96: usize = 18;
+    pub const AES128_CTS_HMAC_SHA1_96: usize = 17;
+
+    //= [Deprecate Triple-DES (3DES) and RC4 in Kerberos](https://datatracker.ietf.org/doc/html/rfc8429#section-4) =//
+    pub const DES3_CBC_SHA1_KD: usize = 16;
+    pub const RC4_HMA: usize = 23;
+    pub const DES3_CBC_SHA1: usize = 7;
+    pub const DES3_CBC_MD5: usize = 5;
+}
