@@ -1,4 +1,5 @@
 mod aes;
+mod des;
 pub(crate) mod nfold;
 pub(crate) mod utils;
 
@@ -6,6 +7,10 @@ use crypto::symmetriccipher::SymmetricCipherError;
 use thiserror::Error;
 
 use crate::constants::etypes::{AES128_CTS_HMAC_SHA1_96, AES256_CTS_HMAC_SHA1_96, DES3_CBC_SHA1_KD};
+
+use self::aes::aes128_cts_hmac_sha1_96::Aes128CtsHmacSha196;
+use self::aes::aes256_cts_hmac_sha1_96::Aes256CtsHmacSha196;
+use self::des::des3_cbc_sha1_kd::Des3CbcSha1Kd;
 
 /// https://www.rfc-editor.org/rfc/rfc3962.html#section-4
 /// the 8-octet ASCII string "kerberos"
@@ -48,6 +53,16 @@ pub enum CipherSuites {
     Des3CbcSha1Kd,
 }
 
+impl CipherSuites {
+    pub fn cipher(&self) -> Box<dyn Cipher> {
+        match self {
+            CipherSuites::Aes256CtsHmacSha196 => Box::new(Aes256CtsHmacSha196::new()),
+            CipherSuites::Aes128CtsHmacSha196 => Box::new(Aes128CtsHmacSha196::new()),
+            CipherSuites::Des3CbcSha1Kd => Box::new(Des3CbcSha1Kd::new()),
+        }
+    }
+}
+
 impl TryFrom<usize> for CipherSuites {
     type Error = KerberosCryptoError;
 
@@ -70,3 +85,5 @@ impl From<CipherSuites> for usize {
         }
     }
 }
+
+pub use self::aes::key_derivation::derive_key_from_password;

@@ -436,6 +436,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "des"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ffdd80ce8ce993de27e9f063a444a4d53ce8e8db4c1f00cc03af5ad5a9867a1e"
+dependencies = [
+ "cipher 0.4.3",
+]
+
+[[package]]
 name = "diff"
 version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1402,6 +1411,7 @@ dependencies = [
  "aes 0.8.1",
  "byteorder",
  "cbc",
+ "des",
  "hmac",
  "kerberos_crypto",
  "pbkdf2",

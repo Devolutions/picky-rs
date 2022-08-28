@@ -9,7 +9,7 @@ pub struct Aes256CtsHmacSha196;
 
 impl Aes256CtsHmacSha196 {
     pub fn new() -> Self {
-        Self {}
+        Self
     }
 }
 
