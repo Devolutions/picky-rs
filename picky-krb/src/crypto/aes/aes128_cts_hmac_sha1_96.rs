@@ -45,72 +45,72 @@ mod tests {
 
     use super::Aes128CtsHmacSha196;
 
-    #[test]
-    fn aes256_cts_hmac_sha1_96_encrypt() {
-        let plaintext = [
-            97, 101, 115, 50, 53, 54, 95, 99, 116, 115, 95, 104, 109, 97, 99, 95, 115, 104, 97, 49, 95, 57, 54,
-        ];
-        let key = derive_key_from_password("test", "EXAMPLEp1", &AesSize::Aes256).unwrap();
-        println!("key: {:?}", key);
-        let cipher = Aes128CtsHmacSha196::new();
+    // #[test]
+    // fn aes256_cts_hmac_sha1_96_encrypt() {
+    //     let plaintext = [
+    //         97, 101, 115, 50, 53, 54, 95, 99, 116, 115, 95, 104, 109, 97, 99, 95, 115, 104, 97, 49, 95, 57, 54,
+    //     ];
+    //     let key = derive_key_from_password("test", "EXAMPLEp1", &AesSize::Aes256).unwrap();
+    //     println!("key: {:?}", key);
+    //     let cipher = Aes128CtsHmacSha196::new();
 
-        let encrypted = cipher.encrypt(&key, 5, &plaintext).unwrap();
+    //     let encrypted = cipher.encrypt(&key, 5, &plaintext).unwrap();
 
-        assert_eq!(
-            &[
-                214, 122, 109, 174, 37, 138, 242, 223, 137, 137, 242, 93, 162, 124, 121, 114, 161, 144, 68, 138, 219,
-                96, 18, 26, 10, 139, 245, 156, 28, 218, 173, 28, 10, 164, 28, 60, 222, 116, 184, 96, 153, 3, 46, 220,
-                113, 173, 31, 154, 73, 236, 25
-            ],
-            encrypted.as_slice()
-        );
-    }
+    //     assert_eq!(
+    //         &[
+    //             214, 122, 109, 174, 37, 138, 242, 223, 137, 137, 242, 93, 162, 124, 121, 114, 161, 144, 68, 138, 219,
+    //             96, 18, 26, 10, 139, 245, 156, 28, 218, 173, 28, 10, 164, 28, 60, 222, 116, 184, 96, 153, 3, 46, 220,
+    //             113, 173, 31, 154, 73, 236, 25
+    //         ],
+    //         encrypted.as_slice()
+    //     );
+    // }
 
-    #[test]
-    fn aes256_cts_hmac_sha1_96_decrypt() {
-        let cipher_data = [
-            214, 122, 109, 174, 37, 138, 242, 223, 137, 137, 242, 93, 162, 124, 121, 114, 161, 144, 68, 138, 219, 96,
-            18, 26, 10, 139, 245, 156, 28, 218, 173, 28, 10, 164, 28, 60, 222, 116, 184, 96, 153, 3, 46, 220, 113, 173,
-            31, 154, 73, 236, 25,
-        ];
-        let key = derive_key_from_password("test", "EXAMPLEp1", &AesSize::Aes256).unwrap();
-        println!("key: {:?}", key);
-        let cipher = Aes128CtsHmacSha196::new();
+    // #[test]
+    // fn aes256_cts_hmac_sha1_96_decrypt() {
+    //     let cipher_data = [
+    //         214, 122, 109, 174, 37, 138, 242, 223, 137, 137, 242, 93, 162, 124, 121, 114, 161, 144, 68, 138, 219, 96,
+    //         18, 26, 10, 139, 245, 156, 28, 218, 173, 28, 10, 164, 28, 60, 222, 116, 184, 96, 153, 3, 46, 220, 113, 173,
+    //         31, 154, 73, 236, 25,
+    //     ];
+    //     let key = derive_key_from_password("test", "EXAMPLEp1", &AesSize::Aes256).unwrap();
+    //     println!("key: {:?}", key);
+    //     let cipher = Aes128CtsHmacSha196::new();
 
-        let plaintext = cipher.decrypt(&key, 5, &cipher_data).unwrap();
+    //     let plaintext = cipher.decrypt(&key, 5, &cipher_data).unwrap();
 
-        assert_eq!(
-            &[97, 101, 115, 50, 53, 54, 95, 99, 116, 115, 95, 104, 109, 97, 99, 95, 115, 104, 97, 49, 95, 57, 54],
-            plaintext.as_slice()
-        );
-    }
+    //     assert_eq!(
+    //         &[97, 101, 115, 50, 53, 54, 95, 99, 116, 115, 95, 104, 109, 97, 99, 95, 115, 104, 97, 49, 95, 57, 54],
+    //         plaintext.as_slice()
+    //     );
+    // }
 
-    #[test]
-    fn t2() {
-        let cipher_data = [
-            214, 122, 109, 174, 37, 138, 242, 223, 137, 137, 242, 93, 162, 124, 121, 114, 161, 144, 68, 138, 219, 96,
-            18, 26, 10, 139, 245, 156, 28, 218, 173, 28, 10, 164, 28, 60, 222, 116, 184, 96, 153, 3, 46, 220, 113, 173,
-            31, 154, 73, 236, 25,
-        ];
-        let c = new_kerberos_cipher(17).unwrap();
-        let key = c.generate_key_from_string("test", "EXAMPLEp1".as_bytes());
-        println!("key: {:?}", key);
+    // #[test]
+    // fn t2() {
+    //     let cipher_data = [
+    //         214, 122, 109, 174, 37, 138, 242, 223, 137, 137, 242, 93, 162, 124, 121, 114, 161, 144, 68, 138, 219, 96,
+    //         18, 26, 10, 139, 245, 156, 28, 218, 173, 28, 10, 164, 28, 60, 222, 116, 184, 96, 153, 3, 46, 220, 113, 173,
+    //         31, 154, 73, 236, 25,
+    //     ];
+    //     let c = new_kerberos_cipher(17).unwrap();
+    //     let key = c.generate_key_from_string("test", "EXAMPLEp1".as_bytes());
+    //     println!("key: {:?}", key);
 
-        let plaintext = c.decrypt(&key, 5, &cipher_data).unwrap();
-        println!("{:?}", plaintext);
+    //     let plaintext = c.decrypt(&key, 5, &cipher_data).unwrap();
+    //     println!("{:?}", plaintext);
 
-        // assert_eq!(&[97, 101, 115, 50, 53, 54, 95, 99, 116, 115, 95, 104, 109, 97, 99, 95, 115, 104, 97, 49, 95, 57, 54], plaintext.as_slice());
-    }
+    //     // assert_eq!(&[97, 101, 115, 50, 53, 54, 95, 99, 116, 115, 95, 104, 109, 97, 99, 95, 115, 104, 97, 49, 95, 57, 54], plaintext.as_slice());
+    // }
 
-    #[test]
-    fn t() {
-        let plaintext = [
-            97, 101, 115, 50, 53, 54, 95, 99, 116, 115, 95, 104, 109, 97, 99, 95, 115, 104, 97, 49, 95, 57, 54,
-        ];
-        let c = new_kerberos_cipher(17).unwrap();
-        let key = c.generate_key_from_string("test", "EXAMPLEp1".as_bytes());
-        println!("key: {:?}", key);
+    // #[test]
+    // fn t() {
+    //     let plaintext = [
+    //         97, 101, 115, 50, 53, 54, 95, 99, 116, 115, 95, 104, 109, 97, 99, 95, 115, 104, 97, 49, 95, 57, 54,
+    //     ];
+    //     let c = new_kerberos_cipher(17).unwrap();
+    //     let key = c.generate_key_from_string("test", "EXAMPLEp1".as_bytes());
+    //     println!("key: {:?}", key);
 
-        println!("{:?}", c.encrypt(&key, 5, &plaintext));
-    }
+    //     println!("{:?}", c.encrypt(&key, 5, &plaintext));
+    // }
 }

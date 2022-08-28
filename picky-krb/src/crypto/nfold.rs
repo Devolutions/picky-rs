@@ -1,9 +1,9 @@
 fn gcd(mut n1: usize, mut n2: usize) -> usize {
     while n1 != n2 {
         if n1 > n2 {
-            n1 = n1 - n2;
+            n1 -= n2;
         } else {
-            n2 = n2 - n1;
+            n2 -= n1;
         }
     }
 

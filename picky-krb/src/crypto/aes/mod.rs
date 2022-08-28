@@ -53,15 +53,17 @@ pub fn swap_two_last_blocks(data: &mut [u8]) {
     let len = data.len();
 
     for i in 0..AES_BLOCK_SIZE {
-        let temp = data[i + len - 2 * AES_BLOCK_SIZE];
+        // let temp = data[i + len - 2 * AES_BLOCK_SIZE];
 
-        data[i + len - 2 * AES_BLOCK_SIZE] = data[i + len - AES_BLOCK_SIZE];
-        data[i + len - AES_BLOCK_SIZE] = temp;
+        // data[i + len - 2 * AES_BLOCK_SIZE] = data[i + len - AES_BLOCK_SIZE];
+        // data[i + len - AES_BLOCK_SIZE] = temp;
+
+        data.swap(i + len - 2 * AES_BLOCK_SIZE, i + len - AES_BLOCK_SIZE)
     }
 }
 
 pub fn hmac_sha1(key: &[u8], payload: &[u8]) -> Vec<u8> {
-    let mut hmacker = Hmac::new(Sha1::new(), &key);
+    let mut hmacker = Hmac::new(Sha1::new(), key);
     hmacker.input(payload);
 
     let mut hmac = hmacker.result().code().to_vec();
