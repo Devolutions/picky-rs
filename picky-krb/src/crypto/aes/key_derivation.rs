@@ -26,7 +26,7 @@ pub fn derive_key(key: &[u8], well_known: &[u8], aes_size: &AesSize) -> Kerberos
 
     while out.len() < key_len {
         n_fold_usage = encrypt_aes(key, &n_fold_usage, aes_size)?;
-        out.append(&mut n_fold_usage.clone());
+        out.extend_from_slice(&n_fold_usage);
     }
 
     Ok(out)

@@ -1,13 +1,10 @@
-// use hmac::Hmac;
-// use pbkdf2::pbkdf2;
-// use sha1::Sha1;
-
 use crate::crypto::nfold::n_fold;
 use crate::crypto::{KerberosCryptoError, KerberosCryptoResult, KERBEROS};
 
 use super::encrypt::encrypt_des;
-use super::{DES3_BLOCK_SIZE, DES3_KEY_SIZE};
+use super::{DES3_BLOCK_SIZE, DES3_KEY_SIZE, DES3_SEED_LEN};
 
+// weak keys from https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-67r1.pdf
 const WEAK_KEYS: [[u8; 8]; 4] = [
     [0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
     [0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE, 0xFE],
@@ -31,19 +28,18 @@ const SEMI_WEAK_KEYS: [[u8; 8]; 12] = [
 ];
 
 pub fn derive_key(key: &[u8], well_known: &[u8]) -> KerberosCryptoResult<Vec<u8>> {
-    // let block_bit_len = aes_size.block_bit_len();
     if key.len() != DES3_KEY_SIZE {
         return Err(KerberosCryptoError::KeyLength(key.len(), DES3_KEY_SIZE));
     }
 
     let mut n_fold_usage = n_fold(well_known, DES3_BLOCK_SIZE * 8);
 
-    let key_len = 21 * 8;
+    let key_len = DES3_SEED_LEN;
     let mut out = Vec::with_capacity(key_len);
 
     while out.len() < key_len {
         n_fold_usage = encrypt_des(key, &n_fold_usage)?;
-        out.append(&mut n_fold_usage.clone());
+        out.extend_from_slice(&n_fold_usage);
     }
 
     Ok(out)
@@ -133,30 +129,7 @@ pub fn derive_key_from_password<P: AsRef<[u8]>, S: AsRef<[u8]>>(password: P, sal
     let mut secret = password.as_ref().to_vec();
     secret.extend_from_slice(salt.as_ref());
 
-    let temp_key = random_to_key(&n_fold(&secret, 21 * 8));
+    let temp_key = random_to_key(&n_fold(&secret, DES3_SEED_LEN * 8));
 
     derive_key(&temp_key, KERBEROS)
-}
-
-#[cfg(test)]
-mod tests {
-    // use crate::crypto::aes::AesSize;
-
-    // use super::derive_key_from_password;
-
-    // #[test]
-    // fn test_derive_key_from_password() {
-    //     let password = "5hYYSAfFJp";
-    //     let salt = "EXAMPLE.COMtest1";
-
-    //     let key = derive_key_from_password(password, salt, &AesSize::Aes256).unwrap();
-
-    //     assert_eq!(
-    //         &[
-    //             218_u8, 222, 209, 204, 21, 174, 23, 222, 170, 99, 164, 144, 247, 103, 137, 68, 117, 143, 59, 37, 90,
-    //             84, 37, 105, 203, 32, 235, 167, 97, 238, 171, 172
-    //         ] as &[u8],
-    //         key.as_slice()
-    //     );
-    // }
 }

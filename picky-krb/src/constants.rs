@@ -61,7 +61,20 @@ pub mod key_usages {
     pub const ACCEPTOR_SIGN: i32 = 23;
     pub const INITIATOR_SEAL: i32 = 24;
     pub const INITIATOR_SIGN: i32 = 25;
+
     //= [Key Usage Numbers](https://datatracker.ietf.org/doc/html/rfc4120#section-7.5.1) =//
+    pub const AS_REQ_TIMESTAMP: i32 = 1;
+    pub const TICKET_REP: i32 = 2;
+    pub const AS_REP_ENC: i32 = 3;
+    pub const TGS_REQ_AUTH_DATA_SESSION_KEY: i32 = 4;
+    pub const TGS_REQ_AUTH_DATA_SUB_KEY: i32 = 5;
+    pub const TGS_REQ_PA_DATA_AP_REQ_AUTHENTICATOR_CKSUM: i32 = 6;
+    pub const TGS_REQ_PA_DATA_AP_REQ_AUTHENTICATOR: i32 = 7;
+    pub const TGS_REP_ENC_SESSION_KEY: i32 = 8;
+    pub const TGS_REP_ENC_SUB_KEY: i32 = 9;
+    pub const AP_REQ_AUTHENTICATOR_CKSUM: i32 = 10;
+    pub const AP_REQ_AUTHENTICATOR: i32 = 11;
+    pub const AP_REP_ENC: i32 = 12;
     pub const KRB_PRIV_ENC_PART: i32 = 13;
 }
 
@@ -87,14 +100,12 @@ pub mod krb_priv {
     pub const KRB_PRIV_VERSION: [u8; 2] = [0x00, 0x01];
 }
 
+/// [Assigned Numbers](https://datatracker.ietf.org/doc/html/rfc3961#section-8)
 pub mod etypes {
-    //= [AES Encryption for Kerberos 5](https://www.rfc-editor.org/rfc/rfc3962.html#section-7) =//
-    pub const AES256_CTS_HMAC_SHA1_96: usize = 18;
-    pub const AES128_CTS_HMAC_SHA1_96: usize = 17;
-
-    //= [Deprecate Triple-DES (3DES) and RC4 in Kerberos](https://datatracker.ietf.org/doc/html/rfc8429#section-4) =//
-    pub const DES3_CBC_SHA1_KD: usize = 16;
-    pub const RC4_HMA: usize = 23;
-    pub const DES3_CBC_SHA1: usize = 7;
     pub const DES3_CBC_MD5: usize = 5;
+    pub const DES3_CBC_SHA1: usize = 7;
+    pub const DES3_CBC_SHA1_KD: usize = 16;
+    pub const AES128_CTS_HMAC_SHA1_96: usize = 17;
+    pub const AES256_CTS_HMAC_SHA1_96: usize = 18;
+    pub const RC4_HMA: usize = 23;
 }

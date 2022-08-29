@@ -46,7 +46,6 @@ pub trait Cipher {
     fn cipher_type(&self) -> CipherSuites;
     fn encrypt(&self, key: &[u8], key_usage: i32, payload: &[u8]) -> KerberosCryptoResult<Vec<u8>>;
     fn decrypt(&self, key: &[u8], key_usage: i32, cipher_data: &[u8]) -> KerberosCryptoResult<Vec<u8>>;
-    fn checksum(&self, key: &[u8], key_usage: i32, payload: &[u8]) -> KerberosCryptoResult<Vec<u8>>;
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -73,8 +73,4 @@ impl Cipher for Des3CbcSha1Kd {
 
         todo!()
     }
-
-    fn checksum(&self, _key: &[u8], _key_usage: i32, _payload: &[u8]) -> KerberosCryptoResult<Vec<u8>> {
-        todo!()
-    }
 }
