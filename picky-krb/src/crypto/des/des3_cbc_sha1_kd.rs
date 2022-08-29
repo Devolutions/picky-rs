@@ -3,12 +3,12 @@ use rand::Rng;
 
 use crate::crypto::common::hmac_sha1;
 use crate::crypto::utils::{usage_ke, usage_ki};
-use crate::crypto::{Cipher, CipherSuites, KerberosCryptoError, KerberosCryptoResult};
+use crate::crypto::{Cipher, CipherSuite, KerberosCryptoError, KerberosCryptoResult};
 
 use super::decrypt::decrypt_des;
 use super::encrypt::encrypt_des;
 use super::key_derivation::derive_key;
-use super::{DES3_BLOCK_SIZE, DES3_KEY_SIZE, DES3_MAC_SIZE};
+use super::{DES3_BLOCK_SIZE, DES3_KEY_SIZE, DES3_MAC_SIZE, derive_key_from_password};
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Des3CbcSha1Kd;
@@ -24,8 +24,8 @@ impl Cipher for Des3CbcSha1Kd {
         DES3_BLOCK_SIZE
     }
 
-    fn cipher_type(&self) -> CipherSuites {
-        CipherSuites::Des3CbcSha1Kd
+    fn cipher_type(&self) -> CipherSuite {
+        CipherSuite::Des3CbcSha1Kd
     }
 
     fn encrypt(&self, key: &[u8], key_usage: i32, payload: &[u8]) -> KerberosCryptoResult<Vec<u8>> {
@@ -73,5 +73,9 @@ impl Cipher for Des3CbcSha1Kd {
         }
 
         todo!()
+    }
+
+    fn generate_key_from_password(&self, password: &[u8], salt: &[u8]) -> KerberosCryptoResult<Vec<u8>> {
+        derive_key_from_password(password, salt)
     }
 }

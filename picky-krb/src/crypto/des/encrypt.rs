@@ -28,8 +28,7 @@ pub fn encrypt_des(key: &[u8], payload: &[u8]) -> KerberosCryptoResult<Vec<u8>> 
     let ct = DesCbcCipher::new(key.into(), (&iv as &[u8]).into());
 
     let cipher = ct
-        .encrypt_padded_mut::<Pkcs7>(&mut payload, payload_len)
-        .map_err(|err| KerberosCryptoError::CipherPad(format!("{:?}", err)))?;
+        .encrypt_padded_mut::<Pkcs7>(&mut payload, payload_len)?;
 
     Ok(cipher[0..payload_len].to_vec())
 }

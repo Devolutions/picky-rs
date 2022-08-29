@@ -4,7 +4,6 @@ pub fn usage_ke(usage: i32) -> [u8; 5] {
 }
 
 /// usage | 0x99
-#[allow(dead_code)]
 pub fn usage_kc(usage: i32) -> [u8; 5] {
     key_usage(usage, 0x99)
 }

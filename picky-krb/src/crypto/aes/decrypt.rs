@@ -1,6 +1,6 @@
-use crypto::aes::cbc_decryptor;
-use crypto::blockmodes;
-use crypto::buffer::{RefReadBuffer, RefWriteBuffer};
+use aes::cipher::block_padding::NoPadding;
+use aes::cipher::{KeyIvInit, BlockDecryptMut};
+use aes::{Aes256, Aes128};
 
 use crate::crypto::common::hmac_sha1;
 use crate::crypto::utils::{usage_ke, usage_ki};
@@ -8,6 +8,9 @@ use crate::crypto::{KerberosCryptoError, KerberosCryptoResult};
 
 use super::key_derivation::derive_key;
 use super::{swap_two_last_blocks, AesSize, AES_BLOCK_SIZE, AES_MAC_SIZE};
+
+pub type Aes256CbcDecryptor = cbc::Decryptor<Aes256>;
+pub type Aes128CbcDecryptor = cbc::Decryptor<Aes128>;
 
 pub fn decrypt(key: &[u8], key_usage: i32, cipher_data: &[u8], aes_size: &AesSize) -> KerberosCryptoResult<Vec<u8>> {
     if cipher_data.len() < AES_BLOCK_SIZE + AES_MAC_SIZE {
@@ -34,22 +37,22 @@ pub fn decrypt(key: &[u8], key_usage: i32, cipher_data: &[u8], aes_size: &AesSiz
 }
 
 pub fn decrypt_aes(key: &[u8], cipher_data: &[u8], aes_size: &AesSize) -> KerberosCryptoResult<Vec<u8>> {
-    let mut cipher = cbc_decryptor(
-        crypto::aes::KeySize::KeySize256,
-        key,
-        &vec![0; aes_size.block_bit_len() / 8],
-        blockmodes::NoPadding,
-    );
+    let mut cipher_data = cipher_data.to_vec();
 
-    let mut payload = vec![0; cipher_data.len()];
+    let iv = vec![0; aes_size.block_bit_len() / 8];
 
-    cipher.decrypt(
-        &mut RefReadBuffer::new(cipher_data),
-        &mut RefWriteBuffer::new(&mut payload),
-        true,
-    )?;
+    match aes_size {
+        AesSize::Aes256 => {
+            let cipher = Aes256CbcDecryptor::new(key.into(), iv.as_slice().into());
+            cipher.decrypt_padded_mut::<NoPadding>(&mut cipher_data)?;
+        },
+        AesSize::Aes128 => {
+            let cipher = Aes128CbcDecryptor::new(key.into(), iv.as_slice().into());
+            cipher.decrypt_padded_mut::<NoPadding>(&mut cipher_data)?;
+        },
+    }
 
-    Ok(payload)
+    Ok(cipher_data)
 }
 
 pub fn decrypt_aes_cts(key: &[u8], cipher_data: &[u8], aes_size: &AesSize) -> KerberosCryptoResult<Vec<u8>> {

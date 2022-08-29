@@ -1,9 +1,9 @@
+use aes::cipher::block_padding::NoPadding;
+use aes::cipher::{KeyIvInit, BlockEncryptMut};
+use aes::{Aes256, Aes128};
+use cbc::Encryptor;
 use rand::rngs::OsRng;
 use rand::Rng;
-
-use crypto::aes::cbc_encryptor;
-use crypto::blockmodes;
-use crypto::buffer::{RefReadBuffer, RefWriteBuffer};
 
 use crate::crypto::aes::key_derivation::derive_key;
 use crate::crypto::common::hmac_sha1;
@@ -11,6 +11,9 @@ use crate::crypto::utils::{usage_ke, usage_ki};
 use crate::crypto::{KerberosCryptoError, KerberosCryptoResult};
 
 use super::{swap_two_last_blocks, AesSize, AES_BLOCK_SIZE, AES_MAC_SIZE};
+
+pub type Aes256CbcEncryptor = Encryptor<Aes256>;
+pub type Aes128CbcEncryptor = Encryptor<Aes128>;
 
 pub fn encrypt(key: &[u8], key_usage: i32, payload: &[u8], aes_size: &AesSize) -> KerberosCryptoResult<Vec<u8>> {
     if key.len() != aes_size.key_length() {
@@ -31,10 +34,14 @@ pub fn encrypt(key: &[u8], key_usage: i32, payload: &[u8], aes_size: &AesSize) -
     data_to_encrypt[aes_size.confounder_byte_size()..].copy_from_slice(payload);
 
     let ke = derive_key(key, &usage_ke(key_usage), aes_size)?;
+    println!("ke: {:?}", ke);
     let mut encrypted = encrypt_aes_cts(&ke, &data_to_encrypt, aes_size)?;
+    println!("encrypted: {:?}", encrypted);
 
     let ki = derive_key(key, &usage_ki(key_usage), aes_size)?;
+    println!("ki: {:?}", ki);
     let checksum = hmac_sha1(&ki, &data_to_encrypt, AES_MAC_SIZE);
+    println!("checksum: {:?}", checksum);
 
     encrypted.extend_from_slice(&checksum);
 
@@ -42,22 +49,23 @@ pub fn encrypt(key: &[u8], key_usage: i32, payload: &[u8], aes_size: &AesSize) -
 }
 
 pub fn encrypt_aes(key: &[u8], plaintext: &[u8], aes_size: &AesSize) -> KerberosCryptoResult<Vec<u8>> {
-    let mut cipher = cbc_encryptor(
-        crypto::aes::KeySize::KeySize256,
-        key,
-        &vec![0; aes_size.block_bit_len() / 8],
-        blockmodes::NoPadding,
-    );
+    let iv = vec![0; AES_BLOCK_SIZE];
 
-    let mut cipher_data = vec![0; plaintext.len()];
+    let mut payload = plaintext.to_vec();
+    let payload_len = payload.len();
 
-    cipher.encrypt(
-        &mut RefReadBuffer::new(plaintext),
-        &mut RefWriteBuffer::new(&mut cipher_data),
-        true,
-    )?;
+    match aes_size {
+        AesSize::Aes256 => {
+            let cipher = Aes256CbcEncryptor::new(key.into(), iv.as_slice().into());
+            cipher.encrypt_padded_mut::<NoPadding>(&mut payload, payload_len).unwrap();
+        },
+        AesSize::Aes128 => {
+            let cipher = Aes128CbcEncryptor::new(key.into(), iv.as_slice().into());
+            cipher.encrypt_padded_mut::<NoPadding>(&mut payload, payload_len)?;
+        },
+    }
 
-    Ok(cipher_data)
+    Ok(payload)
 }
 
 pub fn encrypt_aes_cts(key: &[u8], payload: &[u8], aes_size: &AesSize) -> KerberosCryptoResult<Vec<u8>> {

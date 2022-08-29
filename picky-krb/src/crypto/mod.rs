@@ -4,7 +4,8 @@ pub mod des;
 pub(crate) mod nfold;
 pub(crate) mod utils;
 
-use crypto::symmetriccipher::SymmetricCipherError;
+use ::aes::cipher::block_padding::UnpadError;
+use ::aes::cipher::inout::PadError;
 use thiserror::Error;
 
 use crate::constants::etypes::{AES128_CTS_HMAC_SHA1_96, AES256_CTS_HMAC_SHA1_96, DES3_CBC_SHA1_KD};
@@ -30,12 +31,20 @@ pub enum KerberosCryptoError {
     #[error("cipher error: {0}")]
     CipherError(String),
     #[error("Padding error: {0:?}")]
-    CipherPad(String),
+    CipherUnpad(UnpadError),
+    #[error("Padding error: {0:?}")]
+    CipherPad(PadError),
 }
 
-impl From<SymmetricCipherError> for KerberosCryptoError {
-    fn from(error: SymmetricCipherError) -> Self {
-        Self::CipherError(format!("{:?}", error))
+impl From<UnpadError> for KerberosCryptoError {
+    fn from(err: UnpadError) -> Self {
+        Self::CipherUnpad(err)
+    }
+}
+
+impl From<PadError> for KerberosCryptoError {
+    fn from(err: PadError) -> Self {
+        Self::CipherPad(err)
     }
 }
 
@@ -43,29 +52,30 @@ pub type KerberosCryptoResult<T> = Result<T, KerberosCryptoError>;
 
 pub trait Cipher {
     fn key_size(&self) -> usize;
-    fn cipher_type(&self) -> CipherSuites;
+    fn cipher_type(&self) -> CipherSuite;
     fn encrypt(&self, key: &[u8], key_usage: i32, payload: &[u8]) -> KerberosCryptoResult<Vec<u8>>;
     fn decrypt(&self, key: &[u8], key_usage: i32, cipher_data: &[u8]) -> KerberosCryptoResult<Vec<u8>>;
+    fn generate_key_from_password(&self, password: &[u8], salt: &[u8]) -> KerberosCryptoResult<Vec<u8>>;
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum CipherSuites {
+pub enum CipherSuite {
     Aes128CtsHmacSha196,
     Aes256CtsHmacSha196,
     Des3CbcSha1Kd,
 }
 
-impl CipherSuites {
+impl CipherSuite {
     pub fn cipher(&self) -> Box<dyn Cipher> {
         match self {
-            CipherSuites::Aes256CtsHmacSha196 => Box::new(Aes256CtsHmacSha196::new()),
-            CipherSuites::Aes128CtsHmacSha196 => Box::new(Aes128CtsHmacSha196::new()),
-            CipherSuites::Des3CbcSha1Kd => Box::new(Des3CbcSha1Kd::new()),
+            CipherSuite::Aes256CtsHmacSha196 => Box::new(Aes256CtsHmacSha196::new()),
+            CipherSuite::Aes128CtsHmacSha196 => Box::new(Aes128CtsHmacSha196::new()),
+            CipherSuite::Des3CbcSha1Kd => Box::new(Des3CbcSha1Kd::new()),
         }
     }
 }
 
-impl TryFrom<usize> for CipherSuites {
+impl TryFrom<usize> for CipherSuite {
     type Error = KerberosCryptoError;
 
     fn try_from(identifier: usize) -> Result<Self, Self::Error> {
@@ -78,12 +88,32 @@ impl TryFrom<usize> for CipherSuites {
     }
 }
 
-impl From<CipherSuites> for usize {
-    fn from(cipher: CipherSuites) -> Self {
+impl From<CipherSuite> for usize {
+    fn from(cipher: CipherSuite) -> Self {
         match cipher {
-            CipherSuites::Aes256CtsHmacSha196 => AES256_CTS_HMAC_SHA1_96,
-            CipherSuites::Aes128CtsHmacSha196 => AES128_CTS_HMAC_SHA1_96,
-            CipherSuites::Des3CbcSha1Kd => DES3_CBC_SHA1_KD,
+            CipherSuite::Aes256CtsHmacSha196 => AES256_CTS_HMAC_SHA1_96,
+            CipherSuite::Aes128CtsHmacSha196 => AES128_CTS_HMAC_SHA1_96,
+            CipherSuite::Des3CbcSha1Kd => DES3_CBC_SHA1_KD,
+        }
+    }
+}
+
+impl From<CipherSuite> for u8 {
+    fn from(cipher: CipherSuite) -> Self {
+        match cipher {
+            CipherSuite::Aes256CtsHmacSha196 => AES256_CTS_HMAC_SHA1_96 as u8,
+            CipherSuite::Aes128CtsHmacSha196 => AES128_CTS_HMAC_SHA1_96 as u8,
+            CipherSuite::Des3CbcSha1Kd => DES3_CBC_SHA1_KD as u8,
+        }
+    }
+}
+
+impl From<&CipherSuite> for u8 {
+    fn from(cipher: &CipherSuite) -> Self {
+        match cipher {
+            CipherSuite::Aes256CtsHmacSha196 => AES256_CTS_HMAC_SHA1_96 as u8,
+            CipherSuite::Aes128CtsHmacSha196 => AES128_CTS_HMAC_SHA1_96 as u8,
+            CipherSuite::Des3CbcSha1Kd => DES3_CBC_SHA1_KD as u8,
         }
     }
 }

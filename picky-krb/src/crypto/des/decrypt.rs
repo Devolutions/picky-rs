@@ -18,11 +18,10 @@ pub fn decrypt_des(key: &[u8], payload: &[u8]) -> KerberosCryptoResult<Vec<u8>> 
     // RFC 3961: initial cipher state      All bits zero
     let iv = [0_u8; DES3_BLOCK_SIZE];
 
-    let ct = DesCbcCipher::new(key.into(), (&iv as &[u8]).into());
+    let cipher = DesCbcCipher::new(key.into(), (&iv as &[u8]).into());
 
-    let _cipher = ct
-        .decrypt_padded_mut::<Pkcs7>(&mut payload)
-        .map_err(|err| KerberosCryptoError::CipherPad(format!("{:?}", err)))?;
+    cipher
+        .decrypt_padded_mut::<Pkcs7>(&mut payload)?;
 
     Ok(payload)
 }
