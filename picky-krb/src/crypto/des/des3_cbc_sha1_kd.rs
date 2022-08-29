@@ -8,7 +8,7 @@ use crate::crypto::{Cipher, CipherSuite, KerberosCryptoError, KerberosCryptoResu
 use super::decrypt::decrypt_des;
 use super::encrypt::encrypt_des;
 use super::key_derivation::derive_key;
-use super::{DES3_BLOCK_SIZE, DES3_KEY_SIZE, DES3_MAC_SIZE, derive_key_from_password};
+use super::{derive_key_from_password, DES3_BLOCK_SIZE, DES3_KEY_SIZE, DES3_MAC_SIZE};
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Des3CbcSha1Kd;
@@ -44,6 +44,9 @@ impl Cipher for Des3CbcSha1Kd {
         data_to_encrypt[0..DES3_BLOCK_SIZE].copy_from_slice(&confounder);
         data_to_encrypt[DES3_BLOCK_SIZE..].copy_from_slice(payload);
 
+        let pad_len = (DES3_BLOCK_SIZE - (data_to_encrypt.len() % DES3_BLOCK_SIZE)) % DES3_BLOCK_SIZE;
+        data_to_encrypt.extend_from_slice(&vec![0; pad_len]);
+
         let ke = derive_key(key, &usage_ke(key_usage))?;
         let mut encrypted = encrypt_des(&ke, &data_to_encrypt)?;
 
@@ -72,10 +75,60 @@ impl Cipher for Des3CbcSha1Kd {
             return Err(KerberosCryptoError::IntegrityCheck);
         }
 
-        todo!()
+        Ok(plaintext[DES3_BLOCK_SIZE..].to_vec())
     }
 
     fn generate_key_from_password(&self, password: &[u8], salt: &[u8]) -> KerberosCryptoResult<Vec<u8>> {
         derive_key_from_password(password, salt)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::crypto::Cipher;
+
+    use super::Des3CbcSha1Kd;
+
+    #[test]
+    fn encrypt() {
+        let key = [
+            115, 248, 21, 32, 230, 42, 157, 138, 158, 254, 157, 145, 13, 110, 64, 107, 173, 206, 247, 93, 55, 146, 167,
+            138,
+        ];
+        let plaintext = [
+            97, 101, 115, 50, 53, 54, 95, 99, 116, 115, 95, 104, 109, 97, 99, 95, 115, 104, 97, 49, 95, 57, 54,
+        ];
+        let cipher = Des3CbcSha1Kd::new();
+
+        let cipher_data = cipher.encrypt(&key, 5, &plaintext).unwrap();
+
+        assert_eq!(
+            &[
+                126, 136, 43, 80, 62, 251, 57, 122, 225, 31, 122, 177, 228, 203, 192, 209, 209, 50, 207, 26, 25, 42,
+                111, 102, 243, 28, 130, 32, 30, 129, 155, 136, 93, 10, 246, 56, 89, 215, 120, 254, 207, 136, 121, 74,
+                156, 20, 56, 227, 234, 98, 203, 221
+            ],
+            cipher_data.as_slice()
+        );
+    }
+
+    #[test]
+    fn decrypt() {
+        let key = [
+            115, 248, 21, 32, 230, 42, 157, 138, 158, 254, 157, 145, 13, 110, 64, 107, 173, 206, 247, 93, 55, 146, 167,
+            138,
+        ];
+        let plaintext = [
+            126, 136, 43, 80, 62, 251, 57, 122, 225, 31, 122, 177, 228, 203, 192, 209, 209, 50, 207, 26, 25, 42, 111,
+            102, 243, 28, 130, 32, 30, 129, 155, 136, 93, 10, 246, 56, 89, 215, 120, 254, 207, 136, 121, 74, 156, 20,
+            56, 227, 234, 98, 203, 221,
+        ];
+        let cipher = Des3CbcSha1Kd::new();
+
+        let cipher_data = cipher.decrypt(&key, 5, &plaintext).unwrap();
+        assert_eq!(
+            &[97, 101, 115, 50, 53, 54, 95, 99, 116, 115, 95, 104, 109, 97, 99, 95, 115, 104, 97, 49, 95, 57, 54, 0],
+            cipher_data.as_slice()
+        );
     }
 }

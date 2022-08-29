@@ -1,6 +1,6 @@
 use aes::cipher::block_padding::NoPadding;
-use aes::cipher::{KeyIvInit, BlockDecryptMut};
-use aes::{Aes256, Aes128};
+use aes::cipher::{BlockDecryptMut, KeyIvInit};
+use aes::{Aes128, Aes256};
 
 use crate::crypto::common::hmac_sha1;
 use crate::crypto::utils::{usage_ke, usage_ki};
@@ -32,24 +32,24 @@ pub fn decrypt(key: &[u8], key_usage: i32, cipher_data: &[u8], aes_size: &AesSiz
         return Err(KerberosCryptoError::IntegrityCheck);
     }
 
-    // [0..AES_BLOCK_SIZE..] = the first block is a random confounder bytes. skip them
+    // [0..AES_BLOCK_SIZE] = the first block is a random confounder bytes. skip them
     Ok(plaintext[AES_BLOCK_SIZE..].to_vec())
 }
 
 pub fn decrypt_aes(key: &[u8], cipher_data: &[u8], aes_size: &AesSize) -> KerberosCryptoResult<Vec<u8>> {
     let mut cipher_data = cipher_data.to_vec();
 
-    let iv = vec![0; aes_size.block_bit_len() / 8];
+    let iv = vec![0; AES_BLOCK_SIZE];
 
     match aes_size {
         AesSize::Aes256 => {
             let cipher = Aes256CbcDecryptor::new(key.into(), iv.as_slice().into());
             cipher.decrypt_padded_mut::<NoPadding>(&mut cipher_data)?;
-        },
+        }
         AesSize::Aes128 => {
             let cipher = Aes128CbcDecryptor::new(key.into(), iv.as_slice().into());
             cipher.decrypt_padded_mut::<NoPadding>(&mut cipher_data)?;
-        },
+        }
     }
 
     Ok(cipher_data)
@@ -60,14 +60,15 @@ pub fn decrypt_aes_cts(key: &[u8], cipher_data: &[u8], aes_size: &AesSize) -> Ke
         return decrypt_aes(key, cipher_data, aes_size);
     }
 
-    let pad_length = AES_BLOCK_SIZE - (cipher_data.len() % AES_BLOCK_SIZE);
+    let pad_length = (AES_BLOCK_SIZE - (cipher_data.len() % AES_BLOCK_SIZE)) % AES_BLOCK_SIZE;
 
     let mut plaintext;
 
     let mut cipher_data = cipher_data.to_vec();
+
     if pad_length != 16 {
         // Decrypt Cn-1 with IV = 0.
-        let start = cipher_data.len() - 32 + pad_length;
+        let start = cipher_data.len() + pad_length - 32;
 
         let dn = decrypt_aes(key, &cipher_data[start..start + 16], aes_size)?;
 

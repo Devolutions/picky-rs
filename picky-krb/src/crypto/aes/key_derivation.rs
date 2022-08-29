@@ -5,7 +5,7 @@ use sha1::Sha1;
 use crate::crypto::nfold::n_fold;
 use crate::crypto::{KerberosCryptoResult, KERBEROS};
 
-use super::encrypt::encrypt_aes;
+use super::encrypt::encrypt_aes_cbc;
 use super::AesSize;
 
 /// https://www.rfc-editor.org/rfc/rfc3962.html#section-6
@@ -25,7 +25,7 @@ pub fn derive_key(key: &[u8], well_known: &[u8], aes_size: &AesSize) -> Kerberos
     let mut out = Vec::with_capacity(key_len);
 
     while out.len() < key_len {
-        n_fold_usage = encrypt_aes(key, &n_fold_usage, aes_size)?;
+        n_fold_usage = encrypt_aes_cbc(key, &n_fold_usage, aes_size)?;
         out.extend_from_slice(&n_fold_usage);
     }
 
@@ -53,7 +53,7 @@ mod tests {
     use super::derive_key_from_password;
 
     #[test]
-    fn test_derive_key_from_password() {
+    fn aes256_derive_key_from_password() {
         let password = "5hYYSAfFJp";
         let salt = "EXAMPLE.COMtest1";
 
@@ -61,9 +61,22 @@ mod tests {
 
         assert_eq!(
             &[
-                218_u8, 222, 209, 204, 21, 174, 23, 222, 170, 99, 164, 144, 247, 103, 137, 68, 117, 143, 59, 37, 90,
-                84, 37, 105, 203, 32, 235, 167, 97, 238, 171, 172
-            ] as &[u8],
+                218, 222, 209, 204, 21, 174, 23, 222, 170, 99, 164, 144, 247, 103, 137, 68, 117, 143, 59, 37, 90, 84,
+                37, 105, 203, 32, 235, 167, 97, 238, 171, 172
+            ],
+            key.as_slice()
+        );
+    }
+
+    #[test]
+    fn aes128_derive_key_from_password() {
+        let password = "5hYYSAfFJp";
+        let salt = "EXAMPLE.COMtest1";
+
+        let key = derive_key_from_password(password, salt, &AesSize::Aes128).unwrap();
+
+        assert_eq!(
+            &[187, 67, 208, 2, 227, 119, 67, 22, 18, 86, 174, 201, 6, 129, 207, 220],
             key.as_slice()
         );
     }

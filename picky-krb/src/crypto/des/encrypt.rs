@@ -1,4 +1,4 @@
-use aes::cipher::block_padding::Pkcs7;
+use aes::cipher::block_padding::NoPadding;
 use aes::cipher::{BlockEncryptMut, KeyIvInit};
 use des::TdesEde3;
 
@@ -22,13 +22,12 @@ pub fn encrypt_des(key: &[u8], payload: &[u8]) -> KerberosCryptoResult<Vec<u8>> 
 
     payload.extend_from_slice(&[0; DES3_BLOCK_SIZE]);
 
-    // RFC 3961: initial cipher state      All bits zero
+    // RFC 3961: initial cipher state. All bits zero
     let iv = [0_u8; DES3_BLOCK_SIZE];
 
-    let ct = DesCbcCipher::new(key.into(), (&iv as &[u8]).into());
+    let ct = DesCbcCipher::new(key.into(), &iv.into());
 
-    let cipher = ct
-        .encrypt_padded_mut::<Pkcs7>(&mut payload, payload_len)?;
+    let cipher = ct.encrypt_padded_mut::<NoPadding>(&mut payload, payload_len)?;
 
     Ok(cipher[0..payload_len].to_vec())
 }
@@ -38,7 +37,7 @@ mod tests {
     use super::encrypt_des;
 
     #[test]
-    fn test_encrypt() {
+    fn test_encrypt_des() {
         let key = &[
             78, 101, 119, 84, 114, 105, 112, 108, 101, 68, 69, 83, 67, 105, 112, 104, 101, 114, 40, 107, 101, 121, 41,
             46,
@@ -52,10 +51,36 @@ mod tests {
 
         assert_eq!(
             &[
-                87_u8, 99, 22, 0, 235, 138, 12, 253, 230, 59, 41, 113, 167, 76, 242, 13, 165, 158, 210, 120, 86, 75,
-                221, 202, 86, 77, 170, 9, 146, 89, 112, 88, 71, 246, 188, 99, 190, 8, 2, 57
+                87, 99, 22, 0, 235, 138, 12, 253, 230, 59, 41, 113, 167, 76, 242, 13, 165, 158, 210, 120, 86, 75, 221,
+                202, 86, 77, 170, 9, 146, 89, 112, 88, 71, 246, 188, 99, 190, 8, 2, 57
             ],
             cipher.as_slice()
         );
+    }
+
+    #[test]
+    fn test_encrypt_des_3() {
+        let payload = &[254, 157, 144, 13, 111, 64, 173, 206];
+        let key = &[
+            100, 234, 37, 148, 191, 233, 42, 16, 104, 233, 26, 155, 127, 110, 98, 200, 104, 196, 248, 253, 35, 227, 26,
+            167,
+        ];
+
+        let cipher = encrypt_des(key, payload).unwrap();
+
+        assert_eq!(&[247, 92, 54, 146, 167, 87, 189, 111], cipher.as_slice());
+    }
+
+    #[test]
+    fn test_encrypt_des_2() {
+        let payload = &[115, 248, 21, 32, 230, 42, 157, 159];
+        let key = &[
+            100, 234, 37, 148, 191, 233, 42, 16, 104, 233, 26, 155, 127, 110, 98, 200, 104, 196, 248, 253, 35, 227, 26,
+            167,
+        ];
+
+        let cipher = encrypt_des(key, payload).unwrap();
+
+        assert_eq!(&[254, 157, 144, 13, 111, 64, 173, 206], cipher.as_slice());
     }
 }

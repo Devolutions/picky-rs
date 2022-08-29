@@ -1,6 +1,6 @@
 use aes::cipher::block_padding::NoPadding;
-use aes::cipher::{KeyIvInit, BlockEncryptMut};
-use aes::{Aes256, Aes128};
+use aes::cipher::{BlockEncryptMut, KeyIvInit};
+use aes::{Aes128, Aes256};
 use cbc::Encryptor;
 use rand::rngs::OsRng;
 use rand::Rng;
@@ -34,21 +34,17 @@ pub fn encrypt(key: &[u8], key_usage: i32, payload: &[u8], aes_size: &AesSize) -
     data_to_encrypt[aes_size.confounder_byte_size()..].copy_from_slice(payload);
 
     let ke = derive_key(key, &usage_ke(key_usage), aes_size)?;
-    println!("ke: {:?}", ke);
     let mut encrypted = encrypt_aes_cts(&ke, &data_to_encrypt, aes_size)?;
-    println!("encrypted: {:?}", encrypted);
 
     let ki = derive_key(key, &usage_ki(key_usage), aes_size)?;
-    println!("ki: {:?}", ki);
     let checksum = hmac_sha1(&ki, &data_to_encrypt, AES_MAC_SIZE);
-    println!("checksum: {:?}", checksum);
 
     encrypted.extend_from_slice(&checksum);
 
     Ok(encrypted)
 }
 
-pub fn encrypt_aes(key: &[u8], plaintext: &[u8], aes_size: &AesSize) -> KerberosCryptoResult<Vec<u8>> {
+pub fn encrypt_aes_cbc(key: &[u8], plaintext: &[u8], aes_size: &AesSize) -> KerberosCryptoResult<Vec<u8>> {
     let iv = vec![0; AES_BLOCK_SIZE];
 
     let mut payload = plaintext.to_vec();
@@ -57,12 +53,14 @@ pub fn encrypt_aes(key: &[u8], plaintext: &[u8], aes_size: &AesSize) -> Kerberos
     match aes_size {
         AesSize::Aes256 => {
             let cipher = Aes256CbcEncryptor::new(key.into(), iv.as_slice().into());
-            cipher.encrypt_padded_mut::<NoPadding>(&mut payload, payload_len).unwrap();
-        },
+            cipher
+                .encrypt_padded_mut::<NoPadding>(&mut payload, payload_len)
+                .unwrap();
+        }
         AesSize::Aes128 => {
             let cipher = Aes128CbcEncryptor::new(key.into(), iv.as_slice().into());
             cipher.encrypt_padded_mut::<NoPadding>(&mut payload, payload_len)?;
-        },
+        }
     }
 
     Ok(payload)
@@ -72,9 +70,9 @@ pub fn encrypt_aes_cts(key: &[u8], payload: &[u8], aes_size: &AesSize) -> Kerber
     let pad_length = (AES_BLOCK_SIZE - (payload.len() % AES_BLOCK_SIZE)) % AES_BLOCK_SIZE;
 
     let mut padded_payload = payload.to_vec();
-    padded_payload.append(&mut vec![0; pad_length]);
+    padded_payload.extend_from_slice(&vec![0; pad_length]);
 
-    let mut ciphertext = encrypt_aes(key, &padded_payload, aes_size)?;
+    let mut ciphertext = encrypt_aes_cbc(key, &padded_payload, aes_size)?;
 
     if ciphertext.len() <= AES_BLOCK_SIZE {
         return Ok(ciphertext);

@@ -4,7 +4,9 @@ pub(crate) mod decrypt;
 pub(crate) mod encrypt;
 mod key_derivation;
 
-use super::{KerberosCryptoResult, utils::usage_kc, common::hmac_sha1};
+use super::common::hmac_sha1;
+use super::utils::usage_kc;
+use super::KerberosCryptoResult;
 
 /// [Kerberos Algorithm Profile Parameters](https://www.rfc-editor.org/rfc/rfc3962.html#section-6)
 /// cipher block size 16 octets
@@ -60,7 +62,12 @@ pub fn swap_two_last_blocks(data: &mut [u8]) {
     }
 }
 
-pub fn checksum_sha_aes(key: &[u8], key_usage: i32, payload: &[u8], aes_size: &AesSize) -> KerberosCryptoResult<Vec<u8>> {
+pub fn checksum_sha_aes(
+    key: &[u8],
+    key_usage: i32,
+    payload: &[u8],
+    aes_size: &AesSize,
+) -> KerberosCryptoResult<Vec<u8>> {
     let kc = derive_key(key, &usage_kc(key_usage), aes_size)?;
 
     Ok(hmac_sha1(&kc, payload, AES_MAC_SIZE))

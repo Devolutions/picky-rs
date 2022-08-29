@@ -42,7 +42,7 @@ pub fn derive_key(key: &[u8], well_known: &[u8]) -> KerberosCryptoResult<Vec<u8>
         out.extend_from_slice(&n_fold_usage);
     }
 
-    Ok(out)
+    Ok(random_to_key(&out))
 }
 
 fn fix_weak_key(mut key: Vec<u8>) -> Vec<u8> {
@@ -66,14 +66,13 @@ fn weak(key: &[u8]) -> bool {
         }
     }
 
-    true
+    false
 }
 
 fn calc_even_parity(mut b: u8) -> (u8, u8) {
     let lowestbit = b & 0x01;
-    // c counter of 1s in the first 7 bits of the byte
     let mut c = 0;
-    // Iterate over the highest 7 bits (hence p starts at 1 not zero) and count the 1s.
+
     for p in 1..8 {
         let v = b & (1 << p);
         if v != 0 {
@@ -82,11 +81,9 @@ fn calc_even_parity(mut b: u8) -> (u8, u8) {
     }
 
     if c % 2 == 0 {
-        //Even number of 1s so set parity to 1
-        b = b | 1;
+        b |= 1;
     } else {
-        //Odd number of 1s so set parity to 0
-        b = b & !1;
+        b &= !1;
     }
 
     (lowestbit, b)
@@ -97,13 +94,13 @@ fn stretch_56_bits(key: &[u8]) -> Vec<u8> {
 
     let mut lb: u8 = 0;
 
-    for i in 0..d.len() {
-        let (bv, nb) = calc_even_parity(d[i]);
-        d[i] = nb;
+    for (i, value) in d.iter_mut().enumerate() {
+        let (bv, nb) = calc_even_parity(*value);
+        *value = nb;
         if bv != 0 {
-            lb = lb | (1 << (i + 1));
+            lb |= 1 << (i + 1);
         } else {
-            lb = lb & !(1 << (i + 1));
+            lb &= !(1 << (i + 1));
         }
     }
 
@@ -113,7 +110,7 @@ fn stretch_56_bits(key: &[u8]) -> Vec<u8> {
     d
 }
 
-fn random_to_key(key: &[u8]) -> Vec<u8> {
+pub fn random_to_key(key: &[u8]) -> Vec<u8> {
     let mut r = fix_weak_key(stretch_56_bits(&key[0..7]));
 
     let r2 = fix_weak_key(stretch_56_bits(&key[7..14]));
@@ -131,5 +128,26 @@ pub fn derive_key_from_password<P: AsRef<[u8]>, S: AsRef<[u8]>>(password: P, sal
 
     let temp_key = random_to_key(&n_fold(&secret, DES3_SEED_LEN * 8));
 
-    derive_key(&temp_key, KERBEROS)
+    Ok(derive_key(&temp_key, KERBEROS)?)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::crypto::des::derive_key_from_password;
+
+    #[test]
+    fn test_derive_key_from_password() {
+        let password = "5hYYSAfFJp";
+        let salt = "EXAMPLE.COMtest1";
+
+        let key = derive_key_from_password(password, salt).unwrap();
+
+        assert_eq!(
+            &[
+                115, 248, 21, 32, 230, 42, 157, 138, 158, 254, 157, 145, 13, 110, 64, 107, 173, 206, 247, 93, 55, 146,
+                167, 138
+            ],
+            key.as_slice()
+        );
+    }
 }

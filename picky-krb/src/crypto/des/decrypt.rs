@@ -1,4 +1,4 @@
-use aes::cipher::block_padding::Pkcs7;
+use aes::cipher::block_padding::NoPadding;
 use aes::cipher::{BlockDecryptMut, KeyIvInit};
 use des::TdesEde3;
 
@@ -20,8 +20,7 @@ pub fn decrypt_des(key: &[u8], payload: &[u8]) -> KerberosCryptoResult<Vec<u8>> 
 
     let cipher = DesCbcCipher::new(key.into(), (&iv as &[u8]).into());
 
-    cipher
-        .decrypt_padded_mut::<Pkcs7>(&mut payload)?;
+    cipher.decrypt_padded_mut::<NoPadding>(&mut payload)?;
 
     Ok(payload)
 }
