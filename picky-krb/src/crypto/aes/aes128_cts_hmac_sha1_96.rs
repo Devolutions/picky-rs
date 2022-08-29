@@ -4,7 +4,7 @@ use super::decrypt::decrypt;
 use super::encrypt::encrypt;
 use super::{AesSize, AES128_KEY_SIZE};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Aes128CtsHmacSha196;
 
 impl Aes128CtsHmacSha196 {

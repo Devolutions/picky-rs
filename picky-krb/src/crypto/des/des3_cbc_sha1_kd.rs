@@ -10,6 +10,7 @@ use super::encrypt::encrypt_des;
 use super::key_derivation::derive_key;
 use super::{DES3_BLOCK_SIZE, DES3_KEY_SIZE, DES3_MAC_SIZE};
 
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct Des3CbcSha1Kd;
 
 impl Des3CbcSha1Kd {
