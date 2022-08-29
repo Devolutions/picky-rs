@@ -1,12 +1,8 @@
-pub mod aes128_cts_hmac_sha1_96;
-pub mod aes256_cts_hmac_sha1_96;
-pub mod decrypt;
-pub mod encrypt;
-pub mod key_derivation;
-
-use crypto::hmac::Hmac;
-use crypto::mac::Mac;
-use crypto::sha1::Sha1;
+pub(crate) mod aes128_cts_hmac_sha1_96;
+pub(crate) mod aes256_cts_hmac_sha1_96;
+pub(crate) mod decrypt;
+pub(crate) mod encrypt;
+mod key_derivation;
 
 /// [Kerberos Algorithm Profile Parameters](https://www.rfc-editor.org/rfc/rfc3962.html#section-6)
 /// cipher block size 16 octets
@@ -62,12 +58,6 @@ pub fn swap_two_last_blocks(data: &mut [u8]) {
     }
 }
 
-pub fn hmac_sha1(key: &[u8], payload: &[u8]) -> Vec<u8> {
-    let mut hmacker = Hmac::new(Sha1::new(), key);
-    hmacker.input(payload);
-
-    let mut hmac = hmacker.result().code().to_vec();
-    hmac.resize(AES_MAC_SIZE, 0);
-
-    hmac
-}
+pub use aes128_cts_hmac_sha1_96::Aes128CtsHmacSha196;
+pub use aes256_cts_hmac_sha1_96::Aes256CtsHmacSha196;
+pub use key_derivation::{derive_key, derive_key_from_password};

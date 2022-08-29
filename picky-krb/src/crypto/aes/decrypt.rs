@@ -2,11 +2,12 @@ use crypto::aes::cbc_decryptor;
 use crypto::blockmodes;
 use crypto::buffer::{RefReadBuffer, RefWriteBuffer};
 
+use crate::crypto::common::hmac_sha1;
 use crate::crypto::utils::{usage_ke, usage_ki};
 use crate::crypto::{KerberosCryptoError, KerberosCryptoResult};
 
 use super::key_derivation::derive_key;
-use super::{hmac_sha1, swap_two_last_blocks, AesSize, AES_BLOCK_SIZE, AES_MAC_SIZE};
+use super::{swap_two_last_blocks, AesSize, AES_BLOCK_SIZE, AES_MAC_SIZE};
 
 pub fn decrypt(key: &[u8], key_usage: i32, cipher_data: &[u8], aes_size: &AesSize) -> KerberosCryptoResult<Vec<u8>> {
     if cipher_data.len() < AES_BLOCK_SIZE + AES_MAC_SIZE {
@@ -22,7 +23,7 @@ pub fn decrypt(key: &[u8], key_usage: i32, cipher_data: &[u8], aes_size: &AesSiz
     let plaintext = decrypt_aes_cts(&ke, cipher_data, aes_size)?;
 
     let ki = derive_key(key, &usage_ki(key_usage), aes_size)?;
-    let calculated_checksum = hmac_sha1(&ki, &plaintext);
+    let calculated_checksum = hmac_sha1(&ki, &plaintext, AES_MAC_SIZE);
 
     if calculated_checksum != checksum {
         return Err(KerberosCryptoError::IntegrityCheck);

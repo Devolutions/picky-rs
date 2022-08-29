@@ -1,5 +1,6 @@
-mod aes;
-mod des;
+pub mod aes;
+pub(crate) mod common;
+pub mod des;
 pub(crate) mod nfold;
 pub(crate) mod utils;
 
@@ -28,6 +29,8 @@ pub enum KerberosCryptoError {
     IntegrityCheck,
     #[error("cipher error: {0}")]
     CipherError(String),
+    #[error("Padding error: {0:?}")]
+    CipherPad(String),
 }
 
 impl From<SymmetricCipherError> for KerberosCryptoError {
@@ -85,5 +88,3 @@ impl From<CipherSuites> for usize {
         }
     }
 }
-
-pub use self::aes::key_derivation::derive_key_from_password;

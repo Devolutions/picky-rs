@@ -19,9 +19,7 @@ fn random_to_key(data: Vec<u8>) -> Vec<u8> {
 }
 
 pub fn derive_key(key: &[u8], well_known: &[u8], aes_size: &AesSize) -> KerberosCryptoResult<Vec<u8>> {
-    let block_bit_len = aes_size.block_bit_len();
-
-    let mut n_fold_usage = n_fold(well_known, block_bit_len);
+    let mut n_fold_usage = n_fold(well_known, aes_size.block_bit_len());
 
     let key_len = aes_size.key_length();
     let mut out = Vec::with_capacity(key_len);

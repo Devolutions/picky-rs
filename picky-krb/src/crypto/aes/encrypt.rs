@@ -5,12 +5,12 @@ use crypto::aes::cbc_encryptor;
 use crypto::blockmodes;
 use crypto::buffer::{RefReadBuffer, RefWriteBuffer};
 
-use crate::crypto::aes::hmac_sha1;
 use crate::crypto::aes::key_derivation::derive_key;
-use crate::crypto::utils::usage_ki;
+use crate::crypto::common::hmac_sha1;
+use crate::crypto::utils::{usage_ke, usage_ki};
 use crate::crypto::{KerberosCryptoError, KerberosCryptoResult};
 
-use super::{swap_two_last_blocks, AesSize, AES_BLOCK_SIZE};
+use super::{swap_two_last_blocks, AesSize, AES_BLOCK_SIZE, AES_MAC_SIZE};
 
 pub fn encrypt(key: &[u8], key_usage: i32, payload: &[u8], aes_size: &AesSize) -> KerberosCryptoResult<Vec<u8>> {
     if key.len() != aes_size.key_length() {
@@ -30,11 +30,11 @@ pub fn encrypt(key: &[u8], key_usage: i32, payload: &[u8], aes_size: &AesSize) -
     data_to_encrypt[0..aes_size.confounder_byte_size()].copy_from_slice(&confounder);
     data_to_encrypt[aes_size.confounder_byte_size()..].copy_from_slice(payload);
 
-    let ke = derive_key(key, &usage_ki(key_usage), aes_size)?;
+    let ke = derive_key(key, &usage_ke(key_usage), aes_size)?;
     let mut encrypted = encrypt_aes_cts(&ke, &data_to_encrypt, aes_size)?;
 
     let ki = derive_key(key, &usage_ki(key_usage), aes_size)?;
-    let checksum = hmac_sha1(&ki, &data_to_encrypt);
+    let checksum = hmac_sha1(&ki, &data_to_encrypt, AES_MAC_SIZE);
 
     encrypted.extend_from_slice(&checksum);
 
