@@ -1,3 +1,4 @@
+#[inline]
 fn gcd(mut n1: usize, mut n2: usize) -> usize {
     while n1 != n2 {
         if n1 > n2 {
@@ -10,10 +11,12 @@ fn gcd(mut n1: usize, mut n2: usize) -> usize {
     n1
 }
 
+#[inline]
 fn lcm(n1: usize, n2: usize) -> usize {
     n1 * n2 / gcd(n1, n2)
 }
 
+#[inline]
 fn get_bit(data: &[u8], n: usize) -> u8 {
     let pos_byte = n / 8;
     let pos_bit = n % 8;
@@ -23,6 +26,7 @@ fn get_bit(data: &[u8], n: usize) -> u8 {
     val_byte >> (8 - (pos_bit + 1)) & 0x0001
 }
 
+#[inline]
 fn set_bit(data: &mut [u8], pos: usize, val: u8) {
     let pos_byte = pos / 8;
     let pos_bit = pos % 8;
@@ -32,6 +36,7 @@ fn set_bit(data: &mut [u8], pos: usize, val: u8) {
     data[pos_byte] = new_byte;
 }
 
+#[inline]
 fn rotate_right(data: &[u8], len: usize, n: usize, out: &mut [u8]) {
     for i in 0..len {
         let val = get_bit(data, i);
@@ -39,6 +44,7 @@ fn rotate_right(data: &[u8], len: usize, n: usize, out: &mut [u8]) {
     }
 }
 
+#[inline]
 fn sum(n1: &[u8], n2: &[u8], len: usize) -> Vec<u8> {
     let num_of_bytes = (len - 1) / 8 + 1;
     let mut out = vec![0; num_of_bytes];
@@ -73,6 +79,7 @@ fn sum(n1: &[u8], n2: &[u8], len: usize) -> Vec<u8> {
     out
 }
 
+#[inline]
 pub fn n_fold(data: &[u8], n: usize) -> Vec<u8> {
     let k = data.len() * 8;
 

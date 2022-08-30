@@ -2,8 +2,6 @@ use aes::cipher::block_padding::NoPadding;
 use aes::cipher::{BlockEncryptMut, KeyIvInit};
 use aes::{Aes128, Aes256};
 use cbc::Encryptor;
-use rand::rngs::OsRng;
-use rand::Rng;
 
 use crate::crypto::aes::key_derivation::derive_key;
 use crate::crypto::common::hmac_sha1;
@@ -15,18 +13,18 @@ use super::{swap_two_last_blocks, AesSize, AES_BLOCK_SIZE, AES_MAC_SIZE};
 pub type Aes256CbcEncryptor = Encryptor<Aes256>;
 pub type Aes128CbcEncryptor = Encryptor<Aes128>;
 
-pub fn encrypt(key: &[u8], key_usage: i32, payload: &[u8], aes_size: &AesSize) -> KerberosCryptoResult<Vec<u8>> {
+//= [Cryptosystem Profile Based on Simplified Profile](https://datatracker.ietf.org/doc/html/rfc3961#section-5.3) =//
+pub fn encrypt_message(
+    key: &[u8],
+    key_usage: i32,
+    payload: &[u8],
+    aes_size: &AesSize,
+    // conf = Random string of length c
+    confounder: [u8; AES_BLOCK_SIZE],
+) -> KerberosCryptoResult<Vec<u8>> {
     if key.len() != aes_size.key_length() {
         return Err(KerberosCryptoError::KeyLength(key.len(), aes_size.key_length()));
     }
-
-    // confounder (just random bytes)
-    #[cfg(test)]
-    let confounder = [
-        161, 52, 157, 33, 238, 232, 185, 93, 167, 130, 91, 180, 167, 165, 224, 78,
-    ];
-    #[cfg(not(test))]
-    let confounder = OsRng::default().gen::<[u8; AES_BLOCK_SIZE]>();
 
     let mut data_to_encrypt = vec![0; aes_size.confounder_byte_size() + payload.len()];
 
@@ -34,12 +32,15 @@ pub fn encrypt(key: &[u8], key_usage: i32, payload: &[u8], aes_size: &AesSize) -
     data_to_encrypt[aes_size.confounder_byte_size()..].copy_from_slice(payload);
 
     let ke = derive_key(key, &usage_ke(key_usage), aes_size)?;
+    // (C1, newIV) = E(Ke, conf | plaintext | pad, oldstate.ivec)
     let mut encrypted = encrypt_aes_cts(&ke, &data_to_encrypt, aes_size)?;
 
     let ki = derive_key(key, &usage_ki(key_usage), aes_size)?;
-    let checksum = hmac_sha1(&ki, &data_to_encrypt, AES_MAC_SIZE);
+    // H1 = HMAC(Ki, conf | plaintext | pad)
+    let hmac = hmac_sha1(&ki, &data_to_encrypt, AES_MAC_SIZE);
 
-    encrypted.extend_from_slice(&checksum);
+    // ciphertext =  C1 | H1[1..h]
+    encrypted.extend_from_slice(&hmac);
 
     Ok(encrypted)
 }
@@ -66,23 +67,24 @@ pub fn encrypt_aes_cbc(key: &[u8], plaintext: &[u8], aes_size: &AesSize) -> Kerb
     Ok(payload)
 }
 
+//= [CTS using CBC](https://en.wikipedia.org/wiki/Ciphertext_stealing#CBC_ciphertext_stealing_encryption_using_a_standard_CBC_interface) =//
 pub fn encrypt_aes_cts(key: &[u8], payload: &[u8], aes_size: &AesSize) -> KerberosCryptoResult<Vec<u8>> {
     let pad_length = (AES_BLOCK_SIZE - (payload.len() % AES_BLOCK_SIZE)) % AES_BLOCK_SIZE;
 
     let mut padded_payload = payload.to_vec();
     padded_payload.extend_from_slice(&vec![0; pad_length]);
 
-    let mut ciphertext = encrypt_aes_cbc(key, &padded_payload, aes_size)?;
+    let mut cipher = encrypt_aes_cbc(key, &padded_payload, aes_size)?;
 
-    if ciphertext.len() <= AES_BLOCK_SIZE {
-        return Ok(ciphertext);
+    if cipher.len() <= AES_BLOCK_SIZE {
+        return Ok(cipher);
     }
 
-    if ciphertext.len() >= 2 * AES_BLOCK_SIZE {
-        swap_two_last_blocks(&mut ciphertext);
+    if cipher.len() >= 2 * AES_BLOCK_SIZE {
+        swap_two_last_blocks(&mut cipher)?;
     }
 
-    ciphertext.resize(payload.len(), 0);
+    cipher.resize(payload.len(), 0);
 
-    Ok(ciphertext)
+    Ok(cipher)
 }

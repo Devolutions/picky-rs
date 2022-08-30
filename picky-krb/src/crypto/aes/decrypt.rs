@@ -12,7 +12,13 @@ use super::{swap_two_last_blocks, AesSize, AES_BLOCK_SIZE, AES_MAC_SIZE};
 pub type Aes256CbcDecryptor = cbc::Decryptor<Aes256>;
 pub type Aes128CbcDecryptor = cbc::Decryptor<Aes128>;
 
-pub fn decrypt(key: &[u8], key_usage: i32, cipher_data: &[u8], aes_size: &AesSize) -> KerberosCryptoResult<Vec<u8>> {
+//= [Cryptosystem Profile Based on Simplified Profile](https://datatracker.ietf.org/doc/html/rfc3961#section-5.3) =//
+pub fn decrypt_message(
+    key: &[u8],
+    key_usage: i32,
+    cipher_data: &[u8],
+    aes_size: &AesSize,
+) -> KerberosCryptoResult<Vec<u8>> {
     if cipher_data.len() < AES_BLOCK_SIZE + AES_MAC_SIZE {
         return Err(KerberosCryptoError::CipherLength(
             cipher_data.len(),
@@ -20,14 +26,17 @@ pub fn decrypt(key: &[u8], key_usage: i32, cipher_data: &[u8], aes_size: &AesSiz
         ));
     }
 
+    // (C1,H1) = ciphertext
     let (cipher_data, checksum) = cipher_data.split_at(cipher_data.len() - AES_MAC_SIZE);
 
     let ke = derive_key(key, &usage_ke(key_usage), aes_size)?;
+    // (P1, newIV) = D(Ke, C1, oldstate.ivec)
     let plaintext = decrypt_aes_cts(&ke, cipher_data, aes_size)?;
 
     let ki = derive_key(key, &usage_ki(key_usage), aes_size)?;
     let calculated_checksum = hmac_sha1(&ki, &plaintext, AES_MAC_SIZE);
 
+    // if (H1 != HMAC(Ki, P1)[1..h])
     if calculated_checksum != checksum {
         return Err(KerberosCryptoError::IntegrityCheck);
     }
@@ -36,7 +45,7 @@ pub fn decrypt(key: &[u8], key_usage: i32, cipher_data: &[u8], aes_size: &AesSiz
     Ok(plaintext[AES_BLOCK_SIZE..].to_vec())
 }
 
-pub fn decrypt_aes(key: &[u8], cipher_data: &[u8], aes_size: &AesSize) -> KerberosCryptoResult<Vec<u8>> {
+pub fn decrypt_aes_cbc(key: &[u8], cipher_data: &[u8], aes_size: &AesSize) -> KerberosCryptoResult<Vec<u8>> {
     let mut cipher_data = cipher_data.to_vec();
 
     let iv = vec![0; AES_BLOCK_SIZE];
@@ -55,34 +64,33 @@ pub fn decrypt_aes(key: &[u8], cipher_data: &[u8], aes_size: &AesSize) -> Kerber
     Ok(cipher_data)
 }
 
+//= [CTS using CBC](https://en.wikipedia.org/wiki/Ciphertext_stealing#CBC_ciphertext_stealing_decryption_using_a_standard_CBC_interface) =//
 pub fn decrypt_aes_cts(key: &[u8], cipher_data: &[u8], aes_size: &AesSize) -> KerberosCryptoResult<Vec<u8>> {
     if cipher_data.len() == AES_BLOCK_SIZE {
-        return decrypt_aes(key, cipher_data, aes_size);
+        return decrypt_aes_cbc(key, cipher_data, aes_size);
     }
 
     let pad_length = (AES_BLOCK_SIZE - (cipher_data.len() % AES_BLOCK_SIZE)) % AES_BLOCK_SIZE;
 
-    let mut plaintext;
-
-    let mut cipher_data = cipher_data.to_vec();
+    let mut cipher = cipher_data.to_vec();
 
     if pad_length != 16 {
-        // Decrypt Cn-1 with IV = 0.
-        let start = cipher_data.len() + pad_length - 32;
+        // decrypt Cn-1 with iv = 0.
+        let start = cipher.len() + pad_length - AES_BLOCK_SIZE * 2;
 
-        let dn = decrypt_aes(key, &cipher_data[start..start + 16], aes_size)?;
+        let dn = decrypt_aes_cbc(key, &cipher[start..start + 16], aes_size)?;
 
         let dn_len = dn.len();
-        cipher_data.extend_from_slice(&dn[dn_len - pad_length..]);
+        cipher.extend_from_slice(&dn[dn_len - pad_length..]);
     }
 
-    if cipher_data.len() >= 2 * AES_BLOCK_SIZE {
-        swap_two_last_blocks(&mut cipher_data);
+    if cipher.len() >= 2 * AES_BLOCK_SIZE {
+        swap_two_last_blocks(&mut cipher)?;
     }
 
-    plaintext = decrypt_aes(key, &cipher_data, aes_size)?;
+    let mut plaintext = decrypt_aes_cbc(key, &cipher, aes_size)?;
 
-    plaintext.resize(cipher_data.len() - pad_length, 0);
+    plaintext.resize(cipher.len() - pad_length, 0);
 
     Ok(plaintext)
 }

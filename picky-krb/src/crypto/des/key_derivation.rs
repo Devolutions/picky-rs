@@ -4,6 +4,12 @@ use crate::crypto::{KerberosCryptoError, KerberosCryptoResult, KERBEROS};
 use super::encrypt::encrypt_des;
 use super::{DES3_BLOCK_SIZE, DES3_KEY_SIZE, DES3_SEED_LEN};
 
+/// [Encryption and Checksum Specifications for Kerberos 5](https://datatracker.ietf.org/doc/html/rfc3961)
+/// This RFC contains key derivation algorithm for triple DES
+///
+/// [DES-Based Encryption and Checksum Types](https://datatracker.ietf.org/doc/html/rfc3961#section-6.2)
+/// This sections contains explanation and pseudo code of the implemented functions
+
 // weak keys from https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-67r1.pdf
 const WEAK_KEYS: [[u8; 8]; 4] = [
     [0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
@@ -45,6 +51,7 @@ pub fn derive_key(key: &[u8], well_known: &[u8]) -> KerberosCryptoResult<Vec<u8>
     Ok(random_to_key(&out))
 }
 
+#[inline]
 fn fix_weak_key(mut key: Vec<u8>) -> Vec<u8> {
     if weak(&key) {
         key[7] ^= 0xF0;
@@ -122,13 +129,14 @@ pub fn random_to_key(key: &[u8]) -> Vec<u8> {
     r
 }
 
+//= [Triple DES Key Production](https://datatracker.ietf.org/doc/html/rfc3961#section-6.3.1) =//
 pub fn derive_key_from_password<P: AsRef<[u8]>, S: AsRef<[u8]>>(password: P, salt: S) -> KerberosCryptoResult<Vec<u8>> {
     let mut secret = password.as_ref().to_vec();
     secret.extend_from_slice(salt.as_ref());
 
     let temp_key = random_to_key(&n_fold(&secret, DES3_SEED_LEN * 8));
 
-    Ok(derive_key(&temp_key, KERBEROS)?)
+    derive_key(&temp_key, KERBEROS)
 }
 
 #[cfg(test)]

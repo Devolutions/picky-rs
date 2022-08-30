@@ -2,11 +2,48 @@ use aes::cipher::block_padding::NoPadding;
 use aes::cipher::{BlockEncryptMut, KeyIvInit};
 use des::TdesEde3;
 
+use crate::crypto::common::hmac_sha1;
+use crate::crypto::utils::{usage_ke, usage_ki};
 use crate::crypto::{KerberosCryptoError, KerberosCryptoResult};
 
-use super::{DES3_BLOCK_SIZE, DES3_KEY_SIZE};
+use super::{derive_key, DES3_BLOCK_SIZE, DES3_KEY_SIZE, DES3_MAC_SIZE};
 
 type DesCbcCipher = cbc::Encryptor<TdesEde3>;
+
+//= [Cryptosystem Profile Based on Simplified Profile](https://datatracker.ietf.org/doc/html/rfc3961#section-5.3) =//
+pub fn encrypt_message(
+    key: &[u8],
+    key_usage: i32,
+    payload: &[u8],
+    // conf = Random string of length c
+    confounder: [u8; DES3_BLOCK_SIZE],
+) -> KerberosCryptoResult<Vec<u8>> {
+    if key.len() != DES3_KEY_SIZE {
+        return Err(KerberosCryptoError::KeyLength(key.len(), DES3_KEY_SIZE));
+    }
+
+    let mut data_to_encrypt = vec![0; DES3_BLOCK_SIZE + payload.len()];
+
+    data_to_encrypt[0..DES3_BLOCK_SIZE].copy_from_slice(&confounder);
+    data_to_encrypt[DES3_BLOCK_SIZE..].copy_from_slice(payload);
+
+    let pad_len = (DES3_BLOCK_SIZE - (data_to_encrypt.len() % DES3_BLOCK_SIZE)) % DES3_BLOCK_SIZE;
+    // pad
+    data_to_encrypt.extend_from_slice(&vec![0; pad_len]);
+
+    let ke = derive_key(key, &usage_ke(key_usage))?;
+    // (C1, newIV) = E(Ke, conf | plaintext | pad, oldstate.ivec)
+    let mut encrypted = encrypt_des(&ke, &data_to_encrypt)?;
+
+    let ki = derive_key(key, &usage_ki(key_usage))?;
+    // H1 = HMAC(Ki, conf | plaintext | pad)
+    let hmac = hmac_sha1(&ki, &data_to_encrypt, DES3_MAC_SIZE);
+
+    // ciphertext =  C1 | H1[1..h]
+    encrypted.extend_from_slice(&hmac);
+
+    Ok(encrypted)
+}
 
 pub fn encrypt_des(key: &[u8], payload: &[u8]) -> KerberosCryptoResult<Vec<u8>> {
     if key.len() != DES3_KEY_SIZE {
@@ -27,9 +64,11 @@ pub fn encrypt_des(key: &[u8], payload: &[u8]) -> KerberosCryptoResult<Vec<u8>> 
 
     let ct = DesCbcCipher::new(key.into(), &iv.into());
 
-    let cipher = ct.encrypt_padded_mut::<NoPadding>(&mut payload, payload_len)?;
+    ct.encrypt_padded_mut::<NoPadding>(&mut payload, payload_len)?;
 
-    Ok(cipher[0..payload_len].to_vec())
+    payload.resize(payload_len, 0);
+
+    Ok(payload)
 }
 
 #[cfg(test)]

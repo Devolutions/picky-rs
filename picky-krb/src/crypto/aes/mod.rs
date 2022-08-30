@@ -6,7 +6,7 @@ mod key_derivation;
 
 use super::common::hmac_sha1;
 use super::utils::usage_kc;
-use super::KerberosCryptoResult;
+use super::{KerberosCryptoError, KerberosCryptoResult};
 
 /// [Kerberos Algorithm Profile Parameters](https://www.rfc-editor.org/rfc/rfc3962.html#section-6)
 /// cipher block size 16 octets
@@ -26,6 +26,7 @@ pub enum AesSize {
 }
 
 impl AesSize {
+    #[inline]
     pub fn key_length(&self) -> usize {
         match self {
             AesSize::Aes256 => AES256_KEY_SIZE,
@@ -33,6 +34,7 @@ impl AesSize {
         }
     }
 
+    #[inline]
     pub fn block_bit_len(&self) -> usize {
         match self {
             AesSize::Aes256 => AES_BLOCK_SIZE * 8,
@@ -44,22 +46,24 @@ impl AesSize {
         self.key_length() * 8
     }
 
+    #[inline]
     fn confounder_byte_size(&self) -> usize {
         AES_BLOCK_SIZE
     }
 }
 
-pub fn swap_two_last_blocks(data: &mut [u8]) {
+pub fn swap_two_last_blocks(data: &mut [u8]) -> KerberosCryptoResult<()> {
+    if data.len() < AES_BLOCK_SIZE * 2 {
+        return Err(KerberosCryptoError::CipherLength(data.len(), AES_BLOCK_SIZE * 2));
+    }
+
     let len = data.len();
 
     for i in 0..AES_BLOCK_SIZE {
-        // let temp = data[i + len - 2 * AES_BLOCK_SIZE];
-
-        // data[i + len - 2 * AES_BLOCK_SIZE] = data[i + len - AES_BLOCK_SIZE];
-        // data[i + len - AES_BLOCK_SIZE] = temp;
-
         data.swap(i + len - 2 * AES_BLOCK_SIZE, i + len - AES_BLOCK_SIZE)
     }
+
+    Ok(())
 }
 
 pub fn checksum_sha_aes(

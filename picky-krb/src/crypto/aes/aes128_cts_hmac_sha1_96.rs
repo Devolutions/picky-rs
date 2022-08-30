@@ -1,8 +1,11 @@
+use rand::rngs::OsRng;
+use rand::Rng;
+
 use crate::crypto::{Cipher, CipherSuite, KerberosCryptoError, KerberosCryptoResult};
 
-use super::decrypt::decrypt;
-use super::encrypt::encrypt;
-use super::{derive_key_from_password, AesSize, AES128_KEY_SIZE};
+use super::decrypt::decrypt_message;
+use super::encrypt::encrypt_message;
+use super::{derive_key_from_password, AesSize, AES128_KEY_SIZE, AES_BLOCK_SIZE};
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Aes128CtsHmacSha196;
@@ -23,11 +26,17 @@ impl Cipher for Aes128CtsHmacSha196 {
     }
 
     fn encrypt(&self, key: &[u8], key_usage: i32, payload: &[u8]) -> Result<Vec<u8>, KerberosCryptoError> {
-        encrypt(key, key_usage, payload, &AesSize::Aes128)
+        encrypt_message(
+            key,
+            key_usage,
+            payload,
+            &AesSize::Aes128,
+            OsRng::default().gen::<[u8; AES_BLOCK_SIZE]>(),
+        )
     }
 
     fn decrypt(&self, key: &[u8], key_usage: i32, cipher_data: &[u8]) -> KerberosCryptoResult<Vec<u8>> {
-        decrypt(key, key_usage, cipher_data, &AesSize::Aes128)
+        decrypt_message(key, key_usage, cipher_data, &AesSize::Aes128)
     }
 
     fn generate_key_from_password(&self, password: &[u8], salt: &[u8]) -> KerberosCryptoResult<Vec<u8>> {
@@ -37,22 +46,29 @@ impl Cipher for Aes128CtsHmacSha196 {
 
 #[cfg(test)]
 mod tests {
-    use crate::crypto::Cipher;
-
-    use super::Aes128CtsHmacSha196;
+    use crate::crypto::aes::decrypt::decrypt_message;
+    use crate::crypto::aes::encrypt::encrypt_message;
+    use crate::crypto::aes::AesSize;
 
     fn encrypt(plaintext: &[u8]) -> Vec<u8> {
         let key = [199, 196, 22, 102, 68, 93, 58, 102, 147, 19, 119, 57, 30, 138, 63, 230];
-        let cipher = Aes128CtsHmacSha196::new();
 
-        cipher.encrypt(&key, 5, &plaintext).unwrap()
+        encrypt_message(
+            &key,
+            5,
+            &plaintext,
+            &AesSize::Aes128,
+            [
+                161, 52, 157, 33, 238, 232, 185, 93, 167, 130, 91, 180, 167, 165, 224, 78,
+            ],
+        )
+        .unwrap()
     }
 
     fn decrypt(payload: &[u8]) -> Vec<u8> {
         let key = [199, 196, 22, 102, 68, 93, 58, 102, 147, 19, 119, 57, 30, 138, 63, 230];
-        let cipher = Aes128CtsHmacSha196::new();
 
-        cipher.decrypt(&key, 5, &payload).unwrap()
+        decrypt_message(&key, 5, payload, &AesSize::Aes128).unwrap()
     }
 
     #[test]
