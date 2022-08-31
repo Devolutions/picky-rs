@@ -74,11 +74,11 @@ pub fn decrypt_aes_cts(key: &[u8], cipher_data: &[u8], aes_size: &AesSize) -> Ke
 
     let mut cipher = cipher_data.to_vec();
 
-    if pad_length != 16 {
+    if pad_length != 0 {
         // decrypt Cn-1 with iv = 0.
         let start = cipher.len() + pad_length - AES_BLOCK_SIZE * 2;
 
-        let dn = decrypt_aes_cbc(key, &cipher[start..start + 16], aes_size)?;
+        let dn = decrypt_aes_cbc(key, &cipher[start..start + AES_BLOCK_SIZE], aes_size)?;
 
         let dn_len = dn.len();
         cipher.extend_from_slice(&dn[dn_len - pad_length..]);

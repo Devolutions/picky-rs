@@ -23,7 +23,7 @@ pbkdf2 = { version = "0.11", features = ["sha1"] }
 hmac = "0.12.1"
 sha1 = "0.10.1"
 
-crypto = { version = "0.4.0" }
+crypto = "0.4.0"
 aes = "0.8.1"
 des = "0.8.1"
 cbc = "0.1.2"

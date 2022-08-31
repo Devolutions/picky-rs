@@ -22,7 +22,7 @@ impl Cipher for Aes128CtsHmacSha196 {
     }
 
     fn cipher_type(&self) -> CipherSuite {
-        CipherSuite::Aes256CtsHmacSha196
+        CipherSuite::Aes128CtsHmacSha196
     }
 
     fn encrypt(&self, key: &[u8], key_usage: i32, payload: &[u8]) -> Result<Vec<u8>, KerberosCryptoError> {
@@ -40,7 +40,7 @@ impl Cipher for Aes128CtsHmacSha196 {
     }
 
     fn generate_key_from_password(&self, password: &[u8], salt: &[u8]) -> KerberosCryptoResult<Vec<u8>> {
-        derive_key_from_password(password, salt, &AesSize::Aes256)
+        derive_key_from_password(password, salt, &AesSize::Aes128)
     }
 }
 

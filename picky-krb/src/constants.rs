@@ -100,7 +100,7 @@ pub mod krb_priv {
     pub const KRB_PRIV_VERSION: [u8; 2] = [0x00, 0x01];
 }
 
-/// [Assigned Numbers](https://datatracker.ietf.org/doc/html/rfc3961#section-8)
+//= [Assigned Numbers](https://datatracker.ietf.org/doc/html/rfc3961#section-8) =//
 pub mod etypes {
     pub const DES3_CBC_MD5: usize = 5;
     pub const DES3_CBC_SHA1: usize = 7;
