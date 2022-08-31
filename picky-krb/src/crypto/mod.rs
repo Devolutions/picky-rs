@@ -58,7 +58,7 @@ pub trait Cipher {
     fn generate_key_from_password(&self, password: &[u8], salt: &[u8]) -> KerberosCryptoResult<Vec<u8>>;
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CipherSuite {
     Aes128CtsHmacSha196,
     Aes256CtsHmacSha196,

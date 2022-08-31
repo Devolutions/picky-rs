@@ -19,7 +19,7 @@ const AES_MAC_SIZE: usize = 12;
 pub const AES128_KEY_SIZE: usize = 128 / 8;
 pub const AES256_KEY_SIZE: usize = 256 / 8;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AesSize {
     Aes256,
     Aes128,

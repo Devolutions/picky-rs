@@ -7,7 +7,7 @@ use super::decrypt::decrypt_message;
 use super::encrypt::encrypt_message;
 use super::{derive_key_from_password, DES3_BLOCK_SIZE, DES3_KEY_SIZE};
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Des3CbcSha1Kd;
 
 impl Des3CbcSha1Kd {

@@ -7,7 +7,7 @@ use super::decrypt::decrypt_message;
 use super::encrypt::encrypt_message;
 use super::{derive_key_from_password, AesSize, AES256_KEY_SIZE, AES_BLOCK_SIZE};
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Aes256CtsHmacSha196;
 
 impl Aes256CtsHmacSha196 {
@@ -59,7 +59,7 @@ mod tests {
         encrypt_message(
             &key,
             5,
-            &plaintext,
+            plaintext,
             &AesSize::Aes256,
             [
                 161, 52, 157, 33, 238, 232, 185, 93, 167, 130, 91, 180, 167, 165, 224, 78,
