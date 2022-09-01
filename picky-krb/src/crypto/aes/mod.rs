@@ -26,7 +26,6 @@ pub enum AesSize {
 }
 
 impl AesSize {
-    #[inline]
     pub fn key_length(&self) -> usize {
         match self {
             AesSize::Aes256 => AES256_KEY_SIZE,
@@ -34,7 +33,6 @@ impl AesSize {
         }
     }
 
-    #[inline]
     pub fn block_bit_len(&self) -> usize {
         match self {
             AesSize::Aes256 => AES_BLOCK_SIZE * 8,
@@ -46,7 +44,6 @@ impl AesSize {
         self.key_length() * 8
     }
 
-    #[inline]
     fn confounder_byte_size(&self) -> usize {
         AES_BLOCK_SIZE
     }

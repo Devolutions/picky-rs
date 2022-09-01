@@ -51,7 +51,6 @@ pub fn derive_key(key: &[u8], well_known: &[u8]) -> KerberosCryptoResult<Vec<u8>
     Ok(random_to_key(&out))
 }
 
-#[inline]
 fn fix_weak_key(mut key: Vec<u8>) -> Vec<u8> {
     if weak(&key) {
         key[7] ^= 0xF0;
@@ -60,7 +59,6 @@ fn fix_weak_key(mut key: Vec<u8>) -> Vec<u8> {
     key
 }
 
-#[inline]
 fn weak(key: &[u8]) -> bool {
     for weak_key in WEAK_KEYS {
         if weak_key == key {
@@ -77,7 +75,6 @@ fn weak(key: &[u8]) -> bool {
     false
 }
 
-#[inline]
 fn calc_even_parity(mut b: u8) -> (u8, u8) {
     let lowestbit = b & 0x01;
     let mut c = 0;

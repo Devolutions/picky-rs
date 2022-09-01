@@ -13,7 +13,6 @@ use super::AesSize;
 /// default string-to-key parameters        00 00 10 00
 const AES_ITERATION_COUNT: u32 = 0x1000;
 
-#[inline]
 fn random_to_key(data: Vec<u8>) -> Vec<u8> {
     data
 }
