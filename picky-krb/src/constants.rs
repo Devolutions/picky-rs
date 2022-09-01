@@ -109,3 +109,20 @@ pub mod etypes {
     pub const AES256_CTS_HMAC_SHA1_96: usize = 18;
     pub const RC4_HMA: usize = 23;
 }
+
+//= [Assigned Numbers](https://datatracker.ietf.org/doc/html/rfc3961#section-8) =//
+pub mod cksum_types {
+    pub const CRC32: usize = 1;
+    pub const RSA_MD4: usize = 2;
+    pub const RSA_MD4_DES: usize = 3;
+    pub const DES_MAC: usize = 4;
+    pub const DES_MAC_K: usize = 5;
+    pub const RSA_MD4_DES_K: usize = 6;
+    pub const RSA_MD5: usize = 7;
+    pub const RSA_MD5_DES: usize = 8;
+    pub const RSA_MD5_DES3: usize = 9;
+    pub const HMAC_SHA1_DES3_KD: usize = 12;
+    pub const HMAC_SHA1_DES3: usize = 13;
+    pub const HMAC_SHA1_96_AES128: usize = 15;
+    pub const HMAC_SHA1_96_AES256: usize = 16;
+}
