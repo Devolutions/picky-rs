@@ -1,6 +1,6 @@
 [package]
 name = "picky-krb"
-version = "0.3.1"
+version = "0.4.0"
 authors = ["Devolutions Inc."]
 edition = "2021"
 rust-version = "1.60"
@@ -18,3 +18,13 @@ picky-asn1-der = "0.3.1"
 serde = { version = "1.0.136", features = ["derive"] }
 byteorder = "1.1.0"
 thiserror = "1.0.30"
+
+pbkdf2 = { version = "0.11", features = ["sha1"] }
+hmac = "0.12.1"
+sha1 = "0.10.1"
+
+crypto = "0.4.0"
+aes = "0.8.1"
+des = "0.8.1"
+cbc = "0.1.2"
+rand = "0.8.5"

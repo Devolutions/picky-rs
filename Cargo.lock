@@ -299,6 +299,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "crypto"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17d88231face754cdb045c1b65912a0f4ff78ca24bf371e30a4a8cfa993b3897"
+dependencies = [
+ "crypto-common",
+]
+
+[[package]]
 name = "crypto-bigint"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -364,6 +373,15 @@ dependencies = [
  "const-oid",
  "crypto-bigint",
  "pem-rfc7468",
+]
+
+[[package]]
+name = "des"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ffdd80ce8ce993de27e9f063a444a4d53ce8e8db4c1f00cc03af5ad5a9867a1e"
+dependencies = [
+ "cipher 0.4.3",
 ]
 
 [[package]]
@@ -582,6 +600,15 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+
+[[package]]
+name = "hmac"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c49c37c09c17a53d937dfbb742eb3a961d65a994e6bcdcf37e7399d0cc8ab5e"
+dependencies = [
+ "digest",
+]
 
 [[package]]
 name = "http"
@@ -945,12 +972,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "password-hash"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7676374caaee8a325c9e7a2ae557f216c5563a171d6997b0ef8a65af35147700"
+dependencies = [
+ "base64ct",
+ "rand_core",
+ "subtle",
+]
+
+[[package]]
 name = "pbkdf2"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "83a0692ec44e4cf1ef28ca317f14f8f07da2d95ec3fa01f86e4467b725e60917"
 dependencies = [
  "digest",
+ "hmac",
+ "password-hash",
+ "sha-1",
+ "sha2",
 ]
 
 [[package]]
@@ -1145,12 +1187,20 @@ dependencies = [
 
 [[package]]
 name = "picky-krb"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
+ "aes 0.8.1",
  "byteorder",
+ "cbc",
+ "crypto",
+ "des",
+ "hmac",
+ "pbkdf2",
  "picky-asn1 0.5.0",
  "picky-asn1-der 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand",
  "serde",
+ "sha1",
  "thiserror",
 ]
 
@@ -1469,6 +1519,17 @@ name = "sha-1"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "028f48d513f9678cda28f6e4064755b3fbb2af6acd672f2c209b62323f7aea0f"
+dependencies = [
+ "cfg-if",
+ "cpufeatures",
+ "digest",
+]
+
+[[package]]
+name = "sha1"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c77f4e7f65455545c2153c1253d25056825e77ee2533f0e41deb65a93a34852f"
 dependencies = [
  "cfg-if",
  "cpufeatures",
