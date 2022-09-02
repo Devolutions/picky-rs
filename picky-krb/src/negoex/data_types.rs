@@ -1,10 +1,8 @@
-use std::{
-    fmt,
-    io::{self, Read},
-};
+use std::fmt;
+use std::io::{self, Read, Write};
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use serde::{de, ser, Deserialize, Serialize};
+use serde::{de, ser, Deserialize, Serialize, Serializer};
 use uuid::Uuid;
 
 use super::{NegoexDecode, NegoexEncode};
@@ -210,7 +208,68 @@ pub struct Extension {
 ///     ULONG ByteArrayLength;
 /// } BYTE_VECTOR;
 /// ```
-pub type ByteVector = Vec<u8>;
+pub type ByteVector = Vector<u8>;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Vector<T>(Vec<T>);
+
+impl<T: de::DeserializeOwned> Vector<T> {
+    pub fn from_reader(mut from: impl Read, data: impl AsRef<[u8]>) -> Result<Self, io::Error> {
+        let offset = from.read_u32::<BigEndian>()?;
+        let count = from.read_u32::<BigEndian>()?;
+
+        let mut elements = Vec::with_capacity(count as usize);
+
+        let mut reader: Box<dyn Read> = Box::new(&data.as_ref()[offset as usize..]);
+
+        for _ in 0..count {
+            let e: T = bincode::deserialize_from(&mut reader).unwrap();
+            elements.push(e);
+        }
+
+        Ok(Self(elements))
+    }
+}
+
+impl<T: serde::Serialize> Vector<T> {
+    pub fn write_to(&self, offset: u32, mut writer: impl Write, mut data_writer: impl Write) -> Result<(), io::Error> {
+        writer.write_u32::<BigEndian>(offset + 4)?;
+
+        writer.write_u32::<BigEndian>(self.0.len() as u32)?;
+
+        for e in &self.0 {
+            bincode::serialize_into(&mut data_writer, e).unwrap();
+        }
+
+        Ok(())
+    }
+}
+
+// impl<'de> de::Deserialize<'de> for Vector<u8> {
+//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+//     where
+//         D: de::Deserializer<'de>,
+//     {
+//         struct Visitor;
+
+//         impl<'de> de::Visitor<'de> for Visitor {
+//             type Value = Vector<u8>;
+
+//             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+//                 formatter.write_str("a valid ByteVector")
+//             }
+
+//             fn visit_seq<A>(self, seq: A) -> Result<Self::Value, A::Error>
+//                 where
+//                     A: de::SeqAccess<'de>, {
+//                 println!("visit seq");
+//                 todo!()
+//             }
+//         }
+
+//         deserializer.deserialize_struct("ByteVector", &["offset", "count", "pad"], Visitor)
+//     }
+// }
 
 /// [2.2.5.2.2 AUTH_SCHEME_VECTOR](https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NEGOEX/%5bMS-NEGOEX%5d.pdf)
 /// ```not_rust
@@ -232,6 +291,14 @@ pub type AuthSchemeVector = Vec<AuthScheme>;
 /// ```
 pub type ExtensionVector = Vec<Extension>;
 
+// #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+// pub struct ChecksumVector {
+//     offset: u32,
+//     count: u16,
+//     pad: u16,
+//     checksum: Vec<u8>,
+// }
+
 /// [2.2.5.1.3 CHECKSUM](https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NEGOEX/%5bMS-NEGOEX%5d.pdf)
 /// ```not_rust
 /// struct
@@ -242,12 +309,68 @@ pub type ExtensionVector = Vec<Extension>;
 ///     BYTE_VECTOR ChecksumValue;
 /// } CHECKSUM;
 /// ```
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Checksum {
-    pub header_len: u32,
-    pub checksum_scheme: u32,
     pub checksum_type: u32,
-    pub checksum_value: ByteVector,
+    pub checksum_value: Vector<u8>,
+}
+// pub struct Checksum (
+// pub header_len: u32,
+// pub checksum_scheme: u32,
+// pub checksum_type: u32,
+// pub checksum_value: vec<u8>,
+// );
+
+impl Checksum {
+    pub fn len(&self) -> usize {
+        self.checksum_value.0.len()
+    }
+
+    pub fn from_bytes(mut reader: impl Read, data: impl AsRef<[u8]>) -> Result<Self, io::Error> {
+        let _header_len = reader.read_u32::<BigEndian>()?;
+
+        let checksum_scheme = reader.read_u32::<BigEndian>()?;
+
+        if checksum_scheme != CHECKSUM_SCHEME_RFC3961 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "Invalid checksum scheme: {}. Expected: {}.",
+                    checksum_scheme, CHECKSUM_SCHEME_RFC3961
+                ),
+            ));
+        }
+
+        let checksum_type = reader.read_u32::<BigEndian>()?;
+
+        let checksum_value = ByteVector::from_reader(reader, data)?;
+
+        Ok(Self {
+            // header_len,
+            // checksum_scheme,
+            checksum_type,
+            checksum_value,
+        })
+    }
+
+    pub fn write_into(
+        &self,
+        offset: u32,
+        header_len: u32,
+        mut writer: impl Write,
+        mut data_writer: impl Write,
+    ) -> Result<(), io::Error> {
+        writer.write_u32::<BigEndian>(header_len)?;
+
+        writer.write_u32::<BigEndian>(CHECKSUM_SCHEME_RFC3961)?;
+
+        writer.write_u32::<BigEndian>(self.checksum_type)?;
+
+        let offset = offset + 3 * 4;
+        self.checksum_value.write_to(offset, writer, data_writer)?;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -256,9 +379,10 @@ mod tests {
 
     use uuid::Uuid;
 
+    use crate::constants::cksum_types::HMAC_SHA1_96_AES256;
     use crate::negoex::data_types::Guid;
 
-    use super::{MessageHeader, MessageType, SIGNATURE, Checksum, CHECKSUM_SCHEME_RFC3961};
+    use super::{ByteVector, Checksum, MessageHeader, MessageType, Vector, CHECKSUM_SCHEME_RFC3961, SIGNATURE};
 
     #[test]
     fn message_header_encode() {
@@ -305,12 +429,31 @@ mod tests {
     }
 
     #[test]
+    fn t() {
+        // let a: Vector<u8> = bincode::deserialize(&[1, 2, 3, 4]).unwrap();
+    }
+
+    #[test]
     fn checksum_encode() {
-        let checksum = Checksum {
-            header_len: 20,
-            checksum_scheme: CHECKSUM_SCHEME_RFC3961,
-            checksum_type: todo!(),
-            checksum_value: todo!(),
-        };
+        // let checksum = Checksum {
+        //     header_len: 20,
+        //     checksum_scheme: CHECKSUM_SCHEME_RFC3961,
+        //     checksum_type: HMAC_SHA1_96_AES256 as u32,
+        //     checksum_value: ChecksumVector {
+        //         offset: 80,
+        //         count: 12,
+        //         pad: 0,
+        //         checksum: vec![228, 167, 112, 148, 23, 131, 204, 12, 13, 36, 58, 87],
+        //     },
+        // };
+
+        // let encoded = bincode::serialize(&checksum).unwrap();
+
+        // assert_eq!(
+        //     &[
+        //         //
+        //     ],
+        //     encoded.as_slice(),
+        // )
     }
 }
