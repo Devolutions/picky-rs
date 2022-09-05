@@ -1,8 +1,9 @@
 use std::io::{self, Read, Write};
 
-use byteorder::{ReadBytesExt, BigEndian, WriteBytesExt};
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
-use super::{data_types::{MessageHeader, AuthScheme, AuthSchemeVector, ExtensionVector, ByteVector, Checksum, Guid}, NegoexMessage};
+use super::data_types::{AuthScheme, AuthSchemeVector, ByteVector, Checksum, ExtensionVector, Guid, MessageHeader};
+use super::NegoexMessage;
 
 /// [2.2.4 Random array](https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NEGOEX/%5bMS-NEGOEX%5d.pdf)
 /// ```not_rust
@@ -62,7 +63,12 @@ impl NegoexMessage for Nego {
         })
     }
 
-    fn encode_with_data(&self, offset: &mut usize, mut to: impl Write, mut data: impl Write) -> Result<(), Self::Error> {
+    fn encode_with_data(
+        &self,
+        offset: &mut usize,
+        mut to: impl Write,
+        mut data: impl Write,
+    ) -> Result<(), Self::Error> {
         self.header.encode(offset, &mut to)?;
 
         to.write_all(&self.random)?;
@@ -72,7 +78,7 @@ impl NegoexMessage for Nego {
         self.auth_schemes.encode_with_data(offset, &mut to, &mut data)?;
 
         self.extensions.encode_with_data(offset, &mut to, &mut data)?;
-        
+
         Ok(())
     }
 
@@ -132,7 +138,12 @@ impl NegoexMessage for Exchange {
         Ok(())
     }
 
-    fn encode_with_data(&self, offset: &mut usize, mut to: impl Write, mut data: impl Write) -> Result<(), Self::Error> {
+    fn encode_with_data(
+        &self,
+        offset: &mut usize,
+        mut to: impl Write,
+        mut data: impl Write,
+    ) -> Result<(), Self::Error> {
         self.header.encode(offset, &mut to)?;
 
         self.auth_scheme.encode(offset, &mut to)?;
@@ -186,7 +197,12 @@ impl NegoexMessage for Verify {
         Ok(())
     }
 
-    fn encode_with_data(&self, offset: &mut usize, mut to: impl Write, mut data: impl Write) -> Result<(), Self::Error> {
+    fn encode_with_data(
+        &self,
+        offset: &mut usize,
+        mut to: impl Write,
+        mut data: impl Write,
+    ) -> Result<(), Self::Error> {
         self.header.encode(offset, &mut to)?;
 
         self.auth_scheme.encode(offset, &mut to)?;

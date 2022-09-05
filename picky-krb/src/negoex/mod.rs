@@ -1,6 +1,6 @@
-use std::io::{Read, Write, self};
+use std::io::{self, Read, Write};
 
-use byteorder::{ReadBytesExt, WriteBytesExt, BigEndian};
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
 pub mod data_types;
 pub mod messages;
@@ -79,7 +79,12 @@ impl<T: NegoexMessage<Error = io::Error>> NegoexMessage for Vec<T> {
 
     // fn encode(&self, offset: &mut usize, )
 
-    fn encode_with_data(&self, offset: &mut usize, mut to: impl Write, mut data: impl Write) -> Result<(), Self::Error> {
+    fn encode_with_data(
+        &self,
+        offset: &mut usize,
+        mut to: impl Write,
+        mut data: impl Write,
+    ) -> Result<(), Self::Error> {
         *offset += 4 + 4 + 4;
         to.write_u32::<BigEndian>(*offset as u32)?;
 

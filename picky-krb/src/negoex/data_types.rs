@@ -47,7 +47,7 @@ impl NegoexMessage for Guid {
     }
 
     fn encode(&self, offset: &mut usize, to: impl Write) -> Result<(), Self::Error> {
-        self.encode_with_data(offset, to, &mut[] as &mut [u8])
+        self.encode_with_data(offset, to, &mut [] as &mut [u8])
     }
 }
 
@@ -209,7 +209,12 @@ impl NegoexMessage for MessageHeader {
         })
     }
 
-    fn encode_with_data(&self, offset: &mut usize, mut to: impl Write, mut data: impl Write) -> Result<(), Self::Error> {
+    fn encode_with_data(
+        &self,
+        offset: &mut usize,
+        mut to: impl Write,
+        mut data: impl Write,
+    ) -> Result<(), Self::Error> {
         to.write_u64::<BigEndian>(self.signature)?;
         *offset += 8;
 
@@ -267,7 +272,12 @@ impl NegoexMessage for Extension {
         })
     }
 
-    fn encode_with_data(&self, offset: &mut usize, mut to: impl Write, mut data: impl Write) -> Result<(), Self::Error> {
+    fn encode_with_data(
+        &self,
+        offset: &mut usize,
+        mut to: impl Write,
+        mut data: impl Write,
+    ) -> Result<(), Self::Error> {
         to.write_u32::<BigEndian>(self.extension_type)?;
         *offset += 4;
 
@@ -376,7 +386,12 @@ impl NegoexMessage for Checksum {
         })
     }
 
-    fn encode_with_data(&self, offset: &mut usize, mut to: impl Write, mut data: impl Write) -> Result<(), Self::Error> {
+    fn encode_with_data(
+        &self,
+        offset: &mut usize,
+        mut to: impl Write,
+        mut data: impl Write,
+    ) -> Result<(), Self::Error> {
         to.write_u32::<BigEndian>(self.header_len)?;
         *offset += 4;
 
