@@ -1,6 +1,6 @@
 use std::io::{self, Read, Write};
 
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{BigEndian, LittleEndian, ReadBytesExt, WriteBytesExt};
 
 pub mod data_types;
 pub mod messages;
@@ -53,18 +53,11 @@ impl<T: NegoexMessage<Error = io::Error>> NegoexMessage for Vec<T> {
     }
 
     fn decode(offset: &mut usize, mut from: impl Read, message: &[u8]) -> Result<Self, Self::Error> {
-        let message_offset = from.read_u32::<BigEndian>()? as usize;
+        let message_offset = from.read_u32::<LittleEndian>()? as usize;
         *offset += 4;
 
-        if message_offset < *offset {
-            panic!("bad offset");
-        }
-
-        let count = from.read_u32::<BigEndian>()? as usize;
+        let count = from.read_u32::<LittleEndian>()? as usize;
         *offset += 4;
-
-        // padding is not described in specification but present in real messages
-        // let _padding = from.read_u16::<BigEndian>()?;
 
         let mut reader: Box<dyn Read> = Box::new(&message[message_offset..]);
 
@@ -77,18 +70,16 @@ impl<T: NegoexMessage<Error = io::Error>> NegoexMessage for Vec<T> {
         Ok(elements)
     }
 
-    // fn encode(&self, offset: &mut usize, )
-
     fn encode_with_data(
         &self,
         offset: &mut usize,
         mut to: impl Write,
         mut data: impl Write,
     ) -> Result<(), Self::Error> {
-        *offset += 4 + 4 + 4;
-        to.write_u32::<BigEndian>(*offset as u32)?;
+        *offset += 4 + 4;
+        to.write_u32::<LittleEndian>(*offset as u32)?;
 
-        to.write_u32::<BigEndian>(self.len() as u32)?;
+        to.write_u32::<LittleEndian>(self.len() as u32)?;
 
         // 0 = 4 byte padding that is not described in specification but present in real messages
         // to.write_u32::<BigEndian>(0)?;
