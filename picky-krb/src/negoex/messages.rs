@@ -3,7 +3,7 @@ use std::io::{self, Read, Write};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 use super::data_types::{AuthScheme, AuthSchemeVector, ByteVector, Checksum, ExtensionVector, MessageHeader};
-use super::NegoexMessage;
+use super::{NegoexDataType, NegoexMessage};
 
 /// [2.2.4 Random array](https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NEGOEX/%5bMS-NEGOEX%5d.pdf)
 /// ```not_rust
@@ -34,22 +34,17 @@ pub struct Nego {
 impl NegoexMessage for Nego {
     type Error = io::Error;
 
-    fn size(&self) -> usize {
-        self.header.size() + RANDOM_ARRAY_SIZE + 8 + self.auth_schemes.size() + self.extensions.size()
-    }
-
-    fn decode(offset: &mut usize, mut from: impl Read, message: &[u8]) -> Result<Self, Self::Error> {
-        let header: MessageHeader = NegoexMessage::decode(offset, &mut from, &[])?;
+    fn decode(mut from: impl Read, message: &[u8]) -> Result<Self, Self::Error> {
+        let header: MessageHeader = NegoexDataType::decode(&mut from, &[])?;
 
         let mut random = [0; RANDOM_ARRAY_SIZE];
         from.read_exact(&mut random)?;
-        *offset += 32;
 
         let protocol_version = from.read_u64::<LittleEndian>()?;
 
-        let auth_schemes = NegoexMessage::decode(offset, &mut from, message)?;
+        let auth_schemes = NegoexDataType::decode(&mut from, message)?;
 
-        let extensions = NegoexMessage::decode(offset, &mut from, message)?;
+        let extensions = NegoexDataType::decode(&mut from, message)?;
 
         Ok(Self {
             header,
@@ -60,34 +55,23 @@ impl NegoexMessage for Nego {
         })
     }
 
-    fn encode_with_data(
-        &self,
-        offset: &mut usize,
-        mut to: impl Write,
-        mut data: impl Write,
-    ) -> Result<(), Self::Error> {
-        self.header.encode(&mut to)?;
-
-        to.write_all(&self.random)?;
-        // *offset += RANDOM_ARRAY_SIZE;
-
-        to.write_u64::<LittleEndian>(self.protocol_version)?;
-        // *offset += 8;
-
-        self.auth_schemes.encode_with_data(offset, &mut to, &mut data)?;
-
-        self.extensions.encode_with_data(offset, &mut to, &mut data)?;
-
-        Ok(())
-    }
-
     fn encode(&self, mut to: impl Write) -> Result<(), Self::Error> {
         let mut message_header = Vec::new();
         let mut message_data = Vec::new();
 
         let mut offset = self.header.header_len as usize;
 
-        self.encode_with_data(&mut offset, &mut message_header, &mut message_data)?;
+        self.header.encode(&mut message_header)?;
+
+        message_header.write_all(&self.random)?;
+
+        message_header.write_u64::<LittleEndian>(self.protocol_version)?;
+
+        self.auth_schemes
+            .encode_with_data(&mut offset, &mut message_header, &mut message_data)?;
+
+        self.extensions
+            .encode_with_data(&mut offset, &mut message_header, &mut message_data)?;
 
         to.write_all(&message_header)?;
         to.write_all(&message_data)?;
@@ -115,15 +99,11 @@ pub struct Exchange {
 impl NegoexMessage for Exchange {
     type Error = io::Error;
 
-    fn size(&self) -> usize {
-        self.header.size() + self.auth_scheme.size() + self.exchange.size()
-    }
-
-    fn decode(offset: &mut usize, mut from: impl Read, message: &[u8]) -> Result<Self, Self::Error> {
+    fn decode(mut from: impl Read, message: &[u8]) -> Result<Self, Self::Error> {
         Ok(Self {
-            header: NegoexMessage::decode(offset, &mut from, message)?,
-            auth_scheme: NegoexMessage::decode(offset, &mut from, message)?,
-            exchange: NegoexMessage::decode(offset, &mut from, message)?,
+            header: NegoexDataType::decode(&mut from, message)?,
+            auth_scheme: NegoexDataType::decode(&mut from, message)?,
+            exchange: NegoexDataType::decode(&mut from, message)?,
         })
     }
 
@@ -133,25 +113,15 @@ impl NegoexMessage for Exchange {
         let mut message_header = Vec::new();
         let mut message_data = Vec::new();
 
-        self.encode_with_data(&mut offset, &mut message_header, &mut message_data)?;
+        self.header.encode(&mut message_header)?;
+
+        self.auth_scheme.encode(&mut message_header)?;
+
+        self.exchange
+            .encode_with_data(&mut offset, &mut message_header, &mut message_data)?;
 
         to.write_all(&message_header)?;
         to.write_all(&message_data)?;
-
-        Ok(())
-    }
-
-    fn encode_with_data(
-        &self,
-        offset: &mut usize,
-        mut to: impl Write,
-        mut data: impl Write,
-    ) -> Result<(), Self::Error> {
-        self.header.encode(&mut to)?;
-
-        self.auth_scheme.encode(&mut to)?;
-
-        self.exchange.encode_with_data(offset, &mut to, &mut data)?;
 
         Ok(())
     }
@@ -176,15 +146,11 @@ pub struct Verify {
 impl NegoexMessage for Verify {
     type Error = io::Error;
 
-    fn size(&self) -> usize {
-        self.header.size() + self.auth_scheme.size() + self.checksum.size()
-    }
-
-    fn decode(offset: &mut usize, mut from: impl Read, message: &[u8]) -> Result<Self, Self::Error> {
+    fn decode(mut from: impl Read, message: &[u8]) -> Result<Self, Self::Error> {
         Ok(Self {
-            header: NegoexMessage::decode(offset, &mut from, message)?,
-            auth_scheme: NegoexMessage::decode(offset, &mut from, message)?,
-            checksum: NegoexMessage::decode(offset, &mut from, message)?,
+            header: NegoexDataType::decode(&mut from, message)?,
+            auth_scheme: NegoexDataType::decode(&mut from, message)?,
+            checksum: NegoexDataType::decode(&mut from, message)?,
         })
     }
 
@@ -194,25 +160,15 @@ impl NegoexMessage for Verify {
         let mut message_header = Vec::new();
         let mut message_data = Vec::new();
 
-        self.encode_with_data(&mut offset, &mut message_header, &mut message_data)?;
+        self.header.encode(&mut message_header)?;
+
+        self.auth_scheme.encode(&mut message_header)?;
+
+        self.checksum
+            .encode_with_data(&mut offset, &mut message_header, &mut message_data)?;
 
         to.write_all(&message_header)?;
         to.write_all(&message_data)?;
-
-        Ok(())
-    }
-
-    fn encode_with_data(
-        &self,
-        offset: &mut usize,
-        mut to: impl Write,
-        mut data: impl Write,
-    ) -> Result<(), Self::Error> {
-        self.header.encode(&mut to)?;
-
-        self.auth_scheme.encode(&mut to)?;
-
-        self.checksum.encode_with_data(offset, &mut to, &mut data)?;
 
         Ok(())
     }
@@ -240,7 +196,7 @@ mod tests {
             120, 110, 195, 8,
         ];
 
-        let nego = Nego::decode(&mut 0, &encoded as &[u8], &encoded).unwrap();
+        let nego = Nego::decode(&encoded as &[u8], &encoded).unwrap();
 
         assert_eq!(
             Nego {
@@ -313,7 +269,7 @@ mod tests {
             107, 101, 110, 32, 83, 105, 103, 110, 105, 110, 103, 32, 80, 117, 98, 108, 105, 99, 32, 75, 101, 121,
         ];
 
-        let exchange = Exchange::decode(&mut 0, &encoded as &[u8], &encoded).unwrap();
+        let exchange = Exchange::decode(&encoded as &[u8], &encoded).unwrap();
 
         assert_eq!(
             Exchange {
@@ -397,7 +353,7 @@ mod tests {
             148, 23, 131, 204, 12, 13, 36, 58, 87,
         ];
 
-        let verify = Verify::decode(&mut 0, &encoded as &[u8], &encoded).unwrap();
+        let verify = Verify::decode(&encoded as &[u8], &encoded).unwrap();
 
         assert_eq!(
             Verify {
@@ -445,7 +401,12 @@ mod tests {
         verify.encode(&mut encoded).unwrap();
 
         assert_eq!(
-            &[78, 69, 71, 79, 69, 88, 84, 83, 6, 0, 0, 0, 9, 0, 0, 0, 76, 0, 0, 0, 88, 0, 0, 0, 90, 7, 41, 59, 145, 243, 51, 175, 161, 180, 162, 18, 36, 157, 124, 180, 92, 51, 83, 13, 234, 249, 13, 77, 178, 236, 74, 227, 120, 110, 195, 8, 20, 0, 0, 0, 1, 0, 0, 0, 16, 0, 0, 0, 76, 0, 0, 0, 12, 0, 0, 0, 80, 14, 142, 6, 58, 29, 106, 165, 72, 160, 111, 12],
+            &[
+                78, 69, 71, 79, 69, 88, 84, 83, 6, 0, 0, 0, 9, 0, 0, 0, 76, 0, 0, 0, 88, 0, 0, 0, 90, 7, 41, 59, 145,
+                243, 51, 175, 161, 180, 162, 18, 36, 157, 124, 180, 92, 51, 83, 13, 234, 249, 13, 77, 178, 236, 74,
+                227, 120, 110, 195, 8, 20, 0, 0, 0, 1, 0, 0, 0, 16, 0, 0, 0, 76, 0, 0, 0, 12, 0, 0, 0, 80, 14, 142, 6,
+                58, 29, 106, 165, 72, 160, 111, 12
+            ],
             encoded.as_slice()
         );
     }

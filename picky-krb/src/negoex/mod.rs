@@ -11,24 +11,32 @@ where
 {
     type Error;
 
+    fn decode(from: impl Read, message: &[u8]) -> Result<Self, Self::Error>;
+    fn encode(&self, to: impl Write) -> Result<(), Self::Error>;
+}
+
+pub trait NegoexDataType
+where
+    Self: Sized,
+{
+    type Error;
+
     fn size(&self) -> usize;
 
-    fn decode(offset: &mut usize, from: impl Read, message: &[u8]) -> Result<Self, Self::Error>;
+    fn decode(from: impl Read, message: &[u8]) -> Result<Self, Self::Error>;
 
     fn encode(&self, to: impl Write) -> Result<(), Self::Error>;
     fn encode_with_data(&self, offset: &mut usize, to: impl Write, data: impl Write) -> Result<(), Self::Error>;
 }
 
-impl NegoexMessage for u8 {
+impl NegoexDataType for u8 {
     type Error = io::Error;
 
     fn size(&self) -> usize {
         1
     }
 
-    fn decode(offset: &mut usize, mut from: impl Read, _message: &[u8]) -> Result<Self, Self::Error> {
-        *offset += 1;
-
+    fn decode(mut from: impl Read, _message: &[u8]) -> Result<Self, Self::Error> {
         from.read_u8()
     }
 
@@ -46,27 +54,24 @@ impl NegoexMessage for u8 {
     }
 }
 
-impl<T: NegoexMessage<Error = io::Error>> NegoexMessage for Vec<T> {
+impl<T: NegoexDataType<Error = io::Error>> NegoexDataType for Vec<T> {
     type Error = io::Error;
 
     fn size(&self) -> usize {
-        // count with padding
-        8 + 4 + if self.len() == 0 { 0 } else { self[1].size() }
+        8 + if self.len() == 0 { 0 } else { self[1].size() }
     }
 
-    fn decode(offset: &mut usize, mut from: impl Read, message: &[u8]) -> Result<Self, Self::Error> {
+    fn decode(mut from: impl Read, message: &[u8]) -> Result<Self, Self::Error> {
         let message_offset = from.read_u32::<LittleEndian>()? as usize;
-        *offset += 4;
 
         let count = from.read_u32::<LittleEndian>()? as usize;
-        *offset += 4;
 
         let mut reader: Box<dyn Read> = Box::new(&message[message_offset..]);
 
         let mut elements = Vec::with_capacity(count);
 
         for _ in 0..count {
-            elements.push(T::decode(offset, &mut reader, message)?);
+            elements.push(T::decode(&mut reader, message)?);
         }
 
         Ok(elements)
@@ -78,10 +83,6 @@ impl<T: NegoexMessage<Error = io::Error>> NegoexMessage for Vec<T> {
         mut to: impl Write,
         mut data: impl Write,
     ) -> Result<(), Self::Error> {
-        // *offset += 4 + 4;
-
-        println!("offset: {}", *offset);
-
         if self.is_empty() {
             to.write_u32::<LittleEndian>(0)?;
         } else {
@@ -89,9 +90,6 @@ impl<T: NegoexMessage<Error = io::Error>> NegoexMessage for Vec<T> {
         }
 
         to.write_u32::<LittleEndian>(self.len() as u32)?;
-
-        // 0 = 4 byte padding that is not described in specification but present in real messages
-        // to.write_u32::<BigEndian>(0)?;
 
         let mut elements_headers = Vec::new();
         let mut elements_data = Vec::new();

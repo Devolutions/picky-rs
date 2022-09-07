@@ -5,7 +5,7 @@ use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::{FromPrimitive, ToPrimitive};
 use uuid::Uuid;
 
-use super::NegoexMessage;
+use super::NegoexDataType;
 
 /// [2.2.3 Constants](https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NEGOEX/%5bMS-NEGOEX%5d.pdf)
 /// ```not_rust
@@ -22,24 +22,21 @@ pub const CHECKSUM_SCHEME_RFC3961: u32 = 0x1;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Guid(pub Uuid);
 
-impl NegoexMessage for Guid {
+impl NegoexDataType for Guid {
     type Error = io::Error;
 
     fn size(&self) -> usize {
         16
     }
 
-    fn decode(offset: &mut usize, mut from: impl Read, _message: &[u8]) -> Result<Self, Self::Error> {
+    fn decode(mut from: impl Read, _message: &[u8]) -> Result<Self, Self::Error> {
         let mut id_bytes = [0; 16];
         from.read_exact(&mut id_bytes)?;
-        *offset += 16;
 
         Ok(Self(Uuid::from_bytes_le(id_bytes)))
     }
 
-    fn encode_with_data(&self, offset: &mut usize, mut to: impl Write, _data: impl Write) -> Result<(), Self::Error> {
-        // *offset += 16;
-
+    fn encode_with_data(&self, _offset: &mut usize, mut to: impl Write, _data: impl Write) -> Result<(), Self::Error> {
         to.write_all(&self.0.to_bytes_le())?;
 
         Ok(())
@@ -90,22 +87,19 @@ pub enum MessageType {
     Alert = 7,
 }
 
-impl NegoexMessage for MessageType {
+impl NegoexDataType for MessageType {
     type Error = io::Error;
 
     fn size(&self) -> usize {
         4
     }
 
-    fn decode(offset: &mut usize, mut from: impl Read, _message: &[u8]) -> Result<Self, Self::Error> {
-        *offset += 4;
-
+    fn decode(mut from: impl Read, _message: &[u8]) -> Result<Self, Self::Error> {
         Ok(MessageType::from_u32(from.read_u32::<LittleEndian>()?)
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "invalid MessageType"))?)
     }
 
-    fn encode_with_data(&self, offset: &mut usize, mut to: impl Write, _data: impl Write) -> Result<(), Self::Error> {
-        // *offset += 4;
+    fn encode_with_data(&self, _offset: &mut usize, mut to: impl Write, _data: impl Write) -> Result<(), Self::Error> {
         to.write_u32::<LittleEndian>(
             self.to_u32()
                 .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "can not encode MessageType as u32"))?,
@@ -143,16 +137,15 @@ pub struct MessageHeader {
     pub conversation_id: ConversationId,
 }
 
-impl NegoexMessage for MessageHeader {
+impl NegoexDataType for MessageHeader {
     type Error = io::Error;
 
     fn size(&self) -> usize {
         8 + self.message_type.size() + 4 + 4 + 4 + self.conversation_id.size()
     }
 
-    fn decode(offset: &mut usize, mut from: impl Read, message: &[u8]) -> Result<Self, Self::Error> {
+    fn decode(mut from: impl Read, message: &[u8]) -> Result<Self, Self::Error> {
         let signature = from.read_u64::<LittleEndian>()?;
-        *offset += 8;
 
         if signature != SIGNATURE {
             return Err(io::Error::new(
@@ -164,18 +157,15 @@ impl NegoexMessage for MessageHeader {
             ));
         }
 
-        let message_type = MessageType::decode(offset, &mut from, message)?;
+        let message_type = MessageType::decode(&mut from, message)?;
 
         let sequence_num = from.read_u32::<LittleEndian>()?;
-        *offset += 4;
 
         let header_len = from.read_u32::<LittleEndian>()?;
-        *offset += 4;
 
         let message_len = from.read_u32::<LittleEndian>()?;
-        *offset += 4;
 
-        let conversation_id = ConversationId::decode(offset, &mut from, message)?;
+        let conversation_id = ConversationId::decode(&mut from, message)?;
 
         Ok(Self {
             signature,
@@ -194,18 +184,14 @@ impl NegoexMessage for MessageHeader {
         mut data: impl Write,
     ) -> Result<(), Self::Error> {
         to.write_u64::<LittleEndian>(self.signature)?;
-        // *offset += 8;
 
         self.message_type.encode_with_data(offset, &mut to, &mut data)?;
 
         to.write_u32::<LittleEndian>(self.sequence_num)?;
-        // *offset += 4;
 
         to.write_u32::<LittleEndian>(self.header_len)?;
-        // *offset += 4;
 
         to.write_u32::<LittleEndian>(self.message_len)?;
-        // *offset += 4;
 
         self.conversation_id.encode_with_data(offset, &mut to, &mut data)?;
 
@@ -233,18 +219,17 @@ pub struct Extension {
     pub extension_value: ByteVector,
 }
 
-impl NegoexMessage for Extension {
+impl NegoexDataType for Extension {
     type Error = io::Error;
 
     fn size(&self) -> usize {
         4 + self.extension_value.len()
     }
 
-    fn decode(offset: &mut usize, mut from: impl Read, message: &[u8]) -> Result<Self, Self::Error> {
+    fn decode(mut from: impl Read, message: &[u8]) -> Result<Self, Self::Error> {
         let extension_type = from.read_u32::<LittleEndian>()?;
-        *offset += 4;
 
-        let extension_value = ByteVector::decode(offset, &mut from, message)?;
+        let extension_value = ByteVector::decode(&mut from, message)?;
 
         Ok(Self {
             extension_type,
@@ -259,7 +244,6 @@ impl NegoexMessage for Extension {
         mut data: impl Write,
     ) -> Result<(), Self::Error> {
         to.write_u32::<LittleEndian>(self.extension_type)?;
-        // *offset += 4;
 
         self.extension_value.encode_with_data(offset, &mut to, &mut data)?;
 
@@ -337,19 +321,17 @@ pub struct Checksum {
     pub checksum_value: Vec<u8>,
 }
 
-impl NegoexMessage for Checksum {
+impl NegoexDataType for Checksum {
     type Error = io::Error;
 
     fn size(&self) -> usize {
         4 + 4 + 4 + self.checksum_value.size()
     }
 
-    fn decode(offset: &mut usize, mut from: impl Read, message: &[u8]) -> Result<Self, Self::Error> {
+    fn decode(mut from: impl Read, message: &[u8]) -> Result<Self, Self::Error> {
         let header_len = from.read_u32::<LittleEndian>()?;
-        *offset += 4;
 
         let checksum_scheme = from.read_u32::<LittleEndian>()?;
-        *offset += 4;
 
         if checksum_scheme != CHECKSUM_SCHEME_RFC3961 {
             return Err(io::Error::new(
@@ -362,9 +344,8 @@ impl NegoexMessage for Checksum {
         }
 
         let checksum_type = from.read_u32::<LittleEndian>()?;
-        *offset += 4;
 
-        let checksum_value = Vec::decode(offset, &mut from, message)?;
+        let checksum_value = Vec::decode(&mut from, message)?;
 
         Ok(Self {
             header_len,
@@ -414,7 +395,7 @@ mod tests {
 
     use crate::constants::cksum_types::HMAC_SHA1_96_AES256;
     use crate::negoex::data_types::Guid;
-    use crate::negoex::NegoexMessage;
+    use crate::negoex::NegoexDataType;
 
     use super::{Checksum, Extension, MessageHeader, MessageType, CHECKSUM_SCHEME_RFC3961, SIGNATURE};
 
@@ -435,7 +416,7 @@ mod tests {
     fn guid_decode() {
         let encoded_guid = [90, 7, 41, 59, 145, 243, 51, 175, 161, 180, 162, 18, 36, 157, 124, 180];
 
-        let guid = Guid::decode(&mut 0, &encoded_guid as &[u8], &encoded_guid).unwrap();
+        let guid = Guid::decode(&encoded_guid as &[u8], &encoded_guid).unwrap();
 
         assert_eq!(Uuid::from_str("3b29075a-f391-af33-a1b4-a212249d7cb4").unwrap(), guid.0);
     }
@@ -444,7 +425,7 @@ mod tests {
     fn message_type_decode() {
         let encoded = [1, 0, 0, 0];
 
-        let message_type = MessageType::decode(&mut 0, &encoded as &[u8], &encoded).unwrap();
+        let message_type = MessageType::decode(&encoded as &[u8], &encoded).unwrap();
 
         assert_eq!(MessageType::AcceptorNego, message_type);
     }
@@ -489,7 +470,7 @@ mod tests {
             51, 175, 161, 180, 162, 18, 36, 157, 124, 180,
         ];
 
-        let message_header = MessageHeader::decode(&mut 0, &encoded as &[u8], &encoded).unwrap();
+        let message_header = MessageHeader::decode(&encoded as &[u8], &encoded).unwrap();
 
         assert_eq!(
             MessageHeader {
@@ -524,7 +505,7 @@ mod tests {
     fn extension_decode() {
         let encoded = [3, 0, 0, 0, 12, 0, 0, 0, 6, 0, 0, 0, 1, 2, 3, 4, 5, 6];
 
-        let extension = Extension::decode(&mut 0, &encoded as &[u8], &encoded).unwrap();
+        let extension = Extension::decode(&encoded as &[u8], &encoded).unwrap();
 
         assert_eq!(
             Extension {
@@ -546,7 +527,7 @@ mod tests {
         ];
 
         // 56 - start of the Checksum struct
-        let checksum = Checksum::decode(&mut 0, &negoex_verify[56..], &negoex_verify).unwrap();
+        let checksum = Checksum::decode(&negoex_verify[56..], &negoex_verify).unwrap();
 
         assert_eq!(
             Checksum {
