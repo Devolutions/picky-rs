@@ -1,9 +1,8 @@
 use std::io::{self, Read, Write};
 
-use byteorder::{BigEndian, LittleEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::{FromPrimitive, ToPrimitive};
-use serde::{de, ser, Deserialize, Serialize, Serializer};
 use uuid::Uuid;
 
 use super::NegoexMessage;
@@ -39,15 +38,17 @@ impl NegoexMessage for Guid {
     }
 
     fn encode_with_data(&self, offset: &mut usize, mut to: impl Write, _data: impl Write) -> Result<(), Self::Error> {
-        *offset += 16;
+        // *offset += 16;
 
         to.write_all(&self.0.to_bytes_le())?;
 
         Ok(())
     }
 
-    fn encode(&self, offset: &mut usize, to: impl Write) -> Result<(), Self::Error> {
-        self.encode_with_data(offset, to, &mut [] as &mut [u8])
+    fn encode(&self, to: impl Write) -> Result<(), Self::Error> {
+        let mut offset = 0;
+
+        self.encode_with_data(&mut offset, to, &mut [] as &mut [u8])
     }
 }
 
@@ -104,7 +105,7 @@ impl NegoexMessage for MessageType {
     }
 
     fn encode_with_data(&self, offset: &mut usize, mut to: impl Write, _data: impl Write) -> Result<(), Self::Error> {
-        *offset += 4;
+        // *offset += 4;
         to.write_u32::<LittleEndian>(
             self.to_u32()
                 .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "can not encode MessageType as u32"))?,
@@ -113,8 +114,10 @@ impl NegoexMessage for MessageType {
         Ok(())
     }
 
-    fn encode(&self, offset: &mut usize, to: impl Write) -> Result<(), Self::Error> {
-        self.encode_with_data(offset, to, &mut [] as &mut [u8])
+    fn encode(&self, to: impl Write) -> Result<(), Self::Error> {
+        let mut offset = 0;
+
+        self.encode_with_data(&mut offset, to, &mut [] as &mut [u8])
     }
 }
 
@@ -144,7 +147,7 @@ impl NegoexMessage for MessageHeader {
     type Error = io::Error;
 
     fn size(&self) -> usize {
-        8 + self.message_type.size() + 3 + 3 + 3 + self.conversation_id.size()
+        8 + self.message_type.size() + 4 + 4 + 4 + self.conversation_id.size()
     }
 
     fn decode(offset: &mut usize, mut from: impl Read, message: &[u8]) -> Result<Self, Self::Error> {
@@ -191,26 +194,28 @@ impl NegoexMessage for MessageHeader {
         mut data: impl Write,
     ) -> Result<(), Self::Error> {
         to.write_u64::<LittleEndian>(self.signature)?;
-        *offset += 8;
+        // *offset += 8;
 
         self.message_type.encode_with_data(offset, &mut to, &mut data)?;
 
         to.write_u32::<LittleEndian>(self.sequence_num)?;
-        *offset += 4;
+        // *offset += 4;
 
         to.write_u32::<LittleEndian>(self.header_len)?;
-        *offset += 4;
+        // *offset += 4;
 
         to.write_u32::<LittleEndian>(self.message_len)?;
-        *offset += 4;
+        // *offset += 4;
 
         self.conversation_id.encode_with_data(offset, &mut to, &mut data)?;
 
         Ok(())
     }
 
-    fn encode(&self, offset: &mut usize, to: impl Write) -> Result<(), Self::Error> {
-        self.encode_with_data(offset, to, &mut [] as &mut [u8])
+    fn encode(&self, to: impl Write) -> Result<(), Self::Error> {
+        let mut offset = 0;
+
+        self.encode_with_data(&mut offset, to, &mut [] as &mut [u8])
     }
 }
 
@@ -254,18 +259,20 @@ impl NegoexMessage for Extension {
         mut data: impl Write,
     ) -> Result<(), Self::Error> {
         to.write_u32::<LittleEndian>(self.extension_type)?;
-        *offset += 4;
+        // *offset += 4;
 
         self.extension_value.encode_with_data(offset, &mut to, &mut data)?;
 
         Ok(())
     }
 
-    fn encode(&self, offset: &mut usize, mut to: impl Write) -> Result<(), Self::Error> {
+    fn encode(&self, mut to: impl Write) -> Result<(), Self::Error> {
+        let mut offset = 12;
+
         let mut header = Vec::new();
         let mut data = Vec::new();
 
-        self.encode_with_data(offset, &mut header, &mut data)?;
+        self.encode_with_data(&mut offset, &mut header, &mut data)?;
 
         to.write_all(&mut header)?;
         to.write_all(&mut data)?;
@@ -374,24 +381,23 @@ impl NegoexMessage for Checksum {
         mut data: impl Write,
     ) -> Result<(), Self::Error> {
         to.write_u32::<LittleEndian>(self.header_len)?;
-        *offset += 4;
 
         to.write_u32::<LittleEndian>(self.checksum_scheme)?;
-        *offset += 4;
 
         to.write_u32::<LittleEndian>(self.checksum_type)?;
-        *offset += 4;
 
         self.checksum_value.encode_with_data(offset, &mut to, &mut data)?;
 
         Ok(())
     }
 
-    fn encode(&self, offset: &mut usize, mut to: impl Write) -> Result<(), Self::Error> {
+    fn encode(&self, mut to: impl Write) -> Result<(), Self::Error> {
+        let mut offset = self.header_len as usize;
+
         let mut header = Vec::new();
         let mut data = Vec::new();
 
-        self.encode_with_data(offset, &mut header, &mut data)?;
+        self.encode_with_data(&mut offset, &mut header, &mut data)?;
 
         to.write_all(&mut header)?;
         to.write_all(&mut data)?;
@@ -417,7 +423,7 @@ mod tests {
         let guid = Guid(Uuid::from_str("0d53335c-f9ea-4d0d-b2ec-4ae3786ec308").unwrap());
 
         let mut encoded = Vec::new();
-        guid.encode(&mut 0, &mut encoded).unwrap();
+        guid.encode(&mut encoded).unwrap();
 
         assert_eq!(
             &[92, 51, 83, 13, 234, 249, 13, 77, 178, 236, 74, 227, 120, 110, 195, 8],
@@ -448,7 +454,7 @@ mod tests {
         let message_type = MessageType::ApRequest;
 
         let mut encoded = Vec::new();
-        message_type.encode(&mut 0, &mut encoded).unwrap();
+        message_type.encode(&mut encoded).unwrap();
 
         assert_eq!(&[5, 0, 0, 0], encoded.as_slice());
     }
@@ -465,7 +471,7 @@ mod tests {
         };
 
         let mut encoded = Vec::new();
-        message_header.encode(&mut 0, &mut encoded).unwrap();
+        message_header.encode(&mut encoded).unwrap();
 
         assert_eq!(
             &[
@@ -506,7 +512,7 @@ mod tests {
         };
 
         let mut encoded = Vec::new();
-        extension.encode(&mut 0, &mut encoded).unwrap();
+        extension.encode(&mut encoded).unwrap();
 
         assert_eq!(
             &[3, 0, 0, 0, 12, 0, 0, 0, 6, 0, 0, 0, 1, 2, 3, 4, 5, 6],
@@ -563,7 +569,7 @@ mod tests {
         };
 
         let mut encoded = Vec::new();
-        checksum.encode(&mut 0, &mut encoded).unwrap();
+        checksum.encode(&mut encoded).unwrap();
 
         assert_eq!(
             &[

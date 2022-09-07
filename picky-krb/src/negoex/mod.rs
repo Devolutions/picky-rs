@@ -1,6 +1,6 @@
 use std::io::{self, Read, Write};
 
-use byteorder::{BigEndian, LittleEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 pub mod data_types;
 pub mod messages;
@@ -15,7 +15,7 @@ where
 
     fn decode(offset: &mut usize, from: impl Read, message: &[u8]) -> Result<Self, Self::Error>;
 
-    fn encode(&self, offset: &mut usize, to: impl Write) -> Result<(), Self::Error>;
+    fn encode(&self, to: impl Write) -> Result<(), Self::Error>;
     fn encode_with_data(&self, offset: &mut usize, to: impl Write, data: impl Write) -> Result<(), Self::Error>;
 }
 
@@ -39,8 +39,10 @@ impl NegoexMessage for u8 {
         Ok(())
     }
 
-    fn encode(&self, offset: &mut usize, to: impl Write) -> Result<(), Self::Error> {
-        self.encode_with_data(offset, to, &mut [] as &mut [u8])
+    fn encode(&self, to: impl Write) -> Result<(), Self::Error> {
+        let mut offset = 0;
+
+        self.encode_with_data(&mut offset, to, &mut [] as &mut [u8])
     }
 }
 
@@ -76,8 +78,15 @@ impl<T: NegoexMessage<Error = io::Error>> NegoexMessage for Vec<T> {
         mut to: impl Write,
         mut data: impl Write,
     ) -> Result<(), Self::Error> {
-        *offset += 4 + 4;
-        to.write_u32::<LittleEndian>(*offset as u32)?;
+        // *offset += 4 + 4;
+
+        println!("offset: {}", *offset);
+
+        if self.is_empty() {
+            to.write_u32::<LittleEndian>(0)?;
+        } else {
+            to.write_u32::<LittleEndian>(*offset as u32)?;
+        }
 
         to.write_u32::<LittleEndian>(self.len() as u32)?;
 
@@ -88,6 +97,7 @@ impl<T: NegoexMessage<Error = io::Error>> NegoexMessage for Vec<T> {
         let mut elements_data = Vec::new();
 
         for element in self.iter() {
+            *offset += element.size();
             element.encode_with_data(offset, &mut elements_headers, &mut elements_data)?;
         }
 
@@ -97,11 +107,13 @@ impl<T: NegoexMessage<Error = io::Error>> NegoexMessage for Vec<T> {
         Ok(())
     }
 
-    fn encode(&self, offset: &mut usize, mut to: impl Write) -> Result<(), Self::Error> {
+    fn encode(&self, mut to: impl Write) -> Result<(), Self::Error> {
+        let mut offset = 0;
+
         let mut header = Vec::new();
         let mut data = Vec::new();
 
-        self.encode_with_data(offset, &mut header, &mut data)?;
+        self.encode_with_data(&mut offset, &mut header, &mut data)?;
 
         to.write_all(&mut header)?;
         to.write_all(&mut data)?;
