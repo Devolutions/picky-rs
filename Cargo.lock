@@ -1253,7 +1253,7 @@ dependencies = [
  "pbkdf2",
  "picky-asn1 0.5.0",
  "picky-asn1-der 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "picky-asn1-x509 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "picky-asn1-x509 0.8.0",
  "rand",
  "serde",
  "sha1",

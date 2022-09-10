@@ -1,3 +1,4 @@
+#[macro_export]
 macro_rules! serde_invalid_value {
     ($typ:ident, $unexp:literal, $exp:literal) => {{
         const _: Option<$typ> = None;
@@ -8,6 +9,7 @@ macro_rules! serde_invalid_value {
     }};
 }
 
+#[macro_export]
 macro_rules! seq_next_element {
     ($seq:ident, $typ:ident, $missing_elem:literal) => {{
         const _: Option<$typ> = None;

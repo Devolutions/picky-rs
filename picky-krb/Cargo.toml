@@ -15,7 +15,7 @@ include = ["src/**/*", "README.md", "CHANGELOG.md"]
 [dependencies]
 picky-asn1 = { version = "0.5.0", features = ["chrono_conversion"] }
 picky-asn1-der = "0.3.1"
-picky-asn1-x509 = "0.8.0"
+picky-asn1-x509 = { path = "../picky-asn1-x509" }
 serde = { version = "1.0.136", features = ["derive"] }
 byteorder = "1.4.3"
 thiserror = "1.0.30"
