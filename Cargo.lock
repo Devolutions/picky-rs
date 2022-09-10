@@ -1249,6 +1249,7 @@ dependencies = [
  "hmac",
  "num-derive",
  "num-traits",
+ "oid",
  "pbkdf2",
  "picky-asn1 0.5.0",
  "picky-asn1-der 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
