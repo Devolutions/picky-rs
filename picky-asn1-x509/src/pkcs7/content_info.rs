@@ -1,3 +1,4 @@
+use oid::ObjectIdentifier;
 use picky_asn1::bit_string::BitString;
 use picky_asn1::restricted_string::{BMPString, CharSetError};
 use picky_asn1::tag::{TagClass, TagPeeker};
@@ -58,6 +59,13 @@ impl EncapsulatedContentInfo {
     pub fn new_pkcs7_data(data: Option<Vec<u8>>) -> Self {
         Self {
             content_type: oids::pkcs7().into(),
+            content: data.map(|data| ContentValue::Data(data.into()).into()),
+        }
+    }
+
+    pub fn new(oid: ObjectIdentifier, data: Option<Vec<u8>>) -> Self {
+        Self {
+            content_type: ObjectIdentifierAsn1::from(oid),
             content: data.map(|data| ContentValue::Data(data.into()).into()),
         }
     }

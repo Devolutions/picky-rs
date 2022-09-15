@@ -42,6 +42,8 @@ macro_rules! define_oid {
 define_oid! {
     // x9-57
     DSA_WITH_SHA1 => dsa_with_sha1 => "1.2.840.10040.4.3",
+    // x9-42
+    DIFFIE_HELLMAN => diffie_hellman => "1.2.840.10046.2.1",
     // ANSI-X962
     EC_PUBLIC_KEY => ec_public_key => "1.2.840.10045.2.1",
     ECDSA_WITH_SHA256 => ecdsa_with_sha256 => "1.2.840.10045.4.3.2",
@@ -212,5 +214,14 @@ define_oid! {
     MS_KRB5 => ms_krb5 => "1.2.840.48018.1.2.2",
     KRB5_USER_TO_USER => krb5_user_to_user => "1.2.840.113554.1.2.2.3",
     NTLM_SSP => ntlm_ssp => "1.3.6.1.4.1.311.2.2.10",
+    NEGOEX => negoex => "1.3.6.1.4.1.311.2.2.30",
     SPNEGO => spnego => "1.3.6.1.5.5.2",
+
+    // [SPNEGO](https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-SPNG/%5bMS-SPNG%5d.pdf)
+    //  The OID assigned for PKU2U is (1.3.6.1.5.2.7
+    GSS_PKU2U => gss_pku2u => "1.3.6.1.5.2.7",
+
+    // http://oid-info.com/get/1.3.6.1.5.2.3.1
+    // id-pkinit-authData
+    KERBEROS_V5_PKINIT => kerberos_v5_pkinit => "1.3.6.1.5.2.3.1",
 }

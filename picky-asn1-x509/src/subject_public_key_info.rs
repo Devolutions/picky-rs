@@ -1,5 +1,5 @@
 use crate::{oids, AlgorithmIdentifier, EcParameters};
-use picky_asn1::wrapper::{BitStringAsn1, BitStringAsn1Container, IntegerAsn1, OctetStringAsn1};
+use picky_asn1::wrapper::{BitStringAsn1, BitStringAsn1Container, IntegerAsn1, OctetStringAsn1, Optional};
 use serde::{de, ser, Deserialize, Serialize};
 use std::fmt;
 
@@ -8,6 +8,32 @@ pub enum PublicKey {
     Rsa(EncapsulatedRsaPublicKey),
     Ec(EncapsulatedEcPoint),
     Ed(EncapsulatedEcPoint),
+    // Diffie-Hellman
+    Dh(DhDomainParameters),
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+pub struct ValidationParms {
+    seed: BitStringAsn1,
+    pg_gen_counter: IntegerAsn1,
+}
+
+/// [Diffie-Hellman Key Exchange Keys](https://www.rfc-editor.org/rfc/rfc3279#section-2.3.3)
+/// ```not_rust
+/// DomainParameters ::= SEQUENCE {
+///       p       INTEGER, -- odd prime, p=jq +1
+///       g       INTEGER, -- generator, g
+///       q       INTEGER, -- factor of p-1
+///       j       INTEGER OPTIONAL, -- subgroup factor
+///       validationParms  ValidationParms OPTIONAL }
+/// ```
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+pub struct DhDomainParameters {
+    pub p: IntegerAsn1,
+    pub g: IntegerAsn1,
+    pub q: IntegerAsn1,
+    pub j: Optional<Option<IntegerAsn1>>,
+    pub validation_params: Optional<Option<ValidationParms>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
@@ -56,13 +82,17 @@ impl ser::Serialize for SubjectPublicKeyInfo {
         S: ser::Serializer,
     {
         use ser::SerializeSeq;
+
         let mut seq = serializer.serialize_seq(Some(2))?;
         seq.serialize_element(&self.algorithm)?;
+
         match &self.subject_public_key {
             PublicKey::Rsa(key) => seq.serialize_element(key)?,
             PublicKey::Ec(key) => seq.serialize_element(key)?,
             PublicKey::Ed(key) => seq.serialize_element(key)?,
+            PublicKey::Dh(key) => seq.serialize_element(key)?,
         }
+
         seq.end()
     }
 }
@@ -93,6 +123,7 @@ impl<'de> de::Deserialize<'de> for SubjectPublicKeyInfo {
                         PublicKey::Ec(seq_next_element!(seq, SubjectPublicKeyInfo, "elliptic curves key"))
                     }
                     oids::ED25519 => PublicKey::Ed(seq_next_element!(seq, SubjectPublicKeyInfo, "curve25519 key")),
+                    oids::DIFFIE_HELLMAN => PublicKey::Dh(seq_next_element!(seq, SubjectPublicKeyInfo, "Diffie-Hellman key")),
                     _ => {
                         return Err(serde_invalid_value!(
                             SubjectPublicKeyInfo,
