@@ -5,22 +5,16 @@ use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::{FromPrimitive, ToPrimitive};
 use uuid::Uuid;
 
-use super::NegoexDataType;
-
-/// [2.2.3 Constants](https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NEGOEX/%5bMS-NEGOEX%5d.pdf)
-/// ```not_rust
-/// #define MESSAGE_SIGNATURE 0x535458454f47454ei64 // "NEGOEXTS"
-/// ```
-pub const SIGNATURE: u64 = 0x535458454f47454e;
-
-/// [2.2.3 Constants](https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NEGOEX/%5bMS-NEGOEX%5d.pdf)3 Constants
-/// ```not_rust
-/// #define CHECKSUM_SCHEME_RFC3961 1
-/// ```
-pub const CHECKSUM_SCHEME_RFC3961: u32 = 0x1;
+use super::{NegoexDataType, CHECKSUM_SCHEME_RFC3961, SIGNATURE};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Guid(pub Uuid);
+
+impl From<Uuid> for Guid {
+    fn from(id: Uuid) -> Self {
+        Self(id)
+    }
+}
 
 impl NegoexDataType for Guid {
     type Error = io::Error;

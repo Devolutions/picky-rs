@@ -5,6 +5,28 @@ use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 pub mod data_types;
 pub mod messages;
 
+/// [2.2.3 Constants](https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NEGOEX/%5bMS-NEGOEX%5d.pdf)
+/// ```not_rust
+/// #define MESSAGE_SIGNATURE 0x535458454f47454ei64 // "NEGOEXTS"
+/// ```
+pub const SIGNATURE: u64 = 0x535458454f47454e;
+
+/// [2.2.3 Constants](https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NEGOEX/%5bMS-NEGOEX%5d.pdf)
+/// ```not_rust
+/// #define CHECKSUM_SCHEME_RFC3961 1
+/// ```
+pub const CHECKSUM_SCHEME_RFC3961: u32 = 0x1;
+
+/// [2.2.6.3 NEGO_MESSAGE](https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NEGOEX/%5bMS-NEGOEX%5d.pdf)
+/// ProtocolVersion: A ULONG64 type that indicates the numbered version of this protocol. This field contains 0.
+pub const PROTOCOL_VERSION: u64 = 0;
+
+/// [2.2.4 Random array](https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NEGOEX/%5bMS-NEGOEX%5d.pdf)
+/// ```not_rust
+/// UCHAR Random[32];
+/// ```
+pub const RANDOM_ARRAY_SIZE: usize = 32;
+
 pub trait NegoexMessage
 where
     Self: Sized,

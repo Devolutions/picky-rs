@@ -1133,7 +1133,6 @@ version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1088a7f82ee21e534da0f62b074b559d2a0717b0d5104ba7a47c1f5bc6c83f69"
 dependencies = [
- "chrono",
  "oid",
  "serde",
  "serde_bytes",
@@ -1251,8 +1250,8 @@ dependencies = [
  "num-traits",
  "oid",
  "pbkdf2",
- "picky-asn1 0.5.0",
- "picky-asn1-der 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "picky-asn1 0.6.0",
+ "picky-asn1-der 0.3.1",
  "picky-asn1-x509 0.8.0",
  "rand",
  "serde",

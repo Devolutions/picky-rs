@@ -53,11 +53,11 @@ pub struct Pku2uNegoRep {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct ExternalPrincipalIdentifier {
     #[serde(default)]
-    subject_name: Optional<Option<ImplicitContextTag0<OctetStringAsn1>>>,
+    pub subject_name: Optional<Option<ImplicitContextTag0<OctetStringAsn1>>>,
     #[serde(default)]
-    issuer_and_serial_number: Optional<Option<ImplicitContextTag1<OctetStringAsn1>>>,
+    pub issuer_and_serial_number: Optional<Option<ImplicitContextTag1<OctetStringAsn1>>>,
     #[serde(default)]
-    subject_key_identifier: Optional<Option<ImplicitContextTag2<OctetStringAsn1>>>,
+    pub subject_key_identifier: Optional<Option<ImplicitContextTag2<OctetStringAsn1>>>,
 }
 
 /// [Generation of Client Request](https://www.rfc-editor.org/rfc/rfc4556.html#section-3.2.1)
@@ -70,11 +70,11 @@ pub struct ExternalPrincipalIdentifier {
 /// ```
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct PaPkAsReq {
-    signed_auth_pack: ImplicitContextTag0<OctetStringAsn1>,
+    pub signed_auth_pack: ImplicitContextTag0<OctetStringAsn1>,
     #[serde(default)]
-    trusted_certifiers: Optional<Option<ExplicitContextTag1<Asn1SequenceOf<ExternalPrincipalIdentifier>>>>,
+    pub trusted_certifiers: Optional<Option<ExplicitContextTag1<Asn1SequenceOf<ExternalPrincipalIdentifier>>>>,
     #[serde(default)]
-    kdc_pk_id: Optional<Option<ImplicitContextTag2<OctetStringAsn1>>>,
+    pub kdc_pk_id: Optional<Option<ImplicitContextTag2<OctetStringAsn1>>>,
 }
 
 /// [Generation of Client Request](https://www.rfc-editor.org/rfc/rfc4556.html#section-3.2.1)
@@ -88,11 +88,11 @@ pub struct PaPkAsReq {
 /// ```
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct PkAuthenticator {
-    cusec: ExplicitContextTag0<IntegerAsn1>,
-    ctime: ExplicitContextTag1<KerberosTime>,
-    nonce: ExplicitContextTag2<IntegerAsn1>,
+    pub cusec: ExplicitContextTag0<IntegerAsn1>,
+    pub ctime: ExplicitContextTag1<KerberosTime>,
+    pub nonce: ExplicitContextTag2<IntegerAsn1>,
     #[serde(default)]
-    pa_checksum: Optional<Option<ExplicitContextTag3<OctetStringAsn1>>>,
+    pub pa_checksum: Optional<Option<ExplicitContextTag3<OctetStringAsn1>>>,
 }
 
 /// [Generation of Client Request](https://www.rfc-editor.org/rfc/rfc4556.html#section-3.2.1)
@@ -112,13 +112,13 @@ pub type DhNonce = OctetStringAsn1;
 /// ```
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct AuthPack {
-    pk_authenticator: ExplicitContextTag0<PkAuthenticator>,
+    pub pk_authenticator: ExplicitContextTag0<PkAuthenticator>,
     #[serde(default)]
-    client_public_value: Optional<Option<ExplicitContextTag1<SubjectPublicKeyInfo>>>,
+    pub client_public_value: Optional<Option<ExplicitContextTag1<SubjectPublicKeyInfo>>>,
     #[serde(default)]
-    supported_cms_types: Optional<Option<ExplicitContextTag2<Asn1SequenceOf<AlgorithmIdentifier>>>>,
+    pub supported_cms_types: Optional<Option<ExplicitContextTag2<Asn1SequenceOf<AlgorithmIdentifier>>>>,
     #[serde(default)]
-    client_dh_nonce: Optional<Option<ExplicitContextTag3<DhNonce>>>,
+    pub client_dh_nonce: Optional<Option<ExplicitContextTag3<DhNonce>>>,
 }
 
 /// [Generation of KDC Reply](https://www.rfc-editor.org/rfc/rfc4556.html#section-3.2.3)
@@ -130,9 +130,9 @@ pub struct AuthPack {
 /// ```
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct DhRepInfo {
-    dh_signed_data: ImplicitContextTag0<OctetStringAsn1>,
+    pub dh_signed_data: ImplicitContextTag0<OctetStringAsn1>,
     #[serde(default)]
-    server_dh_nonce: Optional<Option<ExplicitContextTag1<DhNonce>>>,
+    pub server_dh_nonce: Optional<Option<ExplicitContextTag1<DhNonce>>>,
 }
 
 /// [Generation of KDC Reply](https://www.rfc-editor.org/rfc/rfc4556.html#section-3.2.3)

@@ -1,15 +1,12 @@
 use std::io::{self, Read, Write};
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use uuid::Uuid;
 
-use super::data_types::{AuthScheme, AuthSchemeVector, ByteVector, Checksum, ExtensionVector, MessageHeader};
-use super::{NegoexDataType, NegoexMessage};
-
-/// [2.2.4 Random array](https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NEGOEX/%5bMS-NEGOEX%5d.pdf)
-/// ```not_rust
-/// UCHAR Random[32];
-/// ```
-pub const RANDOM_ARRAY_SIZE: usize = 32;
+use super::data_types::{
+    AuthScheme, AuthSchemeVector, ByteVector, Checksum, Extension, ExtensionVector, Guid, MessageHeader, MessageType,
+};
+use super::{NegoexDataType, NegoexMessage, PROTOCOL_VERSION, RANDOM_ARRAY_SIZE, SIGNATURE};
 
 /// [2.2.6.3 NEGO_MESSAGE](https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NEGOEX/%5bMS-NEGOEX%5d.pdf)
 /// ```not_rust
@@ -29,6 +26,38 @@ pub struct Nego {
     pub protocol_version: u64,
     pub auth_schemes: AuthSchemeVector,
     pub extensions: ExtensionVector,
+}
+
+impl Nego {
+    pub fn new(
+        message_type: MessageType,
+        conversation_id: Uuid,
+        sequence_num: u32,
+        random: [u8; RANDOM_ARRAY_SIZE],
+        auth_schemes: Vec<Uuid>,
+        extensions: Vec<Extension>,
+    ) -> Self {
+        let auth_schemes: AuthSchemeVector = auth_schemes.into_iter().map(Guid::from).collect();
+
+        let mut header = MessageHeader {
+            signature: SIGNATURE,
+            message_type,
+            sequence_num,
+            header_len: 96, // always the same for the Nego message
+            message_len: 0,
+            conversation_id: Guid::from(conversation_id),
+        };
+
+        header.message_len = (header.size() + RANDOM_ARRAY_SIZE + 8 + auth_schemes.size() + extensions.size()) as u32;
+
+        Self {
+            header,
+            random,
+            protocol_version: PROTOCOL_VERSION,
+            auth_schemes,
+            extensions,
+        }
+    }
 }
 
 impl NegoexMessage for Nego {
@@ -94,6 +123,35 @@ pub struct Exchange {
     pub header: MessageHeader,
     pub auth_scheme: AuthScheme,
     pub exchange: ByteVector,
+}
+
+impl Exchange {
+    pub fn new(
+        message_type: MessageType,
+        conversation_id: Uuid,
+        sequence_num: u32,
+        auth_scheme: Uuid,
+        exchange: Vec<u8>,
+    ) -> Self {
+        let mut header = MessageHeader {
+            signature: SIGNATURE,
+            message_type,
+            sequence_num,
+            header_len: 64,
+            message_len: 0,
+            conversation_id: Guid::from(conversation_id),
+        };
+
+        let auth_scheme = Guid::from(auth_scheme);
+
+        header.message_len = (header.size() + auth_scheme.size() + exchange.size()) as u32;
+
+        Exchange {
+            header,
+            auth_scheme,
+            exchange,
+        }
+    }
 }
 
 impl NegoexMessage for Exchange {
@@ -181,8 +239,8 @@ mod tests {
     use uuid::Uuid;
 
     use crate::constants::cksum_types::HMAC_SHA1_96_AES256;
-    use crate::negoex::data_types::{Checksum, Guid, MessageHeader, MessageType, CHECKSUM_SCHEME_RFC3961, SIGNATURE};
-    use crate::negoex::NegoexMessage;
+    use crate::negoex::data_types::{Checksum, Guid, MessageHeader, MessageType};
+    use crate::negoex::{NegoexMessage, CHECKSUM_SCHEME_RFC3961, SIGNATURE};
 
     use super::{Exchange, Nego, Verify};
 
