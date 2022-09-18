@@ -12,6 +12,12 @@ pub enum PublicKey {
     Dh(DhDomainParameters),
 }
 
+/// [Diffie-Hellman Key Exchange Keys](https://www.rfc-editor.org/rfc/rfc3279#section-2.3.3)
+/// ```not_rust
+/// ValidationParms ::= SEQUENCE {
+///       seed             BIT STRING,
+///       pgenCounter      INTEGER }
+/// ```
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct ValidationParms {
     seed: BitStringAsn1,
@@ -32,7 +38,9 @@ pub struct DhDomainParameters {
     pub p: IntegerAsn1,
     pub g: IntegerAsn1,
     pub q: IntegerAsn1,
+    #[serde(default)]
     pub j: Optional<Option<IntegerAsn1>>,
+    #[serde(default)]
     pub validation_params: Optional<Option<ValidationParms>>,
 }
 
