@@ -26,14 +26,16 @@ pub enum KerberosCryptoError {
     CipherLength(usize, usize),
     #[error("Invalid algorithm identifier: {0}")]
     AlgorithmIdentifier(usize),
-    #[error("Bad integrity: calculates hmac is different than provided")]
+    #[error("Bad integrity: calculated hmac is different than provided")]
     IntegrityCheck,
-    #[error("cipher error: {0}")]
+    #[error("Cipher error: {0}")]
     CipherError(String),
     #[error("Padding error: {0:?}")]
     CipherUnpad(UnpadError),
     #[error("Padding error: {0:?}")]
     CipherPad(PadError),
+    #[error("Invalid seed bit len: {0}")]
+    SeedBitLen(String),
 }
 
 impl From<UnpadError> for KerberosCryptoError {
@@ -52,10 +54,12 @@ pub type KerberosCryptoResult<T> = Result<T, KerberosCryptoError>;
 
 pub trait Cipher {
     fn key_size(&self) -> usize;
+    fn seed_bit_len(&self) -> usize;
     fn cipher_type(&self) -> CipherSuite;
     fn encrypt(&self, key: &[u8], key_usage: i32, payload: &[u8]) -> KerberosCryptoResult<Vec<u8>>;
     fn decrypt(&self, key: &[u8], key_usage: i32, cipher_data: &[u8]) -> KerberosCryptoResult<Vec<u8>>;
     fn generate_key_from_password(&self, password: &[u8], salt: &[u8]) -> KerberosCryptoResult<Vec<u8>>;
+    fn random_to_key(&self, key: Vec<u8>) -> Vec<u8>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

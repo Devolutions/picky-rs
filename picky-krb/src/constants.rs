@@ -85,8 +85,14 @@ pub mod key_usages {
 pub mod gss_api {
     pub const AP_REQ_TOKEN_ID: [u8; 2] = [0x01, 0x00];
     pub const TGT_REQ_TOKEN_ID: [u8; 2] = [0x04, 0x00];
+
+    /// [The Protocol Description](https://datatracker.ietf.org/doc/html/draft-zhu-pku2u-09#section-6)
+    /// KRB_AS_REQ          05 00
     pub const AS_REQ_TOKEN_ID: [u8; 2] = [0x05, 0x00];
+    /// [The Protocol Description](https://datatracker.ietf.org/doc/html/draft-zhu-pku2u-09#section-6)
+    /// KRB_AS_REP          06 00
     pub const AS_REP_TOKEN_ID: [u8; 2] = [0x06, 0x00];
+
     pub const ACCEPT_COMPLETE: [u8; 3] = [0x0a, 0x01, 0x00];
     pub const ACCEPT_INCOMPLETE: [u8; 3] = [0x0a, 0x01, 0x01];
 
