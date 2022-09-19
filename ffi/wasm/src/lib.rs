@@ -7,12 +7,6 @@ pub mod pem;
 
 use wasm_bindgen::prelude::*;
 
-// When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
-// allocator.
-#[cfg(festure = "wee_alloc")]
-#[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-
 #[wasm_bindgen(start)]
 pub fn init_picky() -> Result<(), JsValue> {
     // When the `console_error_panic_hook` feature is enabled, we can call the
