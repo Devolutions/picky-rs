@@ -1,6 +1,6 @@
 [package]
 name = "picky"
-version = "0.4.0"
+version = "0.4.1"
 authors = ["Benoît CORTIER <bcortier@proton.me>"]
 edition = "2021"
 publish = false
@@ -34,13 +34,6 @@ serde_json = "1.0.82"
 # all the `std::fmt` and `std::panicking` infrastructure, so isn't great for
 # code size when deploying.
 console_error_panic_hook = { version = "0.1.7", optional = true }
-
-# `wee_alloc` is a tiny allocator for wasm that is only ~1K in code size
-# compared to the default allocator's ~10K. It is slower than the default
-# allocator, however.
-#
-# Unfortunately, `wee_alloc` requires nightly Rust when targeting wasm for now.
-wee_alloc = { version = "0.4.5", optional = true }
 
 getrandom = { version = "0.2.7", features = ["js"] }
 

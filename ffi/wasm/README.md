@@ -11,7 +11,7 @@ This should be run in the CI.
 2. Build the package: 
 
     ```
-    $ wasm-pack build --target web --scope devolutions --out-name picky --features wee_alloc
+    $ wasm-pack build --target web --scope devolutions --out-name picky
     ```
 
 3. Rename `@devolutions/picky-wasm` to `@devolutions/picky` in `pkg/package.json`.
@@ -34,7 +34,7 @@ Other tests are run using `nodejs` and the `ava` testing framework.
 For these, you need to build the npm package targeting `nodejs`:
 
 ```
-$ wasm-pack build --target nodejs --scope @devolutions --out-name picky --features wee_alloc
+$ wasm-pack build --target nodejs --scope @devolutions --out-name picky
 ```
 
 Rename `@devolutions/picky-wasm` to `@devolutions/picky` in `pkg/package.json`.

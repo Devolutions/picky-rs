@@ -2,7 +2,7 @@
 
 $ErrorActionPreference = "Stop"
 
-wasm-pack build --target bundler --scope devolutions --out-name picky --features wee_alloc
+wasm-pack build --target bundler --scope devolutions --out-name picky
 
 if ($LastExitCode -ne 0)
 {
