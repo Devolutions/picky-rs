@@ -1,6 +1,7 @@
 pub(crate) mod decrypt;
 pub(crate) mod des3_cbc_sha1_kd;
 pub(crate) mod encrypt;
+pub(crate) mod hmac_sha1_des3_kd;
 mod key_derivation;
 
 /// [Triple-DES Based Encryption](https://datatracker.ietf.org/doc/html/rfc3961#section-6.3)
@@ -17,4 +18,5 @@ pub const DES3_MAC_SIZE: usize = 20;
 pub const DES3_SEED_LEN: usize = 21;
 
 pub use des3_cbc_sha1_kd::Des3CbcSha1Kd;
+pub use hmac_sha1_des3_kd::HmacSha1Des3Kd;
 pub use key_derivation::{derive_key, derive_key_from_password};

@@ -4,7 +4,7 @@ use picky_asn1::wrapper::{
     ExplicitContextTag3, ImplicitContextTag0, ImplicitContextTag1, ImplicitContextTag2, IntegerAsn1,
     ObjectIdentifierAsn1, OctetStringAsn1, Optional,
 };
-use picky_asn1_x509::{seq_next_element, serde_invalid_value, AlgorithmIdentifier, SubjectPublicKeyInfo};
+use picky_asn1_x509::{seq_next_element, serde_invalid_value, AlgorithmIdentifier};
 use serde::{de, ser, Deserialize, Serialize};
 
 use crate::data_types::{KerberosTime, PrincipalName, Realm};
@@ -101,6 +101,50 @@ pub struct PkAuthenticator {
 /// ```
 pub type DhNonce = OctetStringAsn1;
 
+/// [Diffie-Hellman Key Exchange Keys](https://www.rfc-editor.org/rfc/rfc3279#section-2.3.3)
+/// ```not_rust
+/// ValidationParms ::= SEQUENCE {
+///       seed             BIT STRING,
+///       pgenCounter      INTEGER }
+/// ```
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+pub struct ValidationParams {
+    seed: BitStringAsn1,
+    pg_gen_counter: IntegerAsn1,
+}
+
+/// [Diffie-Hellman Key Exchange Keys](https://www.rfc-editor.org/rfc/rfc3279#section-2.3.3)
+/// ```not_rust
+/// DomainParameters ::= SEQUENCE {
+///       p       INTEGER, -- odd prime, p = jq +1
+///       g       INTEGER, -- generator, g
+///       q       INTEGER, -- factor of p - 1
+///       j       INTEGER OPTIONAL, -- subgroup factor
+///       validationParms  ValidationParms OPTIONAL }
+/// ```
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+pub struct DhDomainParameters {
+    pub p: IntegerAsn1,
+    pub g: IntegerAsn1,
+    pub q: IntegerAsn1,
+    #[serde(default)]
+    pub j: Optional<Option<IntegerAsn1>>,
+    #[serde(default)]
+    pub validation_params: Optional<Option<ValidationParams>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+pub struct DhReqKeyInfo {
+    pub identifier: ObjectIdentifierAsn1,
+    pub key_info: DhDomainParameters,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+pub struct DhReqInfo {
+    pub key_info: DhReqKeyInfo,
+    pub key_value: BitStringAsn1,
+}
+
 /// [Generation of Client Request](https://www.rfc-editor.org/rfc/rfc4556.html#section-3.2.1)
 /// ```not_rust
 /// AuthPack ::= SEQUENCE {
@@ -114,7 +158,7 @@ pub type DhNonce = OctetStringAsn1;
 pub struct AuthPack {
     pub pk_authenticator: ExplicitContextTag0<PkAuthenticator>,
     #[serde(default)]
-    pub client_public_value: Optional<Option<ExplicitContextTag1<SubjectPublicKeyInfo>>>,
+    pub client_public_value: Optional<Option<ExplicitContextTag1<DhReqInfo>>>,
     #[serde(default)]
     pub supported_cms_types: Optional<Option<ExplicitContextTag2<Asn1SequenceOf<AlgorithmIdentifier>>>>,
     #[serde(default)]
@@ -222,10 +266,10 @@ impl ser::Serialize for PaPkAsRep {
 /// ```
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct KdcDhKeyInfo {
-    subject_public_key: ExplicitContextTag0<BitStringAsn1>,
-    nonce: ExplicitContextTag1<IntegerAsn1>,
+    pub subject_public_key: ExplicitContextTag0<BitStringAsn1>,
+    pub nonce: ExplicitContextTag1<IntegerAsn1>,
     #[serde(default)]
-    dh_key_expiration: Optional<Option<ExplicitContextTag2<KerberosTime>>>,
+    pub dh_key_expiration: Optional<Option<ExplicitContextTag2<KerberosTime>>>,
 }
 
 #[cfg(test)]

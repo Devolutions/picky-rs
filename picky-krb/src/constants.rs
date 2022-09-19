@@ -84,6 +84,7 @@ pub mod key_usages {
 //= [The Kerberos Version 5 GSS API](https://datatracker.ietf.org/doc/html/rfc4121) =//
 pub mod gss_api {
     pub const AP_REQ_TOKEN_ID: [u8; 2] = [0x01, 0x00];
+    pub const AP_REP_TOKEN_ID: [u8; 2] = [0x01, 0x00];
     pub const TGT_REQ_TOKEN_ID: [u8; 2] = [0x04, 0x00];
 
     /// [The Protocol Description](https://datatracker.ietf.org/doc/html/draft-zhu-pku2u-09#section-6)
