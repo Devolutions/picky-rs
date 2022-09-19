@@ -223,5 +223,9 @@ define_oid! {
 
     // http://oid-info.com/get/1.3.6.1.5.2.3.1
     // id-pkinit-authData
-    KERBEROS_V5_PKINIT => kerberos_v5_pkinit => "1.3.6.1.5.2.3.1",
+    PKINIT_AUTH_DATA => pkinit_auth_data => "1.3.6.1.5.2.3.1",
+
+    // http://oid-info.com/get/1.3.6.1.5.2.3.2
+    // id-pkinit-DHKeyData
+    PKINIT_DH_KEY_DATA => kpinit_dh_key_data => "1.3.6.1.5.2.3.2",
 }
