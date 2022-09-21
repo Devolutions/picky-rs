@@ -2,8 +2,8 @@ pub(crate) mod aes128_cts_hmac_sha1_96;
 pub(crate) mod aes256_cts_hmac_sha1_96;
 pub(crate) mod decrypt;
 pub(crate) mod encrypt;
-pub(crate) mod hmac_sha196_aes_256;
 pub(crate) mod hmac_sha196_aes_128;
+pub(crate) mod hmac_sha196_aes_256;
 mod key_derivation;
 
 use super::common::hmac_sha1;

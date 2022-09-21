@@ -1,8 +1,9 @@
 pub mod aes;
-pub(crate) mod common;
-mod cipher;
 mod checksum;
+mod cipher;
+pub(crate) mod common;
 pub mod des;
+pub mod diffie_hellman;
 pub(crate) mod nfold;
 pub(crate) mod utils;
 
@@ -50,6 +51,5 @@ impl From<PadError> for KerberosCryptoError {
 
 pub type KerberosCryptoResult<T> = Result<T, KerberosCryptoError>;
 
-pub use cipher::{Cipher, CipherSuite};
 pub use checksum::{Checksum, ChecksumSuite};
-
+pub use cipher::{Cipher, CipherSuite};

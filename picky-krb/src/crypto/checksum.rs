@@ -1,6 +1,8 @@
-use crate::constants::cksum_types::{HMAC_SHA1_96_AES256, HMAC_SHA1_96_AES128, HMAC_SHA1_DES3_KD};
+use crate::constants::cksum_types::{HMAC_SHA1_96_AES128, HMAC_SHA1_96_AES256, HMAC_SHA1_DES3_KD};
 
-use super::{KerberosCryptoError, KerberosCryptoResult, aes::{HmacSha196Aes256, HmacSha196Aes128}, des::HmacSha1Des3Kd};
+use super::aes::{HmacSha196Aes128, HmacSha196Aes256};
+use super::des::HmacSha1Des3Kd;
+use super::{KerberosCryptoError, KerberosCryptoResult};
 
 pub trait Checksum {
     fn checksum_type(&self) -> ChecksumSuite;

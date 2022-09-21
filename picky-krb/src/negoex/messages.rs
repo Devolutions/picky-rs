@@ -6,7 +6,7 @@ use uuid::Uuid;
 use super::data_types::{
     AuthScheme, AuthSchemeVector, ByteVector, Checksum, Extension, ExtensionVector, Guid, MessageHeader, MessageType,
 };
-use super::{NegoexDataType, NegoexMessage, PROTOCOL_VERSION, RANDOM_ARRAY_SIZE, SIGNATURE, CHECKSUM_SCHEME_RFC3961};
+use super::{NegoexDataType, NegoexMessage, CHECKSUM_SCHEME_RFC3961, PROTOCOL_VERSION, RANDOM_ARRAY_SIZE, SIGNATURE};
 
 /// [2.2.6.3 NEGO_MESSAGE](https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NEGOEX/%5bMS-NEGOEX%5d.pdf)
 /// ```not_rust

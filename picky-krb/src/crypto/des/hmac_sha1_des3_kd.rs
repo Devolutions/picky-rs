@@ -1,4 +1,6 @@
-use crate::crypto::{ChecksumSuite, KerberosCryptoResult, utils::usage_ki, common::hmac_sha1, Checksum};
+use crate::crypto::common::hmac_sha1;
+use crate::crypto::utils::usage_ki;
+use crate::crypto::{Checksum, ChecksumSuite, KerberosCryptoResult};
 
 use super::{derive_key, DES3_MAC_SIZE};
 
