@@ -10,7 +10,6 @@ pub enum PublicKey {
     Ed(EncapsulatedEcPoint),
 }
 
-
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct RsaPublicKey {
     pub modulus: IntegerAsn1,         // n

@@ -1,6 +1,6 @@
 use picky_asn1::restricted_string::{PrintableString, Utf8String};
 use picky_asn1::tag::{Tag, TagPeeker};
-use picky_asn1::wrapper::PrintableStringAsn1;
+use picky_asn1::wrapper::{BMPStringAsn1, PrintableStringAsn1};
 use serde::{de, ser};
 use std::borrow::Cow;
 use std::fmt;
@@ -24,6 +24,7 @@ pub enum DirectoryString {
     //UniversalString,
     Utf8String(String),
     //BmpString,
+    BmpString(BMPStringAsn1),
 }
 
 impl fmt::Display for DirectoryString {
@@ -37,6 +38,7 @@ impl DirectoryString {
         match &self {
             DirectoryString::PrintableString(string) => String::from_utf8_lossy(string.as_bytes()),
             DirectoryString::Utf8String(string) => Cow::Borrowed(string.as_str()),
+            DirectoryString::BmpString(string) => Cow::Owned(string.to_string()),
         }
     }
 
@@ -44,6 +46,7 @@ impl DirectoryString {
         match &self {
             DirectoryString::PrintableString(string) => string.as_bytes(),
             DirectoryString::Utf8String(string) => string.as_bytes(),
+            DirectoryString::BmpString(string) => string.as_bytes(),
         }
     }
 }
@@ -83,6 +86,7 @@ impl From<DirectoryString> for String {
         match ds {
             DirectoryString::PrintableString(string) => String::from_utf8_lossy(string.as_bytes()).into(),
             DirectoryString::Utf8String(string) => string,
+            DirectoryString::BmpString(string) => string.to_string(),
         }
     }
 }
@@ -95,6 +99,7 @@ impl ser::Serialize for DirectoryString {
         match &self {
             DirectoryString::PrintableString(string) => string.serialize(serializer),
             DirectoryString::Utf8String(string) => string.serialize(serializer),
+            DirectoryString::BmpString(string) => string.serialize(serializer),
         }
     }
 }
@@ -128,6 +133,11 @@ impl<'de> de::Deserialize<'de> for DirectoryString {
                         seq,
                         DirectoryString,
                         "PrintableString"
+                    ))),
+                    Tag::BMP_STRING => Ok(DirectoryString::BmpString(seq_next_element!(
+                        seq,
+                        DirectoryString,
+                        "BmpString"
                     ))),
                     Tag::TELETEX_STRING => Err(serde_invalid_value!(
                         DirectoryString,
