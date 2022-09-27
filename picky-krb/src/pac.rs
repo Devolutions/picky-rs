@@ -130,7 +130,7 @@ impl PacBuffer {
             return Err(PacError::InvalidRange);
         }
 
-        (&mut data.get_mut()[from..to]).copy_from_slice(&self.data);
+        data.get_mut()[from..to].copy_from_slice(&self.data);
 
         Ok(())
     }
