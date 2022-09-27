@@ -5,7 +5,7 @@
     <Description>Bindings to Rust picky native library</Description>
     <TargetFrameworks>netstandard2.0</TargetFrameworks>
     <LangVersion>latest</LangVersion>
-    <Version>2022.8.26.0</Version>
+    <Version>2022.9.27.0</Version>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -22,6 +22,10 @@
     <NativeLibPath_osx_universal>$(RuntimesPath)/osx-universal/native/libDevolutionsPicky.dylib</NativeLibPath_osx_universal>
     <NativeLibPath_linux_x64>$(RuntimesPath)/linux-x64/native/libDevolutionsPicky.so</NativeLibPath_linux_x64>
     <NativeLibPath_linux_arm64>$(RuntimesPath)/linux-arm64/native/libDevolutionsPicky.so</NativeLibPath_linux_arm64>
+    <NativeLibPath_android_arm64>$(RuntimesPath)/android-arm64/native/libDevolutionsPicky.so</NativeLibPath_android_arm64>
+    <NativeLibPath_android_arm>$(RuntimesPath)/android-arm/native/libDevolutionsPicky.so</NativeLibPath_android_arm>
+    <NativeLibPath_android_x64>$(RuntimesPath)/android-x64/native/libDevolutionsPicky.so</NativeLibPath_android_x64>
+    <NativeLibPath_android_x86>$(RuntimesPath)/android-x86/native/libDevolutionsPicky.so</NativeLibPath_android_x86>
   </PropertyGroup>
 
   <ItemGroup Condition="Exists('$(NativeLibPath_win_x64)')">
@@ -82,6 +86,42 @@
     <Content Include="$(NativeLibPath_linux_arm64)">
       <Link>%(Filename)%(Extension)</Link>
       <PackagePath>runtimes/linux-arm64/native/%(Filename)%(Extension)</PackagePath>
+      <Pack>true</Pack>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup Condition="Exists('$(NativeLibPath_android_arm64)')">
+    <Content Include="$(NativeLibPath_android_arm64)">
+      <Link>%(Filename)%(Extension)</Link>
+      <PackagePath>runtimes/android-arm64/native/%(Filename)%(Extension)</PackagePath>
+      <Pack>true</Pack>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup Condition="Exists('$(NativeLibPath_android_arm)')">
+    <Content Include="$(NativeLibPath_android_arm)">
+      <Link>%(Filename)%(Extension)</Link>
+      <PackagePath>runtimes/android-arm/native/%(Filename)%(Extension)</PackagePath>
+      <Pack>true</Pack>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup Condition="Exists('$(NativeLibPath_android_x64)')">
+    <Content Include="$(NativeLibPath_android_x64)">
+      <Link>%(Filename)%(Extension)</Link>
+      <PackagePath>runtimes/android-x64/native/%(Filename)%(Extension)</PackagePath>
+      <Pack>true</Pack>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup Condition="Exists('$(NativeLibPath_android_x86)')">
+    <Content Include="$(NativeLibPath_android_x86)">
+      <Link>%(Filename)%(Extension)</Link>
+      <PackagePath>runtimes/android-x86/native/%(Filename)%(Extension)</PackagePath>
       <Pack>true</Pack>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
