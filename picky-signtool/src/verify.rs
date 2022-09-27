@@ -254,12 +254,7 @@ pub fn extract_signed_ps_file_content_bytes(raw_content: &[u8]) -> &[u8] {
         if haystack.len() < needle.len() {
             return None;
         }
-        for i in 0..(haystack.len() - needle.len() + 1) {
-            if haystack[i..(i + needle.len())] == needle[..] {
-                return Some(i);
-            }
-        }
-        None
+        (0..(haystack.len() - needle.len() + 1)).find(|&i| haystack[i..(i + needle.len())] == needle[..])
     };
 
     let mut ps_authenticode_header = Vec::with_capacity(PS_AUTHENTICODE_HEADER.len() * 2);
