@@ -6,3 +6,4 @@ package/
 **/*.rs.bk
 c-api/examples/out
 picky_server_conf.yaml
+.DS_Store
