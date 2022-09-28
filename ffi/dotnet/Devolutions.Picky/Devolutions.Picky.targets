@@ -52,22 +52,6 @@
       <IncludeInVsix>true</IncludeInVsix>
       <Pack>false</Pack>
     </Content>
-    <Content Condition="'$(IsPowerShell)' == 'true'" Include="$(MSBuildThisFileDirectory)\..\runtimes\ios-x64\native\libDevolutionsPicky.dylib">
-      <Link>runtimes\ios-x64\native\libDevolutionsPicky.dylib</Link>
-      <PublishState>Included</PublishState>
-      <Visible>False</Visible>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <IncludeInVsix>true</IncludeInVsix>
-      <Pack>false</Pack>
-    </Content>
-    <Content Condition="'$(IsPowerShell)' == 'true'" Include="$(MSBuildThisFileDirectory)\..\runtimes\ios-arm64\native\libDevolutionsPicky.dylib">
-      <Link>runtimes\ios-arm64\native\libDevolutionsPicky.dylib</Link>
-      <PublishState>Included</PublishState>
-      <Visible>False</Visible>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <IncludeInVsix>true</IncludeInVsix>
-      <Pack>false</Pack>
-    </Content>
   </ItemGroup>
   <ItemGroup Condition="$([MSBuild]::IsOSPlatform('OSX')) AND '$(IsPowerShell)' != 'true'">
     <NativeReference Include="$(MSBuildThisFileDirectory)\..\runtimes\osx-universal\native\libDevolutionsPicky.dylib">
@@ -99,4 +83,9 @@
           <Abi>x86_64</Abi>
       </AndroidNativeLibrary>
   </ItemGroup> 
+  <ItemGroup Condition="(('$(Platform)' == 'iPhone')) or (('$(Platform)' == 'iPhoneSimulator'))">
+    <NativeReference Include="$(MSBuildThisFileDirectory)..\runtimes\ios-universal\native\libDevolutionsPicky.framework">
+      <Kind>Framework</Kind>
+    </NativeReference>
+  </ItemGroup>
 </Project>

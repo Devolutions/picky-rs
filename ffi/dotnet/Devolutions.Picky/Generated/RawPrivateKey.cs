@@ -14,19 +14,23 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct PrivateKey
 {
+#if __IOS__
+    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
+#else
     private const string NativeLib = "DevolutionsPicky";
+#endif
 
     /// <summary>
     /// Extracts private key from PEM object.
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PrivateKey_from_pem", ExactSpelling = true)]
-    public static unsafe extern IntPtr FromPem(Pem* pem);
+    public static unsafe extern KeyFfiResultBoxPrivateKeyBoxPickyError FromPem(Pem* pem);
 
     /// <summary>
     /// Reads a private key from its PKCS8 storage.
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PrivateKey_from_pkcs8", ExactSpelling = true)]
-    public static unsafe extern IntPtr FromPkcs8(byte* pkcs8, nuint pkcs8Sz);
+    public static unsafe extern KeyFfiResultBoxPrivateKeyBoxPickyError FromPkcs8(byte* pkcs8, nuint pkcs8Sz);
 
     /// <summary>
     /// Generates a new RSA private key.
@@ -35,13 +39,13 @@ public partial struct PrivateKey
     /// This is slow in debug builds.
     /// </remarks>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PrivateKey_generate_rsa", ExactSpelling = true)]
-    public static unsafe extern IntPtr GenerateRsa(nuint bits);
+    public static unsafe extern KeyFfiResultBoxPrivateKeyBoxPickyError GenerateRsa(nuint bits);
 
     /// <summary>
     /// Exports the private key into a PEM object
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PrivateKey_to_pem", ExactSpelling = true)]
-    public static unsafe extern IntPtr ToPem(PrivateKey* self);
+    public static unsafe extern KeyFfiResultBoxPemBoxPickyError ToPem(PrivateKey* self);
 
     /// <summary>
     /// Extracts the public part of this private key

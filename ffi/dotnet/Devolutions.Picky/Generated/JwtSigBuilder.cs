@@ -144,9 +144,7 @@ public partial class JwtSigBuilder: IDisposable
             {
                 fixed (byte* objBufPtr = objBuf)
                 {
-                    IntPtr resultPtr = Raw.JwtSigBuilder.AddAdditionalParameterObject(_inner, nameBufPtr, nameBufLength, objBufPtr, objBufLength);
-                    Raw.JwtFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.JwtFfiResultVoidBoxPickyError>(resultPtr);
-                    Raw.JwtFfiResultVoidBoxPickyError.Destroy(resultPtr);
+                    Raw.JwtFfiResultVoidBoxPickyError result = Raw.JwtSigBuilder.AddAdditionalParameterObject(_inner, nameBufPtr, nameBufLength, objBufPtr, objBufLength);
                     if (!result.isOk)
                     {
                         throw new PickyException(new PickyError(result.Err));
@@ -295,9 +293,7 @@ public partial class JwtSigBuilder: IDisposable
             nuint claimsBufLength = (nuint)claimsBuf.Length;
             fixed (byte* claimsBufPtr = claimsBuf)
             {
-                IntPtr resultPtr = Raw.JwtSigBuilder.SetClaims(_inner, claimsBufPtr, claimsBufLength);
-                Raw.JwtFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.JwtFfiResultVoidBoxPickyError>(resultPtr);
-                Raw.JwtFfiResultVoidBoxPickyError.Destroy(resultPtr);
+                Raw.JwtFfiResultVoidBoxPickyError result = Raw.JwtSigBuilder.SetClaims(_inner, claimsBufPtr, claimsBufLength);
                 if (!result.isOk)
                 {
                     throw new PickyException(new PickyError(result.Err));

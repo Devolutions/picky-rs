@@ -17,31 +17,35 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct Pem
 {
+#if __IOS__
+    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
+#else
     private const string NativeLib = "DevolutionsPicky";
+#endif
 
     /// <summary>
     /// Creates a PEM object with the given label and data.
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pem_new", ExactSpelling = true)]
-    public static unsafe extern IntPtr New(byte* label, nuint labelSz, byte* data, nuint dataSz);
+    public static unsafe extern PemFfiResultBoxPemBoxPickyError New(byte* label, nuint labelSz, byte* data, nuint dataSz);
 
     /// <summary>
     /// Loads a PEM from the filesystem.
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pem_load_from_file", ExactSpelling = true)]
-    public static unsafe extern IntPtr LoadFromFile(byte* path, nuint pathSz);
+    public static unsafe extern PemFfiResultBoxPemBoxPickyError LoadFromFile(byte* path, nuint pathSz);
 
     /// <summary>
     /// Saves this PEM object to the filesystem.
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pem_save_to_file", ExactSpelling = true)]
-    public static unsafe extern IntPtr SaveToFile(Pem* self, byte* path, nuint pathSz);
+    public static unsafe extern PemFfiResultVoidBoxPickyError SaveToFile(Pem* self, byte* path, nuint pathSz);
 
     /// <summary>
     /// Parses a PEM-encoded string representation.
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pem_parse", ExactSpelling = true)]
-    public static unsafe extern IntPtr Parse(byte* input, nuint inputSz);
+    public static unsafe extern PemFfiResultBoxPemBoxPickyError Parse(byte* input, nuint inputSz);
 
     /// <summary>
     /// Returns the length of the data contained by this PEM object.
@@ -53,13 +57,13 @@ public partial struct Pem
     /// Returns the label of this PEM object.
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pem_get_label", ExactSpelling = true)]
-    public static unsafe extern IntPtr GetLabel(Pem* self, DiplomatWriteable* writeable);
+    public static unsafe extern PemFfiResultVoidBoxPickyError GetLabel(Pem* self, DiplomatWriteable* writeable);
 
     /// <summary>
     /// Returns the string representation of this PEM object.
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pem_to_repr", ExactSpelling = true)]
-    public static unsafe extern IntPtr ToRepr(Pem* self, DiplomatWriteable* writeable);
+    public static unsafe extern PemFfiResultVoidBoxPickyError ToRepr(Pem* self, DiplomatWriteable* writeable);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pem_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(Pem* self);

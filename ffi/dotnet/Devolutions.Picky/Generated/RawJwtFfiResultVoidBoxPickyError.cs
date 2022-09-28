@@ -14,8 +14,6 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct JwtFfiResultVoidBoxPickyError
 {
-    private const string NativeLib = "DevolutionsPicky";
-
     [StructLayout(LayoutKind.Explicit)]
     private unsafe struct InnerUnion
     {
@@ -35,7 +33,4 @@ public partial struct JwtFfiResultVoidBoxPickyError
             return _inner.err;
         }
     }
-
-    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "result_unit_box_PickyError_destroy", ExactSpelling = true)]
-    public static unsafe extern void Destroy(IntPtr self);
 }
