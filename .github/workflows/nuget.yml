@@ -289,7 +289,7 @@ jobs:
           Write-Host $RPathCmd
           Invoke-Expression $RPathCmd
 
-          [xml] $InfoPlistXml = Get-Content "Info.plist"
+          [xml] $InfoPlistXml = Get-Content (Join-Path "ffi" "dotnet" "Devolutions.Picky" "Info.plist")
           Select-Xml -xml $InfoPlistXml -XPath "/plist/dict/key[. = 'CFBundleIdentifier']/following-sibling::string[1]" |
           %{ 	
           $_.Node.InnerXml = "com.devolutions.sspi"
