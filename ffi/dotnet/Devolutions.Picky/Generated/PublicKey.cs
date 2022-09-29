@@ -46,7 +46,9 @@ public partial class PublicKey: IDisposable
             {
                 throw new ObjectDisposedException("Pem");
             }
-            Raw.KeyFfiResultBoxPublicKeyBoxPickyError result = Raw.PublicKey.FromPem(pemRaw);
+            IntPtr resultPtr = Raw.PublicKey.FromPem(pemRaw);
+            Raw.KeyFfiResultBoxPublicKeyBoxPickyError result = Marshal.PtrToStructure<Raw.KeyFfiResultBoxPublicKeyBoxPickyError>(resultPtr);
+            Raw.KeyFfiResultBoxPublicKeyBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -70,7 +72,9 @@ public partial class PublicKey: IDisposable
             nuint derLength = (nuint)der.Length;
             fixed (byte* derPtr = der)
             {
-                Raw.KeyFfiResultBoxPublicKeyBoxPickyError result = Raw.PublicKey.FromDer(derPtr, derLength);
+                IntPtr resultPtr = Raw.PublicKey.FromDer(derPtr, derLength);
+                Raw.KeyFfiResultBoxPublicKeyBoxPickyError result = Marshal.PtrToStructure<Raw.KeyFfiResultBoxPublicKeyBoxPickyError>(resultPtr);
+                Raw.KeyFfiResultBoxPublicKeyBoxPickyError.Destroy(resultPtr);
                 if (!result.isOk)
                 {
                     throw new PickyException(new PickyError(result.Err));
@@ -96,7 +100,9 @@ public partial class PublicKey: IDisposable
             {
                 throw new ObjectDisposedException("PublicKey");
             }
-            Raw.KeyFfiResultBoxPemBoxPickyError result = Raw.PublicKey.ToPem(_inner);
+            IntPtr resultPtr = Raw.PublicKey.ToPem(_inner);
+            Raw.KeyFfiResultBoxPemBoxPickyError result = Marshal.PtrToStructure<Raw.KeyFfiResultBoxPemBoxPickyError>(resultPtr);
+            Raw.KeyFfiResultBoxPemBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));

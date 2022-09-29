@@ -120,7 +120,9 @@ public partial class SshCert: IDisposable
             nuint reprBufLength = (nuint)reprBuf.Length;
             fixed (byte* reprBufPtr = reprBuf)
             {
-                Raw.SshFfiResultBoxSshCertBoxPickyError result = Raw.SshCert.Parse(reprBufPtr, reprBufLength);
+                IntPtr resultPtr = Raw.SshCert.Parse(reprBufPtr, reprBufLength);
+                Raw.SshFfiResultBoxSshCertBoxPickyError result = Marshal.PtrToStructure<Raw.SshFfiResultBoxSshCertBoxPickyError>(resultPtr);
+                Raw.SshFfiResultBoxSshCertBoxPickyError.Destroy(resultPtr);
                 if (!result.isOk)
                 {
                     throw new PickyException(new PickyError(result.Err));
@@ -143,7 +145,9 @@ public partial class SshCert: IDisposable
             {
                 throw new ObjectDisposedException("SshCert");
             }
-            Raw.SshFfiResultVoidBoxPickyError result = Raw.SshCert.ToRepr(_inner, &writeable);
+            IntPtr resultPtr = Raw.SshCert.ToRepr(_inner, &writeable);
+            Raw.SshFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.SshFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.SshFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -164,7 +168,9 @@ public partial class SshCert: IDisposable
                 throw new ObjectDisposedException("SshCert");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            Raw.SshFfiResultVoidBoxPickyError result = Raw.SshCert.ToRepr(_inner, &writeable);
+            IntPtr resultPtr = Raw.SshCert.ToRepr(_inner, &writeable);
+            Raw.SshFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.SshFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.SshFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -274,7 +280,9 @@ public partial class SshCert: IDisposable
             {
                 throw new ObjectDisposedException("SshCert");
             }
-            Raw.SshFfiResultVoidBoxPickyError result = Raw.SshCert.GetKeyId(_inner, &writeable);
+            IntPtr resultPtr = Raw.SshCert.GetKeyId(_inner, &writeable);
+            Raw.SshFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.SshFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.SshFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -292,7 +300,9 @@ public partial class SshCert: IDisposable
                 throw new ObjectDisposedException("SshCert");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            Raw.SshFfiResultVoidBoxPickyError result = Raw.SshCert.GetKeyId(_inner, &writeable);
+            IntPtr resultPtr = Raw.SshCert.GetKeyId(_inner, &writeable);
+            Raw.SshFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.SshFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.SshFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -312,7 +322,9 @@ public partial class SshCert: IDisposable
             {
                 throw new ObjectDisposedException("SshCert");
             }
-            Raw.SshFfiResultVoidBoxPickyError result = Raw.SshCert.GetComment(_inner, &writeable);
+            IntPtr resultPtr = Raw.SshCert.GetComment(_inner, &writeable);
+            Raw.SshFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.SshFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.SshFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -330,7 +342,9 @@ public partial class SshCert: IDisposable
                 throw new ObjectDisposedException("SshCert");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            Raw.SshFfiResultVoidBoxPickyError result = Raw.SshCert.GetComment(_inner, &writeable);
+            IntPtr resultPtr = Raw.SshCert.GetComment(_inner, &writeable);
+            Raw.SshFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.SshFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.SshFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
