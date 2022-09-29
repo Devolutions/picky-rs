@@ -53,7 +53,7 @@
       <Pack>false</Pack>
     </Content>
   </ItemGroup>
-  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('OSX')) AND '$(IsPowerShell)' != 'true'">
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('OSX')) AND '$(IsPowerShell)' != 'true' AND '$(Platform)' != 'iPhone' AND '$(Platform)' != 'iPhoneSimulator'">
     <NativeReference Include="$(MSBuildThisFileDirectory)\..\runtimes\osx-universal\native\libDevolutionsPicky.dylib">
       <Kind>Dynamic</Kind>
       <SmartLink>False</SmartLink>
