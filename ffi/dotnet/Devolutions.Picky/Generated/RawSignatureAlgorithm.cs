@@ -14,7 +14,11 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct SignatureAlgorithm
 {
+#if __IOS__
+    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
+#else
     private const string NativeLib = "DevolutionsPicky";
+#endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SignatureAlgorithm_new_rsa_pkcs_1v15", ExactSpelling = true)]
     public static unsafe extern IntPtr NewRsaPkcs1v15(HashAlgorithm hashAlgorithm);
