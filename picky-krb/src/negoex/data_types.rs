@@ -289,14 +289,6 @@ pub type AuthSchemeVector = Vec<AuthScheme>;
 /// ```
 pub type ExtensionVector = Vec<Extension>;
 
-// #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-// pub struct ChecksumVector {
-//     offset: u32,
-//     count: u16,
-//     pad: u16,
-//     checksum: Vec<u8>,
-// }
-
 /// [2.2.5.1.3 CHECKSUM](https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NEGOEX/%5bMS-NEGOEX%5d.pdf)
 /// ```not_rust
 /// struct

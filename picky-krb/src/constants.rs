@@ -33,8 +33,8 @@ pub mod types {
     pub const PA_TGS_REQ_TYPE: [u8; 1] = [0x01];
     pub const PA_PAC_OPTIONS_TYPE: [u8; 2] = [0x00, 0xa7];
     //= [PKINIT](https://www.rfc-editor.org/rfc/rfc4556.html#section-3.1.3) =//
-    pub const PA_PK_AS_REQ: [u8; 2] = [00, 10];
-    pub const PA_PK_AS_REP: [u8; 2] = [00, 11];
+    pub const PA_PK_AS_REQ: [u8; 1] = [0x10];
+    pub const PA_PK_AS_REP: [u8; 1] = [17];
 
     pub const TICKET_TYPE: u8 = 1;
     pub const AUTHENTICATOR_TYPE: u8 = 2;

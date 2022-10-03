@@ -57,6 +57,13 @@ impl AlgorithmIdentifier {
         }
     }
 
+    pub fn new_sha1() -> Self {
+        Self {
+            algorithm: oids::sha1().into(),
+            parameters: AlgorithmIdentifierParameters::Null,
+        }
+    }
+
     pub fn new_sha224_with_rsa_encryption() -> Self {
         Self {
             algorithm: oids::sha224_with_rsa_encryption().into(),

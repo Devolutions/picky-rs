@@ -37,11 +37,11 @@ impl TryFrom<&[u8]> for CipherSuite {
     type Error = KerberosCryptoError;
 
     fn try_from(identifier: &[u8]) -> Result<Self, Self::Error> {
-        if identifier.len() != 2 {
+        if identifier.len() != 1 {
             return Err(KerberosCryptoError::AlgorithmIdentifierData(identifier.into()));
         }
 
-        match u16::from_be_bytes(identifier.try_into().unwrap()) as usize {
+        match u8::from_be_bytes(identifier.try_into().unwrap()) as usize {
             AES256_CTS_HMAC_SHA1_96 => Ok(Self::Aes256CtsHmacSha196),
             AES128_CTS_HMAC_SHA1_96 => Ok(Self::Aes128CtsHmacSha196),
             DES3_CBC_SHA1_KD => Ok(Self::Des3CbcSha1Kd),

@@ -102,6 +102,8 @@ impl<T: Serialize + Clone> KrbMessage<T> {
     pub fn encode(&self, mut data: impl Write) -> Result<(), GssApiMessageError> {
         let mut oid = Vec::new();
 
+        println!("oid: {:?}", picky_asn1_der::to_vec(&self.krb5_oid).unwrap());
+
         {
             let mut s = picky_asn1_der::Serializer::new_to_byte_buf(&mut oid);
             self.krb5_oid.serialize(&mut s)?;
@@ -125,6 +127,8 @@ impl<T: ser::Serialize + Debug + PartialEq + Clone> ser::Serialize for KrbMessag
         let mut buff = Vec::new();
         self.encode(&mut buff)
             .map_err(|e| S::Error::custom(format!("Cannot serialize GssApiMessage inner value: {:?}", e)))?;
+
+        println!("buff: {:?}", buff);
 
         Asn1RawDer(buff).serialize(serializer)
     }
