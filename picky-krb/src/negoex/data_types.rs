@@ -7,6 +7,9 @@ use uuid::Uuid;
 
 use super::{NegoexDataType, CHECKSUM_SCHEME_RFC3961, SIGNATURE};
 
+const GUID_SIZE: usize = 16;
+pub(crate) const CHECKSUM_HEADER_LEN: u32 = 4 /* header_len */ + 4 /* checksum_scheme */ + 4 /* type */ + 8 /* checksum vector header */;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Guid(pub Uuid);
 
@@ -20,11 +23,11 @@ impl NegoexDataType for Guid {
     type Error = io::Error;
 
     fn size(&self) -> usize {
-        16
+        GUID_SIZE
     }
 
     fn decode(mut from: impl Read, _message: &[u8]) -> Result<Self, Self::Error> {
-        let mut id_bytes = [0; 16];
+        let mut id_bytes = [0; GUID_SIZE];
         from.read_exact(&mut id_bytes)?;
 
         Ok(Self(Uuid::from_bytes_le(id_bytes)))
@@ -85,6 +88,7 @@ impl NegoexDataType for MessageType {
     type Error = io::Error;
 
     fn size(&self) -> usize {
+        // message type are always have a size of 4 bytes
         4
     }
 
@@ -135,7 +139,12 @@ impl NegoexDataType for MessageHeader {
     type Error = io::Error;
 
     fn size(&self) -> usize {
-        8 + self.message_type.size() + 4 + 4 + 4 + self.conversation_id.size()
+        8 /* signature */ +
+        self.message_type.size() +
+        4 /* sequence_num */ +
+        4 /* header_len */ +
+        4 /* message_len */ +
+        self.conversation_id.size()
     }
 
     fn decode(mut from: impl Read, message: &[u8]) -> Result<Self, Self::Error> {
@@ -217,7 +226,7 @@ impl NegoexDataType for Extension {
     type Error = io::Error;
 
     fn size(&self) -> usize {
-        4 + self.extension_value.len()
+        4 /* extension_type */ + self.extension_value.len()
     }
 
     fn decode(mut from: impl Read, message: &[u8]) -> Result<Self, Self::Error> {
@@ -245,7 +254,7 @@ impl NegoexDataType for Extension {
     }
 
     fn encode(&self, mut to: impl Write) -> Result<(), Self::Error> {
-        let mut offset = 12;
+        let mut offset = 0;
 
         let mut header = Vec::new();
         let mut data = Vec::new();
@@ -311,7 +320,11 @@ impl NegoexDataType for Checksum {
     type Error = io::Error;
 
     fn size(&self) -> usize {
-        4 + 4 + 4 + self.checksum_value.size()
+        4 /* header_len */ +
+        4 /* checksum_scheme */ +
+        4 /* checksum type */ +
+        4 /* padding of 4 bytes */ +
+        self.checksum_value.size()
     }
 
     fn decode(mut from: impl Read, message: &[u8]) -> Result<Self, Self::Error> {

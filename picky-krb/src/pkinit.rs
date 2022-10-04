@@ -1,24 +1,13 @@
 use picky_asn1::tag::{TagClass, TagPeeker};
 use picky_asn1::wrapper::{
-    Asn1SequenceOf, Asn1SetOf, BitStringAsn1, ExplicitContextTag0, ExplicitContextTag1, ExplicitContextTag2,
-    ExplicitContextTag3, ImplicitContextTag0, ImplicitContextTag1, ImplicitContextTag2, IntegerAsn1,
-    ObjectIdentifierAsn1, OctetStringAsn1, Optional,
+    Asn1SequenceOf, BitStringAsn1, ExplicitContextTag0, ExplicitContextTag1, ExplicitContextTag2, ExplicitContextTag3,
+    ImplicitContextTag0, ImplicitContextTag1, ImplicitContextTag2, IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1,
+    Optional,
 };
 use picky_asn1_x509::{seq_next_element, serde_invalid_value, AlgorithmIdentifier};
 use serde::{de, ser, Deserialize, Serialize};
 
 use crate::data_types::{KerberosTime, PrincipalName, Realm};
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct Pku2uValueInner<T> {
-    pub identifier: ObjectIdentifierAsn1,
-    pub value: T,
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct Pku2uValue<T> {
-    pub inner: Asn1SetOf<Pku2uValueInner<T>>,
-}
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct Pku2uNegoReqMetadata {
@@ -274,22 +263,16 @@ pub struct KdcDhKeyInfo {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-
-    use oid::ObjectIdentifier;
-    use picky_asn1::restricted_string::{BMPString, IA5String, PrintableString};
+    use picky_asn1::restricted_string::IA5String;
     use picky_asn1::wrapper::{
-        Asn1SequenceOf, Asn1SetOf, BMPStringAsn1, ExplicitContextTag0, ExplicitContextTag1, ImplicitContextTag0,
-        ImplicitContextTag1, IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1, Optional, PrintableStringAsn1,
+        Asn1SequenceOf, ExplicitContextTag0, ExplicitContextTag1, ImplicitContextTag0, ImplicitContextTag1,
+        IntegerAsn1, OctetStringAsn1, Optional,
     };
 
     use crate::data_types::{KerberosStringAsn1, PrincipalName};
     use crate::pkinit::DhRepInfo;
 
-    use super::{
-        PaPkAsRep, PaPkAsReq, Pku2uNegoBody, Pku2uNegoRep, Pku2uNegoReq, Pku2uNegoReqMetadata, Pku2uValue,
-        Pku2uValueInner,
-    };
+    use super::{PaPkAsRep, PaPkAsReq, Pku2uNegoBody, Pku2uNegoRep, Pku2uNegoReq, Pku2uNegoReqMetadata};
 
     #[test]
     fn pku2u_nego_req_encode() {
@@ -339,47 +322,6 @@ mod tests {
                 0, 91, 0, 50, 0, 48, 0, 50, 0, 49, 0, 93, 161, 56, 48, 54, 160, 17, 27, 15, 87, 69, 76, 76, 75, 78, 79,
                 87, 78, 58, 80, 75, 85, 50, 85, 161, 33, 48, 31, 160, 3, 2, 1, 2, 161, 24, 48, 22, 27, 7, 84, 69, 82,
                 77, 83, 82, 86, 27, 11, 65, 90, 82, 68, 79, 87, 78, 45, 87, 49, 48
-            ],
-            encoded.as_slice()
-        );
-    }
-
-    #[test]
-    fn pku2u_value_decode() {
-        let raw_data = [
-            48, 35, 49, 33, 48, 31, 6, 3, 85, 4, 3, 19, 24, 84, 111, 107, 101, 110, 32, 83, 105, 103, 110, 105, 110,
-            103, 32, 80, 117, 98, 108, 105, 99, 32, 75, 101, 121,
-        ];
-
-        let pku2u_value: Pku2uValue<PrintableStringAsn1> = picky_asn1_der::from_bytes(&raw_data).unwrap();
-
-        assert_eq!(
-            Pku2uValue {
-                inner: Asn1SetOf::from(vec![Pku2uValueInner {
-                    identifier: ObjectIdentifierAsn1(ObjectIdentifier::try_from("2.5.4.3").unwrap()),
-                    value: PrintableStringAsn1::from(PrintableString::from_str("Token Signing Public Key").unwrap()),
-                }])
-            },
-            pku2u_value
-        );
-    }
-
-    #[test]
-    fn pku2u_value_encode() {
-        let value = Pku2uValue {
-            inner: Asn1SetOf::from(vec![Pku2uValueInner {
-                identifier: ObjectIdentifierAsn1(ObjectIdentifier::try_from("2.5.4.3").unwrap()),
-                value: BMPStringAsn1::from(BMPString::from_str("\0M\0S\0-\0O\0r\0g\0a\0n\0i\0z\0a\0t\0i\0o\0n\0-\0P\02\0P\0-\0A\0c\0c\0e\0s\0s\0 \0[\02\00\02\01\0]").unwrap()),
-            }]),
-        };
-
-        let encoded = picky_asn1_der::to_vec(&value).unwrap();
-
-        assert_eq!(
-            &[
-                48, 77, 49, 75, 48, 73, 6, 3, 85, 4, 3, 30, 66, 0, 77, 0, 83, 0, 45, 0, 79, 0, 114, 0, 103, 0, 97, 0,
-                110, 0, 105, 0, 122, 0, 97, 0, 116, 0, 105, 0, 111, 0, 110, 0, 45, 0, 80, 0, 50, 0, 80, 0, 45, 0, 65,
-                0, 99, 0, 99, 0, 101, 0, 115, 0, 115, 0, 32, 0, 91, 0, 50, 0, 48, 0, 50, 0, 49, 0, 93
             ],
             encoded.as_slice()
         );

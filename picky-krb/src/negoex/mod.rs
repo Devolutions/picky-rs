@@ -80,7 +80,9 @@ impl<T: NegoexDataType<Error = io::Error>> NegoexDataType for Vec<T> {
     type Error = io::Error;
 
     fn size(&self) -> usize {
-        8 + if self.len() == 0 { 0 } else { self[0].size() * self.len() }
+        4 /* offset */ +
+        4 /* count */ +
+        self.get(0).map(|e| e.size()).unwrap_or_default() * self.len()
     }
 
     fn decode(mut from: impl Read, message: &[u8]) -> Result<Self, Self::Error> {

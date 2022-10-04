@@ -5,8 +5,13 @@ use uuid::Uuid;
 
 use super::data_types::{
     AuthScheme, AuthSchemeVector, ByteVector, Checksum, Extension, ExtensionVector, Guid, MessageHeader, MessageType,
+    CHECKSUM_HEADER_LEN,
 };
 use super::{NegoexDataType, NegoexMessage, CHECKSUM_SCHEME_RFC3961, PROTOCOL_VERSION, RANDOM_ARRAY_SIZE, SIGNATURE};
+
+const NEGO_MESSAGE_HEADER_LEN: u32 = 40 /* header */ + (RANDOM_ARRAY_SIZE as u32) + 8 /* protocol version */ + 8 /* auth schemes header */ + 8 /* extensions header */;
+const EXCHANGE_MESSAGE_HEADER_LEN: u32 = 40 /* header */ + 16 /* auth scheme */ + 8 /* exchange header */;
+const VERIFY_MESSAGE_HEADER_LEN: u32 = 40 /* header */ + 16 /* auth scheme */ + 4 /* padding */ + CHECKSUM_HEADER_LEN;
 
 /// [2.2.6.3 NEGO_MESSAGE](https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NEGOEX/%5bMS-NEGOEX%5d.pdf)
 /// ```not_rust
@@ -43,12 +48,13 @@ impl Nego {
             signature: SIGNATURE,
             message_type,
             sequence_num,
-            header_len: 96, // always the same for the Nego message
+            header_len: NEGO_MESSAGE_HEADER_LEN,
             message_len: 0,
             conversation_id: Guid::from(conversation_id),
         };
 
-        header.message_len = (header.size() + RANDOM_ARRAY_SIZE + 8 + auth_schemes.size() + extensions.size()) as u32;
+        header.message_len = (header.size() + RANDOM_ARRAY_SIZE + 8 /* protocol version */ + auth_schemes.size() + extensions.size())
+            as u32;
 
         Self {
             header,
@@ -137,7 +143,7 @@ impl Exchange {
             signature: SIGNATURE,
             message_type,
             sequence_num,
-            header_len: 64,
+            header_len: EXCHANGE_MESSAGE_HEADER_LEN,
             message_len: 0,
             conversation_id: Guid::from(conversation_id),
         };
@@ -145,9 +151,6 @@ impl Exchange {
         let auth_scheme = Guid::from(auth_scheme);
 
         header.message_len = (header.size() + auth_scheme.size() + exchange.size()) as u32;
-
-        println!("exchange message len: {:?}", header.message_len);
-        println!("header len: {}, exchange len: {}, auth_scheme: {}", header.size(), exchange.size(), auth_scheme.size());
 
         Exchange {
             header,
@@ -217,7 +220,7 @@ impl Verify {
             signature: SIGNATURE,
             message_type,
             sequence_num,
-            header_len: 20,
+            header_len: VERIFY_MESSAGE_HEADER_LEN,
             message_len: 0,
             conversation_id: Guid::from(conversation_id),
         };
@@ -225,7 +228,7 @@ impl Verify {
         let auth_scheme = Guid::from(auth_scheme);
 
         let checksum = Checksum {
-            header_len: 20,
+            header_len: CHECKSUM_HEADER_LEN,
             checksum_scheme: CHECKSUM_SCHEME_RFC3961,
             checksum_type,
             checksum_value,
@@ -256,7 +259,8 @@ impl NegoexMessage for Verify {
         let mut offset = self.header.header_len as usize;
 
         let mut message_header = Vec::new();
-        let mut message_data = Vec::new();
+        // 4 byte padding
+        let mut message_data = vec![0, 0, 0, 0];
 
         self.header.encode(&mut message_header)?;
 
@@ -283,16 +287,6 @@ mod tests {
     use crate::negoex::{NegoexMessage, CHECKSUM_SCHEME_RFC3961, SIGNATURE};
 
     use super::{Exchange, Nego, Verify};
-
-    #[test]
-    fn nego_decode_2() {
-        let encoded = [
-        78, 69, 71, 79, 69, 88, 84, 83, 1, 0, 0, 0, 2, 0, 0, 0, 96, 0, 0, 0, 112, 0, 0, 0, 94, 157, 63, 136, 85, 21, 232, 45, 204, 50, 80, 109, 227, 64, 49, 174, 234, 72, 225, 50, 154, 48, 136, 219, 97, 85, 200, 206, 114, 174, 45, 195, 40, 109, 4, 215, 93, 74, 66, 243, 119, 136, 168, 8, 162, 117, 215, 142, 0, 0, 0, 0, 0, 0, 0, 0, 96, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 92, 51, 83, 13, 234, 249, 13, 77, 178, 236, 74, 227, 120, 110, 195, 8, 78, 69, 71, 79, 69, 88, 84, 83, 3, 0, 0, 0, 3, 0, 0, 0, 64, 0, 0, 0, 153, 0, 0, 0, 94, 157, 63, 136, 85, 21, 232, 45, 204, 50, 80, 109, 227, 64, 49, 174, 92, 51, 83, 13, 234, 249, 13, 77, 178, 236, 74, 227, 120, 110, 195, 8, 64, 0, 0, 0, 89, 0, 0, 0, 48, 87, 160, 85, 48, 83, 48, 81, 128, 79, 48, 77, 49, 75, 48, 73, 6, 3, 85, 4, 3, 30, 66, 0, 77, 0, 83, 0, 45, 0, 79, 0, 114, 0, 103, 0, 97, 0, 110, 0, 105, 0, 122, 0, 97, 0, 116, 0, 105, 0, 111, 0, 110, 0, 45, 0, 80, 0, 50, 0, 80, 0, 45, 0, 65, 0, 99, 0, 99, 0, 101, 0, 115, 0, 115, 0, 32, 0, 91, 0, 50, 0, 48, 0, 50, 0, 50, 0, 93
-        ];
-
-        let nego = Nego::decode(&encoded as &[u8], &encoded).unwrap();
-        println!("nego: {:?}", nego);
-    }
 
     #[test]
     fn nego_decode() {
