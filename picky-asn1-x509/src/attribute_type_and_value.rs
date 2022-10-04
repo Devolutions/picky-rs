@@ -165,7 +165,7 @@ impl<'de> de::Deserialize<'de> for AttributeTypeAndValue {
 
                 let value =
                     match Into::<String>::into(&ty.0).as_str() {
-                        oids::AT_COMMON_NAME =>  AttributeTypeAndValueParameters::CommonName(seq_next_element!(
+                        oids::AT_COMMON_NAME => AttributeTypeAndValueParameters::CommonName(seq_next_element!(
                             seq,
                             AttributeTypeAndValue,
                             "at common name"
