@@ -18,8 +18,8 @@ embed-resource = "1.7.2"
 picky = { path = "../picky/", default-features = false, features = ["ssh", "x509", "time_conversion", "jose"] }
 
 # FFI
-diplomat = { git = "https://github.com/CBenoit/diplomat.git", rev = "fc3a85ff1e9bb90b8e088959f9b96e678e7a878f" }
-diplomat-runtime = { git = "https://github.com/CBenoit/diplomat.git", rev = "fc3a85ff1e9bb90b8e088959f9b96e678e7a878f" }
+diplomat = { git = "https://github.com/CBenoit/diplomat.git", rev = "0257abe01196eb68c254e47b516fc089c7d460c4" }
+diplomat-runtime = { git = "https://github.com/CBenoit/diplomat.git", rev = "0257abe01196eb68c254e47b516fc089c7d460c4" }
 
 time = "0.3.9"
 hex = "0.4.3"

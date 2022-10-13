@@ -14,7 +14,11 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct SignatureFfiResultBoxSignatureAlgorithmBoxPickyError
 {
+#if __IOS__
+    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
+#else
     private const string NativeLib = "DevolutionsPicky";
+#endif
 
     [StructLayout(LayoutKind.Explicit)]
     private unsafe struct InnerUnion
