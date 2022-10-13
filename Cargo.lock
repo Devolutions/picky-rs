@@ -404,7 +404,7 @@ dependencies = [
 [[package]]
 name = "diplomat"
 version = "0.3.0"
-source = "git+https://github.com/CBenoit/diplomat.git?rev=fc3a85ff1e9bb90b8e088959f9b96e678e7a878f#fc3a85ff1e9bb90b8e088959f9b96e678e7a878f"
+source = "git+https://github.com/CBenoit/diplomat.git?rev=0257abe01196eb68c254e47b516fc089c7d460c4#0257abe01196eb68c254e47b516fc089c7d460c4"
 dependencies = [
  "diplomat_core",
  "lazy_static",
@@ -416,12 +416,12 @@ dependencies = [
 [[package]]
 name = "diplomat-runtime"
 version = "0.3.0"
-source = "git+https://github.com/CBenoit/diplomat.git?rev=fc3a85ff1e9bb90b8e088959f9b96e678e7a878f#fc3a85ff1e9bb90b8e088959f9b96e678e7a878f"
+source = "git+https://github.com/CBenoit/diplomat.git?rev=0257abe01196eb68c254e47b516fc089c7d460c4#0257abe01196eb68c254e47b516fc089c7d460c4"
 
 [[package]]
 name = "diplomat_core"
 version = "0.3.0"
-source = "git+https://github.com/CBenoit/diplomat.git?rev=fc3a85ff1e9bb90b8e088959f9b96e678e7a878f#fc3a85ff1e9bb90b8e088959f9b96e678e7a878f"
+source = "git+https://github.com/CBenoit/diplomat.git?rev=0257abe01196eb68c254e47b516fc089c7d460c4#0257abe01196eb68c254e47b516fc089c7d460c4"
 dependencies = [
  "impls",
  "lazy_static",
