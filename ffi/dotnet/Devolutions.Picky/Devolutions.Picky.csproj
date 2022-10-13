@@ -168,6 +168,7 @@
 
   <ItemGroup>
     <Content Include="Devolutions.Picky.targets" PackagePath="build/Devolutions.Picky.targets" Pack="true" />
+    <Content Include="Devolutions.Picky.props" PackagePath="build/Devolutions.Picky.props" Pack="true" />
   </ItemGroup>
 
 </Project>

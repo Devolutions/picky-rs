@@ -83,9 +83,4 @@
           <Abi>x86_64</Abi>
       </AndroidNativeLibrary>
   </ItemGroup> 
-  <ItemGroup Condition="(('$(Platform)' == 'iPhone')) or (('$(Platform)' == 'iPhoneSimulator'))">
-    <NativeReference Include="$(MSBuildThisFileDirectory)..\runtimes\ios-universal\native\libDevolutionsPicky.framework">
-      <Kind>Framework</Kind>
-    </NativeReference>
-  </ItemGroup>
 </Project>
