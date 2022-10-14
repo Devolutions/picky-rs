@@ -6,6 +6,10 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 
+#if __IOS__
+using ObjCRuntime;
+#endif
+
 namespace Devolutions.Picky.Diplomat;
 
 #nullable enable
@@ -103,11 +107,17 @@ public struct DiplomatWriteable : IDisposable
         }
     }
 
+#if __IOS__
+    [MonoPInvokeCallback(typeof(WriteableFlush))]
+#endif
     private static void Flush(IntPtr self)
     {
         // Nothing to do
     }
 
+#if __IOS__
+    [MonoPInvokeCallback(typeof(WriteableGrow))]
+#endif
     [return: MarshalAs(UnmanagedType.U1)]
     private unsafe static bool Grow(IntPtr writeable, nuint capacity)
     {

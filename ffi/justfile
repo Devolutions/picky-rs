@@ -18,8 +18,8 @@ default: bindings
 # Indeed, in older frameworks a few important types
 # are not blittables, causing Result types to not be
 # correctly send at the FFI boundary. 
-diplomat_repo := "https://github.com/CBenoit/diplomat.git"
-diplomat_rev  := "0257abe01196eb68c254e47b516fc089c7d460c4"
+diplomat_repo := "https://github.com/thenextman/diplomat.git"
+diplomat_rev  := "d6ee7c188de021ac342b206b1e965b721399ac91"
 
 diplomat-install:
     cargo install --git {{diplomat_repo}} --rev {{diplomat_rev}} diplomat-tool -f

@@ -5,7 +5,7 @@
     <Description>Bindings to Rust picky native library</Description>
     <TargetFrameworks>netstandard2.0;Xamarin.iOS10</TargetFrameworks>
     <LangVersion>latest</LangVersion>
-    <Version>2022.10.13.0</Version>
+    <Version>2022.10.14.0</Version>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
