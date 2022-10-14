@@ -30,7 +30,7 @@ A [justfile](https://github.com/casey/just) is provided to run common commands u
 The appropriate version of `Diplomat`'s tool can be installed with:
 
 ```
-$ just install-diplomat
+$ just diplomat-install
 ```
 
 Commands for generating the bindings are issued with:
