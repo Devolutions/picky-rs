@@ -163,6 +163,8 @@ jobs:
 
       - name: Build picky (${{matrix.os}}-${{matrix.arch}})
         shell: pwsh
+        env:
+          IPHONEOS_DEPLOYMENT_TARGET: '12.1'
         run: |
           Set-PSDebug -Trace 1
 
