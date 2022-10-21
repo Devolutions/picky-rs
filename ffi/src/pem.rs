@@ -62,3 +62,19 @@ pub mod ffi {
         }
     }
 }
+
+/// Retuns data contained in this Pem object.
+///
+/// # Safety
+///
+/// Returned data should not be modified.
+#[no_mangle]
+pub unsafe extern "C" fn Pem_peek_data(pem: Option<&ffi::Pem>, len: *mut usize) -> *const u8 {
+    if let Some(pem) = pem {
+        let data = pem.0.data();
+        *len = data.len();
+        data.as_ptr()
+    } else {
+        core::ptr::null()
+    }
+}

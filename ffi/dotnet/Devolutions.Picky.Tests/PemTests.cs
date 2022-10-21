@@ -40,9 +40,8 @@ Od8i323fM5dQS1qQpBjBc/5fPw==
     public void Smoke()
     {
         Pem fromReprPem = Pem.Parse(certPemRepr);
-        // TODO: need support for returning buffer of bytes
-        // Pem fromDataPem = Pem.New(fromReprPem.Label, fromReprPem.ToData());
-        // Assert.Equal(certPemRepr, fromDataPem.ToRepr());
+        Pem fromDataPem = Pem.New(fromReprPem.Label, fromReprPem.ToData());
+        Assert.Equal(certPemRepr, fromDataPem.ToRepr());
     }
 
     [Fact]
