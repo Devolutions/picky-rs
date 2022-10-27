@@ -11,7 +11,7 @@ pub enum DiffieHellmanError {
     #[error("Invalid bit len: {0}")]
     BitLen(String),
     #[error("Invalid data len: expected at least {0} but got {1}.")]
-    DataLen(usize, usize)
+    DataLen(usize, usize),
 }
 
 pub type DiffieHellmanResult<T> = Result<T, DiffieHellmanError>;

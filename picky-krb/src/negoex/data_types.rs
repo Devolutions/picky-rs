@@ -26,14 +26,16 @@ impl NegoexDataType for Guid {
         Ok(Self::from_bytes_le(id_bytes))
     }
 
-    fn encode_with_payload(&self, _offset: usize, mut to: impl Write, _data: impl Write) -> Result<(), Self::Error> {
+    fn encode_with_payload(&self, _offset: usize, mut to: impl Write, _data: impl Write) -> Result<usize, Self::Error> {
         to.write_all(&self.to_bytes_le())?;
 
-        Ok(())
+        Ok(0)
     }
 
     fn encode(&self, to: impl Write) -> Result<(), Self::Error> {
-        self.encode_with_payload(0, to, &mut [] as &mut [u8])
+        self.encode_with_payload(0, to, &mut [] as &mut [u8])?;
+
+        Ok(())
     }
 }
 
@@ -90,17 +92,19 @@ impl NegoexDataType for MessageType {
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "invalid MessageType"))?)
     }
 
-    fn encode_with_payload(&self, _offset: usize, mut to: impl Write, _data: impl Write) -> Result<(), Self::Error> {
+    fn encode_with_payload(&self, _offset: usize, mut to: impl Write, _data: impl Write) -> Result<usize, Self::Error> {
         to.write_u32::<LittleEndian>(
             self.to_u32()
                 .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "can not encode MessageType as u32"))?,
         )?;
 
-        Ok(())
+        Ok(0)
     }
 
     fn encode(&self, to: impl Write) -> Result<(), Self::Error> {
-        self.encode_with_payload(0, to, &mut [] as &mut [u8])
+        self.encode_with_payload(0, to, &mut [] as &mut [u8])?;
+
+        Ok(())
     }
 }
 
@@ -176,10 +180,10 @@ impl NegoexDataType for MessageHeader {
         offset: usize,
         mut to: impl Write,
         mut data: impl Write,
-    ) -> Result<(), Self::Error> {
+    ) -> Result<usize, Self::Error> {
         to.write_u64::<LittleEndian>(self.signature)?;
 
-        self.message_type.encode_with_payload(offset, &mut to, &mut data)?;
+        let message_type_offset = self.message_type.encode_with_payload(offset, &mut to, &mut data)?;
 
         to.write_u32::<LittleEndian>(self.sequence_num)?;
 
@@ -187,13 +191,15 @@ impl NegoexDataType for MessageHeader {
 
         to.write_u32::<LittleEndian>(self.message_len)?;
 
-        self.conversation_id.encode_with_payload(offset, &mut to, &mut data)?;
+        let conversation_id_offset = self.conversation_id.encode_with_payload(offset, &mut to, &mut data)?;
 
-        Ok(())
+        Ok(message_type_offset + conversation_id_offset)
     }
 
     fn encode(&self, to: impl Write) -> Result<(), Self::Error> {
-        self.encode_with_payload(0, to, &mut [] as &mut [u8])
+        self.encode_with_payload(0, to, &mut [] as &mut [u8])?;
+
+        Ok(())
     }
 }
 
@@ -234,12 +240,10 @@ impl NegoexDataType for Extension {
         offset: usize,
         mut to: impl Write,
         mut data: impl Write,
-    ) -> Result<(), Self::Error> {
+    ) -> Result<usize, Self::Error> {
         to.write_u32::<LittleEndian>(self.extension_type)?;
 
-        self.extension_value.encode_with_payload(offset, &mut to, &mut data)?;
-
-        Ok(())
+        self.extension_value.encode_with_payload(offset, &mut to, &mut data)
     }
 
     fn encode(&self, mut to: impl Write) -> Result<(), Self::Error> {
@@ -348,16 +352,14 @@ impl NegoexDataType for Checksum {
         offset: usize,
         mut to: impl Write,
         mut data: impl Write,
-    ) -> Result<(), Self::Error> {
+    ) -> Result<usize, Self::Error> {
         to.write_u32::<LittleEndian>(self.header_len)?;
 
         to.write_u32::<LittleEndian>(self.checksum_scheme)?;
 
         to.write_u32::<LittleEndian>(self.checksum_type)?;
 
-        self.checksum_value.encode_with_payload(offset, &mut to, &mut data)?;
-
-        Ok(())
+        self.checksum_value.encode_with_payload(offset, &mut to, &mut data)
     }
 
     fn encode(&self, mut to: impl Write) -> Result<(), Self::Error> {

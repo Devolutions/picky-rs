@@ -72,7 +72,9 @@ impl Nego {
 impl NegoexMessage for Nego {
     type Error = io::Error;
 
-    fn decode(mut from: impl Read, message: &[u8]) -> Result<Self, Self::Error> {
+    fn decode(message: &[u8]) -> Result<Self, Self::Error> {
+        let mut from = message;
+
         let header: MessageHeader = NegoexDataType::decode(&mut from, &[])?;
 
         let mut random = [0; RANDOM_ARRAY_SIZE];
@@ -166,7 +168,9 @@ impl Exchange {
 impl NegoexMessage for Exchange {
     type Error = io::Error;
 
-    fn decode(mut from: impl Read, message: &[u8]) -> Result<Self, Self::Error> {
+    fn decode(message: &[u8]) -> Result<Self, Self::Error> {
+        let mut from = message;
+
         Ok(Self {
             header: NegoexDataType::decode(&mut from, message)?,
             auth_scheme: NegoexDataType::decode(&mut from, message)?,
@@ -250,7 +254,9 @@ impl Verify {
 impl NegoexMessage for Verify {
     type Error = io::Error;
 
-    fn decode(mut from: impl Read, message: &[u8]) -> Result<Self, Self::Error> {
+    fn decode(message: &[u8]) -> Result<Self, Self::Error> {
+        let mut from = message;
+
         Ok(Self {
             header: NegoexDataType::decode(&mut from, message)?,
             auth_scheme: NegoexDataType::decode(&mut from, message)?,
@@ -299,7 +305,7 @@ mod tests {
             120, 110, 195, 8,
         ];
 
-        let nego = Nego::decode(&encoded as &[u8], &encoded).unwrap();
+        let nego = Nego::decode(&encoded).unwrap();
 
         assert_eq!(
             Nego {
@@ -372,7 +378,7 @@ mod tests {
             107, 101, 110, 32, 83, 105, 103, 110, 105, 110, 103, 32, 80, 117, 98, 108, 105, 99, 32, 75, 101, 121,
         ];
 
-        let exchange = Exchange::decode(&encoded as &[u8], &encoded).unwrap();
+        let exchange = Exchange::decode(&encoded).unwrap();
 
         assert_eq!(
             Exchange {
@@ -456,7 +462,7 @@ mod tests {
             148, 23, 131, 204, 12, 13, 36, 58, 87,
         ];
 
-        let verify = Verify::decode(&encoded as &[u8], &encoded).unwrap();
+        let verify = Verify::decode(&encoded).unwrap();
 
         assert_eq!(
             Verify {

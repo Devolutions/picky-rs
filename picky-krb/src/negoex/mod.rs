@@ -27,28 +27,41 @@ pub const PROTOCOL_VERSION: u64 = 0;
 /// ```
 pub const RANDOM_ARRAY_SIZE: usize = 32;
 
+/// This trait provides interface for decoding/encoding NEGOEX messages like Nego, Exchange, Verify
+/// * [NEGOEX](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-negoex/77c795cf-e522-4678-b0f1-2063c5c0561c)
 pub trait NegoexMessage
 where
     Self: Sized,
 {
     type Error;
 
-    fn decode(from: impl Read, message: &[u8]) -> Result<Self, Self::Error>;
+    //= Decodes NEGOEX message. `message` is the NEGOEX message buffer =//
+    fn decode(message: &[u8]) -> Result<Self, Self::Error>;
+
+    //= Encodes NEGOEX message into provided `to`. =//
     fn encode(&self, to: impl Write) -> Result<(), Self::Error>;
 }
 
+/// This trait provides interface for decoding/encoding NEGOEX data types like MessageHeader, Checksum, etc.
+/// * [NEGOEX](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-negoex/77c795cf-e522-4678-b0f1-2063c5c0561c)
 pub trait NegoexDataType
 where
     Self: Sized,
 {
     type Error;
 
+    //= Returns the encoded size of the data type. =//
     fn size(&self) -> usize;
 
+    /// Decodes Self from the provided sources.
+    /// `message` - the initial message buffer.
     fn decode(from: impl Read, message: &[u8]) -> Result<Self, Self::Error>;
 
+    //= Encodes Self into `to`. The data will be places right after the header =//
     fn encode(&self, to: impl Write) -> Result<(), Self::Error>;
-    fn encode_with_payload(&self, offset: usize, to: impl Write, data: impl Write) -> Result<(), Self::Error>;
+
+    //= Encodes header into the `to` and data into the `data` =//
+    fn encode_with_payload(&self, offset: usize, to: impl Write, data: impl Write) -> Result<usize, Self::Error>;
 }
 
 impl NegoexDataType for u8 {
@@ -62,14 +75,16 @@ impl NegoexDataType for u8 {
         from.read_u8()
     }
 
-    fn encode_with_payload(&self, _offset: usize, mut to: impl Write, _data: impl Write) -> Result<(), Self::Error> {
+    fn encode_with_payload(&self, _offset: usize, mut to: impl Write, _data: impl Write) -> Result<usize, Self::Error> {
         to.write_u8(*self)?;
 
-        Ok(())
+        Ok(0)
     }
 
     fn encode(&self, to: impl Write) -> Result<(), Self::Error> {
-        self.encode_with_payload(0, to, &mut [] as &mut [u8])
+        self.encode_with_payload(0, to, &mut [] as &mut [u8])?;
+
+        Ok(())
     }
 }
 
@@ -100,10 +115,10 @@ impl<T: NegoexDataType<Error = io::Error>> NegoexDataType for Vec<T> {
 
     fn encode_with_payload(
         &self,
-        mut offset: usize,
+        offset: usize,
         mut to: impl Write,
         mut data: impl Write,
-    ) -> Result<(), Self::Error> {
+    ) -> Result<usize, Self::Error> {
         if self.is_empty() {
             to.write_u32::<LittleEndian>(0)?;
         } else {
@@ -115,15 +130,16 @@ impl<T: NegoexDataType<Error = io::Error>> NegoexDataType for Vec<T> {
         let mut elements_headers = Vec::new();
         let mut elements_data = Vec::new();
 
+        let mut written = 0;
         for element in self.iter() {
-            offset += element.size();
-            element.encode_with_payload(offset, &mut elements_headers, &mut elements_data)?;
+            written += element.size();
+            element.encode_with_payload(offset + written, &mut elements_headers, &mut elements_data)?;
         }
 
         data.write_all(&elements_headers)?;
         data.write_all(&elements_data)?;
 
-        Ok(())
+        Ok(written)
     }
 
     fn encode(&self, mut to: impl Write) -> Result<(), Self::Error> {
