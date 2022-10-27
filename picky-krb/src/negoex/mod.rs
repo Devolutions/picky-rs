@@ -9,7 +9,7 @@ pub mod messages;
 /// ```not_rust
 /// #define MESSAGE_SIGNATURE 0x535458454f47454ei64 // "NEGOEXTS"
 /// ```
-pub const SIGNATURE: u64 = 0x535458454f47454e;
+pub const NEGOEXTS_MESSAGE_SIGNATURE: u64 = 0x535458454f47454e;
 
 /// [2.2.3 Constants](https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NEGOEX/%5bMS-NEGOEX%5d.pdf)
 /// ```not_rust
@@ -110,6 +110,7 @@ impl<T: NegoexDataType<Error = io::Error>> NegoexDataType for Vec<T> {
         if self.is_empty() {
             to.write_u32::<LittleEndian>(0)?;
         } else {
+            println!("write offset: {}", offset);
             to.write_u32::<LittleEndian>(*offset as u32)?;
         }
 

@@ -7,7 +7,10 @@ use super::data_types::{
     AuthScheme, AuthSchemeVector, ByteVector, Checksum, Extension, ExtensionVector, Guid, MessageHeader, MessageType,
     CHECKSUM_HEADER_LEN,
 };
-use super::{NegoexDataType, NegoexMessage, CHECKSUM_SCHEME_RFC3961, PROTOCOL_VERSION, RANDOM_ARRAY_SIZE, SIGNATURE};
+use super::{
+    NegoexDataType, NegoexMessage, CHECKSUM_SCHEME_RFC3961, NEGOEXTS_MESSAGE_SIGNATURE, PROTOCOL_VERSION,
+    RANDOM_ARRAY_SIZE,
+};
 
 const NEGO_MESSAGE_HEADER_LEN: u32 = 40 /* header */ + (RANDOM_ARRAY_SIZE as u32) + 8 /* protocol version */ + 8 /* auth schemes header */ + 8 /* extensions header */;
 const EXCHANGE_MESSAGE_HEADER_LEN: u32 = 40 /* header */ + 16 /* auth scheme */ + 8 /* exchange header */;
@@ -45,7 +48,7 @@ impl Nego {
         let auth_schemes: AuthSchemeVector = auth_schemes.into_iter().map(Guid::from).collect();
 
         let mut header = MessageHeader {
-            signature: SIGNATURE,
+            signature: NEGOEXTS_MESSAGE_SIGNATURE,
             message_type,
             sequence_num,
             header_len: NEGO_MESSAGE_HEADER_LEN,
@@ -140,7 +143,7 @@ impl Exchange {
         exchange: Vec<u8>,
     ) -> Self {
         let mut header = MessageHeader {
-            signature: SIGNATURE,
+            signature: NEGOEXTS_MESSAGE_SIGNATURE,
             message_type,
             sequence_num,
             header_len: EXCHANGE_MESSAGE_HEADER_LEN,
@@ -217,7 +220,7 @@ impl Verify {
         checksum_value: Vec<u8>,
     ) -> Self {
         let mut header = MessageHeader {
-            signature: SIGNATURE,
+            signature: NEGOEXTS_MESSAGE_SIGNATURE,
             message_type,
             sequence_num,
             header_len: VERIFY_MESSAGE_HEADER_LEN,
@@ -284,7 +287,7 @@ mod tests {
 
     use crate::constants::cksum_types::HMAC_SHA1_96_AES256;
     use crate::negoex::data_types::{Checksum, Guid, MessageHeader, MessageType};
-    use crate::negoex::{NegoexMessage, CHECKSUM_SCHEME_RFC3961, SIGNATURE};
+    use crate::negoex::{NegoexMessage, CHECKSUM_SCHEME_RFC3961, NEGOEXTS_MESSAGE_SIGNATURE};
 
     use super::{Exchange, Nego, Verify};
 
@@ -303,7 +306,7 @@ mod tests {
         assert_eq!(
             Nego {
                 header: MessageHeader {
-                    signature: SIGNATURE,
+                    signature: NEGOEXTS_MESSAGE_SIGNATURE,
                     message_type: MessageType::InitiatorNego,
                     sequence_num: 0,
                     header_len: 96,
@@ -326,7 +329,7 @@ mod tests {
     fn nego_encode() {
         let nego = Nego {
             header: MessageHeader {
-                signature: SIGNATURE,
+                signature: NEGOEXTS_MESSAGE_SIGNATURE,
                 message_type: MessageType::InitiatorNego,
                 sequence_num: 0,
                 header_len: 96,
@@ -376,7 +379,7 @@ mod tests {
         assert_eq!(
             Exchange {
                 header: MessageHeader {
-                    signature: SIGNATURE,
+                    signature: NEGOEXTS_MESSAGE_SIGNATURE,
                     message_type: MessageType::AcceptorMetaData,
                     sequence_num: 3,
                     header_len: 64,
@@ -403,7 +406,7 @@ mod tests {
     fn exchange_encode() {
         let exchange = Exchange {
             header: MessageHeader {
-                signature: SIGNATURE,
+                signature: NEGOEXTS_MESSAGE_SIGNATURE,
                 message_type: MessageType::InitiatorMetaData,
                 sequence_num: 1,
                 header_len: 64,
@@ -460,7 +463,7 @@ mod tests {
         assert_eq!(
             Verify {
                 header: MessageHeader {
-                    signature: SIGNATURE,
+                    signature: NEGOEXTS_MESSAGE_SIGNATURE,
                     message_type: MessageType::Verify,
                     sequence_num: 7,
                     header_len: 80,
@@ -483,7 +486,7 @@ mod tests {
     fn verify_encode() {
         let verify = Verify {
             header: MessageHeader {
-                signature: SIGNATURE,
+                signature: NEGOEXTS_MESSAGE_SIGNATURE,
                 message_type: MessageType::Verify,
                 sequence_num: 9,
                 header_len: 76,
@@ -506,8 +509,8 @@ mod tests {
             &[
                 78, 69, 71, 79, 69, 88, 84, 83, 6, 0, 0, 0, 9, 0, 0, 0, 76, 0, 0, 0, 88, 0, 0, 0, 90, 7, 41, 59, 145,
                 243, 51, 175, 161, 180, 162, 18, 36, 157, 124, 180, 92, 51, 83, 13, 234, 249, 13, 77, 178, 236, 74,
-                227, 120, 110, 195, 8, 20, 0, 0, 0, 1, 0, 0, 0, 16, 0, 0, 0, 76, 0, 0, 0, 12, 0, 0, 0, 80, 14, 142, 6,
-                58, 29, 106, 165, 72, 160, 111, 12
+                227, 120, 110, 195, 8, 20, 0, 0, 0, 1, 0, 0, 0, 16, 0, 0, 0, 76, 0, 0, 0, 12, 0, 0, 0, 0, 0, 0, 0, 80,
+                14, 142, 6, 58, 29, 106, 165, 72, 160, 111, 12
             ],
             encoded.as_slice()
         );

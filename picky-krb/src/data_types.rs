@@ -1,4 +1,4 @@
-use byteorder::{WriteBytesExt, ReadBytesExt, LittleEndian};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use picky_asn1::wrapper::{
     Asn1SequenceOf, BitStringAsn1, ExplicitContextTag0, ExplicitContextTag1, ExplicitContextTag2, ExplicitContextTag3,
     ExplicitContextTag4, ExplicitContextTag5, ExplicitContextTag6, ExplicitContextTag7, ExplicitContextTag8,
@@ -8,10 +8,10 @@ use picky_asn1_der::application_tag::ApplicationTag;
 use serde::de::Error;
 use serde::{de, Deserialize, Deserializer, Serialize};
 
-use std::{fmt, io};
 use std::fmt::Debug;
-use std::io::{Write, Read};
+use std::io::{Read, Write};
 use std::marker::PhantomData;
+use std::{fmt, io};
 
 use crate::constants::types::{AUTHENTICATOR_TYPE, ENC_AP_REP_PART_TYPE, KRB_PRIV_ENC_PART, TICKET_TYPE};
 use crate::messages::KrbError;
@@ -421,7 +421,7 @@ impl<'de, T: Deserialize<'de>> ResultExt<'de, T> for Result<T, KrbError> {
 pub type KrbResult<T> = Result<T, KrbError>;
 
 /// [2.2.6 KERB-AD-RESTRICTION-ENTRY](https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-KILE/%5bMS-KILE%5d.pdf)
-/// 
+///
 /// ```not_rust
 /// KERB-AD-RESTRICTION-ENTRY ::= SEQUENCE {
 /// restriction-type [0] Int32,
@@ -439,7 +439,7 @@ pub struct KerbAdRestrictionEntry {
 pub const MACHINE_ID_LENGTH: usize = 32;
 
 /// [2.2.5 LSAP_TOKEN_INFO_INTEGRITY](https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-KILE/%5bMS-KILE%5d.pdf)
-/// 
+///
 /// ```not_rust
 /// typedef struct _LSAP_TOKEN_INFO_INTEGRITY {
 ///     unsigned long Flags;
@@ -466,7 +466,7 @@ impl LsapTokenInfoIntegrity {
     pub fn decode(mut from: impl Read) -> io::Result<Self> {
         let flags = from.read_u32::<LittleEndian>()?;
         let token_il = from.read_u32::<LittleEndian>()?;
-        
+
         let mut machine_id = [0; MACHINE_ID_LENGTH];
         from.read_exact(&mut machine_id)?;
 

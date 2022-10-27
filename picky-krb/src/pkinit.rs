@@ -7,7 +7,7 @@ use picky_asn1::wrapper::{
 use picky_asn1_x509::{seq_next_element, serde_invalid_value, AlgorithmIdentifier};
 use serde::{de, ser, Deserialize, Serialize};
 
-use crate::data_types::{KerberosTime, PrincipalName, Realm, Checksum};
+use crate::data_types::{Checksum, KerberosTime, PrincipalName, Realm};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct Pku2uNegoReqMetadata {

@@ -23,7 +23,6 @@ pub enum DirectoryString {
     PrintableString(PrintableStringAsn1),
     //UniversalString,
     Utf8String(String),
-    //BmpString,
     BmpString(BMPStringAsn1),
 }
 

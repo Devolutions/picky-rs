@@ -5,7 +5,7 @@ use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::{FromPrimitive, ToPrimitive};
 use uuid::Uuid;
 
-use super::{NegoexDataType, CHECKSUM_SCHEME_RFC3961, SIGNATURE};
+use super::{NegoexDataType, CHECKSUM_SCHEME_RFC3961, NEGOEXTS_MESSAGE_SIGNATURE};
 
 const GUID_SIZE: usize = 16;
 pub(crate) const CHECKSUM_HEADER_LEN: u32 = 4 /* header_len */ + 4 /* checksum_scheme */ + 4 /* type */ + 8 /* checksum vector header */;
@@ -150,12 +150,12 @@ impl NegoexDataType for MessageHeader {
     fn decode(mut from: impl Read, message: &[u8]) -> Result<Self, Self::Error> {
         let signature = from.read_u64::<LittleEndian>()?;
 
-        if signature != SIGNATURE {
+        if signature != NEGOEXTS_MESSAGE_SIGNATURE {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!(
                     "invalid message signature: {:x?}. expected: {:x?}",
-                    signature, SIGNATURE
+                    signature, NEGOEXTS_MESSAGE_SIGNATURE
                 ),
             ));
         }
@@ -254,12 +254,14 @@ impl NegoexDataType for Extension {
     }
 
     fn encode(&self, mut to: impl Write) -> Result<(), Self::Error> {
-        let mut offset = 0;
+        let mut offset = 12;
 
         let mut header = Vec::new();
         let mut data = Vec::new();
 
         self.encode_with_data(&mut offset, &mut header, &mut data)?;
+
+        println!("header: {:?}, data: {:?}", header, data);
 
         to.write_all(&mut header)?;
         to.write_all(&mut data)?;
@@ -396,7 +398,7 @@ mod tests {
     use crate::negoex::data_types::Guid;
     use crate::negoex::NegoexDataType;
 
-    use super::{Checksum, Extension, MessageHeader, MessageType, CHECKSUM_SCHEME_RFC3961, SIGNATURE};
+    use super::{Checksum, Extension, MessageHeader, MessageType, CHECKSUM_SCHEME_RFC3961, NEGOEXTS_MESSAGE_SIGNATURE};
 
     #[test]
     fn guid_encode() {
@@ -442,7 +444,7 @@ mod tests {
     #[test]
     fn message_header_encode() {
         let message_header = MessageHeader {
-            signature: SIGNATURE,
+            signature: NEGOEXTS_MESSAGE_SIGNATURE,
             message_type: MessageType::AcceptorNego,
             sequence_num: 2,
             header_len: 96,
@@ -473,7 +475,7 @@ mod tests {
 
         assert_eq!(
             MessageHeader {
-                signature: SIGNATURE,
+                signature: NEGOEXTS_MESSAGE_SIGNATURE,
                 message_type: MessageType::AcceptorNego,
                 sequence_num: 2,
                 header_len: 96,
