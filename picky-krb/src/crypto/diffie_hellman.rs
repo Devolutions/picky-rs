@@ -2,14 +2,25 @@ use num_bigint::BigUint;
 use num_traits::FromPrimitive;
 use rand::{CryptoRng, Rng, RngCore};
 use sha1::{Digest, Sha1};
+use thiserror::Error;
 
-use crate::crypto::{Cipher, KerberosCryptoError, KerberosCryptoResult};
+use crate::crypto::Cipher;
+
+#[derive(Error, Debug)]
+pub enum DiffieHellmanError {
+    #[error("Invalid bit len: {0}")]
+    BitLen(String),
+    #[error("Invalid data len: expected at least {0} but got {1}.")]
+    DataLen(usize, usize)
+}
+
+pub type DiffieHellmanResult<T> = Result<T, DiffieHellmanError>;
 
 /// [Using Diffie-Hellman Key Exchange](https://www.rfc-editor.org/rfc/rfc4556.html#section-3.2.3.1)
 /// K-truncate truncates its input to the first K bits
-fn k_truncate(k: usize, mut data: Vec<u8>) -> KerberosCryptoResult<Vec<u8>> {
+fn k_truncate(k: usize, mut data: Vec<u8>) -> DiffieHellmanResult<Vec<u8>> {
     if k % 8 != 0 {
-        return Err(KerberosCryptoError::SeedBitLen(format!(
+        return Err(DiffieHellmanError::BitLen(format!(
             "Seed bit len must be a multiple of 8. Got: {}",
             k
         )));
@@ -18,7 +29,7 @@ fn k_truncate(k: usize, mut data: Vec<u8>) -> KerberosCryptoResult<Vec<u8>> {
     let bytes_len = k / 8;
 
     if bytes_len > data.len() {
-        return Err(KerberosCryptoError::CipherLength(data.len(), bytes_len));
+        return Err(DiffieHellmanError::DataLen(bytes_len, data.len()));
     }
 
     data.resize(bytes_len, 0);
@@ -33,7 +44,7 @@ fn k_truncate(k: usize, mut data: Vec<u8>) -> KerberosCryptoResult<Vec<u8>> {
 ///                          SHA1(0x02 | x) |
 ///                          ...
 ///                          ))
-fn octet_string_to_key(x: &[u8], cipher: &dyn Cipher) -> KerberosCryptoResult<Vec<u8>> {
+fn octet_string_to_key(x: &[u8], cipher: &dyn Cipher) -> DiffieHellmanResult<Vec<u8>> {
     let seed_len = cipher.seed_bit_len() / 8;
 
     let mut key = Vec::new();
@@ -65,7 +76,7 @@ pub fn generate_key_from_shared_secret(
     dh_shared_secret: &[u8],
     nonce: Option<DhNonce>,
     cipher: &dyn Cipher,
-) -> KerberosCryptoResult<Vec<u8>> {
+) -> DiffieHellmanResult<Vec<u8>> {
     let mut x = dh_shared_secret.to_vec();
 
     if let Some(DhNonce {
@@ -103,7 +114,7 @@ pub fn generate_key(
     modulus: &[u8],
     nonce: Option<DhNonce>,
     cipher: &dyn Cipher,
-) -> KerberosCryptoResult<Vec<u8>> {
+) -> DiffieHellmanResult<Vec<u8>> {
     let dh_shared_secret = generate_dh_shared_secret(public_key, private_key, modulus);
 
     generate_key_from_shared_secret(&dh_shared_secret, nonce, cipher)

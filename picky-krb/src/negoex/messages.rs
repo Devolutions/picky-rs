@@ -97,7 +97,7 @@ impl NegoexMessage for Nego {
         let mut message_header = Vec::new();
         let mut message_data = Vec::new();
 
-        let mut offset = self.header.header_len as usize;
+        let offset = self.header.header_len as usize;
 
         self.header.encode(&mut message_header)?;
 
@@ -106,10 +106,10 @@ impl NegoexMessage for Nego {
         message_header.write_u64::<LittleEndian>(self.protocol_version)?;
 
         self.auth_schemes
-            .encode_with_data(&mut offset, &mut message_header, &mut message_data)?;
+            .encode_with_payload(offset, &mut message_header, &mut message_data)?;
 
         self.extensions
-            .encode_with_data(&mut offset, &mut message_header, &mut message_data)?;
+            .encode_with_payload(offset, &mut message_header, &mut message_data)?;
 
         to.write_all(&message_header)?;
         to.write_all(&message_data)?;
@@ -175,7 +175,7 @@ impl NegoexMessage for Exchange {
     }
 
     fn encode(&self, mut to: impl Write) -> Result<(), Self::Error> {
-        let mut offset = self.header.header_len as usize;
+        let offset = self.header.header_len as usize;
 
         let mut message_header = Vec::new();
         let mut message_data = Vec::new();
@@ -185,7 +185,7 @@ impl NegoexMessage for Exchange {
         self.auth_scheme.encode(&mut message_header)?;
 
         self.exchange
-            .encode_with_data(&mut offset, &mut message_header, &mut message_data)?;
+            .encode_with_payload(offset, &mut message_header, &mut message_data)?;
 
         to.write_all(&message_header)?;
         to.write_all(&message_data)?;
@@ -259,7 +259,7 @@ impl NegoexMessage for Verify {
     }
 
     fn encode(&self, mut to: impl Write) -> Result<(), Self::Error> {
-        let mut offset = self.header.header_len as usize;
+        let offset = self.header.header_len as usize;
 
         let mut message_header = Vec::new();
         // 4 byte padding
@@ -270,7 +270,7 @@ impl NegoexMessage for Verify {
         self.auth_scheme.encode(&mut message_header)?;
 
         self.checksum
-            .encode_with_data(&mut offset, &mut message_header, &mut message_data)?;
+            .encode_with_payload(offset, &mut message_header, &mut message_data)?;
 
         to.write_all(&message_header)?;
         to.write_all(&message_data)?;
@@ -282,8 +282,6 @@ impl NegoexMessage for Verify {
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
-
-    use uuid::Uuid;
 
     use crate::constants::cksum_types::HMAC_SHA1_96_AES256;
     use crate::negoex::data_types::{Checksum, Guid, MessageHeader, MessageType};
@@ -311,14 +309,14 @@ mod tests {
                     sequence_num: 0,
                     header_len: 96,
                     message_len: 112,
-                    conversation_id: Guid(Uuid::from_str("3b29075a-f391-af33-a1b4-a212249d7cb4").unwrap()),
+                    conversation_id: Guid::from_str("3b29075a-f391-af33-a1b4-a212249d7cb4").unwrap(),
                 },
                 random: [
                     171, 30, 157, 109, 166, 119, 29, 212, 26, 40, 14, 87, 69, 187, 217, 132, 195, 93, 44, 219, 112,
                     114, 184, 136, 25, 92, 118, 239, 113, 111, 71, 120
                 ],
                 protocol_version: 0,
-                auth_schemes: vec![Guid(Uuid::from_str("0d53335c-f9ea-4d0d-b2ec-4ae3786ec308").unwrap())],
+                auth_schemes: vec![Guid::from_str("0d53335c-f9ea-4d0d-b2ec-4ae3786ec308").unwrap()],
                 extensions: Vec::new(),
             },
             nego
@@ -334,14 +332,14 @@ mod tests {
                 sequence_num: 0,
                 header_len: 96,
                 message_len: 112,
-                conversation_id: Guid(Uuid::from_str("3b29075a-f391-af33-a1b4-a212249d7cb4").unwrap()),
+                conversation_id: Guid::from_str("3b29075a-f391-af33-a1b4-a212249d7cb4").unwrap(),
             },
             random: [
                 171, 30, 157, 109, 166, 119, 29, 212, 26, 40, 14, 87, 69, 187, 217, 132, 195, 93, 44, 219, 112, 114,
                 184, 136, 25, 92, 118, 239, 113, 111, 71, 120,
             ],
             protocol_version: 0,
-            auth_schemes: vec![Guid(Uuid::from_str("0d53335c-f9ea-4d0d-b2ec-4ae3786ec308").unwrap())],
+            auth_schemes: vec![Guid::from_str("0d53335c-f9ea-4d0d-b2ec-4ae3786ec308").unwrap()],
             extensions: Vec::new(),
         };
 
@@ -384,9 +382,9 @@ mod tests {
                     sequence_num: 3,
                     header_len: 64,
                     message_len: 238,
-                    conversation_id: Guid(Uuid::from_str("3b29075a-f391-af33-a1b4-a212249d7cb4").unwrap()),
+                    conversation_id: Guid::from_str("3b29075a-f391-af33-a1b4-a212249d7cb4").unwrap(),
                 },
-                auth_scheme: Guid(Uuid::from_str("0d53335c-f9ea-4d0d-b2ec-4ae3786ec308").unwrap()),
+                auth_scheme: Guid::from_str("0d53335c-f9ea-4d0d-b2ec-4ae3786ec308").unwrap(),
                 exchange: vec![
                     48, 129, 171, 160, 129, 168, 48, 129, 165, 48, 81, 128, 79, 48, 77, 49, 75, 48, 73, 6, 3, 85, 4, 3,
                     30, 66, 0, 77, 0, 83, 0, 45, 0, 79, 0, 114, 0, 103, 0, 97, 0, 110, 0, 105, 0, 122, 0, 97, 0, 116,
@@ -411,9 +409,9 @@ mod tests {
                 sequence_num: 1,
                 header_len: 64,
                 message_len: 297,
-                conversation_id: Guid(Uuid::from_str("3b29075a-f391-af33-a1b4-a212249d7cb4").unwrap()),
+                conversation_id: Guid::from_str("3b29075a-f391-af33-a1b4-a212249d7cb4").unwrap(),
             },
-            auth_scheme: Guid(Uuid::from_str("0d53335c-f9ea-4d0d-b2ec-4ae3786ec308").unwrap()),
+            auth_scheme: Guid::from_str("0d53335c-f9ea-4d0d-b2ec-4ae3786ec308").unwrap(),
             exchange: vec![
                 48, 129, 230, 160, 129, 169, 48, 129, 166, 48, 81, 128, 79, 48, 77, 49, 75, 48, 73, 6, 3, 85, 4, 3, 30,
                 66, 0, 77, 0, 83, 0, 45, 0, 79, 0, 114, 0, 103, 0, 97, 0, 110, 0, 105, 0, 122, 0, 97, 0, 116, 0, 105,
@@ -468,9 +466,9 @@ mod tests {
                     sequence_num: 7,
                     header_len: 80,
                     message_len: 92,
-                    conversation_id: Guid(Uuid::from_str("3b29075a-f391-af33-a1b4-a212249d7cb4").unwrap()),
+                    conversation_id: Guid::from_str("3b29075a-f391-af33-a1b4-a212249d7cb4").unwrap(),
                 },
-                auth_scheme: Guid(Uuid::from_str("0d53335c-f9ea-4d0d-b2ec-4ae3786ec308").unwrap()),
+                auth_scheme: Guid::from_str("0d53335c-f9ea-4d0d-b2ec-4ae3786ec308").unwrap(),
                 checksum: Checksum {
                     header_len: 20,
                     checksum_scheme: CHECKSUM_SCHEME_RFC3961,
@@ -491,9 +489,9 @@ mod tests {
                 sequence_num: 9,
                 header_len: 76,
                 message_len: 88,
-                conversation_id: Guid(Uuid::from_str("3b29075a-f391-af33-a1b4-a212249d7cb4").unwrap()),
+                conversation_id: Guid::from_str("3b29075a-f391-af33-a1b4-a212249d7cb4").unwrap(),
             },
-            auth_scheme: Guid(Uuid::from_str("0d53335c-f9ea-4d0d-b2ec-4ae3786ec308").unwrap()),
+            auth_scheme: Guid::from_str("0d53335c-f9ea-4d0d-b2ec-4ae3786ec308").unwrap(),
             checksum: Checksum {
                 header_len: 20,
                 checksum_scheme: CHECKSUM_SCHEME_RFC3961,

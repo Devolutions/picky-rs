@@ -48,7 +48,7 @@ where
     fn decode(from: impl Read, message: &[u8]) -> Result<Self, Self::Error>;
 
     fn encode(&self, to: impl Write) -> Result<(), Self::Error>;
-    fn encode_with_data(&self, offset: &mut usize, to: impl Write, data: impl Write) -> Result<(), Self::Error>;
+    fn encode_with_payload(&self, offset: usize, to: impl Write, data: impl Write) -> Result<(), Self::Error>;
 }
 
 impl NegoexDataType for u8 {
@@ -62,17 +62,14 @@ impl NegoexDataType for u8 {
         from.read_u8()
     }
 
-    fn encode_with_data(&self, offset: &mut usize, mut to: impl Write, _data: impl Write) -> Result<(), Self::Error> {
+    fn encode_with_payload(&self, _offset: usize, mut to: impl Write, _data: impl Write) -> Result<(), Self::Error> {
         to.write_u8(*self)?;
-        *offset += 1;
 
         Ok(())
     }
 
     fn encode(&self, to: impl Write) -> Result<(), Self::Error> {
-        let mut offset = 0;
-
-        self.encode_with_data(&mut offset, to, &mut [] as &mut [u8])
+        self.encode_with_payload(0, to, &mut [] as &mut [u8])
     }
 }
 
@@ -90,7 +87,7 @@ impl<T: NegoexDataType<Error = io::Error>> NegoexDataType for Vec<T> {
 
         let count = from.read_u32::<LittleEndian>()? as usize;
 
-        let mut reader: Box<dyn Read> = Box::new(&message[message_offset..]);
+        let mut reader = &message[message_offset..];
 
         let mut elements = Vec::with_capacity(count);
 
@@ -101,17 +98,16 @@ impl<T: NegoexDataType<Error = io::Error>> NegoexDataType for Vec<T> {
         Ok(elements)
     }
 
-    fn encode_with_data(
+    fn encode_with_payload(
         &self,
-        offset: &mut usize,
+        mut offset: usize,
         mut to: impl Write,
         mut data: impl Write,
     ) -> Result<(), Self::Error> {
         if self.is_empty() {
             to.write_u32::<LittleEndian>(0)?;
         } else {
-            println!("write offset: {}", offset);
-            to.write_u32::<LittleEndian>(*offset as u32)?;
+            to.write_u32::<LittleEndian>(offset as u32)?;
         }
 
         to.write_u32::<LittleEndian>(self.len() as u32)?;
@@ -120,8 +116,8 @@ impl<T: NegoexDataType<Error = io::Error>> NegoexDataType for Vec<T> {
         let mut elements_data = Vec::new();
 
         for element in self.iter() {
-            *offset += element.size();
-            element.encode_with_data(offset, &mut elements_headers, &mut elements_data)?;
+            offset += element.size();
+            element.encode_with_payload(offset, &mut elements_headers, &mut elements_data)?;
         }
 
         data.write_all(&elements_headers)?;
@@ -131,12 +127,10 @@ impl<T: NegoexDataType<Error = io::Error>> NegoexDataType for Vec<T> {
     }
 
     fn encode(&self, mut to: impl Write) -> Result<(), Self::Error> {
-        let mut offset = 0;
-
         let mut header = Vec::new();
         let mut data = Vec::new();
 
-        self.encode_with_data(&mut offset, &mut header, &mut data)?;
+        self.encode_with_payload(0, &mut header, &mut data)?;
 
         to.write_all(&mut header)?;
         to.write_all(&mut data)?;

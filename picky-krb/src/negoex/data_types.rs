@@ -10,14 +10,7 @@ use super::{NegoexDataType, CHECKSUM_SCHEME_RFC3961, NEGOEXTS_MESSAGE_SIGNATURE}
 const GUID_SIZE: usize = 16;
 pub(crate) const CHECKSUM_HEADER_LEN: u32 = 4 /* header_len */ + 4 /* checksum_scheme */ + 4 /* type */ + 8 /* checksum vector header */;
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct Guid(pub Uuid);
-
-impl From<Uuid> for Guid {
-    fn from(id: Uuid) -> Self {
-        Self(id)
-    }
-}
+pub type Guid = Uuid;
 
 impl NegoexDataType for Guid {
     type Error = io::Error;
@@ -30,19 +23,17 @@ impl NegoexDataType for Guid {
         let mut id_bytes = [0; GUID_SIZE];
         from.read_exact(&mut id_bytes)?;
 
-        Ok(Self(Uuid::from_bytes_le(id_bytes)))
+        Ok(Self::from_bytes_le(id_bytes))
     }
 
-    fn encode_with_data(&self, _offset: &mut usize, mut to: impl Write, _data: impl Write) -> Result<(), Self::Error> {
-        to.write_all(&self.0.to_bytes_le())?;
+    fn encode_with_payload(&self, _offset: usize, mut to: impl Write, _data: impl Write) -> Result<(), Self::Error> {
+        to.write_all(&self.to_bytes_le())?;
 
         Ok(())
     }
 
     fn encode(&self, to: impl Write) -> Result<(), Self::Error> {
-        let mut offset = 0;
-
-        self.encode_with_data(&mut offset, to, &mut [] as &mut [u8])
+        self.encode_with_payload(0, to, &mut [] as &mut [u8])
     }
 }
 
@@ -57,6 +48,9 @@ pub type ConversationId = Guid;
 /// typedef GUID AUTH_SCHEME;
 /// ```
 pub type AuthScheme = Guid;
+
+//= message type are always have a size of 4 bytes =//
+const MESSAGE_TYPE_SIZE: usize = 4;
 
 /// [2.2.6.1 MESSAGE_TYPE](https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-NEGOEX/%5bMS-NEGOEX%5d.pdf)
 /// ```not_rust
@@ -88,8 +82,7 @@ impl NegoexDataType for MessageType {
     type Error = io::Error;
 
     fn size(&self) -> usize {
-        // message type are always have a size of 4 bytes
-        4
+        MESSAGE_TYPE_SIZE
     }
 
     fn decode(mut from: impl Read, _message: &[u8]) -> Result<Self, Self::Error> {
@@ -97,7 +90,7 @@ impl NegoexDataType for MessageType {
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "invalid MessageType"))?)
     }
 
-    fn encode_with_data(&self, _offset: &mut usize, mut to: impl Write, _data: impl Write) -> Result<(), Self::Error> {
+    fn encode_with_payload(&self, _offset: usize, mut to: impl Write, _data: impl Write) -> Result<(), Self::Error> {
         to.write_u32::<LittleEndian>(
             self.to_u32()
                 .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "can not encode MessageType as u32"))?,
@@ -107,9 +100,7 @@ impl NegoexDataType for MessageType {
     }
 
     fn encode(&self, to: impl Write) -> Result<(), Self::Error> {
-        let mut offset = 0;
-
-        self.encode_with_data(&mut offset, to, &mut [] as &mut [u8])
+        self.encode_with_payload(0, to, &mut [] as &mut [u8])
     }
 }
 
@@ -180,15 +171,15 @@ impl NegoexDataType for MessageHeader {
         })
     }
 
-    fn encode_with_data(
+    fn encode_with_payload(
         &self,
-        offset: &mut usize,
+        offset: usize,
         mut to: impl Write,
         mut data: impl Write,
     ) -> Result<(), Self::Error> {
         to.write_u64::<LittleEndian>(self.signature)?;
 
-        self.message_type.encode_with_data(offset, &mut to, &mut data)?;
+        self.message_type.encode_with_payload(offset, &mut to, &mut data)?;
 
         to.write_u32::<LittleEndian>(self.sequence_num)?;
 
@@ -196,15 +187,13 @@ impl NegoexDataType for MessageHeader {
 
         to.write_u32::<LittleEndian>(self.message_len)?;
 
-        self.conversation_id.encode_with_data(offset, &mut to, &mut data)?;
+        self.conversation_id.encode_with_payload(offset, &mut to, &mut data)?;
 
         Ok(())
     }
 
     fn encode(&self, to: impl Write) -> Result<(), Self::Error> {
-        let mut offset = 0;
-
-        self.encode_with_data(&mut offset, to, &mut [] as &mut [u8])
+        self.encode_with_payload(0, to, &mut [] as &mut [u8])
     }
 }
 
@@ -240,28 +229,26 @@ impl NegoexDataType for Extension {
         })
     }
 
-    fn encode_with_data(
+    fn encode_with_payload(
         &self,
-        offset: &mut usize,
+        offset: usize,
         mut to: impl Write,
         mut data: impl Write,
     ) -> Result<(), Self::Error> {
         to.write_u32::<LittleEndian>(self.extension_type)?;
 
-        self.extension_value.encode_with_data(offset, &mut to, &mut data)?;
+        self.extension_value.encode_with_payload(offset, &mut to, &mut data)?;
 
         Ok(())
     }
 
     fn encode(&self, mut to: impl Write) -> Result<(), Self::Error> {
-        let mut offset = 12;
+        let offset = 12;
 
         let mut header = Vec::new();
         let mut data = Vec::new();
 
-        self.encode_with_data(&mut offset, &mut header, &mut data)?;
-
-        println!("header: {:?}, data: {:?}", header, data);
+        self.encode_with_payload(offset, &mut header, &mut data)?;
 
         to.write_all(&mut header)?;
         to.write_all(&mut data)?;
@@ -356,9 +343,9 @@ impl NegoexDataType for Checksum {
         })
     }
 
-    fn encode_with_data(
+    fn encode_with_payload(
         &self,
-        offset: &mut usize,
+        offset: usize,
         mut to: impl Write,
         mut data: impl Write,
     ) -> Result<(), Self::Error> {
@@ -368,18 +355,18 @@ impl NegoexDataType for Checksum {
 
         to.write_u32::<LittleEndian>(self.checksum_type)?;
 
-        self.checksum_value.encode_with_data(offset, &mut to, &mut data)?;
+        self.checksum_value.encode_with_payload(offset, &mut to, &mut data)?;
 
         Ok(())
     }
 
     fn encode(&self, mut to: impl Write) -> Result<(), Self::Error> {
-        let mut offset = self.header_len as usize;
+        let offset = self.header_len as usize;
 
         let mut header = Vec::new();
         let mut data = Vec::new();
 
-        self.encode_with_data(&mut offset, &mut header, &mut data)?;
+        self.encode_with_payload(offset, &mut header, &mut data)?;
 
         to.write_all(&mut header)?;
         to.write_all(&mut data)?;
@@ -402,7 +389,7 @@ mod tests {
 
     #[test]
     fn guid_encode() {
-        let guid = Guid(Uuid::from_str("0d53335c-f9ea-4d0d-b2ec-4ae3786ec308").unwrap());
+        let guid = Uuid::from_str("0d53335c-f9ea-4d0d-b2ec-4ae3786ec308").unwrap();
 
         let mut encoded = Vec::new();
         guid.encode(&mut encoded).unwrap();
@@ -419,7 +406,7 @@ mod tests {
 
         let guid = Guid::decode(&encoded_guid as &[u8], &encoded_guid).unwrap();
 
-        assert_eq!(Uuid::from_str("3b29075a-f391-af33-a1b4-a212249d7cb4").unwrap(), guid.0);
+        assert_eq!(Uuid::from_str("3b29075a-f391-af33-a1b4-a212249d7cb4").unwrap(), guid);
     }
 
     #[test]
@@ -449,7 +436,7 @@ mod tests {
             sequence_num: 2,
             header_len: 96,
             message_len: 112,
-            conversation_id: Guid(Uuid::from_str("3b29075a-f391-af33-a1b4-a212249d7cb4").unwrap()),
+            conversation_id: Guid::from_str("3b29075a-f391-af33-a1b4-a212249d7cb4").unwrap(),
         };
 
         let mut encoded = Vec::new();
@@ -480,7 +467,7 @@ mod tests {
                 sequence_num: 2,
                 header_len: 96,
                 message_len: 112,
-                conversation_id: Guid(Uuid::from_str("3b29075a-f391-af33-a1b4-a212249d7cb4").unwrap()),
+                conversation_id: Guid::from_str("3b29075a-f391-af33-a1b4-a212249d7cb4").unwrap(),
             },
             message_header,
         );
