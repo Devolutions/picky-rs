@@ -79,12 +79,15 @@ pub mod key_usages {
     pub const AP_REQ_AUTHENTICATOR: i32 = 11;
     pub const AP_REP_ENC: i32 = 12;
     pub const KRB_PRIV_ENC_PART: i32 = 13;
+
+    //= [The GSS-API Binding for PKU2U](https://datatracker.ietf.org/doc/html/draft-zhu-pku2u-04#section-6) =//
+    pub const KEY_USAGE_FINISHED: i32 = 41;
 }
 
 //= [The Kerberos Version 5 GSS API](https://datatracker.ietf.org/doc/html/rfc4121) =//
 pub mod gss_api {
     pub const AP_REQ_TOKEN_ID: [u8; 2] = [0x01, 0x00];
-    pub const AP_REP_TOKEN_ID: [u8; 2] = [0x01, 0x00];
+    pub const AP_REP_TOKEN_ID: [u8; 2] = [0x02, 0x00];
     pub const TGT_REQ_TOKEN_ID: [u8; 2] = [0x04, 0x00];
 
     /// [The Protocol Description](https://datatracker.ietf.org/doc/html/draft-zhu-pku2u-09#section-6)

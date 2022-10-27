@@ -7,7 +7,7 @@ use picky_asn1::wrapper::{
 use picky_asn1_x509::{seq_next_element, serde_invalid_value, AlgorithmIdentifier};
 use serde::{de, ser, Deserialize, Serialize};
 
-use crate::data_types::{KerberosTime, PrincipalName, Realm};
+use crate::data_types::{KerberosTime, PrincipalName, Realm, Checksum};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct Pku2uNegoReqMetadata {
@@ -259,6 +259,17 @@ pub struct KdcDhKeyInfo {
     pub nonce: ExplicitContextTag1<IntegerAsn1>,
     #[serde(default)]
     pub dh_key_expiration: Optional<Option<ExplicitContextTag2<KerberosTime>>>,
+}
+
+/// [The GSS-API Binding for PKU2U](https://datatracker.ietf.org/doc/html/draft-zhu-pku2u-04#section-6)
+/// ```not_rust
+/// KRB-FINISHED ::= SEQUENCE {
+///      gss-mic [1] Checksum,
+/// }
+/// ```
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+pub struct KrbFinished {
+    pub gss_mic: ExplicitContextTag1<Checksum>,
 }
 
 #[cfg(test)]

@@ -1,3 +1,4 @@
+use byteorder::{WriteBytesExt, ReadBytesExt, LittleEndian};
 use picky_asn1::wrapper::{
     Asn1SequenceOf, BitStringAsn1, ExplicitContextTag0, ExplicitContextTag1, ExplicitContextTag2, ExplicitContextTag3,
     ExplicitContextTag4, ExplicitContextTag5, ExplicitContextTag6, ExplicitContextTag7, ExplicitContextTag8,
@@ -7,8 +8,9 @@ use picky_asn1_der::application_tag::ApplicationTag;
 use serde::de::Error;
 use serde::{de, Deserialize, Deserializer, Serialize};
 
-use std::fmt;
+use std::{fmt, io};
 use std::fmt::Debug;
+use std::io::{Write, Read};
 use std::marker::PhantomData;
 
 use crate::constants::types::{AUTHENTICATOR_TYPE, ENC_AP_REP_PART_TYPE, KRB_PRIV_ENC_PART, TICKET_TYPE};
@@ -163,8 +165,8 @@ pub type Ticket = ApplicationTag<TicketInner, TICKET_TYPE>;
 /// ```
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct LastReqInner {
-    lr_type: ExplicitContextTag0<IntegerAsn1>,
-    lr_value: ExplicitContextTag1<KerberosTime>,
+    pub lr_type: ExplicitContextTag0<IntegerAsn1>,
+    pub lr_value: ExplicitContextTag1<KerberosTime>,
 }
 pub type LastReq = Asn1SequenceOf<LastReqInner>;
 
@@ -417,6 +419,64 @@ impl<'de, T: Deserialize<'de>> ResultExt<'de, T> for Result<T, KrbError> {
 }
 
 pub type KrbResult<T> = Result<T, KrbError>;
+
+/// [2.2.6 KERB-AD-RESTRICTION-ENTRY](https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-KILE/%5bMS-KILE%5d.pdf)
+/// 
+/// ```not_rust
+/// KERB-AD-RESTRICTION-ENTRY ::= SEQUENCE {
+/// restriction-type [0] Int32,
+/// restriction [1] OCTET STRING
+/// }
+/// ```
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+pub struct KerbAdRestrictionEntry {
+    pub restriction_type: ExplicitContextTag0<IntegerAsn1>,
+    pub restriction: ExplicitContextTag1<OctetStringAsn1>,
+}
+
+/// [3.1.1.4 Machine ID](https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-KILE/%5bMS-KILE%5d.pdf)
+/// KILE implements a 32-byte binary random string machine ID
+pub const MACHINE_ID_LENGTH: usize = 32;
+
+/// [2.2.5 LSAP_TOKEN_INFO_INTEGRITY](https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-KILE/%5bMS-KILE%5d.pdf)
+/// 
+/// ```not_rust
+/// typedef struct _LSAP_TOKEN_INFO_INTEGRITY {
+///     unsigned long Flags;
+///     unsigned long TokenIL;
+///     unsigned char MachineID[32];
+/// } LSAP_TOKEN_INFO_INTEGRITY,
+/// ```
+#[derive(Debug, PartialEq, Clone)]
+pub struct LsapTokenInfoIntegrity {
+    pub flags: u32,
+    pub token_il: u32,
+    pub machine_id: [u8; MACHINE_ID_LENGTH],
+}
+
+impl LsapTokenInfoIntegrity {
+    pub fn encode(&self, mut to: impl Write) -> io::Result<()> {
+        to.write_u32::<LittleEndian>(self.flags)?;
+        to.write_u32::<LittleEndian>(self.token_il)?;
+        to.write_all(&self.machine_id)?;
+
+        Ok(())
+    }
+
+    pub fn decode(mut from: impl Read) -> io::Result<Self> {
+        let flags = from.read_u32::<LittleEndian>()?;
+        let token_il = from.read_u32::<LittleEndian>()?;
+        
+        let mut machine_id = [0; MACHINE_ID_LENGTH];
+        from.read_exact(&mut machine_id)?;
+
+        Ok(Self {
+            flags,
+            token_il,
+            machine_id,
+        })
+    }
+}
 
 #[cfg(test)]
 mod tests {

@@ -49,6 +49,16 @@ impl From<&ChecksumSuite> for u32 {
     }
 }
 
+impl From<ChecksumSuite> for u32 {
+    fn from(checksum_suite: ChecksumSuite) -> Self {
+        match checksum_suite {
+            ChecksumSuite::HmacSha196Aes256 => HMAC_SHA1_96_AES256 as u32,
+            ChecksumSuite::HmacSha196Aes128 => HMAC_SHA1_96_AES128 as u32,
+            ChecksumSuite::HmacSha1Des3Kd => HMAC_SHA1_DES3_KD as u32,
+        }
+    }
+}
+
 impl From<ChecksumSuite> for usize {
     fn from(checksum_suite: ChecksumSuite) -> Self {
         match checksum_suite {

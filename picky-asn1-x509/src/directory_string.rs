@@ -38,7 +38,15 @@ impl DirectoryString {
         match &self {
             DirectoryString::PrintableString(string) => String::from_utf8_lossy(string.as_bytes()),
             DirectoryString::Utf8String(string) => Cow::Borrowed(string.as_str()),
-            DirectoryString::BmpString(string) => Cow::Owned(string.to_string()),
+            DirectoryString::BmpString(string) => {
+                let data = string
+                    .0
+                    .as_bytes()
+                    .chunks(2)
+                    .map(|c| u16::from_be_bytes(c.try_into().unwrap()))
+                    .collect::<Vec<_>>();
+                Cow::Owned(String::from_utf16_lossy(&data))
+            }
         }
     }
 

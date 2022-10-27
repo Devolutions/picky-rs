@@ -67,7 +67,7 @@ pub struct NegTokenInit {
     pub mech_list_mic: Optional<Option<ExplicitContextTag3<OctetStringAsn1>>>,
 }
 
-/// [3.2.1.  GSS-API](https://datatracker.ietf.org/doc/html/rfc2478#section-3.2.1)
+/// [3.2.1. GSS-API](https://datatracker.ietf.org/doc/html/rfc2478#section-3.2.1)
 ///
 /// ```not_rust
 /// NegTokenTarg ::= SEQUENCE {
