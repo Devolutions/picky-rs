@@ -217,8 +217,8 @@ define_oid! {
     NEGOEX => negoex => "1.3.6.1.4.1.311.2.2.30",
     SPNEGO => spnego => "1.3.6.1.5.5.2",
 
-    // [SPNEGO](https://winprotocoldoc.blob.core.windows.net/productionwindowsarchives/MS-SPNG/%5bMS-SPNG%5d.pdf)
-    //  The OID assigned for PKU2U is (1.3.6.1.5.2.7
+    // [SPNEGO](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-spng/211417c4-11ef-46c0-a8fb-f178a51c2088)
+    //  The OID assigned for PKU2U is (1.3.6.1.5.2.7)
     GSS_PKU2U => gss_pku2u => "1.3.6.1.5.2.7",
 
     // http://oid-info.com/get/1.3.6.1.5.2.3.1

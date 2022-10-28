@@ -37,15 +37,7 @@ impl DirectoryString {
         match &self {
             DirectoryString::PrintableString(string) => String::from_utf8_lossy(string.as_bytes()),
             DirectoryString::Utf8String(string) => Cow::Borrowed(string.as_str()),
-            DirectoryString::BmpString(string) => {
-                let data = string
-                    .0
-                    .as_bytes()
-                    .chunks(2)
-                    .map(|c| u16::from_be_bytes(c.try_into().unwrap()))
-                    .collect::<Vec<_>>();
-                Cow::Owned(String::from_utf16_lossy(&data))
-            }
+            DirectoryString::BmpString(string) => Cow::Owned(unicode_bytes_to_utf8_string(string.as_bytes())),
         }
     }
 
@@ -88,12 +80,18 @@ impl From<PrintableStringAsn1> for DirectoryString {
     }
 }
 
+impl From<BMPStringAsn1> for DirectoryString {
+    fn from(string: BMPStringAsn1) -> Self {
+        Self::BmpString(string)
+    }
+}
+
 impl From<DirectoryString> for String {
     fn from(ds: DirectoryString) -> Self {
         match ds {
             DirectoryString::PrintableString(string) => String::from_utf8_lossy(string.as_bytes()).into(),
             DirectoryString::Utf8String(string) => string,
-            DirectoryString::BmpString(string) => string.to_string(),
+            DirectoryString::BmpString(string) => unicode_bytes_to_utf8_string(string.as_bytes()),
         }
     }
 }
@@ -172,4 +170,14 @@ impl<'de> de::Deserialize<'de> for DirectoryString {
 
         deserializer.deserialize_enum("DirectoryString", &["PrintableString", "Utf8String"], Visitor)
     }
+}
+
+fn unicode_bytes_to_utf8_string(data: &[u8]) -> String {
+    debug_assert_eq!(data.len() % 2, 0);
+    String::from_utf16_lossy(
+        &data
+            .chunks(2)
+            .map(|c| u16::from_be_bytes(c.try_into().unwrap()))
+            .collect::<Vec<u16>>(),
+    )
 }
