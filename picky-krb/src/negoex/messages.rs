@@ -27,7 +27,7 @@ const VERIFY_MESSAGE_HEADER_LEN: u32 = 40 /* header */ + 16 /* auth scheme */ + 
 ///     EXTENSION_VECTOR Extensions;
 /// } NEGO_MESSAGE;
 /// ```
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Nego {
     pub header: MessageHeader,
     pub random: [u8; RANDOM_ARRAY_SIZE],
@@ -53,7 +53,7 @@ impl Nego {
             sequence_num,
             header_len: NEGO_MESSAGE_HEADER_LEN,
             message_len: 0,
-            conversation_id: Guid::from(conversation_id),
+            conversation_id,
         };
 
         header.message_len = (header.size() + RANDOM_ARRAY_SIZE + 8 /* protocol version */ + auth_schemes.size() + extensions.size())
@@ -129,7 +129,7 @@ impl NegoexMessage for Nego {
 ///     BYTE_VECTOR Exchange;
 /// } EXCHANGE_MESSAGE;
 /// ```
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Exchange {
     pub header: MessageHeader,
     pub auth_scheme: AuthScheme,
@@ -150,10 +150,8 @@ impl Exchange {
             sequence_num,
             header_len: EXCHANGE_MESSAGE_HEADER_LEN,
             message_len: 0,
-            conversation_id: Guid::from(conversation_id),
+            conversation_id,
         };
-
-        let auth_scheme = Guid::from(auth_scheme);
 
         header.message_len = (header.size() + auth_scheme.size() + exchange.size()) as u32;
 
@@ -207,7 +205,7 @@ impl NegoexMessage for Exchange {
 ///     CHECKSUM Checksum;
 /// } VERIFY_MESSAGE;
 /// ```
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Verify {
     pub header: MessageHeader,
     pub auth_scheme: AuthScheme,
@@ -229,10 +227,8 @@ impl Verify {
             sequence_num,
             header_len: VERIFY_MESSAGE_HEADER_LEN,
             message_len: 0,
-            conversation_id: Guid::from(conversation_id),
+            conversation_id,
         };
-
-        let auth_scheme = Guid::from(auth_scheme);
 
         let checksum = Checksum {
             header_len: CHECKSUM_HEADER_LEN,

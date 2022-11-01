@@ -148,8 +148,8 @@ impl<T: NegoexDataType<Error = io::Error>> NegoexDataType for Vec<T> {
 
         self.encode_with_payload(0, &mut header, &mut data)?;
 
-        to.write_all(&mut header)?;
-        to.write_all(&mut data)?;
+        to.write_all(&header)?;
+        to.write_all(&data)?;
 
         Ok(())
     }

@@ -34,7 +34,7 @@ pub type Realm = KerberosStringAsn1;
 ///         name-string     [1] SEQUENCE OF KerberosString
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct PrincipalName {
     pub name_type: ExplicitContextTag0<IntegerAsn1>,
     pub name_string: ExplicitContextTag1<Asn1SequenceOf<KerberosStringAsn1>>,
@@ -62,7 +62,7 @@ pub type Microseconds = IntegerAsn1;
 ///         address         [1] OCTET STRING
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct HostAddress {
     pub addr_type: ExplicitContextTag0<IntegerAsn1>,
     pub address: ExplicitContextTag1<OctetStringAsn1>,
@@ -76,7 +76,7 @@ pub struct HostAddress {
 ///         ad-data         [1] OCTET STRING
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct AuthorizationDataInner {
     pub ad_type: ExplicitContextTag0<IntegerAsn1>,
     pub ad_data: ExplicitContextTag1<OctetStringAsn1>,
@@ -92,7 +92,7 @@ pub type AuthorizationData = Asn1SequenceOf<AuthorizationDataInner>;
 ///         padata-value    [2] OCTET STRING
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct PaData {
     pub padata_type: ExplicitContextTag1<IntegerAsn1>,
     pub padata_data: ExplicitContextTag2<OctetStringAsn1>,
@@ -114,7 +114,7 @@ pub type KerberosFlags = BitStringAsn1;
 ///         cipher  [2] OCTET STRING -- ciphertext
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct EncryptedData {
     pub etype: ExplicitContextTag0<IntegerAsn1>,
     pub kvno: Optional<Option<ExplicitContextTag1<IntegerAsn1>>>,
@@ -129,7 +129,7 @@ pub struct EncryptedData {
 ///         keyvalue        [1] OCTET STRING
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct EncryptionKey {
     pub key_type: ExplicitContextTag0<IntegerAsn1>,
     pub key_value: ExplicitContextTag1<OctetStringAsn1>,
@@ -145,7 +145,7 @@ pub struct EncryptionKey {
 ///         enc-part        [3] EncryptedData
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct TicketInner {
     pub tkt_vno: ExplicitContextTag0<IntegerAsn1>,
     pub realm: ExplicitContextTag1<Realm>,
@@ -163,7 +163,7 @@ pub type Ticket = ApplicationTag<TicketInner, TICKET_TYPE>;
 ///         lr-value        [1] KerberosTime
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct LastReqInner {
     pub lr_type: ExplicitContextTag0<IntegerAsn1>,
     pub lr_value: ExplicitContextTag1<KerberosTime>,
@@ -178,7 +178,7 @@ pub type LastReq = Asn1SequenceOf<LastReqInner>;
 ///     data-value [2] OCTET STRING OPTIONAL
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct KerbErrorData {
     pub data_type: ExplicitContextTag1<IntegerAsn1>,
     #[serde(default)]
@@ -193,7 +193,7 @@ pub struct KerbErrorData {
 ///         pausec          [1] Microseconds OPTIONAL
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct PaEncTsEnc {
     pub patimestamp: ExplicitContextTag0<KerberosTime>,
     #[serde(default)]
@@ -214,7 +214,7 @@ pub type PaEncTimestamp = EncryptedData;
 ///     include-pac[0] BOOLEAN
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct KerbPaPacRequest {
     pub include_pac: ExplicitContextTag0<bool>,
 }
@@ -226,7 +226,7 @@ pub struct KerbPaPacRequest {
 ///     flags                ::= KerberosFlags
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct PaPacOptions {
     pub flags: ExplicitContextTag0<KerberosFlags>,
 }
@@ -246,7 +246,7 @@ pub type ApOptions = KerberosFlags;
 ///         checksum        [1] OCTET STRING
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Checksum {
     pub cksumtype: ExplicitContextTag0<IntegerAsn1>,
     pub checksum: ExplicitContextTag1<OctetStringAsn1>,
@@ -267,7 +267,7 @@ pub struct Checksum {
 ///         authorization-data      [8] AuthorizationData OPTIONAL
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct AuthenticatorInner {
     pub authenticator_bno: ExplicitContextTag0<IntegerAsn1>,
     pub crealm: ExplicitContextTag1<Realm>,
@@ -294,7 +294,7 @@ pub type Authenticator = ApplicationTag<AuthenticatorInner, AUTHENTICATOR_TYPE>;
 ///         seq-number      [3] UInt32 OPTIONAL
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct EncApRepPartInner {
     pub ctime: ExplicitContextTag0<KerberosTime>,
     pub cusec: ExplicitContextTag1<Microseconds>,
@@ -314,7 +314,7 @@ pub type EncApRepPart = ApplicationTag<EncApRepPartInner, ENC_AP_REP_PART_TYPE>;
 ///         s2kparams       [2] OCTET STRING OPTIONAL
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct EtypeInfo2Entry {
     pub etype: ExplicitContextTag0<IntegerAsn1>,
     #[serde(default)]
@@ -342,7 +342,7 @@ pub type EtypeInfo2 = Asn1SequenceOf<EtypeInfo2Entry>;
 ///         r-address       [5] HostAddress OPTIONAL -- recip's addr
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct EncKrbPrivPartInner {
     pub user_data: ExplicitContextTag0<OctetStringAsn1>,
     pub timestamp: Optional<Option<ExplicitContextTag1<KerberosTime>>>,
@@ -364,7 +364,7 @@ pub type EncKrbPrivPart = ApplicationTag<EncKrbPrivPartInner, KRB_PRIV_ENC_PART>
 ///     targrealm[2]   Realm OPTIONAL
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct ChangePasswdData {
     pub new_passwd: ExplicitContextTag0<OctetStringAsn1>,
     pub target_name: Optional<Option<ExplicitContextTag1<PrincipalName>>>,
@@ -428,7 +428,7 @@ pub type KrbResult<T> = Result<T, KrbError>;
 /// restriction [1] OCTET STRING
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct KerbAdRestrictionEntry {
     pub restriction_type: ExplicitContextTag0<IntegerAsn1>,
     pub restriction: ExplicitContextTag1<OctetStringAsn1>,
@@ -447,7 +447,7 @@ pub const MACHINE_ID_LENGTH: usize = 32;
 ///     unsigned char MachineID[32];
 /// } LSAP_TOKEN_INFO_INTEGRITY,
 /// ```
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct LsapTokenInfoIntegrity {
     pub flags: u32,
     pub token_il: u32,

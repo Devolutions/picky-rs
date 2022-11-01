@@ -68,7 +68,7 @@ const MESSAGE_TYPE_SIZE: usize = 4;
 ///     MESSAGE_TYPE_ALERT
 /// } MESSAGE_TYPE;
 /// ```
-#[derive(Debug, Clone, PartialEq, FromPrimitive, ToPrimitive)]
+#[derive(Debug, Clone, PartialEq, Eq, FromPrimitive, ToPrimitive)]
 pub enum MessageType {
     InitiatorNego = 0,
     AcceptorNego = 1,
@@ -88,8 +88,8 @@ impl NegoexDataType for MessageType {
     }
 
     fn decode(mut from: impl Read, _message: &[u8]) -> Result<Self, Self::Error> {
-        Ok(MessageType::from_u32(from.read_u32::<LittleEndian>()?)
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "invalid MessageType"))?)
+        MessageType::from_u32(from.read_u32::<LittleEndian>()?)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "invalid MessageType"))
     }
 
     fn encode_with_payload(&self, _offset: usize, mut to: impl Write, _data: impl Write) -> Result<usize, Self::Error> {
@@ -120,7 +120,7 @@ impl NegoexDataType for MessageType {
 ///     CONVERSATION_ID ConversationId;
 /// } MESSAGE_HEADER;
 /// ```
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MessageHeader {
     pub signature: u64,
     pub message_type: MessageType,
@@ -211,7 +211,7 @@ impl NegoexDataType for MessageHeader {
 ///     BYTE_VECTOR ExtensionValue;
 /// } EXTENSION;
 /// ```
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Extension {
     pub extension_type: u32,
     pub extension_value: ByteVector,
@@ -254,8 +254,8 @@ impl NegoexDataType for Extension {
 
         self.encode_with_payload(offset, &mut header, &mut data)?;
 
-        to.write_all(&mut header)?;
-        to.write_all(&mut data)?;
+        to.write_all(&header)?;
+        to.write_all(&data)?;
 
         Ok(())
     }
@@ -301,7 +301,7 @@ pub type ExtensionVector = Vec<Extension>;
 ///     BYTE_VECTOR ChecksumValue;
 /// } CHECKSUM;
 /// ```
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Checksum {
     pub header_len: u32,
     pub checksum_scheme: u32,
@@ -370,8 +370,8 @@ impl NegoexDataType for Checksum {
 
         self.encode_with_payload(offset, &mut header, &mut data)?;
 
-        to.write_all(&mut header)?;
-        to.write_all(&mut data)?;
+        to.write_all(&header)?;
+        to.write_all(&data)?;
 
         Ok(())
     }

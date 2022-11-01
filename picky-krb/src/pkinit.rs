@@ -9,24 +9,24 @@ use serde::{de, ser, Deserialize, Serialize};
 
 use crate::data_types::{Checksum, KerberosTime, PrincipalName, Realm};
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Pku2uNegoReqMetadata {
     pub inner: ImplicitContextTag0<OctetStringAsn1>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Pku2uNegoBody {
     pub realm: ExplicitContextTag0<Realm>,
     pub sname: ExplicitContextTag1<PrincipalName>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Pku2uNegoReq {
     pub metadata: ExplicitContextTag0<Asn1SequenceOf<Pku2uNegoReqMetadata>>,
     pub body: ExplicitContextTag1<Pku2uNegoBody>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct Pku2uNegoRep {
     pub metadata: ExplicitContextTag0<Asn1SequenceOf<Pku2uNegoReqMetadata>>,
 }
@@ -39,7 +39,7 @@ pub struct Pku2uNegoRep {
 ///    subjectKeyIdentifier    [2] IMPLICIT OCTET STRING OPTIONAL,
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct ExternalPrincipalIdentifier {
     #[serde(default)]
     pub subject_name: Optional<Option<ImplicitContextTag0<OctetStringAsn1>>>,
@@ -57,7 +57,7 @@ pub struct ExternalPrincipalIdentifier {
 ///    kdcPkId                 [2] IMPLICIT OCTET STRING OPTIONAL,
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct PaPkAsReq {
     pub signed_auth_pack: ImplicitContextTag0<OctetStringAsn1>,
     #[serde(default)]
@@ -75,7 +75,7 @@ pub struct PaPkAsReq {
 ///    paChecksum              [3] OCTET STRING OPTIONAL,
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct PkAuthenticator {
     pub cusec: ExplicitContextTag0<IntegerAsn1>,
     pub ctime: ExplicitContextTag1<KerberosTime>,
@@ -122,13 +122,13 @@ pub struct DhDomainParameters {
     pub validation_params: Optional<Option<ValidationParams>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct DhReqKeyInfo {
     pub identifier: ObjectIdentifierAsn1,
     pub key_info: DhDomainParameters,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct DhReqInfo {
     pub key_info: DhReqKeyInfo,
     pub key_value: BitStringAsn1,
@@ -143,7 +143,7 @@ pub struct DhReqInfo {
 ///    clientDHNonce           [3] DHNonce OPTIONAL,
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct AuthPack {
     pub pk_authenticator: ExplicitContextTag0<PkAuthenticator>,
     #[serde(default)]
@@ -161,7 +161,7 @@ pub struct AuthPack {
 ///    serverDHNonce           [1] DHNonce OPTIONAL,
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct DhRepInfo {
     pub dh_signed_data: ImplicitContextTag0<OctetStringAsn1>,
     #[serde(default)]
@@ -175,7 +175,7 @@ pub struct DhRepInfo {
 ///    encKeyPack              [1] IMPLICIT OCTET STRING,
 /// }
 /// ```
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum PaPkAsRep {
     DhInfo(ExplicitContextTag0<DhRepInfo>),
     EncKeyPack(ImplicitContextTag1<OctetStringAsn1>),
@@ -253,7 +253,7 @@ impl ser::Serialize for PaPkAsRep {
 ///    dhKeyExpiration         [2] KerberosTime OPTIONAL,
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct KdcDhKeyInfo {
     pub subject_public_key: ExplicitContextTag0<BitStringAsn1>,
     pub nonce: ExplicitContextTag1<IntegerAsn1>,
@@ -267,7 +267,7 @@ pub struct KdcDhKeyInfo {
 ///      gss-mic [1] Checksum,
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct KrbFinished {
     pub gss_mic: ExplicitContextTag1<Checksum>,
 }
