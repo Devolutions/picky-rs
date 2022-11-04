@@ -1,5 +1,4 @@
 use num_bigint_dig::BigUint;
-use num_traits::FromPrimitive;
 use rand::{CryptoRng, Rng, RngCore};
 use sha1::{Digest, Sha1};
 use thiserror::Error;
@@ -125,8 +124,7 @@ pub fn generate_key(
 pub fn generate_private_key<R: RngCore + CryptoRng>(q: &[u8], rng: &mut R) -> Vec<u8> {
     let q = BigUint::from_bytes_be(q);
 
-    rng.gen_range(BigUint::from_usize(2).unwrap()..(q - 1_u32))
-        .to_bytes_be()
+    rng.gen_range(BigUint::from_bytes_be(&[2])..(q - 1_u32)).to_bytes_be()
 }
 
 /// [Key and Parameter Requirements](https://www.rfc-editor.org/rfc/rfc2631#section-2.2)

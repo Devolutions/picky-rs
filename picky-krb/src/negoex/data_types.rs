@@ -90,9 +90,7 @@ impl NegoexDataType for MessageType {
     }
 
     fn encode_with_payload(&self, _offset: usize, mut to: impl Write, _data: impl Write) -> Result<usize, Self::Error> {
-        to.write_u32::<LittleEndian>(
-            self.into()
-        )?;
+        to.write_u32::<LittleEndian>(self.into())?;
 
         Ok(0)
     }
@@ -117,7 +115,7 @@ impl TryFrom<u32> for MessageType {
             5 => Ok(MessageType::ApRequest),
             6 => Ok(MessageType::Verify),
             7 => Ok(MessageType::Alert),
-            _ => Err(io::Error::new(io::ErrorKind::InvalidData, "invalid MessageType"))
+            _ => Err(io::Error::new(io::ErrorKind::InvalidData, "invalid MessageType")),
         }
     }
 }

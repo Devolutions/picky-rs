@@ -15,7 +15,7 @@ const AES_ITERATION_COUNT: u32 = 0x1000;
 
 /// https://www.rfc-editor.org/rfc/rfc3961.html#section-3
 /// random-to-key (bitstring[K])->(protocol-key)
-/// 
+///
 /// For AES Encryption, the random-to-key function is the identity function
 /// https://www.rfc-editor.org/rfc/rfc3962.html#section-6
 /// random-to-key function: identity function

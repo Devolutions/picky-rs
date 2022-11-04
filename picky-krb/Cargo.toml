@@ -32,5 +32,4 @@ rand = "0.8.5"
 
 uuid = { version = "1.1.2", default-features = false, features = ["serde"] }
 oid = "0.2.1"
-num-traits = "0.2.15"
 num-bigint-dig = { version = "0.8.1", features = ["rand"] }

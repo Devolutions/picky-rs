@@ -1285,7 +1285,6 @@ dependencies = [
  "des",
  "hmac",
  "num-bigint-dig",
- "num-traits",
  "oid",
  "pbkdf2",
  "picky-asn1 0.6.0",
