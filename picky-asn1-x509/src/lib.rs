@@ -1,5 +1,5 @@
 #[macro_use]
-pub mod macros;
+mod macros;
 
 pub mod algorithm_identifier;
 pub mod attribute;
