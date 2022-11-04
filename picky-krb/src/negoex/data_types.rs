@@ -1,8 +1,6 @@
 use std::io::{self, Read, Write};
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use num_derive::{FromPrimitive, ToPrimitive};
-use num_traits::{FromPrimitive, ToPrimitive};
 use uuid::Uuid;
 
 use super::{NegoexDataType, CHECKSUM_SCHEME_RFC3961, NEGOEXTS_MESSAGE_SIGNATURE};
@@ -68,16 +66,16 @@ const MESSAGE_TYPE_SIZE: usize = 4;
 ///     MESSAGE_TYPE_ALERT
 /// } MESSAGE_TYPE;
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, FromPrimitive, ToPrimitive)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MessageType {
-    InitiatorNego = 0,
-    AcceptorNego = 1,
-    InitiatorMetaData = 2,
-    AcceptorMetaData = 3,
-    Challenge = 4,
-    ApRequest = 5,
-    Verify = 6,
-    Alert = 7,
+    InitiatorNego,
+    AcceptorNego,
+    InitiatorMetaData,
+    AcceptorMetaData,
+    Challenge,
+    ApRequest,
+    Verify,
+    Alert,
 }
 
 impl NegoexDataType for MessageType {
@@ -88,14 +86,12 @@ impl NegoexDataType for MessageType {
     }
 
     fn decode(mut from: impl Read, _message: &[u8]) -> Result<Self, Self::Error> {
-        MessageType::from_u32(from.read_u32::<LittleEndian>()?)
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "invalid MessageType"))
+        MessageType::try_from(from.read_u32::<LittleEndian>()?)
     }
 
     fn encode_with_payload(&self, _offset: usize, mut to: impl Write, _data: impl Write) -> Result<usize, Self::Error> {
         to.write_u32::<LittleEndian>(
-            self.to_u32()
-                .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "can not encode MessageType as u32"))?,
+            self.into()
         )?;
 
         Ok(0)
@@ -105,6 +101,39 @@ impl NegoexDataType for MessageType {
         self.encode_with_payload(0, to, &mut [] as &mut [u8])?;
 
         Ok(())
+    }
+}
+
+impl TryFrom<u32> for MessageType {
+    type Error = io::Error;
+
+    fn try_from(type_raw: u32) -> Result<Self, Self::Error> {
+        match type_raw {
+            0 => Ok(MessageType::InitiatorNego),
+            1 => Ok(MessageType::AcceptorNego),
+            2 => Ok(MessageType::InitiatorMetaData),
+            3 => Ok(MessageType::AcceptorMetaData),
+            4 => Ok(MessageType::Challenge),
+            5 => Ok(MessageType::ApRequest),
+            6 => Ok(MessageType::Verify),
+            7 => Ok(MessageType::Alert),
+            _ => Err(io::Error::new(io::ErrorKind::InvalidData, "invalid MessageType"))
+        }
+    }
+}
+
+impl From<&MessageType> for u32 {
+    fn from(message_type: &MessageType) -> Self {
+        match message_type {
+            MessageType::InitiatorNego => 0,
+            MessageType::AcceptorNego => 1,
+            MessageType::InitiatorMetaData => 2,
+            MessageType::AcceptorMetaData => 3,
+            MessageType::Challenge => 4,
+            MessageType::ApRequest => 5,
+            MessageType::Verify => 6,
+            MessageType::Alert => 7,
+        }
     }
 }
 
