@@ -39,8 +39,9 @@ pub struct BitString {
 }
 
 impl BitString {
-    pub fn inner(&self) -> Vec<u8> {
-        self.data.clone()
+    /// Returns inner bytes slice
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.data
     }
 
     fn h_number_of_unused_bits(data_size: usize, num_bits: usize) -> u8 {

@@ -4,7 +4,7 @@ use picky_asn1::wrapper::{
     ImplicitContextTag0, ImplicitContextTag1, ImplicitContextTag2, IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1,
     Optional,
 };
-use picky_asn1_x509::{seq_next_element, serde_invalid_value, AlgorithmIdentifier};
+use picky_asn1_x509::AlgorithmIdentifier;
 use serde::{de, ser, Deserialize, Serialize};
 
 use crate::data_types::{Checksum, KerberosTime, PrincipalName, Realm};
@@ -201,26 +201,30 @@ impl<'de> Deserialize<'de> for PaPkAsRep {
             where
                 A: de::SeqAccess<'de>,
             {
-                let tag_peeker: TagPeeker = seq_next_element!(seq, PaPkAsRep, "choice tag");
+                let tag_peeker: TagPeeker = seq.next_element()?.ok_or_else(|| {
+                    de::Error::invalid_value(
+                        de::Unexpected::Other("[PaPkAsRep] choice tag is missing"),
+                        &"valid choice tag",
+                    )
+                })?;
 
                 let pa_pk_as_rep = match tag_peeker.next_tag.class_and_number() {
-                    (TagClass::ContextSpecific, 0) => PaPkAsRep::DhInfo(seq_next_element!(
-                        seq,
-                        ExplicitContextTag0<DhRepInfo>,
-                        PaPkAsRep,
-                        "dhInfo"
-                    )),
-                    (TagClass::ContextSpecific, 1) => PaPkAsRep::EncKeyPack(seq_next_element!(
-                        seq,
-                        ImplicitContextTag1<OctetStringAsn1>,
-                        PaPkAsRep,
-                        "encKeyPack"
-                    )),
+                    (TagClass::ContextSpecific, 0) => PaPkAsRep::DhInfo(seq.next_element()?.ok_or_else(|| {
+                        de::Error::invalid_value(
+                            de::Unexpected::Other("[PaPkAsRep] dhInfo is missing"),
+                            &"valid dhInfo",
+                        )
+                    })?),
+                    (TagClass::ContextSpecific, 1) => PaPkAsRep::EncKeyPack(seq.next_element()?.ok_or_else(|| {
+                        de::Error::invalid_value(
+                            de::Unexpected::Other("[PaPkAsRep] encKeyPack is missing"),
+                            &"valid encKeyPack",
+                        )
+                    })?),
                     _ => {
-                        return Err(serde_invalid_value!(
-                            PaPkAsRep,
-                            "unknown choice value",
-                            "a supported PA-PK-AS-REP choice"
+                        return Err(de::Error::invalid_value(
+                            de::Unexpected::Other("[PaPkAsRep] unknown choice value"),
+                            &"a supported PA-PK-AS-REP choice",
                         ))
                     }
                 };

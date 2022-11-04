@@ -1,4 +1,4 @@
-use num_bigint::BigUint;
+use num_bigint_dig::BigUint;
 use num_traits::FromPrimitive;
 use rand::{CryptoRng, Rng, RngCore};
 use sha1::{Digest, Sha1};
