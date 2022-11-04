@@ -37,7 +37,7 @@ impl DirectoryString {
         match &self {
             DirectoryString::PrintableString(string) => String::from_utf8_lossy(string.as_bytes()),
             DirectoryString::Utf8String(string) => Cow::Borrowed(string.as_str()),
-            DirectoryString::BmpString(string) => Cow::Owned(unicode_bytes_to_utf8_string(string.as_bytes())),
+            DirectoryString::BmpString(string) => Cow::Owned(utf16_to_utf8_lossy(string.as_bytes())),
         }
     }
 
@@ -91,7 +91,7 @@ impl From<DirectoryString> for String {
         match ds {
             DirectoryString::PrintableString(string) => String::from_utf8_lossy(string.as_bytes()).into(),
             DirectoryString::Utf8String(string) => string,
-            DirectoryString::BmpString(string) => unicode_bytes_to_utf8_string(string.as_bytes()),
+            DirectoryString::BmpString(string) => utf16_to_utf8_lossy(string.as_bytes()),
         }
     }
 }
@@ -172,7 +172,7 @@ impl<'de> de::Deserialize<'de> for DirectoryString {
     }
 }
 
-fn unicode_bytes_to_utf8_string(data: &[u8]) -> String {
+fn utf16_to_utf8_lossy(data: &[u8]) -> String {
     debug_assert_eq!(data.len() % 2, 0);
     String::from_utf16_lossy(
         &data
