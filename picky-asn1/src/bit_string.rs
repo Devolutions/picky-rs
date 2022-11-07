@@ -39,6 +39,11 @@ pub struct BitString {
 }
 
 impl BitString {
+    /// Returns inner bytes slice
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.data
+    }
+
     fn h_number_of_unused_bits(data_size: usize, num_bits: usize) -> u8 {
         (data_size * 8 - num_bits) as u8
     }

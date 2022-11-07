@@ -5,6 +5,7 @@ use crate::crypto::{Cipher, CipherSuite, KerberosCryptoError, KerberosCryptoResu
 
 use super::decrypt::decrypt_message;
 use super::encrypt::encrypt_message;
+use super::key_derivation::random_to_key;
 use super::{derive_key_from_password, AesSize, AES128_KEY_SIZE, AES_BLOCK_SIZE};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -19,6 +20,10 @@ impl Aes128CtsHmacSha196 {
 impl Cipher for Aes128CtsHmacSha196 {
     fn key_size(&self) -> usize {
         AES128_KEY_SIZE
+    }
+
+    fn seed_bit_len(&self) -> usize {
+        self.key_size() * 8
     }
 
     fn cipher_type(&self) -> CipherSuite {
@@ -41,6 +46,10 @@ impl Cipher for Aes128CtsHmacSha196 {
 
     fn generate_key_from_password(&self, password: &[u8], salt: &[u8]) -> KerberosCryptoResult<Vec<u8>> {
         derive_key_from_password(password, salt, &AesSize::Aes128)
+    }
+
+    fn random_to_key(&self, key: Vec<u8>) -> Vec<u8> {
+        random_to_key(key)
     }
 }
 

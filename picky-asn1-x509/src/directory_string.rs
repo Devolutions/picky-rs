@@ -1,6 +1,6 @@
 use picky_asn1::restricted_string::{PrintableString, Utf8String};
 use picky_asn1::tag::{Tag, TagPeeker};
-use picky_asn1::wrapper::PrintableStringAsn1;
+use picky_asn1::wrapper::{BMPStringAsn1, PrintableStringAsn1};
 use serde::{de, ser};
 use std::borrow::Cow;
 use std::fmt;
@@ -23,7 +23,7 @@ pub enum DirectoryString {
     PrintableString(PrintableStringAsn1),
     //UniversalString,
     Utf8String(String),
-    //BmpString,
+    BmpString(BMPStringAsn1),
 }
 
 impl fmt::Display for DirectoryString {
@@ -37,6 +37,7 @@ impl DirectoryString {
         match &self {
             DirectoryString::PrintableString(string) => String::from_utf8_lossy(string.as_bytes()),
             DirectoryString::Utf8String(string) => Cow::Borrowed(string.as_str()),
+            DirectoryString::BmpString(string) => Cow::Owned(utf16_to_utf8_lossy(string.as_bytes())),
         }
     }
 
@@ -44,6 +45,7 @@ impl DirectoryString {
         match &self {
             DirectoryString::PrintableString(string) => string.as_bytes(),
             DirectoryString::Utf8String(string) => string.as_bytes(),
+            DirectoryString::BmpString(string) => string.as_bytes(),
         }
     }
 }
@@ -78,11 +80,18 @@ impl From<PrintableStringAsn1> for DirectoryString {
     }
 }
 
+impl From<BMPStringAsn1> for DirectoryString {
+    fn from(string: BMPStringAsn1) -> Self {
+        Self::BmpString(string)
+    }
+}
+
 impl From<DirectoryString> for String {
     fn from(ds: DirectoryString) -> Self {
         match ds {
             DirectoryString::PrintableString(string) => String::from_utf8_lossy(string.as_bytes()).into(),
             DirectoryString::Utf8String(string) => string,
+            DirectoryString::BmpString(string) => utf16_to_utf8_lossy(string.as_bytes()),
         }
     }
 }
@@ -95,6 +104,7 @@ impl ser::Serialize for DirectoryString {
         match &self {
             DirectoryString::PrintableString(string) => string.serialize(serializer),
             DirectoryString::Utf8String(string) => string.serialize(serializer),
+            DirectoryString::BmpString(string) => string.serialize(serializer),
         }
     }
 }
@@ -129,6 +139,11 @@ impl<'de> de::Deserialize<'de> for DirectoryString {
                         DirectoryString,
                         "PrintableString"
                     ))),
+                    Tag::BMP_STRING => Ok(DirectoryString::BmpString(seq_next_element!(
+                        seq,
+                        DirectoryString,
+                        "BmpString"
+                    ))),
                     Tag::TELETEX_STRING => Err(serde_invalid_value!(
                         DirectoryString,
                         "TeletexString not supported",
@@ -155,4 +170,14 @@ impl<'de> de::Deserialize<'de> for DirectoryString {
 
         deserializer.deserialize_enum("DirectoryString", &["PrintableString", "Utf8String"], Visitor)
     }
+}
+
+fn utf16_to_utf8_lossy(data: &[u8]) -> String {
+    debug_assert_eq!(data.len() % 2, 0);
+    String::from_utf16_lossy(
+        &data
+            .chunks(2)
+            .map(|c| u16::from_be_bytes(c.try_into().unwrap()))
+            .collect::<Vec<u16>>(),
+    )
 }

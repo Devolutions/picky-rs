@@ -5,7 +5,8 @@ use crate::crypto::{Cipher, CipherSuite, KerberosCryptoResult};
 
 use super::decrypt::decrypt_message;
 use super::encrypt::encrypt_message;
-use super::{derive_key_from_password, DES3_BLOCK_SIZE, DES3_KEY_SIZE};
+use super::key_derivation::random_to_key;
+use super::{derive_key_from_password, DES3_BLOCK_SIZE, DES3_KEY_SIZE, DES3_SEED_LEN};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Des3CbcSha1Kd;
@@ -19,6 +20,14 @@ impl Des3CbcSha1Kd {
 impl Cipher for Des3CbcSha1Kd {
     fn key_size(&self) -> usize {
         DES3_KEY_SIZE
+    }
+
+    fn seed_bit_len(&self) -> usize {
+        DES3_SEED_LEN * 8
+    }
+
+    fn random_to_key(&self, key: Vec<u8>) -> Vec<u8> {
+        random_to_key(&key)
     }
 
     fn cipher_type(&self) -> CipherSuite {

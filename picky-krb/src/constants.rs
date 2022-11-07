@@ -32,6 +32,9 @@ pub mod types {
     pub const PA_ETYPE_INFO2_TYPE: [u8; 1] = [0x13];
     pub const PA_TGS_REQ_TYPE: [u8; 1] = [0x01];
     pub const PA_PAC_OPTIONS_TYPE: [u8; 2] = [0x00, 0xa7];
+    //= [PKINIT](https://www.rfc-editor.org/rfc/rfc4556.html#section-3.1.3) =//
+    pub const PA_PK_AS_REQ: [u8; 1] = [0x10];
+    pub const PA_PK_AS_REP: [u8; 1] = [17];
 
     pub const TICKET_TYPE: u8 = 1;
     pub const AUTHENTICATOR_TYPE: u8 = 2;
@@ -76,12 +79,24 @@ pub mod key_usages {
     pub const AP_REQ_AUTHENTICATOR: i32 = 11;
     pub const AP_REP_ENC: i32 = 12;
     pub const KRB_PRIV_ENC_PART: i32 = 13;
+
+    //= [The GSS-API Binding for PKU2U](https://datatracker.ietf.org/doc/html/draft-zhu-pku2u-04#section-6) =//
+    pub const KEY_USAGE_FINISHED: i32 = 41;
 }
 
 //= [The Kerberos Version 5 GSS API](https://datatracker.ietf.org/doc/html/rfc4121) =//
 pub mod gss_api {
     pub const AP_REQ_TOKEN_ID: [u8; 2] = [0x01, 0x00];
+    pub const AP_REP_TOKEN_ID: [u8; 2] = [0x02, 0x00];
     pub const TGT_REQ_TOKEN_ID: [u8; 2] = [0x04, 0x00];
+
+    /// [The Protocol Description](https://datatracker.ietf.org/doc/html/draft-zhu-pku2u-09#section-6)
+    /// KRB_AS_REQ          05 00
+    pub const AS_REQ_TOKEN_ID: [u8; 2] = [0x05, 0x00];
+    /// [The Protocol Description](https://datatracker.ietf.org/doc/html/draft-zhu-pku2u-09#section-6)
+    /// KRB_AS_REP          06 00
+    pub const AS_REP_TOKEN_ID: [u8; 2] = [0x06, 0x00];
+
     pub const ACCEPT_COMPLETE: [u8; 3] = [0x0a, 0x01, 0x00];
     pub const ACCEPT_INCOMPLETE: [u8; 3] = [0x0a, 0x01, 0x01];
 
@@ -108,4 +123,21 @@ pub mod etypes {
     pub const AES128_CTS_HMAC_SHA1_96: usize = 17;
     pub const AES256_CTS_HMAC_SHA1_96: usize = 18;
     pub const RC4_HMA: usize = 23;
+}
+
+//= [Assigned Numbers](https://datatracker.ietf.org/doc/html/rfc3961#section-8) =//
+pub mod cksum_types {
+    pub const CRC32: usize = 1;
+    pub const RSA_MD4: usize = 2;
+    pub const RSA_MD4_DES: usize = 3;
+    pub const DES_MAC: usize = 4;
+    pub const DES_MAC_K: usize = 5;
+    pub const RSA_MD4_DES_K: usize = 6;
+    pub const RSA_MD5: usize = 7;
+    pub const RSA_MD5_DES: usize = 8;
+    pub const RSA_MD5_DES3: usize = 9;
+    pub const HMAC_SHA1_DES3_KD: usize = 12;
+    pub const HMAC_SHA1_DES3: usize = 13;
+    pub const HMAC_SHA1_96_AES128: usize = 15;
+    pub const HMAC_SHA1_96_AES256: usize = 16;
 }

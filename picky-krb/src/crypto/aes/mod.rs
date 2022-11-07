@@ -2,6 +2,8 @@ pub(crate) mod aes128_cts_hmac_sha1_96;
 pub(crate) mod aes256_cts_hmac_sha1_96;
 pub(crate) mod decrypt;
 pub(crate) mod encrypt;
+pub(crate) mod hmac_sha196_aes_128;
+pub(crate) mod hmac_sha196_aes_256;
 mod key_derivation;
 
 use super::common::hmac_sha1;
@@ -76,4 +78,6 @@ pub fn checksum_sha_aes(
 
 pub use aes128_cts_hmac_sha1_96::Aes128CtsHmacSha196;
 pub use aes256_cts_hmac_sha1_96::Aes256CtsHmacSha196;
+pub use hmac_sha196_aes_128::HmacSha196Aes128;
+pub use hmac_sha196_aes_256::HmacSha196Aes256;
 pub use key_derivation::{derive_key, derive_key_from_password};

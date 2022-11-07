@@ -56,13 +56,16 @@ impl ser::Serialize for SubjectPublicKeyInfo {
         S: ser::Serializer,
     {
         use ser::SerializeSeq;
+
         let mut seq = serializer.serialize_seq(Some(2))?;
         seq.serialize_element(&self.algorithm)?;
+
         match &self.subject_public_key {
             PublicKey::Rsa(key) => seq.serialize_element(key)?,
             PublicKey::Ec(key) => seq.serialize_element(key)?,
             PublicKey::Ed(key) => seq.serialize_element(key)?,
         }
+
         seq.end()
     }
 }

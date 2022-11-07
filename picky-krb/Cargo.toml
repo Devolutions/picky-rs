@@ -13,10 +13,11 @@ readme = "README.md"
 include = ["src/**/*", "README.md", "CHANGELOG.md"]
 
 [dependencies]
-picky-asn1 = { version = "0.5.0", features = ["chrono_conversion"] }
-picky-asn1-der = "0.3.1"
+picky-asn1 = { version = "0.6.0", path = "../picky-asn1" }
+picky-asn1-der = { version = "0.3.1", path = "../picky-asn1-der" }
+picky-asn1-x509 = { version = "0.8.0", path = "../picky-asn1-x509" }
 serde = { version = "1.0.136", features = ["derive"] }
-byteorder = "1.1.0"
+byteorder = "1.4.3"
 thiserror = "1.0.30"
 
 pbkdf2 = { version = "0.11", features = ["sha1"] }
@@ -28,3 +29,7 @@ aes = "0.8.1"
 des = "0.8.1"
 cbc = "0.1.2"
 rand = "0.8.5"
+
+uuid = { version = "1.1.2", default-features = false, features = ["serde"] }
+oid = "0.2.1"
+num-bigint-dig = { version = "0.8.1", features = ["rand"] }

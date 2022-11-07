@@ -55,7 +55,7 @@ pub type MechTypeList = Asn1SequenceOf<MechType>;
 ///     mechListMIC     [3] OCTET STRING  OPTIONAL,
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NegTokenInit {
     #[serde(default)]
     pub mech_types: Optional<Option<ExplicitContextTag0<MechTypeList>>>,
@@ -67,7 +67,7 @@ pub struct NegTokenInit {
     pub mech_list_mic: Optional<Option<ExplicitContextTag3<OctetStringAsn1>>>,
 }
 
-/// [3.2.1.  GSS-API](https://datatracker.ietf.org/doc/html/rfc2478#section-3.2.1)
+/// [3.2.1. GSS-API](https://datatracker.ietf.org/doc/html/rfc2478#section-3.2.1)
 ///
 /// ```not_rust
 /// NegTokenTarg ::= SEQUENCE {
@@ -77,7 +77,7 @@ pub struct NegTokenInit {
 ///     mechListMIC    [3] OCTET STRING                            OPTIONAL
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NegTokenTarg {
     #[serde(default)]
     pub neg_result: Optional<Option<ExplicitContextTag0<Asn1RawDer>>>,
@@ -91,7 +91,7 @@ pub struct NegTokenTarg {
 
 pub type NegTokenTarg1 = ExplicitContextTag1<NegTokenTarg>;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct KrbMessage<T: Clone> {
     pub krb5_oid: ObjectIdentifierAsn1,
     pub krb5_token_id: [u8; 2],
@@ -130,7 +130,7 @@ impl<T: ser::Serialize + Debug + PartialEq + Clone> ser::Serialize for KrbMessag
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct GssApiNegInit {
     pub oid: ObjectIdentifierAsn1,
     pub neg_token_init: ExplicitContextTag0<NegTokenInit>,

@@ -32,7 +32,7 @@ use crate::data_types::{
 ///     dclocator-hint         [2] INTEGER OPTIONAL
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct KdcProxyMessage {
     pub kerb_message: ExplicitContextTag0<OctetStringAsn1>,
     #[serde(default)]
@@ -87,7 +87,7 @@ impl KdcProxyMessage {
 ///                                        -- NOTE: not empty
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct KdcReqBody {
     pub kdc_options: ExplicitContextTag0<KerberosFlags>,
     pub cname: Optional<Option<ExplicitContextTag1<PrincipalName>>>,
@@ -117,7 +117,7 @@ pub struct KdcReqBody {
 ///         req-body        [4] KDC-REQ-BODY,
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct KdcReq {
     pub pvno: ExplicitContextTag1<IntegerAsn1>,
     pub msg_type: ExplicitContextTag2<IntegerAsn1>,
@@ -153,7 +153,7 @@ pub type TgsReq = ApplicationTag<KdcReq, TGS_REQ_MSG_TYPE>;
 ///         enc-part        [6] EncryptedData
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct KdcRep {
     pub pvno: ExplicitContextTag0<IntegerAsn1>,
     pub msg_type: ExplicitContextTag1<IntegerAsn1>,
@@ -197,7 +197,7 @@ pub type TgsRep = ApplicationTag<KdcRep, TGS_REP_MSG_TYPE>;
 ///         e-data          [12] OCTET STRING OPTIONAL
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct KrbErrorInner {
     pub pvno: ExplicitContextTag0<IntegerAsn1>,
     pub msg_type: ExplicitContextTag1<IntegerAsn1>,
@@ -249,7 +249,7 @@ impl ToString for KrbErrorInner {
 ///         caddr           [11] HostAddresses OPTIONAL
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct EncKdcRepPart {
     pub key: ExplicitContextTag0<EncryptionKey>,
     pub last_req: ExplicitContextTag1<LastReq>,
@@ -283,7 +283,7 @@ pub type EncAsRepPart = ApplicationTag<EncKdcRepPart, ENC_AS_REP_PART_TYPE>;
 /// ```
 pub type EncTgsRepPart = ApplicationTag<EncKdcRepPart, ENC_TGS_REP_PART_TYPE>;
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct ApReqInner {
     pub pvno: ExplicitContextTag0<IntegerAsn1>,
     pub msg_type: ExplicitContextTag1<IntegerAsn1>,
@@ -294,7 +294,7 @@ pub struct ApReqInner {
 
 pub type ApReq = ApplicationTag<ApReqInner, AP_REQ_MSG_TYPE>;
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct ApRepInner {
     pub pvno: ExplicitContextTag0<IntegerAsn1>,
     pub msg_type: ExplicitContextTag1<IntegerAsn1>,
@@ -302,14 +302,14 @@ pub struct ApRepInner {
 }
 pub type ApRep = ApplicationTag<ApRepInner, AP_REP_MSG_TYPE>;
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct TgtReq {
     pub pvno: ExplicitContextTag0<IntegerAsn1>,
     pub msg_type: ExplicitContextTag1<IntegerAsn1>,
     pub server_name: ExplicitContextTag2<PrincipalName>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct TgtRep {
     pub pvno: ExplicitContextTag0<IntegerAsn1>,
     pub msg_type: ExplicitContextTag1<IntegerAsn1>,
@@ -326,7 +326,7 @@ pub struct TgtRep {
 ///         enc-part        [3] EncryptedData -- EncKrbPrivPart
 /// }
 /// ```
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct KrbPrivInner {
     pub pvno: ExplicitContextTag0<IntegerAsn1>,
     pub msg_type: ExplicitContextTag1<IntegerAsn1>,
@@ -335,7 +335,7 @@ pub struct KrbPrivInner {
 
 pub type KrbPriv = ApplicationTag<KrbPrivInner, KRB_PRIV>;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ApMessage {
     ApReq(ApReq),
     ApRep(ApRep),
@@ -396,7 +396,7 @@ impl ser::Serialize for ApMessage {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KrbPrivMessage {
     pub ap_message: ApMessage,
     pub krb_priv: KrbPriv,
