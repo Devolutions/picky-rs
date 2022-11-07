@@ -9,13 +9,21 @@ if ($LastExitCode -ne 0)
     throw "wasm-pack build failed"
 }
 
-cd ava_tests
-npm install
-npm test
-
-if ($LastExitCode -ne 0)
+try
 {
-    throw "ava tests failed"
-}
+    Push-Location ava_tests
 
-Write-Host "Success!"
+    npm install
+    npm test
+    
+    if ($LastExitCode -ne 0)
+    {
+        throw "ava tests failed"
+    }
+    
+    Write-Host "Success!"
+}
+finally
+{
+    Pop-Location
+}

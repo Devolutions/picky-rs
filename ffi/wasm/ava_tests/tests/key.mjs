@@ -51,7 +51,7 @@ test("Private Key to Public Key", (t) => {
 		const pub = priv.to_public_key();
 		t.is(pubKeyPemRepr, pub.to_pem().to_repr());
 	} catch (e) {
-		if (typeof (e.to_display) === "undefined") {
+		if (typeof e.to_display === "undefined") {
 			throw e;
 		} else {
 			throw e.to_display();
@@ -65,7 +65,7 @@ test("Generate RSA keypair", (t) => {
 		const pem = key.to_pem();
 		t.is(pem.get_label(), "PRIVATE KEY");
 	} catch (e) {
-		if (typeof (e.to_display) === "undefined") {
+		if (typeof e.to_display === "undefined") {
 			throw e;
 		} else {
 			throw e.to_display();

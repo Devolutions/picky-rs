@@ -74,7 +74,7 @@ test("Smoke", (t) => {
 		t.is(parts[0], HEADER_SECTION);
 		t.is(parts[1], PAYLOAD_SECTION);
 	} catch (e) {
-		if (typeof (e.to_display) === "undefined") {
+		if (typeof e.to_display === "undefined") {
 			throw e;
 		} else {
 			throw e.to_display();
@@ -92,7 +92,7 @@ test("Decode Signed JWT", (t) => {
 		t.is(jwt.get_content_type(), "AUTH");
 		t.is(jwt.get_claims(), CLAIMS);
 	} catch (e) {
-		if (typeof (e.to_display) === "undefined") {
+		if (typeof e.to_display === "undefined") {
 			throw e;
 		} else {
 			throw e.to_display();
@@ -158,7 +158,7 @@ test("Additional Header Parameters", (t) => {
 			t.is(header.additional_negative_number, -64);
 		}
 	} catch (e) {
-		if (typeof (e.to_display) === "undefined") {
+		if (typeof e.to_display === "undefined") {
 			throw e;
 		} else {
 			throw e.to_display();
