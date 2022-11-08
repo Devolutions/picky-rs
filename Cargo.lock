@@ -1121,9 +1121,9 @@ dependencies = [
  "md-5",
  "num-bigint-dig",
  "oid",
- "picky-asn1 0.6.0",
- "picky-asn1-der 0.3.1",
- "picky-asn1-x509 0.8.0",
+ "picky-asn1 0.7.0",
+ "picky-asn1-der 0.4.0",
+ "picky-asn1-x509 0.9.0",
  "pretty_assertions",
  "rand",
  "reqwest",
@@ -1153,9 +1153,9 @@ dependencies = [
  "md-5",
  "num-bigint-dig",
  "oid",
- "picky-asn1 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "picky-asn1-der 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "picky-asn1-x509 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "picky-asn1 0.6.0",
+ "picky-asn1-der 0.3.1",
+ "picky-asn1-x509 0.8.0",
  "rand",
  "reqwest",
  "rsa",
@@ -1180,19 +1180,6 @@ dependencies = [
 [[package]]
 name = "picky-asn1"
 version = "0.6.0"
-dependencies = [
- "chrono",
- "oid",
- "picky-asn1-der 0.3.1",
- "serde",
- "serde_bytes",
- "time 0.3.16",
- "zeroize",
-]
-
-[[package]]
-name = "picky-asn1"
-version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b7a3f07db0e5b22727979a992df18c78170c7c30279ab4149a395c0c3843832"
 dependencies = [
@@ -1204,17 +1191,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "picky-asn1-der"
-version = "0.3.1"
+name = "picky-asn1"
+version = "0.7.0"
 dependencies = [
- "base64",
- "lazy_static",
- "num-bigint-dig",
+ "chrono",
  "oid",
- "picky-asn1 0.6.0",
- "pretty_assertions",
+ "picky-asn1-der 0.4.0",
  "serde",
  "serde_bytes",
+ "time 0.3.16",
+ "zeroize",
 ]
 
 [[package]]
@@ -1229,19 +1215,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "picky-asn1-x509"
-version = "0.8.0"
+name = "picky-asn1-der"
+version = "0.4.0"
 dependencies = [
  "base64",
- "hex",
+ "lazy_static",
  "num-bigint-dig",
  "oid",
- "picky-asn1 0.6.0",
- "picky-asn1-der 0.3.1",
+ "picky-asn1 0.7.0",
  "pretty_assertions",
  "serde",
- "widestring 0.5.1",
- "zeroize",
+ "serde_bytes",
 ]
 
 [[package]]
@@ -1253,8 +1237,24 @@ dependencies = [
  "base64",
  "num-bigint-dig",
  "oid",
- "picky-asn1 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "picky-asn1-der 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "picky-asn1 0.6.0",
+ "picky-asn1-der 0.3.1",
+ "serde",
+ "widestring 0.5.1",
+ "zeroize",
+]
+
+[[package]]
+name = "picky-asn1-x509"
+version = "0.9.0"
+dependencies = [
+ "base64",
+ "hex",
+ "num-bigint-dig",
+ "oid",
+ "picky-asn1 0.7.0",
+ "picky-asn1-der 0.4.0",
+ "pretty_assertions",
  "serde",
  "widestring 0.5.1",
  "zeroize",
@@ -1276,7 +1276,7 @@ dependencies = [
 
 [[package]]
 name = "picky-krb"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "aes 0.8.2",
  "byteorder",
@@ -1287,9 +1287,9 @@ dependencies = [
  "num-bigint-dig",
  "oid",
  "pbkdf2",
- "picky-asn1 0.6.0",
- "picky-asn1-der 0.3.1",
- "picky-asn1-x509 0.8.0",
+ "picky-asn1 0.7.0",
+ "picky-asn1-der 0.4.0",
+ "picky-asn1-x509 0.9.0",
  "rand",
  "serde",
  "sha1",

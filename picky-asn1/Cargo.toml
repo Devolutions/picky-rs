@@ -1,6 +1,6 @@
 [package]
 name = "picky-asn1"
-version = "0.6.0"
+version = "0.7.0"
 edition = "2021"
 rust-version = "1.60"
 authors = [
@@ -23,7 +23,7 @@ time = { version = "0.3.9", optional = true }
 zeroize = { version = "^1.5", optional = true }
 
 [dev-dependencies]
-picky-asn1-der = { version = "0.3.1", path = "../picky-asn1-der" }
+picky-asn1-der = { path = "../picky-asn1-der" }
 
 [features]
 chrono_conversion = ["chrono"]

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.9.0] 2022-11-07
+
+### Added
+
+- More OIDs such as PKINIT_AUTH_DATA and PKINIT_DH_KEY_DATA
+- Support for BMPString
+
 ## [0.8.0] 2022-08-01
 
 ### Added

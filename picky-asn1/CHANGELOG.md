@@ -7,13 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.7.0] 2022-11-07
+
+### Added
+
+- `BitString::as_inner` method
+
 ## [0.6.0] 2022-08-01
 
-## Added
+### Added
 
 - Implement `Zeroize` for `IntegerAsn1` (behind the `zeroize` feature)
 
-## Changed
+### Changed
 
 - Bump minimal rustc version to 1.60
 
