@@ -19,9 +19,9 @@ repository = "https://github.com/Devolutions/picky-rs"
 include = ["src/**/*", "README.md", "CHANGELOG.md"]
 
 [dependencies]
-picky-asn1 = { version = "0.6", path = "../picky-asn1", features = ["zeroize"] }
-picky-asn1-der = { version = "0.3", path = "../picky-asn1-der" }
-picky-asn1-x509 = { version = "0.8", path = "../picky-asn1-x509", features = ["legacy", "zeroize"] }
+picky-asn1 = { version = "0.7", path = "../picky-asn1", features = ["zeroize"] }
+picky-asn1-der = { version = "0.4", path = "../picky-asn1-der" }
+picky-asn1-x509 = { version = "0.9", path = "../picky-asn1-x509", features = ["legacy", "zeroize"] }
 serde = { version = "1.0.136", features = ["derive"] }
 oid = { version = "0.2.1", features = ["serde_support"] }
 base64 = "0.13.0"

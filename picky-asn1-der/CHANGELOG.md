@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.4.0] 2022-11-07
+
+### Added
+
+- Derive additional traits for some types ([#171](https://github.com/Devolutions/picky-rs/pull/171))
+
 ## [0.3.1] 2022-05-19
 
 ### Changed
