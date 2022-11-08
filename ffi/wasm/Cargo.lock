@@ -414,7 +414,7 @@ dependencies = [
 
 [[package]]
 name = "picky-asn1"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "oid",
  "serde",
@@ -424,7 +424,7 @@ dependencies = [
 
 [[package]]
 name = "picky-asn1-der"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "picky-asn1",
  "serde",
@@ -433,7 +433,7 @@ dependencies = [
 
 [[package]]
 name = "picky-asn1-x509"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "base64",
  "num-bigint-dig",
