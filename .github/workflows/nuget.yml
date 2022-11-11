@@ -374,7 +374,9 @@ jobs:
       - name: Build picky (managed)
         shell: pwsh
         run: |
+          # netstandard2.0 / Xamarin.iOS10 targets packaged as Devolutions.Picky
           msbuild .\ffi\dotnet\Devolutions.Picky.sln -t:restore,build -p:RestorePackagesConfig=true /p:Configuration=Release
+          # net7.0-ios target packaged as Devolutions.Picky.iOS
           dotnet build .\ffi\dotnet\Devolutions.Picky\Devolutions.Picky.csproj -c Release /p:PackageId=Devolutions.Picky.iOS
 
       - name: Upload managed components
