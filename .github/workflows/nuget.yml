@@ -344,6 +344,14 @@ jobs:
       - name: Add msbuild to PATH
         uses: microsoft/setup-msbuild@v1.1
 
+      - name: Install .NET 7
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: 7
+
+      - name: Install ios workload
+        run: dotnet workload install ios
+
       - name: Prepare dependencies
         shell: pwsh
         run: |
@@ -367,6 +375,7 @@ jobs:
         shell: pwsh
         run: |
           msbuild .\ffi\dotnet\Devolutions.Picky.sln -t:restore,build -p:RestorePackagesConfig=true /p:Configuration=Release
+          dotnet build .\ffi\dotnet\Devolutions.Picky\Devolutions.Picky.csproj -c Release /p:PackageId=Devolutions.Picky.iOS
 
       - name: Upload managed components
         uses: actions/upload-artifact@v3

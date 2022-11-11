@@ -1,0 +1,50 @@
+<Project>
+
+  <PropertyGroup Condition="$(PackageId.EndsWith('iOS'))">
+    <TargetFrameworks>net7.0-ios</TargetFrameworks>
+    <SupportedOSPlatformVersion>12.1</SupportedOSPlatformVersion>
+  </PropertyGroup>
+
+  <ItemGroup Condition="Exists('$(NativeLibPath_ios_x64)')">
+    <Content Include="$(NativeLibPath_ios_x64)">
+      <Link>%(Filename)%(Extension)</Link>
+      <PackagePath>runtimes/ios-x64/native/%(Filename)%(Extension)</PackagePath>
+      <Pack>true</Pack>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup Condition="Exists('$(NativeLibPath_ios_arm64)')">
+    <Content Include="$(NativeLibPath_ios_arm64)">
+      <Link>%(Filename)%(Extension)</Link>
+      <PackagePath>runtimes/ios-arm64/native/%(Filename)%(Extension)</PackagePath>
+      <Pack>true</Pack>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup Condition="Exists('$(NativeLibPath_ios_universal)')">
+    <Content Include="$(NativeLibPath_ios_universal)">
+      <Link>%(Filename)%(Extension)</Link>
+      <PackagePath>runtimes/ios-universal/native/%(Filename)%(Extension)</PackagePath>
+      <Pack>true</Pack>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup Condition="Exists('$(NativeLibPath_ios_framework)')">
+    <None Include="$(RuntimesPath)/ios-universal/native/*.framework/**">
+      <PackagePath>runtimes/ios-universal/native/</PackagePath>
+      <Pack>true</Pack>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup Condition="!$(PackageId.EndsWith('iOS'))">
+    <Content Include="Devolutions.Picky.iOS.props" PackagePath="build/Devolutions.Picky.props" Pack="true" />
+  </ItemGroup>
+
+  <ItemGroup Condition="$(PackageId.EndsWith('iOS'))">
+    <Content Include="Devolutions.Picky.iOS.props" PackagePath="build/Devolutions.Picky.iOS.props" Pack="true" />
+  </ItemGroup>
+</Project>
