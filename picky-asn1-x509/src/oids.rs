@@ -124,6 +124,8 @@ define_oid! {
     AT_STREET_NAME => at_street_name => "2.5.4.9",
     AT_ORGANIZATION_NAME => at_organization_name => "2.5.4.10",
     AT_ORGANIZATIONAL_UNIT_NAME => at_organizational_unit_name => "2.5.4.11",
+    AT_GIVENNAME => at_given_name => "2.5.4.42",
+    AT_PHONE => at_phone => "2.5.4.20",
 
     // certificate extensions
     SUBJECT_KEY_IDENTIFIER => subject_key_identifier => "2.5.29.14",

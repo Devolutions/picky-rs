@@ -15,6 +15,8 @@ pub enum NameAttr {
     StreetName,
     OrganizationName,
     OrganizationalUnitName,
+    GivenName,
+    Phone,
 }
 
 /// [RFC 5280 #4.1.2.4](https://tools.ietf.org/html/rfc5280#section-4.1.2.4)
@@ -87,6 +89,8 @@ impl Name {
             NameAttr::StreetName => AttributeTypeAndValue::new_street_name(value),
             NameAttr::OrganizationName => AttributeTypeAndValue::new_organization_name(value),
             NameAttr::OrganizationalUnitName => AttributeTypeAndValue::new_organizational_unit_name(value),
+            NameAttr::GivenName => AttributeTypeAndValue::new_given_name(value),
+            NameAttr::Phone => AttributeTypeAndValue::new_phone(value),
         };
         let set_val = Asn1SetOf(vec![ty_val]);
         ((self.0).0).push(set_val);
@@ -149,6 +153,12 @@ impl fmt::Display for NamePrettyFormatter<'_> {
                     }
                     AttributeTypeAndValueParameters::EmailAddress(name) => {
                         write!(f, "EMAIL={}", String::from_utf8_lossy(name.as_bytes()))?;
+                    }
+                    AttributeTypeAndValueParameters::GivenName(name) => {
+                        write!(f, "GIVENNAME={}", name)?;
+                    }
+                    AttributeTypeAndValueParameters::Phone(name) => {
+                        write!(f, "PHONE={}", name)?;
                     }
                     AttributeTypeAndValueParameters::Custom(der) => {
                         write!(f, "{}={:?}", Into::<String>::into(&attr.ty.0), der)?;
