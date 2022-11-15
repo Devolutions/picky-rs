@@ -96,6 +96,7 @@ impl AttributeTypeAndValue {
             value: AttributeTypeAndValueParameters::EmailAddress(name.into()),
         }
     }
+
     pub fn new_given_name<S: Into<DirectoryString>>(name: S) -> Self {
         Self {
             ty: oids::at_given_name().into(),
