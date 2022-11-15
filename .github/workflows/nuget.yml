@@ -33,9 +33,9 @@ jobs:
           $IsDryRun = '${{ github.event.inputs.dry-run }}' -Eq 'true' -Or '${{ github.event_name }}' -Eq 'schedule'
 
           if ($IsDryRun) {
-            Write-Host '::set-output name=dry-run::true'
+            echo "dry-run=true" >> $Env:GITHUB_OUTPUT
           } else {
-            Write-Host '::set-output name=dry-run::false'
+            echo "dry-run=false" >> $Env:GITHUB_OUTPUT
           }
 
       - name: Get version
@@ -45,8 +45,8 @@ jobs:
           $CsprojXml = [Xml] (Get-Content .\ffi\dotnet\Devolutions.Picky\Devolutions.Picky.csproj)
           $ProjectVersion = $CsprojXml.Project.PropertyGroup.Version | Select-Object -First 1
           $PackageVersion = $ProjectVersion -Replace "^(\d+)\.(\d+)\.(\d+).(\d+)$", "`$1.`$2.`$3"
-          Write-Host "::set-output name=project-version::$ProjectVersion"
-          Write-Host "::set-output name=package-version::$PackageVersion"
+          echo "project-version=$ProjectVersion" >> $Env:GITHUB_OUTPUT
+          echo "package-version=$PackageVersion" >> $Env:GITHUB_OUTPUT
 
   build-native:
     name: Native build
