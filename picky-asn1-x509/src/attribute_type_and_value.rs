@@ -15,6 +15,8 @@ pub enum AttributeTypeAndValueParameters {
     OrganizationName(DirectoryString),
     OrganizationalUnitName(DirectoryString),
     EmailAddress(IA5StringAsn1),
+    GivenName(DirectoryString),
+    Phone(DirectoryString),
     Custom(picky_asn1_der::Asn1RawDer),
 }
 
@@ -94,6 +96,20 @@ impl AttributeTypeAndValue {
             value: AttributeTypeAndValueParameters::EmailAddress(name.into()),
         }
     }
+
+    pub fn new_given_name<S: Into<DirectoryString>>(name: S) -> Self {
+        Self {
+            ty: oids::at_given_name().into(),
+            value: AttributeTypeAndValueParameters::GivenName(name.into()),
+        }
+    }
+
+    pub fn new_phone<S: Into<DirectoryString>>(name: S) -> Self {
+        Self {
+            ty: oids::at_phone().into(),
+            value: AttributeTypeAndValueParameters::Phone(name.into()),
+        }
+    }
 }
 
 impl ser::Serialize for AttributeTypeAndValue {
@@ -135,7 +151,13 @@ impl ser::Serialize for AttributeTypeAndValue {
             AttributeTypeAndValueParameters::EmailAddress(name) => {
                 seq.serialize_element(name)?;
             }
-            AttributeTypeAndValueParameters::Custom(der) => {
+            AttributeTypeAndValueParameters::GivenName(name) => {
+                seq.serialize_element(name)?;
+            }
+            AttributeTypeAndValueParameters::Phone(name) => {
+                seq.serialize_element(name)?;
+            }
+           AttributeTypeAndValueParameters::Custom(der) => {
                 seq.serialize_element(der)?;
             }
         }
@@ -208,6 +230,16 @@ impl<'de> de::Deserialize<'de> for AttributeTypeAndValue {
                             seq,
                             AttributeTypeAndValue,
                             "at email address"
+                        )),
+                        oids::AT_GIVENNAME => AttributeTypeAndValueParameters::GivenName(seq_next_element!(
+                            seq,
+                            AttributeTypeAndValue,
+                            "at given name"
+                        )),
+                        oids::AT_PHONE => AttributeTypeAndValueParameters::Phone(seq_next_element!(
+                            seq,
+                            AttributeTypeAndValue,
+                            "at phone"
                         )),
                         _ => AttributeTypeAndValueParameters::Custom(seq_next_element!(
                             seq,
