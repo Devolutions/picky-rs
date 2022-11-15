@@ -103,6 +103,7 @@ impl AttributeTypeAndValue {
             value: AttributeTypeAndValueParameters::GivenName(name.into()),
         }
     }
+
     pub fn new_phone<S: Into<DirectoryString>>(name: S) -> Self {
         Self {
             ty: oids::at_phone().into(),
