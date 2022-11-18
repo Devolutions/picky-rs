@@ -220,14 +220,12 @@ pub type KrbError = ApplicationTag<KrbErrorInner, KRB_ERROR_MSG_TYPE>;
 
 impl ToString for KrbErrorInner {
     fn to_string(&self) -> String {
-        let mut be_byes = [0, 0, 0, 0];
-        let error_code_bytes = self.error_code.0.as_signed_bytes_be();
+        let mut le_bytes = [0, 0, 0, 0];
+        let error_code_bytes = &self.error_code.0;
         let len = error_code_bytes.len();
-
         let len = std::cmp::min(4, len);
-        be_byes[0..len].copy_from_slice(&error_code_bytes[..len]);
-
-        format!("error code: {}", i32::from_be_bytes(be_byes))
+        le_bytes[0..len].copy_from_slice(&error_code_bytes[..len]);
+        format!("error code: {:#04X?}", i32::from_le_bytes(le_bytes))
     }
 }
 
