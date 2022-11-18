@@ -2419,7 +2419,7 @@ mod test {
         let der_signature = base64::decode(signature).unwrap();
         let authenticode_signature = AuthenticodeSignature::from_der(&der_signature).unwrap();
 
-        let time = UtcDate::now();
+        let time = UtcDate::new(2021, 7, 9, 7, 48, 3).unwrap();
         let validator = authenticode_signature.authenticode_verifier();
         let validator = validator
             .ignore_basic_authenticode_validation()
@@ -2526,7 +2526,7 @@ mod test {
         let der_signature = base64::decode(signature).unwrap();
         let authenticode_signature = AuthenticodeSignature::from_der(&der_signature).unwrap();
 
-        let time = UtcDate::now();
+        let time = UtcDate::new(2021, 7, 9, 7, 48, 3).unwrap();
         let validator = authenticode_signature.authenticode_verifier();
         let validator = validator
             .ignore_basic_authenticode_validation()
