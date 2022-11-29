@@ -301,7 +301,7 @@ jobs:
           [xml] $InfoPlistXml = Get-Content (Join-Path "ffi" "dotnet" "Devolutions.Picky" "Info.plist")
           Select-Xml -xml $InfoPlistXml -XPath "/plist/dict/key[. = 'CFBundleIdentifier']/following-sibling::string[1]" |
           %{ 	
-          $_.Node.InnerXml = "com.devolutions.sspi"
+          $_.Node.InnerXml = "com.devolutions.picky"
           }
           Select-Xml -xml $InfoPlistXml -XPath "/plist/dict/key[. = 'CFBundleExecutable']/following-sibling::string[1]" |
           %{ 	
