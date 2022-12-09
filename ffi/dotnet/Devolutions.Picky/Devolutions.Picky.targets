@@ -38,7 +38,7 @@
       <IncludeInVsix>true</IncludeInVsix>
       <Pack>false</Pack>
     </Content>
-    <Content Condition="'$(IsPowerShell)' == 'true'" Include="$(MSBuildThisFileDirectory)\..\runtimes\osx-x64\native\libDevolutionsPicky.dylib">
+    <Content Condition="'$(IsPowerShell)' == 'true' OR $(RuntimeIdentifiers.Contains('osx-x64'))" Include="$(MSBuildThisFileDirectory)\..\runtimes\osx-x64\native\libDevolutionsPicky.dylib">
       <Link>runtimes\osx-x64\native\libDevolutionsPicky.dylib</Link>
       <PublishState>Included</PublishState>
       <Visible>False</Visible>
@@ -46,7 +46,7 @@
       <IncludeInVsix>true</IncludeInVsix>
       <Pack>false</Pack>
     </Content>
-    <Content Condition="'$(IsPowerShell)' == 'true'" Include="$(MSBuildThisFileDirectory)\..\runtimes\osx-arm64\native\libDevolutionsPicky.dylib">
+    <Content Condition="'$(IsPowerShell)' == 'true' OR $(RuntimeIdentifiers.Contains('osx-arm64'))" Include="$(MSBuildThisFileDirectory)\..\runtimes\osx-arm64\native\libDevolutionsPicky.dylib">
       <Link>runtimes\osx-arm64\native\libDevolutionsPicky.dylib</Link>
       <PublishState>Included</PublishState>
       <Visible>False</Visible>
