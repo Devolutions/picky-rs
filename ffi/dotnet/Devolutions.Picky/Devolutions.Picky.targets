@@ -4,8 +4,11 @@
     <IsPowerShell Condition="$(DefineConstants.Contains('__POWERSHELL__'))">true</IsPowerShell>
     <IsAndroid Condition="$(TargetFramework.ToUpper().Contains('ANDROID'))">true</IsAndroid>
     <IsIOS Condition="'$(Platform)' == 'iPhone' or '$(Platform)' == 'iPhoneSimulator'">true</IsIOS>
+    <IsNet6Mac Condition="$(TargetFramework.Contains('-macos'))">true</IsNet6Mac>
   </PropertyGroup>
   <ItemGroup>
+  
+    <!-- Windows or PowerShell -->
     <Content Condition="$([MSBuild]::IsOSPlatform('Windows')) OR '$(IsPowerShell)' == 'true'" Include="$(MSBuildThisFileDirectory)\..\runtimes\win-x64\native\DevolutionsPicky.dll">
       <Link>runtimes\win-x64\native\DevolutionsPicky.dll</Link>
       <PublishState>Included</PublishState>
@@ -22,6 +25,8 @@
       <IncludeInVsix>true</IncludeInVsix>
       <Pack>false</Pack>
     </Content>
+
+    <!-- Linux or PowerShell -->
     <Content Condition="$([MSBuild]::IsOSPlatform('Linux')) OR '$(IsPowerShell)' == 'true'" Include="$(MSBuildThisFileDirectory)\..\runtimes\linux-x64\native\libDevolutionsPicky.so">
       <Link>runtimes\linux-x64\native\libDevolutionsPicky.so</Link>
       <PublishState>Included</PublishState>
@@ -38,7 +43,9 @@
       <IncludeInVsix>true</IncludeInVsix>
       <Pack>false</Pack>
     </Content>
-    <Content Condition="'$(IsPowerShell)' == 'true' OR $(RuntimeIdentifiers.Contains('osx-x64'))" Include="$(MSBuildThisFileDirectory)\..\runtimes\osx-x64\native\libDevolutionsPicky.dylib">
+
+    <!-- PowerShell -->
+    <Content Condition="'$(IsPowerShell)' == 'true'" Include="$(MSBuildThisFileDirectory)\..\runtimes\osx-x64\native\libDevolutionsPicky.dylib">
       <Link>runtimes\osx-x64\native\libDevolutionsPicky.dylib</Link>
       <PublishState>Included</PublishState>
       <Visible>False</Visible>
@@ -46,7 +53,7 @@
       <IncludeInVsix>true</IncludeInVsix>
       <Pack>false</Pack>
     </Content>
-    <Content Condition="'$(IsPowerShell)' == 'true' OR $(RuntimeIdentifiers.Contains('osx-arm64'))" Include="$(MSBuildThisFileDirectory)\..\runtimes\osx-arm64\native\libDevolutionsPicky.dylib">
+    <Content Condition="'$(IsPowerShell)' == 'true'" Include="$(MSBuildThisFileDirectory)\..\runtimes\osx-arm64\native\libDevolutionsPicky.dylib">
       <Link>runtimes\osx-arm64\native\libDevolutionsPicky.dylib</Link>
       <PublishState>Included</PublishState>
       <Visible>False</Visible>
@@ -55,12 +62,16 @@
       <Pack>false</Pack>
     </Content>
   </ItemGroup>
-  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('OSX')) AND '$(IsPowerShell)' != 'true' AND '$(IsIOS)' != 'true' AND '$(IsAndroid)' != 'true'">
+
+  <!-- Xamarin.Mac -->
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('OSX')) AND '$(IsPowerShell)' != 'true' AND '$(IsIOS)' != 'true' AND '$(IsAndroid)' != 'true' AND '$(IsNet6Mac)' != 'true'">
     <NativeReference Include="$(MSBuildThisFileDirectory)\..\runtimes\osx-universal\native\libDevolutionsPicky.dylib">
       <Kind>Dynamic</Kind>
       <SmartLink>False</SmartLink>
     </NativeReference>
   </ItemGroup>
+
+  <!-- Xamarin.Android or net6.0-android -->
   <ItemGroup Condition="$(AndroidSupportedAbis.Contains('armeabi-v7a')) or $(RuntimeIdentifiers.Contains('android-arm'))">
       <AndroidNativeLibrary Include="$(MSBuildThisFileDirectory)\..\runtimes\android-arm\native\libDevolutionsPicky.so">
           <Link>%(Filename)%(Extension)</Link>
