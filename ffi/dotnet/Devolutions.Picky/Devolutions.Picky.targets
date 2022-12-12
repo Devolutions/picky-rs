@@ -4,6 +4,7 @@
     <IsPowerShell Condition="$(DefineConstants.Contains('__POWERSHELL__'))">true</IsPowerShell>
     <IsAndroid Condition="$(TargetFramework.ToUpper().Contains('ANDROID'))">true</IsAndroid>
     <IsIOS Condition="'$(Platform)' == 'iPhone' or '$(Platform)' == 'iPhoneSimulator'">true</IsIOS>
+    <IsNet6Mac Condition="$(TargetFramework.Contains('-macos'))">true</IsNet6Mac>
   </PropertyGroup>
   <ItemGroup>
   
@@ -63,7 +64,7 @@
   </ItemGroup>
 
   <!-- Xamarin.Mac -->
-  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('OSX')) AND '$(IsPowerShell)' != 'true' AND '$(IsIOS)' != 'true' AND '$(IsAndroid)' != 'true' AND $(RuntimeIdentifiers.Contains('osx-')) != 'true'">
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('OSX')) AND '$(IsPowerShell)' != 'true' AND '$(IsIOS)' != 'true' AND '$(IsAndroid)' != 'true' AND '$(IsNet6Mac)' != 'true'">
     <NativeReference Include="$(MSBuildThisFileDirectory)\..\runtimes\osx-universal\native\libDevolutionsPicky.dylib">
       <Kind>Dynamic</Kind>
       <SmartLink>False</SmartLink>
