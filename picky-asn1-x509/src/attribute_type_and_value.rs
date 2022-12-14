@@ -157,7 +157,7 @@ impl ser::Serialize for AttributeTypeAndValue {
             AttributeTypeAndValueParameters::Phone(name) => {
                 seq.serialize_element(name)?;
             }
-           AttributeTypeAndValueParameters::Custom(der) => {
+            AttributeTypeAndValueParameters::Custom(der) => {
                 seq.serialize_element(der)?;
             }
         }
