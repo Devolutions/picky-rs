@@ -205,7 +205,7 @@ pub struct KrbErrorInner {
     pub cusec: Optional<Option<ExplicitContextTag3<KerberosTime>>>,
     pub stime: ExplicitContextTag4<KerberosTime>,
     pub susec: ExplicitContextTag5<Microseconds>,
-    pub error_code: ExplicitContextTag6<IntegerAsn1>,
+    pub error_code: ExplicitContextTag6<u32>, /* use u32 until we can de/serialize signed integers. error_code should fit in u8. */
     pub crealm: Optional<Option<ExplicitContextTag7<Realm>>>,
     pub cname: Optional<Option<ExplicitContextTag8<PrincipalName>>>,
     pub realm: ExplicitContextTag9<Realm>,
@@ -218,19 +218,9 @@ pub struct KrbErrorInner {
 
 pub type KrbError = ApplicationTag<KrbErrorInner, KRB_ERROR_MSG_TYPE>;
 
-impl KrbErrorInner {
-    pub fn error_code(&self) -> i32 {
-        let mut le_bytes = [0, 0, 0, 0];
-        let error_code_bytes = &self.error_code.0;
-        let len = std::cmp::min(4, error_code_bytes.len());
-        le_bytes[0..len].copy_from_slice(&error_code_bytes[..len]);
-        i32::from_le_bytes(le_bytes)
-    }
-}
-
 impl fmt::Display for KrbErrorInner {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:#04X?}", self.error_code())
+        write!(f, "{:#04X?}", self.error_code)
     }
 }
 
@@ -1004,7 +994,7 @@ mod tests {
             cusec: Optional::from(None),
             stime: ExplicitContextTag4::from(GeneralizedTimeAsn1::from(Date::new(2021, 12, 31, 11, 6, 1).unwrap())),
             susec: ExplicitContextTag5::from(IntegerAsn1(vec![0x0a, 0x0c, 0x87])),
-            error_code: ExplicitContextTag6::from(IntegerAsn1(vec![KRB_AP_ERR_INAPP_CKSUM.try_into().unwrap()])),
+            error_code: ExplicitContextTag6::from(KRB_AP_ERR_INAPP_CKSUM),
             crealm: Optional::from(Some(ExplicitContextTag7::from(GeneralStringAsn1::from(
                 IA5String::from_string("EXAMPLE.COM".to_owned()).unwrap(),
             )))),
@@ -1055,7 +1045,7 @@ mod tests {
             cusec: Optional::from(None),
             stime: ExplicitContextTag4::from(GeneralizedTimeAsn1::from(Date::new(2021, 12, 28, 13, 40, 11).unwrap())),
             susec: ExplicitContextTag5::from(IntegerAsn1(vec![12, 139, 242])),
-            error_code: ExplicitContextTag6::from(IntegerAsn1(vec![KDC_ERR_C_PRINCIPAL_UNKNOWN.try_into().unwrap()])),
+            error_code: ExplicitContextTag6::from(KDC_ERR_C_PRINCIPAL_UNKNOWN),
             crealm: Optional::from(Some(ExplicitContextTag7::from(GeneralStringAsn1::from(
                 IA5String::from_string("EXAMPLE.COM".to_owned()).unwrap(),
             )))),

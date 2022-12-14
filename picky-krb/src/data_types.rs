@@ -480,6 +480,7 @@ impl LsapTokenInfoIntegrity {
 
 #[cfg(test)]
 mod tests {
+    use crate::constants::error_codes::KDC_ERR_C_PRINCIPAL_UNKNOWN;
     use crate::data_types::{
         AuthenticatorInner, AuthorizationData, AuthorizationDataInner, Checksum, EncApRepPart, EncApRepPartInner,
         EncKrbPrivPart, EncKrbPrivPartInner, EncryptedData, EncryptionKey, EtypeInfo2Entry, HostAddress,
@@ -987,7 +988,7 @@ mod tests {
             cusec: Optional::from(None),
             stime: ExplicitContextTag4::from(GeneralizedTimeAsn1::from(Date::new(2021, 12, 28, 13, 40, 11).unwrap())),
             susec: ExplicitContextTag5::from(IntegerAsn1(vec![12, 139, 242])),
-            error_code: ExplicitContextTag6::from(IntegerAsn1(vec![6])),
+            error_code: ExplicitContextTag6::from(KDC_ERR_C_PRINCIPAL_UNKNOWN),
             crealm: Optional::from(Some(ExplicitContextTag7::from(GeneralStringAsn1::from(
                 IA5String::from_string("EXAMPLE.COM".to_owned()).unwrap(),
             )))),
