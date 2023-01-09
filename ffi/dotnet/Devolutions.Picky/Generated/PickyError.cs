@@ -12,7 +12,7 @@ namespace Devolutions.Picky;
 #nullable enable
 
 /// <summary>
-/// Stringified Picky error along an error kind
+/// Stringified Picky error along with an error kind.
 /// </summary>
 public partial class PickyError: IDisposable
 {
