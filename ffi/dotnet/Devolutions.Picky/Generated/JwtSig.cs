@@ -312,7 +312,7 @@ public partial class JwtSig: IDisposable
     }
 
     /// <summary>
-    /// Decode JWT and WITHOUT CHECKING THE SIGNATURE. Useful for token inspection.
+    /// Decode JWT WITHOUT CHECKING THE SIGNATURE. Useful for token inspection.
     /// </summary>
     /// <exception cref="PickyException"></exception>
     /// <returns>
