@@ -133,8 +133,17 @@ pub mod ffi {
             public_key: &PublicKey,
             validator: &JwtValidator,
         ) -> DiplomatResult<Box<JwtSig>, Box<PickyError>> {
-            let jwt = err_check_from!(picky::jose::jwt::JwtSig::decode(compact_repr, &public_key.0)
+            let jwt = err_check_from!(jwt::JwtSig::decode(compact_repr, &public_key.0)
                 .and_then(|jwt| jwt.validate::<serde_json::Value>(&validator.0)));
+            Ok(Box::new(JwtSig(jwt))).into()
+        }
+
+        /// Decode JWT and WITHOUT CHECKING THE SIGNATURE. Useful for token inspection.
+        pub fn decode_unchecked(compact_repr: &str) -> DiplomatResult<Box<JwtSig>, Box<PickyError>> {
+            let jws = err_check_from!(picky::jose::jws::RawJws::decode(compact_repr));
+            let jwt = err_check_from!(
+                jwt::JwtSig::from(jws.discard_signature()).validate::<serde_json::Value>(&jwt::NO_CHECK_VALIDATOR)
+            );
             Ok(Box::new(JwtSig(jwt))).into()
         }
 

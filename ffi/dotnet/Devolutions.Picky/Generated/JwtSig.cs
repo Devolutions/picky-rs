@@ -312,6 +312,34 @@ public partial class JwtSig: IDisposable
     }
 
     /// <summary>
+    /// Decode JWT and WITHOUT CHECKING THE SIGNATURE. Useful for token inspection.
+    /// </summary>
+    /// <exception cref="PickyException"></exception>
+    /// <returns>
+    /// A <c>JwtSig</c> allocated on Rust side.
+    /// </returns>
+    public static JwtSig DecodeUnchecked(string compactRepr)
+    {
+        unsafe
+        {
+            byte[] compactReprBuf = DiplomatUtils.StringToUtf8(compactRepr);
+            nuint compactReprBufLength = (nuint)compactReprBuf.Length;
+            fixed (byte* compactReprBufPtr = compactReprBuf)
+            {
+                IntPtr resultPtr = Raw.JwtSig.DecodeUnchecked(compactReprBufPtr, compactReprBufLength);
+                Raw.JwtFfiResultBoxJwtSigBoxPickyError result = Marshal.PtrToStructure<Raw.JwtFfiResultBoxJwtSigBoxPickyError>(resultPtr);
+                Raw.JwtFfiResultBoxJwtSigBoxPickyError.Destroy(resultPtr);
+                if (!result.isOk)
+                {
+                    throw new PickyException(new PickyError(result.Err));
+                }
+                Raw.JwtSig* retVal = result.Ok;
+                return new JwtSig(retVal);
+            }
+        }
+    }
+
+    /// <summary>
     /// Encode using the given private key and returns the compact representation of this token.
     /// </summary>
     /// <exception cref="PickyException"></exception>

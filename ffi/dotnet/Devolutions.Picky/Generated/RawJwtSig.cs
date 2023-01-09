@@ -60,6 +60,12 @@ public partial struct JwtSig
     public static unsafe extern IntPtr Decode(byte* compactRepr, nuint compactReprSz, PublicKey* publicKey, JwtValidator* validator);
 
     /// <summary>
+    /// Decode JWT and WITHOUT CHECKING THE SIGNATURE. Useful for token inspection.
+    /// </summary>
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "JwtSig_decode_unchecked", ExactSpelling = true)]
+    public static unsafe extern IntPtr DecodeUnchecked(byte* compactRepr, nuint compactReprSz);
+
+    /// <summary>
     /// Encode using the given private key and returns the compact representation of this token.
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "JwtSig_encode", ExactSpelling = true)]

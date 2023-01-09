@@ -88,6 +88,15 @@ vQIDAQAB
     }
 
     [Fact]
+    public void DecodeSignedJwtUnchecked()
+    {
+        JwtSig jwt = JwtSig.DecodeUnchecked(signedJwt);
+        Assert.Equal("master-key", jwt.Kid);
+        Assert.Equal("AUTH", jwt.ContentType);
+        Assert.Equal(claims, jwt.Claims);
+    }
+
+    [Fact]
     public void DecodeExpired()
     {
         Pem pem = Pem.Parse(pubKeyPemRepr);
