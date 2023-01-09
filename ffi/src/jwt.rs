@@ -133,7 +133,7 @@ pub mod ffi {
             public_key: &PublicKey,
             validator: &JwtValidator,
         ) -> DiplomatResult<Box<JwtSig>, Box<PickyError>> {
-            let jwt = err_check!(picky::jose::jwt::JwtSig::decode(compact_repr, &public_key.0)
+            let jwt = err_check_from!(picky::jose::jwt::JwtSig::decode(compact_repr, &public_key.0)
                 .and_then(|jwt| jwt.validate::<serde_json::Value>(&validator.0)));
             Ok(Box::new(JwtSig(jwt))).into()
         }

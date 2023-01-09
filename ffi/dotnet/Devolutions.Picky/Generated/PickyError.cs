@@ -12,11 +12,19 @@ namespace Devolutions.Picky;
 #nullable enable
 
 /// <summary>
-/// Stringified Picky error.
+/// Stringified Picky error along an error kind
 /// </summary>
 public partial class PickyError: IDisposable
 {
     private unsafe Raw.PickyError* _inner;
+
+    public PickyErrorKind Kind
+    {
+        get
+        {
+            return GetKind();
+        }
+    }
 
     /// <summary>
     /// Creates a managed <c>PickyError</c> from a raw handle.
@@ -78,6 +86,25 @@ public partial class PickyError: IDisposable
                 throw new ObjectDisposedException("PickyError");
             }
             Raw.PickyError.Print(_inner);
+        }
+    }
+
+    /// <summary>
+    /// Returns the error kind.
+    /// </summary>
+    /// <returns>
+    /// A <c>PickyErrorKind</c> allocated on C# side.
+    /// </returns>
+    public PickyErrorKind GetKind()
+    {
+        unsafe
+        {
+            if (_inner == null)
+            {
+                throw new ObjectDisposedException("PickyError");
+            }
+            Raw.PickyErrorKind retVal = Raw.PickyError.GetKind(_inner);
+            return (PickyErrorKind)retVal;
         }
     }
 

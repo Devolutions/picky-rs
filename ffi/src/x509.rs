@@ -45,19 +45,19 @@ pub mod ffi {
     impl Cert {
         /// Parses a X509 certificate from its DER representation.
         pub fn from_der(der: &[u8]) -> DiplomatResult<Box<Cert>, Box<PickyError>> {
-            let cert = err_check!(certificate::Cert::from_der(der));
+            let cert = err_check_from!(certificate::Cert::from_der(der));
             Ok(Box::new(Self(cert))).into()
         }
 
         /// Extracts X509 certificate from PEM object.
         pub fn from_pem(pem: &Pem) -> DiplomatResult<Box<Cert>, Box<PickyError>> {
-            let cert = err_check!(certificate::Cert::from_pem(&pem.0));
+            let cert = err_check_from!(certificate::Cert::from_pem(&pem.0));
             Ok(Box::new(Self(cert))).into()
         }
 
         /// Exports the X509 certificate into a PEM object
         pub fn to_pem(&self) -> DiplomatResult<Box<Pem>, Box<PickyError>> {
-            let pem = err_check!(self.0.to_pem());
+            let pem = err_check_from!(self.0.to_pem());
             Ok(Box::new(Pem(pem))).into()
         }
 
@@ -82,7 +82,7 @@ pub mod ffi {
         }
 
         pub fn get_subject_key_id_hex(&self, writeable: &mut DiplomatWriteable) -> DiplomatResult<(), Box<PickyError>> {
-            let ski = err_check!(self.0.subject_key_identifier());
+            let ski = err_check_from!(self.0.subject_key_identifier());
             let ski = hex::encode(&ski);
             err_check!(writeable.write_str(&ski));
             writeable.flush();

@@ -21,6 +21,7 @@ use thiserror::Error;
 const ELEMENT_NAME: &str = "x509 certificate";
 
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum CertError {
     /// couldn't generate certificate
     #[error("couldn't generate certificate: {source}")]
