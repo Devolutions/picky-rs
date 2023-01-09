@@ -138,7 +138,7 @@ pub mod ffi {
             Ok(Box::new(JwtSig(jwt))).into()
         }
 
-        /// Decode JWT and WITHOUT CHECKING THE SIGNATURE. Useful for token inspection.
+        /// Decode JWT WITHOUT CHECKING THE SIGNATURE. Useful for token inspection.
         pub fn decode_unchecked(compact_repr: &str) -> DiplomatResult<Box<JwtSig>, Box<PickyError>> {
             let jws = err_check_from!(picky::jose::jws::RawJws::decode(compact_repr));
             let jwt = err_check_from!(
