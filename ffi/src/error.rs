@@ -99,7 +99,7 @@ pub mod ffi {
         BadSignature,
     }
 
-    /// Stringified Picky error along an error kind
+    /// Stringified Picky error along with an error kind.
     #[diplomat::opaque]
     pub struct PickyError(pub(super) super::PickyErrorInner);
 
