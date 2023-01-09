@@ -14,7 +14,7 @@ pub mod ffi {
         ) -> DiplomatResult<Box<SignatureAlgorithm>, Box<PickyError>> {
             let algo = match picky::hash::HashAlgorithm::try_from(hash_algorithm) {
                 Ok(v) => v,
-                Err(()) => return Err(Box::new(PickyError("Invalid hash algorithm".to_owned()))).into(),
+                Err(()) => return Err(Box::new(PickyError::from("Invalid hash algorithm"))).into(),
             };
             Ok(Box::new(Self(picky::signature::SignatureAlgorithm::RsaPkcs1v15(algo)))).into()
         }
@@ -25,7 +25,7 @@ pub mod ffi {
             msg: &[u8],
             signature: &[u8],
         ) -> DiplomatResult<(), Box<PickyError>> {
-            err_check!(self.0.verify(&public_key.0, msg, signature));
+            err_check_from!(self.0.verify(&public_key.0, msg, signature));
             Ok(()).into()
         }
     }

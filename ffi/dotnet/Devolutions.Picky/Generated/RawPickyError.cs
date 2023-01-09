@@ -12,7 +12,7 @@ namespace Devolutions.Picky.Raw;
 #nullable enable
 
 /// <summary>
-/// Stringified Picky error.
+/// Stringified Picky error along with an error kind.
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 public partial struct PickyError
@@ -34,6 +34,12 @@ public partial struct PickyError
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PickyError_print", ExactSpelling = true)]
     public static unsafe extern void Print(PickyError* self);
+
+    /// <summary>
+    /// Returns the error kind.
+    /// </summary>
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PickyError_get_kind", ExactSpelling = true)]
+    public static unsafe extern PickyErrorKind GetKind(PickyError* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PickyError_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(PickyError* self);

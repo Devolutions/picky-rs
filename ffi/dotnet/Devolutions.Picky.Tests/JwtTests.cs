@@ -88,6 +88,30 @@ vQIDAQAB
     }
 
     [Fact]
+    public void DecodeSignedJwtUnchecked()
+    {
+        JwtSig jwt = JwtSig.DecodeUnchecked(signedJwt);
+        Assert.Equal("master-key", jwt.Kid);
+        Assert.Equal("AUTH", jwt.ContentType);
+        Assert.Equal(claims, jwt.Claims);
+    }
+
+    [Fact]
+    public void DecodeExpired()
+    {
+        Pem pem = Pem.Parse(pubKeyPemRepr);
+        PublicKey key = PublicKey.FromPem(pem);
+        JwtValidator validator = JwtValidator.Strict(1516639022, 0);
+
+        try {
+            JwtSig jwt = JwtSig.Decode(signedJwt, key, validator);
+            Assert.True(false, "Expected a PickyException thrown");
+        } catch (PickyException e) {
+            Assert.Equal(PickyErrorKind.Expired, e.Inner.Kind);
+        }
+    }
+
+    [Fact]
     public void AdditionalHeaderParameters()
     {
         string additionalObject = @"{""answer"":42,""foo"":""bar""}";
