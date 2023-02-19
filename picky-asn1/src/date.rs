@@ -354,11 +354,10 @@ mod chrono_convert {
 
     impl<TR: TimeRepr> From<Date<TR>> for NaiveDateTime {
         fn from(date: Date<TR>) -> Self {
-            NaiveDate::from_ymd(i32::from(date.year), u32::from(date.month), u32::from(date.day)).and_hms(
-                u32::from(date.hour),
-                u32::from(date.minute),
-                u32::from(date.second),
-            )
+            NaiveDate::from_ymd_opt(i32::from(date.year), u32::from(date.month), u32::from(date.day))
+                .unwrap()
+                .and_hms_opt(u32::from(date.hour), u32::from(date.minute), u32::from(date.second))
+                .unwrap()
         }
     }
 

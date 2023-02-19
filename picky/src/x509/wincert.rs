@@ -84,7 +84,7 @@ impl WinCertificate {
         buffer.write_u16::<LittleEndian>(certificate_type as u16)?;
 
         buffer.write_all(&certificate)?;
-        buffer.write_all(&vec![0; padding as usize])?;
+        buffer.write_all(&vec![0; padding])?;
 
         buffer
             .into_inner()

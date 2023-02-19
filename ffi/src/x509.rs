@@ -83,7 +83,7 @@ pub mod ffi {
 
         pub fn get_subject_key_id_hex(&self, writeable: &mut DiplomatWriteable) -> DiplomatResult<(), Box<PickyError>> {
             let ski = err_check_from!(self.0.subject_key_identifier());
-            let ski = hex::encode(&ski);
+            let ski = hex::encode(ski);
             err_check!(writeable.write_str(&ski));
             writeable.flush();
             Ok(()).into()

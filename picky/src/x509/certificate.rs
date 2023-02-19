@@ -109,7 +109,7 @@ pub enum CaChainError {
     IssuerIsNotCA { issuer_id: String },
 
     /// authority key id doesn't match
-    #[error("authority key id doesn't match (expected: {}, got: {})", base64::encode(&.expected), base64::encode(&.actual))]
+    #[error("authority key id doesn't match (expected: {}, got: {})", base64::encode(expected), base64::encode(actual))]
     AuthorityKeyIdMismatch { expected: Vec<u8>, actual: Vec<u8> },
 
     /// issuer name doesn't match
@@ -1063,7 +1063,7 @@ mod tests {
         let key_id = cert
             .subject_key_identifier()
             .expect("couldn't get subject key identifier");
-        pretty_assertions::assert_eq!(hex::encode(&key_id), kid);
+        pretty_assertions::assert_eq!(hex::encode(key_id), kid);
     }
 
     fn parse_key(pem_str: &str) -> PrivateKey {

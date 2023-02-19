@@ -267,12 +267,12 @@ impl Jws {
     }
 
     pub fn encode(&self, private_key: &PrivateKey) -> Result<String, JwsError> {
-        let header_base64 = base64::encode_config(&serde_json::to_vec(&self.header)?, base64::URL_SAFE_NO_PAD);
+        let header_base64 = base64::encode_config(serde_json::to_vec(&self.header)?, base64::URL_SAFE_NO_PAD);
         let payload_base64 = base64::encode_config(&self.payload, base64::URL_SAFE_NO_PAD);
         let header_and_payload = [header_base64, payload_base64].join(".");
         let signature_algo = SignatureAlgorithm::try_from(self.header.alg)?;
         let signature = signature_algo.sign(header_and_payload.as_bytes(), private_key)?;
-        let signature_base64 = base64::encode_config(&signature, base64::URL_SAFE_NO_PAD);
+        let signature_base64 = base64::encode_config(signature, base64::URL_SAFE_NO_PAD);
         Ok([header_and_payload, signature_base64].join("."))
     }
 

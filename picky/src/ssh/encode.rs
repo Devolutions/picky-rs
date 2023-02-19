@@ -150,7 +150,7 @@ impl SshComplexTypeEncode for Timestamp {
     type Error = io::Error;
 
     fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
-        stream.write_u64::<BigEndian>(self.0 as u64)?;
+        stream.write_u64::<BigEndian>(self.0)?;
         Ok(())
     }
 }

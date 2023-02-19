@@ -289,11 +289,11 @@ mod tests {
         let cert: Certificate = picky_asn1_der::from_bytes(&encoded).expect("intermediate cert");
 
         pretty_assertions::assert_eq!(
-            hex::encode(&cert.subject_key_identifier().unwrap()),
+            hex::encode(cert.subject_key_identifier().unwrap()),
             "1f74d63f29c17474453b05122c3da8bd435902a6"
         );
         pretty_assertions::assert_eq!(
-            hex::encode(&cert.authority_key_identifier().unwrap().key_identifier().unwrap()),
+            hex::encode(cert.authority_key_identifier().unwrap().key_identifier().unwrap()),
             "b45ae4a5b3ded252f6b9d5a6950feb3ebcc7fdff"
         );
     }
