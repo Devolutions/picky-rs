@@ -19,9 +19,9 @@ pub enum ChecksumSuite {
 impl ChecksumSuite {
     pub fn hasher(&self) -> Box<dyn Checksum> {
         match self {
-            ChecksumSuite::HmacSha196Aes256 => Box::new(HmacSha196Aes256::default()),
-            ChecksumSuite::HmacSha196Aes128 => Box::new(HmacSha196Aes128::default()),
-            ChecksumSuite::HmacSha1Des3Kd => Box::new(HmacSha1Des3Kd::default()),
+            ChecksumSuite::HmacSha196Aes256 => Box::<HmacSha196Aes256>::default(),
+            ChecksumSuite::HmacSha196Aes128 => Box::<HmacSha196Aes128>::default(),
+            ChecksumSuite::HmacSha1Des3Kd => Box::<HmacSha1Des3Kd>::default(),
         }
     }
 }

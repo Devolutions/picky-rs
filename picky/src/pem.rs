@@ -133,7 +133,7 @@ fn parse_pem_impl(input: &[u8]) -> Result<Pem<'static>, PemError> {
             .copied()
             .filter(|&byte| byte != b'\r' && byte != b'\n')
             .collect();
-        base64::decode(&striped_raw_data).map_err(|source| PemError::Base64Decoding { source })?
+        base64::decode(striped_raw_data).map_err(|source| PemError::Base64Decoding { source })?
     } else {
         // Can be decoded as is!
         base64::decode(raw_data).map_err(|source| PemError::Base64Decoding { source })?
@@ -173,7 +173,7 @@ pub fn read_pem(reader: &mut impl BufRead) -> Result<Pem<'static>, PemError> {
         .cloned()
         .filter(|&byte| byte != b'\r' && byte != b'\n')
         .collect();
-    let data = base64::decode(&base64_data).map_err(|source| PemError::Base64Decoding { source })?;
+    let data = base64::decode(base64_data).map_err(|source| PemError::Base64Decoding { source })?;
 
     // read until end of footer
     h_read_until(reader, PEM_DASHES_BOUNDARIES.as_bytes(), &mut buf).ok_or(PemError::FooterNotFound)?;

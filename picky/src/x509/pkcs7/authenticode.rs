@@ -840,7 +840,13 @@ impl<'a> AuthenticodeValidator<'a> {
 
         // In CTL time in a OctetString encoded as 64 bits Windows FILETIME LE
         let time_octet_string_to_utc_time = |time: &OctetStringAsn1| -> DateTime<Utc> {
-            let since: DateTime<Utc> = DateTime::from_utc(NaiveDate::from_ymd(1601, 1, 1).and_hms(0, 0, 0), Utc);
+            let since: DateTime<Utc> = DateTime::from_utc(
+                NaiveDate::from_ymd_opt(1601, 1, 1)
+                    .unwrap()
+                    .and_hms_opt(0, 0, 0)
+                    .unwrap(),
+                Utc,
+            );
             since.add(Duration::seconds(
                 i64::from_le_bytes([
                     time.0[0], time.0[1], time.0[2], time.0[3], time.0[4], time.0[5], time.0[6], time.0[7],
