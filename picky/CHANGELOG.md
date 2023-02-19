@@ -49,10 +49,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support SSH keys and certificates
 - `CheckedJwtEnc::new_with_cty`
 - `CheckedJwtSig::new_with_cty`
+- Support for JWT additional header parameters
 
 ### Changed
 
-- Bump minimal rustc version to 1.56
+- Bump minimal rustc version to 1.60
 - (Breaking) Move Authenticode related code from `picky::x509::wincert` to `picky::x509::pkcs7::authenticode` module
 - (Breaking) Authenticode implementation is now behind `pkcs7` feature
 - (Breaking) `PrivateKey::to_pem` and `PublicKey::to_pem` now return a `Pem`
@@ -61,9 +62,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fix `BufReader` panic in `WinCertificate::decode` and `WinCertificate::encode` if data len is bigger than default capacity.
-- Fix `WinCertificate` encoding: `length` wasn’t correct.
-- Fix leading zeros in JWK encoding (see issue [#140](https://github.com/Devolutions/picky-rs/issues/140)).
+- `BufReader` panic in `WinCertificate::decode` and `WinCertificate::encode` if data len is bigger than default capacity.
+- `WinCertificate` encoding: `length` wasn’t correct.
+- Leading zeros in JWK encoding.
+
+  JWK encoding of a value is the unsigned big-endian representation as an octet sequence.
+  The octet sequence MUST utilize the minimum number of octets needed to represent the value.
+  That is: **no leading zero** must be present.
+
+  See issue [#140](https://github.com/Devolutions/picky-rs/issues/140)
+
+- Fetch curve info from private_key_algorithm ([#143](https://github.com/Devolutions/picky-rs/issues/143))
+
+  Pick curve info from private_key_algorithm field.
+
 
 ### Removed
 

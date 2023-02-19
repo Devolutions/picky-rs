@@ -1,6 +1,6 @@
 [package]
 name = "picky"
-version = "7.0.0-rc.3"
+version = "7.0.0-rc.4"
 authors = [
     "Benoît CORTIER <benoit.cortier@fried-world.eu>",
     "Jonathan Trepanier <jtrepanier@devolutions.net>",
@@ -22,47 +22,47 @@ include = ["src/**/*", "README.md", "CHANGELOG.md"]
 picky-asn1 = { version = "0.7", path = "../picky-asn1", features = ["zeroize"] }
 picky-asn1-der = { version = "0.4", path = "../picky-asn1-der" }
 picky-asn1-x509 = { version = "0.9", path = "../picky-asn1-x509", features = ["legacy", "zeroize"] }
-serde = { version = "1.0.136", features = ["derive"] }
+serde = { version = "1.0.152", features = ["derive"] }
 oid = { version = "0.2.1", features = ["serde_support"] }
-base64 = "0.13.0"
-thiserror = "1.0.30"
+base64 = "0.13.1"
+thiserror = "1.0.38"
 byteorder = { version = "1.4.3", optional = true }
-chrono = { version = "0.4.19", optional = true }
-time = { version = "0.3.9", optional = true }
-serde_json = { version = "1.0.79", optional = true }
-http = { version = "0.2.6", optional = true }
+chrono = { version = "0.4.23", optional = true }
+time = { version = "0.3.19", optional = true }
+serde_json = { version = "1.0.93", optional = true }
+http = { version = "0.2.9", optional = true }
 cab = { version = "0.3.0", optional = true }
 lexical-sort = { version = "0.3.1", optional = true }
 
 # FIXME: either use ureq, or even better: do not require this kind of dependency at all to let user decide which lib to use.
 # (currently users should *really* not forget to use `spawn_blocking` when calling associated functions from async context)
-reqwest = { version = "0.11.10", default-features = false, features = ["blocking"], optional = true }
+reqwest = { version = "0.11.14", default-features = false, features = ["blocking"], optional = true }
 
 # /!\ ===== cryptography dependencies ===== /!\
 # These should be updated as soon as possible.
 # /!\ ===================================== /!\
 
 rand = "0.8.5"
-num-bigint-dig = "0.8.1"
+num-bigint-dig = "0.8.2"
 
 # Use Ring for now (https://github.com/Devolutions/picky-rs/pull/132#issuecomment-1058224365)
 ring = { version = "0.16.20", optional = true }
 rsa = "0.6.1"
 
-digest = "0.10.3"
-md-5 = "0.10.1"
-sha1 = { package = "sha-1", version = "0.10.0" }
-sha2 = "0.10.2"
-sha3 = "0.10.1"
+digest = "0.10.6"
+md-5 = "0.10.5"
+sha1 = { package = "sha-1", version = "0.10.1" }
+sha2 = "0.10.6"
+sha3 = "0.10.6"
 
 aes-gcm = { version = "0.9.4", optional = true }
-aes = { version = "0.8.1", optional = true }
-ctr = { version = "0.9.1", optional = true }
+aes = { version = "0.8.2", optional = true }
+ctr = { version = "0.9.2", optional = true }
 cbc = { version = "0.1.2", optional = true }
 bcrypt-pbkdf = { version = "0.9.0", optional = true }
 
 [dev-dependencies]
-pretty_assertions = "1.2.1"
+pretty_assertions = "1.3.0"
 hex = "0.4.3"
 cfg-if = "1.0.0"
 ring = "0.16.20"
@@ -87,3 +87,7 @@ http_trait_impl = ["dep:http"]
 chrono_conversion = ["dep:chrono", "picky-asn1/chrono_conversion"]
 time_conversion = ["dep:time", "picky-asn1/time_conversion"]
 ec = ["dep:ring"]
+
+[package.metadata.docs.rs]
+# Enable all features when building documentation for docs.rs
+all-features = true
