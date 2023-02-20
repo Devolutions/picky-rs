@@ -109,7 +109,11 @@ pub enum CaChainError {
     IssuerIsNotCA { issuer_id: String },
 
     /// authority key id doesn't match
-    #[error("authority key id doesn't match (expected: {}, got: {})", base64::encode(expected), base64::encode(actual))]
+    #[error(
+        "authority key id doesn't match (expected: {}, got: {})",
+        base64::encode(expected),
+        base64::encode(actual)
+    )]
     AuthorityKeyIdMismatch { expected: Vec<u8>, actual: Vec<u8> },
 
     /// issuer name doesn't match

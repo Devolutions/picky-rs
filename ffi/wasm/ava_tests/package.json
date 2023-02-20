@@ -10,7 +10,7 @@
     "check": "rome check .",
     "ci": "rome ci ."
   },
-  "dependencies": {
+  "optionalDependencies": {
     "@devolutions/picky": "file:../pkg"
   },
   "devDependencies": {
