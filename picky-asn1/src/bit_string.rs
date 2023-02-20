@@ -33,7 +33,7 @@ use serde::{de, ser};
 /// b.set(63, true);
 /// assert_eq!(b.is_set(63), false);
 /// ```
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct BitString {
     data: Vec<u8>,
 }
@@ -231,6 +231,14 @@ impl BitString {
     /// ```
     pub fn payload_view_mut(&mut self) -> &mut [u8] {
         &mut self.data[1..]
+    }
+}
+
+impl fmt::Debug for BitString {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "0x")?;
+        self.data.iter().try_for_each(|byte| write!(f, "{byte:02X}"))?;
+        Ok(())
     }
 }
 
