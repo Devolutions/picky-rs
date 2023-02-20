@@ -414,7 +414,7 @@ dependencies = [
 
 [[package]]
 name = "picky-asn1"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "oid",
  "serde",

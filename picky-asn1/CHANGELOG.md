@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.7.1] 2022-11-07
+
+### Changed
+
+- Debug representation of `BitString`, `RestrictedString`, `OctetStringAsn1` and `IntegerAsn1` in hexadecimal
+
 ## [0.7.0] 2022-11-07
 
 ### Added

@@ -1157,7 +1157,7 @@ dependencies = [
  "md-5",
  "num-bigint-dig",
  "oid",
- "picky-asn1 0.7.0",
+ "picky-asn1 0.7.1",
  "picky-asn1-der 0.4.0",
  "picky-asn1-x509 0.9.0",
  "pretty_assertions",
@@ -1201,7 +1201,7 @@ dependencies = [
 
 [[package]]
 name = "picky-asn1"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "chrono",
  "oid",
@@ -1231,7 +1231,7 @@ dependencies = [
  "lazy_static",
  "num-bigint-dig",
  "oid",
- "picky-asn1 0.7.0",
+ "picky-asn1 0.7.1",
  "pretty_assertions",
  "serde",
  "serde_bytes",
@@ -1261,7 +1261,7 @@ dependencies = [
  "hex",
  "num-bigint-dig",
  "oid",
- "picky-asn1 0.7.0",
+ "picky-asn1 0.7.1",
  "picky-asn1-der 0.4.0",
  "pretty_assertions",
  "serde",
@@ -1296,7 +1296,7 @@ dependencies = [
  "num-bigint-dig",
  "oid",
  "pbkdf2",
- "picky-asn1 0.7.0",
+ "picky-asn1 0.7.1",
  "picky-asn1-der 0.4.0",
  "picky-asn1-x509 0.9.0",
  "rand",
