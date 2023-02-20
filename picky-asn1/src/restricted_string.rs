@@ -21,6 +21,8 @@ impl fmt::Display for CharSetError {
 // === CharSet === //
 
 pub trait CharSet {
+    const NAME: &'static str;
+
     /// Checks whether a sequence is a valid string or not.
     fn check(data: &[u8]) -> bool;
 }
@@ -28,7 +30,7 @@ pub trait CharSet {
 // === RestrictedString === //
 
 /// A generic restricted character string.
-#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
+#[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct RestrictedString<C> {
     data: Vec<u8>,
     marker: PhantomData<C>,
@@ -98,6 +100,21 @@ impl<C: CharSet> FromStr for RestrictedString<C> {
 impl<C: CharSet> AsRef<[u8]> for RestrictedString<C> {
     fn as_ref(&self) -> &[u8] {
         &self.data
+    }
+}
+
+impl<C: CharSet> fmt::Debug for RestrictedString<C> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}(", C::NAME)?;
+        if let Ok(utf8) = std::str::from_utf8(&self.data) {
+            fmt::Debug::fmt(utf8, f)?;
+        } else {
+            write!(f, "0x")?;
+            self.data.iter().try_for_each(|byte| write!(f, "{byte:02X}"))?;
+        }
+        write!(f, ")")?;
+
+        Ok(())
     }
 }
 
@@ -174,6 +191,8 @@ pub struct NumericCharSet;
 pub type NumericString = RestrictedString<NumericCharSet>;
 
 impl CharSet for NumericCharSet {
+    const NAME: &'static str = "NUMERIC";
+
     fn check(data: &[u8]) -> bool {
         for &c in data {
             if c != b' ' && !c.is_ascii_digit() {
@@ -192,6 +211,8 @@ pub struct PrintableCharSet;
 pub type PrintableString = RestrictedString<PrintableCharSet>;
 
 impl CharSet for PrintableCharSet {
+    const NAME: &'static str = "PRINTABLE";
+
     fn check(data: &[u8]) -> bool {
         for &c in data {
             if !(c.is_ascii_alphanumeric()
@@ -224,6 +245,8 @@ pub struct Utf8CharSet;
 pub type Utf8String = RestrictedString<Utf8CharSet>;
 
 impl CharSet for Utf8CharSet {
+    const NAME: &'static str = "UTF8";
+
     fn check(data: &[u8]) -> bool {
         std::str::from_utf8(data).is_ok()
     }
@@ -239,6 +262,8 @@ pub struct IA5CharSet;
 pub type IA5String = RestrictedString<IA5CharSet>;
 
 impl CharSet for IA5CharSet {
+    const NAME: &'static str = "IA5";
+
     fn check(data: &[u8]) -> bool {
         for &c in data {
             if !c.is_ascii() {
@@ -255,6 +280,8 @@ pub struct BMPCharSet;
 pub type BMPString = RestrictedString<BMPCharSet>;
 
 impl CharSet for BMPCharSet {
+    const NAME: &'static str = "BMP";
+
     fn check(data: &[u8]) -> bool {
         if data.len() % 2 != 0 {
             return false;
@@ -275,7 +302,7 @@ mod tests {
 
     #[test]
     fn valid_printable_string() {
-        PrintableString::from_str("29INRUSAET3snre?:=tanui83  9283019").expect("invalid string");
+        PrintableString::from_str("29INRUSAET3snre?:=tanui83  9283019").expect("valid string");
     }
 
     #[test]
@@ -285,7 +312,7 @@ mod tests {
 
     #[test]
     fn valid_numeric_string() {
-        NumericString::from_str("2983  9283019").expect("invalid string");
+        NumericString::from_str("2983  9283019").expect("valid string");
     }
 
     #[test]
@@ -295,7 +322,7 @@ mod tests {
 
     #[test]
     fn valid_ia5_string() {
-        IA5String::from_str("BUeisuteurnt").expect("invalid string");
+        IA5String::from_str("BUeisuteurnt").expect("valid string");
     }
 
     #[test]
@@ -305,7 +332,7 @@ mod tests {
 
     #[test]
     fn valid_utf8_string() {
-        Utf8String::from_str("1224na÷日本語はむずかちー−×—«BUeisuteurnt").expect("invalid string");
+        Utf8String::from_str("1224na÷日本語はむずかちー−×—«BUeisuteurnt").expect("valid string");
     }
 
     #[test]

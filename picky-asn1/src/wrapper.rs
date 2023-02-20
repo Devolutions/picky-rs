@@ -311,11 +311,21 @@ where
 }
 
 /// A Vec<u8> wrapper for Asn1 encoding as OctetString.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Hash, Clone, Default)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, PartialOrd, Hash, Clone, Default)]
 pub struct OctetStringAsn1(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 type VecU8 = Vec<u8>;
 impls! { OctetStringAsn1(VecU8), Tag::OCTET_STRING }
+
+impl fmt::Debug for OctetStringAsn1 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "OctetString(0x")?;
+        self.0.iter().try_for_each(|byte| write!(f, "{byte:02X}"))?;
+        write!(f, ")")?;
+
+        Ok(())
+    }
+}
 
 /// A BigInt wrapper for Asn1 encoding.
 ///
@@ -323,7 +333,7 @@ impls! { OctetStringAsn1(VecU8), Tag::OCTET_STRING }
 ///
 /// For underlying implementation,
 /// see this [Microsoft's documentation](https://docs.microsoft.com/en-us/windows/win32/seccertenroll/about-integer).
-#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq, PartialOrd, Hash, Clone)]
+#[derive(Serialize, Deserialize, Default, PartialEq, Eq, PartialOrd, Hash, Clone)]
 pub struct IntegerAsn1(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 impls! { IntegerAsn1(VecU8), Tag::INTEGER }
@@ -391,6 +401,16 @@ impl IntegerAsn1 {
 impl zeroize::Zeroize for IntegerAsn1 {
     fn zeroize(&mut self) {
         self.0.zeroize();
+    }
+}
+
+impl fmt::Debug for IntegerAsn1 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Integer(0x")?;
+        self.0.iter().try_for_each(|byte| write!(f, "{byte:02X}"))?;
+        write!(f, ")")?;
+
+        Ok(())
     }
 }
 
