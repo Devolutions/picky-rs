@@ -13,9 +13,9 @@ readme = "README.md"
 include = ["src/**/*", "README.md", "CHANGELOG.md"]
 
 [dependencies]
-picky-asn1 = { version = "0.7.0", path = "../picky-asn1" }
-picky-asn1-der = { version = "0.4.0", path = "../picky-asn1-der" }
-picky-asn1-x509 = { version = "0.9.0", path = "../picky-asn1-x509" }
+picky-asn1 = { version = "0.7", path = "../picky-asn1" }
+picky-asn1-der = { version = "0.4", path = "../picky-asn1-der" }
+picky-asn1-x509 = { version = "0.9", path = "../picky-asn1-x509" }
 serde = { version = "1.0.152", features = ["derive"] }
 byteorder = "1.4.3"
 thiserror = "1.0.38"
