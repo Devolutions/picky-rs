@@ -137,12 +137,23 @@ impl SignatureAlgorithm {
             #[cfg(feature = "ec")]
             SignatureAlgorithm::Ecdsa(picky_hash_algo) => {
                 use crate::key::ec::{EcdsaCurve, EcdsaKeypair};
+                use p256::ecdsa::signature::Signer;
 
                 let ec_keypair = EcdsaKeypair::try_from(private_key)?;
 
-                let signing_algorithm = match ec_keypair.curve {
+                match ec_keypair.curve {
                     EcdsaCurve::Nist256 => match picky_hash_algo {
-                        HashAlgorithm::SHA2_256 => &ring::signature::ECDSA_P256_SHA256_ASN1_SIGNING,
+                        HashAlgorithm::SHA2_256 => {
+                            let key = p256::ecdsa::SigningKey::from_bytes(&ec_keypair.private_key).map_err(|e| {
+                                SignatureError::Ec {
+                                    context: format!("Cannot decode p256 EC keypair: {}", e),
+                                }
+                            })?;
+                            let sig: p256::ecdsa::Signature = key.try_sign(msg).map_err(|e| SignatureError::Ec {
+                                context: format!("Cannot produce p256 signature: {}", e),
+                            })?;
+                            sig.to_der().as_bytes().to_vec()
+                        }
                         _ => {
                             return Err(SignatureError::UnsupportedAlgorithm {
                                 algorithm: format!(
@@ -153,7 +164,17 @@ impl SignatureAlgorithm {
                         }
                     },
                     EcdsaCurve::Nist384 => match picky_hash_algo {
-                        HashAlgorithm::SHA2_384 => &ring::signature::ECDSA_P384_SHA384_ASN1_SIGNING,
+                        HashAlgorithm::SHA2_384 => {
+                            let key = p384::ecdsa::SigningKey::from_bytes(&ec_keypair.private_key).map_err(|e| {
+                                SignatureError::Ec {
+                                    context: format!("Cannot decode p384 EC keypair: {}", e),
+                                }
+                            })?;
+                            let sig: p384::ecdsa::Signature = key.try_sign(msg).map_err(|e| SignatureError::Ec {
+                                context: format!("Cannot produce p384 signature: {}", e),
+                            })?;
+                            sig.to_der().as_bytes().to_vec()
+                        }
                         _ => {
                             return Err(SignatureError::UnsupportedAlgorithm {
                                 algorithm: format!(
@@ -168,22 +189,7 @@ impl SignatureAlgorithm {
                             algorithm: "ECDSA P-512 curve is not yet supported".to_string(),
                         })
                     }
-                };
-
-                let keypair = ring::signature::EcdsaKeyPair::from_private_key_and_public_key(
-                    signing_algorithm,
-                    &ec_keypair.private_key,
-                    ec_keypair.public_key,
-                )
-                .map_err(|e| SignatureError::Ec {
-                    context: format!("Cannot decode EC keypair: {}", e),
-                })?;
-
-                let rng = ring::rand::SystemRandom::new();
-                let signature = keypair.sign(&rng, msg).map_err(|e| SignatureError::Ec {
-                    context: format!("Cannot produce signature: {}", e),
-                })?;
-                signature.as_ref().to_vec()
+                }
             }
         };
 
@@ -211,24 +217,40 @@ impl SignatureAlgorithm {
             }
             #[cfg(feature = "ec")]
             SignatureAlgorithm::Ecdsa(picky_hash_algo) => {
-                use crate::key::ec::EcdsaPublicKey;
-
-                let verification_algorithm = match picky_hash_algo {
-                    HashAlgorithm::SHA2_256 => &ring::signature::ECDSA_P256_SHA256_ASN1,
-                    HashAlgorithm::SHA2_384 => &ring::signature::ECDSA_P384_SHA384_ASN1,
+                let ec_pub_key = crate::key::ec::EcdsaPublicKey::try_from(public_key)?;
+                match picky_hash_algo {
+                    HashAlgorithm::SHA2_256 => {
+                        use p256::ecdsa::signature::Verifier;
+                        let vkey = p256::ecdsa::VerifyingKey::from_sec1_bytes(ec_pub_key.data).map_err(|e| {
+                            SignatureError::Ec {
+                                context: format!("Cannot parse p256 public key from der bytes: {}", e),
+                            }
+                        })?;
+                        let signature =
+                            p256::ecdsa::Signature::from_der(signature).map_err(|e| SignatureError::Ec {
+                                context: format!("Cannot parse p256 signature: {}", e),
+                            })?;
+                        vkey.verify(msg, &signature).map_err(|_| SignatureError::BadSignature)?
+                    }
+                    HashAlgorithm::SHA2_384 => {
+                        use p384::ecdsa::signature::Verifier;
+                        let vkey = p384::ecdsa::VerifyingKey::from_sec1_bytes(ec_pub_key.data).map_err(|e| {
+                            SignatureError::Ec {
+                                context: format!("Cannot parse p384 public key: {}", e),
+                            }
+                        })?;
+                        let signature =
+                            p384::ecdsa::Signature::from_der(signature).map_err(|e| SignatureError::Ec {
+                                context: format!("Cannot parse p384 signature: {}", e),
+                            })?;
+                        vkey.verify(msg, &signature).map_err(|_| SignatureError::BadSignature)?
+                    }
                     _ => {
                         return Err(SignatureError::UnsupportedAlgorithm {
                             algorithm: format!("ECDSA with {:?} hash algorithm is not supported", picky_hash_algo),
                         })
                     }
-                };
-
-                let ec_pub_key = EcdsaPublicKey::try_from(public_key)?;
-                let verification_key = ring::signature::UnparsedPublicKey::new(verification_algorithm, ec_pub_key.data);
-
-                verification_key
-                    .verify(msg, signature)
-                    .map_err(|_| SignatureError::BadSignature)?
+                }
             }
         }
 
@@ -331,5 +353,50 @@ csaQwO9jFvbQFIpCvcMRjaunLfhIWiYDdg==
         signature_algorithm
             .verify(&public_key, msg, &signature.unwrap())
             .unwrap();
+    }
+
+    #[rstest]
+    #[case(EC_PRIVATE_KEY_NIST256_PEM, &ring::signature::ECDSA_P256_SHA256_ASN1_SIGNING, HashAlgorithm::SHA2_256)]
+    #[case(EC_PRIVATE_KEY_NIST384_PEM, &ring::signature::ECDSA_P384_SHA384_ASN1_SIGNING, HashAlgorithm::SHA2_384)]
+    fn sign_and_verify_compatibility_with_ring(
+        #[case] key_pem: &str,
+        #[case] algorithm: &'static ring::signature::EcdsaSigningAlgorithm,
+        #[case] hash: HashAlgorithm,
+    ) {
+        // sign using ring
+        let private_key = PrivateKey::from_pem_str(key_pem).unwrap();
+        let public_key = PublicKey::from(private_key);
+        let msg = b"hello world";
+
+        let (privk, pubk) = match hash {
+            HashAlgorithm::SHA2_256 => {
+                use p256::EncodedPoint;
+                let k = p256::SecretKey::from_sec1_pem(key_pem).unwrap();
+                (
+                    k.to_be_bytes().as_slice().to_vec(),
+                    Into::<EncodedPoint>::into(k.public_key()).as_bytes().to_vec(),
+                )
+            }
+            HashAlgorithm::SHA2_384 => {
+                use p384::EncodedPoint;
+                let k = p384::SecretKey::from_sec1_pem(key_pem).unwrap();
+                (
+                    k.to_be_bytes().as_slice().to_vec(),
+                    Into::<EncodedPoint>::into(k.public_key()).as_bytes().to_vec(),
+                )
+            }
+            _ => panic!("no this condition"),
+        };
+
+        let keypair = ring::signature::EcdsaKeyPair::from_private_key_and_public_key(algorithm, &privk, &pubk).unwrap();
+
+        let rng = ring::rand::SystemRandom::new();
+        let signature = keypair.sign(&rng, msg).unwrap();
+        let sig = signature.as_ref().to_vec();
+
+        // verify using rust-crypto
+        let signature_algorithm = SignatureAlgorithm::Ecdsa(hash);
+
+        signature_algorithm.verify(&public_key, msg, &sig).unwrap();
     }
 }

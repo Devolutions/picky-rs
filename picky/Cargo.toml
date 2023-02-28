@@ -45,8 +45,9 @@ reqwest = { version = "0.11.14", default-features = false, features = ["blocking
 rand = "0.8.5"
 num-bigint-dig = "0.8.2"
 
-# Use Ring for now (https://github.com/Devolutions/picky-rs/pull/132#issuecomment-1058224365)
-ring = { version = "0.16.20", optional = true }
+p256 = { version = "0.12.0", optional = true }
+p384 = { version = "0.12.0", optional = true }
+
 rsa = "0.6.1"
 
 digest = "0.10.6"
@@ -86,7 +87,7 @@ ssh = ["dep:byteorder", "dep:aes", "dep:ctr", "dep:cbc", "dep:bcrypt-pbkdf", "de
 http_trait_impl = ["dep:http"]
 chrono_conversion = ["dep:chrono", "picky-asn1/chrono_conversion"]
 time_conversion = ["dep:time", "picky-asn1/time_conversion"]
-ec = ["dep:ring"]
+ec = ["p256", "p384"]
 
 [package.metadata.docs.rs]
 # Enable all features when building documentation for docs.rs
