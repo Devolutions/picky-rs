@@ -2,9 +2,8 @@ use crate::key::{KeyError, PrivateKey, PublicKey};
 use picky_asn1::wrapper::{BitStringAsn1, OctetStringAsn1Container};
 use picky_asn1_x509::{oids, private_key_info};
 
-pub(crate) struct EcdsaKeypair<'a> {
+pub(crate) struct EcdsaKeypair {
     pub(crate) private_key: Vec<u8>,
-    pub(crate) public_key: &'a [u8],
     pub(crate) curve: EcdsaCurve,
 }
 
@@ -15,27 +14,16 @@ pub(crate) enum EcdsaCurve {
     Nist512,
 }
 
-impl<'a> TryFrom<&'a PrivateKey> for EcdsaKeypair<'a> {
+impl<'a> TryFrom<&'a PrivateKey> for EcdsaKeypair {
     type Error = KeyError;
 
     fn try_from(v: &'a PrivateKey) -> Result<Self, Self::Error> {
-        let (private_key_data, public_key_data) = match &v.as_inner().private_key {
+        let private_key_data = match &v.as_inner().private_key {
             private_key_info::PrivateKeyValue::RSA(_) => Err(KeyError::EC {
                 context: "EC keypair cannot be built from RSA private key".to_string(),
             }),
             private_key_info::PrivateKeyValue::EC(OctetStringAsn1Container(private_key)) => {
-                let private_key_data = private_key.private_key.to_vec();
-                let public_key_data = private_key.public_key.payload_view();
-
-                if public_key_data.is_empty() {
-                    Err(KeyError::EC {
-                        context:
-                            "EC keypair cannot be built from EC private key that doesn't have a bundled private key"
-                                .to_string(),
-                    })
-                } else {
-                    Ok((private_key_data, public_key_data))
-                }
+                Ok(private_key.private_key.to_vec())
             }
         }?;
 
@@ -65,7 +53,6 @@ impl<'a> TryFrom<&'a PrivateKey> for EcdsaKeypair<'a> {
 
         Ok(EcdsaKeypair {
             private_key: private_key_data,
-            public_key: public_key_data,
             curve,
         })
     }
