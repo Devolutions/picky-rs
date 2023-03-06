@@ -342,10 +342,10 @@ impls! { IntegerAsn1(VecU8), Tag::INTEGER }
 fn minimal_encode_start(bytes: &[u8]) -> usize {
     let mut start = 0;
     while start + 1 < bytes.len() {
-        if bytes[start] == 0 && (bytes[start + 1] & 0x80) == 0 {
-            start = start + 1;
-        } else if bytes[start] == 0xFF && (bytes[start + 1] & 0x80) == 0x80 {
-            start = start + 1;
+        if bytes[start] == 0 && (bytes[start + 1] & 0x80) == 0
+            || bytes[start] == 0xFF && (bytes[start + 1] & 0x80) == 0x80
+        {
+            start += 1;
         } else {
             break;
         }
