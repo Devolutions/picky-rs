@@ -394,7 +394,6 @@ impl IntegerAsn1 {
         }
     }
 
-    // TODO: This method should probably take a `&[u8]`:
     pub fn from_bytes_be_signed(bytes: Vec<u8>) -> Self {
         let start = minimal_encode_start(&bytes);
         if start == 0 {
@@ -410,7 +409,6 @@ impl IntegerAsn1 {
     /// and add a leading 0x00 byte indicating the number is positive.
     /// Prefer `from_signed_bytes_be` if you can build a signed bytes string without
     /// overhead on you side.
-    // TODO: This method should probably take a `&[u8]`:
     pub fn from_bytes_be_unsigned(mut bytes: Vec<u8>) -> Self {
         if !bytes.is_empty() && bytes[0] & 0x80 == 0x80 {
             bytes.insert(0, 0x00);
