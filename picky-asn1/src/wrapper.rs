@@ -338,6 +338,21 @@ pub struct IntegerAsn1(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 impls! { IntegerAsn1(VecU8), Tag::INTEGER }
 
+// X.690-0207 Section 8.3.2:
+fn minimal_encode_start(bytes: &[u8]) -> usize {
+    let mut start = 0;
+    while start + 1 < bytes.len() {
+        if bytes[start] == 0 && (bytes[start + 1] & 0x80) == 0
+            || bytes[start] == 0xFF && (bytes[start + 1] & 0x80) == 0x80
+        {
+            start += 1;
+        } else {
+            break;
+        }
+    }
+    start
+}
+
 impl IntegerAsn1 {
     pub fn is_positive(&self) -> bool {
         if self.0.len() > 1 && self.0[0] == 0x00 || self.0.is_empty() {
@@ -380,7 +395,12 @@ impl IntegerAsn1 {
     }
 
     pub fn from_bytes_be_signed(bytes: Vec<u8>) -> Self {
-        Self(bytes)
+        let start = minimal_encode_start(&bytes);
+        if start == 0 {
+            Self(bytes)
+        } else {
+            Self(bytes[start..].to_vec())
+        }
     }
 
     /// Build an ASN.1 Integer from unsigned big endian bytes.
@@ -393,7 +413,12 @@ impl IntegerAsn1 {
         if !bytes.is_empty() && bytes[0] & 0x80 == 0x80 {
             bytes.insert(0, 0x00);
         }
-        Self(bytes)
+        let start = minimal_encode_start(&bytes);
+        if start == 0 {
+            Self(bytes)
+        } else {
+            Self(bytes[start..].to_vec())
+        }
     }
 }
 
@@ -772,5 +797,25 @@ mod tests {
     #[test]
     fn integer_from_unsigned_bytes_be_no_panic() {
         IntegerAsn1::from_bytes_be_unsigned(vec![]);
+    }
+
+    #[test]
+    fn minimal_encode_start_positive() {
+        // Open question: shouldn't we replace a zero length "integer" with
+        // 0x00 octet?
+        assert_eq!(minimal_encode_start(b""), 0);
+        assert_eq!(minimal_encode_start(b"\x00"), 0);
+        assert_eq!(minimal_encode_start(b"\x00\x00"), 1);
+        assert_eq!(minimal_encode_start(b"\x00\x00\x00"), 2);
+        assert_eq!(minimal_encode_start(b"\x00\x00\x80"), 1);
+    }
+
+    #[test]
+    fn minimal_encode_start_negative() {
+        assert_eq!(minimal_encode_start(b"\xFF"), 0);
+        assert_eq!(minimal_encode_start(b"\xFF\x00"), 0);
+        assert_eq!(minimal_encode_start(b"\xFF\x80"), 1);
+        assert_eq!(minimal_encode_start(b"\xFF\xFF\x00"), 1);
+        assert_eq!(minimal_encode_start(b"\xFF\xFF\x80"), 2);
     }
 }
