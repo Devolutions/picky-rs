@@ -2,7 +2,7 @@
 name = "picky-asn1-x509"
 version = "0.9.0"
 authors = [
-    "Benoît CORTIER <benoit.cortier@fried-world.eu>",
+    "Benoît CORTIER <bcortier@devolutions.net>",
     "Sergey Noskov <snoskov@avito.ru>",
     "Kim Altintop <kim@monadic.xyz>",
     "Joe Ellis <joe.ellis@arm.com>",

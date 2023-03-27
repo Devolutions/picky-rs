@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.7.2] 2023-03-27
+
+### Fixed
+
+- ASN.1 Integer minimal encoding ([#209](https://github.com/Devolutions/picky-rs/pull/209))
+
 ## [0.7.1] 2022-11-07
 
 ### Changed

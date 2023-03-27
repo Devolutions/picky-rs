@@ -5,7 +5,7 @@ edition = "2021"
 rust-version = "1.60"
 authors = [
     "KizzyCode Software Labs./Keziah Biermann <development@kizzycode.de>",
-    "Benoît CORTIER <benoit.cortier@fried-world.eu>",
+    "Benoît CORTIER <bcortier@devolutions.net>",
     "Alexandr Yusuk <aleksandr.yusuk@apriorit.com>",
 ]
 keywords = ["serde", "asn1", "asn1-der", "serialize", "deserialize"]

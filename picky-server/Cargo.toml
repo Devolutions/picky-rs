@@ -3,7 +3,7 @@ name = "picky-server"
 version = "4.9.0"
 authors = [
     "Jonathan Trépanier <jtrepanier@devolutions.net>",
-    "Benoît CORTIER <benoit.cortier@fried-world.eu>",
+    "Benoît CORTIER <bcortier@devolutions.net>",
     "Johann Dufaud <jdufaud@devolutions.net>",
 ]
 edition = "2021"
@@ -15,7 +15,7 @@ publish = false
 # picky-server has been discontinued, so this crate is not in the main workspace anymore
 
 [dependencies]
-picky = { version = "7.0.0-rc.4", default-features = false, features = ["x509", "jose", "pkcs7", "ssh", "time_conversion" ], path = "../picky" }
+picky = { version = "7.0.0-rc.5", default-features = false, features = ["x509", "jose", "pkcs7", "ssh", "time_conversion" ], path = "../picky" }
 picky-asn1 = { version = "0.7", path = "../picky-asn1" }
 mongodm = { version = "0.8.0", features = ["tokio-runtime"] }
 clap = { version = "2.33.3", features = ["yaml"] }

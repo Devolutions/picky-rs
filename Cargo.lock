@@ -1270,7 +1270,7 @@ dependencies = [
 
 [[package]]
 name = "picky"
-version = "7.0.0-rc.4"
+version = "7.0.0-rc.5"
 dependencies = [
  "aes 0.8.2",
  "aes-gcm",
@@ -1291,7 +1291,7 @@ dependencies = [
  "oid",
  "p256",
  "p384",
- "picky-asn1 0.7.1",
+ "picky-asn1 0.7.2",
  "picky-asn1-der 0.4.0",
  "picky-asn1-x509 0.9.0",
  "pretty_assertions",
@@ -1335,7 +1335,7 @@ dependencies = [
 
 [[package]]
 name = "picky-asn1"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "chrono",
  "oid",
@@ -1365,7 +1365,7 @@ dependencies = [
  "lazy_static",
  "num-bigint-dig",
  "oid",
- "picky-asn1 0.7.1",
+ "picky-asn1 0.7.2",
  "pretty_assertions",
  "serde",
  "serde_bytes",
@@ -1395,7 +1395,7 @@ dependencies = [
  "hex",
  "num-bigint-dig",
  "oid",
- "picky-asn1 0.7.1",
+ "picky-asn1 0.7.2",
  "picky-asn1-der 0.4.0",
  "pretty_assertions",
  "serde",
@@ -1412,7 +1412,7 @@ dependencies = [
  "embed-resource",
  "getrandom",
  "hex",
- "picky 7.0.0-rc.4",
+ "picky 7.0.0-rc.5",
  "serde_json",
  "time 0.3.19",
 ]
@@ -1430,7 +1430,7 @@ dependencies = [
  "num-bigint-dig",
  "oid",
  "pbkdf2",
- "picky-asn1 0.7.1",
+ "picky-asn1 0.7.2",
  "picky-asn1-der 0.4.0",
  "picky-asn1-x509 0.9.0",
  "rand",
