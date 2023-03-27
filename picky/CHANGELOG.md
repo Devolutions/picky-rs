@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Support for ECDSA p256 and ECDSA p384 signatures (#132)
+- Support for ECDSA p256 and ECDSA p384 signatures ([#132](https://github.com/Devolutions/picky-rs/pull/132) and [#208](https://github.com/Devolutions/picky-rs/pull/208))
 - Support for MD5 hashing
 - CTL implementation behind `ctl` feature
 - CTL fetching over HTTP is behind `ctl_http_fetch` feature

@@ -1,14 +1,16 @@
 [package]
 name = "picky"
-version = "7.0.0-rc.4"
+version = "7.0.0-rc.5"
 authors = [
-    "Benoît CORTIER <benoit.cortier@fried-world.eu>",
+    "Benoît CORTIER <bcortier@devolutions.net>",
     "Jonathan Trepanier <jtrepanier@devolutions.net>",
     "François Dubois <fdubois@devolutions.net>",
     "Richard Markiewicz <rmarkiewicz@devolutions.net>",
     "Ionut Mihalcea <ionut.mihalcea@arm.com>",
     "Kim Altintop <kim@monadic.xyz>",
     "Alexandr Yusuk <aleksandr.yusuk@apriorit.com>",
+    "Flavio Castelli <flavio@castelli.me>",
+    "Xynnn_ <xynnn@linux.alibaba.com>",
 ]
 description = "Portable X.509, PKI, JOSE and HTTP signature implementation."
 keywords = ["x509", "jwt", "signature", "jose", "pki"]

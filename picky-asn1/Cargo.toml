@@ -1,11 +1,12 @@
 [package]
 name = "picky-asn1"
-version = "0.7.1"
+version = "0.7.2"
 edition = "2021"
 rust-version = "1.60"
 authors = [
-    "Benoît CORTIER <benoit.cortier@fried-world.eu>",
+    "Benoît CORTIER <bcortier@devolutions.net>",
     "Alexandr Yusuk <aleksandr.yusuk@apriorit.com>",
+    "Brian Maher",
 ]
 keywords = ["serde", "asn1", "serialize", "deserialize"]
 categories = ["encoding"]
