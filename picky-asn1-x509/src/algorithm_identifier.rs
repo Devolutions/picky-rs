@@ -1,11 +1,12 @@
 use crate::oids;
 use oid::ObjectIdentifier;
 use picky_asn1::tag::{Tag, TagPeeker};
-use picky_asn1::wrapper::{IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1};
-use serde::{de, ser, Deserialize, Serialize};
 use picky_asn1::wrapper::ExplicitContextTag0;
 use picky_asn1::wrapper::ExplicitContextTag1;
 use picky_asn1::wrapper::ExplicitContextTag2;
+use picky_asn1::wrapper::{IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1};
+use serde::{de, ser, Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::error::Error;
 use std::fmt;
 
@@ -377,22 +378,24 @@ impl ser::Serialize for RsassaPssParams {
         let mut seq = serializer.serialize_seq(Some(3))?;
         seq.serialize_element(&ExplicitContextTag0(&self.hash_algorithm))?;
         seq.serialize_element(&ExplicitContextTag1(&self.mask_gen_algorithm))?;
-        seq.serialize_element(&ExplicitContextTag2(&IntegerAsn1::from_bytes_be_signed(self.salt_length.to_be_bytes().to_vec())))?;
+        seq.serialize_element(&ExplicitContextTag2(&IntegerAsn1::from_bytes_be_signed(
+            self.salt_length.to_be_bytes().to_vec(),
+        )))?;
         seq.end()
     }
 }
 
 fn usize_from_be_bytes(asn1: &IntegerAsn1) -> usize {
     let bytes = asn1.as_unsigned_bytes_be();
-    if bytes.len() > 8 {
-        usize::MAX
-    } else if bytes.len() < 8 {
-        let mut tmp = [0; 8];
-        tmp[(8 - bytes.len())..8].clone_from_slice(bytes);
-        usize::from_be_bytes(tmp)
-    } else {
+    match bytes.len().cmp(&8) {
+        Ordering::Greater => usize::MAX,
+        Ordering::Less => {
+            let mut tmp = [0; 8];
+            tmp[(8 - bytes.len())..8].clone_from_slice(bytes);
+            usize::from_be_bytes(tmp)
+        }
         // unwrap is safe since we know this is exactly 8 bytes.
-        usize::from_be_bytes(bytes.try_into().unwrap())
+        Ordering::Equal => usize::from_be_bytes(bytes.try_into().unwrap()),
     }
 }
 
@@ -415,7 +418,12 @@ impl<'de> de::Deserialize<'de> for RsassaPssParams {
                 A: de::SeqAccess<'de>,
             {
                 let hash = seq_next_element!(seq, ExplicitContextTag0<HashAlgorithm>, HashAlgorithm, "cont [0]");
-                let mask_gen = seq_next_element!(seq, ExplicitContextTag1<MaskGenAlgorithm>, MaskGenAlgorithm, "maskGenAlgorithm");
+                let mask_gen = seq_next_element!(
+                    seq,
+                    ExplicitContextTag1<MaskGenAlgorithm>,
+                    MaskGenAlgorithm,
+                    "maskGenAlgorithm"
+                );
                 let salt = seq_next_element!(seq, ExplicitContextTag2<IntegerAsn1>, IntegerAsn1, "saltLength");
                 Ok(RsassaPssParams {
                     hash_algorithm: hash.0,
@@ -452,6 +460,9 @@ impl HashAlgorithm {
             SHA384 => 48,
             SHA512 => 64,
         }
+    }
+    pub fn is_empty(&self) -> bool {
+        false
     }
 }
 impl From<&HashAlgorithm> for ObjectIdentifierAsn1 {
@@ -517,11 +528,13 @@ impl<'de> de::Deserialize<'de> for HashAlgorithm {
             {
                 let oid: ObjectIdentifierAsn1 = seq_next_element!(seq, ObjectIdentifierAsn1, "oid of hashAlgorithm");
                 let _: Option<()> = seq.next_element()?;
-                oid.try_into().map_err(|_| serde_invalid_value!(
-                    HashAlgorithm,
-                    "unsupported or unknown hash algorithm",
-                    "a supported hash algorithm"
-                ))
+                oid.try_into().map_err(|_| {
+                    serde_invalid_value!(
+                        HashAlgorithm,
+                        "unsupported or unknown hash algorithm",
+                        "a supported hash algorithm"
+                    )
+                })
             }
         }
 
@@ -575,7 +588,8 @@ impl<'de> de::Deserialize<'de> for MaskGenAlgorithm {
             where
                 A: de::SeqAccess<'de>,
             {
-                let mask_gen_algorithm: ObjectIdentifierAsn1 = seq_next_element!(seq, ObjectIdentifierAsn1, "oid of maskGenAlgorithm");
+                let mask_gen_algorithm: ObjectIdentifierAsn1 =
+                    seq_next_element!(seq, ObjectIdentifierAsn1, "oid of maskGenAlgorithm");
                 let hash_algorithm: HashAlgorithm = seq_next_element!(seq, HashAlgorithm, "hashAlgorithm");
                 Ok(MaskGenAlgorithm {
                     mask_gen_algorithm,
@@ -950,13 +964,12 @@ mod tests {
         assert_eq!(digest, expected);
     }
 
-
     #[test]
     fn rsa_pss_params_sha256() {
         let expected = [
             0x30, 0x34, 0xa0, 0x0f, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01, 0x05,
             0x00, 0xa1, 0x1c, 0x30, 0x1a, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x08, 0x30, 0x0d,
-            0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01, 0x05, 0x00, 0xa2, 0x03, 0x02, 0x01, 0x20
+            0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01, 0x05, 0x00, 0xa2, 0x03, 0x02, 0x01, 0x20,
         ];
         let structure = RsassaPssParams::new(HashAlgorithm::SHA256);
         check_serde!(structure: RsassaPssParams in expected);
@@ -967,7 +980,7 @@ mod tests {
         let expected = [
             0x30, 0x34, 0xa0, 0x0f, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x02, 0x05,
             0x00, 0xa1, 0x1c, 0x30, 0x1a, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x08, 0x30, 0x0d,
-            0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x02, 0x05, 0x00, 0xa2, 0x03, 0x02, 0x01, 0x30
+            0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x02, 0x05, 0x00, 0xa2, 0x03, 0x02, 0x01, 0x30,
         ];
         let structure = RsassaPssParams::new(HashAlgorithm::SHA384);
         check_serde!(structure: RsassaPssParams in expected);
@@ -978,7 +991,7 @@ mod tests {
         let expected = [
             0x30, 0x34, 0xa0, 0x0f, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03, 0x05,
             0x00, 0xa1, 0x1c, 0x30, 0x1a, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x08, 0x30, 0x0d,
-            0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03, 0x05, 0x00, 0xa2, 0x03, 0x02, 0x01, 0x40
+            0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03, 0x05, 0x00, 0xa2, 0x03, 0x02, 0x01, 0x40,
         ];
         let structure = RsassaPssParams::new(HashAlgorithm::SHA512);
         check_serde!(structure: RsassaPssParams in expected);
@@ -990,7 +1003,7 @@ mod tests {
             0x30, 0x41, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x0A, 0x30, 0x34, 0xa0, 0x0f, 0x30,
             0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01, 0x05, 0x00, 0xa1, 0x1c, 0x30, 0x1a,
             0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x08, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48,
-            0x01, 0x65, 0x03, 0x04, 0x02, 0x01, 0x05, 0x00, 0xa2, 0x03, 0x02, 0x01, 0x20
+            0x01, 0x65, 0x03, 0x04, 0x02, 0x01, 0x05, 0x00, 0xa2, 0x03, 0x02, 0x01, 0x20,
         ];
         let structure = AlgorithmIdentifier::new_rsassa_pss(RsassaPssParams::new(HashAlgorithm::SHA256));
         check_serde!(structure: AlgorithmIdentifier in expected);
