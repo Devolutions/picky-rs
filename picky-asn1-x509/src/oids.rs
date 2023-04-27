@@ -60,6 +60,7 @@ define_oid! {
     SHA384_WITH_RSA_ENCRYPTION => sha384_with_rsa_encryption => "1.2.840.113549.1.1.12",
     SHA512_WITH_RSA_ENCRYPTION => sha512_with_rsa_encryption => "1.2.840.113549.1.1.13",
     SHA224_WITH_RSA_ENCRYPTION => sha224_with_rsa_encryption => "1.2.840.113549.1.1.14",
+    RSASSA_PSS => rsassa_pss => "1.2.840.113549.1.1.10",
     EMAIL_ADDRESS => email_address => "1.2.840.113549.1.9.1", // deprecated
     EXTENSION_REQ => extension_request => "1.2.840.113549.1.9.14",
 
@@ -210,6 +211,9 @@ define_oid! {
     UNKNOWN_RESERVED_PROP_ID_127 => unknown_reserved_prop_id_127 => "1.3.6.1.4.1.311.10.11.127",
 
     AUTO_UPDATE_END_REVOCATION => auto_update_end_revocation => "1.3.6.1.4.1.311.60.3.2",
+
+    // RSA  Mask Generator Function 1
+    ID_MGF1 => id_mgf1 => "1.2.840.113549.1.1.8",
 
     // NLA protocols
     KRB5 => krb5 => "1.2.840.113554.1.2.2",
