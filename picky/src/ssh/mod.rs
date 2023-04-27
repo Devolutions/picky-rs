@@ -8,13 +8,11 @@ pub use certificate::{SshCertKeyType, SshCertType, SshCertificate, SshCertificat
 pub use private_key::SshPrivateKey;
 pub use public_key::SshPublicKey;
 
-use base64::read::DecoderReader;
-use base64::write::EncoderWriter;
 use byteorder::ReadBytesExt;
 use std::io::{self, Read};
 
-pub type Base64Writer<T> = EncoderWriter<T>;
-pub type Base64Reader<'a, R> = DecoderReader<'a, R>;
+pub(crate) type Base64Writer<'a, T, E> = base64::write::EncoderWriter<'a, T, E>;
+pub(crate) type Base64Reader<'a, T, E> = base64::read::DecoderReader<'a, T, E>;
 
 const SSH_RSA_KEY_TYPE: &str = "ssh-rsa";
 

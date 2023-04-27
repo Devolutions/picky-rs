@@ -6,7 +6,7 @@ use crate::jose::jwk::Jwk;
 use crate::key::{PrivateKey, PublicKey};
 use aes_gcm::aead::generic_array::typenum::Unsigned;
 use aes_gcm::{AeadInPlace, Aes128Gcm, Aes256Gcm, NewAead};
-use base64::DecodeError;
+use base64::{engine::general_purpose, DecodeError, Engine as _};
 use digest::generic_array::GenericArray;
 use rand::RngCore;
 use rsa::{PaddingScheme, PublicKey as RsaPublicKeyInterface, RsaPrivateKey, RsaPublicKey};
@@ -434,15 +434,15 @@ fn decode_impl(compact_repr: Cow<'_, str>) -> Result<RawJwe<'_>, JweError> {
             input: compact_repr.clone().into_owned(),
         })?;
 
-    let protected_header = base64::decode_config(protected_header, base64::URL_SAFE_NO_PAD)?;
+    let protected_header = general_purpose::URL_SAFE_NO_PAD.decode(protected_header)?;
     let header = serde_json::from_slice::<JweHeader>(&protected_header)?;
 
     Ok(RawJwe {
         header,
-        encrypted_key: base64::decode_config(encrypted_key, base64::URL_SAFE_NO_PAD)?,
-        initialization_vector: base64::decode_config(initialization_vector, base64::URL_SAFE_NO_PAD)?,
-        ciphertext: base64::decode_config(ciphertext, base64::URL_SAFE_NO_PAD)?,
-        authentication_tag: base64::decode_config(authentication_tag, base64::URL_SAFE_NO_PAD)?,
+        encrypted_key: general_purpose::URL_SAFE_NO_PAD.decode(encrypted_key)?,
+        initialization_vector: general_purpose::URL_SAFE_NO_PAD.decode(initialization_vector)?,
+        ciphertext: general_purpose::URL_SAFE_NO_PAD.decode(ciphertext)?,
+        authentication_tag: general_purpose::URL_SAFE_NO_PAD.decode(authentication_tag)?,
         compact_repr,
     })
 }
@@ -457,7 +457,7 @@ enum EncoderMode<'a> {
 
 fn encode_impl(jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
     let mut header = jwe.header;
-    let protected_header_base64 = base64::encode_config(serde_json::to_vec(&header)?, base64::URL_SAFE_NO_PAD);
+    let protected_header_base64 = general_purpose::URL_SAFE_NO_PAD.encode(serde_json::to_vec(&header)?);
 
     let (encrypted_key_base64, jwe_cek) = match mode {
         EncoderMode::Direct(symmetric_key) => {
@@ -497,7 +497,7 @@ fn encode_impl(jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
             let encrypted_key = rsa_public_key.encrypt(&mut rng, padding, &symmetric_key)?;
 
             (
-                base64::encode_config(encrypted_key, base64::URL_SAFE_NO_PAD),
+                general_purpose::URL_SAFE_NO_PAD.encode(encrypted_key),
                 Cow::Owned(symmetric_key),
             )
         }
@@ -523,9 +523,9 @@ fn encode_impl(jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
         }
     };
 
-    let initialization_vector_base64 = base64::encode_config(nonce.as_slice(), base64::URL_SAFE_NO_PAD);
-    let ciphertext_base64 = base64::encode_config(&buffer, base64::URL_SAFE_NO_PAD);
-    let authentication_tag_base64 = base64::encode_config(authentication_tag, base64::URL_SAFE_NO_PAD);
+    let initialization_vector_base64 = general_purpose::URL_SAFE_NO_PAD.encode(nonce.as_slice());
+    let ciphertext_base64 = general_purpose::URL_SAFE_NO_PAD.encode(&buffer);
+    let authentication_tag_base64 = general_purpose::URL_SAFE_NO_PAD.encode(authentication_tag);
 
     Ok([
         protected_header_base64,
@@ -729,8 +729,7 @@ mod tests {
 
         // 1: JOSE header
 
-        let protected_header_base64 =
-            base64::encode_config(serde_json::to_vec(&jwe.header).unwrap(), base64::URL_SAFE_NO_PAD);
+        let protected_header_base64 = general_purpose::URL_SAFE_NO_PAD.encode(serde_json::to_vec(&jwe.header).unwrap());
         assert_eq!(
             protected_header_base64,
             "eyJhbGciOiJSU0EtT0FFUCIsImVuYyI6IkEyNTZHQ00ifQ"
@@ -750,7 +749,7 @@ mod tests {
         // 4: Initialization Vector
 
         let iv_base64 = "48V1_ALb6US04U3b";
-        let iv = base64::decode_config(iv_base64, base64::URL_SAFE_NO_PAD).unwrap();
+        let iv = general_purpose::URL_SAFE_NO_PAD.decode(iv_base64).unwrap();
 
         // 5: AAD
 
@@ -785,8 +784,8 @@ mod tests {
             protected_header_base64,
             encrypted_key_base64,
             iv_base64,
-            base64::encode_config(&ciphertext, base64::URL_SAFE_NO_PAD),
-            base64::encode_config(tag, base64::URL_SAFE_NO_PAD),
+            general_purpose::URL_SAFE_NO_PAD.encode(&ciphertext),
+            general_purpose::URL_SAFE_NO_PAD.encode(tag),
         );
 
         assert_eq!(token, "eyJhbGciOiJSU0EtT0FFUCIsImVuYyI6IkEyNTZHQ00ifQ.OKOawDo13gRp2ojaHV7LFpZcgV7T6DVZKTyKOMTYUmKoTCVJRgckCL9kiMT03JGeipsEdY3mx_etLbbWSrFr05kLzcSr4qKAq7YN7e9jwQRb23nfa6c9d-StnImGyFDbSv04uVuxIp5Zms1gNxKKK2Da14B8S4rzVRltdYwam_lDp5XnZAYpQdb76FdIKLaVmqgfwX7XWRxv2322i-vDxRfqNzo_tETKzpVLzfiwQyeyPGLBIO56YJ7eObdv0je81860ppamavo35UgoRdbYaBcoh9QcfylQr66oc6vFWXRcZ_ZT2LawVCWTIy3brGPi6UklfCpIMfIjf7iGdXKHzg.48V1_ALb6US04U3b.5eym8TW_c8SuK0ltJ3rpYIzOeDQz7TALvtu6UG9oMo4vpzs9tX_EFShS8iB7j6jiSdiwkIr3ajwQzaBtQD_A.XFBoMYUZodetZdvTiFvSkQ");

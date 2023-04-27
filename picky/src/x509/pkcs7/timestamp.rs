@@ -40,6 +40,7 @@ pub trait Timestamper: Sized {
 #[cfg(feature = "http_timestamp")]
 pub mod http_timestamp {
     use super::*;
+    use base64::engine::{general_purpose, Engine as _};
     use picky_asn1_x509::pkcs7::signer_info::{UnsignedAttribute, UnsignedAttributeValue};
     use reqwest::blocking::Client;
     use reqwest::header::{CACHE_CONTROL, CONTENT_LENGTH, CONTENT_TYPE};
@@ -62,7 +63,7 @@ pub mod http_timestamp {
             let timestamp_request = TimestampRequest::new(digest);
 
             let client = Client::new();
-            let content = base64::encode(timestamp_request.to_der()?);
+            let content = general_purpose::STANDARD.encode(timestamp_request.to_der()?);
 
             let request = client
                 .request(Method::POST, self.url.clone())
@@ -88,7 +89,9 @@ pub mod http_timestamp {
 
             body.retain(|&x| x != b'\n' && x != b'\r' && x != b'\0'); // Removing CRLF entries
 
-            let der = base64::decode(body).map_err(|_| TimestampError::Base64DecodeError)?;
+            let der = general_purpose::STANDARD
+                .decode(body)
+                .map_err(|_| TimestampError::Base64DecodeError)?;
             let token = Pkcs7::from_der(&der).map_err(TimestampError::Pkcs7Error)?;
 
             Ok(token)

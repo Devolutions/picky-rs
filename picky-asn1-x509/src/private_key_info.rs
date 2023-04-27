@@ -431,12 +431,14 @@ impl Drop for ECPrivateKey {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use base64::{engine::general_purpose, Engine as _};
     use picky_asn1::bit_string::BitString;
 
     #[test]
     fn pkcs_8_private_key() {
-        let encoded = base64::decode(
-            "MIIBVgIBADANBgkqhkiG9w0BAQEFAASCAUAwggE8AgEAAkEAq7BFUpkGp3+LQmlQ\
+        let encoded = general_purpose::STANDARD
+            .decode(
+                "MIIBVgIBADANBgkqhkiG9w0BAQEFAASCAUAwggE8AgEAAkEAq7BFUpkGp3+LQmlQ\
              Yx2eqzDV+xeG8kx/sQFV18S5JhzGeIJNA72wSeukEPojtqUyX2J0CciPBh7eqclQ\
              2zpAswIDAQABAkAgisq4+zRdrzkwH1ITV1vpytnkO/NiHcnePQiOW0VUybPyHoGM\
              /jf75C5xET7ZQpBe5kx5VHsPZj0CBb3b+wSRAiEA2mPWCBytosIU/ODRfq6EiV04\
@@ -444,8 +446,8 @@ mod tests {
              5QIhAKthiYcYKlL9h8bjDsQhZDUACPasjzdsDEdq8inDyLOFAiEAmCr/tZwA3qeA\
              ZoBzI10DGPIuoKXBd3nk/eBxPkaxlEECIQCNymjsoI7GldtujVnr1qT+3yedLfHK\
              srDVjIT3LsvTqw==",
-        )
-        .expect("invalid base64");
+            )
+            .expect("invalid base64");
 
         let modulus = IntegerAsn1::from(encoded[35..100].to_vec());
         let public_exponent = IntegerAsn1::from(encoded[102..105].to_vec());
@@ -474,8 +476,9 @@ mod tests {
         // https://github.com/Devolutions/picky-rs/issues/53
         // We want to support these for now.
 
-        let encoded = base64::decode(
-            "MIIDMAIBADANBgkqhkiG9w0BAQEFAASCAxowggMWAgEAAoIBAOB9jOJvCkMHOc98Q\
+        let encoded = general_purpose::STANDARD
+            .decode(
+                "MIIDMAIBADANBgkqhkiG9w0BAQEFAASCAxowggMWAgEAAoIBAOB9jOJvCkMHOc98Q\
              GPFikxAvBKANkme5f/nNuNnEnbefoKDFkS6ElfqASAAkIHxUREnRvBTTa6b+qba/0\
              DhBuXsYGCl8VF0pUE4JGujv1HIi5aRCar0WmY66s7DJ4uR3Nk9Jy0WeRiH4yyzEIG\
              8+6QDu4d/U6slWTmE8eZtQEE7rz4FGpQU9OhrGM3xJOIIbLX/xU2SFt83Xs3JREEt\
@@ -492,23 +495,24 @@ mod tests {
              yOdodNnpUCgYDwEo/sPJNaPOzc7fpaQr2PUUJ3ksL0ncGRO2h1JGYgDtWe5u1srSI\
              DlpM2NdYSZyT04ebOF2SqNUBwY3LB1tPOFnjYwCutp4c75OYhOor7TodZHlzt3GeQ\
              ntUw6XbHX0ohTgs4u2NXwOTq5yKeW4VYzuevN5ksF8GoW2noalpn+w==",
-        )
-        .unwrap();
+            )
+            .unwrap();
 
         picky_asn1_der::from_bytes::<PrivateKeyInfo>(&encoded).unwrap();
     }
 
     #[test]
     fn decode_ec_key() {
-        let decoded = base64::decode(
-            "\
+        let decoded = general_purpose::STANDARD
+            .decode(
+                "\
         MIHcAgEBBEIBhqphIGu2PmlcEb6xADhhSCpgPUulB0s4L2qOgolRgaBx4fNgINFE\
         mBsSyHJncsWG8WFEuUzAYy/YKz2lP0Qx6Z2gBwYFK4EEACOhgYkDgYYABABwBevJ\
         w/+Xh6I98ruzoTX3MNTsbgnc+glenJRCbEJkjbJrObFhbfgqP52r1lAy2RxuShGi\
         NYJJzNPT6vR1abS32QFtvTH7YbYa6OWk9dtGNY/cYxgx1nQyhUuofdW7qbbfu/Ww\
         TP2oFsPXRAavZCh4AbWUn8bAHmzNRyuJonQBKlQlVQ==",
-        )
-        .unwrap();
+            )
+            .unwrap();
 
         let ec_key = ECPrivateKey {
             version: IntegerAsn1([1].into()),
@@ -524,7 +528,7 @@ mod tests {
 
     #[test]
     fn decode_pkcs8_ec_key() {
-        let decoded = base64::decode("MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgKZqrmOg/cDZ4tPCn\
+        let decoded = general_purpose::STANDARD.decode("MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgKZqrmOg/cDZ4tPCn\
                                                             4LROs145nxx+ssufvflL8cROxFmhRANCAARmU90fCSTsncefY7hVeKw1WIg/YQmT\
                                                             4DGJ7nJPZ+WXAd/xxp4c0bHGlIOju/U95ITPN9dAmro7OUTDJpz+rzGW").unwrap();
         let expected_pkcs8_ec_key = PrivateKeyInfo {

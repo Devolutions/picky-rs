@@ -526,7 +526,7 @@ mod tests {
         PublicKey::from_pem(&RSA_PUBLIC_KEY_PEM.parse::<Pem>().expect("pem")).expect("public key");
     }
 
-    const GARBAGE_PEM: &str = "-----BEGIN GARBAGE-----GARBAGE-----END GARBAGE-----";
+    const GARBAGE_PEM: &str = "-----BEGIN GARBAGE-----R0FSQkFHRQo=-----END GARBAGE-----";
 
     #[test]
     fn public_key_from_garbage_pem_err() {

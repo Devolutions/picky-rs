@@ -22,19 +22,21 @@ pub struct TimestampRequest {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use base64::{engine::general_purpose, Engine as _};
 
     #[test]
     fn decode_timestamp_request() {
-        let decoded = base64::decode(
-            "MIIBIwYKKwYBBAGCNwMCATCCARMGCSqGSIb3DQEHAaCCAQQEggEAQrCUqwV+9+Fl\
+        let decoded = general_purpose::STANDARD
+            .decode(
+                "MIIBIwYKKwYBBAGCNwMCATCCARMGCSqGSIb3DQEHAaCCAQQEggEAQrCUqwV+9+Fl\
                   bgfJUwua28rmolLOZf/d3alzHUu6P1iV/9crZeu9ShrFdmQ4ZVWTpcR7bcVGPVsW\
                   QdUgx2n1mJCPied8YPjzC0wfJPvzZzOz9X919EAFRUi4VPs5qEsHJV57YP5mJ2UC\
                   XqXKSR9HhRO/06TSGz7hkFh+vpsKYVvIZpDXNJPRUilgEDQXjHCdMZyOzPb9wO8k\
                   cFHbUYZT9lVp9p8Wg+P56RdOANgtS5GKfku2BTsgbwxh5k8GzMnsiaf++O8LgMaE\
                   zsvEwbfbi+Egxi+7An0T7EttZcn6vbS28vtGKXOg6uzaiBN2u2KYq7f3KTq32sgD\
                   QgPEuhsAhQ==",
-        )
-        .unwrap();
+            )
+            .unwrap();
 
         let timestamp_request: TimestampRequest = picky_asn1_der::from_bytes(&decoded).unwrap();
         check_serde!(timestamp_request: TimestampRequest in decoded);

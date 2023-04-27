@@ -57,6 +57,7 @@
 use crate::pki_tests::ocsp_request::AlgorithmIdentifier;
 use crate::pki_tests::rsa_public_key::{RSAPublicKey, SubjectPublicKeyInfoRsa};
 use crate::pki_tests::version::{implicit_app0_version_is_default, Version};
+use base64::{engine::general_purpose, Engine as _};
 use num_bigint_dig::BigInt;
 use oid::prelude::*;
 use picky_asn1::bit_string::BitString;
@@ -113,8 +114,9 @@ struct Extension {
 
 #[test]
 fn x509_v3_certificate() {
-    let encoded = base64::decode(
-        "MIIEGjCCAgKgAwIBAgIEN8NXxDANBgkqhkiG9w0BAQsFADAiMSAwHgYDVQQ\
+    let encoded = general_purpose::STANDARD
+        .decode(
+            "MIIEGjCCAgKgAwIBAgIEN8NXxDANBgkqhkiG9w0BAQsFADAiMSAwHgYDVQQ\
          DDBdjb250b3NvLmxvY2FsIEF1dGhvcml0eTAeFw0xOTEwMTcxNzQxMjhaFw0yMjEwM\
          TYxNzQxMjhaMB0xGzAZBgNVBAMMEnRlc3QuY29udG9zby5sb2NhbDCCASIwDQYJKoZ\
          IhvcNAQEBBQADggEPADCCAQoCggEBAMptALdk7xKj9JmFSycxlaTV47oLv5Aabir17\
@@ -136,8 +138,8 @@ fn x509_v3_certificate() {
          yNp7WjRYl8hJ0YVZ7TRtP8nJOkZ6s046YHVWxMuGdqZfd/AUFb9xzzXjGRuuZ1JmSf\
          +VBOFEe2MaPMyMQBeIs3Othz6Fcy6Am5F6c3It31WYJwiCa/NdbMIvGy1xvAN5kzR/\
          Y6hkoQljoSr1rVuszJ9dtvuTccA==",
-    )
-    .expect("invalid base64");
+        )
+        .expect("invalid base64");
 
     // Issuer
 

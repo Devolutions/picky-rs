@@ -21,7 +21,7 @@ picky-asn1 = { version = "0.7", path = "../picky-asn1" }
 picky-asn1-der = { version = "0.4", path = "../picky-asn1-der" }
 serde = { version = "1.0.152", features = ["derive"] }
 oid = { version = "0.2.1", features = ["serde_support"] }
-base64 = "0.13.1"
+base64 = "0.21"
 num-bigint-dig = { version = "0.8.2", optional = true }
 widestring = { version = "0.5.1", default-features = false, features = ["alloc"], optional = true }
 zeroize = { version = "^1.5", optional = true }

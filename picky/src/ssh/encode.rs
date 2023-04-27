@@ -9,6 +9,7 @@ use crate::ssh::private_key::{
 use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
 use crate::ssh::{Base64Writer, SSH_RSA_KEY_TYPE};
 use aes::cipher::{KeyIvInit, StreamCipher};
+use base64::engine::general_purpose;
 use byteorder::{BigEndian, WriteBytesExt};
 use num_bigint_dig::{BigUint, ModInverse};
 use rsa::{PublicKeyParts, RsaPrivateKey, RsaPublicKey};
@@ -183,7 +184,7 @@ impl SshComplexTypeEncode for SshPublicKey {
         };
 
         {
-            let mut base64_write = Base64Writer::new(&mut stream, base64::STANDARD);
+            let mut base64_write = Base64Writer::new(&mut stream, &general_purpose::STANDARD);
             self.inner_key.encode(&mut base64_write)?;
             base64_write.finish()?;
         }
@@ -299,7 +300,7 @@ impl SshComplexTypeEncode for SshCertificate {
         stream.write_all(self.cert_key_type.as_str().as_bytes())?;
         stream.write_u8(b' ')?;
 
-        let mut cert_data = Base64Writer::new(stream, base64::STANDARD);
+        let mut cert_data = Base64Writer::new(stream, &general_purpose::STANDARD);
 
         cert_data.write_ssh_string(self.cert_key_type.as_str())?;
         cert_data.write_ssh_bytes(&self.nonce)?;

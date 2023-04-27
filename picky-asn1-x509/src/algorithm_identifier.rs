@@ -605,6 +605,7 @@ pub struct DigestInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use base64::{engine::general_purpose, Engine as _};
 
     #[test]
     fn aes_null_params() {

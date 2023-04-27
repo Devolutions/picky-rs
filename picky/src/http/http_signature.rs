@@ -2,7 +2,7 @@ use crate::hash::HashAlgorithm;
 use crate::http::http_request::{HttpRequest, HttpRequestError};
 use crate::key::{PrivateKey, PublicKey};
 use crate::signature::{SignatureAlgorithm, SignatureError};
-use base64::{DecodeError, URL_SAFE_NO_PAD};
+use base64::{engine::general_purpose, DecodeError, Engine as _};
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -633,9 +633,9 @@ impl<'a> HttpSignatureBuilder<'a> {
             created,
             expires,
             signature: if legacy {
-                base64::encode_config(&signature_binary, URL_SAFE_NO_PAD)
+                general_purpose::URL_SAFE_NO_PAD.encode(&signature_binary)
             } else {
-                base64::encode(&signature_binary)
+                general_purpose::STANDARD.encode(&signature_binary)
             },
             algorithm: Some(HttpSigAlgorithm::Known(signature_type)),
             legacy,
@@ -802,9 +802,9 @@ impl<'a> HttpSignatureVerifier<'a> {
         };
 
         let decoded_signature = if self.http_signature.legacy {
-            base64::decode_config(&self.http_signature.signature, URL_SAFE_NO_PAD)?
+            general_purpose::URL_SAFE_NO_PAD.decode(&self.http_signature.signature)?
         } else {
-            base64::decode(&self.http_signature.signature)?
+            general_purpose::STANDARD.decode(&self.http_signature.signature)?
         };
 
         signature_type.verify(public_key, signing_string.as_bytes(), &decoded_signature)?;

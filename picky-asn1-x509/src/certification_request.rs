@@ -114,6 +114,7 @@ mod tests {
     use super::*;
     use crate::name::*;
     use crate::{DirectoryName, Extension, GeneralName};
+    use base64::{engine::general_purpose, Engine as _};
     use picky_asn1::bit_string::BitString;
     use picky_asn1::restricted_string::{IA5String, PrintableString, Utf8String};
     use picky_asn1::wrapper::IntegerAsn1;
@@ -121,8 +122,9 @@ mod tests {
 
     #[test]
     fn basic_csr() {
-        let encoded = base64::decode(
-            "MIICYjCCAUoCAQAwHTEbMBkGA1UEAxMSdGVzdC5jb250b3NvLmxvY2FsMIIBIjAN\
+        let encoded = general_purpose::STANDARD
+            .decode(
+                "MIICYjCCAUoCAQAwHTEbMBkGA1UEAxMSdGVzdC5jb250b3NvLmxvY2FsMIIBIjAN\
             BgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAym0At2TvEqP0mYVLJzGVpNXjugu/\
             kBpuKvXt/Vax4Bxnj3YzHTCpwkyZPytUC6zJ+q+uGh0e7gYQsYHJKjgoKEsS6gQ4\
             ZM3D/AQy0zqPUT0ruSKDWKK4f2d/2ijDs5R2LHj7DtNZBanCXU16Qp1O28su0QZK\
@@ -135,8 +137,8 @@ mod tests {
             6OK9O6ypqTtwXxnm3TJF9dctLwvbh7NZSaamSlxI0/ajKZOP9k1KZEOPtaiiMPe2\
             yr+QvwY2ov66MRG5PPRZELQWBaPZOuFwmCsFOLXJMpvhoAgklBCFZmiQMgApGIC1\
             FIDgjm2ZhQQIRMnTsAV6f7BclRTaUkc0sPl17YB9GfNfOm1oL7o=",
-        )
-        .expect("invalid base64");
+            )
+            .expect("invalid base64");
 
         let certification_request_info = CertificationRequestInfo::new(
             DirectoryName::new_common_name(PrintableString::from_str("test.contoso.local").unwrap()),
@@ -159,8 +161,9 @@ mod tests {
 
     #[test]
     fn csr_with_extensions_attribute() {
-        let encoded = base64::decode(
-            "MIICjDCCAXQCAQAwIDELMAkGA1UEBhMCWFgxETAPBgNVBAMMCHNvbWV0ZXN0MIIB\
+        let encoded = general_purpose::STANDARD
+            .decode(
+                "MIICjDCCAXQCAQAwIDELMAkGA1UEBhMCWFgxETAPBgNVBAMMCHNvbWV0ZXN0MIIB\
             IjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvNELh212N4optYS7pqbtvjyv\
             +t4fQjX/pwB88BUCEjBgh+DJ49EBPQg9oObADTcBi3EeXu4M5y6f/dzIhovayJ/y\
             9j7Cj0Bw+VY+eRXywkVG/DqaiKG2mIQW+fho7/jhazhpeIxCzObPTwiQK7i96Vjq\
@@ -174,8 +177,8 @@ mod tests {
             cd6xK4oIJyoeiXyVBdn68gtPY6xjFxta67nyj39sSGhATxrDgxtLHEH2+HStywr0\
             4/osg9vP/OH5iFYOiEimK6ErYNg8rM1A/OTe5p8emA6y3o5dHG8lKYwevyUXMSLv\
             38CNeh0MS2KmyHz2085HlIIAXIu2xAUyWLsQik+eV6M=",
-        )
-        .expect("invalid base64");
+            )
+            .expect("invalid base64");
 
         let extensions = vec![Extension::new_subject_alt_name(vec![GeneralName::DnsName(
             IA5String::from_string("localhost".into()).unwrap().into(),

@@ -231,20 +231,22 @@ pub struct PolicyQualifier {
 mod tests {
     use super::*;
     use crate::{AlgorithmIdentifier, ShaVariant};
+    use base64::{engine::general_purpose, Engine as _};
     use picky_asn1::date::UTCTime;
 
     #[test]
     fn decode_certificate_trust_list_entry() {
-        let ctl_entry_hex = base64::decode(
-            "MIIBKgQUzdTurmAArH9Aw4AsFx4wFIAwwHIxggEQMBgGCisGAQQBgjcKC34xCgQI\
+        let ctl_entry_hex = general_purpose::STANDARD
+            .decode(
+                "MIIBKgQUzdTurmAArH9Aw4AsFx4wFIAwwHIxggEQMBgGCisGAQQBgjcKC34xCgQI\
                                  AADZtUTB0gEwHgYKKwYBBAGCNwoLaTEQBA4wDAYKKwYBBAGCNzwDAjAgBgorBgEE\
                                  AYI3CgsdMRIEEPDEAvBATqmtvyWgPd8spvowJAYKKwYBBAGCNwoLFDEWBBQOrIJg\
                                  QFYnl+UlE/wq4QpTlVnkpDAwBgorBgEEAYI3CgtiMSIEIIhd5kw0Dj6nBljwHhFF\
                                  +Vf82ieqvuoaufqp/bAQLUB3MFoGCisGAQQBgjcKCwsxTARKTQBpAGMAcgBvAHMA\
                                  bwBmAHQAIABSAG8AbwB0ACAAQwBlAHIAdABpAGYAaQBjAGEAdABlACAAQQB1AHQA\
                                  aABvAHIAaQB0AHkAAAA=",
-        )
-        .unwrap();
+            )
+            .unwrap();
 
         let cert_fingerprint = OctetStringAsn1::from(ctl_entry_hex[6..26].to_vec());
 
@@ -317,8 +319,9 @@ mod tests {
 
     #[test]
     fn decode_certificate_trust_list() {
-        let ctl_hex = base64::decode(
-            "MIIBZzAMBgorBgEEAYI3CgMJAgkUAddM40UqdcsXDTIxMDUxOTE5MTUwM1owCQYF\
+        let ctl_hex = general_purpose::STANDARD
+            .decode(
+                "MIIBZzAMBgorBgEEAYI3CgMJAgkUAddM40UqdcsXDTIxMDUxOTE5MTUwM1owCQYF\
             Kw4DAhoFADCCATAwggEsBBQY98H8wwkCA/1bqi+GGnVJdsjdJTGCARIwGAYKKwYB\
             BAGCNwoLaDEKBAgAADYETd/TATAYBgorBgEEAYI3Cgt+MQoECAAAEMUektIBMBwG\
             CisGAQQBgjcKCwkxDgQMMAoGCCsGAQUFBwMIMCAGCisGAQQBgjcKCx0xEgQQT/fb\
@@ -326,8 +329,8 @@ mod tests {
             J+LwMDAGCisGAQQBgjcKC2IxIgQgW3iZh/PEBVuHAJQbM3g6Xxbgz/k36jIBH+BH\
             efdjUwgwRAYKKwYBBAGCNwoLCzE2BDRWAGUAcgBpAFMAaQBnAG4AIABUAGkAbQBl\
             ACAAUwB0AGEAbQBwAGkAbgBnACAAQwBBAAAA",
-        )
-        .unwrap();
+            )
+            .unwrap();
 
         let cert_enhkey_usage_prop_id_entry = CTLEntryAttribute {
             oid: oids::cert_enhkey_usage_prop_id().into(),
