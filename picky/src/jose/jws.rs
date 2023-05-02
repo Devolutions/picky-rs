@@ -6,7 +6,7 @@ use crate::hash::HashAlgorithm;
 use crate::jose::jwk::Jwk;
 use crate::key::{PrivateKey, PublicKey};
 use crate::signature::{SignatureAlgorithm, SignatureError};
-use base64::DecodeError;
+use base64::{engine::general_purpose, DecodeError, Engine as _};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -267,12 +267,12 @@ impl Jws {
     }
 
     pub fn encode(&self, private_key: &PrivateKey) -> Result<String, JwsError> {
-        let header_base64 = base64::encode_config(serde_json::to_vec(&self.header)?, base64::URL_SAFE_NO_PAD);
-        let payload_base64 = base64::encode_config(&self.payload, base64::URL_SAFE_NO_PAD);
+        let header_base64 = general_purpose::URL_SAFE_NO_PAD.encode(serde_json::to_vec(&self.header)?);
+        let payload_base64 = general_purpose::URL_SAFE_NO_PAD.encode(&self.payload);
         let header_and_payload = [header_base64, payload_base64].join(".");
         let signature_algo = SignatureAlgorithm::try_from(self.header.alg)?;
         let signature = signature_algo.sign(header_and_payload.as_bytes(), private_key)?;
-        let signature_base64 = base64::encode_config(signature, base64::URL_SAFE_NO_PAD);
+        let signature_base64 = general_purpose::URL_SAFE_NO_PAD.encode(signature);
         Ok([header_and_payload, signature_base64].join("."))
     }
 
@@ -340,12 +340,12 @@ fn decode_impl(compact_repr: Cow<'_, str>) -> Result<RawJws<'_>, JwsError> {
         });
     }
 
-    let header_json = base64::decode_config(&compact_repr[..first_dot_idx], base64::URL_SAFE_NO_PAD)?;
+    let header_json = general_purpose::URL_SAFE_NO_PAD.decode(&compact_repr[..first_dot_idx])?;
     let header = serde_json::from_slice::<JwsHeader>(&header_json)?;
 
-    let signature = base64::decode_config(&compact_repr[last_dot_idx + 1..], base64::URL_SAFE_NO_PAD)?;
+    let signature = general_purpose::URL_SAFE_NO_PAD.decode(&compact_repr[last_dot_idx + 1..])?;
 
-    let payload = base64::decode_config(&compact_repr[first_dot_idx + 1..last_dot_idx], base64::URL_SAFE_NO_PAD)?;
+    let payload = general_purpose::URL_SAFE_NO_PAD.decode(&compact_repr[first_dot_idx + 1..last_dot_idx])?;
 
     Ok(RawJws {
         compact_repr,
@@ -367,7 +367,7 @@ pub fn verify_signature(encoded_token: &str, public_key: &PublicKey, algorithm: 
         });
     }
 
-    let signature = base64::decode_config(&encoded_token[last_dot_idx + 1..], base64::URL_SAFE_NO_PAD)?;
+    let signature = general_purpose::URL_SAFE_NO_PAD.decode(&encoded_token[last_dot_idx + 1..])?;
     let signature_algo = SignatureAlgorithm::try_from(algorithm)?;
     signature_algo.verify(public_key, encoded_token[..last_dot_idx].as_bytes(), &signature)?;
 

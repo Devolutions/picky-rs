@@ -66,12 +66,14 @@ mod tests {
     use super::Pkcs7Certificate;
     use crate::pkcs7::signer_info::UnsignedAttributeValue;
     use crate::{Attribute, AttributeValues};
+    use base64::{engine::general_purpose, Engine as _};
     use picky_asn1::wrapper::{Asn1SetOf, OctetStringAsn1};
 
     #[test]
     fn full_pkcs7_decode() {
-        let decoded = base64::decode(
-            "MIIF1AYJKoZIhvcNAQcCoIIFxTCCBcECAQExADALBgkqhkiG9w0BBwGgggWnMIIF\
+        let decoded = general_purpose::STANDARD
+            .decode(
+                "MIIF1AYJKoZIhvcNAQcCoIIFxTCCBcECAQExADALBgkqhkiG9w0BBwGgggWnMIIF\
                 ozCCA4ugAwIBAgIUXp0J4CZ0ZSsXBh952AQo0XUudpwwDQYJKoZIhvcNAQELBQAw\
                 YTELMAkGA1UEBhMCQVIxCzAJBgNVBAgMAkFSMQswCQYDVQQHDAJBUjELMAkGA1UE\
                 CgwCQVIxCzAJBgNVBAsMAkFSMQswCQYDVQQDDAJBUjERMA8GCSqGSIb3DQEJARYC\
@@ -103,8 +105,8 @@ mod tests {
                 Eh49eilHGchkyMBawo80ctWy9UNH/Yt3uiwuga0Q2sCLlrbPxE5Ro3Ou/SZF9YtZ\
                 Ee/Xdsl0pUmdAylBzp08AJWCuPheE7XjrnfDlPz4BRuiB+qOMDO/ngLNZ0rFbiIV\
                 3ojRzKEAMQA=",
-        )
-        .unwrap();
+            )
+            .unwrap();
 
         let pkcs7: Pkcs7Certificate = picky_asn1_der::from_bytes(decoded.as_slice()).unwrap();
         check_serde!(pkcs7: Pkcs7Certificate in decoded);
@@ -112,8 +114,9 @@ mod tests {
 
     #[test]
     fn full_pkcs7_decode_with_ca_root() {
-        let decoded = base64::decode(
-            "MIIIwgYJKoZIhvcNAQcCoIIIszCCCK8CAQExADALBgkqhkiG9w0BBwGgggiVMIIE\
+        let decoded = general_purpose::STANDARD
+            .decode(
+                "MIIIwgYJKoZIhvcNAQcCoIIIszCCCK8CAQExADALBgkqhkiG9w0BBwGgggiVMIIE\
                 nDCCAoQCFGe148Dqygm4BCpH70eVHP64Kf3zMA0GCSqGSIb3DQEBCwUAMIGHMQsw\
                 CQYDVQQGEwJUWTELMAkGA1UECAwCVFkxETAPBgNVBAcMCFNvbWVDaXR5MRQwEgYD\
                 VQQKDAtTb21lQ29tcGFueTERMA8GA1UECwwIU29tZVVuaXQxDzANBgNVBAMMBk15\
@@ -160,8 +163,8 @@ mod tests {
                 5UPxb2USETPoTohJOPpE27w6/1Ztb8AUgDzjZwd50Ty1ci6SBeFsD7YBgnSZO9ze\
                 S8zhKeY18ivsny0RKPO28/fO7rhExogn4sg12H6kaM3NokmDUf8FVy/Np0LCFreU\
                 cjZ0Bdoi73yZiQcNp8lb1Hm5jJbq2Oa1aY88KZ1Hdyx+jqEAMQA=",
-        )
-        .unwrap();
+            )
+            .unwrap();
 
         let pkcs7: Pkcs7Certificate = picky_asn1_der::from_bytes(decoded.as_slice()).unwrap();
         check_serde!(pkcs7: Pkcs7Certificate in decoded);
@@ -169,8 +172,9 @@ mod tests {
 
     #[test]
     fn decode_pkcs7_with_timestamp() {
-        let decoded = base64::decode(
-            "MIIkWwYJKoZIhvcNAQcCoIIkTDCCJEgCAQExDzANBglghkgBZQMEAgEFADB5Bgor\
+        let decoded = general_purpose::STANDARD
+            .decode(
+                "MIIkWwYJKoZIhvcNAQcCoIIkTDCCJEgCAQExDzANBglghkgBZQMEAgEFADB5Bgor\
                   BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG\
                   KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCD+xe8u4YoS6UEO\
                   jtW70wceL89huvuluOvdcbeefpOXLqCCDYEwggX/MIID56ADAgECAhMzAAABh3IX\
@@ -364,8 +368,8 @@ mod tests {
                   ou5BeU6YgdUYlkGnJ9xD3loc6+HvRz09U9XxSZmy0tctC3jNMv92wSFi2kKcmt7i\
                   9xzUxj4Ia+jA8G4zr6nZ1bKSIZ4PJ2AhgU0ZC6FFtrj5+7Q+xwaWiHHqyILB35/K\
                   k7qonnRYsNjUjEV6mMWyBU1uS4JTUWYJXNDXvi08PG0tf5gKtPAvt8NixqJE43w=",
-        )
-        .unwrap();
+            )
+            .unwrap();
 
         let pkcs7: Pkcs7Certificate = picky_asn1_der::from_bytes(&decoded).unwrap();
         let signer_info = pkcs7
@@ -387,8 +391,9 @@ mod tests {
 
     #[test]
     fn deserialize_problem_signature() {
-        let decoded = base64::decode(
-            "MIIjkgYJKoZIhvcNAQcCoIIjgzCCI38CAQExDzANBglghkgBZQMEAgEFADB5Bgor\
+        let decoded = general_purpose::STANDARD
+            .decode(
+                "MIIjkgYJKoZIhvcNAQcCoIIjgzCCI38CAQExDzANBglghkgBZQMEAgEFADB5Bgor\
                         BgEEAYI3AgEEoGswaTA0BgorBgEEAYI3AgEeMCYCAwEAAAQQH8w7YFlLCE63JNLG\
                         KX7zUQIBAAIBAAIBAAIBAAIBADAxMA0GCWCGSAFlAwQCAQUABCBOlmcSb72K+wH5\
                         7rgEoyM/xepQH0ZFeACdfeWgW6yh06CCDYEwggX/MIID56ADAgECAhMzAAABh3IX\
@@ -579,8 +584,8 @@ mod tests {
                         1VLKNa5p8Uwx4tsWz6RvIhztN/wvOo5yUoXR55DLKUMAp283TM4A3n6exf7iEb5N\
                         4jvlHkA6au1Uan+buR92YRqCvyUjqSzSJZo7w3NwLUM6GdFUIY0=\
                         ",
-        )
-        .unwrap();
+            )
+            .unwrap();
 
         let pkcs7: Pkcs7Certificate = picky_asn1_der::from_bytes(&decoded).unwrap();
 

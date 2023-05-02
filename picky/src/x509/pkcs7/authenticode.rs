@@ -1295,6 +1295,7 @@ mod test {
     use crate::pem::parse_pem;
     use crate::x509::certificate::{CertType, CertificateBuilder};
     use crate::x509::{Csr, KeyIdGenMethod};
+    use base64::{engine::general_purpose, Engine as _};
     use picky_asn1_x509::Extension;
 
     const RSA_PRIVATE_KEY: &str = "-----BEGIN RSA PRIVATE KEY-----\n\
@@ -2422,7 +2423,7 @@ mod test {
                             2/zdX1wrovKdyKa8bF+34x+bnObgiiiNs0vqWXELgiCu2pHtcEHnHv70H62f3jBUKc5gIZ\
                             PHvJPJq54bXy2JxFBRUZFo8r8af75X3+atMp9eSErcSUK2UTygICS2lz/ZRaIZ";
 
-        let der_signature = base64::decode(signature).unwrap();
+        let der_signature = general_purpose::STANDARD.decode(signature).unwrap();
         let authenticode_signature = AuthenticodeSignature::from_der(&der_signature).unwrap();
 
         let time = UtcDate::new(2022, 7, 9, 7, 48, 3).unwrap();
@@ -2529,7 +2530,7 @@ mod test {
                               CmE1KKJ1vU1qzC03SsoPtxHKFKo5cJ88tiehDxCKDNjf1c2JJy9iGEaQZN9tLCPHtz/W6p\
                               Q355Y6GW1xdqI879CvAQX/Dy9+g42WddYjeJE0iD";
 
-        let der_signature = base64::decode(signature).unwrap();
+        let der_signature = general_purpose::STANDARD.decode(signature).unwrap();
         let authenticode_signature = AuthenticodeSignature::from_der(&der_signature).unwrap();
 
         let time = UtcDate::new(2022, 7, 9, 7, 48, 3).unwrap();

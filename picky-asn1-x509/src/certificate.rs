@@ -161,14 +161,16 @@ fn extensions_are_empty(extensions: &Extensions) -> bool {
 mod tests {
     use super::*;
     use crate::{DirectoryName, Extension, KeyIdentifier, KeyUsage};
+    use base64::{engine::general_purpose, Engine as _};
     use num_bigint_dig::BigInt;
     use picky_asn1::bit_string::BitString;
     use picky_asn1::date::UTCTime;
 
     #[test]
     fn x509_v3_certificate() {
-        let encoded = base64::decode(
-            "MIIEGjCCAgKgAwIBAgIEN8NXxDANBgkqhkiG9w0BAQsFADAiMSAwHgYDVQQ\
+        let encoded = general_purpose::STANDARD
+            .decode(
+                "MIIEGjCCAgKgAwIBAgIEN8NXxDANBgkqhkiG9w0BAQsFADAiMSAwHgYDVQQ\
              DDBdjb250b3NvLmxvY2FsIEF1dGhvcml0eTAeFw0xOTEwMTcxNzQxMjhaFw0yMjEwM\
              TYxNzQxMjhaMB0xGzAZBgNVBAMMEnRlc3QuY29udG9zby5sb2NhbDCCASIwDQYJKoZ\
              IhvcNAQEBBQADggEPADCCAQoCggEBAMptALdk7xKj9JmFSycxlaTV47oLv5Aabir17\
@@ -190,8 +192,8 @@ mod tests {
              yNp7WjRYl8hJ0YVZ7TRtP8nJOkZ6s046YHVWxMuGdqZfd/AUFb9xzzXjGRuuZ1JmSf\
              +VBOFEe2MaPMyMQBeIs3Othz6Fcy6Am5F6c3It31WYJwiCa/NdbMIvGy1xvAN5kzR/\
              Y6hkoQljoSr1rVuszJ9dtvuTccA==",
-        )
-        .expect("invalid base64");
+            )
+            .expect("invalid base64");
 
         // Issuer
 
@@ -264,8 +266,9 @@ mod tests {
 
     #[test]
     fn key_id() {
-        let encoded = base64::decode(
-            "MIIDPzCCAiegAwIBAgIBATANBgkqhkiG9w0BAQUFADA7MQswCQYDVQQGEwJOTDER\
+        let encoded = general_purpose::STANDARD
+            .decode(
+                "MIIDPzCCAiegAwIBAgIBATANBgkqhkiG9w0BAQUFADA7MQswCQYDVQQGEwJOTDER\
                 MA8GA1UECgwIUG9sYXJTU0wxGTAXBgNVBAMMEFBvbGFyU1NMIFRlc3QgQ0EwHhcN\
                 MTEwMjEyMTQ0NDA2WhcNMjEwMjEyMTQ0NDA2WjA8MQswCQYDVQQGEwJOTDERMA8G\
                 A1UECgwIUG9sYXJTU0wxGjAYBgNVBAMMEVBvbGFyU1NMIFNlcnZlciAxMIIBIjAN\
@@ -283,8 +286,8 @@ mod tests {
                 jvo3oVjiexfasjsICXFNoncjthKtS7v4zrsgXNPz92h58NgXnDtQU+Eb9tVA9kUs\
                 Ln/az3v5DdgrNoAO60zK1zYAmekLil7pgba/jBLPeAQ2fZVgFxttKv33nUnUBzKA\
                 Od8i323fM5dQS1qQpBjBc/5fPw==",
-        )
-        .expect("invalid base64");
+            )
+            .expect("invalid base64");
 
         let cert: Certificate = picky_asn1_der::from_bytes(&encoded).expect("intermediate cert");
 

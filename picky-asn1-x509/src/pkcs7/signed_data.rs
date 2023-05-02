@@ -190,6 +190,7 @@ mod tests {
         oids, Certificate, EncapsulatedRsaPublicKey, Extension, Extensions, KeyIdentifier, Name, NameAttr, PublicKey,
         RsaPublicKey, SubjectPublicKeyInfo, TbsCertificate, Validity, Version,
     };
+    use base64::{engine::general_purpose, Engine as _};
     use picky_asn1::bit_string::BitString;
     use picky_asn1::date::UTCTime;
     use picky_asn1::restricted_string::{IA5String, PrintableString};
@@ -197,8 +198,9 @@ mod tests {
 
     #[test]
     fn decode_test() {
-        let pkcs7 = base64::decode(
-            "MIIGOgYJKoZIhvcNAQcCoIIGKzCCBicCAQExADALBgkqhkiG9w0BBwGgggYNMIIG\
+        let pkcs7 = general_purpose::STANDARD
+            .decode(
+                "MIIGOgYJKoZIhvcNAQcCoIIGKzCCBicCAQExADALBgkqhkiG9w0BBwGgggYNMIIG\
                 CTCCA/GgAwIBAgIUOnS/zC1zk2aJttmSVNtzX8rhMXwwDQYJKoZIhvcNAQELBQAw\
                 gZMxCzAJBgNVBAYTAlVBMRIwEAYDVQQIDAlIdW1ibGVHdXkxETAPBgNVBAcMCFNv\
                 bWVDaXR5MRkwFwYDVQQKDBBTb21lT3JnYW5pemF0aW9uMREwDwYDVQQLDAhTb21l\
@@ -232,8 +234,8 @@ mod tests {
                 t5vcoqFzuspOVIvdPLFY3pPZY9dxVNdDi4T6qJNZCq++Ukyc0LQOUkshF9HaHB3I\
                 xUDGjR5n4X0lkjgM5IvL+OaZREqWkD/tiCu4V/5Z86mZi6VwCcgYrp/Q4bFjsWBw\
                 p0mAUFZ9UjurAaEAMQA=",
-        )
-        .unwrap();
+            )
+            .unwrap();
 
         assert_eq!(CmsVersion::V1, CmsVersion::from_u8(*pkcs7.get(25).unwrap()).unwrap());
 
@@ -322,8 +324,9 @@ mod tests {
 
     #[test]
     fn decode_with_crl() {
-        let decoded = base64::decode(
-            "MIIIxwYJKoZIhvcNAQcCoIIIuDCCCLQCAQExADALBgkqhkiG9w0BBwGgggXJMIIF\
+        let decoded = general_purpose::STANDARD
+            .decode(
+                "MIIIxwYJKoZIhvcNAQcCoIIIuDCCCLQCAQExADALBgkqhkiG9w0BBwGgggXJMIIF\
                 xTCCA62gAwIBAgIUFYedpm34R9SrNONqEn43NrNlDHMwDQYJKoZIhvcNAQELBQAw\
                 cjELMAkGA1UEBhMCZmYxCzAJBgNVBAgMAmZmMQswCQYDVQQHDAJmZjELMAkGA1UE\
                 CgwCZmYxCzAJBgNVBAsMAmZmMQ8wDQYDVQQDDAZDQU5hbWUxHjAcBgkqhkiG9w0B\
@@ -370,8 +373,8 @@ mod tests {
                 LiFMcN1hzGQQo00ycuU6eF+Iz+H/olJyrpdJxf0jh2Sok71LX6YlALvfvZjW5eYc\
                 8AvDttigOLiDwm8eYAxsC8Ku4cMiMSkgs71vvmz0U/LHypZiNJsEEaR76NH9OLiz\
                 XCIYfP7WudYgfGBRRiw4WeB7jZNtVzFzkyiwliZLqocBuM8f1O2pv/QxAA==",
-        )
-        .unwrap();
+            )
+            .unwrap();
 
         let mut issuer = Name::new();
         issuer.add_attr(NameAttr::CountryName, PrintableString::new("ff").unwrap());
@@ -408,8 +411,9 @@ mod tests {
 
     #[test]
     fn decode_certificate_trust_list_certificate_set() {
-        let decoded = base64::decode(
-            "\
+        let decoded = general_purpose::STANDARD
+            .decode(
+                "\
         oIINKTCCBhQwggP8oAMCAQICEzMAAABWo7N5AjhScwQAAAAAAFYwDQYJKoZIhvcN\
         AQELBQAwgYExCzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpXYXNoaW5ndG9uMRAwDgYD\
         VQQHEwdSZWRtb25kMR4wHAYDVQQKExVNaWNyb3NvZnQgQ29ycG9yYXRpb24xKzAp\
@@ -481,8 +485,8 @@ mod tests {
         26lk147lM9KdQ4JLbjdmuQ1nV1RaSA7jivsf7QomvA000gpHhWEqI7HgVIpQFFaF\
         wP8t92mZRH0a9E18GA7hBwfuCWZSSnoaYqTli8+FooaKcZCxfdYR01Ee2lznzNYS\
         EHaork+TtWTJve3c+w==",
-        )
-        .unwrap();
+            )
+            .unwrap();
 
         let certificate_set: CertificateSet = picky_asn1_der::from_bytes(&decoded).unwrap();
         check_serde!(certificate_set: CertificateSet in decoded);

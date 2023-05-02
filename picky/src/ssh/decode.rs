@@ -8,6 +8,7 @@ use crate::ssh::certificate::{
 use crate::ssh::private_key::{KdfOption, SshBasePrivateKey, SshPrivateKeyError};
 use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
 use crate::ssh::{read_to_buffer_until_whitespace, Base64Reader, SSH_RSA_KEY_TYPE};
+use base64::engine::general_purpose;
 use byteorder::{BigEndian, ReadBytesExt};
 use num_bigint_dig::BigUint;
 use std::io::{self, Cursor, Read};
@@ -201,7 +202,7 @@ impl SshComplexTypeDecode for SshPublicKey {
             SSH_RSA_KEY_TYPE => {
                 read_to_buffer_until_whitespace(&mut stream, &mut buffer)?;
                 let mut slice = buffer.as_slice();
-                let decoder = Base64Reader::new(&mut slice, base64::STANDARD);
+                let decoder = Base64Reader::new(&mut slice, &general_purpose::STANDARD);
                 SshComplexTypeDecode::decode(decoder)?
             }
             _ => return Err(SshPublicKeyError::UnknownKeyType),
@@ -254,7 +255,7 @@ impl SshComplexTypeDecode for SshCertificate {
         read_to_buffer_until_whitespace(&mut stream, &mut cert_data)?;
 
         let mut cert_data = cert_data.as_slice();
-        let mut cert_data = Base64Reader::new(&mut cert_data, base64::STANDARD);
+        let mut cert_data = Base64Reader::new(&mut cert_data, &general_purpose::STANDARD);
 
         let cert_key_type = cert_data.read_ssh_string()?;
         let cert_key_type = SshCertKeyType::try_from(cert_key_type)?;

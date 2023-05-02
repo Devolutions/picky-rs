@@ -529,6 +529,7 @@ impl ExtendedKeyUsage {
 mod tests {
     use super::*;
     use crate::GeneralName;
+    use base64::{engine::general_purpose, Engine as _};
     use picky_asn1::restricted_string::IA5String;
 
     #[test]
@@ -543,8 +544,9 @@ mod tests {
 
     #[test]
     fn eku_ku_bc_san_extensions() {
-        let cert_der = base64::decode(
-            "MIIDIjCCAgoCAQAwIDELMAkGA1UEBhMCRlIxETAPBgNVBAMMCERyYXBlYXUhMIIB\
+        let cert_der = general_purpose::STANDARD
+            .decode(
+                "MIIDIjCCAgoCAQAwIDELMAkGA1UEBhMCRlIxETAPBgNVBAMMCERyYXBlYXUhMIIB\
                            IjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA5GqDEM7AfctJizsFEqtAvXd5\
                            Fl1GtyXDAnx68MUTuSL22t8aBZoCCi3/9AlS75uUqKggHnRuY2MRYPQaUzpE1F1a\
                            aZJNr6tXQy39FtdXrDq2zfwZdDmLW6sPmhvJrBO4yWjuG3wh1paPHy+rBHOjYt+9\
@@ -561,8 +563,8 @@ mod tests {
                            VDWhWaGncSdDur6++dp2OAGYTAv4XIHc0nhtcBoxeL4VhjcuksOdGg3JF02gW6Rc\
                            B1gipqD0jun8kPgWcQY22zhmP2HuPp0y58t9cu9FsnUcAFa//5pQA1LuaSFp65D4\
                            92uaByS3lH18xzrkygzn1BeHRpo0fk4I9Rk8uy2QygCk43Pv6SU=",
-        )
-        .expect("cert der");
+            )
+            .expect("cert der");
 
         let encoded = &cert_der[359..359 + 3 + 168];
 

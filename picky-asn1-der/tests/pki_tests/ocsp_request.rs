@@ -39,6 +39,7 @@
 // https://access.redhat.com/documentation/en-us/red_hat_certificate_system/9/html/administration_guide/online_certificate_status_protocol_responder
 // https://lapo.it/asn1js/#MEIwQDA-MDwwOjAJBgUrDgMCGgUABBT4cyABkyiCIhU4JpmIBewdDnn8ZgQUbyBZ44kgy35o7xW5BMzM8FTvyTwCAQE
 
+use base64::{engine::general_purpose, Engine as _};
 use oid::prelude::*;
 use picky_asn1::wrapper::{ObjectIdentifierAsn1, OctetStringAsn1};
 use serde::{Deserialize, Serialize};
@@ -74,11 +75,12 @@ pub struct AlgorithmIdentifier {
 
 #[test]
 fn ocsp_request() {
-    let encoded_ocsp_request = base64::decode(
-        "MEIwQDA+MDwwOjAJBgUrDgMCGgUABBT4cyABkyiCIhU4J\
+    let encoded_ocsp_request = general_purpose::STANDARD
+        .decode(
+            "MEIwQDA+MDwwOjAJBgUrDgMCGgUABBT4cyABkyiCIhU4J\
          pmIBewdDnn8ZgQUbyBZ44kgy35o7xW5BMzM8FTvyTwCAQE=",
-    )
-    .expect("invalid base64");
+        )
+        .expect("invalid base64");
 
     let sha1_oid = ObjectIdentifier::try_from("1.3.14.3.2.26").unwrap();
     let ocsp_request = OcspRequest {

@@ -5,7 +5,7 @@
 use crate::jose::jwe::{JweAlg, JweEnc};
 use crate::jose::jws::JwsAlg;
 use crate::key::PublicKey;
-use base64::DecodeError;
+use base64::{engine::general_purpose, DecodeError, Engine as _};
 use picky_asn1::wrapper::IntegerAsn1;
 use picky_asn1_x509::SubjectPublicKeyInfo;
 use serde::{Deserialize, Serialize};
@@ -74,8 +74,8 @@ impl JwkKeyType {
         let modulus = Self::h_strip_unrequired_leading_zero(modulus);
         let public_exponent = Self::h_strip_unrequired_leading_zero(public_exponent);
         Self::Rsa(JwkPublicRsaKey {
-            n: base64::encode_config(modulus, base64::URL_SAFE_NO_PAD),
-            e: base64::encode_config(public_exponent, base64::URL_SAFE_NO_PAD),
+            n: general_purpose::URL_SAFE_NO_PAD.encode(modulus),
+            e: general_purpose::URL_SAFE_NO_PAD.encode(public_exponent),
         })
     }
 
@@ -315,22 +315,26 @@ pub struct JwkPublicRsaKey {
 impl JwkPublicRsaKey {
     pub fn modulus_signed_bytes_be(&self) -> Result<Vec<u8>, JwkError> {
         let mut buf = Self::h_allocate_signed_big_int_buffer(&self.n);
-        base64::decode_config_buf(&self.n, base64::URL_SAFE_NO_PAD, &mut buf).map_err(JwkError::from)?;
+        general_purpose::URL_SAFE_NO_PAD
+            .decode_vec(&self.n, &mut buf)
+            .map_err(JwkError::from)?;
         Ok(buf)
     }
 
     pub fn modulus_unsigned_bytes_be(&self) -> Result<Vec<u8>, JwkError> {
-        base64::decode_config(&self.n, base64::URL_SAFE_NO_PAD).map_err(JwkError::from)
+        general_purpose::URL_SAFE_NO_PAD.decode(&self.n).map_err(JwkError::from)
     }
 
     pub fn public_exponent_signed_bytes_be(&self) -> Result<Vec<u8>, JwkError> {
         let mut buf = Self::h_allocate_signed_big_int_buffer(&self.e);
-        base64::decode_config_buf(&self.e, base64::URL_SAFE_NO_PAD, &mut buf).map_err(JwkError::from)?;
+        general_purpose::URL_SAFE_NO_PAD
+            .decode_vec(&self.e, &mut buf)
+            .map_err(JwkError::from)?;
         Ok(buf)
     }
 
     pub fn public_exponent_unsigned_bytes_be(&self) -> Result<Vec<u8>, JwkError> {
-        base64::decode_config(&self.e, base64::URL_SAFE_NO_PAD).map_err(JwkError::from)
+        general_purpose::URL_SAFE_NO_PAD.decode(&self.e).map_err(JwkError::from)
     }
 
     fn h_allocate_signed_big_int_buffer(base64_url_encoding: &str) -> Vec<u8> {
@@ -475,9 +479,9 @@ ZQIDAQAB
         let initial_key = PublicKey::from_pem(&PUBLIC_KEY_PEM.parse::<Pem>().expect("pem")).expect("public key");
         let jwk = Jwk::from_public_key(&initial_key).unwrap();
         if let JwkKeyType::Rsa(rsa_key) = &jwk.key {
-            let modulus = base64::decode_config(&rsa_key.n, base64::URL_SAFE_NO_PAD).unwrap();
+            let modulus = general_purpose::URL_SAFE_NO_PAD.decode(&rsa_key.n).unwrap();
             assert_ne!(modulus[0], 0x00);
-            let public_exponent = base64::decode_config(&rsa_key.e, base64::URL_SAFE_NO_PAD).unwrap();
+            let public_exponent = general_purpose::URL_SAFE_NO_PAD.decode(&rsa_key.e).unwrap();
             assert_ne!(public_exponent[0], 0x00);
         } else {
             panic!("Unexpected key type");

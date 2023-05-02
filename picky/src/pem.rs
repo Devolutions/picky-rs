@@ -3,7 +3,7 @@
 //! Based on the RFC-7468
 //! ([Textual Encodings of PKIX, PKCS, and CMS Structures](https://tools.ietf.org/html/rfc7468)).
 
-use base64::DecodeError;
+use base64::{engine::general_purpose, DecodeError, Engine as _};
 use std::borrow::Cow;
 use std::fmt;
 use std::io::BufRead;
@@ -79,7 +79,7 @@ impl fmt::Display for Pem<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "{} {}-----", PEM_HEADER_START, self.label)?;
 
-        let encoded = base64::encode(&self.data);
+        let encoded = general_purpose::STANDARD.encode(&self.data);
         let bytes = encoded.as_bytes();
         for chunk in bytes.chunks(64) {
             let chunk = std::str::from_utf8(chunk).map_err(|_| fmt::Error)?;
@@ -133,10 +133,14 @@ fn parse_pem_impl(input: &[u8]) -> Result<Pem<'static>, PemError> {
             .copied()
             .filter(|&byte| byte != b'\r' && byte != b'\n')
             .collect();
-        base64::decode(striped_raw_data).map_err(|source| PemError::Base64Decoding { source })?
+        general_purpose::STANDARD
+            .decode(striped_raw_data)
+            .map_err(|source| PemError::Base64Decoding { source })?
     } else {
         // Can be decoded as is!
-        base64::decode(raw_data).map_err(|source| PemError::Base64Decoding { source })?
+        general_purpose::STANDARD
+            .decode(raw_data)
+            .map_err(|source| PemError::Base64Decoding { source })?
     };
 
     Ok(Pem {
@@ -173,7 +177,9 @@ pub fn read_pem(reader: &mut impl BufRead) -> Result<Pem<'static>, PemError> {
         .cloned()
         .filter(|&byte| byte != b'\r' && byte != b'\n')
         .collect();
-    let data = base64::decode(base64_data).map_err(|source| PemError::Base64Decoding { source })?;
+    let data = general_purpose::STANDARD
+        .decode(base64_data)
+        .map_err(|source| PemError::Base64Decoding { source })?;
 
     // read until end of footer
     h_read_until(reader, PEM_DASHES_BOUNDARIES.as_bytes(), &mut buf).ok_or(PemError::FooterNotFound)?;
@@ -265,7 +271,7 @@ mod tests {
         pretty_assertions::assert_eq!(reconverted_pem, PEM_STR);
     }
 
-    const FLATTENED_PEM: &str = "-----BEGIN GARBAGE-----GARBAGE-----END GARBAGE-----";
+    const FLATTENED_PEM: &str = "-----BEGIN GARBAGE-----R0FSQkFHRQo=-----END GARBAGE-----";
 
     #[test]
     fn flattened() {
@@ -273,8 +279,8 @@ mod tests {
         read_pem(&mut BufReader::new(FLATTENED_PEM.as_bytes())).unwrap();
     }
 
-    const MULTIPLE_PEM: &str = "-----BEGIN GARBAGE1-----GARBAGE-----END GARBAGE1-----\
-         -----BEGIN GARBAGE2-----GARBAGE-----END GARBAGE2-----";
+    const MULTIPLE_PEM: &str = "-----BEGIN GARBAGE1-----R0FSQkFHRQo=-----END GARBAGE1-----\
+         -----BEGIN GARBAGE2-----R0FSQkFHRQo=-----END GARBAGE2-----";
 
     #[test]
     fn multiple() {

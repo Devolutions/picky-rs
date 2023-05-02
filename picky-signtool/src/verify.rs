@@ -3,6 +3,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, bail, Context};
+use base64::{engine::general_purpose, Engine as _};
 use clap::ArgMatches;
 use lief::Binary;
 
@@ -170,7 +171,9 @@ pub fn authenticode_signature_ps_from_file(file_path: &Path) -> anyhow::Result<A
     let signature = extract_ps_authenticode_signature(buffer.as_ref())
         .with_context(|| format!("Failed to extract Authenticode signature from {:?}", file_path))?;
 
-    let der_signature = base64::decode(signature).context("Failed to convert signature to DER")?;
+    let der_signature = general_purpose::STANDARD
+        .decode(signature)
+        .context("Failed to convert signature to DER")?;
 
     let authenticode_signature = AuthenticodeSignature::from_der(&der_signature)
         .with_context(|| format!("Failed to deserialize Authenticode signature for {:?}", file_path))?;

@@ -15,6 +15,7 @@
 // https://lapo.it/asn1js/#MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsiLoIxmXaZAFRBKtHYZhiF8m-pYR-xGIpupvsdDEvKO92D6fIccgVLIW6p6sSNkoXx5J6KDSMbA_chy5M6pRvJkaCXCI4zlCPMYvPhI8OxN3RYPfdQTLpgPywrlfdn2CAum7o4D8nR4NJacB3NfPnS9tsJ2L3p5iHviuTB4xm03IKmPPqsaJy-nXUFC1XS9E_PseVHRuNvKa7WmlwSZngQzKAVSIwqpgCc-oP1pKEeJ0M3LHFo8ao5SuzhfXUIGrPnkUKEE3m7B0b8xXZfP1N6ELoonWDK-RMgYIBaZdgBhPfHxF8KfTHvSzcUzWZojuR-ynaFL9AJK-8RiXnB4CJwIDAQAB
 
 use super::ocsp_request::AlgorithmIdentifier;
+use base64::{engine::general_purpose, Engine as _};
 use num_bigint_dig::BigInt;
 use oid::prelude::*;
 use picky_asn1::wrapper::*;
@@ -35,16 +36,17 @@ type EncapsulatedRSAPublicKey = BitStringAsn1Container<RSAPublicKey>;
 
 #[test]
 fn subject_public_key_info() {
-    let encoded = base64::decode(
-        "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsiLoIx\
+    let encoded = general_purpose::STANDARD
+        .decode(
+            "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsiLoIx\
          mXaZAFRBKtHYZhiF8m+pYR+xGIpupvsdDEvKO92D6fIccgVLIW6p6sSNk\
          oXx5J6KDSMbA/chy5M6pRvJkaCXCI4zlCPMYvPhI8OxN3RYPfdQTLpgPy\
          wrlfdn2CAum7o4D8nR4NJacB3NfPnS9tsJ2L3p5iHviuTB4xm03IKmPPq\
          saJy+nXUFC1XS9E/PseVHRuNvKa7WmlwSZngQzKAVSIwqpgCc+oP1pKEe\
          J0M3LHFo8ao5SuzhfXUIGrPnkUKEE3m7B0b8xXZfP1N6ELoonWDK+RMgY\
          IBaZdgBhPfHxF8KfTHvSzcUzWZojuR+ynaFL9AJK+8RiXnB4CJwIDAQAB",
-    )
-    .expect("invalid base64");
+        )
+        .expect("invalid base64");
 
     // RSA algorithm identifier
 

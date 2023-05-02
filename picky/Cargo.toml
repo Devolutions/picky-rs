@@ -26,7 +26,7 @@ picky-asn1-der = { version = "0.4", path = "../picky-asn1-der" }
 picky-asn1-x509 = { version = "0.9", path = "../picky-asn1-x509", features = ["legacy", "zeroize"] }
 serde = { version = "1.0.152", features = ["derive"] }
 oid = { version = "0.2.1", features = ["serde_support"] }
-base64 = "0.13.1"
+base64 = "0.21.0"
 thiserror = "1.0.38"
 byteorder = { version = "1.4.3", optional = true }
 chrono = { version = "0.4.23", optional = true }

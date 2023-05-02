@@ -310,12 +310,14 @@ impl Serialize for UnsignedAttributeValue {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use base64::{engine::general_purpose, Engine as _};
 
     #[cfg(feature = "ctl")]
     #[test]
     fn decode_certificate_trust_list_signer_info() {
-        let decoded = base64::decode(
-            "MIICngIBATCBmTCBgTELMAkGA1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24x\
+        let decoded = general_purpose::STANDARD
+            .decode(
+                "MIICngIBATCBmTCBgTELMAkGA1UEBhMCVVMxEzARBgNVBAgTCldhc2hpbmd0b24x\
             EDAOBgNVBAcTB1JlZG1vbmQxHjAcBgNVBAoTFU1pY3Jvc29mdCBDb3Jwb3JhdGlv\
             bjErMCkGA1UEAxMiTWljcm9zb2Z0IENlcnRpZmljYXRlIExpc3QgQ0EgMjAxMQIT\
             MwAAAFajs3kCOFJzBAAAAAAAVjANBglghkgBZQMEAgEFAKCB2jAYBgkqhkiG9w0B\
@@ -330,8 +332,8 @@ mod tests {
             cwcGic2ebDrpSZe0VVEgF9Blqk49W+JRwADVNdWFcDZbiAQv63vSy+VdFzKZer07\
             JAVDdVamvS5pk4MvNkszAG2KHsij6J3M97KcJY0FKuhPsfb9pnR61nmfDaFzoHOY\
             pkw=",
-        )
-        .unwrap();
+            )
+            .unwrap();
 
         let signer_info: SignerInfo = picky_asn1_der::from_bytes(&decoded).unwrap();
         check_serde!(signer_info: SignerInfo in decoded);

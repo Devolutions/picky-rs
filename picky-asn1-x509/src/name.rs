@@ -382,6 +382,7 @@ pub struct EdiPartyName {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use base64::{engine::general_purpose, Engine as _};
     use oid::ObjectIdentifier;
     use picky_asn1::restricted_string::IA5String;
     use picky_asn1_der::Asn1RawDer;
