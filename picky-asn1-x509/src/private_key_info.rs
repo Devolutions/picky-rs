@@ -1,15 +1,22 @@
-use crate::{oids, AlgorithmIdentifier, AlgorithmIdentifierParameters, EcParameters};
+use crate::{oids, AlgorithmIdentifier, AlgorithmIdentifierParameters, EcParameters, EncapsulatedEcPoint};
+
+use picky_asn1::tag::TagPeeker;
 use picky_asn1::wrapper::{
-    BitStringAsn1, ExplicitContextTag0, ExplicitContextTag1, IntegerAsn1, OctetStringAsn1, OctetStringAsn1Container,
-    Optional,
+    BitStringAsn1, ExplicitContextTag0, ExplicitContextTag1, IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1,
+    OctetStringAsn1Container, Optional,
 };
 #[cfg(not(feature = "legacy"))]
 use serde::Deserialize;
 use serde::{de, ser, Serialize};
-
-use std::fmt;
 #[cfg(feature = "zeroize")]
 use zeroize::Zeroize;
+
+use oid::ObjectIdentifier;
+use picky_asn1::bit_string::BitString;
+use picky_asn1::Asn1Type;
+use std::fmt;
+
+pub type EncapsulatedEcSecret = OctetStringAsn1;
 
 /// [Public-Key Cryptography Standards (PKCS) #8](https://tools.ietf.org/html/rfc5208#section-5)
 ///
@@ -56,7 +63,7 @@ pub struct PrivateKeyInfo {
     pub version: u8,
     pub private_key_algorithm: AlgorithmIdentifier,
     pub private_key: PrivateKeyValue,
-    //pub attributes
+    // -- attributes (not supported)
 }
 
 impl PrivateKeyInfo {
@@ -86,6 +93,42 @@ impl PrivateKeyInfo {
         Self {
             version: 0,
             private_key_algorithm: AlgorithmIdentifier::new_rsa_encryption(),
+            private_key,
+        }
+    }
+
+    /// Creates a new `PrivateKeyInfo` with the given `curve_oid` and `secret`.
+    ///
+    /// If `skip_optional_params` is `true`, the `parameters` field will be omitted from internal
+    /// `ECPrivateKey` ASN.1 structure, reducing duplication. This inforation is still present in
+    /// the `private_key_algorithm` field.
+    pub fn new_ec_encryption(
+        curve_oid: ObjectIdentifier,
+        secret: impl Into<OctetStringAsn1>,
+        public_point: Option<BitString>,
+        skip_optional_params: bool,
+    ) -> Self {
+        let curve_oid: ObjectIdentifierAsn1 = curve_oid.into();
+        let secret: OctetStringAsn1 = secret.into();
+        let point: Option<BitStringAsn1> = public_point.map(Into::into);
+
+        let parameters: ExplicitContextTag0<Option<EcParameters>> =
+            (!skip_optional_params).then(|| curve_oid.clone().into()).into();
+        let public_point: ExplicitContextTag1<Option<BitStringAsn1>> = point.into();
+
+        let private_key = PrivateKeyValue::EC(
+            ECPrivateKey {
+                version: vec![1].into(),
+                private_key: secret,
+                parameters: parameters.into(),
+                public_key: public_point.into(),
+            }
+            .into(),
+        );
+
+        Self {
+            version: 0,
+            private_key_algorithm: AlgorithmIdentifier::new_elliptic_curve(curve_oid.into()),
             private_key,
         }
     }
@@ -120,10 +163,11 @@ impl<'de> de::Deserialize<'de> for PrivateKeyInfo {
 
                 let private_key_algorithm: AlgorithmIdentifier =
                     seq_next_element!(seq, PrivateKeyInfo, "private key algorithm");
+
                 let private_key = if private_key_algorithm.is_a(oids::rsa_encryption()) {
                     PrivateKeyValue::RSA(seq_next_element!(seq, PrivateKeyInfo, "rsa oid"))
                 } else if matches!(private_key_algorithm.parameters(), AlgorithmIdentifierParameters::Ec(_)) {
-                    PrivateKeyValue::EC(seq_next_element!(seq, PrivateKeyInfo, "ec oid"))
+                    PrivateKeyValue::EC(seq_next_element!(seq, PrivateKeyInfo, "ec private key"))
                 } else {
                     return Err(serde_invalid_value!(
                         PrivateKeyInfo,
@@ -364,11 +408,11 @@ impl RsaPrivateKey {
 #[derive(Serialize, Debug, Clone, PartialEq, Eq)]
 pub struct ECPrivateKey {
     pub version: IntegerAsn1,
-    pub private_key: OctetStringAsn1,
+    pub private_key: EncapsulatedEcSecret,
     #[serde(skip_serializing_if = "Optional::is_default")]
     pub parameters: Optional<ExplicitContextTag0<Option<EcParameters>>>,
     #[serde(skip_serializing_if = "Optional::is_default")]
-    pub public_key: Optional<ExplicitContextTag1<BitStringAsn1>>,
+    pub public_key: Optional<ExplicitContextTag1<Option<EncapsulatedEcPoint>>>,
 }
 
 impl<'de> serde::Deserialize<'de> for ECPrivateKey {
@@ -398,22 +442,39 @@ impl<'de> serde::Deserialize<'de> for ECPrivateKey {
                     ));
                 }
 
-                Ok(ECPrivateKey {
+                let private_key = seq_next_element!(seq, OctetStringAsn1, "OctetStringAsn1");
+
+                let mut ec_private_key = ECPrivateKey {
                     version,
-                    private_key: seq_next_element!(seq, OctetStringAsn1, "OctetStringAsn1"),
-                    parameters: seq_next_element!(
-                        seq,
-                        Optional<ExplicitContextTag0<Option<EcParameters>>>,
-                        ECPrivateKey,
-                        "EcParameters"
-                    ),
-                    public_key: seq_next_element!(
-                        seq,
-                        Optional<ExplicitContextTag1<BitStringAsn1>>,
-                        ECPrivateKey,
-                        "BitStringAsn1"
-                    ),
-                })
+                    private_key,
+                    parameters: Optional::default(),
+                    public_key: Optional::default(),
+                };
+
+                let mut last_tag = seq.next_element::<TagPeeker>()?;
+
+                if let Some(tag) = &last_tag {
+                    if tag.next_tag == ExplicitContextTag0::<EcParameters>::TAG {
+                        let parameters =
+                            seq_next_element!(seq, ExplicitContextTag0<EcParameters>, ECPrivateKey, "EcParameters");
+
+                        ec_private_key.parameters = Optional(ExplicitContextTag0(Some(parameters.0)));
+
+                        // Query next tag, as we still could encounter public key tag
+                        last_tag = seq.next_element::<TagPeeker>()?;
+                    }
+                }
+
+                if let Some(tag) = last_tag {
+                    if tag.next_tag == ExplicitContextTag1::<BitStringAsn1>::TAG {
+                        let public_key =
+                            seq_next_element!(seq, ExplicitContextTag1<BitStringAsn1>, ECPrivateKey, "BitStringAsn1");
+
+                        ec_private_key.public_key = Optional(ExplicitContextTag1(Some(public_key.0)));
+                    }
+                }
+
+                Ok(ec_private_key)
             }
         }
 
@@ -518,9 +579,9 @@ mod tests {
             version: IntegerAsn1([1].into()),
             private_key: OctetStringAsn1::from(decoded[8..74].to_vec()),
             parameters: ExplicitContextTag0(Some(EcParameters::NamedCurve(oids::secp521r1().into()))).into(),
-            public_key: Optional(ExplicitContextTag1(
+            public_key: Optional(ExplicitContextTag1(Some(
                 BitString::with_bytes(decoded[90..].to_vec()).into(),
-            )),
+            ))),
         };
 
         check_serde!(ec_key: ECPrivateKey in decoded);
@@ -540,9 +601,9 @@ mod tests {
                 version: IntegerAsn1([1].into()),
                 private_key: OctetStringAsn1(decoded[36..68].to_vec()),
                 parameters: Optional(Default::default()),
-                public_key: Optional(ExplicitContextTag1(
+                public_key: Optional(ExplicitContextTag1(Some(
                     BitString::with_bytes(decoded[73..].to_vec()).into(),
-                )),
+                ))),
             })),
         };
 

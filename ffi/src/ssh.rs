@@ -51,7 +51,7 @@ impl From<ssh::SshCertType> for ffi::SshCertType {
 #[diplomat::bridge]
 pub mod ffi {
     use crate::error::ffi::PickyError;
-    use crate::key::ffi::PrivateKey;
+    use crate::key::ffi::{EcCurve, PrivateKey};
     use crate::pem::ffi::Pem;
     use crate::signature::ffi::SignatureAlgorithm;
     use diplomat_runtime::{DiplomatResult, DiplomatWriteable};
@@ -120,6 +120,32 @@ pub mod ffi {
             };
 
             let key = err_check!(ssh::SshPrivateKey::generate_rsa(bits, passphrase, comment));
+            Ok(Box::new(SshPrivateKey(key))).into()
+        }
+
+        /// Generates a new SSH EC Private Key.
+        ///
+        /// No passphrase is set if `passphrase` is empty.
+        ///
+        /// No comment is set if `comment` is empty.
+        pub fn generate_ec(
+            curve: EcCurve,
+            passphrase: &str,
+            comment: &str,
+        ) -> DiplomatResult<Box<SshPrivateKey>, Box<PickyError>> {
+            let passphrase = if passphrase.is_empty() {
+                None
+            } else {
+                Some(passphrase.to_owned())
+            };
+
+            let comment = if comment.is_empty() {
+                None
+            } else {
+                Some(comment.to_owned())
+            };
+
+            let key = err_check!(ssh::SshPrivateKey::generate_ec(curve.into(), passphrase, comment));
             Ok(Box::new(SshPrivateKey(key))).into()
         }
 

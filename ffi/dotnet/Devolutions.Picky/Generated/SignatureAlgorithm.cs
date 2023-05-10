@@ -52,6 +52,28 @@ public partial class SignatureAlgorithm: IDisposable
     }
 
     /// <exception cref="PickyException"></exception>
+    /// <returns>
+    /// A <c>SignatureAlgorithm</c> allocated on Rust side.
+    /// </returns>
+    public static SignatureAlgorithm NewEcdsa(HashAlgorithm hashAlgorithm)
+    {
+        unsafe
+        {
+            Raw.HashAlgorithm hashAlgorithmRaw;
+            hashAlgorithmRaw = (Raw.HashAlgorithm)hashAlgorithm;
+            IntPtr resultPtr = Raw.SignatureAlgorithm.NewEcdsa(hashAlgorithmRaw);
+            Raw.SignatureFfiResultBoxSignatureAlgorithmBoxPickyError result = Marshal.PtrToStructure<Raw.SignatureFfiResultBoxSignatureAlgorithmBoxPickyError>(resultPtr);
+            Raw.SignatureFfiResultBoxSignatureAlgorithmBoxPickyError.Destroy(resultPtr);
+            if (!result.isOk)
+            {
+                throw new PickyException(new PickyError(result.Err));
+            }
+            Raw.SignatureAlgorithm* retVal = result.Ok;
+            return new SignatureAlgorithm(retVal);
+        }
+    }
+
+    /// <exception cref="PickyException"></exception>
     public void Verify(PublicKey publicKey, byte[] msg, byte[] signature)
     {
         unsafe

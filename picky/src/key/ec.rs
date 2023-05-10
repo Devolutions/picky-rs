@@ -1,64 +1,225 @@
+use super::PrivateKeyKind;
 use crate::key::{KeyError, PrivateKey, PublicKey};
-use picky_asn1::wrapper::{BitStringAsn1, OctetStringAsn1Container};
-use picky_asn1_x509::{oids, private_key_info};
+use crate::oid::ObjectIdentifier;
+use picky_asn1::wrapper::BitStringAsn1;
+use picky_asn1_x509::{oids, EcParameters};
+use std::fmt::Display;
 
+#[derive(Debug)]
 pub(crate) struct EcdsaKeypair {
-    pub(crate) private_key: Vec<u8>,
-    pub(crate) curve: EcdsaCurve,
+    curve: NamedEcCurve,
+    private_key: Vec<u8>,
+    public_key: Vec<u8>,
 }
 
-#[derive(Debug, PartialEq)]
-pub(crate) enum EcdsaCurve {
-    Nist256,
-    Nist384,
-    Nist512,
+impl EcdsaKeypair {
+    pub fn curve(&self) -> &NamedEcCurve {
+        &self.curve
+    }
+
+    pub fn secret(&self) -> &[u8] {
+        &self.private_key
+    }
+}
+
+pub(crate) enum EcComponent<'a> {
+    PointX(&'a [u8]),
+    PointY(&'a [u8]),
+    Secret(&'a [u8]),
+}
+
+/// Elliptic curve name to use for curve operations which require curve-specific arithmetic.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EcCurve {
+    /// NIST P-256 curve (secp256r1)
+    NistP256,
+    /// NIST P-384 curve (secp384r1)
+    NistP384,
+}
+
+impl EcCurve {
+    /// Get size of field compoennet in bytes (e.g. X and Y point values, Secret key,
+    /// R and S signature values)
+    pub(crate) fn field_bytes_size(self) -> usize {
+        match self {
+            EcCurve::NistP256 => {
+                use p256::elliptic_curve::generic_array::typenum::Unsigned;
+                use p256::elliptic_curve::FieldBytesSize;
+                <FieldBytesSize<p256::NistP256> as Unsigned>::USIZE
+            }
+            EcCurve::NistP384 => {
+                use p384::elliptic_curve::generic_array::typenum::Unsigned;
+                use p384::elliptic_curve::FieldBytesSize;
+                <FieldBytesSize<p384::NistP384> as Unsigned>::USIZE
+            }
+        }
+    }
+
+    /// We need to validate input data sizes to prevent panics in the underlying `generic_array`
+    /// library code.
+    pub(crate) fn validate_component<'a>(&self, component: EcComponent<'a>) -> Result<&'a [u8], KeyError> {
+        let (buffer, error_message) = match component {
+            EcComponent::PointX(buf) => (buf, "Invalid `point.x` component size"),
+            EcComponent::PointY(buf) => (buf, "Invalid `point.y` component size"),
+            EcComponent::Secret(buf) => (buf, "Invalid `secret` component size"),
+        };
+
+        if buffer.len() != self.field_bytes_size() {
+            return Err(KeyError::EC {
+                context: error_message.to_string(),
+            });
+        }
+
+        Ok(buffer)
+    }
+}
+
+/// Describes the curve type of an ECDSA keypair
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum NamedEcCurve {
+    Known(EcCurve),
+    Unsupported(ObjectIdentifier),
+}
+
+impl NamedEcCurve {
+    #[cfg(feature = "ssh")]
+    pub fn new_nist_p521() -> Self {
+        Self::Unsupported(oids::secp521r1())
+    }
+
+    #[cfg(feature = "ssh")]
+    pub fn is_nist_p521(&self) -> bool {
+        match self {
+            Self::Unsupported(oid) => oid == &oids::secp521r1(),
+            _ => false,
+        }
+    }
+}
+
+impl Display for EcCurve {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NistP256 => write!(f, "NIST-P256"),
+            Self::NistP384 => write!(f, "NIST-P384"),
+        }
+    }
+}
+
+impl Display for NamedEcCurve {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Known(curve) => curve.fmt(f),
+            Self::Unsupported(oid) => {
+                let oid: String = oid.into();
+                write!(f, "Unsupported(OID: {})", oid)
+            }
+        }
+    }
+}
+
+impl From<&'_ ObjectIdentifier> for NamedEcCurve {
+    fn from(value: &ObjectIdentifier) -> Self {
+        let oid: String = value.into();
+        match oid.as_str() {
+            oids::SECP256R1 => NamedEcCurve::Known(EcCurve::NistP256),
+            oids::SECP384R1 => NamedEcCurve::Known(EcCurve::NistP384),
+            _ => NamedEcCurve::Unsupported(value.clone()),
+        }
+    }
+}
+
+impl From<NamedEcCurve> for ObjectIdentifier {
+    fn from(value: NamedEcCurve) -> Self {
+        match value {
+            NamedEcCurve::Known(curve) => match curve {
+                EcCurve::NistP256 => oids::secp256r1(),
+                EcCurve::NistP384 => oids::secp384r1(),
+            },
+            NamedEcCurve::Unsupported(oid) => oid,
+        }
+    }
 }
 
 impl<'a> TryFrom<&'a PrivateKey> for EcdsaKeypair {
     type Error = KeyError;
 
     fn try_from(v: &'a PrivateKey) -> Result<Self, Self::Error> {
-        let private_key_data = match &v.as_inner().private_key {
-            private_key_info::PrivateKeyValue::RSA(_) => Err(KeyError::EC {
+        match &v.kind {
+            PrivateKeyKind::Rsa => Err(KeyError::EC {
                 context: "EC keypair cannot be built from RSA private key".to_string(),
             }),
-            private_key_info::PrivateKeyValue::EC(OctetStringAsn1Container(private_key)) => {
-                Ok(private_key.private_key.to_vec())
-            }
-        }?;
-
-        let curve = match &v.as_inner().private_key_algorithm.parameters() {
-            picky_asn1_x509::AlgorithmIdentifierParameters::Ec(params) => match params {
-                Some(ec_parameters) => match ec_parameters {
-                    picky_asn1_x509::EcParameters::NamedCurve(curve) => {
-                        let oid = Into::<String>::into(&curve.0);
-                        match oid.as_str() {
-                            oids::SECP256R1 => Ok(EcdsaCurve::Nist256),
-                            oids::SECP384R1 => Ok(EcdsaCurve::Nist384),
-                            oids::SECP521R1 => Ok(EcdsaCurve::Nist512),
-                            unknown => Err(KeyError::EC {
-                                context: format!("Unknown curve type: {}", unknown),
-                            }),
-                        }
-                    }
-                },
-                None => Err(KeyError::EC {
-                    context: "EC keypair cannot be built when curve type is not provided by private key".to_string(),
-                }),
-            },
-            _ => Err(KeyError::EC {
-                context: "No Ec parameters found in private_key_algorithm".to_string(),
+            PrivateKeyKind::Ec {
+                public_key,
+                private_key,
+                curve_oid,
+                ..
+            } => Ok(Self {
+                curve: NamedEcCurve::from(curve_oid),
+                private_key: private_key.clone(),
+                public_key: public_key.clone(),
             }),
-        }?;
-
-        Ok(EcdsaKeypair {
-            private_key: private_key_data,
-            curve,
-        })
+        }
     }
 }
+
+pub(crate) fn calculate_public_ec_key(
+    curve_oid: &ObjectIdentifier,
+    private_key: &[u8],
+    compress: bool,
+) -> Result<Vec<u8>, KeyError> {
+    let curve = NamedEcCurve::from(curve_oid);
+
+    match curve {
+        NamedEcCurve::Known(EcCurve::NistP256) => {
+            use p256::{
+                elliptic_curve::{generic_array::GenericArray as GenericArrayP256, sec1::ToEncodedPoint as _},
+                SecretKey as SecretKeyP256,
+            };
+
+            let secret_bytes = GenericArrayP256::from_slice(private_key);
+            let secret_key = SecretKeyP256::from_bytes(secret_bytes).map_err(|_| KeyError::EC {
+                context: "Failed to construct P256 SecretKey from private key bytes".to_string(),
+            })?;
+
+            // Calculate public key from secret key
+            let public_key = secret_key.public_key().as_affine().to_encoded_point(compress);
+
+            Ok(public_key.to_bytes().to_vec())
+        }
+        NamedEcCurve::Known(EcCurve::NistP384) => {
+            use p384::{
+                elliptic_curve::{generic_array::GenericArray as GenericArrayP384, sec1::ToEncodedPoint as _},
+                SecretKey as SecretKeyP384,
+            };
+
+            let secret_bytes = GenericArrayP384::from_slice(private_key);
+            let secret_key = SecretKeyP384::from_bytes(secret_bytes).map_err(|_| KeyError::EC {
+                context: "Failed to construct P384 SecretKey from private key bytes".to_string(),
+            })?;
+
+            // Calculate public key from secret key
+            let public_key = secret_key.public_key().as_affine().to_encoded_point(compress);
+
+            Ok(public_key.to_bytes().to_vec())
+        }
+        NamedEcCurve::Unsupported(oid) => Err(KeyError::unsupported_curve(&oid, "public key calculation")),
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct EcdsaPublicKey<'a> {
-    pub(crate) data: &'a [u8],
+    data: &'a [u8],
+    curve: NamedEcCurve,
+}
+
+impl EcdsaPublicKey<'_> {
+    pub fn curve(&self) -> &NamedEcCurve {
+        &self.curve
+    }
+
+    pub fn encoded_point(&self) -> &[u8] {
+        self.data
+    }
 }
 
 impl<'a> TryFrom<&'a PublicKey> for EcdsaPublicKey<'a> {
@@ -67,13 +228,28 @@ impl<'a> TryFrom<&'a PublicKey> for EcdsaPublicKey<'a> {
     fn try_from(v: &'a PublicKey) -> Result<Self, Self::Error> {
         use picky_asn1_x509::PublicKey as InnerPublicKey;
 
+        let curve_oid = match &v.as_inner().algorithm.parameters() {
+            picky_asn1_x509::AlgorithmIdentifierParameters::Ec(EcParameters::NamedCurve(curve_oid)) => {
+                curve_oid.0.clone()
+            }
+            _ => {
+                return Err(KeyError::EC {
+                    context: "EC public key cannot be constructed from non-EC public key".to_string(),
+                })
+            }
+        };
+
         match &v.as_inner().subject_public_key {
             InnerPublicKey::Rsa(_) => Err(KeyError::EC {
                 context: "EC public key cannot be constructed from RSA public key".to_string(),
             }),
             InnerPublicKey::Ec(BitStringAsn1(bitstring)) => {
                 let data = bitstring.payload_view();
-                Ok(EcdsaPublicKey { data })
+
+                Ok(EcdsaPublicKey {
+                    data,
+                    curve: NamedEcCurve::from(&curve_oid),
+                })
             }
             InnerPublicKey::Ed(_) => Err(KeyError::EC {
                 context: "EC public key cannot be constructed from ED25519 public key".to_string(),
@@ -81,16 +257,21 @@ impl<'a> TryFrom<&'a PublicKey> for EcdsaPublicKey<'a> {
         }
     }
 }
+
+impl<'a> From<&'a EcdsaKeypair> for EcdsaPublicKey<'a> {
+    fn from(v: &'a EcdsaKeypair) -> Self {
+        Self {
+            data: &v.public_key,
+            curve: v.curve.clone(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_files;
     use rstest::*;
-
-    const PKCS8_EC_PRIVATE_KEY_PEM: &str = "-----BEGIN PRIVATE KEY-----\n\
-                                            MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgKZqrmOg/cDZ4tPCn\n\
-                                            4LROs145nxx+ssufvflL8cROxFmhRANCAARmU90fCSTsncefY7hVeKw1WIg/YQmT\n\
-                                            4DGJ7nJPZ+WXAd/xxp4c0bHGlIOju/U95ITPN9dAmro7OUTDJpz+rzGW\n\
-                                            -----END PRIVATE KEY-----";
 
     const RSA_PUBLIC_KEY_PEM: &str = "-----BEGIN RSA PUBLIC KEY-----\n\
                                       MIIBCgKCAQEA61BjmfXGEvWmegnBGSuS+rU9soUg2FnODva32D1AqhwdziwHINFa\n\
@@ -101,53 +282,39 @@ mod tests {
                                       Ao8eayMp6FcvNucIpUndo1X8dKMv3Y26ZQIDAQAB\n\
                                       -----END RSA PUBLIC KEY-----";
 
-    const EC_PUBLIC_KEY_PEM: &str = "-----BEGIN PUBLIC KEY-----\n\
-                                    MFYwEAYHKoZIzj0CAQYFK4EEAAoDQgAE6grzTyQyJdYOaVVwZosUEv02AdwvYQOv\n\
-                                    bJM105PImXUuqTMyqSmX96/m7zFfyh/DQQbyXIo3E07qifCPMw9/oQ==\n\
-                                    -----END PUBLIC KEY-----";
-
-    const EC_PRIVATE_KEY_NIST256_PEM: &str = r#"-----BEGIN EC PRIVATE KEY-----
-MHcCAQEEICHio5XUa+RbeFfGtGHfbPWehTFJJtCB4/izKHJ9Vm+goAoGCCqGSM49
-AwEHoUQDQgAEh7ZqcI6f0tgqq7nqdcxWM6P4GGCfkWc4q11uXFjtXOKHKCV3LzMY
-g8/V1PD/YOh0HodRJAjkjXub8AmYxiTcXw==
------END EC PRIVATE KEY-----"#;
-
-    const EC_PRIVATE_KEY_NIST384_PEM: &str = r#"-----BEGIN EC PRIVATE KEY-----
-MIGkAgEBBDDT8VOfdzHbIRaWOO1F0vgotY2qM2FfYS3zpdKE7Vqbh26hFsUw+iaG
-GmGnT+29kg+gBwYFK4EEACKhZANiAAQFvVVUKRdN3/bqaEpDA1aHu8FEd3ujuyS0
-AadG6QAiZxH37BGumBcyTTeGHyArqb+GTpsHTUXASbP+P+p5JgkfF9wBMF1SVTvu
-ACZOYcqzGbsAXXdMYqewckhc42ye0u0=
------END EC PRIVATE KEY-----"#;
-
-    const EC_PRIVATE_KEY_NIST512_PEM: &str = r#"-----BEGIN EC PRIVATE KEY-----
-MIHcAgEBBEIBhqphIGu2PmlcEb6xADhhSCpgPUulB0s4L2qOgolRgaBx4fNgINFE
-mBsSyHJncsWG8WFEuUzAYy/YKz2lP0Qx6Z2gBwYFK4EEACOhgYkDgYYABABwBevJ
-w/+Xh6I98ruzoTX3MNTsbgnc+glenJRCbEJkjbJrObFhbfgqP52r1lAy2RxuShGi
-NYJJzNPT6vR1abS32QFtvTH7YbYa6OWk9dtGNY/cYxgx1nQyhUuofdW7qbbfu/Ww
-TP2oFsPXRAavZCh4AbWUn8bAHmzNRyuJonQBKlQlVQ==
------END EC PRIVATE KEY-----"#;
-
     #[rstest]
-    #[case(EC_PRIVATE_KEY_NIST256_PEM)]
-    #[case(EC_PRIVATE_KEY_NIST384_PEM)]
-    #[case(EC_PRIVATE_KEY_NIST512_PEM)]
-    #[case(PKCS8_EC_PRIVATE_KEY_PEM)]
+    #[case(test_files::EC_NIST256_DER_PK_1)]
+    #[case(test_files::EC_NIST384_DER_PK_1)]
+    #[case(test_files::EC_NIST521_DER_PK_1)]
+    #[case(test_files::EC_NIST256_PK_1)] // PKCS8
     fn private_key_from_ec_pem(#[case] key_pem: &str) {
         PrivateKey::from_pem_str(key_pem).unwrap();
     }
 
-    #[test]
-    fn public_key_from_ec_pem() {
-        PublicKey::from_pem_str(EC_PUBLIC_KEY_PEM).unwrap();
+    #[rstest]
+    #[case(test_files::EC_NIST256_NOPUBLIC_DER_PK_1)]
+    #[case(test_files::EC_NIST384_NOPUBLIC_DER_PK_1)]
+    fn ecdsa_private_key_without_public(#[case] key_pem: &str) {
+        // This should succeed for supported curves
+        let key = PrivateKey::from_pem_str(key_pem).unwrap();
+        key.to_public_key().to_pem_str().unwrap();
+    }
+
+    #[rstest]
+    // Known curves
+    #[case(test_files::EC_NIST256_PK_1_PUB)]
+    #[case(test_files::EC_NIST384_PK_1_PUB)]
+    // Unsupported curve, should still work as long as pem contains the public key
+    // (in that case no arithmetic operations are performed on the key)
+    #[case(test_files::EC_PUBLIC_KEY_SECP256K1_PEM)]
+    fn ecdsa_public_valid_key_conversions(#[case] key_pem: &str) {
+        let pk: &PublicKey = &PublicKey::from_pem_str(key_pem).unwrap();
+        let epk: Result<EcdsaPublicKey, KeyError> = pk.try_into();
+        assert!(epk.is_ok());
     }
 
     #[test]
-    fn ecdsa_public_key_conversions() {
-        // ECDSA public key conversion works
-        let pk: &PublicKey = &PublicKey::from_pem_str(EC_PUBLIC_KEY_PEM).unwrap();
-        let epk: Result<EcdsaPublicKey, KeyError> = pk.try_into();
-        assert!(epk.is_ok());
-
+    fn ecdsa_public_invalid_key_conversions() {
         // PEM public key conversion fails with an error
         let pk: &PublicKey = &PublicKey::from_pem_str(RSA_PUBLIC_KEY_PEM).unwrap();
         let epk: Result<EcdsaPublicKey, KeyError> = pk.try_into();
@@ -158,12 +325,25 @@ TP2oFsPXRAavZCh4AbWUn8bAHmzNRyuJonQBKlQlVQ==
     }
 
     #[rstest]
-    #[case(EC_PRIVATE_KEY_NIST256_PEM, EcdsaCurve::Nist256)]
-    #[case(EC_PRIVATE_KEY_NIST384_PEM, EcdsaCurve::Nist384)]
-    #[case(EC_PRIVATE_KEY_NIST512_PEM, EcdsaCurve::Nist512)]
-    fn ecdsa_key_pair_from_ec_private_key(#[case] key: &str, #[case] curve: EcdsaCurve) {
+    #[case(test_files::EC_NIST256_DER_PK_1, NamedEcCurve::Known(EcCurve::NistP256))]
+    #[case(test_files::EC_NIST384_DER_PK_1, NamedEcCurve::Known(EcCurve::NistP384))]
+    #[case(test_files::EC_NIST521_DER_PK_1, NamedEcCurve::Unsupported(oids::secp521r1()))]
+    fn ecdsa_key_pair_from_ec_private_key(#[case] key: &str, #[case] curve: NamedEcCurve) {
         let pk = PrivateKey::from_pem_str(key).unwrap();
         let pair = EcdsaKeypair::try_from(&pk).unwrap();
         assert_eq!(curve, pair.curve);
+    }
+
+    #[test]
+    fn ring_ecdsa_pkcs8_keys_could_be_parsed() {
+        let algo = &ring::signature::ECDSA_P256_SHA256_ASN1_SIGNING;
+        let rng = ring::rand::SystemRandom::new();
+        let pkcs8_bytes = ring::signature::EcdsaKeyPair::generate_pkcs8(algo, &rng).unwrap();
+        // Validate that missing `parameters` field from ECPriavteKeyInfo is handled correctly.
+        // rings skips it during pkcs8 serialization
+        let key = PrivateKey::from_pkcs8(&pkcs8_bytes).unwrap();
+        let pair = EcdsaKeypair::try_from(&key).unwrap();
+
+        assert_eq!(pair.curve(), &NamedEcCurve::Known(EcCurve::NistP256))
     }
 }

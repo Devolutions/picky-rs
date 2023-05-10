@@ -112,6 +112,31 @@ public partial class PrivateKey: IDisposable
     }
 
     /// <summary>
+    /// Generates a new EC private key.
+    /// </summary>
+    /// <exception cref="PickyException"></exception>
+    /// <returns>
+    /// A <c>PrivateKey</c> allocated on Rust side.
+    /// </returns>
+    public static PrivateKey GenerateEc(EcCurve curve)
+    {
+        unsafe
+        {
+            Raw.EcCurve curveRaw;
+            curveRaw = (Raw.EcCurve)curve;
+            IntPtr resultPtr = Raw.PrivateKey.GenerateEc(curveRaw);
+            Raw.KeyFfiResultBoxPrivateKeyBoxPickyError result = Marshal.PtrToStructure<Raw.KeyFfiResultBoxPrivateKeyBoxPickyError>(resultPtr);
+            Raw.KeyFfiResultBoxPrivateKeyBoxPickyError.Destroy(resultPtr);
+            if (!result.isOk)
+            {
+                throw new PickyException(new PickyError(result.Err));
+            }
+            Raw.PrivateKey* retVal = result.Ok;
+            return new PrivateKey(retVal);
+        }
+    }
+
+    /// <summary>
     /// Exports the private key into a PEM object
     /// </summary>
     /// <exception cref="PickyException"></exception>

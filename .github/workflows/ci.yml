@@ -23,13 +23,13 @@ jobs:
 
           cargo fmt --all -- --check
 
-          if ($LastExitCode -eq 1) {   
+          if ($LastExitCode -eq 1) {
             throw "Bad formatting, please run 'cargo +stable fmt --all'"
           }
 
           cargo fmt --manifest-path ./ffi/wasm/Cargo.toml -- --check
 
-          if ($LastExitCode -eq 1) {   
+          if ($LastExitCode -eq 1) {
             throw "Bad formatting, please run 'cargo +stable fmt --manifest-path ./ffi/wasm/Cargo.toml'"
           }
 
@@ -110,12 +110,12 @@ jobs:
           - crate: picky-asn1-x509
             msvc: "1.60"
           - crate: picky
-            msvc: "1.60"
+            msvc: "1.65"
 
     steps:
       - uses: actions/checkout@v3
 
-      - name: Configure runner 
+      - name: Configure runner
         run: |
           set -e
           curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-toolchain ${{ matrix.msvc }}

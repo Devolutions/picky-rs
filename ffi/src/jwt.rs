@@ -70,11 +70,11 @@ pub mod ffi {
         HS384,
         /// HMAC using SHA-512 (unsupported)
         HS512,
-        /// ECDSA using P-256 and SHA-256 (unsupported)
+        /// ECDSA using P-256 and SHA-256
         ES256,
-        /// ECDSA using P-384 and SHA-384 (unsupported)
+        /// ECDSA using P-384 and SHA-384
         ES384,
-        /// ECDSA using P-521 and SHA-512 (unsupported)
+        /// ECDSA using P-521 and SHA-512
         ES512,
         /// RSASSA-PSS using SHA-256 and MGF1 with SHA-256 (unsupported)
         PS256,

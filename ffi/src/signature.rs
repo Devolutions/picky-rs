@@ -19,6 +19,14 @@ pub mod ffi {
             Ok(Box::new(Self(picky::signature::SignatureAlgorithm::RsaPkcs1v15(algo)))).into()
         }
 
+        pub fn new_ecdsa(hash_algorithm: HashAlgorithm) -> DiplomatResult<Box<SignatureAlgorithm>, Box<PickyError>> {
+            let algo = match picky::hash::HashAlgorithm::try_from(hash_algorithm) {
+                Ok(v) => v,
+                Err(()) => return Err(Box::new(PickyError::from("Invalid hash algorithm"))).into(),
+            };
+            Ok(Box::new(Self(picky::signature::SignatureAlgorithm::Ecdsa(algo)))).into()
+        }
+
         pub fn verify(
             &self,
             public_key: &PublicKey,

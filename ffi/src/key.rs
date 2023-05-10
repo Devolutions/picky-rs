@@ -1,8 +1,37 @@
+use self::ffi::EcCurve;
+
+impl From<picky::key::EcCurve> for EcCurve {
+    fn from(value: picky::key::EcCurve) -> Self {
+        match value {
+            picky::key::EcCurve::NistP256 => Self::NistP256,
+            picky::key::EcCurve::NistP384 => Self::NistP384,
+        }
+    }
+}
+
+impl From<EcCurve> for picky::key::EcCurve {
+    fn from(value: EcCurve) -> Self {
+        match value {
+            EcCurve::NistP256 => Self::NistP256,
+            EcCurve::NistP384 => Self::NistP384,
+        }
+    }
+}
+
 #[diplomat::bridge]
 pub mod ffi {
     use crate::error::ffi::PickyError;
     use crate::pem::ffi::Pem;
     use diplomat_runtime::DiplomatResult;
+
+    /// Known elliptic curve name used for ECDSA arithmetic operations
+    #[derive(Clone, Copy)]
+    pub enum EcCurve {
+        /// NIST P-256
+        NistP256,
+        /// NIST P-384
+        NistP384,
+    }
 
     #[diplomat::opaque]
     pub struct PrivateKey(pub picky::key::PrivateKey);
@@ -25,6 +54,12 @@ pub mod ffi {
         /// This is slow in debug builds.
         pub fn generate_rsa(bits: usize) -> DiplomatResult<Box<PrivateKey>, Box<PickyError>> {
             let key = err_check!(picky::key::PrivateKey::generate_rsa(bits));
+            Ok(Box::new(PrivateKey(key))).into()
+        }
+
+        /// Generates a new EC private key.
+        pub fn generate_ec(curve: EcCurve) -> DiplomatResult<Box<PrivateKey>, Box<PickyError>> {
+            let key = err_check!(picky::key::PrivateKey::generate_ec(curve.into()));
             Ok(Box::new(PrivateKey(key))).into()
         }
 

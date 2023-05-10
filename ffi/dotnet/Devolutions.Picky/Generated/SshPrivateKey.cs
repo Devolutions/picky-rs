@@ -89,6 +89,46 @@ public partial class SshPrivateKey: IDisposable
     }
 
     /// <summary>
+    /// Generates a new SSH EC Private Key.
+    /// </summary>
+    /// <remarks>
+    /// No passphrase is set if `passphrase` is empty.
+    /// <br/>
+    /// No comment is set if `comment` is empty.
+    /// </remarks>
+    /// <exception cref="PickyException"></exception>
+    /// <returns>
+    /// A <c>SshPrivateKey</c> allocated on Rust side.
+    /// </returns>
+    public static SshPrivateKey GenerateEc(EcCurve curve, string passphrase, string comment)
+    {
+        unsafe
+        {
+            byte[] passphraseBuf = DiplomatUtils.StringToUtf8(passphrase);
+            byte[] commentBuf = DiplomatUtils.StringToUtf8(comment);
+            nuint passphraseBufLength = (nuint)passphraseBuf.Length;
+            nuint commentBufLength = (nuint)commentBuf.Length;
+            Raw.EcCurve curveRaw;
+            curveRaw = (Raw.EcCurve)curve;
+            fixed (byte* passphraseBufPtr = passphraseBuf)
+            {
+                fixed (byte* commentBufPtr = commentBuf)
+                {
+                    IntPtr resultPtr = Raw.SshPrivateKey.GenerateEc(curveRaw, passphraseBufPtr, passphraseBufLength, commentBufPtr, commentBufLength);
+                    Raw.SshFfiResultBoxSshPrivateKeyBoxPickyError result = Marshal.PtrToStructure<Raw.SshFfiResultBoxSshPrivateKeyBoxPickyError>(resultPtr);
+                    Raw.SshFfiResultBoxSshPrivateKeyBoxPickyError.Destroy(resultPtr);
+                    if (!result.isOk)
+                    {
+                        throw new PickyException(new PickyError(result.Err));
+                    }
+                    Raw.SshPrivateKey* retVal = result.Ok;
+                    return new SshPrivateKey(retVal);
+                }
+            }
+        }
+    }
+
+    /// <summary>
     /// Extracts SSH Private Key from PEM object.
     /// </summary>
     /// <remarks>
