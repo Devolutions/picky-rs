@@ -85,7 +85,7 @@ const EC_PRIVATE_KEY_LABEL: &str = "EC PRIVATE KEY";
 
 // We dont compress EC points by default to avoid potential interoperability issues.
 // Namely, `ring` library has bug in it, which causes it to fail when validating
-// encoded public key, coparing it with generated one (It assumes uncompressed point).
+// encoded public key, comparing it with generated one (It assumes uncompressed point).
 // [https://github.com/briansmith/ring/blob/155231fb017acaaa94a044f124bb34a777d115ef/src/ec/suite_b.rs#L221-L225]
 const COMPRESS_EC_POINT_BY_DEFAULT: bool = false;
 

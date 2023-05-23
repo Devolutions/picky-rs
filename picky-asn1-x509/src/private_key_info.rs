@@ -100,7 +100,7 @@ impl PrivateKeyInfo {
     /// Creates a new `PrivateKeyInfo` with the given `curve_oid` and `secret`.
     ///
     /// If `skip_optional_params` is `true`, the `parameters` field will be omitted from internal
-    /// `ECPrivateKey` ASN.1 structure, reducing duplication. This inforation is still present in
+    /// `ECPrivateKey` ASN.1 structure, reducing duplication. This information is still present in
     /// the `private_key_algorithm` field.
     pub fn new_ec_encryption(
         curve_oid: ObjectIdentifier,

@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.10.0] 2023-05-23
+
+### Fixed
+
+- Fixed `AlgorithmIdentifier` parsing: made `ECParameters` non-optional for EC keys
+- Fixed `ECParameters` - `public_key` now allowed to be optional
+- Fixed broken wasm compilation
+
+### Added
+
+- `oid` is now added as re-export
+- New API methods:
+    - `EcParameters::curve_oid`
+    - `PrivateKeyInfo::new_ec_encryption`
+    - `signature::EcdsaSignatureValue`
+
+### Changed
+
+- (Breaking) `AlgorithmIdentifier::new_elliptic_curve` now accepts `EcParameters` instead of `impl Into<Option<EcParameters>>`
+- (Breaking) `AlgorithmIdentifierParameters::Ec` now have `EcParameters` instead of `Option<EcParameters>`
+- (Breaking) `SubjectPublicKeyInfo::new_ec_key` now accepts curve's `ObjectIdentifier` and point as `BitString`
+
 ## [0.9.0] 2022-11-07
 
 ### Added
@@ -57,7 +79,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - SignedData:
   - (Breaking) `RevocationInfoChoice` field is now optional as specified by the RFC
-  - (Breaking) `CertificateSet` is now a `Vec<CertificateChoices>` which can accept both a normal `Certificate` and an `other` kind of certificate as specified by the RFC  
+  - (Breaking) `CertificateSet` is now a `Vec<CertificateChoices>` which can accept both a normal `Certificate` and an `other` kind of certificate as specified by the RFC
 
 ## [0.6.1] 2021-06-02
 
@@ -154,4 +176,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `RSAPrivateKey` is now RFC8017 compliant
-
