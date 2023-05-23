@@ -105,12 +105,25 @@ mod test_files {
     }}
 
     cfg_if::cfg_if! { if #[cfg(feature = "ssh")] {
-        pub const SSH_PRIVATE_KEY_EC_P256: &str = include_str!("../../test_assets/ssh/ssh_key_p256");
+        // ssh-keygen -t ecdsa -b 256 -C "test_ecdsa@picky.com"
+        pub const SSH_PRIVATE_KEY_EC_P256: &str =
+            include_str!("../../test_assets/ssh/ssh_key_p256");
+
+        // ssh-keygen -t ecdsa -b 384 -C "test_ecdsa@picky.com"
+        pub const SSH_PRIVATE_KEY_EC_P384: &str =
+            include_str!("../../test_assets/ssh/ssh_key_p384");
+
+        // ssh-keygen -t ecdsa -b 521 -C "test_ecdsa@picky.com"
+        pub const SSH_PRIVATE_KEY_EC_P521: &str =
+            include_str!("../../test_assets/ssh/ssh_key_p521");
+
+        // ssh-keygen -t ecdsa -b 256 -C "test_ecdsa@picky.com"
+        pub const SSH_PRIVATE_KEY_EC_P256_ENCRYPTED: &str =
+            include_str!("../../test_assets/ssh/ssh_encrypted_key_p256");
 
         pub const SSH_PUBLIC_KEY_EC_P256: &str = include_str!("../../test_assets/ssh/ssh_key_p256.pub");
         pub const SSH_PUBLIC_KEY_EC_P384: &str = include_str!("../../test_assets/ssh/ssh_key_p384.pub");
         pub const SSH_PUBLIC_KEY_EC_P521: &str = include_str!("../../test_assets/ssh/ssh_key_p521.pub");
-
 
         // ssh-keygen -h -s ./ssh_ca_key -V '+1000w' -I abcd -z 00001 -n server.example.com ./ssh_key_p256.pub
         pub const SSH_CERT_EC_P256: &str = include_str!("../../test_assets/ssh/ssh_cert_p256.crt");
