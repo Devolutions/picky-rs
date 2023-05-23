@@ -549,15 +549,9 @@ pub mod tests {
     #[test]
     fn ecdsa_keys_encrypted() {
         let passphrase = Some("test".to_string());
-        let key = SshPrivateKey::from_pem_str(
-            test_files::SSH_PRIVATE_KEY_EC_P256_ENCRYPTED,
-            passphrase
-        ).unwrap();
+        let key = SshPrivateKey::from_pem_str(test_files::SSH_PRIVATE_KEY_EC_P256_ENCRYPTED, passphrase).unwrap();
         let encoded = key.to_string().unwrap();
-        pretty_assertions::assert_eq!(
-            encoded.as_str(),
-            test_files::SSH_PRIVATE_KEY_EC_P256_ENCRYPTED
-        );
+        pretty_assertions::assert_eq!(encoded.as_str(), test_files::SSH_PRIVATE_KEY_EC_P256_ENCRYPTED);
     }
 
     #[test]
