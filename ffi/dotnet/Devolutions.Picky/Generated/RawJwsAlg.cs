@@ -41,15 +41,15 @@ public enum JwsAlg
     /// </summary>
     HS512 = 5,
     /// <summary>
-    /// ECDSA using P-256 and SHA-256 (unsupported)
+    /// ECDSA using P-256 and SHA-256
     /// </summary>
     ES256 = 6,
     /// <summary>
-    /// ECDSA using P-384 and SHA-384 (unsupported)
+    /// ECDSA using P-384 and SHA-384
     /// </summary>
     ES384 = 7,
     /// <summary>
-    /// ECDSA using P-521 and SHA-512 (unsupported)
+    /// ECDSA using P-521 and SHA-512
     /// </summary>
     ES512 = 8,
     /// <summary>

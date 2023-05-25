@@ -1,4 +1,4 @@
-use crate::key::{KeyError, PrivateKey};
+use crate::key::{EcCurve, KeyError, PrivateKey};
 use crate::pem::{parse_pem, Pem, PemError};
 use crate::ssh::decode::{SshComplexTypeDecode, SshReadExt};
 use crate::ssh::encode::SshComplexTypeEncode;
@@ -88,12 +88,14 @@ impl Default for Kdf {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SshBasePrivateKey {
     Rsa(PrivateKey),
+    Ec(PrivateKey),
 }
 
 impl SshBasePrivateKey {
     pub fn base_public_key(&self) -> SshBasePublicKey {
         match self {
             SshBasePrivateKey::Rsa(rsa) => SshBasePublicKey::Rsa(rsa.to_public_key()),
+            SshBasePrivateKey::Ec(ec) => SshBasePublicKey::Ec(ec.to_public_key()),
         }
     }
 }
@@ -117,6 +119,18 @@ impl SshPrivateKey {
     ) -> Result<Self, SshPrivateKeyError> {
         Ok(SshPrivateKey::h_picky_private_key_to_ssh_private_key(
             PrivateKey::generate_rsa(bits)?,
+            passphrase,
+            comment,
+        ))
+    }
+
+    pub fn generate_ec(
+        curve: EcCurve,
+        passphrase: Option<String>,
+        comment: Option<String>,
+    ) -> Result<Self, SshPrivateKeyError> {
+        Ok(SshPrivateKey::h_picky_private_key_to_ssh_private_key(
+            PrivateKey::generate_ec(curve)?,
             passphrase,
             comment,
         ))
@@ -332,6 +346,8 @@ pub(crate) fn decrypt(
 pub mod tests {
     use super::*;
     use crate::ssh::private_key::SshPrivateKey;
+    use crate::test_files;
+    use rstest::rstest;
 
     #[test]
     fn decode_without_passphrase_2048() {
@@ -516,6 +532,26 @@ pub mod tests {
         let ssh_private_key_after = private_key.to_string().unwrap();
 
         pretty_assertions::assert_eq!(ssh_private_key_pem, ssh_private_key_after.as_str());
+    }
+
+    #[rstest]
+    #[case(test_files::SSH_PRIVATE_KEY_EC_P256)]
+    #[case(test_files::SSH_PRIVATE_KEY_EC_P384)]
+    // Note that even if P521 curve arithmetic is not supported yet, we still can read and write
+    // ssh keys with this curve.
+    #[case(test_files::SSH_PRIVATE_KEY_EC_P521)]
+    fn ecdsa_keys_unencrypted(#[case] pem: &str) {
+        let key = SshPrivateKey::from_pem_str(pem, None).unwrap();
+        let encoded = key.to_string().unwrap();
+        pretty_assertions::assert_eq!(encoded.as_str(), pem);
+    }
+
+    #[test]
+    fn ecdsa_keys_encrypted() {
+        let passphrase = Some("test".to_string());
+        let key = SshPrivateKey::from_pem_str(test_files::SSH_PRIVATE_KEY_EC_P256_ENCRYPTED, passphrase).unwrap();
+        let encoded = key.to_string().unwrap();
+        pretty_assertions::assert_eq!(encoded.as_str(), test_files::SSH_PRIVATE_KEY_EC_P256_ENCRYPTED);
     }
 
     #[test]

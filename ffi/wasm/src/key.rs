@@ -3,6 +3,34 @@ use wasm_bindgen::prelude::*;
 
 define_error!(KeyError, picky::key::KeyError);
 
+impl From<picky::key::EcCurve> for EcCurve {
+    fn from(value: picky::key::EcCurve) -> Self {
+        match value {
+            picky::key::EcCurve::NistP256 => Self::NistP256,
+            picky::key::EcCurve::NistP384 => Self::NistP384,
+        }
+    }
+}
+
+impl From<EcCurve> for picky::key::EcCurve {
+    fn from(value: EcCurve) -> Self {
+        match value {
+            EcCurve::NistP256 => Self::NistP256,
+            EcCurve::NistP384 => Self::NistP384,
+        }
+    }
+}
+
+/// Known elliptic curve name used for ECDSA arithmetic operations
+#[wasm_bindgen]
+#[derive(Clone, Copy)]
+pub enum EcCurve {
+    /// NIST P-256
+    NistP256,
+    /// NIST P-384
+    NistP384,
+}
+
 #[wasm_bindgen]
 pub struct PrivateKey(pub(crate) picky::key::PrivateKey);
 
@@ -25,6 +53,12 @@ impl PrivateKey {
     /// This is slow in debug builds.
     pub fn generate_rsa(bits: usize) -> Result<PrivateKey, KeyError> {
         let key = picky::key::PrivateKey::generate_rsa(bits)?;
+        Ok(Self(key))
+    }
+
+    /// Generates a new EC private key.
+    pub fn generate_ec(curve: EcCurve) -> Result<PrivateKey, KeyError> {
+        let key = picky::key::PrivateKey::generate_ec(curve.into())?;
         Ok(Self(key))
     }
 

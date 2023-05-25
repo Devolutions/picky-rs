@@ -4,9 +4,11 @@
 
 use crate::hash::HashAlgorithm;
 use crate::jose::jwk::Jwk;
-use crate::key::{PrivateKey, PublicKey};
+use crate::key::{EcCurve, PrivateKey, PublicKey};
 use crate::signature::{SignatureAlgorithm, SignatureError};
 use base64::{engine::general_purpose, DecodeError, Engine as _};
+use picky_asn1::wrapper::IntegerAsn1;
+use picky_asn1_x509::signature::EcdsaSignatureValue;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -98,15 +100,15 @@ pub enum JwsAlg {
     /// RSASSA-PKCS-v1_5 using SHA-512
     RS512,
 
-    /// ECDSA using P-256 and SHA-256 (unsupported)
+    /// ECDSA using P-256 and SHA-256
     ///
     /// Recommended+ by RFC
     ES256,
 
-    /// ECDSA using P-384 and SHA-384 (unsupported)
+    /// ECDSA using P-384 and SHA-384
     ES384,
 
-    /// ECDSA using P-521 and SHA-512 (unsupported)
+    /// ECDSA using P-521 and SHA-512
     ES512,
 
     /// RSASSA-PSS using SHA-256 and MGF1 with SHA-256 (unsupported)
@@ -127,6 +129,9 @@ impl TryFrom<SignatureAlgorithm> for JwsAlg {
             SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256) => Ok(Self::RS256),
             SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_384) => Ok(Self::RS384),
             SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_512) => Ok(Self::RS512),
+            SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_256) => Ok(Self::ES256),
+            SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_384) => Ok(Self::ES384),
+            SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_512) => Ok(Self::ES512),
             unsupported => Err(SignatureError::UnsupportedAlgorithm {
                 algorithm: format!("{:?}", unsupported),
             }),
@@ -142,6 +147,9 @@ impl TryFrom<JwsAlg> for SignatureAlgorithm {
             JwsAlg::RS256 => Ok(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256)),
             JwsAlg::RS384 => Ok(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_384)),
             JwsAlg::RS512 => Ok(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_512)),
+            JwsAlg::ES256 => Ok(SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_256)),
+            JwsAlg::ES384 => Ok(SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_384)),
+            JwsAlg::ES512 => Ok(SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_512)),
             unsupported => Err(SignatureError::UnsupportedAlgorithm {
                 algorithm: format!("{:?}", unsupported),
             }),
@@ -272,6 +280,50 @@ impl Jws {
         let header_and_payload = [header_base64, payload_base64].join(".");
         let signature_algo = SignatureAlgorithm::try_from(self.header.alg)?;
         let signature = signature_algo.sign(header_and_payload.as_bytes(), private_key)?;
+
+        let signature = match self.header.alg {
+            // EC sugnatures have special encoding rules (RFC 7518, section 3.4)
+            JwsAlg::ES256 | JwsAlg::ES384 | JwsAlg::ES512 => {
+                // Parse signature as ASN.1 DER sequence
+                let signature: EcdsaSignatureValue =
+                    picky_asn1_der::from_bytes(&signature).map_err(|e| SignatureError::Ec {
+                        context: format!("Invalid EC DER signature encoding: {e}"),
+                    })?;
+
+                let curve = match self.header.alg {
+                    JwsAlg::ES256 => EcCurve::NistP256,
+                    JwsAlg::ES384 => EcCurve::NistP384,
+                    JwsAlg::ES512 => {
+                        return Err(SignatureError::Ec {
+                            context: "ECDSA with SHA-512 is not supported".to_string(),
+                        }
+                        .into())
+                    }
+                    _ => unreachable!("Checked in match above"),
+                };
+
+                let signature_component_size = curve.field_bytes_size();
+
+                let r = signature.r.as_unsigned_bytes_be();
+                let s = signature.s.as_unsigned_bytes_be();
+
+                // We should add zero padding (leading zeros) for R & S components to match the
+                // size of the curve, as ASN.1 DER encoding removes leading zeros.
+                let mut jws_signature = Vec::with_capacity(signature_component_size * 2);
+
+                let r_padding = signature_component_size - r.len();
+                (0..r_padding).for_each(|_| jws_signature.push(0));
+                jws_signature.extend_from_slice(r);
+
+                let s_padding = signature_component_size - s.len();
+                (0..s_padding).for_each(|_| jws_signature.push(0));
+                jws_signature.extend_from_slice(s);
+
+                jws_signature
+            }
+            _ => signature,
+        };
+
         let signature_base64 = general_purpose::URL_SAFE_NO_PAD.encode(signature);
         Ok([header_and_payload, signature_base64].join("."))
     }
@@ -369,6 +421,50 @@ pub fn verify_signature(encoded_token: &str, public_key: &PublicKey, algorithm: 
 
     let signature = general_purpose::URL_SAFE_NO_PAD.decode(&encoded_token[last_dot_idx + 1..])?;
     let signature_algo = SignatureAlgorithm::try_from(algorithm)?;
+
+    let signature = match algorithm {
+        // Special decoding rules for ECDSA
+        JwsAlg::ES256 | JwsAlg::ES384 | JwsAlg::ES512 => {
+            let curve = match algorithm {
+                JwsAlg::ES256 => EcCurve::NistP256,
+                JwsAlg::ES384 => EcCurve::NistP384,
+                JwsAlg::ES512 => {
+                    return Err(SignatureError::Ec {
+                        context: "ECDSA with SHA-512 is not supported".to_string(),
+                    }
+                    .into())
+                }
+                _ => unreachable!("Checked in match above"),
+            };
+
+            let component_size = curve.field_bytes_size();
+            let jws_encoded_signature_size = component_size * 2;
+
+            if signature.len() != jws_encoded_signature_size {
+                return Err(SignatureError::Ec {
+                    context: format!(
+                        "Invalid JWS EC signature size. Expected: {}; Actual: {}",
+                        jws_encoded_signature_size,
+                        signature.len()
+                    ),
+                }
+                .into());
+            }
+
+            let (r, s) = signature.split_at(component_size);
+
+            let signature = EcdsaSignatureValue {
+                r: IntegerAsn1::from_bytes_be_unsigned(r.to_vec()),
+                s: IntegerAsn1::from_bytes_be_unsigned(s.to_vec()),
+            };
+
+            picky_asn1_der::to_vec(&signature).map_err(|e| SignatureError::Ec {
+                context: format!("Failed to encode EC signature to DER format: {e}"),
+            })?
+        }
+        _ => signature,
+    };
+
     signature_algo.verify(public_key, encoded_token[..last_dot_idx].as_bytes(), &signature)?;
 
     Ok(())
@@ -378,16 +474,18 @@ pub fn verify_signature(encoded_token: &str, public_key: &PublicKey, algorithm: 
 mod tests {
     use super::*;
     use crate::pem::Pem;
+    use crate::test_files;
+    use rstest::rstest;
 
     const PAYLOAD: &str = r#"{"sub":"1234567890","name":"John Doe","admin":true,"iat":1516239022}"#;
 
     fn get_private_key_1() -> PrivateKey {
-        let pk_pem = crate::test_files::RSA_2048_PK_1.parse::<Pem>().unwrap();
+        let pk_pem = test_files::RSA_2048_PK_1.parse::<Pem>().unwrap();
         PrivateKey::from_pem(&pk_pem).unwrap()
     }
 
     fn get_private_key_2() -> PrivateKey {
-        let pk_pem = crate::test_files::RSA_2048_PK_7.parse::<Pem>().unwrap();
+        let pk_pem = test_files::RSA_2048_PK_7.parse::<Pem>().unwrap();
         PrivateKey::from_pem(&pk_pem).unwrap()
     }
 
@@ -401,19 +499,42 @@ mod tests {
             payload: PAYLOAD.as_bytes().to_vec(),
         };
         let encoded = jwt.encode(&get_private_key_1()).unwrap();
-        assert_eq!(encoded, crate::test_files::JOSE_JWT_SIG_EXAMPLE);
+        assert_eq!(encoded, test_files::JOSE_JWT_SIG_EXAMPLE);
+    }
+
+    #[rstest]
+    #[case(JwsAlg::ES256, test_files::EC_NIST256_PK_1, test_files::JOSE_JWT_SIG_ES256)]
+    #[case(JwsAlg::ES384, test_files::EC_NIST384_PK_1, test_files::JOSE_JWT_SIG_ES384)]
+    fn ecdsa_algorithm(#[case] alg: JwsAlg, #[case] key_pem: &str, #[case] expected: &str) {
+        let key = PrivateKey::from_pem_str(key_pem).unwrap();
+
+        let jwt = Jws {
+            header: JwsHeader {
+                typ: Some(String::from("JWT")),
+                ..JwsHeader::new(alg)
+            },
+            payload: PAYLOAD.as_bytes().to_vec(),
+        };
+
+        // Check encode + sign
+        let encoded = jwt.encode(&key).unwrap();
+        assert_eq!(encoded, expected);
+
+        // Check decode + verify
+        let jws = RawJws::decode(&encoded).unwrap();
+        jws.verify(&key.to_public_key()).unwrap();
     }
 
     #[test]
     fn decode_rsa_sha256() {
         let public_key = get_private_key_1().to_public_key();
-        let jwt = Jws::decode(crate::test_files::JOSE_JWT_SIG_EXAMPLE, &public_key).unwrap();
+        let jwt = Jws::decode(test_files::JOSE_JWT_SIG_EXAMPLE, &public_key).unwrap();
         assert_eq!(jwt.payload.as_slice(), PAYLOAD.as_bytes());
     }
 
     #[test]
     fn decode_rsa_sha256_delayed_signature_check() {
-        let jws = RawJws::decode(crate::test_files::JOSE_JWT_SIG_EXAMPLE).unwrap();
+        let jws = RawJws::decode(test_files::JOSE_JWT_SIG_EXAMPLE).unwrap();
         println!("{}", String::from_utf8_lossy(&jws.payload));
         assert_eq!(jws.peek_payload(), PAYLOAD.as_bytes());
 
@@ -425,7 +546,7 @@ mod tests {
     #[test]
     fn decode_rsa_sha256_invalid_signature_err() {
         let public_key = get_private_key_2().to_public_key();
-        let err = Jws::decode(crate::test_files::JOSE_JWT_SIG_EXAMPLE, &public_key)
+        let err = Jws::decode(test_files::JOSE_JWT_SIG_EXAMPLE, &public_key)
             .err()
             .unwrap();
         assert_eq!(err.to_string(), "signature error: invalid signature");

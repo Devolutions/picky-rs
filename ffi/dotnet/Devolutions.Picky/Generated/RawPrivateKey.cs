@@ -42,6 +42,12 @@ public partial struct PrivateKey
     public static unsafe extern IntPtr GenerateRsa(nuint bits);
 
     /// <summary>
+    /// Generates a new EC private key.
+    /// </summary>
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PrivateKey_generate_ec", ExactSpelling = true)]
+    public static unsafe extern IntPtr GenerateEc(EcCurve curve);
+
+    /// <summary>
     /// Exports the private key into a PEM object
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PrivateKey_to_pem", ExactSpelling = true)]

@@ -173,10 +173,10 @@ impl AlgorithmIdentifier {
         }
     }
 
-    pub fn new_elliptic_curve<P: Into<Option<EcParameters>>>(ec_params: P) -> Self {
+    pub fn new_elliptic_curve(ec_params: EcParameters) -> Self {
         Self {
             algorithm: oids::ec_public_key().into(),
-            parameters: AlgorithmIdentifierParameters::Ec(ec_params.into()),
+            parameters: AlgorithmIdentifierParameters::Ec(ec_params),
         }
     }
 
@@ -286,16 +286,18 @@ impl<'de> de::Deserialize<'de> for AlgorithmIdentifier {
                         AlgorithmIdentifierParameters::None
                     }
                     oids::DSA_WITH_SHA1 => {
-                        // A note from RFC 3927[https://www.ietf.org/rfc/rfc3279.txt]
+                        // A note from [RFC 3927](https://www.ietf.org/rfc/rfc3279.txt)
                         // When the id-dsa-with-sha1 algorithm identifier appears as the
                         // algorithm field in an AlgorithmIdentifier, the encoding SHALL omit
                         // the parameters field.  That is, the AlgorithmIdentifier SHALL be a
                         // SEQUENCE of one component: the OBJECT IDENTIFIER id-dsa-with-sha1.
                         AlgorithmIdentifierParameters::None
                     }
+                    // A note from [RFC 5480](https://tools.ietf.org/html/rfc5480#section-2.1.1)
+                    // The parameter for id-ecPublicKey is as follows and MUST always be present
                     oids::EC_PUBLIC_KEY => AlgorithmIdentifierParameters::Ec(seq_next_element!(
                         seq,
-                        Option<EcParameters>,
+                        EcParameters,
                         AlgorithmIdentifier,
                         "elliptic curves parameters"
                     )),
@@ -333,7 +335,7 @@ pub enum AlgorithmIdentifierParameters {
     None,
     Null,
     Aes(AesParameters),
-    Ec(Option<EcParameters>),
+    Ec(EcParameters),
     RsassaPss(RsassaPssParams),
 }
 
@@ -390,8 +392,10 @@ fn usize_from_be_bytes(asn1: &IntegerAsn1) -> usize {
     match bytes.len().cmp(&8) {
         Ordering::Greater => usize::MAX,
         Ordering::Less => {
-            let mut tmp = [0; 8];
-            tmp[(8 - bytes.len())..8].clone_from_slice(bytes);
+            const USIZE_SIZE: usize = std::mem::size_of::<usize>();
+
+            let mut tmp = [0; USIZE_SIZE];
+            tmp[(USIZE_SIZE - bytes.len())..USIZE_SIZE].clone_from_slice(bytes);
             usize::from_be_bytes(tmp)
         }
         // unwrap is safe since we know this is exactly 8 bytes.
@@ -606,8 +610,16 @@ impl<'de> de::Deserialize<'de> for MaskGenAlgorithm {
 pub enum EcParameters {
     NamedCurve(ObjectIdentifierAsn1),
     // -- implicitCurve and specifiedCurve MUST NOT be used in PKIX.
-    //ImplicitCurve,
-    //SpecifiedCurve(SpecifiedECDomain)
+    // ImplicitCurve,
+    // SpecifiedCurve(SpecifiedECDomain)
+}
+
+impl EcParameters {
+    pub fn curve_oid(&self) -> &ObjectIdentifier {
+        match self {
+            EcParameters::NamedCurve(oid) => &oid.0,
+        }
+    }
 }
 
 impl From<ObjectIdentifierAsn1> for EcParameters {
@@ -652,18 +664,19 @@ impl<'de> de::Deserialize<'de> for EcParameters {
                 A: de::SeqAccess<'de>,
             {
                 let tag_peeker: TagPeeker = seq_next_element!(seq, EcParameters, "choice tag");
-                match tag_peeker.next_tag {
-                    Tag::OID => Ok(EcParameters::NamedCurve(seq_next_element!(
-                        seq,
-                        EcParameters,
-                        "Object Identifier"
-                    ))),
-                    _ => Err(serde_invalid_value!(
-                        EcParameters,
-                        "unsupported or unknown elliptic curve parameter",
-                        "a supported elliptic curve parameter"
-                    )),
-                }
+
+                let curve_oid = match tag_peeker.next_tag {
+                    Tag::OID => seq_next_element!(seq, ObjectIdentifierAsn1, "NamedCurve object identifier"),
+                    _ => {
+                        return Err(serde_invalid_value!(
+                            EcParameters,
+                            "unsupported or unknown elliptic curve parameter",
+                            "a supported elliptic curve parameter"
+                        ))
+                    }
+                };
+
+                Ok(EcParameters::NamedCurve(curve_oid))
             }
         }
 

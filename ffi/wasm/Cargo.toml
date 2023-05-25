@@ -1,6 +1,6 @@
 [package]
 name = "picky"
-version = "0.4.1"
+version = "0.5.0"
 authors = ["Benoît CORTIER <bcortier@proton.me>"]
 edition = "2021"
 publish = false
@@ -39,4 +39,3 @@ getrandom = { version = "0.2.7", features = ["js"] }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.31"
-

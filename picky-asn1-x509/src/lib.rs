@@ -13,6 +13,7 @@ pub mod oids;
 #[cfg(feature = "pkcs7")]
 pub mod pkcs7;
 pub mod private_key_info;
+pub mod signature;
 pub mod subject_public_key_info;
 pub mod validity;
 pub mod version;
@@ -31,3 +32,6 @@ pub use private_key_info::*;
 pub use subject_public_key_info::*;
 pub use validity::*;
 pub use version::*;
+
+// Re-export `oid` crate as we use it in crate public API
+pub use oid;

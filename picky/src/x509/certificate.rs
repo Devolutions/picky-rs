@@ -1234,6 +1234,58 @@ mod tests {
     }
 
     #[test]
+    fn ec_signing() {
+        let root_key = parse_key(crate::test_files::EC_NIST256_PK_1);
+        let intermediate_key = parse_key(crate::test_files::EC_NIST384_PK_1);
+        let leaf_key = parse_key(crate::test_files::EC_NIST256_PK_2);
+
+        let root = CertificateBuilder::new()
+            .validity(UtcDate::ymd(2065, 6, 15).unwrap(), UtcDate::ymd(2070, 6, 15).unwrap())
+            .self_signed(DirectoryName::new_common_name("TheFuture.usodakedo Root CA"), &root_key)
+            .ca(true)
+            .signature_hash_type(SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_256))
+            .key_id_gen_method(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_384))
+            .build()
+            .expect("couldn't build root ca");
+
+        let intermediate = CertificateBuilder::new()
+            .validity(UtcDate::ymd(2068, 1, 1).unwrap(), UtcDate::ymd(2071, 1, 1).unwrap())
+            .subject(
+                DirectoryName::new_common_name("TheFuture.usodakedo Authority"),
+                intermediate_key.to_public_key(),
+            )
+            .issuer_cert(&root, &root_key)
+            .signature_hash_type(SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_256))
+            .key_id_gen_method(KeyIdGenMethod::SPKValueHashedLeftmost160(HashAlgorithm::SHA1))
+            .ca(true)
+            .pathlen(0)
+            .build()
+            .expect("couldn't build intermediate ca");
+
+        let signed_leaf = CertificateBuilder::new()
+            .validity(UtcDate::ymd(2069, 1, 1).unwrap(), UtcDate::ymd(2072, 1, 1).unwrap())
+            .subject(
+                DirectoryName::new_common_name("ChillingInTheFuture.usobakkari"),
+                leaf_key.to_public_key(),
+            )
+            .issuer_cert(&intermediate, &intermediate_key)
+            .signature_hash_type(SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_384))
+            .key_id_gen_method(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_512))
+            .pathlen(0) // not meaningful in non-CA certificates
+            .build()
+            .expect("couldn't build signed leaf");
+
+        let chain = [intermediate, root];
+
+        signed_leaf
+            .verifier()
+            .chain(chain.iter())
+            .exact_date(&UtcDate::ymd(2069, 10, 1).unwrap())
+            .verify()
+            .expect("couldn't verify chain");
+    }
+
+    #[test]
     fn malicious_ca_chain() {
         let root_key = parse_key(crate::test_files::RSA_2048_PK_1);
         let intermediate_key = parse_key(crate::test_files::RSA_2048_PK_2);

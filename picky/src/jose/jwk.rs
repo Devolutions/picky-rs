@@ -4,8 +4,10 @@
 
 use crate::jose::jwe::{JweAlg, JweEnc};
 use crate::jose::jws::JwsAlg;
-use crate::key::PublicKey;
+use crate::key::ec::{EcdsaPublicKey, NamedEcCurve};
+use crate::key::{EcCurve, PublicKey};
 use base64::{engine::general_purpose, DecodeError, Engine as _};
+use num_bigint_dig::BigUint;
 use picky_asn1::wrapper::IntegerAsn1;
 use picky_asn1_x509::SubjectPublicKeyInfo;
 use serde::{Deserialize, Serialize};
@@ -26,6 +28,12 @@ pub enum JwkError {
     /// unsupported algorithm
     #[error("unsupported algorithm: {algorithm}")]
     UnsupportedAlgorithm { algorithm: &'static str },
+
+    #[error("Invalid ec public key: {cause}")]
+    InvalidEcPublicKey { cause: &'static str },
+
+    #[error("Invalid ec point coordinates in JWK")]
+    InvalidEcPointCoordinates,
 }
 
 impl From<serde_json::Error> for JwkError {
@@ -48,11 +56,11 @@ impl From<DecodeError> for JwkError {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "kty")]
 pub enum JwkKeyType {
-    /// Elliptic Curve (unsupported)
+    /// Elliptic Curve
     ///
     /// Recommended+ by RFC
     #[serde(rename = "EC")]
-    Ec,
+    Ec(JwkPublicEcKey),
     /// Elliptic Curve
     ///
     /// Required by RFC
@@ -71,11 +79,24 @@ impl JwkKeyType {
     /// Each argument is the unsigned big-endian representation as an octet sequence of the value.
     /// If a signed representation is provided, leading zero is removed for any number bigger than 0x7F.
     pub fn new_rsa_key(modulus: &[u8], public_exponent: &[u8]) -> Self {
-        let modulus = Self::h_strip_unrequired_leading_zero(modulus);
-        let public_exponent = Self::h_strip_unrequired_leading_zero(public_exponent);
+        let modulus = h_strip_unrequired_leading_zero(modulus);
+        let public_exponent = h_strip_unrequired_leading_zero(public_exponent);
         Self::Rsa(JwkPublicRsaKey {
             n: general_purpose::URL_SAFE_NO_PAD.encode(modulus),
             e: general_purpose::URL_SAFE_NO_PAD.encode(public_exponent),
+        })
+    }
+
+    /// Build a JWK key from EC components.
+    ///
+    /// `x` and `y` are big-endian representation of the affine point coordinates.
+    pub fn new_ec_key(curve: JwkEcPublicKeyCurve, x: &[u8], y: &[u8]) -> Self {
+        let x = h_strip_unrequired_leading_zero(x);
+        let y = h_strip_unrequired_leading_zero(y);
+        Self::Ec(JwkPublicEcKey {
+            crv: curve,
+            x: general_purpose::URL_SAFE_NO_PAD.encode(x),
+            y: general_purpose::URL_SAFE_NO_PAD.encode(y),
         })
     }
 
@@ -103,14 +124,31 @@ impl JwkKeyType {
     pub fn is_rsa(&self) -> bool {
         self.as_rsa().is_some()
     }
+}
 
-    /// Strips leading zero for any number bigger than 0x7F.
-    fn h_strip_unrequired_leading_zero(value: &[u8]) -> &[u8] {
-        if let [0x00, rest @ ..] = value {
-            rest
-        } else {
-            value
-        }
+/// Strips leading zero for any number bigger than 0x7F.
+fn h_strip_unrequired_leading_zero(value: &[u8]) -> &[u8] {
+    if let [0x00, rest @ ..] = value {
+        rest
+    } else {
+        value
+    }
+}
+
+/// Big integers from 0x00 to 0x7F are all base64-encoded using two ASCII characters ranging from "AA" to "fw".
+/// We know the required capacity is _exactly_ of one byte.
+/// The value 0 is valid and is represented as the array [0x00] ("AA").
+/// For numbers greater than 0x7F, logic is a bit more complex.
+/// There is no leading zero in JWK keys because _unsigned_ numbers are used.
+/// As such, there is no need to disambiguate the high-order bit (0x80)
+/// which is used as the sign bit for _signed_ numbers.
+/// The high-order bit is set when base64 encoding's leading character matches [g-z0-9_-].
+fn h_allocate_signed_big_int_buffer(base64_url_encoding: &str) -> Vec<u8> {
+    match base64_url_encoding.chars().next() {
+        // The leading zero is re-introduced for any number whose high-order bit is set
+        Some('g'..='z' | '0'..='9' | '_' | '-') => vec![0],
+        // Otherwise, there is nothing more to do
+        _ => Vec::with_capacity(1),
     }
 }
 
@@ -173,6 +211,7 @@ pub struct Jwk {
     pub key: JwkKeyType,
 
     /// Identifies the algorithm intended for use with the key.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub alg: Option<Jwa>,
 
     /// Public Key Use
@@ -248,9 +287,52 @@ impl Jwk {
                 let public_exponent = rsa.public_exponent.as_signed_bytes_be();
                 Ok(Self::new(JwkKeyType::new_rsa_key(modulus, public_exponent)))
             }
-            SerdePublicKey::Ec(_) => Err(JwkError::UnsupportedAlgorithm {
-                algorithm: "elliptic curves",
-            }),
+            SerdePublicKey::Ec(_) => {
+                let ec_key = EcdsaPublicKey::try_from(public_key)
+                    .map_err(|_| JwkError::InvalidEcPublicKey { cause: "not EC key" })?;
+
+                match ec_key.curve() {
+                    NamedEcCurve::Known(EcCurve::NistP256) => {
+                        let point = p256::EncodedPoint::from_bytes(ec_key.encoded_point()).map_err(|_| {
+                            JwkError::InvalidEcPublicKey {
+                                cause: "invalid P-256 EC point encoding",
+                            }
+                        })?;
+
+                        match (point.x(), point.y()) {
+                            (Some(x), Some(y)) => Ok(Self::new(JwkKeyType::new_ec_key(
+                                JwkEcPublicKeyCurve::P256,
+                                x.as_slice(),
+                                y.as_slice(),
+                            ))),
+                            _ => Err(JwkError::InvalidEcPublicKey {
+                                cause: "Invalid P-256 curve EC public point coordinates",
+                            }),
+                        }
+                    }
+                    NamedEcCurve::Known(EcCurve::NistP384) => {
+                        let point = p384::EncodedPoint::from_bytes(ec_key.encoded_point()).map_err(|_| {
+                            JwkError::InvalidEcPublicKey {
+                                cause: "invalid P-384 EC point encoding",
+                            }
+                        })?;
+
+                        match (point.x(), point.y()) {
+                            (Some(x), Some(y)) => Ok(Self::new(JwkKeyType::new_ec_key(
+                                JwkEcPublicKeyCurve::P384,
+                                x.as_slice(),
+                                y.as_slice(),
+                            ))),
+                            _ => Err(JwkError::InvalidEcPublicKey {
+                                cause: "Invalid P-384 curve EC public point coordinates",
+                            }),
+                        }
+                    }
+                    NamedEcCurve::Unsupported(_) => Err(JwkError::UnsupportedAlgorithm {
+                        algorithm: "Unsupported EC curve",
+                    }),
+                }
+            }
             SerdePublicKey::Ed(_) => Err(JwkError::UnsupportedAlgorithm {
                 algorithm: "edwards curves",
             }),
@@ -273,9 +355,24 @@ impl Jwk {
                 let spki = SubjectPublicKeyInfo::new_rsa_key(modulus, public_exponent);
                 Ok(spki.into())
             }
-            JwkKeyType::Ec => Err(JwkError::UnsupportedAlgorithm {
-                algorithm: "elliptic curves",
-            }),
+            JwkKeyType::Ec(ec) => {
+                let curve = match ec.crv {
+                    JwkEcPublicKeyCurve::P256 => EcCurve::NistP256,
+                    JwkEcPublicKeyCurve::P384 => EcCurve::NistP384,
+                    JwkEcPublicKeyCurve::P521 => {
+                        // To construct encoded point from coponents we need to use curve-specific
+                        // arithmetic, which is currently not supported by picky.
+                        return Err(JwkError::InvalidEcPublicKey {
+                            cause: "P-521 EC curve arithmetic is not supported",
+                        });
+                    }
+                };
+
+                let x = BigUint::from_bytes_be(&ec.x_signed_bytes_be()?);
+                let y = BigUint::from_bytes_be(&ec.y_signed_bytes_be()?);
+
+                PublicKey::from_ec_components(curve, &x, &y).map_err(|_| JwkError::InvalidEcPointCoordinates)
+            }
             JwkKeyType::Oct => Err(JwkError::UnsupportedAlgorithm {
                 algorithm: "octet sequence",
             }),
@@ -314,7 +411,7 @@ pub struct JwkPublicRsaKey {
 
 impl JwkPublicRsaKey {
     pub fn modulus_signed_bytes_be(&self) -> Result<Vec<u8>, JwkError> {
-        let mut buf = Self::h_allocate_signed_big_int_buffer(&self.n);
+        let mut buf = h_allocate_signed_big_int_buffer(&self.n);
         general_purpose::URL_SAFE_NO_PAD
             .decode_vec(&self.n, &mut buf)
             .map_err(JwkError::from)?;
@@ -326,7 +423,7 @@ impl JwkPublicRsaKey {
     }
 
     pub fn public_exponent_signed_bytes_be(&self) -> Result<Vec<u8>, JwkError> {
-        let mut buf = Self::h_allocate_signed_big_int_buffer(&self.e);
+        let mut buf = h_allocate_signed_big_int_buffer(&self.e);
         general_purpose::URL_SAFE_NO_PAD
             .decode_vec(&self.e, &mut buf)
             .map_err(JwkError::from)?;
@@ -336,22 +433,43 @@ impl JwkPublicRsaKey {
     pub fn public_exponent_unsigned_bytes_be(&self) -> Result<Vec<u8>, JwkError> {
         general_purpose::URL_SAFE_NO_PAD.decode(&self.e).map_err(JwkError::from)
     }
+}
 
-    fn h_allocate_signed_big_int_buffer(base64_url_encoding: &str) -> Vec<u8> {
-        // Big integers from 0x00 to 0x7F are all base64-encoded using two ASCII characters ranging from "AA" to "fw".
-        // We know the required capacity is _exactly_ of one byte.
-        // The value 0 is valid and is represented as the array [0x00] ("AA").
-        // For numbers greater than 0x7F, logic is a bit more complex.
-        // There is no leading zero in JWK keys because _unsigned_ numbers are used.
-        // As such, there is no need to disambiguate the high-order bit (0x80)
-        // which is used as the sign bit for _signed_ numbers.
-        // The high-order bit is set when base64 encoding's leading character matches [g-z0-9_-].
-        match base64_url_encoding.chars().next() {
-            // The leading zero is re-introduced for any number whose high-order bit is set
-            Some('g'..='z' | '0'..='9' | '_' | '-') => vec![0],
-            // Otherwise, there is nothing more to do
-            _ => Vec::with_capacity(1),
-        }
+/// The key type of a JWK defined in
+/// [RFC 7518, section 6.1](https://tools.ietf.org/html/rfc7518#section-6.1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum JwkEcPublicKeyCurve {
+    #[serde(rename = "P-256")]
+    P256,
+    #[serde(rename = "P-384")]
+    P384,
+    #[serde(rename = "P-521")]
+    P521,
+}
+
+// === public rsa key === //
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct JwkPublicEcKey {
+    crv: JwkEcPublicKeyCurve,
+    x: String,
+    y: String,
+}
+
+impl JwkPublicEcKey {
+    pub fn x_signed_bytes_be(&self) -> Result<Vec<u8>, JwkError> {
+        let mut buf = h_allocate_signed_big_int_buffer(&self.x);
+        general_purpose::URL_SAFE_NO_PAD
+            .decode_vec(&self.x, &mut buf)
+            .map_err(JwkError::from)?;
+        Ok(buf)
+    }
+
+    pub fn y_signed_bytes_be(&self) -> Result<Vec<u8>, JwkError> {
+        let mut buf = h_allocate_signed_big_int_buffer(&self.y);
+        general_purpose::URL_SAFE_NO_PAD
+            .decode_vec(&self.y, &mut buf)
+            .map_err(JwkError::from)?;
+        Ok(buf)
     }
 }
 
@@ -360,6 +478,8 @@ mod tests {
     use super::*;
     use crate::jose::jws::JwsAlg;
     use crate::pem::Pem;
+    use crate::test_files;
+    use rstest::rstest;
 
     const RSA_MODULUS: &str = "rpJjxW0nNZiq1mPC3ZAxqf9qNjmKurP7XuKrpWrfv3IOUldqChQVPNg8zCvDOMZIO-ZDuRmVH\
                                EZ5E1vz5auHNACnpl6AvDGJ-4qyX42vfUDMNZx8i86d7bQpwJkO_MVMLj8qMGmTVbQ8zqVw2z\
@@ -464,6 +584,15 @@ mod tests {
         pretty_assertions::assert_eq!(decoded, expected);
     }
 
+    #[rstest]
+    #[case(test_files::JOSE_JWK_EC_P256_JSON)]
+    #[case(test_files::JOSE_JWK_EC_P384_JSON)]
+    fn ecdsa_key_roundtrip(#[case] json: &str) {
+        let decoded = Jwk::from_json(json).unwrap();
+        let encoded = decoded.to_json().unwrap();
+        pretty_assertions::assert_eq!(encoded, json);
+    }
+
     const PUBLIC_KEY_PEM: &str = r#"-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA61BjmfXGEvWmegnBGSuS
 +rU9soUg2FnODva32D1AqhwdziwHINFaD1MVlcrYG6XRKfkcxnaXGfFDWHLEvNBS
@@ -475,7 +604,7 @@ ZQIDAQAB
 -----END PUBLIC KEY-----"#;
 
     #[test]
-    fn x509_and_jwk_conversion() {
+    fn x509_and_jwk_conversion_rsa() {
         let initial_key = PublicKey::from_pem(&PUBLIC_KEY_PEM.parse::<Pem>().expect("pem")).expect("public key");
         let jwk = Jwk::from_public_key(&initial_key).unwrap();
         if let JwkKeyType::Rsa(rsa_key) = &jwk.key {
@@ -483,6 +612,24 @@ ZQIDAQAB
             assert_ne!(modulus[0], 0x00);
             let public_exponent = general_purpose::URL_SAFE_NO_PAD.decode(&rsa_key.e).unwrap();
             assert_ne!(public_exponent[0], 0x00);
+        } else {
+            panic!("Unexpected key type");
+        }
+        let from_jwk_key = jwk.to_public_key().unwrap();
+        assert_eq!(from_jwk_key, initial_key);
+    }
+
+    #[rstest]
+    #[case(test_files::EC_NIST256_PK_1_PUB)]
+    #[case(test_files::EC_NIST384_PK_1_PUB)]
+    fn x509_and_jwk_conversion_ec(#[case] pem: &str) {
+        let initial_key = PublicKey::from_pem(&pem.parse::<Pem>().expect("pem")).expect("public key");
+        let jwk = Jwk::from_public_key(&initial_key).unwrap();
+        if let JwkKeyType::Ec(rsa_key) = &jwk.key {
+            let x = general_purpose::URL_SAFE_NO_PAD.decode(&rsa_key.x).unwrap();
+            assert_ne!(x[0], 0x00);
+            let y = general_purpose::URL_SAFE_NO_PAD.decode(&rsa_key.y).unwrap();
+            assert_ne!(y[0], 0x00);
         } else {
             panic!("Unexpected key type");
         }

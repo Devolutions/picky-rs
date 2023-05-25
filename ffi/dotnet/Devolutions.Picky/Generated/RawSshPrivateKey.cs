@@ -37,6 +37,17 @@ public partial struct SshPrivateKey
     public static unsafe extern IntPtr GenerateRsa(nuint bits, byte* passphrase, nuint passphraseSz, byte* comment, nuint commentSz);
 
     /// <summary>
+    /// Generates a new SSH EC Private Key.
+    /// </summary>
+    /// <remarks>
+    /// No passphrase is set if `passphrase` is empty.
+    /// <br/>
+    /// No comment is set if `comment` is empty.
+    /// </remarks>
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshPrivateKey_generate_ec", ExactSpelling = true)]
+    public static unsafe extern IntPtr GenerateEc(EcCurve curve, byte* passphrase, nuint passphraseSz, byte* comment, nuint commentSz);
+
+    /// <summary>
     /// Extracts SSH Private Key from PEM object.
     /// </summary>
     /// <remarks>

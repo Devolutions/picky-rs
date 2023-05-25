@@ -1,10 +1,12 @@
 use crate::hash::HashAlgorithm;
+use crate::key::ec::EcdsaPublicKey;
 use crate::key::KeyError;
 use crate::signature::{SignatureAlgorithm, SignatureError};
 use crate::ssh::decode::SshComplexTypeDecode;
 use crate::ssh::encode::{SshComplexTypeEncode, SshWriteExt};
 use crate::ssh::private_key::{SshBasePrivateKey, SshPrivateKey, SshPrivateKeyError};
 use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
+use crate::ssh::EcCurveSshExt as _;
 use byteorder::{BigEndian, WriteBytesExt};
 use rand::Rng;
 use rsa::{PublicKeyParts, RsaPublicKey};
@@ -240,6 +242,9 @@ pub enum SshSignatureFormat {
     SshRsa,
     RsaSha256,
     RsaSha512,
+    EcdsaSha2Nistp256,
+    EcdsaSha2Nistp384,
+    EcdsaSha2Nistp521,
 }
 
 impl SshSignatureFormat {
@@ -248,6 +253,9 @@ impl SshSignatureFormat {
             "ssh-rsa" => Ok(SshSignatureFormat::SshRsa),
             "rsa-sha2-256" => Ok(SshSignatureFormat::RsaSha256),
             "rsa-sha2-512" => Ok(SshSignatureFormat::RsaSha512),
+            "ecdsa-sha2-nistp256" => Ok(SshSignatureFormat::EcdsaSha2Nistp256),
+            "ecdsa-sha2-nistp384" => Ok(SshSignatureFormat::EcdsaSha2Nistp384),
+            "ecdsa-sha2-nistp521" => Ok(SshSignatureFormat::EcdsaSha2Nistp521),
             _ => Err(SshSignatureError::UnsupportedSignatureFormat(
                 format.as_ref().to_owned(),
             )),
@@ -259,8 +267,21 @@ impl SshSignatureFormat {
             SshSignatureFormat::SshRsa => "ssh-rsa",
             SshSignatureFormat::RsaSha256 => "rsa-sha2-256",
             SshSignatureFormat::RsaSha512 => "rsa-sha2-512",
+            SshSignatureFormat::EcdsaSha2Nistp256 => "ecdsa-sha2-nistp256",
+            SshSignatureFormat::EcdsaSha2Nistp384 => "ecdsa-sha2-nistp384",
+            SshSignatureFormat::EcdsaSha2Nistp521 => "ecdsa-sha2-nistp521",
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+enum EcCurveIdentifier {
+    #[serde(rename = "nistp256")]
+    Nistp256,
+    #[serde(rename = "nistp384")]
+    Nistp384,
+    #[serde(rename = "nistp521")]
+    Nistp521,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -486,12 +507,13 @@ impl SshCertificateBuilder {
 
         let cert_key_type = cert_key_type.ok_or(SshCertificateGenerationError::NoKeyType)?;
         match cert_key_type {
-            SshCertKeyType::SshRsaV01 | SshCertKeyType::RsaSha2_256V01 | SshCertKeyType::RsaSha2_512v01 => {}
-            SshCertKeyType::EcdsaSha2Nistp256V01
-            | SshCertKeyType::SshDssV01
-            | SshCertKeyType::EcdsaSha2Nistp384V01
-            | SshCertKeyType::EcdsaSha2Nistp521V01
-            | SshCertKeyType::SshEd25519V01 => {
+            SshCertKeyType::SshRsaV01
+            | SshCertKeyType::RsaSha2_256V01
+            | SshCertKeyType::RsaSha2_512v01
+            | SshCertKeyType::EcdsaSha2Nistp256V01
+            | SshCertKeyType::EcdsaSha2Nistp384V01 => {}
+
+            SshCertKeyType::SshDssV01 | SshCertKeyType::SshEd25519V01 | SshCertKeyType::EcdsaSha2Nistp521V01 => {
                 return Err(SshCertificateGenerationError::UnsupportedCertificateKeyType(
                     cert_key_type.as_str().to_owned(),
                 ))
@@ -566,9 +588,13 @@ impl SshCertificateBuilder {
         extensions
             .sort_by(|lhs, rhs| lexical_sort::lexical_cmp(lhs.extension_type.as_str(), rhs.extension_type.as_str()));
 
-        let signature_algo = signature_algo
-            .take()
-            .unwrap_or(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256));
+        let signature_algo = signature_algo.take().unwrap_or(match cert_key_type {
+            SshCertKeyType::EcdsaSha2Nistp256V01 => SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_256),
+            SshCertKeyType::EcdsaSha2Nistp384V01 => SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_384),
+            SshCertKeyType::EcdsaSha2Nistp521V01 => SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_512),
+            // Fallback default algorithm
+            _ => SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256),
+        });
 
         let signature_key = signature_key
             .take()
@@ -586,9 +612,20 @@ impl SshCertificateBuilder {
 
             match &public_key.inner_key {
                 SshBasePublicKey::Rsa(rsa) => {
-                    let rsa = RsaPublicKey::try_from(rsa).unwrap();
+                    let rsa = RsaPublicKey::try_from(rsa)
+                        .map_err(|err| SshCertificateGenerationError::SshPublicKeyError(err.into()))?;
                     buff.write_ssh_mpint(rsa.e())?;
                     buff.write_ssh_mpint(rsa.n())?;
+                }
+                SshBasePublicKey::Ec(ec) => {
+                    let ec = EcdsaPublicKey::try_from(ec)
+                        .map_err(|err| SshCertificateGenerationError::SshPublicKeyError(err.into()))?;
+                    let curve_identifier = ec
+                        .curve()
+                        .to_ecdsa_ssh_key_identifier()
+                        .map_err(|err| SshCertificateGenerationError::SshPublicKeyError(err.into()))?;
+                    buff.write_ssh_string(curve_identifier)?;
+                    buff.write_ssh_bytes(ec.encoded_point())?;
                 }
             };
 
@@ -625,19 +662,42 @@ impl SshCertificateBuilder {
                         HashAlgorithm::SHA2_512 => SshSignatureFormat::RsaSha512,
                         _ => {
                             return Err(SshCertificateGenerationError::IncorrectSignatureAlgorithm(format!(
-                                "Invalid signature format hash algorithm. Only sha1, sha2-256 and ssh2-521 are in use in OpenSSH, but got {:?} hash",
+                                "Invalid signature format hash algorithm. Only sha1, sha2-256 and ssh2-521 are in use in OpenSSH for RSA keys, but got {:?} hash",
                                 hash_algo
                             )))
                         }
                     },
                     SignatureAlgorithm::Ecdsa(_) => {
                         return Err(SshCertificateGenerationError::IncorrectSignatureAlgorithm(
-                            "Ecdsa signatures for SSH certificates are not yet supported".to_owned(),
+                            "ECDSA signature algorithm can't be used with RSA keys".to_owned(),
                         ))
                     }
                 };
 
                 let signature = signature_algo.sign(&raw_signature, rsa)?;
+                (signature, signature_format)
+            }
+            SshBasePrivateKey::Ec(ec) => {
+                let signature_format = match signature_algo {
+                    SignatureAlgorithm::Ecdsa(hash_algo) => match hash_algo {
+                        HashAlgorithm::SHA2_256 => SshSignatureFormat::EcdsaSha2Nistp256,
+                        HashAlgorithm::SHA2_384 => SshSignatureFormat::EcdsaSha2Nistp384,
+                        HashAlgorithm::SHA2_512 => SshSignatureFormat::EcdsaSha2Nistp521,
+                        _ => {
+                            return Err(SshCertificateGenerationError::IncorrectSignatureAlgorithm(format!(
+                                "Invalid signature format hash algorithm. Only sha2-256, sha2-384 and ssh2-521 are in use in OpenSSH for ECDSA keys, but got {:?} hash",
+                                hash_algo
+                            )))
+                        }
+                    },
+                    SignatureAlgorithm::RsaPkcs1v15(_) => {
+                        return Err(SshCertificateGenerationError::IncorrectSignatureAlgorithm(
+                            "RSA signature algorithm can't be used with ECDSA keys".to_owned(),
+                        ))
+                    }
+                };
+
+                let signature = signature_algo.sign(&raw_signature, ec)?;
                 (signature, signature_format)
             }
         };
@@ -670,6 +730,8 @@ impl SshCertificateBuilder {
 pub mod tests {
     use super::*;
     use crate::ssh::private_key::SshPrivateKey;
+    use crate::test_files;
+    use rstest::rstest;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     const PRIVATE_KEY_PEM: &str = "-----BEGIN OPENSSH PRIVATE KEY-----\n\
@@ -784,26 +846,34 @@ pub mod tests {
         pretty_assertions::assert_eq!(cert_before, cert_after);
     }
 
-    #[test]
-    fn test_required_fields_in_certificate_builder() {
+    #[rstest]
+    #[case(test_files::SSH_CERT_EC_P256)]
+    #[case(test_files::SSH_CERT_EC_P384)]
+    fn encode_ecdsa_cert(#[case] cert_before: &str) {
+        let cert: SshCertificate = SshCertificate::from_str(cert_before).unwrap();
+        let cert_after = cert.to_string().unwrap();
+        pretty_assertions::assert_eq!(cert_before, cert_after);
+    }
+
+    #[rstest]
+    #[case(SshCertKeyType::EcdsaSha2Nistp256V01, test_files::SSH_PRIVATE_KEY_EC_P256)]
+    #[case(SshCertKeyType::RsaSha2_256V01, PRIVATE_KEY_PEM)]
+    fn test_certificate_generation(#[case] key_type: SshCertKeyType, #[case] ssh_key_pem: &str) {
         let certificate_builder = SshCertificateBuilder::init();
-
-        certificate_builder.cert_key_type(SshCertKeyType::RsaSha2_256V01);
-
-        let private_key: SshPrivateKey = SshPrivateKey::from_pem_str(PRIVATE_KEY_PEM, None).unwrap();
+        certificate_builder.cert_key_type(key_type);
+        let private_key: SshPrivateKey = SshPrivateKey::from_pem_str(ssh_key_pem, None).unwrap();
         certificate_builder.key(private_key.public_key().clone());
-
         certificate_builder.cert_type(SshCertType::Host);
-
         let now_timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
         certificate_builder.valid_after(now_timestamp);
-
         // 10 minutes = 600 seconds
         let valid_before = now_timestamp + 600;
         certificate_builder.valid_before(valid_before);
-
         certificate_builder.signature_key(private_key);
-        certificate_builder.build().unwrap();
+        let cert = certificate_builder.build().unwrap();
+        // Check that we could parse this certificate after building it
+        let serialized = cert.to_string().unwrap();
+        SshCertificate::from_str(&serialized).unwrap();
     }
 
     #[test]

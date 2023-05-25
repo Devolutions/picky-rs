@@ -24,6 +24,7 @@ pub enum SshPublicKeyError {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SshBasePublicKey {
     Rsa(PublicKey),
+    Ec(PublicKey),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -52,20 +53,9 @@ impl FromStr for SshPublicKey {
 mod tests {
     use super::*;
 
-    use digest::Digest;
+    use crate::test_files;
     use num_bigint_dig::BigUint;
-
-    fn compare_fingerprints(public_key1: &str, public_key2: &str) -> bool {
-        let mut hasher = md5::Md5::new();
-        hasher.update(public_key1.as_bytes());
-        let hash1 = hasher.finalize();
-
-        let mut hasher = md5::Md5::new();
-        hasher.update(public_key2.as_bytes());
-        let hash2 = hasher.finalize();
-
-        hash1 == hash2
-    }
+    use rstest::rstest;
 
     #[test]
     fn decode_ssh_rsa_4096_public_key() {
@@ -147,7 +137,6 @@ mod tests {
 
         let ssh_public_key_after = public_key.to_string().unwrap();
 
-        assert!(compare_fingerprints(ssh_public_key, ssh_public_key_after.as_str()));
         assert_eq!(ssh_public_key, ssh_public_key_after.as_str());
     }
 
@@ -159,7 +148,16 @@ mod tests {
 
         let ssh_public_key_after = public_key.to_string().unwrap();
 
-        assert!(compare_fingerprints(ssh_public_key, ssh_public_key_after.as_str()));
         assert_eq!(ssh_public_key, ssh_public_key_after.as_str());
+    }
+
+    #[rstest]
+    #[case(test_files::SSH_PUBLIC_KEY_EC_P256)]
+    #[case(test_files::SSH_PUBLIC_KEY_EC_P384)]
+    #[case(test_files::SSH_PUBLIC_KEY_EC_P521)]
+    fn ecdsa_roundtrip(#[case] key_str: &str) {
+        let public_key = SshPublicKey::from_str(key_str).unwrap();
+        let ssh_public_key_after = public_key.to_string().unwrap();
+        assert_eq!(key_str, ssh_public_key_after.as_str());
     }
 }

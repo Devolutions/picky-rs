@@ -1,6 +1,6 @@
 [package]
 name = "picky"
-version = "7.0.0-rc.5"
+version = "7.0.0-rc.6"
 authors = [
     "Benoît CORTIER <bcortier@devolutions.net>",
     "Jonathan Trepanier <jtrepanier@devolutions.net>",
@@ -15,7 +15,7 @@ authors = [
 description = "Portable X.509, PKI, JOSE and HTTP signature implementation."
 keywords = ["x509", "jwt", "signature", "jose", "pki"]
 edition = "2021"
-rust-version = "1.60"
+rust-version = "1.65"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Devolutions/picky-rs"
 include = ["src/**/*", "README.md", "CHANGELOG.md"]
@@ -23,9 +23,8 @@ include = ["src/**/*", "README.md", "CHANGELOG.md"]
 [dependencies]
 picky-asn1 = { version = "0.7", path = "../picky-asn1", features = ["zeroize"] }
 picky-asn1-der = { version = "0.4", path = "../picky-asn1-der" }
-picky-asn1-x509 = { version = "0.9", path = "../picky-asn1-x509", features = ["legacy", "zeroize"] }
+picky-asn1-x509 = { version = "0.10", path = "../picky-asn1-x509", features = ["legacy", "zeroize"] }
 serde = { version = "1.0.152", features = ["derive"] }
-oid = { version = "0.2.1", features = ["serde_support"] }
 base64 = "0.21.0"
 thiserror = "1.0.38"
 byteorder = { version = "1.4.3", optional = true }
@@ -47,8 +46,8 @@ reqwest = { version = "0.11.14", default-features = false, features = ["blocking
 rand = "0.8.5"
 num-bigint-dig = "0.8.2"
 
-p256 = { version = "0.12.0", optional = true }
-p384 = { version = "0.12.0", optional = true }
+p256 = "0.13"
+p384 = "0.13"
 
 rsa = "0.6.1"
 
@@ -72,7 +71,7 @@ ring = "0.16.20"
 rstest = "0.12.0"
 
 [features]
-default = ["x509", "ec", "jose", "http_signature", "http_trait_impl"]
+default = ["x509", "jose", "http_signature", "http_trait_impl"]
 
 # main features
 x509 = []
@@ -89,7 +88,6 @@ ssh = ["dep:byteorder", "dep:aes", "dep:ctr", "dep:cbc", "dep:bcrypt-pbkdf", "de
 http_trait_impl = ["dep:http"]
 chrono_conversion = ["dep:chrono", "picky-asn1/chrono_conversion"]
 time_conversion = ["dep:time", "picky-asn1/time_conversion"]
-ec = ["p256", "p384"]
 
 [package.metadata.docs.rs]
 # Enable all features when building documentation for docs.rs

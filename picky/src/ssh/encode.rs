@@ -1,4 +1,5 @@
 use super::certificate::Timestamp;
+use crate::key::ec::{EcdsaKeypair, EcdsaPublicKey};
 use crate::ssh::certificate::{
     SshCertType, SshCertTypeError, SshCertificate, SshCertificateError, SshCriticalOption, SshCriticalOptionError,
     SshExtension, SshExtensionError, SshSignature, SshSignatureError,
@@ -7,7 +8,7 @@ use crate::ssh::private_key::{
     Aes256Ctr, KdfOption, SshBasePrivateKey, SshPrivateKey, SshPrivateKeyError, AES256_CTR, AUTH_MAGIC, BCRYPT, NONE,
 };
 use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
-use crate::ssh::{Base64Writer, SSH_RSA_KEY_TYPE};
+use crate::ssh::{key_type, Base64Writer, EcCurveSshExt as _};
 use aes::cipher::{KeyIvInit, StreamCipher};
 use base64::engine::general_purpose;
 use byteorder::{BigEndian, WriteBytesExt};
@@ -163,9 +164,14 @@ impl SshComplexTypeEncode for SshBasePublicKey {
         match self {
             SshBasePublicKey::Rsa(rsa) => {
                 let rsa = RsaPublicKey::try_from(rsa)?;
-                stream.write_ssh_string(SSH_RSA_KEY_TYPE)?;
+                stream.write_ssh_string(key_type::SSH_RSA)?;
                 stream.write_ssh_mpint(rsa.e())?;
                 stream.write_ssh_mpint(rsa.n())?;
+                Ok(())
+            }
+            SshBasePublicKey::Ec(ec) => {
+                let key = EcdsaPublicKey::try_from(ec)?;
+                encode_ecdsa_public_key_body(&mut stream, &key)?;
                 Ok(())
             }
         }
@@ -178,10 +184,15 @@ impl SshComplexTypeEncode for SshPublicKey {
     fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
         match &self.inner_key {
             SshBasePublicKey::Rsa(_) => {
-                stream.write_all(SSH_RSA_KEY_TYPE.as_bytes())?;
-                stream.write_u8(b' ')?;
+                stream.write_all(key_type::SSH_RSA.as_bytes())?;
+            }
+            SshBasePublicKey::Ec(key) => {
+                let key = EcdsaPublicKey::try_from(key)?;
+                stream.write_all(key.curve().to_ecdsa_ssh_key_type()?.as_bytes())?;
             }
         };
+
+        stream.write_u8(b' ')?;
 
         {
             let mut base64_write = Base64Writer::new(&mut stream, &general_purpose::STANDARD);
@@ -204,7 +215,7 @@ impl SshComplexTypeEncode for SshBasePrivateKey {
         match self {
             SshBasePrivateKey::Rsa(rsa) => {
                 let rsa = RsaPrivateKey::try_from(rsa)?;
-                stream.write_ssh_string(SSH_RSA_KEY_TYPE)?;
+                stream.write_ssh_string(key_type::SSH_RSA)?;
                 stream.write_ssh_mpint(rsa.n())?;
                 stream.write_ssh_mpint(rsa.e())?;
                 stream.write_ssh_mpint(rsa.d())?;
@@ -217,10 +228,31 @@ impl SshComplexTypeEncode for SshBasePrivateKey {
                     stream.write_ssh_mpint(prime)?;
                 }
             }
+            SshBasePrivateKey::Ec(key) => {
+                let keypair = EcdsaKeypair::try_from(key)?;
+
+                let public_key = EcdsaPublicKey::from(&keypair);
+
+                // Encode the public key part
+                encode_ecdsa_public_key_body(&mut stream, &public_key)?;
+
+                // Ecnode encoded secret
+                let secret = BigUint::from_bytes_be(keypair.secret());
+                stream.write_ssh_mpint(&secret)?;
+            }
         };
 
         Ok(())
     }
+}
+
+fn encode_ecdsa_public_key_body(mut stream: impl Write, key: &EcdsaPublicKey<'_>) -> Result<(), SshPublicKeyError> {
+    stream.write_ssh_string(key.curve().to_ecdsa_ssh_key_type()?)?;
+    stream.write_ssh_string(key.curve().to_ecdsa_ssh_key_identifier()?)?;
+
+    // So called "Q" value from RFC5656. In fact - standard SEC1 encoded public key representation
+    stream.write_ssh_bytes(key.encoded_point())?;
+    Ok(())
 }
 
 impl SshComplexTypeEncode for SshPrivateKey {
@@ -307,9 +339,13 @@ impl SshComplexTypeEncode for SshCertificate {
         match &self.public_key.inner_key {
             SshBasePublicKey::Rsa(rsa) => {
                 let rsa = RsaPublicKey::try_from(rsa)?;
-                //SshString("ssh-rsa".to_string()).encode(&mut cert_data)?;
                 cert_data.write_ssh_mpint(rsa.e())?;
                 cert_data.write_ssh_mpint(rsa.n())?;
+            }
+            SshBasePublicKey::Ec(ec) => {
+                let ec = EcdsaPublicKey::try_from(ec)?;
+                cert_data.write_ssh_string(ec.curve().to_ecdsa_ssh_key_identifier()?)?;
+                cert_data.write_ssh_bytes(ec.encoded_point())?;
             }
         };
 
