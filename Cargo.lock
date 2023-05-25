@@ -1252,6 +1252,8 @@ checksum = "3b467d8082dcc552d4ca8c9aecdc94a09b0e092b961c542bb78b6feff8f1b3ea"
 dependencies = [
  "base64 0.13.1",
  "byteorder",
+ "cab",
+ "chrono",
  "digest",
  "md-5",
  "num-bigint-dig",
@@ -1260,6 +1262,7 @@ dependencies = [
  "picky-asn1-der 0.3.1",
  "picky-asn1-x509 0.8.0",
  "rand",
+ "reqwest",
  "rsa",
  "serde",
  "sha-1",
@@ -1325,6 +1328,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b7a3f07db0e5b22727979a992df18c78170c7c30279ab4149a395c0c3843832"
 dependencies = [
+ "chrono",
  "oid",
  "serde",
  "serde_bytes",
@@ -1440,14 +1444,14 @@ dependencies = [
 
 [[package]]
 name = "picky-signtool"
-version = "0.2.0"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "base64 0.21.0",
  "clap",
  "encoding_rs",
  "lief-cwal",
- "picky 7.0.0-rc.6",
+ "picky 7.0.0-rc.3",
  "walkdir",
 ]
 
