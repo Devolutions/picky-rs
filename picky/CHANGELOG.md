@@ -49,7 +49,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `PrivateKey::from_ec_der_with_curve`
 - `PrivateKey::from_ec_der_with_curve_oid`
 - `PrivateKey::generate_ec`
-- `PrivateKey::from_encoded_ec_components`
+- `PrivateKey::generate_ed`
+- `PrivateKey::from_ec_encoded_components`
+- `PrivateKey::from_ed_encoded_components`
 - `PublicKey::to_pem_str`
 - Support SSH keys and certificates
 - `CheckedJwtEnc::new_with_cty`
@@ -60,7 +62,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - EC curves support for SSH keys and certificates
 - EC x509 certificates verification/signing
 - `JwkKeyType::new_ec_key`
+- `JwkKeyType::new_ed_key`
+- `JwkKeyType::as_ec`
+- `JwkKeyType::as_ed`
+- `JwkKeyType::is_ec`
+- `JwkKeyType::is_ed`
 - `SshPrivateKey::generate_ec`
+- `SshPrivateKey::generate_ed`
+- `JwkEcPublicKeyCurve` enum
+- `JwkEdPublicKeyAlgorithm` enum
+- `JwsAlg::EdDSA` variant
+- `JwsAlg::ED25519` variant (`#[deprecated]` from the start, just for compatibility with other libs)
+- Support for X25519 and Ed25519 public/private keys
+- JWS and JWK Ed25519 keys/signing support
+- Ed25519 support for SSH keys and certificates
+- Ed25519 x509 certificates verification/signing
 
 ### Changed
 - Bump minimal rustc version to 1.65 (required by `sec1` transitive dependency after `p256`/`p384` update)
@@ -71,6 +87,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - (Breaking) Separate JWT validation from decoding in JOSE API (this makes API more convenient to first process header
     and then decide what kind of validation should be applied, or what claims type to deserialize into)
 - (Breaking) `PrivateKey` now have private struct representation instead of open enum
+- (Breaking) Now all `PrivateKey::to_public` and all related APIs for private keys return `Result`
+  instead of plain `PublicKey`. This change was required because added support for EC/ED keys is not
+  infallible in regards to public key extraction (public key could be missing from the file and could
+  not be generated because of an unsupported algorithm/curve)
 
 ### Removed
 - (Breaking) `ec` non-default cargo feature (EC operations now enabled by default)
@@ -90,6 +110,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fetch curve info from private_key_algorithm ([#143](https://github.com/Devolutions/picky-rs/issues/143))
 
   Pick curve info from private_key_algorithm field.
+
+- Missing `zeroize` on drop of internal `EcdsaKeypair` structure
+- Fixed invalid padding logic of encrypted SSH keys
+- Fixed invalid generated SSH EC keys
 
 
 ### Removed

@@ -31,6 +31,34 @@ pub enum EcCurve {
     NistP384,
 }
 
+impl From<picky::key::EdAlgorithm> for EdAlgorithm {
+    fn from(value: picky::key::EdAlgorithm) -> Self {
+        match value {
+            picky::key::EdAlgorithm::Ed25519 => Self::Ed25519,
+            picky::key::EdAlgorithm::X25519 => Self::X25519,
+        }
+    }
+}
+
+impl From<EdAlgorithm> for picky::key::EdAlgorithm {
+    fn from(value: EdAlgorithm) -> Self {
+        match value {
+            EdAlgorithm::Ed25519 => Self::Ed25519,
+            EdAlgorithm::X25519 => Self::X25519,
+        }
+    }
+}
+
+/// Known Edwards curve-based algorithm name
+#[wasm_bindgen]
+#[derive(Clone, Copy)]
+pub enum EdAlgorithm {
+    /// Ed25519 signing algorithm
+    Ed25519,
+    /// X25519 key agreement algorithm
+    X25519,
+}
+
 #[wasm_bindgen]
 pub struct PrivateKey(pub(crate) picky::key::PrivateKey);
 
@@ -62,6 +90,14 @@ impl PrivateKey {
         Ok(Self(key))
     }
 
+    /// Generates new ed key pair with specified supported algorithm.
+    /// `write_public_key` specifies whether to include public key in the private key file.
+    /// Note that OpenSSL does not support ed keys with public key included.
+    pub fn generate_ed(algorithm: EdAlgorithm, write_public_key: bool) -> Result<PrivateKey, KeyError> {
+        let key = picky::key::PrivateKey::generate_ed(algorithm.into(), write_public_key)?;
+        Ok(Self(key))
+    }
+
     /// Exports the private key into a PEM object
     pub fn to_pem(&self) -> Result<Pem, KeyError> {
         let pem = self.0.to_pem()?;
@@ -69,8 +105,8 @@ impl PrivateKey {
     }
 
     /// Extracts the public part of this private key
-    pub fn to_public_key(&self) -> PublicKey {
-        PublicKey(self.0.to_public_key())
+    pub fn to_public_key(&self) -> Result<PublicKey, KeyError> {
+        Ok(PublicKey(self.0.to_public_key()?))
     }
 }
 

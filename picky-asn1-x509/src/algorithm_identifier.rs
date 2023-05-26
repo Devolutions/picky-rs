@@ -47,6 +47,10 @@ impl AlgorithmIdentifier {
         algorithm.eq(&self.algorithm.0)
     }
 
+    pub fn is_one_of(&self, algorithms: impl IntoIterator<Item = ObjectIdentifier>) -> bool {
+        algorithms.into_iter().any(|oid| self.is_a(oid))
+    }
+
     pub fn new_md5_with_rsa_encryption() -> Self {
         Self {
             algorithm: oids::md5_with_rsa_encryption().into(),
@@ -180,9 +184,39 @@ impl AlgorithmIdentifier {
         }
     }
 
+    /// Create new algorithm identifier without checking if the algorithm parameters are valid for
+    /// the given algorithm.
+    pub(crate) fn new_unchecked(algorithm: ObjectIdentifier, parameters: AlgorithmIdentifierParameters) -> Self {
+        Self {
+            algorithm: algorithm.into(),
+            parameters,
+        }
+    }
+
     pub fn new_ed25519() -> Self {
         Self {
             algorithm: oids::ed25519().into(),
+            parameters: AlgorithmIdentifierParameters::None,
+        }
+    }
+
+    pub fn new_x25519() -> Self {
+        Self {
+            algorithm: oids::x25519().into(),
+            parameters: AlgorithmIdentifierParameters::None,
+        }
+    }
+
+    pub fn new_ed448() -> Self {
+        Self {
+            algorithm: oids::ed448().into(),
+            parameters: AlgorithmIdentifierParameters::None,
+        }
+    }
+
+    pub fn new_x448() -> Self {
+        Self {
+            algorithm: oids::x448().into(),
             parameters: AlgorithmIdentifierParameters::None,
         }
     }
@@ -282,9 +316,13 @@ impl<'de> de::Deserialize<'de> for AlgorithmIdentifier {
                         RsassaPssParams,
                         "RSASSA-PSS parameters"
                     )),
-                    oids::ECDSA_WITH_SHA384 | oids::ECDSA_WITH_SHA256 | oids::ECDSA_WITH_SHA512 | oids::ED25519 => {
-                        AlgorithmIdentifierParameters::None
-                    }
+                    oids::ECDSA_WITH_SHA384
+                    | oids::ECDSA_WITH_SHA256
+                    | oids::ECDSA_WITH_SHA512
+                    | oids::ED25519
+                    | oids::ED448
+                    | oids::X25519
+                    | oids::X448 => AlgorithmIdentifierParameters::None,
                     oids::DSA_WITH_SHA1 => {
                         // A note from [RFC 3927](https://www.ietf.org/rfc/rfc3279.txt)
                         // When the id-dsa-with-sha1 algorithm identifier appears as the

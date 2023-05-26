@@ -539,7 +539,7 @@ mod tests {
 
     #[test]
     fn decode_jws_rsa_sha256() {
-        let public_key = get_private_key_1().to_public_key();
+        let public_key = get_private_key_1().to_public_key().unwrap();
         let jwt = JwtSig::decode(crate::test_files::JOSE_JWT_SIG_EXAMPLE, &public_key)
             .unwrap()
             .validate::<MyClaims>(&JwtValidator::no_check())
@@ -556,7 +556,7 @@ mod tests {
 
     #[test]
     fn decode_jws_invalid_validator_err() {
-        let public_key = get_private_key_1().to_public_key();
+        let public_key = get_private_key_1().to_public_key().unwrap();
         let validator = JwtValidator::no_check()
             .expiration_check_required()
             .not_before_check_optional();
@@ -570,7 +570,7 @@ mod tests {
 
     #[test]
     fn decode_jws_required_claim_missing_err() {
-        let public_key = get_private_key_1().to_public_key();
+        let public_key = get_private_key_1().to_public_key().unwrap();
         let now = JwtDate::new(0);
         let validator = JwtValidator::strict(now);
         let err = JwtSig::decode(crate::test_files::JOSE_JWT_SIG_EXAMPLE, &public_key)
@@ -583,7 +583,7 @@ mod tests {
 
     #[test]
     fn decode_jws_rsa_sha256_using_json_value_claims() {
-        let public_key = get_private_key_1().to_public_key();
+        let public_key = get_private_key_1().to_public_key().unwrap();
         let validator = JwtValidator::no_check();
         let jwt = JwtSig::decode(crate::test_files::JOSE_JWT_SIG_EXAMPLE, &public_key)
             .unwrap()
@@ -617,7 +617,7 @@ mod tests {
 
     #[test]
     fn decode_jws_not_expired() {
-        let public_key = get_private_key_1().to_public_key();
+        let public_key = get_private_key_1().to_public_key().unwrap();
 
         let jwt = JwtSig::decode(crate::test_files::JOSE_JWT_SIG_WITH_EXP, &public_key)
             .unwrap()
@@ -642,7 +642,7 @@ mod tests {
 
     #[test]
     fn decode_jws_invalid_date_err() {
-        let public_key = get_private_key_1().to_public_key();
+        let public_key = get_private_key_1().to_public_key().unwrap();
 
         let err = JwtSig::decode(crate::test_files::JOSE_JWT_SIG_WITH_EXP, &public_key)
             .unwrap()

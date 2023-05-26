@@ -5,7 +5,7 @@
 use crate::jose::jwe::{JweAlg, JweEnc};
 use crate::jose::jws::JwsAlg;
 use crate::key::ec::{EcdsaPublicKey, NamedEcCurve};
-use crate::key::{EcCurve, PublicKey};
+use crate::key::{EcCurve, EdAlgorithm, PublicKey};
 use base64::{engine::general_purpose, DecodeError, Engine as _};
 use num_bigint_dig::BigUint;
 use picky_asn1::wrapper::IntegerAsn1;
@@ -56,6 +56,11 @@ impl From<DecodeError> for JwkError {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "kty")]
 pub enum JwkKeyType {
+    /// Edwards curve-based cryptography
+    ///
+    /// Defined by separate [RFC 8037](https://www.rfc-editor.org/rfc/rfc8037)
+    #[serde(rename = "OKP")]
+    Ed(JwkPublicEdKey),
     /// Elliptic Curve
     ///
     /// Recommended+ by RFC
@@ -100,6 +105,17 @@ impl JwkKeyType {
         })
     }
 
+    /// Build a JWK key from Edwards curve components.
+    ///
+    /// `crv` is ed-based algoritm name.
+    /// `x` is raw public key bytes.
+    pub fn new_ed_key(crv: JwkEdPublicKeyAlgorithm, x: &[u8]) -> Self {
+        Self::Ed(JwkPublicEdKey {
+            crv,
+            x: general_purpose::URL_SAFE_NO_PAD.encode(x),
+        })
+    }
+
     /// Build a JWK key from RSA components already encoded following base64 url format.
     ///
     /// Each argument is the unsigned big-endian representation as an octet sequence of the value.
@@ -121,8 +137,30 @@ impl JwkKeyType {
         }
     }
 
+    pub fn as_ec(&self) -> Option<&JwkPublicEcKey> {
+        match self {
+            JwkKeyType::Ec(ec) => Some(ec),
+            _ => None,
+        }
+    }
+
+    pub fn as_ed(&self) -> Option<&JwkPublicEdKey> {
+        match self {
+            JwkKeyType::Ed(ed) => Some(ed),
+            _ => None,
+        }
+    }
+
     pub fn is_rsa(&self) -> bool {
         self.as_rsa().is_some()
+    }
+
+    pub fn is_ec(&self) -> bool {
+        self.as_ec().is_some()
+    }
+
+    pub fn is_ed(&self) -> bool {
+        self.as_ed().is_some()
     }
 }
 
@@ -373,6 +411,20 @@ impl Jwk {
 
                 PublicKey::from_ec_components(curve, &x, &y).map_err(|_| JwkError::InvalidEcPointCoordinates)
             }
+            JwkKeyType::Ed(ed) => {
+                let algorithm = match ed.crv {
+                    JwkEdPublicKeyAlgorithm::Ed25519 => Ok(EdAlgorithm::Ed25519),
+                    JwkEdPublicKeyAlgorithm::X25519 => Ok(EdAlgorithm::X25519),
+                    JwkEdPublicKeyAlgorithm::Ed448 => Err("ed448 algorithm"),
+                    JwkEdPublicKeyAlgorithm::X448 => Err("x448 algorithm"),
+                }
+                .map_err(|algorithm| JwkError::UnsupportedAlgorithm { algorithm })?;
+
+                Ok(PublicKey::from_ed_encoded_components(
+                    &algorithm.into(),
+                    ed.public_key_bytes()?.as_ref(),
+                ))
+            }
             JwkKeyType::Oct => Err(JwkError::UnsupportedAlgorithm {
                 algorithm: "octet sequence",
             }),
@@ -437,6 +489,8 @@ impl JwkPublicRsaKey {
 
 /// The key type of a JWK defined in
 /// [RFC 7518, section 6.1](https://tools.ietf.org/html/rfc7518#section-6.1).
+///
+/// Note that P521 is not supported yet for signning and verification.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum JwkEcPublicKeyCurve {
     #[serde(rename = "P-256")]
@@ -447,7 +501,7 @@ pub enum JwkEcPublicKeyCurve {
     P521,
 }
 
-// === public rsa key === //
+// === public ec key === //
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct JwkPublicEcKey {
     crv: JwkEcPublicKeyCurve,
@@ -468,6 +522,42 @@ impl JwkPublicEcKey {
         let mut buf = h_allocate_signed_big_int_buffer(&self.y);
         general_purpose::URL_SAFE_NO_PAD
             .decode_vec(&self.y, &mut buf)
+            .map_err(JwkError::from)?;
+        Ok(buf)
+    }
+}
+
+/// Defined in [RFC 8037](https://tools.ietf.org/html/rfc8037)
+///
+/// Note that X25519, Ed448 and X448 are not yet supported by picky for jws/jwe.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum JwkEdPublicKeyAlgorithm {
+    #[serde(rename = "Ed25519")]
+    Ed25519,
+    #[serde(rename = "Ed448")]
+    Ed448,
+    #[serde(rename = "X25519")]
+    X25519,
+    #[serde(rename = "X448")]
+    X448,
+}
+
+// === public ed key === //
+
+/// Defined in [RFC 8037](https://tools.ietf.org/html/rfc8037)
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct JwkPublicEdKey {
+    /// NOTE: "crv" defines not exactly the curve but the algorithm.
+    crv: JwkEdPublicKeyAlgorithm,
+    /// In contrast to EC keys, the `x` coordinate is an octet string, not an encoded big integer.
+    x: String,
+}
+
+impl JwkPublicEdKey {
+    pub fn public_key_bytes(&self) -> Result<Vec<u8>, JwkError> {
+        let mut buf = Vec::new();
+        general_purpose::URL_SAFE_NO_PAD
+            .decode_vec(&self.x, &mut buf)
             .map_err(JwkError::from)?;
         Ok(buf)
     }
@@ -588,6 +678,15 @@ mod tests {
     #[case(test_files::JOSE_JWK_EC_P256_JSON)]
     #[case(test_files::JOSE_JWK_EC_P384_JSON)]
     fn ecdsa_key_roundtrip(#[case] json: &str) {
+        let decoded = Jwk::from_json(json).unwrap();
+        let encoded = decoded.to_json().unwrap();
+        pretty_assertions::assert_eq!(encoded, json);
+    }
+
+    #[rstest]
+    #[case(test_files::JOSE_JWK_ED25519_JSON)]
+    #[case(test_files::JOSE_JWK_X25519_JSON)]
+    fn ed_key_roundtrip(#[case] json: &str) {
         let decoded = Jwk::from_json(json).unwrap();
         let encoded = decoded.to_json().unwrap();
         pretty_assertions::assert_eq!(encoded, json);

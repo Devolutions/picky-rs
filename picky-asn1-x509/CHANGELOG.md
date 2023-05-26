@@ -7,7 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-## [0.10.0] 2023-05-23
+### Added
+- Support of Ed25519/X25519/Ed448/X448 key structures
+- New API methods
+    - `AlgorithmIdentifier::is_one_of`
+    - `AlgorithmIdentifier::new_x25519`
+    - `AlgorithmIdentifier::new_ed448`
+    - `AlgorithmIdentifier::new_x448`
+    - `PrivateKeyInfo::new_ed_encryption`
+    - `SubjectPublicKeyInfo::new_ed_key`
+
+### Changed
+- `PrivateKeyInfo` structure now also could represent newer `OneAsymmetricKey` structure
+  (structures are backward-compatible). This allows to represent Ed keys with public key field set
+
+## [0.10.0] 2023-06-23
 
 ### Fixed
 

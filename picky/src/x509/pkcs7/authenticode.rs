@@ -2253,7 +2253,7 @@ mod test {
             .validity(UtcDate::ymd(2068, 1, 1).unwrap(), UtcDate::ymd(2071, 1, 1).unwrap())
             .subject(
                 DirectoryName::new_common_name("TheFuture.usodakedo Authority"),
-                intermediate_key.to_public_key(),
+                intermediate_key.to_public_key().unwrap(),
             )
             .issuer_cert(&root, &root_key)
             .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_224))

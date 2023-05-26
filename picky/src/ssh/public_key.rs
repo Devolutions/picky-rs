@@ -1,6 +1,7 @@
 use crate::key::{KeyError, PublicKey};
 use crate::ssh::decode::SshComplexTypeDecode;
 use crate::ssh::encode::SshComplexTypeEncode;
+
 use std::str::FromStr;
 use std::{io, string};
 use thiserror::Error;
@@ -25,6 +26,7 @@ pub enum SshPublicKeyError {
 pub enum SshBasePublicKey {
     Rsa(PublicKey),
     Ec(PublicKey),
+    Ed(PublicKey),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -159,5 +161,12 @@ mod tests {
         let public_key = SshPublicKey::from_str(key_str).unwrap();
         let ssh_public_key_after = public_key.to_string().unwrap();
         assert_eq!(key_str, ssh_public_key_after.as_str());
+    }
+
+    #[test]
+    fn ed25519_roundtrip() {
+        let public_key = SshPublicKey::from_str(test_files::SSH_PUBLIC_KEY_ED25519).unwrap();
+        let ssh_public_key_after = public_key.to_string().unwrap();
+        assert_eq!(test_files::SSH_PUBLIC_KEY_ED25519, ssh_public_key_after.as_str());
     }
 }

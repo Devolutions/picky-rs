@@ -1,8 +1,9 @@
-use crate::key::{EcCurve, KeyError, PrivateKey};
+use crate::key::{EcCurve, EdAlgorithm, KeyError, PrivateKey, PrivateKeyKind};
 use crate::pem::{parse_pem, Pem, PemError};
 use crate::ssh::decode::{SshComplexTypeDecode, SshReadExt};
 use crate::ssh::encode::SshComplexTypeEncode;
 use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
+
 use aes::cipher::block_padding::NoPadding;
 use aes::cipher::{BlockDecryptMut, KeyIvInit, StreamCipher};
 use byteorder::{BigEndian, ReadBytesExt};
@@ -89,14 +90,18 @@ impl Default for Kdf {
 pub enum SshBasePrivateKey {
     Rsa(PrivateKey),
     Ec(PrivateKey),
+    Ed(PrivateKey),
 }
 
 impl SshBasePrivateKey {
-    pub fn base_public_key(&self) -> SshBasePublicKey {
-        match self {
-            SshBasePrivateKey::Rsa(rsa) => SshBasePublicKey::Rsa(rsa.to_public_key()),
-            SshBasePrivateKey::Ec(ec) => SshBasePublicKey::Ec(ec.to_public_key()),
-        }
+    pub fn base_public_key(&self) -> Result<SshBasePublicKey, SshPrivateKeyError> {
+        let key = match self {
+            SshBasePrivateKey::Rsa(rsa) => SshBasePublicKey::Rsa(rsa.to_public_key()?),
+            SshBasePrivateKey::Ec(ec) => SshBasePublicKey::Ec(ec.to_public_key()?),
+            SshBasePrivateKey::Ed(ed) => SshBasePublicKey::Ed(ed.to_public_key()?),
+        };
+
+        Ok(key)
     }
 }
 
@@ -117,11 +122,7 @@ impl SshPrivateKey {
         passphrase: Option<String>,
         comment: Option<String>,
     ) -> Result<Self, SshPrivateKeyError> {
-        Ok(SshPrivateKey::h_picky_private_key_to_ssh_private_key(
-            PrivateKey::generate_rsa(bits)?,
-            passphrase,
-            comment,
-        ))
+        SshPrivateKey::h_picky_private_key_to_ssh_private_key(PrivateKey::generate_rsa(bits)?, passphrase, comment)
     }
 
     pub fn generate_ec(
@@ -129,11 +130,15 @@ impl SshPrivateKey {
         passphrase: Option<String>,
         comment: Option<String>,
     ) -> Result<Self, SshPrivateKeyError> {
-        Ok(SshPrivateKey::h_picky_private_key_to_ssh_private_key(
-            PrivateKey::generate_ec(curve)?,
+        SshPrivateKey::h_picky_private_key_to_ssh_private_key(PrivateKey::generate_ec(curve)?, passphrase, comment)
+    }
+
+    pub fn generate_ed25519(passphrase: Option<String>, comment: Option<String>) -> Result<Self, SshPrivateKeyError> {
+        SshPrivateKey::h_picky_private_key_to_ssh_private_key(
+            PrivateKey::generate_ed(EdAlgorithm::Ed25519, true)?,
             passphrase,
             comment,
-        ))
+        )
     }
 
     pub fn from_pem(pem: &Pem, passphrase: Option<String>) -> Result<Self, SshPrivateKeyError> {
@@ -172,10 +177,10 @@ impl SshPrivateKey {
         private_key: PrivateKey,
         passphrase: Option<String>,
         comment: Option<String>,
-    ) -> SshPrivateKey {
+    ) -> Result<SshPrivateKey, SshPrivateKeyError> {
         let (kdf, cipher_name) = match &passphrase {
             Some(_) => {
-                let mut salt = Vec::new();
+                let mut salt: Vec<u8> = Vec::new();
                 let rounds = 16;
                 let mut rnd = rand::thread_rng();
                 for _ in 0..rounds {
@@ -192,22 +197,40 @@ impl SshPrivateKey {
             None => (Kdf::default(), NONE.to_owned()),
         };
 
+        let public_key = private_key.to_public_key()?;
+
+        let (public, private) = match private_key.as_kind() {
+            PrivateKeyKind::Rsa => {
+                let private = SshBasePrivateKey::Rsa(private_key);
+                let public = SshBasePublicKey::Rsa(public_key);
+                (public, private)
+            }
+            PrivateKeyKind::Ec { .. } => {
+                let private = SshBasePrivateKey::Ec(private_key);
+                let public = SshBasePublicKey::Ec(public_key);
+                (public, private)
+            }
+            PrivateKeyKind::Ed { .. } => {
+                let private = SshBasePrivateKey::Ed(private_key);
+                let public = SshBasePublicKey::Ed(public_key);
+                (public, private)
+            }
+        };
+
         let public_key = SshPublicKey {
-            inner_key: SshBasePublicKey::Rsa(private_key.to_public_key()),
+            inner_key: public,
             comment: String::new(),
         };
 
-        let base_key = SshBasePrivateKey::Rsa(private_key);
-
-        SshPrivateKey {
+        Ok(SshPrivateKey {
             cipher_name,
             kdf,
-            base_key,
+            base_key: private,
             public_key,
             check: 0,
             comment: comment.unwrap_or_default(),
             passphrase,
-        }
+        })
     }
 
     fn decode(mut stream: impl Read, passphrase: Option<String>) -> Result<Self, SshPrivateKeyError>
@@ -247,7 +270,7 @@ impl SshPrivateKey {
         }
 
         let base_key: SshBasePrivateKey = SshComplexTypeDecode::decode(&mut cursor)?;
-        let base_public_key = base_key.base_public_key();
+        let base_public_key = base_key.base_public_key()?;
 
         let comment = cursor.read_ssh_string()?.trim_end().to_owned();
         Ok(SshPrivateKey {
@@ -268,8 +291,10 @@ impl SshPrivateKey {
     }
 }
 
-impl From<PrivateKey> for SshPrivateKey {
-    fn from(private_key: PrivateKey) -> Self {
+impl TryFrom<PrivateKey> for SshPrivateKey {
+    type Error = SshPrivateKeyError;
+
+    fn try_from(private_key: PrivateKey) -> Result<Self, Self::Error> {
         SshPrivateKey::h_picky_private_key_to_ssh_private_key(private_key, None, None)
     }
 }
@@ -345,8 +370,11 @@ pub(crate) fn decrypt(
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use crate::key::ec::EcdsaKeypair;
+    use crate::key::ed::EdKeypair;
     use crate::ssh::private_key::SshPrivateKey;
     use crate::test_files;
+    use rsa::RsaPrivateKey;
     use rstest::rstest;
 
     #[test]
@@ -555,10 +583,61 @@ pub mod tests {
     }
 
     #[test]
-    fn test_private_key_generation() {
+    fn ed25519_roundtrip() {
+        let private_key = SshPrivateKey::from_pem_str(test_files::SSH_PRIVATE_KEY_ED25519, None).unwrap();
+        let encoded = private_key.to_string().unwrap();
+        assert_eq!(test_files::SSH_PRIVATE_KEY_ED25519, encoded.as_str());
+    }
+
+    #[test]
+    fn ed25519_roundtrip_encrypted() {
+        let passphrase = Some("test".to_string());
+        let private_key =
+            SshPrivateKey::from_pem_str(test_files::SSH_PRIVATE_KEY_ED25519_ENCRYPTED, passphrase).unwrap();
+        let encoded = private_key.to_string().unwrap();
+        assert_eq!(test_files::SSH_PRIVATE_KEY_ED25519_ENCRYPTED, encoded.as_str());
+    }
+
+    #[test]
+    fn test_rsa_private_key_generation() {
         let private_key = SshPrivateKey::generate_rsa(2048, Option::Some("123".to_string()), None).unwrap();
         let data = private_key.to_pem().unwrap();
-        let _: SshPrivateKey = SshPrivateKey::from_pem(&data, Option::Some("123".to_string())).unwrap();
+        let parsed = SshPrivateKey::from_pem(&data, Option::Some("123".to_string())).unwrap();
+
+        match parsed.base_key() {
+            SshBasePrivateKey::Rsa(key) => {
+                let _rsa: RsaPrivateKey = key.try_into().unwrap();
+            }
+            _ => panic!("Invalid key type"),
+        }
+    }
+
+    #[test]
+    fn test_ec_private_key_generation() {
+        let private_key = SshPrivateKey::generate_ec(EcCurve::NistP256, Option::Some("123".to_string()), None).unwrap();
+        let data = private_key.to_pem().unwrap();
+        let parsed = SshPrivateKey::from_pem(&data, Option::Some("123".to_string())).unwrap();
+
+        match parsed.base_key() {
+            SshBasePrivateKey::Ec(ec) => {
+                let _ec: EcdsaKeypair = ec.try_into().unwrap();
+            }
+            _ => panic!("Invalid key type"),
+        }
+    }
+
+    #[test]
+    fn test_ed_private_key_generation() {
+        let private_key = SshPrivateKey::generate_ed25519(Option::Some("123".to_string()), None).unwrap();
+        let data = private_key.to_pem().unwrap();
+        let parsed = SshPrivateKey::from_pem(&data, Option::Some("123".to_string())).unwrap();
+
+        match parsed.base_key() {
+            SshBasePrivateKey::Ed(ed) => {
+                let _ed: EdKeypair = ed.try_into().unwrap();
+            }
+            _ => panic!("Invalid key type"),
+        }
     }
 
     #[test]

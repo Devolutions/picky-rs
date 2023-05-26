@@ -47,6 +47,9 @@ public partial struct PrivateKey
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PrivateKey_generate_ec", ExactSpelling = true)]
     public static unsafe extern IntPtr GenerateEc(EcCurve curve);
 
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PrivateKey_generate_ed", ExactSpelling = true)]
+    public static unsafe extern IntPtr GenerateEd(EdAlgorithm algorithm, [MarshalAs(UnmanagedType.U1)] bool writePublicKey);
+
     /// <summary>
     /// Exports the private key into a PEM object
     /// </summary>
@@ -57,7 +60,7 @@ public partial struct PrivateKey
     /// Extracts the public part of this private key
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PrivateKey_to_public_key", ExactSpelling = true)]
-    public static unsafe extern PublicKey* ToPublicKey(PrivateKey* self);
+    public static unsafe extern IntPtr ToPublicKey(PrivateKey* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PrivateKey_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(PrivateKey* self);

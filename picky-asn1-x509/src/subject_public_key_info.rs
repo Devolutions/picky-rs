@@ -1,4 +1,4 @@
-use crate::{oids, AlgorithmIdentifier};
+use crate::{oids, AlgorithmIdentifier, AlgorithmIdentifierParameters};
 use oid::ObjectIdentifier;
 use picky_asn1::{
     bit_string::BitString,
@@ -11,6 +11,7 @@ use std::fmt;
 pub enum PublicKey {
     Rsa(EncapsulatedRsaPublicKey),
     Ec(EncapsulatedEcPoint),
+    /// Used For Ed25519, Ed448, X25519, and X448 keys
     Ed(EncapsulatedEcPoint),
 }
 
@@ -50,6 +51,13 @@ impl SubjectPublicKeyInfo {
         Self {
             algorithm: AlgorithmIdentifier::new_elliptic_curve(curve.into()),
             subject_public_key: PublicKey::Ec(point.into()),
+        }
+    }
+
+    pub fn new_ed_key(curve: ObjectIdentifier, point: BitString) -> Self {
+        Self {
+            algorithm: AlgorithmIdentifier::new_unchecked(curve, AlgorithmIdentifierParameters::None),
+            subject_public_key: PublicKey::Ed(point.into()),
         }
     }
 }
@@ -99,7 +107,12 @@ impl<'de> de::Deserialize<'de> for SubjectPublicKeyInfo {
                     oids::EC_PUBLIC_KEY => {
                         PublicKey::Ec(seq_next_element!(seq, SubjectPublicKeyInfo, "elliptic curves key"))
                     }
-                    oids::ED25519 => PublicKey::Ed(seq_next_element!(seq, SubjectPublicKeyInfo, "curve25519 key")),
+                    oids::ED25519 | oids::X25519 => {
+                        PublicKey::Ed(seq_next_element!(seq, SubjectPublicKeyInfo, "curve25519 key"))
+                    }
+                    oids::ED448 | oids::X448 => {
+                        PublicKey::Ed(seq_next_element!(seq, SubjectPublicKeyInfo, "curve448 key"))
+                    }
                     _ => {
                         return Err(serde_invalid_value!(
                             SubjectPublicKeyInfo,

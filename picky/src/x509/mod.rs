@@ -66,7 +66,7 @@
 //!
 //! let intermediate = CertificateBuilder::new()
 //!     .validity(UtcDate::ymd(2020, 10, 15).unwrap(), UtcDate::ymd(2021, 10, 15).unwrap())
-//!     .subject(DirectoryName::new_common_name("My Authority"), intermediate_key.to_public_key())
+//!     .subject(DirectoryName::new_common_name("My Authority"), intermediate_key.to_public_key().unwrap())
 //!     .issuer_cert(&root, &root_key)
 //!     .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_224))
 //!     .key_id_gen_method(KeyIdGenMethod::SPKValueHashedLeftmost160(HashAlgorithm::SHA1))

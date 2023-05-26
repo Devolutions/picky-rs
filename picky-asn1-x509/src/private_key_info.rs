@@ -19,32 +19,39 @@ use std::fmt;
 pub type EncapsulatedEcSecret = OctetStringAsn1;
 
 /// [Public-Key Cryptography Standards (PKCS) #8](https://tools.ietf.org/html/rfc5208#section-5)
+/// [Asymmetric Key Packages](https://tools.ietf.org/html/rfc5958#section-2)
 ///
 /// # Section 5
 ///
-/// Private-key information shall have ASN.1 type PrivateKeyInfo:
+/// Private-key information shall have ASN.1 type `OneAsymmetricKey` (Backwards-compatible) with
+/// `PrivateKeyInfo` from RFC5208):
 ///
 /// ```not_rust
-/// PrivateKeyInfo ::= SEQUENCE {
+/// OneAsymmetricKey ::= SEQUENCE {
 ///      version                   Version,
 ///      privateKeyAlgorithm       PrivateKeyAlgorithmIdentifier,
 ///      privateKey                PrivateKey,
-///      attributes           [0]  IMPLICIT Attributes OPTIONAL }
+///      attributes           [0]  IMPLICIT Attributes OPTIONAL,
+///      ...,
+///      [[2: publicKey       [1] PublicKey OPTIONAL ]],
+///      ...
+/// }
 ///
-///   Version ::= INTEGER
+///   Version ::= INTEGER { v1(0), v2(1) } (v1, ..., v2)
 ///
 ///   PrivateKeyAlgorithmIdentifier ::= AlgorithmIdentifier
 ///
 ///   PrivateKey ::= OCTET STRING
 ///
-///   Attributes ::= SET OF Attribute
+///   PublicKey ::= BIT STRING
+///
+///   Attributes ::= SET OF Attribute { { OneAsymmetricKeyAttributes } }
 /// ```
 ///
 /// The fields of type PrivateKeyInfo have the following meanings:
 ///
-/// `version` is the syntax version number, for compatibility with
-/// future revisions of this document.  It shall be 0 for this version
-/// of the document.
+/// `version` identifies the version of OneAsymmetricKey.  If publicKey
+/// is present, then version is set to v2(1) else version is set to v1(0).
 ///
 /// `privateKeyAlgorithm` identifies the private-key algorithm.  One
 /// example of a private-key algorithm is PKCS #1's rsaEncryption.
@@ -55,6 +62,10 @@ pub type EncapsulatedEcSecret = OctetStringAsn1;
 /// key, for example, the contents are a BER encoding of a value of
 /// type RSAPrivateKey.
 ///
+/// `publicKey` is OPTIONAL. When present, it contains the public key
+/// encoded in a BIT STRING. The structure within the BIT STRING, if
+/// any, depends on the `privateKeyAlgorithm`
+///
 /// `attributes` is a set of attributes.  These are the extended
 /// information that is encrypted along with the private-key
 /// information.
@@ -64,6 +75,7 @@ pub struct PrivateKeyInfo {
     pub private_key_algorithm: AlgorithmIdentifier,
     pub private_key: PrivateKeyValue,
     // -- attributes (not supported)
+    pub public_key: Option<ExplicitContextTag1<Optional<BitStringAsn1>>>,
 }
 
 impl PrivateKeyInfo {
@@ -94,6 +106,7 @@ impl PrivateKeyInfo {
             version: 0,
             private_key_algorithm: AlgorithmIdentifier::new_rsa_encryption(),
             private_key,
+            public_key: None,
         }
     }
 
@@ -130,6 +143,29 @@ impl PrivateKeyInfo {
             version: 0,
             private_key_algorithm: AlgorithmIdentifier::new_elliptic_curve(curve_oid.into()),
             private_key,
+            public_key: None,
+        }
+    }
+
+    pub fn new_ed_encryption(
+        algorithm: ObjectIdentifier,
+        secret: impl Into<OctetStringAsn1>,
+        public_key: Option<BitString>,
+    ) -> Self {
+        let secret: OctetStringAsn1 = secret.into();
+
+        let (version, public_key) = if let Some(public_key) = public_key {
+            // If the public key is present, the version MUST be set to v2(1)
+            (1, Some(ExplicitContextTag1(Optional(public_key.into()))))
+        } else {
+            (0, None)
+        };
+
+        Self {
+            version,
+            private_key_algorithm: AlgorithmIdentifier::new_unchecked(algorithm, AlgorithmIdentifierParameters::None),
+            private_key: PrivateKeyValue::ED(secret.into()),
+            public_key,
         }
     }
 }
@@ -153,10 +189,10 @@ impl<'de> de::Deserialize<'de> for PrivateKeyInfo {
                 A: de::SeqAccess<'de>,
             {
                 let version = seq_next_element!(seq, PrivateKeyInfo, "version");
-                if version != 0 {
+                if version != 0 && version != 1 {
                     return Err(serde_invalid_value!(
                         PrivateKeyInfo,
-                        "unsupported version (valid version number: 0)",
+                        "unsupported version (valid versions: [v1(0), v2(1)])",
                         "a supported PrivateKeyInfo"
                     ));
                 }
@@ -168,6 +204,10 @@ impl<'de> de::Deserialize<'de> for PrivateKeyInfo {
                     PrivateKeyValue::RSA(seq_next_element!(seq, PrivateKeyInfo, "rsa oid"))
                 } else if matches!(private_key_algorithm.parameters(), AlgorithmIdentifierParameters::Ec(_)) {
                     PrivateKeyValue::EC(seq_next_element!(seq, PrivateKeyInfo, "ec private key"))
+                } else if private_key_algorithm.is_one_of([oids::ed25519(), oids::x25519()]) {
+                    PrivateKeyValue::ED(seq_next_element!(seq, PrivateKeyInfo, "curve25519 private key"))
+                } else if private_key_algorithm.is_one_of([oids::ed448(), oids::x448()]) {
+                    PrivateKeyValue::ED(seq_next_element!(seq, PrivateKeyInfo, "curve448 private key"))
                 } else {
                     return Err(serde_invalid_value!(
                         PrivateKeyInfo,
@@ -176,10 +216,31 @@ impl<'de> de::Deserialize<'de> for PrivateKeyInfo {
                     ));
                 };
 
+                let mut last_tag = seq.next_element::<TagPeeker>()?;
+
+                if let Some(tag) = &last_tag {
+                    if tag.next_tag != ExplicitContextTag1::<BitStringAsn1>::TAG {
+                        // We found attributes, we don't support them yet so skip them
+                        last_tag = seq.next_element::<TagPeeker>()?;
+                    }
+                }
+
+                // OneAssymmetricKey has a public key field, but it's optional
+                let public_key = match last_tag {
+                    Some(tag) if tag.next_tag == ExplicitContextTag1::<BitStringAsn1>::TAG => {
+                        let public_key =
+                            seq_next_element!(seq, ExplicitContextTag1<BitStringAsn1>, PrivateKeyInfo, "BitStringAsn1");
+
+                        Some(ExplicitContextTag1(Optional(public_key.0)))
+                    }
+                    _ => None,
+                };
+
                 Ok(PrivateKeyInfo {
                     version,
                     private_key_algorithm,
                     private_key,
+                    public_key,
                 })
             }
         }
@@ -192,6 +253,8 @@ impl<'de> de::Deserialize<'de> for PrivateKeyInfo {
 pub enum PrivateKeyValue {
     RSA(OctetStringAsn1Container<RsaPrivateKey>),
     EC(OctetStringAsn1Container<ECPrivateKey>),
+    // Used by Ed25519, Ed448, X25519, and X448 keys
+    ED(OctetStringAsn1Container<OctetStringAsn1>),
 }
 
 impl ser::Serialize for PrivateKeyValue {
@@ -202,6 +265,15 @@ impl ser::Serialize for PrivateKeyValue {
         match self {
             PrivateKeyValue::RSA(rsa) => rsa.serialize(serializer),
             PrivateKeyValue::EC(ec) => ec.serialize(serializer),
+            PrivateKeyValue::ED(ed) => ed.serialize(serializer),
+        }
+    }
+}
+
+impl Drop for PrivateKeyValue {
+    fn drop(&mut self) {
+        if let PrivateKeyValue::ED(ed) = self {
+            ed.0 .0.zeroize()
         }
     }
 }
@@ -605,6 +677,7 @@ mod tests {
                     BitString::with_bytes(decoded[73..].to_vec()).into(),
                 ))),
             })),
+            public_key: None,
         };
 
         check_serde!(expected_pkcs8_ec_key: PrivateKeyInfo in decoded);
