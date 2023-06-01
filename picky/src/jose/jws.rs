@@ -557,6 +557,7 @@ mod tests {
 
     /// Validate that invalid header with alg set to "ED25519" could be parsed by picky
     #[rstest]
+    #[allow(deprecated)]
     #[case(
         test_files::JOSE_JWT_SIG_ED25519_GO_PRIVATE_KEY,
         test_files::JOSE_JWT_SIG_ED25519_GO,
