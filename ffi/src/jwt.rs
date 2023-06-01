@@ -16,6 +16,9 @@ impl From<jws::JwsAlg> for JwsAlg {
             jws::JwsAlg::PS256 => JwsAlg::PS256,
             jws::JwsAlg::PS384 => JwsAlg::PS384,
             jws::JwsAlg::PS512 => JwsAlg::PS512,
+            jws::JwsAlg::EdDSA => JwsAlg::EdDSA,
+            #[allow(deprecated)]
+            jws::JwsAlg::ED25519 => JwsAlg::ED25519,
         }
     }
 }
@@ -35,6 +38,9 @@ impl From<JwsAlg> for jws::JwsAlg {
             JwsAlg::PS256 => jws::JwsAlg::PS256,
             JwsAlg::PS384 => jws::JwsAlg::PS384,
             JwsAlg::PS512 => jws::JwsAlg::PS512,
+            JwsAlg::EdDSA => jws::JwsAlg::EdDSA,
+            #[allow(deprecated)]
+            JwsAlg::ED25519 => jws::JwsAlg::ED25519,
         }
     }
 }
@@ -82,6 +88,14 @@ pub mod ffi {
         PS384,
         /// RSASSA-PSS using SHA-512 and MGF1 with SHA-512 (unsupported)
         PS512,
+        /// EdDSA using Ed25519/Ed448
+        EdDSA,
+        /// [DO NOT USE] EdDSA using Ed25519
+        ///
+        /// This value is used by some popular libraries (e.g. `golang-jwt) instead of `EdDSA` due to
+        /// mistake in the implementation. This value is deprecated and should not be used.
+        #[deprecated(note = "You should not use this value, but it may appear in the wild")]
+        ED25519,
     }
 
     ///  Signed JSON Web Token object.

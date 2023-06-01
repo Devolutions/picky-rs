@@ -136,6 +136,28 @@ public partial class PrivateKey: IDisposable
         }
     }
 
+    /// <exception cref="PickyException"></exception>
+    /// <returns>
+    /// A <c>PrivateKey</c> allocated on Rust side.
+    /// </returns>
+    public static PrivateKey GenerateEd(EdAlgorithm algorithm, bool writePublicKey)
+    {
+        unsafe
+        {
+            Raw.EdAlgorithm algorithmRaw;
+            algorithmRaw = (Raw.EdAlgorithm)algorithm;
+            IntPtr resultPtr = Raw.PrivateKey.GenerateEd(algorithmRaw, writePublicKey);
+            Raw.KeyFfiResultBoxPrivateKeyBoxPickyError result = Marshal.PtrToStructure<Raw.KeyFfiResultBoxPrivateKeyBoxPickyError>(resultPtr);
+            Raw.KeyFfiResultBoxPrivateKeyBoxPickyError.Destroy(resultPtr);
+            if (!result.isOk)
+            {
+                throw new PickyException(new PickyError(result.Err));
+            }
+            Raw.PrivateKey* retVal = result.Ok;
+            return new PrivateKey(retVal);
+        }
+    }
+
     /// <summary>
     /// Exports the private key into a PEM object
     /// </summary>
@@ -166,6 +188,7 @@ public partial class PrivateKey: IDisposable
     /// <summary>
     /// Extracts the public part of this private key
     /// </summary>
+    /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PublicKey</c> allocated on Rust side.
     /// </returns>
@@ -177,7 +200,14 @@ public partial class PrivateKey: IDisposable
             {
                 throw new ObjectDisposedException("PrivateKey");
             }
-            Raw.PublicKey* retVal = Raw.PrivateKey.ToPublicKey(_inner);
+            IntPtr resultPtr = Raw.PrivateKey.ToPublicKey(_inner);
+            Raw.KeyFfiResultBoxPublicKeyBoxPickyError result = Marshal.PtrToStructure<Raw.KeyFfiResultBoxPublicKeyBoxPickyError>(resultPtr);
+            Raw.KeyFfiResultBoxPublicKeyBoxPickyError.Destroy(resultPtr);
+            if (!result.isOk)
+            {
+                throw new PickyException(new PickyError(result.Err));
+            }
+            Raw.PublicKey* retVal = result.Ok;
             return new PublicKey(retVal);
         }
     }

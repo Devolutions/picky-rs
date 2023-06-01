@@ -1,7 +1,8 @@
 //! Wrappers around public and private keys raw data providing an easy to use API
 
 pub(crate) mod ec;
-use crate::key::ec::{calculate_public_ec_key, EcComponent, NamedEcCurve};
+pub(crate) mod ed;
+
 use crate::oid::ObjectIdentifier;
 use crate::pem::{parse_pem, Pem, PemError};
 
@@ -10,11 +11,18 @@ use num_bigint_dig::BigUint;
 use picky_asn1::bit_string::BitString;
 use picky_asn1::wrapper::{BitStringAsn1Container, IntegerAsn1, OctetStringAsn1Container};
 use picky_asn1_der::Asn1DerError;
-use picky_asn1_x509::{private_key_info, ECPrivateKey, PrivateKeyInfo, PrivateKeyValue, SubjectPublicKeyInfo};
+use picky_asn1_x509::{
+    private_key_info, ECPrivateKey, PrivateKeyInfo, PrivateKeyValue, SubjectPublicKeyInfo, PRIVATE_KEY_INFO_VERSION_1,
+};
 use rsa::{RsaPrivateKey, RsaPublicKey};
 use thiserror::Error;
+use zeroize::Zeroize;
+
+use ec::{calculate_public_ec_key, EcComponent, NamedEcCurve};
+use ed::{NamedEdAlgorithm, X25519FieldElement, X25519_FIELD_ELEMENT_SIZE};
 
 pub use ec::EcCurve;
+pub use ed::EdAlgorithm;
 
 #[derive(Debug, Error)]
 pub enum KeyError {
@@ -40,6 +48,10 @@ pub enum KeyError {
     #[error("EC error: {context}")]
     EC { context: String },
 
+    /// ED error
+    #[error("ED error: {context}")]
+    ED { context: String },
+
     /// invalid PEM label error
     #[error("invalid PEM label: {label}")]
     InvalidPemLabel { label: String },
@@ -60,6 +72,16 @@ impl KeyError {
             context: format!(
                 "EC curve with oid `{}` is not supported in context of {}",
                 curve_oid, context,
+            ),
+        }
+    }
+
+    pub(crate) fn unsupported_ed_algorithm(oid: &ObjectIdentifier, context: &'static str) -> Self {
+        let oid: String = oid.into();
+        Self::ED {
+            context: format!(
+                "Algorithm with oid `{}` based on Edwards curves is not supported in context of {}",
+                oid, context,
             ),
         }
     }
@@ -90,13 +112,32 @@ const EC_PRIVATE_KEY_LABEL: &str = "EC PRIVATE KEY";
 const COMPRESS_EC_POINT_BY_DEFAULT: bool = false;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum PrivateKeyKind {
+pub(crate) enum PrivateKeyKind {
     Rsa,
     Ec {
-        public_key: Vec<u8>,
+        public_key: Option<Vec<u8>>,
         private_key: Vec<u8>,
         curve_oid: ObjectIdentifier,
     },
+    Ed {
+        public_key: Option<Vec<u8>>,
+        private_key: Vec<u8>,
+        algorithm_oid: ObjectIdentifier,
+    },
+}
+
+impl Drop for PrivateKeyKind {
+    fn drop(&mut self) {
+        match self {
+            PrivateKeyKind::Rsa => {}
+            PrivateKeyKind::Ec { private_key, .. } => {
+                private_key.zeroize();
+            }
+            PrivateKeyKind::Ed { private_key, .. } => {
+                private_key.zeroize();
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -122,8 +163,8 @@ impl TryFrom<&'_ PrivateKey> for RsaPrivateKey {
                     vec![p1, p2],
                 ))
             }
-            private_key_info::PrivateKeyValue::EC(_) => Err(KeyError::Rsa {
-                context: "RSA private key cannot be constructed from an EC private key.".to_string(),
+            _ => Err(KeyError::Rsa {
+                context: "RSA private key cannot be constructed from non-RSA private key.".to_string(),
             }),
         }
     }
@@ -138,8 +179,8 @@ impl TryFrom<&'_ PrivateKey> for RsaPublicKey {
                 BigUint::from_bytes_be(key.modulus.as_unsigned_bytes_be()),
                 BigUint::from_bytes_be(key.public_exponent.as_unsigned_bytes_be()),
             )?),
-            private_key_info::PrivateKeyValue::EC(_) => Err(KeyError::Rsa {
-                context: "RSA public key cannot be constructed from an EC private key.".to_string(),
+            _ => Err(KeyError::Rsa {
+                context: "RSA public key cannot be constructed from non-RSA private key.".to_string(),
             }),
         }
     }
@@ -214,16 +255,19 @@ impl PrivateKey {
         let px_bytes = point_x.to_bytes_be();
         let py_bytes = point_y.to_bytes_be();
 
+        let px_validated = curve.validate_component(EcComponent::PointX(&px_bytes))?;
+        let py_validated = curve.validate_component(EcComponent::PointY(&py_bytes))?;
+
         let point_bytes = match curve {
             EcCurve::NistP256 => {
-                let x = GenericArrayP256::from_slice(&px_bytes);
-                let y = GenericArrayP256::from_slice(&py_bytes);
+                let x = GenericArrayP256::from_slice(px_validated);
+                let y = GenericArrayP256::from_slice(py_validated);
                 let point = EncodedPointP256::from_affine_coordinates(x, y, COMPRESS_EC_POINT_BY_DEFAULT);
                 point.as_bytes().to_vec()
             }
             EcCurve::NistP384 => {
-                let x = GenericArrayP384::from_slice(&px_bytes);
-                let y = GenericArrayP384::from_slice(&py_bytes);
+                let x = GenericArrayP384::from_slice(px_validated);
+                let y = GenericArrayP384::from_slice(py_validated);
                 let point = EncodedPointP384::from_affine_coordinates(x, y, COMPRESS_EC_POINT_BY_DEFAULT);
                 point.as_bytes().to_vec()
             }
@@ -240,7 +284,7 @@ impl PrivateKey {
 
         let kind = PrivateKeyKind::Ec {
             curve_oid,
-            public_key: point_bytes,
+            public_key: Some(point_bytes),
             private_key: secret,
         };
 
@@ -250,17 +294,35 @@ impl PrivateKey {
     /// Infallible method to create new EC key from given components. Note that no checks performed
     /// on the validity of the secret and point bytes representation in regards to selected
     /// curve oid.
-    pub fn from_ec_encoded_components(curve_oid: ObjectIdentifier, secret: &[u8], point: &[u8]) -> Self {
+    pub fn from_ec_encoded_components(curve_oid: ObjectIdentifier, secret: &[u8], point: Option<&[u8]>) -> Self {
         let inner = PrivateKeyInfo::new_ec_encryption(
             curve_oid.clone(),
             secret.to_vec(),
-            Some(BitString::with_bytes(point)),
+            point.map(BitString::with_bytes),
             false,
         );
 
         let kind = PrivateKeyKind::Ec {
             curve_oid,
-            public_key: point.to_vec(),
+            public_key: point.map(|point| point.to_vec()),
+            private_key: secret.to_vec(),
+        };
+
+        Self { kind, inner }
+    }
+
+    pub fn from_ed_encoded_components(
+        algorithm_oid: ObjectIdentifier,
+        secret: &[u8],
+        public_key: Option<&[u8]>,
+    ) -> Self {
+        let public_key_bit_string = public_key.map(BitString::with_bytes);
+
+        let inner = PrivateKeyInfo::new_ed_encryption(algorithm_oid.clone(), secret.to_vec(), public_key_bit_string);
+
+        let kind = PrivateKeyKind::Ed {
+            algorithm_oid,
+            public_key: public_key.map(|key| key.to_vec()),
             private_key: secret.to_vec(),
         };
 
@@ -307,6 +369,48 @@ impl PrivateKey {
 
                 Self::from_ec_decoded_der_with_curve_oid(curve_oid, key)
             }
+            PrivateKeyValue::ED(OctetStringAsn1Container(key)) => {
+                let algorithm = NamedEdAlgorithm::from(inner.private_key_algorithm.oid());
+                let private_key = key.to_vec();
+                let public_key = match &algorithm {
+                    NamedEdAlgorithm::Known(EdAlgorithm::Ed25519) => {
+                        let secret = ed25519_dalek::SecretKey::from_bytes(&private_key).map_err(|e| KeyError::ED {
+                            context: format!("Invalid Ed25519 private key: {e}"),
+                        })?;
+
+                        let public_key = ed25519_dalek::PublicKey::from(&secret);
+
+                        Some(public_key.to_bytes().to_vec())
+                    }
+                    NamedEdAlgorithm::Known(EdAlgorithm::X25519) => {
+                        let len = private_key.len();
+
+                        let secret: X25519FieldElement = private_key.clone().try_into().map_err(|_| KeyError::ED {
+                            context: format!(
+                                "Invalid X25519 private key size. Expected: {X25519_FIELD_ELEMENT_SIZE}, actual: {len}"
+                            ),
+                        })?;
+
+                        let secret = x25519_dalek::StaticSecret::from(secret);
+                        let public_key = x25519_dalek::PublicKey::from(&secret);
+
+                        Some(public_key.to_bytes().to_vec())
+                    }
+                    NamedEdAlgorithm::Unsupported(_) => {
+                        // We can't generate public key from private key for unsupported algorithms
+                        None
+                    }
+                };
+
+                Ok(Self {
+                    kind: PrivateKeyKind::Ed {
+                        algorithm_oid: algorithm.into(),
+                        public_key,
+                        private_key,
+                    },
+                    inner,
+                })
+            }
         }
     }
 
@@ -320,9 +424,10 @@ impl PrivateKey {
             })?;
 
         let inner = PrivateKeyInfo {
-            version: 0,
+            version: PRIVATE_KEY_INFO_VERSION_1,
             private_key_algorithm: AlgorithmIdentifier::new_rsa_encryption(),
             private_key: PrivateKeyValue::RSA(private_key.into()),
+            public_key: None,
         };
 
         Ok(Self {
@@ -347,7 +452,7 @@ impl PrivateKey {
     ) -> Result<Self, KeyError> {
         // Generate the public key if it's not present in the `ECPrivateKey` representation
         let (public_key, public_key_is_generated) = match &decoded.public_key.0 .0 {
-            Some(bit_string) => (bit_string.payload_view().to_vec(), false),
+            Some(bit_string) => (Some(bit_string.payload_view().to_vec()), false),
             None => (
                 calculate_public_ec_key(&curve_oid, &decoded.private_key.0, COMPRESS_EC_POINT_BY_DEFAULT)?,
                 true,
@@ -356,7 +461,9 @@ impl PrivateKey {
         let private_key = decoded.private_key.0.clone();
         // if the public key is generated, we need to skip it when encoding, to preserve the
         // original `ECPrivateKey` structure in encoded representation
-        let public_key_encoded = (!public_key_is_generated).then(|| BitString::with_bytes(public_key.as_slice()));
+        let public_key_encoded = public_key
+            .as_deref()
+            .and_then(|public_key| (!public_key_is_generated).then(|| BitString::with_bytes(public_key)));
         // if the parameters are missing during parsing, we need to skip them when encoding
         let der_skip_parameters = decoded.parameters.0.is_none();
 
@@ -443,22 +550,45 @@ impl PrivateKey {
         self.to_pem().map(|pem| pem.to_string())
     }
 
-    pub fn to_public_key(&self) -> PublicKey {
-        match &self.kind {
+    pub fn to_public_key(&self) -> Result<PublicKey, KeyError> {
+        let key = match &self.kind {
             PrivateKeyKind::Rsa => match &self.inner.private_key {
                 PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => {
                     SubjectPublicKeyInfo::new_rsa_key(key.modulus.clone(), key.public_exponent.clone()).into()
                 }
-                PrivateKeyValue::EC(_) => unreachable!("BUG: EC key data in RSA private key"),
+                _ => unreachable!("BUG: Non-RSA key data in RSA private key"),
             },
             PrivateKeyKind::Ec {
                 public_key, curve_oid, ..
-            } => {
-                let point = picky_asn1::bit_string::BitString::with_bytes(public_key.as_slice());
+            } => match public_key {
+                Some(data) => {
+                    let point = picky_asn1::bit_string::BitString::with_bytes(data.as_slice());
+                    SubjectPublicKeyInfo::new_ec_key(curve_oid.clone(), point).into()
+                }
+                None => {
+                    return Err(KeyError::EC {
+                        context: "Public key can't be calculated for unknown EC algorithms".into(),
+                    });
+                }
+            },
+            PrivateKeyKind::Ed {
+                public_key,
+                algorithm_oid,
+                ..
+            } => match public_key {
+                Some(data) => {
+                    let point = picky_asn1::bit_string::BitString::with_bytes(data.as_slice());
+                    SubjectPublicKeyInfo::new_ed_key(algorithm_oid.clone(), point).into()
+                }
+                None => {
+                    return Err(KeyError::ED {
+                        context: "Public key can't be calculated for unknown edwards curves-based algorithms".into(),
+                    });
+                }
+            },
+        };
 
-                SubjectPublicKeyInfo::new_ec_key(curve_oid.clone(), point).into()
-            }
-        }
+        Ok(key)
     }
 
     /// **Beware**: this is insanely slow in debug builds.
@@ -517,8 +647,49 @@ impl PrivateKey {
 
         let kind = PrivateKeyKind::Ec {
             curve_oid,
-            public_key: point,
+            public_key: Some(point),
             private_key: secret,
+        };
+
+        Ok(Self { kind, inner })
+    }
+
+    // Generates new ed key pair with specified supported algorithm.
+    // `write_public_key` specifies whether to include public key in the private key file.
+    // Note that OpenSSL does not support ed keys with public key included.
+    pub fn generate_ed(algorithm: EdAlgorithm, write_public_key: bool) -> Result<Self, KeyError> {
+        use rand_ed::rngs::OsRng;
+
+        let algorithm_oid: ObjectIdentifier = NamedEdAlgorithm::Known(algorithm).into();
+
+        let (private_key, public_key) = match algorithm {
+            EdAlgorithm::Ed25519 => {
+                let key = ed25519_dalek::SecretKey::generate(&mut OsRng);
+                let private = key.to_bytes().to_vec();
+
+                let public = ed25519_dalek::PublicKey::from(&key).to_bytes().to_vec();
+
+                (private, public)
+            }
+            EdAlgorithm::X25519 => {
+                let key = x25519_dalek::StaticSecret::new(OsRng);
+                let private = key.to_bytes().to_vec();
+
+                let public = x25519_dalek::PublicKey::from(&key).as_bytes().to_vec();
+
+                (private, public)
+            }
+        };
+
+        let public_key_bit_string = write_public_key.then(|| BitString::with_bytes(public_key.as_slice()));
+
+        let inner =
+            PrivateKeyInfo::new_ed_encryption(algorithm_oid.clone(), private_key.clone(), public_key_bit_string);
+
+        let kind = PrivateKeyKind::Ed {
+            algorithm_oid,
+            public_key: Some(public_key),
+            private_key,
         };
 
         Ok(Self { kind, inner })
@@ -527,12 +698,18 @@ impl PrivateKey {
     pub(crate) fn as_inner(&self) -> &PrivateKeyInfo {
         &self.inner
     }
+
+    #[cfg(feature = "ssh")]
+    pub(crate) fn as_kind(&self) -> &PrivateKeyKind {
+        &self.kind
+    }
 }
 
 // === public key === //
 
 const PUBLIC_KEY_PEM_LABEL: &str = "PUBLIC KEY";
 const RSA_PUBLIC_KEY_PEM_LABEL: &str = "RSA PUBLIC KEY";
+const EC_PUBLIC_KEY_PEM_LABEL: &str = "EC PUBLIC KEY";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[repr(transparent)]
@@ -565,27 +742,12 @@ impl From<PublicKey> for SubjectPublicKeyInfo {
         key.0
     }
 }
+impl TryFrom<PrivateKey> for PublicKey {
+    type Error = KeyError;
 
-impl From<PrivateKey> for PublicKey {
     #[inline]
-    fn from(key: PrivateKey) -> Self {
-        let PrivateKey { kind, inner } = key;
-        match kind {
-            PrivateKeyKind::Rsa => match inner.private_key {
-                PrivateKeyValue::RSA(OctetStringAsn1Container(mut key)) => SubjectPublicKeyInfo::new_rsa_key(
-                    std::mem::take(&mut key.modulus),
-                    std::mem::take(&mut key.public_exponent),
-                )
-                .into(),
-                PrivateKeyValue::EC(_) => unreachable!("BUG: EC key data in RSA private key"),
-            },
-            PrivateKeyKind::Ec {
-                public_key, curve_oid, ..
-            } => {
-                let public_key = picky_asn1::bit_string::BitString::with_bytes(public_key);
-                SubjectPublicKeyInfo::new_ec_key(curve_oid, public_key).into()
-            }
-        }
+    fn try_from(key: PrivateKey) -> Result<Self, Self::Error> {
+        key.to_public_key()
     }
 }
 
@@ -633,25 +795,31 @@ impl PublicKey {
     }
 
     /// `point` is SEC1 encoded point data
-    pub fn from_encoded_ec_components(curve: &ObjectIdentifier, point: &[u8]) -> Self {
+    pub fn from_ec_encoded_components(curve: &ObjectIdentifier, point: &[u8]) -> Self {
         let point = picky_asn1::bit_string::BitString::with_bytes(point);
         PublicKey(SubjectPublicKeyInfo::new_ec_key(curve.clone(), point))
+    }
+
+    /// `public_key` is raw edwards curve public key
+    pub fn from_ed_encoded_components(algorithm: &ObjectIdentifier, public_key: &[u8]) -> Self {
+        let point = picky_asn1::bit_string::BitString::with_bytes(public_key);
+        PublicKey(SubjectPublicKeyInfo::new_ed_key(algorithm.clone(), point))
     }
 
     /// Creates public key from its raw components. Only curves declared in [`EcCurve`] are
     /// supported. For correct encoding of the point, we need to know which curve-specific
     /// arithmetic crate to use. If you want to use a curve that is not declared in [`EcCurve`],
-    /// and encoded representation of the point is available - use [`Self::from_encoded_ec_components`]
+    /// and encoded representation of the point is available - use [`Self::from_ec_encoded_components`]
     pub fn from_ec_components(curve: EcCurve, x: &BigUint, y: &BigUint) -> Result<Self, KeyError> {
         let px_bytes = x.to_bytes_be();
         let py_bytes = y.to_bytes_be();
 
+        let px_validated = curve.validate_component(EcComponent::PointX(&px_bytes))?;
+        let py_validated = curve.validate_component(EcComponent::PointY(&py_bytes))?;
+
         match curve {
             EcCurve::NistP256 => {
                 use p256::elliptic_curve::generic_array::GenericArray as GenericArrayP256;
-
-                let px_validated = EcCurve::NistP256.validate_component(EcComponent::PointX(&px_bytes))?;
-                let py_validated = EcCurve::NistP256.validate_component(EcComponent::PointY(&py_bytes))?;
 
                 let p = p256::EncodedPoint::from_affine_coordinates(
                     GenericArrayP256::from_slice(px_validated),
@@ -659,22 +827,21 @@ impl PublicKey {
                     COMPRESS_EC_POINT_BY_DEFAULT,
                 );
 
-                Ok(Self::from_encoded_ec_components(
+                Ok(Self::from_ec_encoded_components(
                     &NamedEcCurve::Known(curve).into(),
                     p.as_bytes(),
                 ))
             }
             EcCurve::NistP384 => {
-                let px_validated = EcCurve::NistP384.validate_component(EcComponent::PointX(&px_bytes))?;
-                let py_validated = EcCurve::NistP384.validate_component(EcComponent::PointY(&py_bytes))?;
+                use p256::elliptic_curve::generic_array::GenericArray as GenericArrayP384;
 
                 let p = p384::EncodedPoint::from_affine_coordinates(
-                    p384::elliptic_curve::generic_array::GenericArray::from_slice(px_validated),
-                    p384::elliptic_curve::generic_array::GenericArray::from_slice(py_validated),
+                    GenericArrayP384::from_slice(px_validated),
+                    GenericArrayP384::from_slice(py_validated),
                     COMPRESS_EC_POINT_BY_DEFAULT,
                 );
 
-                Ok(Self::from_encoded_ec_components(
+                Ok(Self::from_ec_encoded_components(
                     &NamedEcCurve::Known(curve).into(),
                     p.as_bytes(),
                 ))
@@ -700,7 +867,7 @@ impl PublicKey {
 
     pub fn from_pem(pem: &Pem) -> Result<Self, KeyError> {
         match pem.label() {
-            PUBLIC_KEY_PEM_LABEL => Self::from_der(pem.data()),
+            PUBLIC_KEY_PEM_LABEL | EC_PUBLIC_KEY_PEM_LABEL => Self::from_der(pem.data()),
             RSA_PUBLIC_KEY_PEM_LABEL => Self::from_rsa_der(pem.data()),
             _ => Err(KeyError::InvalidPemLabel {
                 label: pem.label().to_owned(),
@@ -746,6 +913,7 @@ impl PublicKey {
 mod tests {
     use super::*;
     use crate::hash::HashAlgorithm;
+    use crate::key::ed::EdKeypair;
     use crate::signature::SignatureAlgorithm;
     use rsa::PublicKeyParts;
     use rstest::rstest;
@@ -854,7 +1022,7 @@ mod tests {
         let pk = PrivateKey::from_pem(&pem).expect("private key");
         let algo = SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256);
         let signed_rsa = algo.sign(MSG, &pk).expect("rsa sign");
-        algo.verify(&pk.to_public_key(), MSG, &signed_rsa)
+        algo.verify(&pk.to_public_key().unwrap(), MSG, &signed_rsa)
             .expect("rsa verify rsa");
 
         println!("Success!");
@@ -910,5 +1078,29 @@ mod tests {
         let pkcs8 = key.to_pkcs8().unwrap();
 
         ring::signature::EcdsaKeyPair::from_pkcs8(signing_alg, &pkcs8).unwrap();
+    }
+
+    #[test]
+    // Read from x25519 keys is not supported in `ring`, because it is mainly used for key
+    // exchange for which key serialization/deserialization is not needed at all. But we support,
+    // just to be consistent with OpenSSL and RFC https://www.rfc-editor.org/rfc/rfc8410
+    fn ring_understands_picky_pkcs8_ed25519() {
+        // Make sure we're generating pkcs8 understood by the `ring` crate.
+        // `ring` is very specific about the format of the ED25519 private key, and in contrast
+        // to OpenSSL, it uses newer v2 version of `PrivateKeyInfo` structure (`OneAsymmetricKey`)
+        // which always includes public key in the private key structure.
+        let key = PrivateKey::generate_ed(EdAlgorithm::Ed25519, true).unwrap();
+        let pkcs8 = key.to_pkcs8().unwrap();
+
+        ring::signature::Ed25519KeyPair::from_pkcs8(&pkcs8).unwrap();
+    }
+
+    #[test]
+    fn ring_ed25519_pkcs8_keys_could_be_parsed() {
+        let rng = ring::rand::SystemRandom::new();
+        let pkcs8_bytes = ring::signature::Ed25519KeyPair::generate_pkcs8(&rng).unwrap();
+
+        let key = PrivateKey::from_pkcs8(&pkcs8_bytes).unwrap();
+        let _pair = EdKeypair::try_from(&key).unwrap();
     }
 }

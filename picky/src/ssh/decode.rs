@@ -1,7 +1,7 @@
-use super::certificate::Timestamp;
-
 use crate::key::ec::{EcCurve, NamedEcCurve};
-use crate::key::{PrivateKey, PublicKey};
+use crate::key::ed::NamedEdAlgorithm;
+use crate::key::{EdAlgorithm, PrivateKey, PublicKey};
+use crate::ssh::certificate::Timestamp;
 use crate::ssh::certificate::{
     SshCertKeyType, SshCertType, SshCertTypeError, SshCertificate, SshCertificateError, SshCriticalOption,
     SshCriticalOptionError, SshCriticalOptionType, SshExtension, SshExtensionError, SshExtensionType, SshSignature,
@@ -9,7 +9,8 @@ use crate::ssh::certificate::{
 };
 use crate::ssh::private_key::{KdfOption, SshBasePrivateKey, SshPrivateKeyError};
 use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
-use crate::ssh::{key_type, read_to_buffer_until_whitespace, Base64Reader};
+use crate::ssh::{key_type, read_to_buffer_until_whitespace, Base64Reader, SSH_COMBO_ED25519_KEY_LENGTH};
+
 use base64::engine::general_purpose;
 use byteorder::{BigEndian, ReadBytesExt};
 use num_bigint_dig::BigUint;
@@ -180,21 +181,43 @@ impl SshComplexTypeDecode for SshBasePublicKey {
     fn decode(mut stream: impl Read) -> Result<Self, Self::Error> {
         let key_type = stream.read_ssh_string()?;
         match key_type.as_str() {
-            key_type::SSH_RSA => {
+            key_type::RSA => {
                 let e = stream.read_ssh_mpint()?;
                 let n = stream.read_ssh_mpint()?;
                 Ok(SshBasePublicKey::Rsa(PublicKey::from_rsa_components(&n, &e)))
             }
             key_type::ECDSA_SHA2_NIST_P256 | key_type::ECDSA_SHA2_NIST_P384 | key_type::ECDSA_SHA2_NIST_P521 => {
                 let (curve, point) = decode_ec_public_key_body_impl(key_type.as_str(), stream)?;
-                Ok(SshBasePublicKey::Ec(PublicKey::from_encoded_ec_components(
+                Ok(SshBasePublicKey::Ec(PublicKey::from_ec_encoded_components(
                     &curve.into(),
                     &point,
+                )))
+            }
+            key_type::ED25519 => {
+                let (algorithm, public_key) = decode_ed25519_public_key_body_impl(key_type.as_str(), stream)?;
+
+                Ok(SshBasePublicKey::Ed(PublicKey::from_ed_encoded_components(
+                    &algorithm.into(),
+                    &public_key,
                 )))
             }
             _ => Err(SshPublicKeyError::UnknownKeyType),
         }
     }
+}
+
+fn decode_ed25519_public_key_body_impl(
+    key_type: &str,
+    mut stream: impl Read,
+) -> Result<(NamedEdAlgorithm, Vec<u8>), SshPublicKeyError> {
+    let algorithm = match key_type {
+        key_type::ED25519 => NamedEdAlgorithm::Known(EdAlgorithm::Ed25519),
+        _ => {
+            return Err(SshPublicKeyError::UnknownKeyType);
+        }
+    };
+    let public_key = stream.read_ssh_bytes()?;
+    Ok((algorithm, public_key))
 }
 
 fn decode_ec_public_key_body_impl(
@@ -232,10 +255,11 @@ impl SshComplexTypeDecode for SshPublicKey {
         buffer.clear();
 
         let inner_key = match header.as_str() {
-            key_type::SSH_RSA
+            key_type::RSA
             | key_type::ECDSA_SHA2_NIST_P256
             | key_type::ECDSA_SHA2_NIST_P384
-            | key_type::ECDSA_SHA2_NIST_P521 => {
+            | key_type::ECDSA_SHA2_NIST_P521
+            | key_type::ED25519 => {
                 read_to_buffer_until_whitespace(&mut stream, &mut buffer)?;
                 let mut slice = buffer.as_slice();
                 let decoder = Base64Reader::new(&mut slice, &general_purpose::STANDARD);
@@ -258,7 +282,7 @@ impl SshComplexTypeDecode for SshBasePrivateKey {
     fn decode(mut stream: impl Read) -> Result<Self, Self::Error> {
         let key_type = stream.read_ssh_string()?;
         match key_type.as_str() {
-            key_type::SSH_RSA => {
+            key_type::RSA => {
                 let n_constant = stream.read_ssh_mpint()?;
                 let e_constant = stream.read_ssh_mpint()?;
                 let d_constant = stream.read_ssh_mpint()?;
@@ -281,7 +305,27 @@ impl SshComplexTypeDecode for SshBasePrivateKey {
                 Ok(SshBasePrivateKey::Ec(PrivateKey::from_ec_encoded_components(
                     curve.into(),
                     &private_key_secret,
-                    &point,
+                    Some(point.as_slice()),
+                )))
+            }
+            key_type::ED25519 => {
+                let (algorithm, public_key) = decode_ed25519_public_key_body_impl(key_type.as_str(), &mut stream)?;
+
+                let private_key_secret = stream.read_ssh_mpint()?.to_bytes_be();
+
+                // OpenSSH is really strange in regards to private ed25519 keys. It stores them as
+                // 64 byte-array, but actually only first 32 bytes are the private key, and the rest
+                // is public key copy
+                if private_key_secret.len() != SSH_COMBO_ED25519_KEY_LENGTH {
+                    return Err(SshPrivateKeyError::InvalidKeyFormat);
+                }
+
+                let private_key_secret = &private_key_secret[..ed25519_dalek::SECRET_KEY_LENGTH];
+
+                Ok(SshBasePrivateKey::Ed(PrivateKey::from_ed_encoded_components(
+                    algorithm.into(),
+                    private_key_secret,
+                    Some(&public_key),
                 )))
             }
             key_type => Err(SshPrivateKeyError::UnsupportedKeyType(key_type.to_owned())),
@@ -328,9 +372,15 @@ impl SshComplexTypeDecode for SshCertificate {
                 let _curve_identifier = cert_data.read_ssh_string()?;
 
                 let public_key_data = cert_data.read_ssh_bytes()?;
-                SshBasePublicKey::Ec(PublicKey::from_encoded_ec_components(&curve.into(), &public_key_data))
+                SshBasePublicKey::Ec(PublicKey::from_ec_encoded_components(&curve.into(), &public_key_data))
             }
-            SshCertKeyType::SshDssV01 | SshCertKeyType::SshEd25519V01 => {
+            SshCertKeyType::SshEd25519V01 => {
+                let algorithm = NamedEdAlgorithm::Known(EdAlgorithm::Ed25519).into();
+
+                let public_key_data = cert_data.read_ssh_bytes()?;
+                SshBasePublicKey::Ed(PublicKey::from_ed_encoded_components(&algorithm, &public_key_data))
+            }
+            SshCertKeyType::SshDssV01 => {
                 return Err(SshCertificateError::UnsupportedCertificateType(
                     cert_key_type.as_str().to_owned(),
                 ))

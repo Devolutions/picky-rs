@@ -64,4 +64,16 @@ public enum JwsAlg
     /// RSASSA-PSS using SHA-512 and MGF1 with SHA-512 (unsupported)
     /// </summary>
     PS512 = 11,
+    /// <summary>
+    /// EdDSA using Ed25519/Ed448
+    /// </summary>
+    EdDSA = 12,
+    /// <summary>
+    /// [DO NOT USE] EdDSA using Ed25519
+    /// </summary>
+    /// <remarks>
+    /// This value is used by some popular libraries (e.g. `golang-jwt) instead of `EdDSA` due to
+    /// mistake in the implementation. This value is deprecated and should not be used.
+    /// </remarks>
+    ED25519 = 13,
 }

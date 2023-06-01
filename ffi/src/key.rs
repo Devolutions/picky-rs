@@ -1,4 +1,4 @@
-use self::ffi::EcCurve;
+use self::ffi::{EcCurve, EdAlgorithm};
 
 impl From<picky::key::EcCurve> for EcCurve {
     fn from(value: picky::key::EcCurve) -> Self {
@@ -18,6 +18,24 @@ impl From<EcCurve> for picky::key::EcCurve {
     }
 }
 
+impl From<picky::key::EdAlgorithm> for EdAlgorithm {
+    fn from(value: picky::key::EdAlgorithm) -> Self {
+        match value {
+            picky::key::EdAlgorithm::Ed25519 => Self::Ed25519,
+            picky::key::EdAlgorithm::X25519 => Self::X25519,
+        }
+    }
+}
+
+impl From<EdAlgorithm> for picky::key::EdAlgorithm {
+    fn from(value: EdAlgorithm) -> Self {
+        match value {
+            EdAlgorithm::Ed25519 => Self::Ed25519,
+            EdAlgorithm::X25519 => Self::X25519,
+        }
+    }
+}
+
 #[diplomat::bridge]
 pub mod ffi {
     use crate::error::ffi::PickyError;
@@ -31,6 +49,15 @@ pub mod ffi {
         NistP256,
         /// NIST P-384
         NistP384,
+    }
+
+    /// Known Edwards curve-based algorithm name
+    #[derive(Clone, Copy)]
+    pub enum EdAlgorithm {
+        /// Ed25519 signing algorithm
+        Ed25519,
+        /// X25519 key agreement algorithm
+        X25519,
     }
 
     #[diplomat::opaque]
@@ -63,6 +90,17 @@ pub mod ffi {
             Ok(Box::new(PrivateKey(key))).into()
         }
 
+        // Generates new ed key pair with specified supported algorithm.
+        // `write_public_key` specifies whether to include public key in the private key file.
+        // Note that OpenSSL does not support ed keys with public key included.
+        pub fn generate_ed(
+            algorithm: EdAlgorithm,
+            write_public_key: bool,
+        ) -> DiplomatResult<Box<PrivateKey>, Box<PickyError>> {
+            let key = err_check!(picky::key::PrivateKey::generate_ed(algorithm.into(), write_public_key));
+            Ok(Box::new(PrivateKey(key))).into()
+        }
+
         /// Exports the private key into a PEM object
         pub fn to_pem(&self) -> DiplomatResult<Box<Pem>, Box<PickyError>> {
             let pem = err_check!(self.0.to_pem());
@@ -70,8 +108,9 @@ pub mod ffi {
         }
 
         /// Extracts the public part of this private key
-        pub fn to_public_key(&self) -> Box<PublicKey> {
-            Box::new(PublicKey(self.0.to_public_key()))
+        pub fn to_public_key(&self) -> DiplomatResult<Box<PublicKey>, Box<PickyError>> {
+            let key = err_check!(self.0.to_public_key());
+            Ok(Box::new(PublicKey(key))).into()
         }
     }
 

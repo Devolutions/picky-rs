@@ -165,6 +165,7 @@ public partial class SshPrivateKey: IDisposable
         }
     }
 
+    /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>SshPrivateKey</c> allocated on Rust side.
     /// </returns>
@@ -178,7 +179,14 @@ public partial class SshPrivateKey: IDisposable
             {
                 throw new ObjectDisposedException("PrivateKey");
             }
-            Raw.SshPrivateKey* retVal = Raw.SshPrivateKey.FromPrivateKey(keyRaw);
+            IntPtr resultPtr = Raw.SshPrivateKey.FromPrivateKey(keyRaw);
+            Raw.SshFfiResultBoxSshPrivateKeyBoxPickyError result = Marshal.PtrToStructure<Raw.SshFfiResultBoxSshPrivateKeyBoxPickyError>(resultPtr);
+            Raw.SshFfiResultBoxSshPrivateKeyBoxPickyError.Destroy(resultPtr);
+            if (!result.isOk)
+            {
+                throw new PickyException(new PickyError(result.Err));
+            }
+            Raw.SshPrivateKey* retVal = result.Ok;
             return new SshPrivateKey(retVal);
         }
     }

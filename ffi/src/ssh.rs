@@ -163,9 +163,9 @@ pub mod ffi {
             Ok(Box::new(SshPrivateKey(key))).into()
         }
 
-        pub fn from_private_key(key: &PrivateKey) -> Box<SshPrivateKey> {
-            let key = ssh::SshPrivateKey::from(key.0.clone());
-            Box::new(SshPrivateKey(key))
+        pub fn from_private_key(key: &PrivateKey) -> DiplomatResult<Box<SshPrivateKey>, Box<PickyError>> {
+            let key = err_check!(ssh::SshPrivateKey::try_from(key.0.clone()));
+            Ok(Box::new(SshPrivateKey(key))).into()
         }
 
         /// Exports the SSH Private Key into a PEM object

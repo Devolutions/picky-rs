@@ -1,6 +1,6 @@
 use super::utils::{from_der, from_pem, from_pem_str, to_der, to_pem};
 use crate::hash::HashAlgorithm;
-use crate::key::{PrivateKey, PublicKey};
+use crate::key::{KeyError, PrivateKey, PublicKey};
 use crate::pem::{Pem, PemError};
 use crate::signature::{SignatureAlgorithm, SignatureError};
 use crate::x509::csr::{Csr, CsrError};
@@ -84,6 +84,9 @@ pub enum CertError {
     /// invalid PEM provided
     #[error("invalid PEM provided: {source}")]
     Pem { source: PemError },
+
+    #[error("failed to get public key from private key: {source}")]
+    PrivateKeyToPublicKey { source: KeyError },
 }
 
 impl From<PemError> for CertError {
@@ -813,7 +816,10 @@ impl<'a> CertificateBuilder<'a> {
         })?;
         let (issuer_name, issuer_key, aki, subject_infos) = {
             let (aki, subject_infos) = if issuer_infos.self_signed {
-                let public_key = issuer_infos.key.to_public_key();
+                let public_key = issuer_infos
+                    .key
+                    .to_public_key()
+                    .map_err(|source| CertError::PrivateKeyToPublicKey { source })?;
                 let aki = key_id_gen_method
                     .generate_from(&public_key)
                     .map_err(|e| CertError::KeyIdGen { source: e })
@@ -1095,7 +1101,7 @@ mod tests {
             .validity(UtcDate::ymd(2068, 1, 1).unwrap(), UtcDate::ymd(2071, 1, 1).unwrap())
             .subject(
                 DirectoryName::new_common_name("TheFuture.usodakedo Authority"),
-                intermediate_key.to_public_key(),
+                intermediate_key.to_public_key().unwrap(),
             )
             .issuer_cert(&root, &root_key)
             .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_224))
@@ -1252,7 +1258,7 @@ mod tests {
             .validity(UtcDate::ymd(2068, 1, 1).unwrap(), UtcDate::ymd(2071, 1, 1).unwrap())
             .subject(
                 DirectoryName::new_common_name("TheFuture.usodakedo Authority"),
-                intermediate_key.to_public_key(),
+                intermediate_key.to_public_key().unwrap(),
             )
             .issuer_cert(&root, &root_key)
             .signature_hash_type(SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_256))
@@ -1266,10 +1272,62 @@ mod tests {
             .validity(UtcDate::ymd(2069, 1, 1).unwrap(), UtcDate::ymd(2072, 1, 1).unwrap())
             .subject(
                 DirectoryName::new_common_name("ChillingInTheFuture.usobakkari"),
-                leaf_key.to_public_key(),
+                leaf_key.to_public_key().unwrap(),
             )
             .issuer_cert(&intermediate, &intermediate_key)
             .signature_hash_type(SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_384))
+            .key_id_gen_method(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_512))
+            .pathlen(0) // not meaningful in non-CA certificates
+            .build()
+            .expect("couldn't build signed leaf");
+
+        let chain = [intermediate, root];
+
+        signed_leaf
+            .verifier()
+            .chain(chain.iter())
+            .exact_date(&UtcDate::ymd(2069, 10, 1).unwrap())
+            .verify()
+            .expect("couldn't verify chain");
+    }
+
+    #[test]
+    fn ed25519_signing() {
+        let root_key = parse_key(crate::test_files::ED25519_PEM_PK_1);
+        let intermediate_key = parse_key(crate::test_files::ED25519_PEM_PK_2);
+        let leaf_key = parse_key(crate::test_files::ED25519_PEM_PK_3);
+
+        let root = CertificateBuilder::new()
+            .validity(UtcDate::ymd(2065, 6, 15).unwrap(), UtcDate::ymd(2070, 6, 15).unwrap())
+            .self_signed(DirectoryName::new_common_name("TheFuture.usodakedo Root CA"), &root_key)
+            .ca(true)
+            .signature_hash_type(SignatureAlgorithm::Ed25519)
+            .key_id_gen_method(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_384))
+            .build()
+            .expect("couldn't build root ca");
+
+        let intermediate = CertificateBuilder::new()
+            .validity(UtcDate::ymd(2068, 1, 1).unwrap(), UtcDate::ymd(2071, 1, 1).unwrap())
+            .subject(
+                DirectoryName::new_common_name("TheFuture.usodakedo Authority"),
+                intermediate_key.to_public_key().unwrap(),
+            )
+            .issuer_cert(&root, &root_key)
+            .signature_hash_type(SignatureAlgorithm::Ed25519)
+            .key_id_gen_method(KeyIdGenMethod::SPKValueHashedLeftmost160(HashAlgorithm::SHA1))
+            .ca(true)
+            .pathlen(0)
+            .build()
+            .expect("couldn't build intermediate ca");
+
+        let signed_leaf = CertificateBuilder::new()
+            .validity(UtcDate::ymd(2069, 1, 1).unwrap(), UtcDate::ymd(2072, 1, 1).unwrap())
+            .subject(
+                DirectoryName::new_common_name("ChillingInTheFuture.usobakkari"),
+                leaf_key.to_public_key().unwrap(),
+            )
+            .issuer_cert(&intermediate, &intermediate_key)
+            .signature_hash_type(SignatureAlgorithm::Ed25519)
             .key_id_gen_method(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_512))
             .pathlen(0) // not meaningful in non-CA certificates
             .build()
@@ -1306,7 +1364,7 @@ mod tests {
             .validity(UtcDate::ymd(2068, 1, 1).unwrap(), UtcDate::ymd(2071, 1, 1).unwrap())
             .subject(
                 DirectoryName::new_common_name("V.E.R.Y Legitimate VerySafe Authority"),
-                intermediate_key.to_public_key(),
+                intermediate_key.to_public_key().unwrap(),
             )
             .issuer_cert(&root, &malicious_root_key)
             .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_512))
@@ -1375,7 +1433,7 @@ mod tests {
             .validity(UtcDate::ymd(2068, 1, 1).unwrap(), UtcDate::ymd(2071, 1, 1).unwrap())
             .subject(
                 DirectoryName::new_common_name("V.E.R.Y Legitimate VerySafe Authority"),
-                intermediate_key.to_public_key(),
+                intermediate_key.to_public_key().unwrap(),
             )
             .issuer_cert(&root, &root_key)
             .ca(true)

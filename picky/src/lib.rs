@@ -40,6 +40,10 @@ mod test_files {
     pub const EC_NIST384_NOPUBLIC_DER_PK_1: &str =
         include_str!("../../test_assets/private_keys/ec-nist384-nopublic-der-pk_1.key");
 
+    // openssl ec -in ec-secp521r1-priv-key.pem -no_public -out ec-secp521r1-nopublic-priv-key.pem
+    pub const EC_NIST521_NOPUBLIC_DER_PK_1: &str =
+        include_str!("../../test_assets/private_keys/ec-nist521-nopublic-der-pk_1.key");
+
     pub const EC_NIST256_DER_PK_1: &str = include_str!("../../test_assets/private_keys/ec-nist256-der-pk_1.key");
 
     pub const EC_NIST384_DER_PK_1: &str = include_str!("../../test_assets/private_keys/ec-nist384-der-pk_1.key");
@@ -57,6 +61,23 @@ mod test_files {
     // openssl ecparam -name secp256k1 -genkey -noout -out ec-secp256k1-priv-key.pem
     // openssl ec -in ec-secp256k1-priv-key.pem -pubout > ec-secp256k1-pub-key.pem
     pub const EC_PUBLIC_KEY_SECP256K1_PEM: &str = include_str!("../../test_assets/public_keys/ec-secp256k1-pk_1.key");
+
+    // openssl genpkey -algorithm ed25519 -outform PEM -out ed25519.pem
+    // openssl pkey -in ed25519.pem -outform PEM > ed25519.pub
+    pub const ED25519_PEM_PK_1: &str = include_str!("../../test_assets/private_keys/ed25519-pem-pk_1.key");
+    pub const ED25519_PEM_PK_1_PUB: &str = include_str!("../../test_assets/public_keys/ed25519-pem-pk_1.key");
+
+    // openssl genpkey -algorithm x25519 -outform PEM -out x25519.pem
+    pub const X25519_PEM_PK_1: &str = include_str!("../../test_assets/private_keys/x25519-pem-pk_1.key");
+    pub const X25519_PEM_PK_1_PUB: &str = include_str!("../../test_assets/public_keys/x25519-pem-pk_1.key");
+
+    // openssl genpkey -algorithm ed448 -outform PEM -out ed448.pem
+    pub const ED448_PEM_PK_1: &str = include_str!("../../test_assets/private_keys/ed448-pem-pk_1.key");
+    pub const ED448_PEM_PK_1_PUB: &str = include_str!("../../test_assets/public_keys/ed448-pem-pk_1.key");
+
+    // openssl genpkey -algorithm x448 -outform PEM -out x448.pem
+    pub const X448_PEM_PK_1: &str = include_str!("../../test_assets/private_keys/x448-pem-pk_1.key");
+    pub const X448_PEM_PK_1_PUB: &str = include_str!("../../test_assets/public_keys/x448-pem-pk_1.key");
 
     cfg_if::cfg_if! { if  #[cfg(feature = "pkcs7")]  {
         pub const PKCS7: &str = include_str!("../../test_assets/pkcs7.p7b");
@@ -76,6 +97,9 @@ mod test_files {
 
         pub const EC_NIST256_PK_2: &str = include_str!("../../test_assets/private_keys/ec-nist256-pk_2.key");
         pub const EC_NIST384_PK_1: &str = include_str!("../../test_assets/private_keys/ec-nist384-pk_1.key");
+
+        pub const ED25519_PEM_PK_2: &str = include_str!("../../test_assets/private_keys/ed25519-pem-pk_2.key");
+        pub const ED25519_PEM_PK_3: &str = include_str!("../../test_assets/private_keys/ed25519-pem-pk_3.key");
 
         pub const INTERMEDIATE_CA: &str = include_str!("../../test_assets/intermediate_ca.crt");
         pub const ROOT_CA: &str = include_str!("../../test_assets/root_ca.crt");
@@ -97,11 +121,28 @@ mod test_files {
             include_str!("../../test_assets/jose/jwk_ec_p256.json");
         pub const JOSE_JWK_EC_P384_JSON: &str =
             include_str!("../../test_assets/jose/jwk_ec_p384.json");
+        pub const JOSE_JWK_ED25519_JSON: &str =
+            include_str!("../../test_assets/jose/jwk_ed25519.json");
+        pub const JOSE_JWK_X25519_JSON: &str =
+            include_str!("../../test_assets/jose/jwk_x25519.json");
 
         pub const JOSE_JWT_SIG_ES256: &str =
             include_str!("../../test_assets/jose/jwt_sig_es256.txt");
         pub const JOSE_JWT_SIG_ES384: &str =
             include_str!("../../test_assets/jose/jwt_sig_es384.txt");
+
+
+        /// Test data was gathered from https://github.com/golang-jwt/jwt
+        pub const JOSE_JWT_SIG_ED25519_GO: &str =
+            include_str!("../../test_assets/jose/jwt_sig_ed25519_go.txt");
+        pub const JOSE_JWT_SIG_ED25519_GO_PRIVATE_KEY: &str =
+            include_str!("../../test_assets/jose/jwt_sig_ed25519_go_private.pem");
+
+        /// Test data was gathered from https://github.com/kataras/jwt
+        pub const JOSE_JWT_SIG_ED25519: &str =
+            include_str!("../../test_assets/jose/jwt_sig_ed25519.txt");
+        pub const JOSE_JWT_SIG_ED25519_PRIVATE_KEY: &str =
+            include_str!("../../test_assets/jose/jwt_sig_ed25519_private.pem");
     }}
 
     cfg_if::cfg_if! { if #[cfg(feature = "ssh")] {
@@ -121,14 +162,26 @@ mod test_files {
         pub const SSH_PRIVATE_KEY_EC_P256_ENCRYPTED: &str =
             include_str!("../../test_assets/ssh/ssh_encrypted_key_p256");
 
+        // ssh-keygen -t ed25519 -C "test_ecdsa@picky.com"
+        pub const SSH_PRIVATE_KEY_ED25519: &str =
+            include_str!("../../test_assets/ssh/ssh_key_ed25519");
+
+        // ssh-keygen -t ecdsa -b 256 -C "test_ecdsa@picky.com"
+        pub const SSH_PRIVATE_KEY_ED25519_ENCRYPTED: &str =
+            include_str!("../../test_assets/ssh/ssh_encrypted_key_ed25519");
+
         pub const SSH_PUBLIC_KEY_EC_P256: &str = include_str!("../../test_assets/ssh/ssh_key_p256.pub");
         pub const SSH_PUBLIC_KEY_EC_P384: &str = include_str!("../../test_assets/ssh/ssh_key_p384.pub");
         pub const SSH_PUBLIC_KEY_EC_P521: &str = include_str!("../../test_assets/ssh/ssh_key_p521.pub");
+
+        pub const SSH_PUBLIC_KEY_ED25519: &str = include_str!("../../test_assets/ssh/ssh_key_ed25519.pub");
 
         // ssh-keygen -h -s ./ssh_ca_key -V '+1000w' -I abcd -z 00001 -n server.example.com ./ssh_key_p256.pub
         pub const SSH_CERT_EC_P256: &str = include_str!("../../test_assets/ssh/ssh_cert_p256.crt");
         // ssh-keygen -h -s ./ssh_ca_key -V '+1000w' -I abcd -z 00001 -n server.example.com ./ssh_key_p384.pub
         pub const SSH_CERT_EC_P384: &str = include_str!("../../test_assets/ssh/ssh_cert_p384.crt");
+        // ssh-keygen -h -s ./ssh_ca_key -V '+1000w' -I abcd -z 00001 -n server.example.com ./ssh_key_ed25519.pub
+        pub const SSH_CERT_ED25519: &str = include_str!("../../test_assets/ssh/ssh_cert_ed25519.crt");
 
     }}
 }

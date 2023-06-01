@@ -666,7 +666,7 @@ mod tests {
             .to_vec();
 
         let private_key = get_private_key_1();
-        let public_key = private_key.to_public_key();
+        let public_key = private_key.to_public_key().unwrap();
 
         let jwe = Jwe::new(JweAlg::RsaOaep, JweEnc::Aes128Gcm, payload);
         let encoded = jwe.clone().encode(&public_key).unwrap();
@@ -684,7 +684,7 @@ mod tests {
             .to_vec();
 
         let private_key = get_private_key_1();
-        let public_key = get_private_key_2().to_public_key();
+        let public_key = get_private_key_2().to_public_key().unwrap();
 
         let jwe = Jwe::new(JweAlg::RsaPkcs1v15, JweEnc::Aes128Gcm, payload);
         let encoded = jwe.encode(&public_key).unwrap();

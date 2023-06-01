@@ -1,5 +1,6 @@
 use crate::hash::HashAlgorithm;
 use crate::key::ec::EcdsaPublicKey;
+use crate::key::ed::EdPublicKey;
 use crate::key::KeyError;
 use crate::signature::{SignatureAlgorithm, SignatureError};
 use crate::ssh::decode::SshComplexTypeDecode;
@@ -7,6 +8,7 @@ use crate::ssh::encode::{SshComplexTypeEncode, SshWriteExt};
 use crate::ssh::private_key::{SshBasePrivateKey, SshPrivateKey, SshPrivateKeyError};
 use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
 use crate::ssh::EcCurveSshExt as _;
+
 use byteorder::{BigEndian, WriteBytesExt};
 use rand::Rng;
 use rsa::{PublicKeyParts, RsaPublicKey};
@@ -245,6 +247,7 @@ pub enum SshSignatureFormat {
     EcdsaSha2Nistp256,
     EcdsaSha2Nistp384,
     EcdsaSha2Nistp521,
+    SshEd25519,
 }
 
 impl SshSignatureFormat {
@@ -256,6 +259,7 @@ impl SshSignatureFormat {
             "ecdsa-sha2-nistp256" => Ok(SshSignatureFormat::EcdsaSha2Nistp256),
             "ecdsa-sha2-nistp384" => Ok(SshSignatureFormat::EcdsaSha2Nistp384),
             "ecdsa-sha2-nistp521" => Ok(SshSignatureFormat::EcdsaSha2Nistp521),
+            "ssh-ed25519" => Ok(SshSignatureFormat::SshEd25519),
             _ => Err(SshSignatureError::UnsupportedSignatureFormat(
                 format.as_ref().to_owned(),
             )),
@@ -270,6 +274,7 @@ impl SshSignatureFormat {
             SshSignatureFormat::EcdsaSha2Nistp256 => "ecdsa-sha2-nistp256",
             SshSignatureFormat::EcdsaSha2Nistp384 => "ecdsa-sha2-nistp384",
             SshSignatureFormat::EcdsaSha2Nistp521 => "ecdsa-sha2-nistp521",
+            SshSignatureFormat::SshEd25519 => "ssh-ed25519",
         }
     }
 }
@@ -511,9 +516,10 @@ impl SshCertificateBuilder {
             | SshCertKeyType::RsaSha2_256V01
             | SshCertKeyType::RsaSha2_512v01
             | SshCertKeyType::EcdsaSha2Nistp256V01
-            | SshCertKeyType::EcdsaSha2Nistp384V01 => {}
+            | SshCertKeyType::EcdsaSha2Nistp384V01
+            | SshCertKeyType::SshEd25519V01 => {}
 
-            SshCertKeyType::SshDssV01 | SshCertKeyType::SshEd25519V01 | SshCertKeyType::EcdsaSha2Nistp521V01 => {
+            SshCertKeyType::SshDssV01 | SshCertKeyType::EcdsaSha2Nistp521V01 => {
                 return Err(SshCertificateGenerationError::UnsupportedCertificateKeyType(
                     cert_key_type.as_str().to_owned(),
                 ))
@@ -592,6 +598,7 @@ impl SshCertificateBuilder {
             SshCertKeyType::EcdsaSha2Nistp256V01 => SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_256),
             SshCertKeyType::EcdsaSha2Nistp384V01 => SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_384),
             SshCertKeyType::EcdsaSha2Nistp521V01 => SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_512),
+            SshCertKeyType::SshEd25519V01 => SignatureAlgorithm::Ed25519,
             // Fallback default algorithm
             _ => SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256),
         });
@@ -626,6 +633,11 @@ impl SshCertificateBuilder {
                         .map_err(|err| SshCertificateGenerationError::SshPublicKeyError(err.into()))?;
                     buff.write_ssh_string(curve_identifier)?;
                     buff.write_ssh_bytes(ec.encoded_point())?;
+                }
+                SshBasePublicKey::Ed(ed) => {
+                    let ed = EdPublicKey::try_from(ed)
+                        .map_err(|err| SshCertificateGenerationError::SshPublicKeyError(err.into()))?;
+                    buff.write_ssh_bytes(ed.data())?;
                 }
             };
 
@@ -672,6 +684,11 @@ impl SshCertificateBuilder {
                             "ECDSA signature algorithm can't be used with RSA keys".to_owned(),
                         ))
                     }
+                    SignatureAlgorithm::Ed25519 => {
+                        return Err(SshCertificateGenerationError::IncorrectSignatureAlgorithm(
+                            "Ed25519 signature algorithm can't be used with RSA keys".to_owned(),
+                        ))
+                    },
                 };
 
                 let signature = signature_algo.sign(&raw_signature, rsa)?;
@@ -695,9 +712,20 @@ impl SshCertificateBuilder {
                             "RSA signature algorithm can't be used with ECDSA keys".to_owned(),
                         ))
                     }
+                    SignatureAlgorithm::Ed25519 => {
+                        return Err(SshCertificateGenerationError::IncorrectSignatureAlgorithm(
+                            "Ed25519 signature algorithm can't be used with ECDSA keys".to_owned(),
+                        ))
+                    },
                 };
 
                 let signature = signature_algo.sign(&raw_signature, ec)?;
+                (signature, signature_format)
+            }
+            SshBasePrivateKey::Ed(ed) => {
+                let signature_format = SshSignatureFormat::SshEd25519;
+
+                let signature = signature_algo.sign(&raw_signature, ed)?;
                 (signature, signature_format)
             }
         };
@@ -849,15 +877,23 @@ pub mod tests {
     #[rstest]
     #[case(test_files::SSH_CERT_EC_P256)]
     #[case(test_files::SSH_CERT_EC_P384)]
-    fn encode_ecdsa_cert(#[case] cert_before: &str) {
+    fn ecdsa_roundtrip(#[case] cert_before: &str) {
         let cert: SshCertificate = SshCertificate::from_str(cert_before).unwrap();
         let cert_after = cert.to_string().unwrap();
         pretty_assertions::assert_eq!(cert_before, cert_after);
     }
 
+    #[test]
+    fn ed25519_roundtrip() {
+        let cert: SshCertificate = SshCertificate::from_str(test_files::SSH_CERT_ED25519).unwrap();
+        let cert_after = cert.to_string().unwrap();
+        pretty_assertions::assert_eq!(test_files::SSH_CERT_ED25519, cert_after);
+    }
+
     #[rstest]
     #[case(SshCertKeyType::EcdsaSha2Nistp256V01, test_files::SSH_PRIVATE_KEY_EC_P256)]
     #[case(SshCertKeyType::RsaSha2_256V01, PRIVATE_KEY_PEM)]
+    #[case(SshCertKeyType::SshEd25519V01, test_files::SSH_PRIVATE_KEY_ED25519)]
     fn test_certificate_generation(#[case] key_type: SshCertKeyType, #[case] ssh_key_pem: &str) {
         let certificate_builder = SshCertificateBuilder::init();
         certificate_builder.cert_key_type(key_type);

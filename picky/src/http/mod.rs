@@ -99,7 +99,7 @@
 //! assert_eq!(parsed_http_signature, http_signature);
 //!
 //! parsed_http_signature.verifier()
-//!     .signature_method(&private_key.to_public_key(), SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_224))
+//!     .signature_method(&private_key.to_public_key().unwrap(), SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_224))
 //!     .generate_signing_string_using_http_request(&parts)
 //!     .now(1402170695)
 //!     .verify()
@@ -129,7 +129,7 @@
 //! assert_eq!(http_signature_pre_generated_str, http_signature_str);
 //!
 //! parsed_http_signature.verifier()
-//!     .signature_method(&private_key.to_public_key(), SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_224))
+//!     .signature_method(&private_key.to_public_key().unwrap(), SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_224))
 //!     .pre_generated_signing_string(signing_string)
 //!     .now(1402170695)
 //!     .verify()

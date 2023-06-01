@@ -3,6 +3,7 @@
 use crate::hash::HashAlgorithm;
 use crate::key::ec::{EcComponent, EcCurve, NamedEcCurve};
 use crate::key::{KeyError, PrivateKey, PublicKey};
+
 use picky_asn1_x509::{oids, AlgorithmIdentifier};
 use rsa::{PublicKey as _, RsaPrivateKey, RsaPublicKey};
 use serde::{Deserialize, Serialize};
@@ -22,6 +23,10 @@ pub enum SignatureError {
     /// EC error
     #[error("EC error: {context}")]
     Ec { context: String },
+
+    /// ED error
+    #[error("ED error: {context}")]
+    Ed { context: String },
 
     /// invalid signature
     #[error("invalid signature")]
@@ -50,6 +55,7 @@ impl From<KeyError> for SignatureError {
 pub enum SignatureAlgorithm {
     RsaPkcs1v15(HashAlgorithm),
     Ecdsa(HashAlgorithm),
+    Ed25519,
 }
 
 impl TryFrom<&'_ AlgorithmIdentifier> for SignatureAlgorithm {
@@ -68,6 +74,7 @@ impl TryFrom<&'_ AlgorithmIdentifier> for SignatureAlgorithm {
             oids::ID_RSASSA_PKCS1_V1_5_WITH_SHA3_512 => Ok(Self::RsaPkcs1v15(HashAlgorithm::SHA3_512)),
             oids::ECDSA_WITH_SHA256 => Ok(Self::Ecdsa(HashAlgorithm::SHA2_256)),
             oids::ECDSA_WITH_SHA384 => Ok(Self::Ecdsa(HashAlgorithm::SHA2_384)),
+            oids::ED25519 => Ok(Self::Ed25519),
             _ => Err(SignatureError::UnsupportedAlgorithm { algorithm: oid_string }),
         }
     }
@@ -109,6 +116,7 @@ impl TryFrom<SignatureAlgorithm> for AlgorithmIdentifier {
                 let msg = format!("ECDSA doesn't support {:?} hashing algorithm", hash);
                 Err(SignatureError::Ec { context: msg })
             }
+            SignatureAlgorithm::Ed25519 => Ok(AlgorithmIdentifier::new_ed25519()),
         }
     }
 }
@@ -183,6 +191,38 @@ impl SignatureAlgorithm {
                         }),
                     },
                     NamedEcCurve::Unsupported(oid) => Err(KeyError::unsupported_curve(oid, "signing").into()),
+                }
+            }
+            SignatureAlgorithm::Ed25519 => {
+                use crate::key::ed::{EdAlgorithm, EdKeypair, EdPublicKey, NamedEdAlgorithm};
+
+                let keypair = EdKeypair::try_from(private_key)?;
+
+                let public_key = EdPublicKey::try_from(&keypair)?;
+
+                match keypair.algorithm() {
+                    NamedEdAlgorithm::Known(EdAlgorithm::Ed25519) => {
+                        let public_key = ed25519_dalek::PublicKey::from_bytes(public_key.data()).map_err(
+                            |e: ed25519_dalek::ed25519::Error| SignatureError::Ed {
+                                context: format!("Cannot decode ed25519 public key: {}", e),
+                            },
+                        )?;
+
+                        let private_key =
+                            ed25519_dalek::SecretKey::from_bytes(keypair.secret()).map_err(|e| SignatureError::Ed {
+                                context: format!("Cannot decode ed25519 secret key: {}", e),
+                            })?;
+
+                        let private_key = ed25519_dalek::ExpandedSecretKey::from(&private_key);
+
+                        Ok(private_key.sign(msg, &public_key).to_bytes().to_vec())
+                    }
+                    NamedEdAlgorithm::Known(EdAlgorithm::X25519) => Err(SignatureError::Ed {
+                        context: "X25519 algorithm is not designed for signing".to_string(),
+                    }),
+                    NamedEdAlgorithm::Unsupported(oid) => {
+                        Err(KeyError::unsupported_ed_algorithm(oid, "signing").into())
+                    }
                 }
             }
         }
@@ -277,6 +317,40 @@ impl SignatureAlgorithm {
                     }
                 }
             }
+            SignatureAlgorithm::Ed25519 => {
+                use crate::key::ed::{EdAlgorithm, EdPublicKey, NamedEdAlgorithm};
+                use ed25519_dalek::Verifier;
+
+                let public_key = EdPublicKey::try_from(public_key)?;
+
+                match public_key.algorithm() {
+                    NamedEdAlgorithm::Known(EdAlgorithm::Ed25519) => {
+                        let public_key = ed25519_dalek::PublicKey::from_bytes(public_key.data()).map_err(
+                            |e: ed25519_dalek::ed25519::Error| SignatureError::Ed {
+                                context: format!("Cannot decode ed25519 public key: {}", e),
+                            },
+                        )?;
+
+                        let signature = ed25519_dalek::Signature::from_bytes(signature).map_err(
+                            |e: ed25519_dalek::SignatureError| SignatureError::Ed {
+                                context: format!("Cannot decode ed25519 signature: {}", e),
+                            },
+                        )?;
+
+                        public_key
+                            .verify(msg, &signature)
+                            .map_err(|_| SignatureError::BadSignature)?;
+                    }
+                    NamedEdAlgorithm::Known(EdAlgorithm::X25519) => {
+                        return Err(SignatureError::Ed {
+                            context: "X25519 algorithm is not designed for signing".to_string(),
+                        });
+                    }
+                    NamedEdAlgorithm::Unsupported(oid) => {
+                        return Err(KeyError::unsupported_ed_algorithm(oid, "verifying").into());
+                    }
+                }
+            }
         }
 
         Ok(())
@@ -286,6 +360,7 @@ impl SignatureAlgorithm {
         match &self {
             SignatureAlgorithm::RsaPkcs1v15(hash_algo) => *hash_algo,
             SignatureAlgorithm::Ecdsa(hash_algo) => *hash_algo,
+            SignatureAlgorithm::Ed25519 => HashAlgorithm::SHA2_512,
         }
     }
 }
@@ -350,7 +425,7 @@ csaQwO9jFvbQFIpCvcMRjaunLfhIWiYDdg==
 -----END EC PRIVATE KEY-----"#;
 
         let another_private_key = PrivateKey::from_pem_str(another_ec_private_key_nist256_pem).unwrap();
-        let wrong_public_key = PublicKey::from(another_private_key);
+        let wrong_public_key = PublicKey::try_from(another_private_key).unwrap();
         assert!(matches!(
             signature_algorithm.verify(&wrong_public_key, msg, &signature),
             Err(SignatureError::BadSignature)
@@ -374,7 +449,7 @@ csaQwO9jFvbQFIpCvcMRjaunLfhIWiYDdg==
             return;
         }
 
-        let public_key = PublicKey::from(private_key);
+        let public_key = PublicKey::try_from(private_key).unwrap();
         signature_algorithm
             .verify(&public_key, msg, &signature.unwrap())
             .unwrap();
@@ -390,7 +465,7 @@ csaQwO9jFvbQFIpCvcMRjaunLfhIWiYDdg==
     ) {
         // sign using ring
         let private_key = PrivateKey::from_pem_str(key_pem).unwrap();
-        let public_key = PublicKey::from(private_key);
+        let public_key = PublicKey::try_from(private_key).unwrap();
         let msg = b"hello world";
 
         let (privk, pubk) = match hash {

@@ -1,5 +1,6 @@
-use super::certificate::Timestamp;
 use crate::key::ec::{EcdsaKeypair, EcdsaPublicKey};
+use crate::key::ed::{EdKeypair, EdPublicKey};
+use crate::ssh::certificate::Timestamp;
 use crate::ssh::certificate::{
     SshCertType, SshCertTypeError, SshCertificate, SshCertificateError, SshCriticalOption, SshCriticalOptionError,
     SshExtension, SshExtensionError, SshSignature, SshSignatureError,
@@ -8,7 +9,8 @@ use crate::ssh::private_key::{
     Aes256Ctr, KdfOption, SshBasePrivateKey, SshPrivateKey, SshPrivateKeyError, AES256_CTR, AUTH_MAGIC, BCRYPT, NONE,
 };
 use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
-use crate::ssh::{key_type, Base64Writer, EcCurveSshExt as _};
+use crate::ssh::{key_type, Base64Writer, EcCurveSshExt as _, EdAlgorithmSshExt as _, SSH_COMBO_ED25519_KEY_LENGTH};
+
 use aes::cipher::{KeyIvInit, StreamCipher};
 use base64::engine::general_purpose;
 use byteorder::{BigEndian, WriteBytesExt};
@@ -164,7 +166,7 @@ impl SshComplexTypeEncode for SshBasePublicKey {
         match self {
             SshBasePublicKey::Rsa(rsa) => {
                 let rsa = RsaPublicKey::try_from(rsa)?;
-                stream.write_ssh_string(key_type::SSH_RSA)?;
+                stream.write_ssh_string(key_type::RSA)?;
                 stream.write_ssh_mpint(rsa.e())?;
                 stream.write_ssh_mpint(rsa.n())?;
                 Ok(())
@@ -173,6 +175,10 @@ impl SshComplexTypeEncode for SshBasePublicKey {
                 let key = EcdsaPublicKey::try_from(ec)?;
                 encode_ecdsa_public_key_body(&mut stream, &key)?;
                 Ok(())
+            }
+            SshBasePublicKey::Ed(ed) => {
+                let key = EdPublicKey::try_from(ed)?;
+                encode_ed_public_key_body(&mut stream, &key)
             }
         }
     }
@@ -184,11 +190,15 @@ impl SshComplexTypeEncode for SshPublicKey {
     fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
         match &self.inner_key {
             SshBasePublicKey::Rsa(_) => {
-                stream.write_all(key_type::SSH_RSA.as_bytes())?;
+                stream.write_all(key_type::RSA.as_bytes())?;
             }
             SshBasePublicKey::Ec(key) => {
                 let key = EcdsaPublicKey::try_from(key)?;
                 stream.write_all(key.curve().to_ecdsa_ssh_key_type()?.as_bytes())?;
+            }
+            SshBasePublicKey::Ed(key) => {
+                let key = EdPublicKey::try_from(key)?;
+                stream.write_all(key.algorithm().to_ed_ssh_key_type()?.as_bytes())?;
             }
         };
 
@@ -215,7 +225,7 @@ impl SshComplexTypeEncode for SshBasePrivateKey {
         match self {
             SshBasePrivateKey::Rsa(rsa) => {
                 let rsa = RsaPrivateKey::try_from(rsa)?;
-                stream.write_ssh_string(key_type::SSH_RSA)?;
+                stream.write_ssh_string(key_type::RSA)?;
                 stream.write_ssh_mpint(rsa.n())?;
                 stream.write_ssh_mpint(rsa.e())?;
                 stream.write_ssh_mpint(rsa.d())?;
@@ -231,7 +241,7 @@ impl SshComplexTypeEncode for SshBasePrivateKey {
             SshBasePrivateKey::Ec(key) => {
                 let keypair = EcdsaKeypair::try_from(key)?;
 
-                let public_key = EcdsaPublicKey::from(&keypair);
+                let public_key = EcdsaPublicKey::try_from(&keypair)?;
 
                 // Encode the public key part
                 encode_ecdsa_public_key_body(&mut stream, &public_key)?;
@@ -240,10 +250,29 @@ impl SshComplexTypeEncode for SshBasePrivateKey {
                 let secret = BigUint::from_bytes_be(keypair.secret());
                 stream.write_ssh_mpint(&secret)?;
             }
+            SshBasePrivateKey::Ed(key) => {
+                let keypair = EdKeypair::try_from(key)?;
+                let public_key = EdPublicKey::try_from(&keypair)?;
+                encode_ed_public_key_body(&mut stream, &public_key)?;
+
+                // SSH Ed25519 key private kye field contains secret in first 32 bytes and the
+                // public key copy in the last 32 bytes.
+                let mut secret = Vec::with_capacity(SSH_COMBO_ED25519_KEY_LENGTH);
+                secret.extend_from_slice(keypair.secret());
+                secret.extend_from_slice(public_key.data());
+
+                stream.write_ssh_bytes(&secret)?;
+            }
         };
 
         Ok(())
     }
+}
+
+fn encode_ed_public_key_body(mut stream: impl Write, key: &EdPublicKey<'_>) -> Result<(), SshPublicKeyError> {
+    stream.write_ssh_string(key.algorithm().to_ed_ssh_key_type()?)?;
+    stream.write_ssh_bytes(key.data())?;
+    Ok(())
 }
 
 fn encode_ecdsa_public_key_body(mut stream: impl Write, key: &EcdsaPublicKey<'_>) -> Result<(), SshPublicKeyError> {
@@ -259,6 +288,9 @@ impl SshComplexTypeEncode for SshPrivateKey {
     type Error = SshPrivateKeyError;
 
     fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
+        const AES256_CTR_BLOCK_SIZE: usize = 16;
+        const UNENCRYPTED_PADDING_SIZE: usize = 8;
+
         stream.write_all(AUTH_MAGIC.as_bytes())?;
         stream.write_u8(b'\0')?;
 
@@ -295,8 +327,14 @@ impl SshComplexTypeEncode for SshPrivateKey {
 
         private_key.write_ssh_string(&self.comment)?;
 
+        let padding_size = if self.passphrase.is_some() {
+            AES256_CTR_BLOCK_SIZE
+        } else {
+            UNENCRYPTED_PADDING_SIZE
+        };
+
         // add padding
-        for i in 1..=(8 - (private_key.len() % 8)) {
+        for i in 1..=(padding_size - (private_key.len() % padding_size)) {
             private_key.push(i as u8);
         }
 
@@ -346,6 +384,10 @@ impl SshComplexTypeEncode for SshCertificate {
                 let ec = EcdsaPublicKey::try_from(ec)?;
                 cert_data.write_ssh_string(ec.curve().to_ecdsa_ssh_key_identifier()?)?;
                 cert_data.write_ssh_bytes(ec.encoded_point())?;
+            }
+            SshBasePublicKey::Ed(ed) => {
+                let ed = EdPublicKey::try_from(ed)?;
+                cert_data.write_ssh_bytes(ed.data())?;
             }
         };
 

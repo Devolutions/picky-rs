@@ -34,6 +34,7 @@ serde_json = { version = "1.0.93", optional = true }
 http = { version = "0.2.9", optional = true }
 cab = { version = "0.3.0", optional = true }
 lexical-sort = { version = "0.3.1", optional = true }
+zeroize = "1.5"
 
 # FIXME: either use ureq, or even better: do not require this kind of dependency at all to let user decide which lib to use.
 # (currently users should *really* not forget to use `spawn_blocking` when calling associated functions from async context)
@@ -45,6 +46,12 @@ reqwest = { version = "0.11.14", default-features = false, features = ["blocking
 
 rand = "0.8.5"
 num-bigint-dig = "0.8.2"
+
+ed25519-dalek = "1"
+# NOTE: x25519-dalek 2.0 is still in rc, so we use 1.0 for now.
+x25519-dalek = "1"
+# ed25519 and x25519 use older versions of `rand` crate
+rand_ed = { package = "rand", version = "0.7" }
 
 p256 = "0.13"
 p384 = "0.13"

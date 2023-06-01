@@ -832,6 +832,8 @@ const HTTP_SIG_ALGO_RSA_SHA3_512: &str = "rsa-sha3-512";
 const HTTP_SIG_ALGO_ECDSA_SHA_256: &str = "ecdsa-sha256";
 const HTTP_SIG_ALGO_ECDSA_SHA_384: &str = "ecdsa-sha384";
 
+const HTTP_SIG_ALGO_ED25519_SHA512: &str = "ed25519-sha512";
+
 fn to_http_sig_algo_str(algo: SignatureAlgorithm) -> &'static str {
     match algo {
         SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::MD5) => HTTP_SIG_ALGO_RSA_MD5,
@@ -844,6 +846,7 @@ fn to_http_sig_algo_str(algo: SignatureAlgorithm) -> &'static str {
         SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA3_512) => HTTP_SIG_ALGO_RSA_SHA3_512,
         SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_256) => HTTP_SIG_ALGO_ECDSA_SHA_256,
         SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_384) => HTTP_SIG_ALGO_ECDSA_SHA_384,
+        SignatureAlgorithm::Ed25519 => HTTP_SIG_ALGO_ED25519_SHA512,
         SignatureAlgorithm::Ecdsa(_) => "ECDSA unsupported algorithm",
     }
 }
@@ -868,6 +871,7 @@ fn from_http_sig_algo_str(s: &str) -> Option<SignatureAlgorithm> {
         HTTP_SIG_ALGO_RSA_SHA3_512 => Some(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA3_512)),
         HTTP_SIG_ALGO_ECDSA_SHA_256 => Some(SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_256)),
         HTTP_SIG_ALGO_ECDSA_SHA_384 => Some(SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_384)),
+        HTTP_SIG_ALGO_ED25519_SHA512 => Some(SignatureAlgorithm::Ed25519),
         _ => None,
     }
 }
@@ -892,6 +896,9 @@ fn is_algo_compatible_with_key(algo: SignatureAlgorithm, key: &PublicKey) -> boo
         SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA3_512) if key_algo == ID_RSASSA_PKCS1_V1_5_WITH_SHA3_512 => {
             true
         }
+        SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_256) if key_algo == ECDSA_WITH_SHA256 => true,
+        SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_384) if key_algo == ECDSA_WITH_SHA384 => true,
+        SignatureAlgorithm::Ed25519 if key_algo == ED25519 => true,
 
         // Key metadata is incompatible with this algorithm
         _ => false,
@@ -1002,7 +1009,7 @@ mod tests {
                 .verifier()
                 .now(1402170700)
                 .signature_method(
-                    &private_key_1().to_public_key(),
+                    &private_key_1().to_public_key().unwrap(),
                     SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256),
                 )
                 .generate_signing_string_using_http_request(&parts)
@@ -1039,7 +1046,7 @@ mod tests {
             .verifier()
             .now(1402170700)
             .signature_method(
-                &private_key_2().to_public_key(),
+                &private_key_2().to_public_key().unwrap(),
                 SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256),
             )
             .generate_signing_string_using_http_request(&parts)
@@ -1051,7 +1058,7 @@ mod tests {
             .verifier()
             .now(1402170700)
             .signature_method(
-                &private_key_1().to_public_key(),
+                &private_key_1().to_public_key().unwrap(),
                 SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA1),
             )
             .generate_signing_string_using_http_request(&parts)
@@ -1066,7 +1073,7 @@ mod tests {
             .verifier()
             .now(1402170710)
             .signature_method(
-                &private_key_1().to_public_key(),
+                &private_key_1().to_public_key().unwrap(),
                 SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256),
             )
             .generate_signing_string_using_http_request(&parts)
@@ -1081,7 +1088,7 @@ mod tests {
             .verifier()
             .now(1402170600)
             .signature_method(
-                &private_key_1().to_public_key(),
+                &private_key_1().to_public_key().unwrap(),
                 SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256),
             )
             .generate_signing_string_using_http_request(&parts)
@@ -1104,7 +1111,7 @@ mod tests {
             .verifier()
             .now(1402170700)
             .signature_method(
-                &private_key_1().to_public_key(),
+                &private_key_1().to_public_key().unwrap(),
                 SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256),
             )
             .generate_signing_string_using_http_request(&parts_2)
@@ -1118,7 +1125,7 @@ mod tests {
             .verifier()
             .now(1402170700)
             .signature_method(
-                &private_key_1().to_public_key(),
+                &private_key_1().to_public_key().unwrap(),
                 SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA1),
             )
             .generate_signing_string_using_http_request(&parts)
@@ -1151,7 +1158,7 @@ mod tests {
             .verifier()
             .now(1402170700)
             .signature_method(
-                &private_key_1().to_public_key(),
+                &private_key_1().to_public_key().unwrap(),
                 SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256),
             )
             .pre_generated_signing_string(signing_string)
@@ -1168,7 +1175,7 @@ mod tests {
             .now(1402170690)
             .leeway(10)
             .signature_method(
-                &private_key_1().to_public_key(),
+                &private_key_1().to_public_key().unwrap(),
                 SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256),
             )
             .pre_generated_signing_string(signing_string)
@@ -1241,7 +1248,7 @@ mod tests {
                 .verifier()
                 .now(1402170700)
                 .signature_method(
-                    &private_key_1().to_public_key(),
+                    &private_key_1().to_public_key().unwrap(),
                     SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256),
                 )
                 .generate_signing_string_using_http_request(&parts)
@@ -1271,7 +1278,7 @@ mod tests {
             .build()
             .expect("build http signature");
 
-        let mut spki = SubjectPublicKeyInfo::from(private_key_1().to_public_key());
+        let mut spki = SubjectPublicKeyInfo::from(private_key_1().to_public_key().unwrap());
         spki.algorithm = AlgorithmIdentifier::new_sha512_with_rsa_encryption();
         let sha512_only_key = PublicKey::from(spki);
 

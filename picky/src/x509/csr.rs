@@ -1,5 +1,5 @@
 use super::utils::{from_der, from_pem, from_pem_str, to_der, to_pem};
-use crate::key::{PrivateKey, PublicKey};
+use crate::key::{KeyError, PrivateKey, PublicKey};
 use crate::pem::{Pem, PemError};
 use crate::signature::{SignatureAlgorithm, SignatureError};
 use crate::x509::certificate::CertError;
@@ -40,6 +40,9 @@ pub enum CsrError {
     /// invalid PEM provided
     #[error("invalid PEM provided: {source}")]
     Pem { source: PemError },
+
+    #[error("failed to get public key from private key: {source}")]
+    PrivateKeyToPublicKey { source: KeyError },
 }
 
 impl From<CertError> for CsrError {
@@ -92,7 +95,11 @@ impl Csr {
         private_key: &PrivateKey,
         signature_hash_type: SignatureAlgorithm,
     ) -> Result<Self, CsrError> {
-        let cri = CertificationRequestInfo::new(subject.into(), private_key.to_public_key().into());
+        let public_key = private_key
+            .to_public_key()
+            .map_err(|source| CsrError::PrivateKeyToPublicKey { source })?;
+
+        let cri = CertificationRequestInfo::new(subject.into(), public_key.into());
         h_generate_from_cri(cri, private_key, signature_hash_type)
     }
 
@@ -102,7 +109,11 @@ impl Csr {
         signature_hash_type: SignatureAlgorithm,
         attributes: Vec<Attribute>,
     ) -> Result<Self, CsrError> {
-        let mut cri = CertificationRequestInfo::new(subject.into(), private_key.to_public_key().into());
+        let public_key = private_key
+            .to_public_key()
+            .map_err(|source| CsrError::PrivateKeyToPublicKey { source })?;
+
+        let mut cri = CertificationRequestInfo::new(subject.into(), public_key.into());
         for attr in attributes {
             cri.add_attribute(attr);
         }

@@ -168,7 +168,7 @@ impl ServerController {
                 let der = signed_cert
                     .to_der()
                     .internal_error_desc("couldn't get certificate der")?;
-                ResponseBuilder::new().body(base64::encode(&der))
+                ResponseBuilder::new().body(base64::encode(der))
             }
             unexpected => {
                 log::error!("unexpected response format: {}", unexpected);
@@ -349,7 +349,13 @@ impl ServerController {
         let (root_key, _) = get_main_private_key(&*self.read_conf().await, self.storage.as_ref())
             .await
             .internal_error_desc("Failed to get private key")?;
-        let ssh_private_key = SshPrivateKey::from(root_key);
+        let ssh_private_key = match SshPrivateKey::try_from(root_key) {
+            Ok(key) => key,
+            Err(e) => {
+                log::error!("convert private key to ssh private key: {}", e);
+                return Err(StatusCode::INTERNAL_SERVER_ERROR);
+            }
+        };
 
         let builder = SshCertificateBuilder::init();
 
@@ -382,7 +388,14 @@ impl ServerController {
         let (root_key, _) = get_main_private_key(&*self.read_conf().await, self.storage.as_ref())
             .await
             .internal_error_desc("Failed to get private key")?;
-        let ssh_key = SshPrivateKey::from(root_key);
+
+        let ssh_key = match SshPrivateKey::try_from(root_key) {
+            Ok(key) => key,
+            Err(e) => {
+                log::error!("convert private key to ssh private key: {}", e);
+                return Err(StatusCode::INTERNAL_SERVER_ERROR);
+            }
+        };
 
         let pub_key = ssh_key
             .public_key()
@@ -663,7 +676,8 @@ async fn generate_intermediate_ca(config: &Config, storage: &dyn PickyStorage) -
 
     let intermediate_cert = Picky::generate_intermediate(
         &intermediate_name,
-        pk.to_public_key(),
+        pk.to_public_key()
+            .map_err(|e| format!("couldn't get public key: {}", e))?,
         &root_cert,
         &root_key,
         config.signing_algorithm,
