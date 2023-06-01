@@ -60,11 +60,11 @@ impl EcCurveSshExt for NamedEcCurve {
     }
 }
 
-trait EdAlorithmSshExt {
+trait EdAlgorithmSshExt {
     fn to_ed_ssh_key_type(&self) -> Result<&'static str, KeyError>;
 }
 
-impl EdAlorithmSshExt for NamedEdAlgorithm {
+impl EdAlgorithmSshExt for NamedEdAlgorithm {
     fn to_ed_ssh_key_type(&self) -> Result<&'static str, KeyError> {
         match self {
             NamedEdAlgorithm::Known(EdAlgorithm::Ed25519) => Ok(key_type::ED25519),

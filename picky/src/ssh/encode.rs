@@ -9,7 +9,7 @@ use crate::ssh::private_key::{
     Aes256Ctr, KdfOption, SshBasePrivateKey, SshPrivateKey, SshPrivateKeyError, AES256_CTR, AUTH_MAGIC, BCRYPT, NONE,
 };
 use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
-use crate::ssh::{key_type, Base64Writer, EcCurveSshExt as _, EdAlorithmSshExt as _, SSH_COMBO_ED25519_KEY_LENGTH};
+use crate::ssh::{key_type, Base64Writer, EcCurveSshExt as _, EdAlgorithmSshExt as _, SSH_COMBO_ED25519_KEY_LENGTH};
 
 use aes::cipher::{KeyIvInit, StreamCipher};
 use base64::engine::general_purpose;

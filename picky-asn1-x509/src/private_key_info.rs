@@ -270,6 +270,7 @@ impl ser::Serialize for PrivateKeyValue {
     }
 }
 
+#[cfg(feature = "zeroize")]
 impl Drop for PrivateKeyValue {
     fn drop(&mut self) {
         if let PrivateKeyValue::ED(ed) = self {
