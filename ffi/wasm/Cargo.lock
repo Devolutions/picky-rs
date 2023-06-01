@@ -300,18 +300,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ed448-goldilocks"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "88322282bccdc6fa7ab65b0c30cb877fba541547653436d08bb775fa4a4307b4"
-dependencies = [
- "fiat-crypto",
- "hex",
- "rand_core 0.6.4",
- "subtle",
-]
-
-[[package]]
 name = "elliptic-curve"
 version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -341,12 +329,6 @@ dependencies = [
  "rand_core 0.6.4",
  "subtle",
 ]
-
-[[package]]
-name = "fiat-crypto"
-version = "0.1.20"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e825f6987101665dea6ec934c09ec6d721de7bc1bf92248e1d5810c8cd636b77"
 
 [[package]]
 name = "generic-array"
@@ -403,12 +385,6 @@ dependencies = [
  "rand_core 0.6.4",
  "subtle",
 ]
-
-[[package]]
-name = "hex"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "hkdf"
@@ -631,7 +607,6 @@ dependencies = [
  "cbc",
  "digest 0.10.6",
  "ed25519-dalek",
- "ed448-goldilocks",
  "md-5",
  "num-bigint-dig",
  "p256",
