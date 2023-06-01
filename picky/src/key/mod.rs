@@ -11,7 +11,9 @@ use num_bigint_dig::BigUint;
 use picky_asn1::bit_string::BitString;
 use picky_asn1::wrapper::{BitStringAsn1Container, IntegerAsn1, OctetStringAsn1Container};
 use picky_asn1_der::Asn1DerError;
-use picky_asn1_x509::{private_key_info, ECPrivateKey, PrivateKeyInfo, PrivateKeyValue, SubjectPublicKeyInfo};
+use picky_asn1_x509::{
+    private_key_info, ECPrivateKey, PrivateKeyInfo, PrivateKeyValue, SubjectPublicKeyInfo, PRIVATE_KEY_INFO_VERSION_1,
+};
 use rsa::{RsaPrivateKey, RsaPublicKey};
 use thiserror::Error;
 use zeroize::Zeroize;
@@ -422,7 +424,7 @@ impl PrivateKey {
             })?;
 
         let inner = PrivateKeyInfo {
-            version: 0,
+            version: PRIVATE_KEY_INFO_VERSION_1,
             private_key_algorithm: AlgorithmIdentifier::new_rsa_encryption(),
             private_key: PrivateKeyValue::RSA(private_key.into()),
             public_key: None,

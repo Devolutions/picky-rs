@@ -16,6 +16,14 @@ use picky_asn1::bit_string::BitString;
 use picky_asn1::Asn1Type;
 use std::fmt;
 
+/// When `PrivateKeyInfo` have this version specified, it should not have `public_key` field set.
+/// This version of `PrivateKeyInfo` mostly used to represent RSA and EC private keys.
+pub const PRIVATE_KEY_INFO_VERSION_1: u8 = 0;
+/// When `PrivateKeyInfo` have this version specified, it should have `public_key` field set.
+/// This version of `PrivateKeyInfo` mostly used to represent Ed25519 and Ed448 private keys and
+/// defined as `OneAsymmetricKey` in [RFC5958](https://tools.ietf.org/html/rfc5958#section-2).
+pub const PRIVATE_KEY_INFO_VERSION_2: u8 = 1;
+
 pub type EncapsulatedEcSecret = OctetStringAsn1;
 
 /// [Public-Key Cryptography Standards (PKCS) #8](https://tools.ietf.org/html/rfc5208#section-5)
@@ -23,7 +31,7 @@ pub type EncapsulatedEcSecret = OctetStringAsn1;
 ///
 /// # Section 5
 ///
-/// Private-key information shall have ASN.1 type `OneAsymmetricKey` (Backwards-compatible) with
+/// Private-key information shall have ASN.1 type `OneAsymmetricKey` (Backwards-compatible with
 /// `PrivateKeyInfo` from RFC5208):
 ///
 /// ```not_rust
@@ -48,7 +56,7 @@ pub type EncapsulatedEcSecret = OctetStringAsn1;
 ///   Attributes ::= SET OF Attribute { { OneAsymmetricKeyAttributes } }
 /// ```
 ///
-/// The fields of type PrivateKeyInfo have the following meanings:
+/// The fields of type `OneAsymmetricKey` have the following meanings:
 ///
 /// `version` identifies the version of OneAsymmetricKey.  If publicKey
 /// is present, then version is set to v2(1) else version is set to v1(0).
@@ -103,7 +111,7 @@ impl PrivateKeyInfo {
         );
 
         Self {
-            version: 0,
+            version: PRIVATE_KEY_INFO_VERSION_1,
             private_key_algorithm: AlgorithmIdentifier::new_rsa_encryption(),
             private_key,
             public_key: None,
@@ -140,7 +148,7 @@ impl PrivateKeyInfo {
         );
 
         Self {
-            version: 0,
+            version: PRIVATE_KEY_INFO_VERSION_1,
             private_key_algorithm: AlgorithmIdentifier::new_elliptic_curve(curve_oid.into()),
             private_key,
             public_key: None,
@@ -156,9 +164,12 @@ impl PrivateKeyInfo {
 
         let (version, public_key) = if let Some(public_key) = public_key {
             // If the public key is present, the version MUST be set to v2(1)
-            (1, Some(ExplicitContextTag1(Optional(public_key.into()))))
+            (
+                PRIVATE_KEY_INFO_VERSION_2,
+                Some(ExplicitContextTag1(Optional(public_key.into()))),
+            )
         } else {
-            (0, None)
+            (PRIVATE_KEY_INFO_VERSION_1, None)
         };
 
         Self {

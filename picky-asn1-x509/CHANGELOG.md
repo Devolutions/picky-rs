@@ -7,21 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-### Added
-- Support of Ed25519/X25519/Ed448/X448 key structures
-- New API methods
-    - `AlgorithmIdentifier::is_one_of`
-    - `AlgorithmIdentifier::new_x25519`
-    - `AlgorithmIdentifier::new_ed448`
-    - `AlgorithmIdentifier::new_x448`
-    - `PrivateKeyInfo::new_ed_encryption`
-    - `SubjectPublicKeyInfo::new_ed_key`
-
-### Changed
-- `PrivateKeyInfo` structure now also could represent newer `OneAsymmetricKey` structure
-  (structures are backward-compatible). This allows to represent Ed keys with public key field set
-
-## [0.10.0] 2023-06-23
+## [0.10.0] 2023-06-01 (Unreleased)
 
 ### Fixed
 
@@ -36,12 +22,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `EcParameters::curve_oid`
     - `PrivateKeyInfo::new_ec_encryption`
     - `signature::EcdsaSignatureValue`
+    - `AlgorithmIdentifier::is_one_of`
+    - `AlgorithmIdentifier::new_x25519`
+    - `AlgorithmIdentifier::new_ed448`
+    - `AlgorithmIdentifier::new_x448`
+    - `PrivateKeyInfo::new_ed_encryption`
+    - `SubjectPublicKeyInfo::new_ed_key`
+- New constants:
+    - `private_key_info::PRIVATE_KEY_INFO_VERSION_1`
+    - `private_key_info::PRIVATE_KEY_INFO_VERSION_2`
+- Support of Ed25519/X25519/Ed448/X448 key structures
 
 ### Changed
 
 - (Breaking) `AlgorithmIdentifier::new_elliptic_curve` now accepts `EcParameters` instead of `impl Into<Option<EcParameters>>`
 - (Breaking) `AlgorithmIdentifierParameters::Ec` now have `EcParameters` instead of `Option<EcParameters>`
 - (Breaking) `SubjectPublicKeyInfo::new_ec_key` now accepts curve's `ObjectIdentifier` and point as `BitString`
+- `PrivateKeyInfo` structure now also could represent newer `OneAsymmetricKey` structure
+  (structures are backward-compatible). This allows to represent Ed keys with public key field set
 
 ## [0.9.0] 2022-11-07
 
