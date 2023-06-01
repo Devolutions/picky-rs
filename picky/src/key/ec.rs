@@ -318,6 +318,15 @@ mod tests {
         key.to_public_key().unwrap().to_pem_str().unwrap();
     }
 
+    #[test]
+    fn ecdsa_private_key_without_public_unsupported_curve() {
+        // We should be able to parse private keys without public keys and unknown curve,
+        // but we `to_public_key` will fail anyway because we don't implement arithmetic for that
+        // curve
+        let key = PrivateKey::from_pem_str(test_files::EC_NIST521_NOPUBLIC_DER_PK_1).unwrap();
+        key.to_public_key().unwrap_err();
+    }
+
     #[rstest]
     // Known curves
     #[case(test_files::EC_NIST256_PK_1_PUB)]

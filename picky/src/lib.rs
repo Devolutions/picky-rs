@@ -40,6 +40,10 @@ mod test_files {
     pub const EC_NIST384_NOPUBLIC_DER_PK_1: &str =
         include_str!("../../test_assets/private_keys/ec-nist384-nopublic-der-pk_1.key");
 
+    // openssl ec -in ec-secp521r1-priv-key.pem -no_public -out ec-secp521r1-nopublic-priv-key.pem
+    pub const EC_NIST521_NOPUBLIC_DER_PK_1: &str =
+        include_str!("../../test_assets/private_keys/ec-nist521-nopublic-der-pk_1.key");
+
     pub const EC_NIST256_DER_PK_1: &str = include_str!("../../test_assets/private_keys/ec-nist256-der-pk_1.key");
 
     pub const EC_NIST384_DER_PK_1: &str = include_str!("../../test_assets/private_keys/ec-nist384-der-pk_1.key");
