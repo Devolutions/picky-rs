@@ -24,17 +24,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "aes"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "433cfd6710c9986c576a25ca913c39d66a6474107b406f34f91d4a8923395241"
+dependencies = [
+ "cfg-if",
+ "cipher 0.4.3",
+ "cpufeatures",
+]
+
+[[package]]
 name = "aes-gcm"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df5f85a83a7d8b0442b6aa7b504b8212c1733da07b98aae43d4bc21b2cb3cdf6"
 dependencies = [
  "aead",
- "aes",
+ "aes 0.7.5",
  "cipher 0.3.0",
  "ctr",
  "ghash",
  "subtle",
+]
+
+[[package]]
+name = "aes-kw"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "69fa2b352dcefb5f7f3a5fb840e02665d311d878955380515e4fd50095dd3d8c"
+dependencies = [
+ "aes 0.8.2",
 ]
 
 [[package]]
@@ -603,6 +623,7 @@ name = "picky"
 version = "7.0.0-rc.6"
 dependencies = [
  "aes-gcm",
+ "aes-kw",
  "base64",
  "cbc",
  "digest 0.10.6",

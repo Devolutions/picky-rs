@@ -96,7 +96,6 @@ mod test_files {
             include_str!("../../test_assets/private_keys/rsa-2048-pk_4.key");
 
         pub const EC_NIST256_PK_2: &str = include_str!("../../test_assets/private_keys/ec-nist256-pk_2.key");
-        pub const EC_NIST384_PK_1: &str = include_str!("../../test_assets/private_keys/ec-nist384-pk_1.key");
 
         pub const ED25519_PEM_PK_2: &str = include_str!("../../test_assets/private_keys/ed25519-pem-pk_2.key");
         pub const ED25519_PEM_PK_3: &str = include_str!("../../test_assets/private_keys/ed25519-pem-pk_3.key");
@@ -131,7 +130,6 @@ mod test_files {
         pub const JOSE_JWT_SIG_ES384: &str =
             include_str!("../../test_assets/jose/jwt_sig_es384.txt");
 
-
         /// Test data was gathered from https://github.com/golang-jwt/jwt
         pub const JOSE_JWT_SIG_ED25519_GO: &str =
             include_str!("../../test_assets/jose/jwt_sig_ed25519_go.txt");
@@ -143,6 +141,13 @@ mod test_files {
             include_str!("../../test_assets/jose/jwt_sig_ed25519.txt");
         pub const JOSE_JWT_SIG_ED25519_PRIVATE_KEY: &str =
             include_str!("../../test_assets/jose/jwt_sig_ed25519_private.pem");
+
+
+        /// Genereated via `jwcrypto` python library
+        pub const JOSE_JWE_GCM256_EC_P256_ECDH: &str =
+            include_str!("../../test_assets/jose/jwe_gcm256_ec_p256_ecdh.txt");
+        pub const JOSE_JWE_GCM128_EC_P384_ECDH_KW192: &str =
+            include_str!("../../test_assets/jose/jwe_gcm128_ec_p384_ecdh_kw192.txt");
     }}
 
     cfg_if::cfg_if! { if #[cfg(feature = "ssh")] {
@@ -183,5 +188,9 @@ mod test_files {
         // ssh-keygen -h -s ./ssh_ca_key -V '+1000w' -I abcd -z 00001 -n server.example.com ./ssh_key_ed25519.pub
         pub const SSH_CERT_ED25519: &str = include_str!("../../test_assets/ssh/ssh_cert_ed25519.crt");
 
+    }}
+
+    cfg_if::cfg_if! { if #[cfg(any(feature = "jose", feature = "x509"))] {
+        pub const EC_NIST384_PK_1: &str = include_str!("../../test_assets/private_keys/ec-nist384-pk_1.key");
     }}
 }
