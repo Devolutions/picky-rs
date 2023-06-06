@@ -5,6 +5,7 @@
 use crate::jose::jwe::{JweAlg, JweEnc};
 use crate::jose::jws::JwsAlg;
 use crate::key::ec::{EcdsaPublicKey, NamedEcCurve};
+use crate::key::ed::{EdPublicKey, NamedEdAlgorithm};
 use crate::key::{EcCurve, EdAlgorithm, PublicKey};
 use base64::{engine::general_purpose, DecodeError, Engine as _};
 use num_bigint_dig::BigUint;
@@ -29,11 +30,14 @@ pub enum JwkError {
     #[error("unsupported algorithm: {algorithm}")]
     UnsupportedAlgorithm { algorithm: &'static str },
 
-    #[error("Invalid ec public key: {cause}")]
-    InvalidEcPublicKey { cause: &'static str },
+    #[error("invalid ec public key: {cause}")]
+    InvalidEcPublicKey { cause: String },
 
-    #[error("Invalid ec point coordinates in JWK")]
+    #[error("invalid ec point coordinates in JWK")]
     InvalidEcPointCoordinates,
+
+    #[error("invalid ed public key: {cause}")]
+    InvalidEdPublicKey { cause: String },
 }
 
 impl From<serde_json::Error> for JwkError {
@@ -107,7 +111,7 @@ impl JwkKeyType {
 
     /// Build a JWK key from Edwards curve components.
     ///
-    /// `crv` is ed-based algoritm name.
+    /// `crv` is ed-based algorithm name.
     /// `x` is raw public key bytes.
     pub fn new_ed_key(crv: JwkEdPublicKeyAlgorithm, x: &[u8]) -> Self {
         Self::Ed(JwkPublicEdKey {
@@ -327,13 +331,13 @@ impl Jwk {
             }
             SerdePublicKey::Ec(_) => {
                 let ec_key = EcdsaPublicKey::try_from(public_key)
-                    .map_err(|_| JwkError::InvalidEcPublicKey { cause: "not EC key" })?;
+                    .map_err(|e| JwkError::InvalidEcPublicKey { cause: e.to_string() })?;
 
                 match ec_key.curve() {
                     NamedEcCurve::Known(EcCurve::NistP256) => {
                         let point = p256::EncodedPoint::from_bytes(ec_key.encoded_point()).map_err(|_| {
                             JwkError::InvalidEcPublicKey {
-                                cause: "invalid P-256 EC point encoding",
+                                cause: "invalid P-256 EC point encoding".to_string(),
                             }
                         })?;
 
@@ -344,14 +348,14 @@ impl Jwk {
                                 y.as_slice(),
                             ))),
                             _ => Err(JwkError::InvalidEcPublicKey {
-                                cause: "Invalid P-256 curve EC public point coordinates",
+                                cause: "Invalid P-256 curve EC public point coordinates".to_string(),
                             }),
                         }
                     }
                     NamedEcCurve::Known(EcCurve::NistP384) => {
                         let point = p384::EncodedPoint::from_bytes(ec_key.encoded_point()).map_err(|_| {
                             JwkError::InvalidEcPublicKey {
-                                cause: "invalid P-384 EC point encoding",
+                                cause: "invalid P-384 EC point encoding".to_string(),
                             }
                         })?;
 
@@ -362,7 +366,7 @@ impl Jwk {
                                 y.as_slice(),
                             ))),
                             _ => Err(JwkError::InvalidEcPublicKey {
-                                cause: "Invalid P-384 curve EC public point coordinates",
+                                cause: "Invalid P-384 curve EC public point coordinates".to_string(),
                             }),
                         }
                     }
@@ -371,9 +375,22 @@ impl Jwk {
                     }),
                 }
             }
-            SerdePublicKey::Ed(_) => Err(JwkError::UnsupportedAlgorithm {
-                algorithm: "edwards curves",
-            }),
+            SerdePublicKey::Ed(_) => {
+                let ed_key = EdPublicKey::try_from(public_key)
+                    .map_err(|e| JwkError::InvalidEdPublicKey { cause: e.to_string() })?;
+
+                let algorithm = match ed_key.algorithm() {
+                    NamedEdAlgorithm::Known(EdAlgorithm::Ed25519) => JwkEdPublicKeyAlgorithm::Ed25519,
+                    NamedEdAlgorithm::Known(EdAlgorithm::X25519) => JwkEdPublicKeyAlgorithm::X25519,
+                    NamedEdAlgorithm::Unsupported(_) => {
+                        return Err(JwkError::UnsupportedAlgorithm {
+                            algorithm: "Unsupported ED algorithm",
+                        })
+                    }
+                };
+
+                Ok(Self::new(JwkKeyType::new_ed_key(algorithm, ed_key.data())))
+            }
         }
     }
 
@@ -400,8 +417,8 @@ impl Jwk {
                     JwkEcPublicKeyCurve::P521 => {
                         // To construct encoded point from coponents we need to use curve-specific
                         // arithmetic, which is currently not supported by picky.
-                        return Err(JwkError::InvalidEcPublicKey {
-                            cause: "P-521 EC curve arithmetic is not supported",
+                        return Err(JwkError::UnsupportedAlgorithm {
+                            algorithm: "P-521 EC curve",
                         });
                     }
                 };

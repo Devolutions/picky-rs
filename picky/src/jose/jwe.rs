@@ -2,10 +2,13 @@
 //!
 //! See [RFC7516](https://tools.ietf.org/html/rfc7516).
 
-use crate::jose::jwk::Jwk;
-use crate::key::{PrivateKey, PublicKey};
+use crate::jose::jwk::{Jwk, JwkError};
+use crate::key::ec::{EcComponent, EcdsaKeypair, EcdsaPublicKey, NamedEcCurve};
+use crate::key::ed::{EdKeypair, EdPublicKey, NamedEdAlgorithm, X25519_FIELD_ELEMENT_SIZE};
+use crate::key::{EcCurve, EdAlgorithm, KeyError, PrivateKey, PrivateKeyKind, PublicKey};
+
 use aes_gcm::aead::generic_array::typenum::Unsigned;
-use aes_gcm::{AeadInPlace, Aes128Gcm, Aes256Gcm, NewAead};
+use aes_gcm::{AeadInPlace, Aes128Gcm, Aes256Gcm, KeyInit, KeySizeUser};
 use base64::{engine::general_purpose, DecodeError, Engine as _};
 use digest::generic_array::GenericArray;
 use rand::RngCore;
@@ -14,14 +17,22 @@ use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use thiserror::Error;
+use zeroize::Zeroizing;
 
-type Aes192Gcm = aes_gcm::AesGcm<aes_gcm::aes::Aes192, aes_gcm::aead::generic_array::typenum::U12>;
+type Aes192Gcm = aes_gcm::AesGcm<aes_gcm::aes::Aes192, aes_gcm::aes::cipher::consts::U12>;
 
 // === error type === //
 
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum JweError {
+    /// JWK conversion error
+    #[error("JWK conversion error")]
+    Jwk {
+        #[from]
+        source: JwkError,
+    },
+
     /// RSA error
     #[error("RSA error: {context}")]
     Rsa { context: String },
@@ -29,6 +40,10 @@ pub enum JweError {
     /// AES-GCM error (opaque)
     #[error("AES-GCM error (opaque)")]
     AesGcm,
+
+    /// AES-KW error
+    #[error("AES-KW error")]
+    AesKw { source: aes_kw::Error },
 
     /// Json error
     #[error("JSON error: {source}")]
@@ -64,6 +79,15 @@ pub enum JweError {
         expected: usize,
         got: usize,
     },
+
+    #[error("private and public key algorithms don't match: {context}")]
+    KeyAlgorithmsMismatch { context: String },
+
+    #[error("missing `epk` header parameter required for ECDH-ES algorithm")]
+    MissingEpk,
+
+    #[error("invalid encrypted key size: expected {expected}, got {got}")]
+    InvalidEncryptedKeySize { expected: usize, got: usize },
 }
 
 impl From<rsa::errors::Error> for JweError {
@@ -93,6 +117,12 @@ impl From<crate::key::KeyError> for JweError {
 impl From<DecodeError> for JweError {
     fn from(e: DecodeError) -> Self {
         Self::Base64Decoding { source: e }
+    }
+}
+
+impl From<aes_kw::Error> for JweError {
+    fn from(e: aes_kw::Error) -> Self {
+        Self::AesKw { source: e }
     }
 }
 
@@ -168,6 +198,114 @@ pub enum JweAlg {
     EcdhEsAesKeyWrap256,
 }
 
+#[derive(Debug, Clone, Copy)]
+enum KeyWrappingAlg {
+    Aes128,
+    Aes192,
+    Aes256,
+}
+
+impl KeyWrappingAlg {
+    fn key_size(self) -> usize {
+        match self {
+            KeyWrappingAlg::Aes128 => 16,
+            KeyWrappingAlg::Aes192 => 24,
+            KeyWrappingAlg::Aes256 => 32,
+        }
+    }
+
+    /// Decrypts wrapped CEK using the given AES decryption key
+    ///
+    /// ### Panics:
+    ///
+    ///   - Caller must unsure `decryption_key` size matches the wrapping algorithm
+    fn decrypt_key(
+        &self,
+        cek_alg: JweEnc,
+        encrypted_cek: &[u8],
+        decryption_key: &[u8],
+    ) -> Result<Zeroizing<Vec<u8>>, JweError> {
+        let mut cek = Zeroizing::new(vec![0u8; cek_alg.key_size()]);
+
+        let expected_wrapped_cek_size = cek.len() + aes_kw::IV_LEN;
+        if encrypted_cek.len() != expected_wrapped_cek_size {
+            return Err(JweError::InvalidEncryptedKeySize {
+                expected: expected_wrapped_cek_size,
+                got: encrypted_cek.len(),
+            });
+        }
+
+        match self {
+            KeyWrappingAlg::Aes128 => {
+                let kek = aes_kw::KekAes128::new(GenericArray::from_slice(decryption_key));
+                kek.unwrap(encrypted_cek, &mut cek)?;
+            }
+            KeyWrappingAlg::Aes192 => {
+                let kek = aes_kw::KekAes192::new(GenericArray::from_slice(decryption_key));
+                kek.unwrap(encrypted_cek, &mut cek)?;
+            }
+            KeyWrappingAlg::Aes256 => {
+                let kek = aes_kw::KekAes256::new(GenericArray::from_slice(decryption_key));
+                kek.unwrap(encrypted_cek, &mut cek)?;
+            }
+        };
+
+        Ok(cek)
+    }
+
+    /// Encrypts the given CEK using the given AES encryption key
+    ///
+    /// ### Panics:
+    ///
+    ///   - Caller must ensure `encryption_key` size matches the wrapping algorithm
+    fn encrypt_key(&self, cek_alg: JweEnc, cek: &[u8], encryption_key: &[u8]) -> Result<Vec<u8>, JweError> {
+        let mut wrapped_key = vec![0u8; cek_alg.key_size() + aes_kw::IV_LEN];
+        match self {
+            KeyWrappingAlg::Aes128 => {
+                let kek = aes_kw::KekAes128::new(GenericArray::from_slice(encryption_key));
+                kek.wrap(cek, &mut wrapped_key)?;
+            }
+            KeyWrappingAlg::Aes192 => {
+                let kek = aes_kw::KekAes192::new(GenericArray::from_slice(encryption_key));
+                kek.wrap(cek, &mut wrapped_key)?;
+            }
+            KeyWrappingAlg::Aes256 => {
+                let kek = aes_kw::KekAes256::new(GenericArray::from_slice(encryption_key));
+                kek.wrap(cek, &mut wrapped_key)?;
+            }
+        };
+
+        Ok(wrapped_key)
+    }
+}
+
+impl JweAlg {
+    /// Get algorithm string representation
+    fn name(&self) -> String {
+        serde_json::to_value(self)
+            .expect("BUG: JweAlg is always convertible to serde_json::Value")
+            .as_str()
+            .expect("BUG: JweAlg is always represented as a string in JSON")
+            .to_string()
+    }
+
+    fn key_wrapping_alg(&self) -> Option<KeyWrappingAlg> {
+        let alg = match self {
+            JweAlg::AesKeyWrap128 => KeyWrappingAlg::Aes128,
+            JweAlg::AesKeyWrap192 => KeyWrappingAlg::Aes192,
+            JweAlg::AesKeyWrap256 => KeyWrappingAlg::Aes256,
+            JweAlg::EcdhEsAesKeyWrap128 => KeyWrappingAlg::Aes128,
+            JweAlg::EcdhEsAesKeyWrap192 => KeyWrappingAlg::Aes192,
+            JweAlg::EcdhEsAesKeyWrap256 => KeyWrappingAlg::Aes256,
+            _ => {
+                return None;
+            }
+        };
+
+        Some(alg)
+    }
+}
+
 // === JWE header === //
 
 /// `enc` header parameter values for JWE to encrypt content
@@ -209,11 +347,20 @@ pub enum JweEnc {
 }
 
 impl JweEnc {
+    /// Get algorithm string representation
+    fn name(&self) -> String {
+        serde_json::to_value(self)
+            .expect("BUG: JweEnc is always convertible to serde_json::Value")
+            .as_str()
+            .expect("BUG: JweEnc is always represented as a string in JSON")
+            .to_string()
+    }
+
     pub fn key_size(self) -> usize {
         match self {
-            Self::Aes128CbcHmacSha256 | Self::Aes128Gcm => <Aes128Gcm as NewAead>::KeySize::to_usize(),
-            Self::Aes192CbcHmacSha384 | Self::Aes192Gcm => <Aes192Gcm as NewAead>::KeySize::to_usize(),
-            Self::Aes256CbcHmacSha512 | Self::Aes256Gcm => <Aes256Gcm as NewAead>::KeySize::to_usize(),
+            Self::Aes128CbcHmacSha256 | Self::Aes128Gcm => <Aes128Gcm as KeySizeUser>::KeySize::to_usize(),
+            Self::Aes192CbcHmacSha384 | Self::Aes192Gcm => <Aes192Gcm as KeySizeUser>::KeySize::to_usize(),
+            Self::Aes256CbcHmacSha512 | Self::Aes256Gcm => <Aes256Gcm as KeySizeUser>::KeySize::to_usize(),
         }
     }
 
@@ -306,6 +453,22 @@ pub struct JweHeader {
     #[serde(rename = "x5t#S256", alias = "x5t#s256", skip_serializing_if = "Option::is_none")]
     pub x5t_s256: Option<String>,
 
+    /// Ephemeral Public Key for `ECDH-ES` encryption algorithm. It is generated by the sender
+    /// during JWT generation and set automatically.
+    pub epk: Option<Jwk>,
+
+    /// Agreement PartyUInfo value for key agreement algorithms
+    /// using it (such as "ECDH-ES"), represented as a base64url-encoded
+    /// string. When used, the PartyUInfo value contains information about
+    /// the producer.  Use of this Header Parameter is OPTIONAL.
+    pub apu: Option<String>,
+
+    /// Agreement PartyVInfo value for key agreement algorithms
+    /// using it (such as "ECDH-ES"), represented as a base64url encoded
+    /// string.  When used, the PartyVInfo value contains information about
+    /// the recipient.  Use of this Header Parameter is OPTIONAL.
+    pub apv: Option<String>,
+
     // -- extra parameters -- //
     /// Additional header parameters (both public and private)
     #[serde(flatten)]
@@ -326,6 +489,9 @@ impl JweHeader {
             x5c: None,
             x5t: None,
             x5t_s256: None,
+            apu: None,
+            apv: None,
+            epk: None,
             additional: HashMap::default(),
         }
     }
@@ -455,58 +621,78 @@ enum EncoderMode<'a> {
     Direct(&'a [u8]),
 }
 
-fn encode_impl(jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
-    let mut header = jwe.header;
-    let protected_header_base64 = general_purpose::URL_SAFE_NO_PAD.encode(serde_json::to_vec(&header)?);
+fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
+    use picky_asn1_x509::PublicKey as RfcPublicKey;
 
     let (encrypted_key_base64, jwe_cek) = match mode {
         EncoderMode::Direct(symmetric_key) => {
-            if symmetric_key.len() != header.enc.key_size() {
+            if symmetric_key.len() != jwe.header.enc.key_size() {
                 return Err(JweError::InvalidSize {
                     ty: "symmetric key",
-                    expected: header.enc.key_size(),
+                    expected: jwe.header.enc.key_size(),
                     got: symmetric_key.len(),
                 });
             }
 
             // Override `alg` header with "dir"
-            header.alg = JweAlg::Direct;
+            jwe.header.alg = JweAlg::Direct;
 
-            (String::new(), Cow::Borrowed(symmetric_key))
+            (String::new(), Zeroizing::new(symmetric_key.to_vec()))
         }
-        EncoderMode::Asymmetric(public_key) => {
-            // Currently, only rsa is supported
-            let rsa_public_key = RsaPublicKey::try_from(public_key)?;
+        EncoderMode::Asymmetric(public_key) => match &public_key.as_inner().subject_public_key {
+            RfcPublicKey::Rsa(_) => {
+                let rsa_public_key = RsaPublicKey::try_from(public_key)?;
 
-            let mut rng = rand::rngs::OsRng;
+                let padding = match jwe.header.alg {
+                    JweAlg::RsaPkcs1v15 => PaddingScheme::new_pkcs1v15_encrypt(),
+                    JweAlg::RsaOaep => PaddingScheme::new_oaep::<sha1::Sha1>(),
+                    JweAlg::RsaOaep256 => PaddingScheme::new_oaep::<sha2::Sha256>(),
+                    unsupported => {
+                        return Err(JweError::UnsupportedAlgorithm {
+                            algorithm: format!("{:?}", unsupported),
+                        })
+                    }
+                };
 
-            let mut symmetric_key = vec![0u8; header.enc.key_size()];
-            rng.fill_bytes(&mut symmetric_key);
+                let cek = generate_cek(jwe.header.enc);
 
-            let padding = match header.alg {
-                JweAlg::RsaPkcs1v15 => PaddingScheme::new_pkcs1v15_encrypt(),
-                JweAlg::RsaOaep => PaddingScheme::new_oaep::<sha1::Sha1>(),
-                JweAlg::RsaOaep256 => PaddingScheme::new_oaep::<sha2::Sha256>(),
-                unsupported => {
-                    return Err(JweError::UnsupportedAlgorithm {
-                        algorithm: format!("{:?}", unsupported),
-                    })
-                }
-            };
+                let encrypted_key = match rsa_public_key.encrypt(&mut rand::rngs::OsRng, padding, &cek) {
+                    Ok(encrypted_key) => encrypted_key,
+                    Err(err) => {
+                        return Err(err.into());
+                    }
+                };
 
-            let encrypted_key = rsa_public_key.encrypt(&mut rng, padding, &symmetric_key)?;
+                (general_purpose::URL_SAFE_NO_PAD.encode(encrypted_key), cek)
+            }
+            RfcPublicKey::Ec(_) | RfcPublicKey::Ed(_) => {
+                let JweEcdhEncryptionContext {
+                    jwe_cek,
+                    encrypted_key,
+                    epk,
+                } = prepare_ecdh_encryption_key(&jwe, public_key)?;
 
-            (
-                general_purpose::URL_SAFE_NO_PAD.encode(encrypted_key),
-                Cow::Owned(symmetric_key),
-            )
-        }
+                jwe.header.epk = Some(Jwk::from_public_key(&epk)?);
+                let encrypted_key_base64 = if encrypted_key.is_empty() {
+                    String::new()
+                } else {
+                    general_purpose::URL_SAFE_NO_PAD.encode(encrypted_key)
+                };
+
+                (encrypted_key_base64, jwe_cek)
+            }
+        },
     };
+
+    // Note that header could be modified by code above:
+    // - `alg` header could be overridden with "dir"
+    // - `epk` header could be set for ECDH-ES
+    let protected_header_base64 = general_purpose::URL_SAFE_NO_PAD.encode(serde_json::to_vec(&jwe.header)?);
 
     let mut buffer = jwe.payload;
     let nonce = <aes_gcm::aead::Nonce<Aes128Gcm> as From<[u8; 12]>>::from(rand::random()); // 96-bits nonce for all AES-GCM variants
     let aad = protected_header_base64.as_bytes(); // The Additional Authenticated Data value used for AES-GCM.
-    let authentication_tag = match header.enc {
+    let authentication_tag = match jwe.header.enc {
         JweEnc::Aes128Gcm => {
             Aes128Gcm::new(GenericArray::from_slice(&jwe_cek)).encrypt_in_place_detached(&nonce, aad, &mut buffer)?
         }
@@ -537,6 +723,66 @@ fn encode_impl(jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
     .join("."))
 }
 
+struct JweEcdhEncryptionContext {
+    jwe_cek: Zeroizing<Vec<u8>>,
+    encrypted_key: Vec<u8>,
+    epk: PublicKey,
+}
+
+fn prepare_ecdh_encryption_key(jwe: &Jwe, public_key: &PublicKey) -> Result<JweEcdhEncryptionContext, JweError> {
+    let header = &jwe.header;
+
+    let (encrypted_key, jwe_cek, epk) = match header.alg {
+        JweAlg::EcdhEs => {
+            // In case of ECDH Direct mode, we use JweEnc algorithm name for KDF
+            let alg_name = header.enc.name();
+            // Use DH shared secret as CEK
+            let (cek, epk) = generate_ecdh_shared_secret(
+                header.apu.as_deref(),
+                header.apv.as_deref(),
+                &alg_name,
+                public_key,
+                header.enc.key_size(),
+            )?;
+            // Encrypted key should be empty octet sequence in direct mode
+            (vec![], cek, epk)
+        }
+        JweAlg::EcdhEsAesKeyWrap128 | JweAlg::EcdhEsAesKeyWrap192 | JweAlg::EcdhEsAesKeyWrap256 => {
+            let alg_name = header.alg.name();
+
+            let wrapping_alg = header
+                .alg
+                .key_wrapping_alg()
+                .expect("BUG: ECDH-ES+AxKW algorithm should have a wrapping algorithm");
+
+            // Generate share key with size equal to wrapping algorithm key size
+            let (shared_secret, epk) = generate_ecdh_shared_secret(
+                header.apu.as_deref(),
+                header.apv.as_deref(),
+                &alg_name,
+                public_key,
+                wrapping_alg.key_size(),
+            )?;
+
+            let cek = generate_cek(header.enc);
+            let wrapped_key = wrapping_alg.encrypt_key(header.enc, &cek, &shared_secret)?;
+
+            (wrapped_key, cek, epk)
+        }
+        _ => {
+            return Err(JweError::UnsupportedAlgorithm {
+                algorithm: format!("Algorithm `{}` is not supported for EC & ED keys", header.alg.name()),
+            });
+        }
+    };
+
+    Ok(JweEcdhEncryptionContext {
+        jwe_cek,
+        encrypted_key,
+        epk,
+    })
+}
+
 // decoder
 
 #[derive(Clone)]
@@ -563,25 +809,34 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
         })?;
 
     let jwe_cek = match mode {
-        DecoderMode::Direct(symmetric_key) => Cow::Borrowed(symmetric_key),
-        DecoderMode::Normal(private_key) => {
-            let rsa_private_key = RsaPrivateKey::try_from(private_key)?;
+        DecoderMode::Direct(symmetric_key) => Zeroizing::new(symmetric_key.to_vec()),
+        DecoderMode::Normal(private_key) => match &private_key.as_kind() {
+            PrivateKeyKind::Rsa => {
+                let rsa_private_key = RsaPrivateKey::try_from(private_key)?;
 
-            let padding = match header.alg {
-                JweAlg::RsaPkcs1v15 => PaddingScheme::new_pkcs1v15_encrypt(),
-                JweAlg::RsaOaep => PaddingScheme::new_oaep::<sha1::Sha1>(),
-                JweAlg::RsaOaep256 => PaddingScheme::new_oaep::<sha2::Sha256>(),
-                unsupported => {
-                    return Err(JweError::UnsupportedAlgorithm {
-                        algorithm: format!("{:?}", unsupported),
-                    })
-                }
-            };
+                let padding = match header.alg {
+                    JweAlg::RsaPkcs1v15 => PaddingScheme::new_pkcs1v15_encrypt(),
+                    JweAlg::RsaOaep => PaddingScheme::new_oaep::<sha1::Sha1>(),
+                    JweAlg::RsaOaep256 => PaddingScheme::new_oaep::<sha2::Sha256>(),
+                    unsupported => {
+                        return Err(JweError::UnsupportedAlgorithm {
+                            algorithm: format!("{:?}", unsupported),
+                        })
+                    }
+                };
 
-            let decrypted_key = rsa_private_key.decrypt(padding, &encrypted_key)?;
+                Zeroizing::new(rsa_private_key.decrypt(padding, &encrypted_key)?)
+            }
+            PrivateKeyKind::Ec { .. } | PrivateKeyKind::Ed { .. } => {
+                let sender_public_key = header
+                    .epk
+                    .as_ref()
+                    .ok_or_else(|| JweError::MissingEpk)?
+                    .to_public_key()?;
 
-            Cow::Owned(decrypted_key)
-        }
+                prepare_ecdh_decryption_key(&header, &encrypted_key, &sender_public_key, private_key)?
+            }
+        },
     };
 
     if jwe_cek.len() != header.enc.key_size() {
@@ -643,11 +898,395 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
     })
 }
 
+fn prepare_ecdh_decryption_key(
+    header: &JweHeader,
+    encrypted_key: &[u8],
+    sender_public_key: &PublicKey,
+    receiver_private_key: &PrivateKey,
+) -> Result<Zeroizing<Vec<u8>>, JweError> {
+    let apu = header.apu.as_deref();
+    let apv = header.apv.as_deref();
+
+    match header.alg {
+        JweAlg::EcdhEs => {
+            let alg_name = header.enc.name();
+            // Use DH shared secret as CEK directly
+            calculate_ecdh_shared_secret(
+                apu,
+                apv,
+                &alg_name,
+                sender_public_key,
+                receiver_private_key,
+                header.enc.key_size(),
+            )
+        }
+        JweAlg::EcdhEsAesKeyWrap128 | JweAlg::EcdhEsAesKeyWrap192 | JweAlg::EcdhEsAesKeyWrap256 => {
+            let wrapping_alg = header
+                .alg
+                .key_wrapping_alg()
+                .expect("BUG: ECDH-ES+AxKW algorithm should have a wrapping algorithm");
+
+            let alg_name = header.alg.name();
+
+            // We need to unwrap CEK from encrypted key
+            let shared_secret = calculate_ecdh_shared_secret(
+                apu,
+                apv,
+                &alg_name,
+                sender_public_key,
+                receiver_private_key,
+                wrapping_alg.key_size(),
+            )?;
+
+            wrapping_alg.decrypt_key(header.enc, encrypted_key, &shared_secret)
+        }
+        _ => {
+            return Err(JweError::UnsupportedAlgorithm {
+                algorithm: format!("Algorithm `{}` is not supported for EC & ED keys", header.alg.name()),
+            });
+        }
+    }
+}
+
+/// Expands the shared secret into a key of the desired size using the ECDH Concat KDF
+fn ecdh_concat_kdf(
+    alg: &str,
+    shared_key_len: usize,
+    derived_key: &[u8],
+    apu: Option<&str>,
+    apv: Option<&str>,
+) -> Result<Zeroizing<Vec<u8>>, JweError> {
+    use sha2::{Digest, Sha256};
+
+    let apu = apu
+        .map(|val| general_purpose::URL_SAFE_NO_PAD.decode(val))
+        .transpose()?;
+
+    let apv = apv
+        .map(|val| general_purpose::URL_SAFE_NO_PAD.decode(val))
+        .transpose()?;
+
+    let div_ceiling = |a: usize, b: usize| (a + b - 1) / b;
+
+    // Size of the resulting key in BITS
+    let shared_key_len_bytes = ((shared_key_len * 8) as u32).to_be_bytes();
+
+    let alg = alg.as_bytes();
+    let alg_len_bytes = (alg.len() as u32).to_be_bytes();
+
+    let apu_len_bytes = apu.as_ref().map(|val| val.len() as u32).unwrap_or(0).to_be_bytes();
+    let apv_len_bytes = apv.as_ref().map(|val| val.len() as u32).unwrap_or(0).to_be_bytes();
+
+    let block_size = Sha256::output_size();
+
+    let count = div_ceiling(shared_key_len, block_size);
+    let mut shared_key = Zeroizing::new(Vec::with_capacity(block_size * count));
+
+    let mut hasher = Sha256::new();
+
+    for i in 0..count {
+        hasher.update(((i + 1) as u32).to_be_bytes());
+        hasher.update(derived_key);
+        hasher.update(alg_len_bytes);
+        hasher.update(alg);
+        hasher.update(apu_len_bytes);
+        if let Some(val) = apu.as_deref() {
+            hasher.update(val);
+        }
+        hasher.update(apv_len_bytes);
+        if let Some(val) = apv.as_deref() {
+            hasher.update(val);
+        }
+        hasher.update(shared_key_len_bytes);
+
+        shared_key.extend_from_slice(hasher.finalize_reset().as_slice());
+    }
+
+    if shared_key.len() > shared_key_len {
+        shared_key.truncate(shared_key_len);
+    }
+
+    // `sha2` crate currently doesn't perform any zeroize operations on finalization/reset, so we
+    // doing a hack here, messing up with internal state of the hasher to make its data useless
+    hasher.update(&shared_key);
+
+    Ok(shared_key)
+}
+
+/// Returns ECDH ephemeral public key and shared secret required to build encrypted JWE
+fn generate_ecdh_shared_secret(
+    apu: Option<&str>,
+    apv: Option<&str>,
+    alg: &str,
+    receiver_public_key: &PublicKey,
+    cek_key_len: usize,
+) -> Result<(Zeroizing<Vec<u8>>, PublicKey), JweError> {
+    use picky_asn1_x509::PublicKey as RfcPublicKey;
+
+    let (shared_secret, epk) = match &receiver_public_key.as_inner().subject_public_key {
+        RfcPublicKey::Ec(_) => {
+            use rand::rngs::OsRng;
+
+            let ec = EcdsaPublicKey::try_from(receiver_public_key)?;
+
+            match ec.curve() {
+                NamedEcCurve::Known(EcCurve::NistP256) => {
+                    let public_key = p256::PublicKey::from_sec1_bytes(ec.encoded_point()).map_err(|e| {
+                        let source = KeyError::EC {
+                            context: format!("Cannot parse p256 encoded point from bytes: {e}"),
+                        };
+                        JweError::Key { source }
+                    })?;
+
+                    let secret = p256::ecdh::EphemeralSecret::random(&mut OsRng);
+
+                    let shared_secret = Zeroizing::new(secret.diffie_hellman(&public_key).raw_secret_bytes().to_vec());
+                    let epk = PublicKey::from_ec_encoded_components(
+                        &NamedEcCurve::Known(EcCurve::NistP256).into(),
+                        secret.public_key().to_sec1_bytes().as_ref(),
+                    );
+
+                    (shared_secret, epk)
+                }
+                NamedEcCurve::Known(EcCurve::NistP384) => {
+                    let public_key = p384::PublicKey::from_sec1_bytes(ec.encoded_point()).map_err(|e| {
+                        let source = KeyError::EC {
+                            context: format!("Cannot parse p384 encoded point from bytes: {e}"),
+                        };
+                        JweError::Key { source }
+                    })?;
+
+                    let secret = p384::ecdh::EphemeralSecret::random(&mut OsRng);
+
+                    let shared_secret = Zeroizing::new(secret.diffie_hellman(&public_key).raw_secret_bytes().to_vec());
+                    let epk = PublicKey::from_ec_encoded_components(
+                        &NamedEcCurve::Known(EcCurve::NistP384).into(),
+                        secret.public_key().to_sec1_bytes().as_ref(),
+                    );
+
+                    (shared_secret, epk)
+                }
+                NamedEcCurve::Unsupported(oid) => {
+                    let source = KeyError::unsupported_curve(oid, "ECDH-ES JWE algorithm");
+                    return Err(JweError::Key { source });
+                }
+            }
+        }
+        RfcPublicKey::Ed(_) => {
+            let ed = EdPublicKey::try_from(receiver_public_key)?;
+
+            match ed.algorithm() {
+                NamedEdAlgorithm::Known(EdAlgorithm::X25519) => {
+                    use rand_ed::rngs::OsRng;
+
+                    let public_key_data: [u8; X25519_FIELD_ELEMENT_SIZE] = ed.data().try_into().map_err(|e| {
+                        let source = KeyError::ED {
+                            context: format!("Cannot parse x25519 encoded point from bytes: {e}"),
+                        };
+                        JweError::Key { source }
+                    })?;
+
+                    let public_key = x25519_dalek::PublicKey::from(public_key_data);
+
+                    let secret = x25519_dalek::EphemeralSecret::new(OsRng);
+
+                    let epk = PublicKey::from_ed_encoded_components(
+                        &EdAlgorithm::X25519.into(),
+                        x25519_dalek::PublicKey::from(&secret).as_bytes().as_slice(),
+                    );
+                    let shared_secret = Zeroizing::new(secret.diffie_hellman(&public_key).as_bytes().to_vec());
+
+                    (shared_secret, epk)
+                }
+                NamedEdAlgorithm::Known(EdAlgorithm::Ed25519) => {
+                    return Err(JweError::UnsupportedAlgorithm {
+                        algorithm: "Ed25519 can't be used for ECDH".to_string(),
+                    });
+                }
+                NamedEdAlgorithm::Unsupported(oid) => {
+                    let source = KeyError::unsupported_ed_algorithm(oid, "ECDH-ES JWE algorithm");
+                    return Err(JweError::Key { source });
+                }
+            }
+        }
+        RfcPublicKey::Rsa(_) => {
+            return Err(JweError::UnsupportedAlgorithm {
+                algorithm: format!("RSA key can't be used with `{:?}` algorithm", alg),
+            });
+        }
+    };
+
+    // Apply concact KDF to raw shared secret
+    Ok((ecdh_concat_kdf(alg, cek_key_len, &shared_secret, apu, apv)?, epk))
+}
+
+/// Calculates ECDH shared secret using given keys and jwe header fields
+fn calculate_ecdh_shared_secret(
+    apu: Option<&str>,
+    apv: Option<&str>,
+    alg: &str,
+    sender_public_key: &PublicKey,
+    receiver_private_key: &PrivateKey,
+    cek_key_len: usize,
+) -> Result<Zeroizing<Vec<u8>>, JweError> {
+    let shared_secret = match &receiver_private_key.as_kind() {
+        PrivateKeyKind::Ec { .. } => {
+            let private_key = EcdsaKeypair::try_from(receiver_private_key)?;
+
+            let public_key =
+                EcdsaPublicKey::try_from(sender_public_key).map_err(|source| JweError::KeyAlgorithmsMismatch {
+                    context: source.to_string(),
+                })?;
+
+            if private_key.curve() != public_key.curve() {
+                return Err(JweError::KeyAlgorithmsMismatch {
+                    context: format!(
+                        "Receiver key have EC curve `{}`, but sender key have `{}` curve",
+                        private_key.curve(),
+                        public_key.curve()
+                    ),
+                });
+            }
+
+            match private_key.curve() {
+                NamedEcCurve::Known(EcCurve::NistP256) => {
+                    let public_key = p256::PublicKey::from_sec1_bytes(public_key.encoded_point()).map_err(|e| {
+                        let source = KeyError::EC {
+                            context: format!("Cannot parse p256 encoded point from bytes: {e}"),
+                        };
+                        JweError::Key { source }
+                    })?;
+
+                    let secret_bytes_validated =
+                        EcCurve::NistP256.validate_component(EcComponent::Secret(private_key.secret()))?;
+
+                    let secret = p256::SecretKey::from_bytes(
+                        p256::elliptic_curve::generic_array::GenericArray::from_slice(secret_bytes_validated),
+                    )
+                    .map_err(|e| KeyError::EC {
+                        context: format!("Cannot parse p256 secret from bytes: {e}"),
+                    })?;
+
+                    // p256 crate doesn't have high level API for static ECDH secrets
+                    let shared_secret =
+                        p256::elliptic_curve::ecdh::diffie_hellman(secret.to_nonzero_scalar(), public_key.as_affine())
+                            .raw_secret_bytes()
+                            .to_vec();
+
+                    Zeroizing::new(shared_secret)
+                }
+                NamedEcCurve::Known(EcCurve::NistP384) => {
+                    let public_key = p384::PublicKey::from_sec1_bytes(public_key.encoded_point()).map_err(|e| {
+                        let source = KeyError::EC {
+                            context: format!("Cannot parse p384 encoded point from bytes: {e}"),
+                        };
+                        JweError::Key { source }
+                    })?;
+
+                    let secret_bytes_validated =
+                        EcCurve::NistP384.validate_component(EcComponent::Secret(private_key.secret()))?;
+
+                    let secret = p384::SecretKey::from_bytes(
+                        p384::elliptic_curve::generic_array::GenericArray::from_slice(secret_bytes_validated),
+                    )
+                    .map_err(|e| KeyError::EC {
+                        context: format!("Cannot parse p384 secret from bytes: {e}"),
+                    })?;
+
+                    // p384 crate doesn't have high level API for static ECDH secrets
+                    let shared_secret =
+                        p384::elliptic_curve::ecdh::diffie_hellman(secret.to_nonzero_scalar(), public_key.as_affine())
+                            .raw_secret_bytes()
+                            .to_vec();
+
+                    Zeroizing::new(shared_secret)
+                }
+                NamedEcCurve::Unsupported(oid) => {
+                    let source = KeyError::unsupported_curve(oid, "ECDH-ES JWE algorithm");
+                    return Err(JweError::Key { source });
+                }
+            }
+        }
+        PrivateKeyKind::Ed { .. } => {
+            let public_key = EdPublicKey::try_from(sender_public_key).map_err(|source| JweError::Key { source })?;
+
+            let private_key =
+                EdKeypair::try_from(receiver_private_key).map_err(|source| JweError::KeyAlgorithmsMismatch {
+                    context: source.to_string(),
+                })?;
+
+            if private_key.algorithm() != public_key.algorithm() {
+                return Err(JweError::KeyAlgorithmsMismatch {
+                    context: format!(
+                        "Receiver key have ED algorithm `{}`, but sender key have `{}` algorithm",
+                        private_key.algorithm(),
+                        public_key.algorithm()
+                    ),
+                });
+            }
+
+            match private_key.algorithm() {
+                NamedEdAlgorithm::Known(EdAlgorithm::X25519) => {
+                    let public_key_data: [u8; X25519_FIELD_ELEMENT_SIZE] =
+                        public_key.data().try_into().map_err(|e| {
+                            let source = KeyError::ED {
+                                context: format!("Cannot parse x25519 encoded point from bytes: {e}"),
+                            };
+                            JweError::Key { source }
+                        })?;
+
+                    let public_key = x25519_dalek::PublicKey::from(public_key_data);
+
+                    let private_key_data: [u8; X25519_FIELD_ELEMENT_SIZE] =
+                        private_key.secret().try_into().map_err(|e| {
+                            let source = KeyError::ED {
+                                context: format!("Cannot parse x25519 secret from bytes: {e}"),
+                            };
+                            JweError::Key { source }
+                        })?;
+
+                    let secret = x25519_dalek::StaticSecret::from(private_key_data);
+
+                    let shared_secret = secret.diffie_hellman(&public_key).as_bytes().to_vec();
+
+                    Zeroizing::new(shared_secret)
+                }
+                NamedEdAlgorithm::Known(EdAlgorithm::Ed25519) => {
+                    return Err(JweError::UnsupportedAlgorithm {
+                        algorithm: "Ed25519 can't be used for ECDH".to_string(),
+                    });
+                }
+                NamedEdAlgorithm::Unsupported(oid) => {
+                    return Err(KeyError::unsupported_ed_algorithm(oid, "ECDH-ES JWE algorithm").into());
+                }
+            }
+        }
+        PrivateKeyKind::Rsa => {
+            return Err(JweError::UnsupportedAlgorithm {
+                algorithm: format!("RSA key can't be used with `{:?}` algorithm", alg),
+            });
+        }
+    };
+
+    // Apply concact KDF to raw shared secret
+    ecdh_concat_kdf(alg, cek_key_len, &shared_secret, apu, apv)
+}
+
+/// Generate content encryption key (CEK) for given algorithm and wraps it with zeroize-on-drop container
+fn generate_cek(alg: JweEnc) -> Zeroizing<Vec<u8>> {
+    let mut cek = Zeroizing::new(vec![0u8; alg.key_size()]);
+    let mut rng = rand::rngs::OsRng;
+    rng.fill_bytes(&mut cek);
+    cek
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::key::PrivateKey;
     use crate::pem::Pem;
+    use crate::test_files;
+    use rstest::rstest;
 
     fn get_private_key_1() -> PrivateKey {
         let pk_pem = crate::test_files::RSA_2048_PK_1.parse::<Pem>().unwrap();
@@ -789,5 +1428,53 @@ mod tests {
         );
 
         assert_eq!(token, "eyJhbGciOiJSU0EtT0FFUCIsImVuYyI6IkEyNTZHQ00ifQ.OKOawDo13gRp2ojaHV7LFpZcgV7T6DVZKTyKOMTYUmKoTCVJRgckCL9kiMT03JGeipsEdY3mx_etLbbWSrFr05kLzcSr4qKAq7YN7e9jwQRb23nfa6c9d-StnImGyFDbSv04uVuxIp5Zms1gNxKKK2Da14B8S4rzVRltdYwam_lDp5XnZAYpQdb76FdIKLaVmqgfwX7XWRxv2322i-vDxRfqNzo_tETKzpVLzfiwQyeyPGLBIO56YJ7eObdv0je81860ppamavo35UgoRdbYaBcoh9QcfylQr66oc6vFWXRcZ_ZT2LawVCWTIy3brGPi6UklfCpIMfIjf7iGdXKHzg.48V1_ALb6US04U3b.5eym8TW_c8SuK0ltJ3rpYIzOeDQz7TALvtu6UG9oMo4vpzs9tX_EFShS8iB7j6jiSdiwkIr3ajwQzaBtQD_A.XFBoMYUZodetZdvTiFvSkQ");
+    }
+
+    #[rstest]
+    // Different asymmetrical keys and different symmetrical key sizes
+    #[case(test_files::EC_NIST256_PK_1, JweAlg::EcdhEs, JweEnc::Aes256Gcm)]
+    #[case(test_files::EC_NIST384_PK_1, JweAlg::EcdhEs, JweEnc::Aes192Gcm)]
+    #[case(test_files::X25519_PEM_PK_1, JweAlg::EcdhEs, JweEnc::Aes128Gcm)]
+    // With key wrapping
+    #[case(test_files::X25519_PEM_PK_1, JweAlg::EcdhEsAesKeyWrap128, JweEnc::Aes256Gcm)]
+    #[case(test_files::EC_NIST256_PK_1, JweAlg::EcdhEsAesKeyWrap128, JweEnc::Aes128Gcm)]
+    #[case(test_files::EC_NIST384_PK_1, JweAlg::EcdhEsAesKeyWrap192, JweEnc::Aes256Gcm)]
+    #[case(test_files::X25519_PEM_PK_1, JweAlg::EcdhEsAesKeyWrap192, JweEnc::Aes128Gcm)]
+    #[case(test_files::EC_NIST256_PK_1, JweAlg::EcdhEsAesKeyWrap256, JweEnc::Aes256Gcm)]
+    #[case(test_files::X25519_PEM_PK_1, JweAlg::EcdhEsAesKeyWrap256, JweEnc::Aes128Gcm)]
+    fn jwe_ecdh_es_roundtrip(#[case] key_pem: &str, #[case] alg: JweAlg, #[case] enc: JweEnc) {
+        let private = PrivateKey::from_pem_str(key_pem).unwrap();
+        let public = private.to_public_key().unwrap();
+
+        let payload = b"Hello, world!".to_vec();
+
+        let encoded = Jwe::new(alg, enc, payload.clone())
+            .encode(&public)
+            .expect("JWE encode failed");
+
+        let decoded = Jwe::decode(&encoded, &private).expect("JWE decode failed");
+
+        assert_eq!(decoded.payload, payload);
+    }
+
+    #[rstest]
+    #[case(test_files::JOSE_JWE_GCM256_EC_P256_ECDH, test_files::EC_NIST256_PK_1)]
+    #[case(test_files::JOSE_JWE_GCM128_EC_P384_ECDH_KW192, test_files::EC_NIST384_PK_1)]
+    fn picky_understands_jwcrypto(#[case] token: &str, #[case] key_pem: &str) {
+        // Tokens were generated via `jwcrypto` library. To generate tokens use the following
+        // code snippet:
+        // ```python
+        // from jwcrypto import jwe, jwk
+        // from jwcrypto.common import json_encode
+        // pem = "<PEM_DATA>"
+        // jwk = jwk.JWK.from_pem(pem)
+        // jwe = jwe.JWE(b'Hello world!', json_encode({'alg': 'ECDH-ES+A256KW', 'enc': 'A192GCM'}))
+        // jwe.add_recipient(jwk)
+        // print(jwe.serialize(compact=True))
+        // ```
+
+        let private = PrivateKey::from_pem_str(key_pem).unwrap();
+        let decoded = Jwe::decode(token, &private).expect("JWE decode failed");
+        assert_eq!(String::from_utf8(decoded.payload).unwrap(), "Hello world!");
     }
 }

@@ -699,7 +699,7 @@ impl PrivateKey {
         &self.inner
     }
 
-    #[cfg(feature = "ssh")]
+    #[cfg(any(feature = "ssh", feature = "jose"))]
     pub(crate) fn as_kind(&self) -> &PrivateKeyKind {
         &self.kind
     }
