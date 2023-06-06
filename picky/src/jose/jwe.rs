@@ -8,7 +8,7 @@ use crate::key::ed::{EdKeypair, EdPublicKey, NamedEdAlgorithm, X25519_FIELD_ELEM
 use crate::key::{EcCurve, EdAlgorithm, KeyError, PrivateKey, PrivateKeyKind, PublicKey};
 
 use aes_gcm::aead::generic_array::typenum::Unsigned;
-use aes_gcm::{AeadInPlace, Aes128Gcm, Aes256Gcm, NewAead};
+use aes_gcm::{AeadInPlace, Aes128Gcm, Aes256Gcm, KeyInit, KeySizeUser};
 use base64::{engine::general_purpose, DecodeError, Engine as _};
 use digest::generic_array::GenericArray;
 use rand::RngCore;
@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use thiserror::Error;
 use zeroize::Zeroizing;
 
-type Aes192Gcm = aes_gcm::AesGcm<aes_gcm::aes::Aes192, aes_gcm::aead::generic_array::typenum::U12>;
+type Aes192Gcm = aes_gcm::AesGcm<aes_gcm::aes::Aes192, aes_gcm::aes::cipher::consts::U12>;
 
 // === error type === //
 
@@ -27,7 +27,7 @@ type Aes192Gcm = aes_gcm::AesGcm<aes_gcm::aes::Aes192, aes_gcm::aead::generic_ar
 #[non_exhaustive]
 pub enum JweError {
     /// JWK conversion error
-    #[error("JWK conversion error: {source}")]
+    #[error("JWK conversion error")]
     Jwk {
         #[from]
         source: JwkError,
@@ -42,11 +42,8 @@ pub enum JweError {
     AesGcm,
 
     /// AES-KW error
-    #[error("AES-KW error: {context}")]
-    AesKw {
-        // `aes_kw::Error` does not implement `std::error::Error`, so we can't use `source` here
-        context: aes_kw::Error,
-    },
+    #[error("AES-KW error")]
+    AesKw { source: aes_kw::Error },
 
     /// Json error
     #[error("JSON error: {source}")]
@@ -83,13 +80,13 @@ pub enum JweError {
         got: usize,
     },
 
-    #[error("Private and public key algorithms don't match: {context}")]
+    #[error("private and public key algorithms don't match: {context}")]
     KeyAlgorithmsMismatch { context: String },
 
-    #[error("Missing `epk` header parameter required for ECDH-ES algorithm")]
+    #[error("missing `epk` header parameter required for ECDH-ES algorithm")]
     MissingEpk,
 
-    #[error("Invalid encrypted key size: expected {expected}, got {got}")]
+    #[error("invalid encrypted key size: expected {expected}, got {got}")]
     InvalidEncryptedKeySize { expected: usize, got: usize },
 }
 
@@ -125,7 +122,7 @@ impl From<DecodeError> for JweError {
 
 impl From<aes_kw::Error> for JweError {
     fn from(e: aes_kw::Error) -> Self {
-        Self::AesKw { context: e }
+        Self::AesKw { source: e }
     }
 }
 
@@ -219,7 +216,8 @@ impl KeyWrappingAlg {
 
     /// Decrypts wrapped CEK using the given AES decryption key
     ///
-    /// SAFETY:
+    /// ### Invariants:
+    ///
     ///   - Caller must unsure `decryption_key` size matches the wrapping algorithm
     fn decrypt_key(
         &self,
@@ -257,7 +255,8 @@ impl KeyWrappingAlg {
 
     /// Encrypts the given CEK using the given AES encryption key
     ///
-    /// SAFETY:
+    /// ### Invariants:
+    ///
     ///   - Caller must ensure `encryption_key` size matches the wrapping algorithm
     fn encrypt_key(&self, cek_alg: JweEnc, cek: &[u8], encryption_key: &[u8]) -> Result<Vec<u8>, JweError> {
         let mut wrapped_key = vec![0u8; cek_alg.key_size() + aes_kw::IV_LEN];
@@ -359,9 +358,9 @@ impl JweEnc {
 
     pub fn key_size(self) -> usize {
         match self {
-            Self::Aes128CbcHmacSha256 | Self::Aes128Gcm => <Aes128Gcm as NewAead>::KeySize::to_usize(),
-            Self::Aes192CbcHmacSha384 | Self::Aes192Gcm => <Aes192Gcm as NewAead>::KeySize::to_usize(),
-            Self::Aes256CbcHmacSha512 | Self::Aes256Gcm => <Aes256Gcm as NewAead>::KeySize::to_usize(),
+            Self::Aes128CbcHmacSha256 | Self::Aes128Gcm => <Aes128Gcm as KeySizeUser>::KeySize::to_usize(),
+            Self::Aes192CbcHmacSha384 | Self::Aes192Gcm => <Aes192Gcm as KeySizeUser>::KeySize::to_usize(),
+            Self::Aes256CbcHmacSha512 | Self::Aes256Gcm => <Aes256Gcm as KeySizeUser>::KeySize::to_usize(),
         }
     }
 

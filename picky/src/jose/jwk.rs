@@ -30,13 +30,13 @@ pub enum JwkError {
     #[error("unsupported algorithm: {algorithm}")]
     UnsupportedAlgorithm { algorithm: &'static str },
 
-    #[error("Invalid ec public key: {cause}")]
+    #[error("invalid ec public key: {cause}")]
     InvalidEcPublicKey { cause: String },
 
-    #[error("Invalid ec point coordinates in JWK")]
+    #[error("invalid ec point coordinates in JWK")]
     InvalidEcPointCoordinates,
 
-    #[error("Invalid ed public key: {cause}")]
+    #[error("invalid ed public key: {cause}")]
     InvalidEdPublicKey { cause: String },
 }
 
