@@ -216,7 +216,7 @@ impl KeyWrappingAlg {
 
     /// Decrypts wrapped CEK using the given AES decryption key
     ///
-    /// ### Invariants:
+    /// ### Panics:
     ///
     ///   - Caller must unsure `decryption_key` size matches the wrapping algorithm
     fn decrypt_key(
@@ -255,7 +255,7 @@ impl KeyWrappingAlg {
 
     /// Encrypts the given CEK using the given AES encryption key
     ///
-    /// ### Invariants:
+    /// ### Panics:
     ///
     ///   - Caller must ensure `encryption_key` size matches the wrapping algorithm
     fn encrypt_key(&self, cek_alg: JweEnc, cek: &[u8], encryption_key: &[u8]) -> Result<Vec<u8>, JweError> {
