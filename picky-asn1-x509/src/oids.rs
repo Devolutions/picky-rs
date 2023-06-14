@@ -64,8 +64,9 @@ define_oid! {
     EMAIL_ADDRESS => email_address => "1.2.840.113549.1.9.1", // deprecated
     EXTENSION_REQ => extension_request => "1.2.840.113549.1.9.14",
 
-    // pkcs7
-    PKCS7 => pkcs7 => "1.2.840.113549.1.7.1",
+    // PKCS#7
+    CONTENT_INFO_TYPE_DATA => content_info_type_data => "1.2.840.113549.1.7.1",
+    CONTENT_INFO_TYPE_ENCRYPTED_DATA => content_info_type_encrypted_data => "1.2.840.113549.1.7.6",
     SIGNED_DATA => signed_data => "1.2.840.113549.1.7.2",
     CONTENT_TYPE => content_type => "1.2.840.113549.1.9.3",
     MESSAGE_DIGEST => message_digest => "1.2.840.113549.1.9.4",
@@ -168,7 +169,13 @@ define_oid! {
     AES256_WRAP_PAD => aes256_wrap_pad => "2.16.840.1.101.3.4.1.48",
 
     // hash algorithm
+    DIGEST_ALGORITHM => digest_algorithm => "1.2.840.113549.2",
     MD5 => md5 => "1.2.840.113549.2.5",
+    HMAC_WITH_SHA1 => hmac_with_sha1 => "1.2.840.113549.2.7",
+    HMAC_WITH_SHA224 => hmac_with_sha224 => "1.2.840.113549.2.8",
+    HMAC_WITH_SHA256 => hmac_with_sha256 => "1.2.840.113549.2.9",
+    HMAC_WITH_SHA384 => hmac_with_sha384 => "1.2.840.113549.2.10",
+    HMAC_WITH_SHA512 => hmac_with_sha512 => "1.2.840.113549.2.11",
     SHA1 => sha1 => "1.3.14.3.2.26",
     SHA256 => sha256 => "2.16.840.1.101.3.4.2.1",
     SHA384 => sha384 => "2.16.840.1.101.3.4.2.2",
@@ -234,4 +241,27 @@ define_oid! {
     // http://oid-info.com/get/1.3.6.1.5.2.3.2
     // id-pkinit-DHKeyData
     PKINIT_DH_KEY_DATA => kpinit_dh_key_data => "1.3.6.1.5.2.3.2",
+
+    // PKCS#12
+    PKCS12_PBE_WITH_SHA_AND_3_KEY_TRIPLE_DES_CBC => pkcs12_pbe_with_sha_and_3_key_triple_des_cbc => "1.2.840.113549.1.12.1.3",
+    PKCS12_PBE_WITH_SHA_AND_40_BIT_RC2_CBC => pkcs12_pbe_with_sha_and_40_bit_rc2_cbc => "1.2.840.113549.1.12.1.6",
+    // Defined in PKCS#12 but starts with pkcs#9 prefix (crlTypes)
+    CRL_SAFE_BAG_TYPE_X509 => crl_safe_bag_type_x509 => "1.2.840.113549.1.9.23.1",
+    // Defined in PKCS#12 but starts with pkcs#9 prefix (certTypes)
+    CERT_SAFE_BAG_TYPE_X509 => cert_safe_bag_type_x509 => "1.2.840.113549.1.9.22.1",
+    // SafeBag types
+    SAFE_BAG_TYPE_KEY => safe_bag_type_key => "1.2.840.113549.1.12.10.1.1",
+    SAFE_BAG_TYPE_SHROUDED_KEY => safe_bag_type_shrouded_key => "1.2.840.113549.1.12.10.1.2",
+    SAFE_BAG_TYPE_CERT => safe_bag_type_cert => "1.2.840.113549.1.12.10.1.3",
+    SAFE_BAG_TYPE_CRL => safe_bag_type_crl => "1.2.840.113549.1.12.10.1.4",
+    SAFE_BAG_TYPE_SECRET => safe_bag_type_secret => "1.2.840.113549.1.12.10.1.5",
+    SAFE_BAG_TYPE_SAFE_CONTENTS => safe_bag_type_safe_contents => "1.2.840.113549.1.12.10.1.6",
+
+    // PKCS#5
+    PBKDF2 => pbkdf2 => "1.2.840.113549.1.5.12",
+    PBES2 => pbes2 => "1.2.840.113549.1.5.13",
+
+    // PKCS#9
+    ATTRIBUTE_PKCS12_FRIENDLY_NAME => attribute_pkcs12_friendly_name => "1.2.840.113549.1.9.20",
+    ATTRIBUTE_PKCS12_LOCAL_KEY_ID => attribute_pkcs12_local_key_id => "1.2.840.113549.1.9.21",
 }

@@ -1,3 +1,4 @@
+use core::fmt;
 use serde::{Deserialize, Serialize};
 
 /// User-provided raw DER wrapper.
@@ -52,11 +53,21 @@ use serde::{Deserialize, Serialize};
 /// let deserialized_b: B = picky_asn1_der::from_bytes(&serialized_a).expect("B from bytes");
 /// assert_eq!(deserialized_b, plain_b);
 /// ```
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, PartialOrd, Hash, Clone)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, PartialOrd, Hash, Clone)]
 pub struct Asn1RawDer(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
 impl Asn1RawDer {
     pub const NAME: &'static str = "Asn1RawDer";
+}
+
+impl fmt::Debug for Asn1RawDer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "RawDer(0x")?;
+        self.0.iter().try_for_each(|byte| write!(f, "{byte:02X}"))?;
+        write!(f, ")")?;
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]

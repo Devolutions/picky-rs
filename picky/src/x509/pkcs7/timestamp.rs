@@ -138,7 +138,7 @@ impl TimestampRequest {
         Self(picky_asn1_x509::timestamp::TimestampRequest {
             countersignature_type: oids::timestamp_request().into(),
             content: EncapsulatedContentInfo {
-                content_type: oids::pkcs7().into(),
+                content_type: oids::content_info_type_data().into(),
                 content: Some(ContentValue::Data(digest.into()).into()),
             },
         })

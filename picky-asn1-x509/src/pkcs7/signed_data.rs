@@ -244,7 +244,7 @@ mod tests {
         check_serde!(digest_algorithm_identifiers: DigestAlgorithmIdentifiers in pkcs7[26..28]);
 
         let content_info = EncapsulatedContentInfo {
-            content_type: ObjectIdentifierAsn1::from(oids::pkcs7()),
+            content_type: ObjectIdentifierAsn1::from(oids::content_info_type_data()),
             content: None,
         };
 

@@ -5,6 +5,7 @@ use picky_asn1::wrapper::ExplicitContextTag0;
 use picky_asn1::wrapper::ExplicitContextTag1;
 use picky_asn1::wrapper::ExplicitContextTag2;
 use picky_asn1::wrapper::{IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1};
+use picky_asn1_der::Asn1RawDer;
 use serde::{de, ser, Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::error::Error;
@@ -938,6 +939,94 @@ pub struct DigestInfo {
     pub digest: OctetStringAsn1,
 }
 
+/// Raw representation of `AlgorithmIdentifier` ASN.1 type to allow parsing unknown algorithms.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RawAlgorithmIdentifier {
+    algorithm: ObjectIdentifier,
+    /// Parameters here are defined in X509 as follows:
+    /// ```not_rust
+    /// parameters ANY DEFINED BY algorithm OPTIONAL
+    /// ```
+    /// therefore we will parse it as raw DER and allow user to parse it later.
+    parameters: Option<Asn1RawDer>,
+}
+
+impl RawAlgorithmIdentifier {
+    /// Create new `RawAlgorithmIdentifier` from algorithm OID and optional parameters.
+    pub fn from_parts(algorithm: ObjectIdentifier, parameters: Option<Asn1RawDer>) -> Self {
+        let parameters = parameters.and_then(|raw| {
+            // `params` field is always present and set to NULL if no parameters are needed.
+            // therefore, we need special handling to show absence of parameters in
+            // `RawAlgorithmIdentifier` API
+            if raw.0 == [0x05, 0x00] {
+                None
+            } else {
+                Some(raw)
+            }
+        });
+
+        Self { algorithm, parameters }
+    }
+
+    pub fn algorithm(&self) -> &ObjectIdentifier {
+        &self.algorithm
+    }
+
+    pub fn parameters(&self) -> Option<&Asn1RawDer> {
+        self.parameters.as_ref()
+    }
+}
+
+impl ser::Serialize for RawAlgorithmIdentifier {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        use ser::SerializeSeq;
+
+        let mut seq = serializer.serialize_seq(Some(2))?;
+        let oid = ObjectIdentifierAsn1(self.algorithm.clone());
+        seq.serialize_element(&oid)?;
+        if let Some(parameters) = &self.parameters {
+            seq.serialize_element(parameters)?;
+        } else {
+            // NULL should be still serialized to AlgortihmIdentifier even if params are absent
+            seq.serialize_element(&())?;
+        }
+        seq.end()
+    }
+}
+
+impl<'de> de::Deserialize<'de> for RawAlgorithmIdentifier {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct RawAlgorithmIdentifierVisitor;
+
+        impl<'de> de::Visitor<'de> for RawAlgorithmIdentifierVisitor {
+            type Value = RawAlgorithmIdentifier;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("a valid DER-encoded RawAlgorithmIdentifier")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let oid: ObjectIdentifierAsn1 = seq_next_element!(seq, RawAlgorithmIdentifier, "raw algorithm oid");
+
+                let algorithm = oid.0;
+                let parameters: Option<Asn1RawDer> = seq.next_element::<Asn1RawDer>()?;
+                Ok(RawAlgorithmIdentifier::from_parts(algorithm, parameters))
+            }
+        }
+
+        deserializer.deserialize_seq(RawAlgorithmIdentifierVisitor)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1083,4 +1172,22 @@ mod tests {
             concat!("deserialized ", stringify!($item), " doesn't match")
         );
     }
+
+    #[test]
+    fn raw_algorithm_roundtrip() {
+        let encoded = [
+            0x30, 0x0C, 0x06, 0x08, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x02, 0x09, 0x05, 0x00,
+        ];
+
+        let decoded: RawAlgorithmIdentifier =
+            picky_asn1_der::from_bytes(&encoded).expect("failed RawAlgorithmIdentifier deserialization");
+
+        let expected = RawAlgorithmIdentifier::from_parts(oids::hmac_with_sha256(), None);
+
+        pretty_assertions::assert_eq!(decoded, expected);
+
+        check_serde!(decoded: RawAlgorithmIdentifier in encoded);
+    }
+
+    // TODO PACMANCODER: Add test with parameters set to some value
 }

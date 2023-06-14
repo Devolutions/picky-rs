@@ -58,7 +58,7 @@ pub struct EncapsulatedContentInfo {
 impl EncapsulatedContentInfo {
     pub fn new_pkcs7_data(data: Option<Vec<u8>>) -> Self {
         Self {
-            content_type: oids::pkcs7().into(),
+            content_type: oids::content_info_type_data().into(),
             content: data.map(|data| ContentValue::Data(data.into()).into()),
         }
     }
@@ -107,7 +107,7 @@ impl<'de> de::Deserialize<'de> for EncapsulatedContentInfo {
                         )
                         .into(),
                     ),
-                    oids::PKCS7 => seq
+                    oids::CONTENT_INFO_TYPE_DATA => seq
                         .next_element::<ExplicitContextTag0<OctetStringAsn1>>()?
                         .map(|value| ExplicitContextTag0(ContentValue::Data(value.0))),
                     #[cfg(feature = "ctl")]

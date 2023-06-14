@@ -14,7 +14,7 @@ use std::fmt;
 ///      signatureAlgorithm   AlgorithmIdentifier,
 ///      signatureValue       BIT STRING  }
 /// ```
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Certificate {
     pub tbs_certificate: TbsCertificate,
     pub signature_algorithm: AlgorithmIdentifier,
@@ -77,7 +77,7 @@ impl Certificate {
 ///                           -- If present, version MUST be v3
 ///      }
 /// ```
-#[derive(Serialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct TbsCertificate {
     #[serde(skip_serializing_if = "version_is_default")]
     pub version: ExplicitContextTag0<Version>,

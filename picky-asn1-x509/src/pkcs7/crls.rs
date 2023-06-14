@@ -118,7 +118,7 @@ impl<'de> Deserialize<'de> for RevocationInfoChoice {
 ///         signatureValue       BIT STRING  }
 ///
 /// ```
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct CertificateList {
     pub tbs_cert_list: TbsCertList,
     pub signature_algorithm: AlgorithmIdentifier,
@@ -144,7 +144,7 @@ pub struct CertificateList {
 ///                                       -- if present, version MUST be v2
 ///                                 }
 /// ```
-#[derive(Serialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Debug, PartialEq, Eq, Clone)]
 pub struct TbsCertList {
     pub version: Option<Version>,
     pub signature: AlgorithmIdentifier,
@@ -214,10 +214,10 @@ impl<'de> de::Deserialize<'de> for TbsCertList {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, PartialEq, Clone)]
+#[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
 pub struct RevokedCertificates(pub Asn1SequenceOf<RevokedCertificate>);
 
-#[derive(Serialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Debug, PartialEq, Eq, Clone)]
 pub struct RevokedCertificate {
     pub user_certificate: CertificateSerialNumber,
     pub revocation_data: Time,
