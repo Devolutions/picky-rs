@@ -202,7 +202,7 @@ mod tests {
     // "Close enough" UTF8 -> UCS2 conversion for testing purposes (works only with ASCII)
     fn utf8_to_ucs2(s: &str) -> Vec<u8> {
         let acc = Vec::with_capacity(s.len() * 2);
-        s.as_bytes().into_iter().copied().fold(acc, |mut acc, c| {
+        s.as_bytes().iter().copied().fold(acc, |mut acc, c| {
             acc.extend_from_slice(&[0, c]);
             acc
         })
