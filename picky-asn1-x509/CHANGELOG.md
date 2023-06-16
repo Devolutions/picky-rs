@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
-## [0.10.0] 2023-06-01 (Unreleased)
+### Added
+- PKCS12 module
+
+### Changed
+- Renamed `oids::pkcs7` to correct `oids::content_info_type_data`
+
+## [0.10.0] 2023-06-15
 
 ### Fixed
 
