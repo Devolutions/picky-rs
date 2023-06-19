@@ -47,7 +47,7 @@ impl Attribute {
     pub fn new_content_type_pkcs7() -> Self {
         Self {
             ty: oids::content_type().into(),
-            value: AttributeValues::ContentType(vec![oids::pkcs7().into()].into()),
+            value: AttributeValues::ContentType(vec![oids::content_info_type_data().into()].into()),
         }
     }
 

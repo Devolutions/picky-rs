@@ -9,11 +9,11 @@ use serde::{de, ser, Deserialize, Serialize};
 use std::fmt;
 
 /// [RFC 5280 #4.1.2.9](https://tools.ietf.org/html/rfc5280#section-4.1.2.9)
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Extensions(pub Vec<Extension>);
 
 /// [RFC 5280 #4.1.2.9](https://tools.ietf.org/html/rfc5280#section-4.1.2.9)
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Extension {
     extn_id: ObjectIdentifierAsn1,
     critical: Optional<bool>,
@@ -279,7 +279,7 @@ impl<'a> From<&'a ExtensionValue> for ExtensionView<'a> {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 enum ExtensionValue {
     AuthorityKeyIdentifier(OctetStringAsn1Container<AuthorityKeyIdentifier>),
     SubjectKeyIdentifier(OctetStringAsn1Container<SubjectKeyIdentifier>),

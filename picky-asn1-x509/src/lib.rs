@@ -10,6 +10,8 @@ pub mod directory_string;
 pub mod extension;
 pub mod name;
 pub mod oids;
+#[cfg(feature = "pkcs12")]
+pub mod pkcs12;
 #[cfg(feature = "pkcs7")]
 pub mod pkcs7;
 pub mod private_key_info;
