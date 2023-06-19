@@ -23,7 +23,6 @@ use serde::{de, ser};
 ///     ... -- For future extensions
 /// }
 /// ```
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CertificateBag {
     /// Encapsulated `Certificate` ASN.1 structure inside `OctetString` container

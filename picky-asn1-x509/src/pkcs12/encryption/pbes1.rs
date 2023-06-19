@@ -29,7 +29,6 @@ impl From<Pbes1AlgorithmKind> for ObjectIdentifier {
 ///     iterations  INTEGER
 /// }
 /// ```
-
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Pbes1Params {
     pub salt: OctetStringAsn1,

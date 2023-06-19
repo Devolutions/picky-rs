@@ -36,7 +36,7 @@ impl ser::Serialize for AuthenticatedSafeContentInfo {
                 seq.end()
             }
             AuthenticatedSafeContentInfo::Unknown { content_type, content } => {
-                let sequence_length = 1 + content.is_some() as usize;
+                let sequence_length = 1 + usize::from(content.is_some());
                 let mut seq = serializer.serialize_seq(Some(sequence_length))?;
                 let oid: ObjectIdentifierAsn1 = content_type.clone().into();
                 seq.serialize_element(&oid)?;

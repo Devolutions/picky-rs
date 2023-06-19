@@ -1174,20 +1174,29 @@ mod tests {
     }
 
     #[test]
-    fn raw_algorithm_roundtrip() {
+    fn raw_algorithm_roundtrip_no_params() {
         let encoded = [
             0x30, 0x0C, 0x06, 0x08, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x02, 0x09, 0x05, 0x00,
         ];
-
-        let decoded: RawAlgorithmIdentifier =
-            picky_asn1_der::from_bytes(&encoded).expect("failed RawAlgorithmIdentifier deserialization");
-
+        let decoded: RawAlgorithmIdentifier = picky_asn1_der::from_bytes(&encoded).unwrap();
         let expected = RawAlgorithmIdentifier::from_parts(oids::hmac_with_sha256(), None);
-
         pretty_assertions::assert_eq!(decoded, expected);
-
         check_serde!(decoded: RawAlgorithmIdentifier in encoded);
     }
 
-    // TODO PACMANCODER: Add test with parameters set to some value
+    #[test]
+    fn raw_algorithm_roundtrip() {
+        let encoded = [
+            0x30, 0x16, 0x06, 0x03, 0x55, 0x04, 0x03, 0x0C, 0x0F, 0x69, 0x6E, 0x74, 0x65, 0x72, 0x6D, 0x65, 0x64, 0x69,
+            0x61, 0x74, 0x65, 0x5F, 0x63, 0x61,
+        ];
+        let decoded: RawAlgorithmIdentifier = picky_asn1_der::from_bytes(&encoded).unwrap();
+        let oid: ObjectIdentifier = "2.5.4.3".to_string().try_into().unwrap();
+        let params = Asn1RawDer(vec![
+            0x0C, 0x0F, 0x69, 0x6E, 0x74, 0x65, 0x72, 0x6D, 0x65, 0x64, 0x69, 0x61, 0x74, 0x65, 0x5F, 0x63, 0x61,
+        ]);
+        let expected = RawAlgorithmIdentifier::from_parts(oid, Some(params));
+        pretty_assertions::assert_eq!(decoded, expected);
+        check_serde!(decoded: RawAlgorithmIdentifier in encoded);
+    }
 }

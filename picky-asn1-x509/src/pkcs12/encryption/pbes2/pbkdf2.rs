@@ -38,7 +38,7 @@ impl ser::Serialize for Pbkdf2Params {
     {
         use ser::SerializeSeq;
 
-        let sequence_size = 2 + self.key_length.is_some() as usize + self.prf.is_some() as usize;
+        let sequence_size = 2 + usize::from(self.key_length.is_some()) + usize::from(self.prf.is_some());
 
         let mut seq = serializer.serialize_seq(Some(sequence_size))?;
 

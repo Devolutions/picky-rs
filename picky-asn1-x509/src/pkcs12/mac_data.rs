@@ -27,7 +27,7 @@ impl ser::Serialize for MacData {
     {
         use ser::SerializeSeq;
 
-        let sequence_len = 2 + self.iterations.is_some() as usize;
+        let sequence_len = 2 + usize::from(self.iterations.is_some());
         let mut seq = serializer.serialize_seq(Some(sequence_len))?;
         seq.serialize_element(&self.mac)?;
         seq.serialize_element(&self.salt)?;

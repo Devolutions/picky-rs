@@ -5,7 +5,7 @@
 //! definition. However, most basic types such as `OCETET STRING` or `BMPString` are represented by
 //! their own distinctive types to avoid confusion.
 //!
-//! Structures defined in this module are were built in such way that allows maximum backwards and
+//! Structures defined in this module are built in such a way that allows maximum backwards and
 //! forwards compatibility with other PKCS#12 implementations by wrapping unknown variants and
 //! algorithms inside raw ASN1 types. For example, if the client code knows about specific
 //! PKCS12 attribute, it always could be accessed via matching on attribute OID and raw ASN1
@@ -58,7 +58,7 @@ impl ser::Serialize for Pfx {
     {
         use ser::SerializeSeq;
 
-        let sequence_len = 2 + self.mac_data.is_some() as usize;
+        let sequence_len = 2 + usize::from(self.mac_data.is_some());
 
         let mut seq = serializer.serialize_seq(Some(sequence_len))?;
 
@@ -124,13 +124,13 @@ mod tests {
         // This test validates PFX structure parsing and parsing of `Certificate`/`PrivateKeyInfo`
         // structures encapsulated inside PFX
 
-        let encoded = include_bytes!("../../test_assets/pkcs12/openssl_nocrypt.pfx");
+        let encoded = include_bytes!("../../../test_assets/pkcs12/openssl_nocrypt.pfx");
         let decoded: Pfx = picky_asn1_der::from_bytes(encoded).unwrap();
 
         // Validate parsed PFX structure via debug representation
-        expect_file!["../../test_assets/pkcs12/openssl_nocrypt.parsed.bin"].assert_debug_eq(&decoded);
+        expect_file!["../../../test_assets/pkcs12/openssl_nocrypt.parsed.bin"].assert_debug_eq(&decoded);
 
-        // OpenSSL-generate PFXs will have exactly the same bytes when re-encoded
+        // OpenSSL-generated PFXs will have exactly the same bytes when re-encoded
         let reencoded = picky_asn1_der::to_vec(&decoded).unwrap();
         assert_eq!(encoded, reencoded.as_slice());
 
@@ -190,20 +190,20 @@ mod tests {
 
     #[test]
     fn pfx_openssl_rc2_roundtrip() {
-        let encoded = include_bytes!("../../test_assets/pkcs12/leaf_password_is_abc.pfx");
+        let encoded = include_bytes!("../../../test_assets/pkcs12/leaf_password_is_abc.pfx");
         let decoded: Pfx = picky_asn1_der::from_bytes(encoded).unwrap();
         // Validate parsed PFX structure via debug representation
-        expect_file!["../../test_assets/pkcs12/leaf_password_is_abc.parsed.txt"].assert_debug_eq(&decoded);
-        // OpenSSL-generate PFXs will have exactly the same bytes when re-encoded
+        expect_file!["../../../test_assets/pkcs12/leaf_password_is_abc.parsed.txt"].assert_debug_eq(&decoded);
+        // OpenSSL-generated PFXs will have exactly the same bytes when re-encoded
         let reencoded = picky_asn1_der::to_vec(&decoded).unwrap();
         assert_eq!(encoded, reencoded.as_slice());
     }
 
     #[test]
     fn pfx_certmgr_aes256_roundtrip() {
-        let encoded = include_bytes!("../../test_assets/pkcs12/certmgr_aes256.pfx");
+        let encoded = include_bytes!("../../../test_assets/pkcs12/certmgr_aes256.pfx");
         let decoded: Pfx = picky_asn1_der::from_bytes(encoded).unwrap();
-        expect_file!["../../test_assets/pkcs12/certmgr_aes256.parsed.txt"].assert_debug_eq(&decoded);
+        expect_file!["../../../test_assets/pkcs12/certmgr_aes256.parsed.txt"].assert_debug_eq(&decoded);
         // For certmgr-generated PFXs, we can't compare the bytes directly because
         // certmgr omits serialization of NULL params of DigestAlgorithm, but we always serialize
         // them. (However certmgr will accept the PFX we generate as we serialize it the same way
@@ -212,10 +212,10 @@ mod tests {
 
     #[test]
     fn pfx_certmgr_3des_roundtrip() {
-        let encoded = include_bytes!("../../test_assets/pkcs12/certmgr_3des.pfx");
+        let encoded = include_bytes!("../../../test_assets/pkcs12/certmgr_3des.pfx");
         let decoded: Pfx = picky_asn1_der::from_bytes(encoded).unwrap();
 
-        expect_file!["../../test_assets/pkcs12/certmgr_3des.parsed.txt"].assert_debug_eq(&decoded);
+        expect_file!["../../../test_assets/pkcs12/certmgr_3des.parsed.txt"].assert_debug_eq(&decoded);
     }
 }
 

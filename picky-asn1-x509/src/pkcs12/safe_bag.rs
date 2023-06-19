@@ -18,7 +18,7 @@ pub use secret::*;
 
 /// [PKCS #12: Personal Information Exchange Syntax Standard](https://datatracker.ietf.org/doc/html/rfc7292#section-4.2)
 ///
-/// SafeBag is the atomic node of PKCS#12 structure, it could contain concrete data such as
+/// SafeBag a building block of PKCS#12 structure, it could contain concrete data such as
 /// `PrivateKeyInfo` or `Certificate` or it could recursively contain other `SafeBag`s via
 /// `SafeContents` structure.
 ///
@@ -97,7 +97,7 @@ impl ser::Serialize for SafeBag {
     {
         use ser::SerializeSeq;
 
-        let sequence_size = 2 + self.attributes.is_some() as usize;
+        let sequence_size = 2 + usize::from(self.attributes.is_some());
         let mut seq = serializer.serialize_seq(Some(sequence_size))?;
 
         match &self.kind {
