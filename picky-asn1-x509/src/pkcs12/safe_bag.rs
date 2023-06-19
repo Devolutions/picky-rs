@@ -18,7 +18,7 @@ pub use secret::*;
 
 /// [PKCS #12: Personal Information Exchange Syntax Standard](https://datatracker.ietf.org/doc/html/rfc7292#section-4.2)
 ///
-/// SafeBag a building block of PKCS#12 structure, it could contain concrete data such as
+/// SafeBag is a building block of PKCS#12 structure, it could contain concrete data such as
 /// `PrivateKeyInfo` or `Certificate` or it could recursively contain other `SafeBag`s via
 /// `SafeContents` structure.
 ///
