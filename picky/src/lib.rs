@@ -17,10 +17,16 @@ pub mod x509;
 #[cfg(feature = "ssh")]
 pub mod ssh;
 
+#[cfg(feature = "pkcs12")]
+pub mod pkcs12;
+
 pub mod hash;
 pub mod key;
 pub mod pem;
 pub mod signature;
+
+#[cfg(feature = "checked_string")]
+pub mod checked_string;
 
 pub use picky_asn1_x509::{oid, oids, AlgorithmIdentifier};
 

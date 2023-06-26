@@ -78,6 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ed25519 support for SSH keys and certificates
 - Ed25519 x509 certificates verification/signing
 - Support for `ECDH-ES` JWE algorithm (P256 and P384 EC keys, X25519 ED keys)
+- Support for `PKCS12`(PFX) files parsing/building
 
 ### Changed
 - Bump minimal rustc version to 1.65 (required by `sec1` transitive dependency after `p256`/`p384` update)

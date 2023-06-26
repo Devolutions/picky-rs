@@ -1,5 +1,4 @@
-use hmac::Hmac;
-use pbkdf2::pbkdf2;
+use pbkdf2::pbkdf2_hmac;
 use sha1::Sha1;
 
 use crate::crypto::nfold::n_fold;
@@ -44,7 +43,7 @@ pub fn derive_key_from_password<P: AsRef<[u8]>, S: AsRef<[u8]>>(
 ) -> KerberosCryptoResult<Vec<u8>> {
     let mut tmp = vec![0; aes_size.key_length()];
 
-    pbkdf2::<Hmac<Sha1>>(password.as_ref(), salt.as_ref(), AES_ITERATION_COUNT, &mut tmp);
+    pbkdf2_hmac::<Sha1>(password.as_ref(), salt.as_ref(), AES_ITERATION_COUNT, &mut tmp);
 
     let temp_key = random_to_key(tmp);
 
