@@ -451,8 +451,7 @@ mod tests {
 
     fn stable_rand() -> impl Pkcs12Rng {
         use rand::SeedableRng;
-        let rng = rand_chacha::ChaChaRng::seed_from_u64(42);
-        rng
+        rand_chacha::ChaChaRng::seed_from_u64(42)
     }
 
     fn build_cert_bags() -> [SafeBag; 3] {
@@ -499,13 +498,13 @@ mod tests {
         let crypto_context = make_crypto_context(password);
 
         // Check that we can decode PFX encoded by picky itself
-        let _decoded = Pfx::from_der_bytes(&der_data, crypto_context, Pkcs12ParsingParams::default()).unwrap();
+        let _decoded = Pfx::from_der_bytes(der_data, crypto_context, Pkcs12ParsingParams::default()).unwrap();
 
         #[cfg(windows)]
         {
             let temp_path = tempfile::NamedTempFile::new().unwrap().into_temp_path();
 
-            std::fs::write(&temp_path, &der_data).unwrap();
+            std::fs::write(&temp_path, der_data).unwrap();
 
             let certutil_args = vec![
                 "-dump".to_string(),
@@ -570,14 +569,14 @@ mod tests {
         let key_encryption = encryption_fn(&mut crypto_context);
 
         let leaf_key_bag =
-            SafeBag::new_encrypted_key(leaf_key, build_leaf_attributes(), key_encryption, &mut crypto_context).unwrap();
+            SafeBag::new_encrypted_key(leaf_key, build_leaf_attributes(), key_encryption, &crypto_context).unwrap();
 
         let cert_encryption = encryption_fn(&mut crypto_context);
 
         let cert_safe_contents = SafeContents::new_encrypted(
             vec![leaf_cert_bag, intermediate_cert_bag, root_cert_bag],
             cert_encryption,
-            &mut crypto_context,
+            &crypto_context,
         )
         .unwrap();
 
