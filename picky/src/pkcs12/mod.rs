@@ -425,27 +425,16 @@ mod tests {
 
     #[test]
     fn pfx_certmgr_rc2() {
-        // TODO(@pacmancoder): Internal certificate structure fails to deserialize (unrelated to
-        // pkcs12 implementation, so this test uses sets `skip_soft_parsing_errors` to true)
-        let params = Pkcs12ParsingParams {
-            skip_soft_parsing_errors: true,
-            ..Default::default()
-        };
         let encoded = include_bytes!("../../../test_assets/pkcs12/leaf_password_is_abc.pfx");
         let crypto_context = Pkcs12CryptoContext::new_with_password("abc");
-        let _decoded = Pfx::from_der(encoded, crypto_context, params).unwrap();
+        let _decoded = Pfx::from_der(encoded, crypto_context, Pkcs12ParsingParams::default()).unwrap();
     }
 
     #[test]
     fn pfx_certmgr_rc2_empty_pass() {
         let encoded = include_bytes!("../../../test_assets/pkcs12/leaf_empty_password.pfx");
-        // See note in `pfx_certmgr_rc2` test
-        let params = Pkcs12ParsingParams {
-            skip_soft_parsing_errors: true,
-            ..Default::default()
-        };
         let crypto_context = Pkcs12CryptoContext::new_without_password();
-        let _decoded = Pfx::from_der(encoded, crypto_context, params).unwrap();
+        let _decoded = Pfx::from_der(encoded, crypto_context, Pkcs12ParsingParams::default()).unwrap();
     }
 
     #[test]
