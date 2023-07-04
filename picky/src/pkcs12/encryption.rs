@@ -1,5 +1,5 @@
-use crate::checked_string::CheckedBmpString;
 use crate::pkcs12::{pbkdf1, Pbkdf1Usage, Pkcs12Error, Pkcs12HashAlgorithm};
+use crate::string_conversion::utf8_to_bmpstring;
 use picky_asn1::wrapper::OctetStringAsn1;
 pub use picky_asn1_x509::pkcs12::Pbes1AlgorithmKind as Pbes1Cipher;
 use picky_asn1_x509::pkcs12::{
@@ -8,21 +8,19 @@ use picky_asn1_x509::pkcs12::{
     Pbes2Params as Pbes2ParamsAsn1, Pbkdf2Params as Pbkdf2ParamsAsn1, Pbkdf2Prf as Pbkdf2PrfAsn1,
     Pbkdf2SaltSource as Pbkdf2SaltSourceAsn1, Pkcs12EncryptionAlgorithm as Pkcs12EncryptionAsn1,
 };
-use std::str::FromStr;
 
 /// Same default KDF iterations as in OpenSSL
 const DEFAULT_KDF_ITERATIONS: usize = 2048;
 const DEFAULT_SALT_SIZE: usize = 8;
 const AES_BLOCK_SIZE: usize = 16;
 
-pub trait Pkcs12Rng: rand::RngCore + rand::CryptoRng {}
+trait Pkcs12Rng: rand::RngCore + rand::CryptoRng {}
 impl<T: rand::RngCore + rand::CryptoRng> Pkcs12Rng for T {}
-
 /// Crypto operations context for PFX file parsing/building. Contains password inside as a secure
 /// string and RNG.
 pub struct Pkcs12CryptoContext {
     password: zeroize::Zeroizing<String>,
-    rng: Box<dyn Pkcs12Rng>,
+    rng: Box<dyn rand::RngCore>,
 }
 
 impl Pkcs12CryptoContext {
@@ -35,7 +33,7 @@ impl Pkcs12CryptoContext {
     }
 
     /// Sets RNG for this context
-    pub fn with_rng(mut self, rng: impl Pkcs12Rng + 'static) -> Self {
+    pub fn with_rng(mut self, rng: impl rand::RngCore + rand::CryptoRng + 'static) -> Self {
         self.rng = Box::new(rng);
         self
     }
@@ -50,7 +48,7 @@ impl Pkcs12CryptoContext {
 
     /// Returns password in PBES1 password representation - UCS2 encoded string with null terminator
     pub(crate) fn password_bytes_pbes1(&self) -> Result<zeroize::Zeroizing<Vec<u8>>, Pkcs12Error> {
-        let mut bmp = CheckedBmpString::from_str(&self.password)?.into_secure_buffer();
+        let mut bmp = zeroize::Zeroizing::new(utf8_to_bmpstring(&self.password)?.into_bytes());
         bmp.extend_from_slice(&[0, 0]);
 
         Ok(bmp)
@@ -61,13 +59,9 @@ impl Pkcs12CryptoContext {
         self.password.as_bytes()
     }
 
-    pub(crate) fn rng(&mut self) -> &mut dyn Pkcs12Rng {
-        &mut *self.rng
-    }
-
     pub(crate) fn generate_bytes(&mut self, len: usize) -> Vec<u8> {
         let mut data = vec![0u8; len];
-        self.rng().fill_bytes(&mut data);
+        self.rng.fill_bytes(&mut data);
         data
     }
 }
