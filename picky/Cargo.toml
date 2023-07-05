@@ -84,6 +84,11 @@ cfg-if = "1.0.0"
 ring = "0.16.20"
 rstest = "0.12.0"
 expect-test = "1"
+# We are pinning `tempfile` version here to reduce the number of dependencies, as tempfile >= 3.4
+# requires `windows` crate version which is different from the one used by other dependencies.
+# (Adds `windows 0.48` dependency while `windows 0.42` is the only one used by other picky
+# dependencies. Because of the pre-1.0 version of `windows`, different minor versions of the crate
+# are treated as not compatible with each other.)
 tempfile = "=3.3"
 rand_chacha = "0.3"
 
