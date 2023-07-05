@@ -45,13 +45,16 @@ pub use safe_contents::*;
 ///
 /// This structure could be directly used to parse content of PFX files.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Pfx {
+pub struct Pfx<AuthSafeDataRepr: AuthenticatedSafeDataRepr = ParsedAuthenticatedSafeDataRepr> {
     pub version: u8,
-    pub auth_safe: AuthenticatedSafeContentInfo,
+    pub auth_safe: AuthenticatedSafeContentInfo<AuthSafeDataRepr>,
     pub mac_data: Option<MacData>,
 }
 
-impl ser::Serialize for Pfx {
+/// Alternative representation of `Pfx` structure with unparsed `AuthenticatedSafe` data
+pub type RawPfx = Pfx<RawAuthenticatedSafeDataRepr>;
+
+impl<AuthSafeDataRepr: AuthenticatedSafeDataRepr> ser::Serialize for Pfx<AuthSafeDataRepr> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: ser::Serializer,
@@ -73,15 +76,15 @@ impl ser::Serialize for Pfx {
     }
 }
 
-impl<'de> de::Deserialize<'de> for Pfx {
+impl<'de, AuthSafeDataRepr: AuthenticatedSafeDataRepr> de::Deserialize<'de> for Pfx<AuthSafeDataRepr> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: de::Deserializer<'de>,
     {
-        struct PfxVisitor;
+        struct PfxVisitor<AuthSafeDataRepr>(core::marker::PhantomData<AuthSafeDataRepr>);
 
-        impl<'de> de::Visitor<'de> for PfxVisitor {
-            type Value = Pfx;
+        impl<'de, AuthSafeDataRepr: AuthenticatedSafeDataRepr> de::Visitor<'de> for PfxVisitor<AuthSafeDataRepr> {
+            type Value = Pfx<AuthSafeDataRepr>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                 formatter.write_str("a valid DER-encoded AuthenticatedSafeContentInfo")
@@ -97,7 +100,8 @@ impl<'de> de::Deserialize<'de> for Pfx {
                     return Err(serde_invalid_value!(Pfx, "PFX version must be 3", "valid PFX version"));
                 }
 
-                let auth_safe: AuthenticatedSafeContentInfo = seq_next_element!(seq, Pfx, "PFX authSafe");
+                let auth_safe: AuthenticatedSafeContentInfo<AuthSafeDataRepr> =
+                    seq_next_element!(seq, Pfx, "PFX authSafe");
 
                 let mac_data: Option<MacData> = seq.next_element()?;
 
@@ -109,7 +113,7 @@ impl<'de> de::Deserialize<'de> for Pfx {
             }
         }
 
-        deserializer.deserialize_seq(PfxVisitor)
+        deserializer.deserialize_seq(PfxVisitor::<AuthSafeDataRepr>(core::marker::PhantomData))
     }
 }
 
@@ -216,6 +220,25 @@ mod tests {
         let decoded: Pfx = picky_asn1_der::from_bytes(encoded).unwrap();
 
         expect_file!["../../../test_assets/pkcs12/certmgr_3des.parsed.txt"].assert_debug_eq(&decoded);
+    }
+
+    #[test]
+    fn unparsed_auth_safe_openssl_rc2_roundtrip() {
+        let encoded = include_bytes!("../../../test_assets/pkcs12/leaf_password_is_abc.pfx");
+        let decoded: RawPfx = picky_asn1_der::from_bytes(encoded).unwrap();
+
+        let auth_safe = if let AuthenticatedSafeContentInfo::Data(auth_safe) = &decoded.auth_safe {
+            auth_safe.0.clone()
+        } else {
+            panic!("Expected valid auth safe data");
+        };
+
+        let parsed: ParsedAuthenticatedSafeDataRepr = picky_asn1_der::from_bytes(&auth_safe).unwrap();
+        assert!(!parsed.into_repr().is_empty());
+
+        // OpenSSL-generated PFXs will have exactly the same bytes when re-encoded
+        let reencoded = picky_asn1_der::to_vec(&decoded).unwrap();
+        assert_eq!(encoded, reencoded.as_slice());
     }
 }
 

@@ -68,8 +68,14 @@ aes-gcm = { version = "0.10", optional = true }
 aes = { version = "0.8.2", optional = true }
 aes-kw = { version = "0.2.1", optional = true, features = ["std"] }
 ctr = { version = "0.9.2", optional = true }
-cbc = { version = "0.1.2", optional = true }
-bcrypt-pbkdf = { version = "0.9.0", optional = true }
+cbc = { version = "0.1.2", optional = true, features = ["alloc"] }
+bcrypt-pbkdf = { version = "0.10.0", optional = true }
+des = { version = "0.8", optional = true }
+rc2 = { version = "0.8", optional = true }
+pbkdf2 = { version = "0.12", optional = true }
+hmac = { version = "0.12", optional = true }
+
+ucs2 = "0.3"
 
 [dev-dependencies]
 pretty_assertions = "1.3.0"
@@ -77,14 +83,23 @@ hex = "0.4.3"
 cfg-if = "1.0.0"
 ring = "0.16.20"
 rstest = "0.12.0"
+expect-test = "1"
+# We are pinning `tempfile` version here to reduce the number of dependencies, as tempfile >= 3.4
+# requires `windows` crate version which is different from the one used by other dependencies.
+# (Adds `windows 0.48` dependency while `windows 0.42` is the only one used by other picky
+# dependencies. Because of the pre-1.0 version of `windows`, different minor versions of the crate
+# are treated as not compatible with each other.)
+tempfile = "=3.3"
+rand_chacha = "0.3"
 
 [features]
-default = ["x509", "jose", "http_signature", "http_trait_impl"]
+default = ["x509", "jose", "http_signature", "http_trait_impl", "pkcs12"]
 
 # main features
 x509 = []
 jose = ["dep:serde_json", "dep:aes-gcm", "dep:cbc", "dep:aes-kw"]
 http_signature = []
+pkcs12 = ["picky-asn1-x509/pkcs12", "dep:des", "dep:rc2", "dep:cbc", "dep:pbkdf2", "dep:hmac", "dep:aes", "x509"]
 
 # secondary features
 pkcs7 = ["x509", "picky-asn1-x509/pkcs7"]
