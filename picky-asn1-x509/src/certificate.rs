@@ -300,4 +300,10 @@ mod tests {
             "b45ae4a5b3ded252f6b9d5a6950feb3ebcc7fdff"
         );
     }
+
+    #[test]
+    fn missing_authority_key_identifier_field_accepted() {
+        let encoded = include_bytes!("../../test_assets/missing_authority_key_identifier_field.crt");
+        let _decoded = picky_asn1_der::from_bytes::<Certificate>(encoded).unwrap();
+    }
 }

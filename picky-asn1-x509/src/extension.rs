@@ -1,10 +1,12 @@
 use crate::{oids, GeneralName, GeneralNames};
 use core::slice::{Iter, IterMut};
 use picky_asn1::bit_string::BitString;
+use picky_asn1::tag::TagPeeker;
 use picky_asn1::wrapper::{
     Asn1SequenceOf, BitStringAsn1, ExplicitContextTag1, ImplicitContextTag0, ImplicitContextTag2, IntegerAsn1,
     ObjectIdentifierAsn1, OctetStringAsn1, OctetStringAsn1Container, Optional,
 };
+use picky_asn1::Asn1Type as _;
 use serde::{de, ser, Deserialize, Serialize};
 use std::fmt;
 
@@ -368,11 +370,44 @@ impl<'de> de::Deserialize<'de> for AuthorityKeyIdentifier {
             where
                 A: de::SeqAccess<'de>,
             {
-                Ok(AuthorityKeyIdentifier {
-                    key_identifier: seq.next_element().unwrap_or(Some(None)).unwrap_or(None),
-                    authority_cert_issuer: seq.next_element().unwrap_or(Some(None)).unwrap_or(None),
-                    authority_cert_serial_number: seq.next_element().unwrap_or(Some(None)).unwrap_or(None),
-                })
+                let mut parsed = AuthorityKeyIdentifier {
+                    key_identifier: None,
+                    authority_cert_issuer: None,
+                    authority_cert_serial_number: None,
+                };
+
+                let mut tag_peeker = seq.next_element::<TagPeeker>()?;
+
+                while let Some(tag) = &tag_peeker {
+                    match tag.next_tag {
+                        ImplicitContextTag0::<OctetStringAsn1>::TAG => {
+                            parsed.key_identifier =
+                                Some(seq_next_element!(seq, AuthorityKeyIdentifier, "key identifier"));
+                        }
+                        ExplicitContextTag1::<GeneralName>::TAG => {
+                            parsed.authority_cert_issuer =
+                                Some(seq_next_element!(seq, AuthorityKeyIdentifier, "authority cert issuer"));
+                        }
+                        ImplicitContextTag2::<IntegerAsn1>::TAG => {
+                            parsed.authority_cert_serial_number = Some(seq_next_element!(
+                                seq,
+                                AuthorityKeyIdentifier,
+                                "authority cert serial number"
+                            ));
+                        }
+                        _ => {
+                            return Err(serde_invalid_value!(
+                                AuthorityKeyIdentifier,
+                                "Unknown AuthorityKeyIdentifier structure",
+                                "Valid AuthorityKeyIdentifier"
+                            ));
+                        }
+                    }
+
+                    tag_peeker = seq.next_element::<TagPeeker>()?;
+                }
+
+                Ok(parsed)
             }
         }
 
