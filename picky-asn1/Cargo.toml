@@ -19,7 +19,7 @@ readme = "README.md"
 serde = { version = "1.0.152", default-features = false, features = ["derive"] }
 oid = { version = "0.2.1", default-features = false, features = ["serde_support"] }
 serde_bytes = "0.11.9"
-chrono = { version = "0.4.23", optional = true }
+chrono = { version = "0.4.23", default-features = false, optional = true }
 time = { version = "0.3.19", optional = true }
 zeroize = { version = "^1.5", optional = true }
 
