@@ -28,7 +28,7 @@ serde = { version = "1.0.152", features = ["derive"] }
 base64 = "0.21.0"
 thiserror = "1.0.38"
 byteorder = { version = "1.4.3", optional = true }
-chrono = { version = "0.4.23", optional = true }
+chrono = { version = "0.4.23", default-features = false, optional = true }
 time = { version = "0.3.19", optional = true }
 serde_json = { version = "1.0.93", optional = true }
 http = { version = "0.2.9", optional = true }
