@@ -1374,7 +1374,7 @@ dependencies = [
  "pbkdf2",
  "picky-asn1 0.7.2",
  "picky-asn1-der 0.4.0",
- "picky-asn1-x509 0.10.0",
+ "picky-asn1-x509 0.11.0",
  "pretty_assertions",
  "rand 0.7.3",
  "rand 0.8.5",
@@ -1477,7 +1477,7 @@ dependencies = [
 
 [[package]]
 name = "picky-asn1-x509"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "base64 0.21.0",
  "expect-test",
@@ -1508,7 +1508,7 @@ dependencies = [
 
 [[package]]
 name = "picky-krb"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "aes",
  "byteorder",
@@ -1521,7 +1521,7 @@ dependencies = [
  "pbkdf2",
  "picky-asn1 0.7.2",
  "picky-asn1-der 0.4.0",
- "picky-asn1-x509 0.10.0",
+ "picky-asn1-x509 0.11.0",
  "rand 0.8.5",
  "serde",
  "sha1",
