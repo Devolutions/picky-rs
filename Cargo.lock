@@ -1346,7 +1346,7 @@ dependencies = [
 
 [[package]]
 name = "picky"
-version = "7.0.0-rc.6"
+version = "7.0.0-rc.7"
 dependencies = [
  "aes",
  "aes-gcm",
@@ -1501,7 +1501,7 @@ dependencies = [
  "embed-resource",
  "getrandom 0.2.8",
  "hex",
- "picky 7.0.0-rc.6",
+ "picky 7.0.0-rc.7",
  "serde_json",
  "time 0.3.19",
 ]
