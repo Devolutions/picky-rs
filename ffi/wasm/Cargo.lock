@@ -657,7 +657,7 @@ dependencies = [
 
 [[package]]
 name = "picky-asn1-x509"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "base64",
  "num-bigint-dig",
