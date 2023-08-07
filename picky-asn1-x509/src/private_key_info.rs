@@ -488,7 +488,6 @@ impl RsaPrivateKey {
 ///      publicKey  [1] BIT STRING OPTIONAL
 ///    }
 /// ```
-
 #[derive(Serialize, Debug, Clone, PartialEq, Eq)]
 pub struct ECPrivateKey {
     pub version: IntegerAsn1,
