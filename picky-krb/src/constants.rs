@@ -142,6 +142,17 @@ pub mod cksum_types {
     pub const HMAC_SHA1_96_AES256: usize = 16;
 }
 
+//= [2.2.1.2 TSCredentials](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-cssp/94a1ab00-5500-42fd-8d3d-7a84e6c2cf03) =//
+pub mod cred_ssp {
+    pub const TS_PASSWORD_CREDS: u8 = 1;
+    pub const TS_SMART_CARD_CREDS: u8 = 2;
+    pub const TS_REMOTE_GUARD_CREDS: u8 = 6;
+
+    // [KeySpec values](https://learn.microsoft.com/en-us/windows-server/identity/ad-fs/technical-reference/ad-fs-and-keyspec-property#keyspec-values-and-associated-meanings)
+    pub const AT_KEYEXCHANGE: u8 = 1;
+    pub const AT_SIGNATURE: u8 = 2;
+}
+
 pub mod error_codes {
     //= [Error Codes](https://datatracker.ietf.org/doc/html/rfc4120#section-7.5.9) =//
     pub const KDC_ERR_NONE: u32 = 0;
