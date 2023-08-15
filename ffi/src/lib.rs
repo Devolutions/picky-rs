@@ -1,6 +1,3 @@
-#[macro_use]
-mod helper;
-
 pub mod date;
 pub mod error;
 pub mod hash;

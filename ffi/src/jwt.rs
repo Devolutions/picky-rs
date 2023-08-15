@@ -57,7 +57,7 @@ pub(crate) struct SigBuilderInner {
 pub mod ffi {
     use crate::error::ffi::PickyError;
     use crate::key::ffi::{PrivateKey, PublicKey};
-    use diplomat_runtime::{DiplomatResult, DiplomatWriteable};
+    use diplomat_runtime::DiplomatWriteable;
     use picky::jose::jwt;
     use std::fmt::Write as _;
 
@@ -111,34 +111,34 @@ pub mod ffi {
 
         /// Returns the content type.
         // TODO: support for optional string in return position
-        pub fn get_content_type(&self, writeable: &mut DiplomatWriteable) -> DiplomatResult<(), Box<PickyError>> {
-            err_check!(write!(writeable, "{}", self.0.header.cty.as_deref().unwrap_or("")));
+        pub fn get_content_type(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            write!(writeable, "{}", self.0.header.cty.as_deref().unwrap_or(""))?;
             writeable.flush();
-            Ok(()).into()
+            Ok(())
         }
 
         /// Returns the key ID.
         // TODO: support for optional string in return position
-        pub fn get_kid(&self, writeable: &mut DiplomatWriteable) -> DiplomatResult<(), Box<PickyError>> {
-            err_check!(write!(writeable, "{}", self.0.header.kid.as_deref().unwrap_or("")));
+        pub fn get_kid(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            write!(writeable, "{}", self.0.header.kid.as_deref().unwrap_or(""))?;
             writeable.flush();
-            Ok(()).into()
+            Ok(())
         }
 
         /// Returns the header as a JSON encoded payload.
-        pub fn get_header(&self, writeable: &mut DiplomatWriteable) -> DiplomatResult<(), Box<PickyError>> {
-            let header = err_check!(serde_json::to_string(&self.0.header));
-            err_check!(write!(writeable, "{header}"));
+        pub fn get_header(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            let header = serde_json::to_string(&self.0.header)?;
+            write!(writeable, "{header}")?;
             writeable.flush();
-            Ok(()).into()
+            Ok(())
         }
 
         /// Returns the claims as a JSON encoded payload.
-        pub fn get_claims(&self, writeable: &mut DiplomatWriteable) -> DiplomatResult<(), Box<PickyError>> {
-            let claims = err_check!(serde_json::to_string(&self.0.state.claims));
-            err_check!(write!(writeable, "{claims}"));
+        pub fn get_claims(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            let claims = serde_json::to_string(&self.0.state.claims)?;
+            write!(writeable, "{claims}")?;
             writeable.flush();
-            Ok(()).into()
+            Ok(())
         }
 
         /// Decode JWT and check signature using provided public key.
@@ -146,31 +146,26 @@ pub mod ffi {
             compact_repr: &str,
             public_key: &PublicKey,
             validator: &JwtValidator,
-        ) -> DiplomatResult<Box<JwtSig>, Box<PickyError>> {
-            let jwt = err_check_from!(jwt::JwtSig::decode(compact_repr, &public_key.0)
-                .and_then(|jwt| jwt.validate::<serde_json::Value>(&validator.0)));
-            Ok(Box::new(JwtSig(jwt))).into()
+        ) -> Result<Box<JwtSig>, Box<PickyError>> {
+            let jwt = jwt::JwtSig::decode(compact_repr, &public_key.0)
+                .and_then(|jwt| jwt.validate::<serde_json::Value>(&validator.0))?;
+            Ok(Box::new(JwtSig(jwt)))
         }
 
         /// Decode JWT WITHOUT CHECKING THE SIGNATURE. Useful for token inspection.
-        pub fn decode_unchecked(compact_repr: &str) -> DiplomatResult<Box<JwtSig>, Box<PickyError>> {
-            let jws = err_check_from!(picky::jose::jws::RawJws::decode(compact_repr));
-            let jwt = err_check_from!(
-                jwt::JwtSig::from(jws.discard_signature()).validate::<serde_json::Value>(&jwt::NO_CHECK_VALIDATOR)
-            );
-            Ok(Box::new(JwtSig(jwt))).into()
+        pub fn decode_unchecked(compact_repr: &str) -> Result<Box<JwtSig>, Box<PickyError>> {
+            let jws = picky::jose::jws::RawJws::decode(compact_repr)?;
+            let jwt =
+                jwt::JwtSig::from(jws.discard_signature()).validate::<serde_json::Value>(&jwt::NO_CHECK_VALIDATOR)?;
+            Ok(Box::new(JwtSig(jwt)))
         }
 
         /// Encode using the given private key and returns the compact representation of this token.
-        pub fn encode(
-            &self,
-            key: &PrivateKey,
-            writeable: &mut DiplomatWriteable,
-        ) -> DiplomatResult<(), Box<PickyError>> {
-            let encoded = err_check!(self.0.clone().encode(&key.0));
-            err_check!(write!(writeable, "{encoded}"));
+        pub fn encode(&self, key: &PrivateKey, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            let encoded = self.0.clone().encode(&key.0)?;
+            write!(writeable, "{encoded}")?;
             writeable.flush();
-            Ok(()).into()
+            Ok(())
         }
     }
 
@@ -203,14 +198,10 @@ pub mod ffi {
         /// Adds a JSON object as additional header parameter.
         ///
         /// This additional header parameter may be either public or private.
-        pub fn add_additional_parameter_object(
-            &mut self,
-            name: &str,
-            obj: &str,
-        ) -> DiplomatResult<(), Box<PickyError>> {
-            let parameter = err_check!(serde_json::from_str(obj));
+        pub fn add_additional_parameter_object(&mut self, name: &str, obj: &str) -> Result<(), Box<PickyError>> {
+            let parameter = serde_json::from_str(obj)?;
             self.0.additional_headers.insert(name.to_owned(), parameter);
-            Ok(()).into()
+            Ok(())
         }
 
         /// Adds a boolean as additional header parameter.
@@ -256,10 +247,10 @@ pub mod ffi {
         /// Sets the given JSON payload.
         ///
         /// Claims should be a valid JSON payload.
-        pub fn set_claims(&mut self, claims: &str) -> DiplomatResult<(), Box<PickyError>> {
-            let claims = err_check!(serde_json::from_str(claims));
+        pub fn set_claims(&mut self, claims: &str) -> Result<(), Box<PickyError>> {
+            let claims = serde_json::from_str(claims)?;
             self.0.claims = claims;
-            Ok(()).into()
+            Ok(())
         }
 
         pub fn build(&self) -> Box<JwtSig> {

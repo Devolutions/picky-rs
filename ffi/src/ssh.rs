@@ -54,7 +54,7 @@ pub mod ffi {
     use crate::key::ffi::{EcCurve, PrivateKey};
     use crate::pem::ffi::Pem;
     use crate::signature::ffi::SignatureAlgorithm;
-    use diplomat_runtime::{DiplomatResult, DiplomatWriteable};
+    use diplomat_runtime::DiplomatWriteable;
     use picky::ssh;
     use std::borrow::ToOwned;
     use std::fmt::Write as _;
@@ -66,9 +66,9 @@ pub mod ffi {
 
     impl SshPublicKey {
         /// Parses string representation of a SSH Public Key.
-        pub fn parse(repr: &str) -> DiplomatResult<Box<SshPublicKey>, Box<PickyError>> {
-            let key = err_check!(ssh::SshPublicKey::from_str(repr));
-            Ok(Box::new(SshPublicKey(key))).into()
+        pub fn parse(repr: &str) -> Result<Box<SshPublicKey>, Box<PickyError>> {
+            let key = ssh::SshPublicKey::from_str(repr)?;
+            Ok(Box::new(SshPublicKey(key)))
         }
 
         /// Returns the SSH Public Key string representation.
@@ -76,17 +76,17 @@ pub mod ffi {
         /// It is generally represented as:
         /// "(algorithm) (der for the key) (comment)"
         /// where (comment) is usually an email address.
-        pub fn to_repr(&self, writeable: &mut DiplomatWriteable) -> DiplomatResult<(), Box<PickyError>> {
-            let repr = err_check!(self.0.to_string());
-            err_check!(writeable.write_str(&repr));
+        pub fn to_repr(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            let repr = self.0.to_string()?;
+            writeable.write_str(&repr)?;
             writeable.flush();
-            Ok(()).into()
+            Ok(())
         }
 
-        pub fn get_comment(&self, writeable: &mut DiplomatWriteable) -> DiplomatResult<(), Box<PickyError>> {
-            err_check!(writeable.write_str(&self.0.comment));
+        pub fn get_comment(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            writeable.write_str(&self.0.comment)?;
             writeable.flush();
-            Ok(()).into()
+            Ok(())
         }
     }
 
@@ -106,7 +106,7 @@ pub mod ffi {
             bits: usize,
             passphrase: &str,
             comment: &str,
-        ) -> DiplomatResult<Box<SshPrivateKey>, Box<PickyError>> {
+        ) -> Result<Box<SshPrivateKey>, Box<PickyError>> {
             let passphrase = if passphrase.is_empty() {
                 None
             } else {
@@ -119,8 +119,8 @@ pub mod ffi {
                 Some(comment.to_owned())
             };
 
-            let key = err_check!(ssh::SshPrivateKey::generate_rsa(bits, passphrase, comment));
-            Ok(Box::new(SshPrivateKey(key))).into()
+            let key = ssh::SshPrivateKey::generate_rsa(bits, passphrase, comment)?;
+            Ok(Box::new(SshPrivateKey(key)))
         }
 
         /// Generates a new SSH EC Private Key.
@@ -132,7 +132,7 @@ pub mod ffi {
             curve: EcCurve,
             passphrase: &str,
             comment: &str,
-        ) -> DiplomatResult<Box<SshPrivateKey>, Box<PickyError>> {
+        ) -> Result<Box<SshPrivateKey>, Box<PickyError>> {
             let passphrase = if passphrase.is_empty() {
                 None
             } else {
@@ -145,53 +145,53 @@ pub mod ffi {
                 Some(comment.to_owned())
             };
 
-            let key = err_check!(ssh::SshPrivateKey::generate_ec(curve.into(), passphrase, comment));
-            Ok(Box::new(SshPrivateKey(key))).into()
+            let key = ssh::SshPrivateKey::generate_ec(curve.into(), passphrase, comment)?;
+            Ok(Box::new(SshPrivateKey(key)))
         }
 
         /// Extracts SSH Private Key from PEM object.
         ///
         /// No passphrase is set if `passphrase` is empty.
-        pub fn from_pem(pem: &Pem, passphrase: &str) -> DiplomatResult<Box<SshPrivateKey>, Box<PickyError>> {
+        pub fn from_pem(pem: &Pem, passphrase: &str) -> Result<Box<SshPrivateKey>, Box<PickyError>> {
             let passphrase = if passphrase.is_empty() {
                 None
             } else {
                 Some(passphrase.to_owned())
             };
 
-            let key = err_check!(ssh::SshPrivateKey::from_pem(&pem.0, passphrase));
-            Ok(Box::new(SshPrivateKey(key))).into()
+            let key = ssh::SshPrivateKey::from_pem(&pem.0, passphrase)?;
+            Ok(Box::new(SshPrivateKey(key)))
         }
 
-        pub fn from_private_key(key: &PrivateKey) -> DiplomatResult<Box<SshPrivateKey>, Box<PickyError>> {
-            let key = err_check!(ssh::SshPrivateKey::try_from(key.0.clone()));
-            Ok(Box::new(SshPrivateKey(key))).into()
+        pub fn from_private_key(key: &PrivateKey) -> Result<Box<SshPrivateKey>, Box<PickyError>> {
+            let key = ssh::SshPrivateKey::try_from(key.0.clone())?;
+            Ok(Box::new(SshPrivateKey(key)))
         }
 
         /// Exports the SSH Private Key into a PEM object
-        pub fn to_pem(&self) -> DiplomatResult<Box<Pem>, Box<PickyError>> {
-            let pem = err_check!(self.0.to_pem());
-            Ok(Box::new(Pem(pem))).into()
+        pub fn to_pem(&self) -> Result<Box<Pem>, Box<PickyError>> {
+            let pem = self.0.to_pem()?;
+            Ok(Box::new(Pem(pem)))
         }
 
         /// Returns the SSH Private Key string representation.
-        pub fn to_repr(&self, writeable: &mut DiplomatWriteable) -> DiplomatResult<(), Box<PickyError>> {
-            let repr = err_check!(self.0.to_string());
-            err_check!(writeable.write_str(&repr));
+        pub fn to_repr(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            let repr = self.0.to_string()?;
+            writeable.write_str(&repr)?;
             writeable.flush();
-            Ok(()).into()
+            Ok(())
         }
 
-        pub fn get_cipher_name(&self, writeable: &mut DiplomatWriteable) -> DiplomatResult<(), Box<PickyError>> {
-            err_check!(writeable.write_str(&self.0.cipher_name));
+        pub fn get_cipher_name(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            writeable.write_str(&self.0.cipher_name)?;
             writeable.flush();
-            Ok(()).into()
+            Ok(())
         }
 
-        pub fn get_comment(&self, writeable: &mut DiplomatWriteable) -> DiplomatResult<(), Box<PickyError>> {
-            err_check!(writeable.write_str(&self.0.comment));
+        pub fn get_comment(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            writeable.write_str(&self.0.comment)?;
             writeable.flush();
-            Ok(()).into()
+            Ok(())
         }
 
         /// Extracts the public part of this private key
@@ -277,9 +277,9 @@ pub mod ffi {
             self.0.comment(comment.to_owned());
         }
 
-        pub fn build(&self) -> DiplomatResult<Box<SshCert>, Box<PickyError>> {
-            let cert = err_check!(self.0.build());
-            Ok(Box::new(SshCert(cert))).into()
+        pub fn build(&self) -> Result<Box<SshCert>, Box<PickyError>> {
+            let cert = self.0.build()?;
+            Ok(Box::new(SshCert(cert)))
         }
     }
 
@@ -292,17 +292,17 @@ pub mod ffi {
         }
 
         /// Parses string representation of a SSH Certificate.
-        pub fn parse(repr: &str) -> DiplomatResult<Box<SshCert>, Box<PickyError>> {
-            let cert = err_check!(ssh::SshCertificate::from_str(repr));
-            Ok(Box::new(SshCert(cert))).into()
+        pub fn parse(repr: &str) -> Result<Box<SshCert>, Box<PickyError>> {
+            let cert = ssh::SshCertificate::from_str(repr)?;
+            Ok(Box::new(SshCert(cert)))
         }
 
         /// Returns the SSH Certificate string representation.
-        pub fn to_repr(&self, writeable: &mut DiplomatWriteable) -> DiplomatResult<(), Box<PickyError>> {
-            let repr = err_check!(self.0.to_string());
-            err_check!(writeable.write_str(&repr));
+        pub fn to_repr(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            let repr = self.0.to_string()?;
+            writeable.write_str(&repr)?;
             writeable.flush();
-            Ok(()).into()
+            Ok(())
         }
 
         pub fn get_public_key(&self) -> Box<SshPublicKey> {
@@ -329,16 +329,16 @@ pub mod ffi {
             Box::new(SshPublicKey(self.0.signature_key.clone()))
         }
 
-        pub fn get_key_id(&self, writeable: &mut DiplomatWriteable) -> DiplomatResult<(), Box<PickyError>> {
-            err_check!(writeable.write_str(&self.0.key_id));
+        pub fn get_key_id(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            writeable.write_str(&self.0.key_id)?;
             writeable.flush();
-            Ok(()).into()
+            Ok(())
         }
 
-        pub fn get_comment(&self, writeable: &mut DiplomatWriteable) -> DiplomatResult<(), Box<PickyError>> {
-            err_check!(writeable.write_str(&self.0.comment));
+        pub fn get_comment(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            writeable.write_str(&self.0.comment)?;
             writeable.flush();
-            Ok(()).into()
+            Ok(())
         }
     }
 }

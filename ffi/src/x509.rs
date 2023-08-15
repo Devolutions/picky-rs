@@ -28,7 +28,7 @@ pub mod ffi {
     use crate::error::ffi::PickyError;
     use crate::key::ffi::PublicKey;
     use crate::pem::ffi::Pem;
-    use diplomat_runtime::{DiplomatResult, DiplomatWriteable};
+    use diplomat_runtime::DiplomatWriteable;
     use picky::x509::certificate;
     use std::fmt::Write;
 
@@ -44,21 +44,21 @@ pub mod ffi {
 
     impl Cert {
         /// Parses a X509 certificate from its DER representation.
-        pub fn from_der(der: &[u8]) -> DiplomatResult<Box<Cert>, Box<PickyError>> {
-            let cert = err_check_from!(certificate::Cert::from_der(der));
-            Ok(Box::new(Self(cert))).into()
+        pub fn from_der(der: &[u8]) -> Result<Box<Cert>, Box<PickyError>> {
+            let cert = certificate::Cert::from_der(der)?;
+            Ok(Box::new(Self(cert)))
         }
 
         /// Extracts X509 certificate from PEM object.
-        pub fn from_pem(pem: &Pem) -> DiplomatResult<Box<Cert>, Box<PickyError>> {
-            let cert = err_check_from!(certificate::Cert::from_pem(&pem.0));
-            Ok(Box::new(Self(cert))).into()
+        pub fn from_pem(pem: &Pem) -> Result<Box<Cert>, Box<PickyError>> {
+            let cert = certificate::Cert::from_pem(&pem.0)?;
+            Ok(Box::new(Self(cert)))
         }
 
         /// Exports the X509 certificate into a PEM object
-        pub fn to_pem(&self) -> DiplomatResult<Box<Pem>, Box<PickyError>> {
-            let pem = err_check_from!(self.0.to_pem());
-            Ok(Box::new(Pem(pem))).into()
+        pub fn to_pem(&self) -> Result<Box<Pem>, Box<PickyError>> {
+            let pem = self.0.to_pem()?;
+            Ok(Box::new(Pem(pem)))
         }
 
         pub fn get_ty(&self) -> CertType {
@@ -81,24 +81,24 @@ pub mod ffi {
             Box::new(UtcDate(self.0.valid_not_after()))
         }
 
-        pub fn get_subject_key_id_hex(&self, writeable: &mut DiplomatWriteable) -> DiplomatResult<(), Box<PickyError>> {
-            let ski = err_check_from!(self.0.subject_key_identifier());
+        pub fn get_subject_key_id_hex(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            let ski = self.0.subject_key_identifier()?;
             let ski = hex::encode(ski);
-            err_check!(writeable.write_str(&ski));
+            writeable.write_str(&ski)?;
             writeable.flush();
-            Ok(()).into()
+            Ok(())
         }
 
-        pub fn get_subject_name(&self, writeable: &mut DiplomatWriteable) -> DiplomatResult<(), Box<PickyError>> {
-            err_check!(write!(writeable, "{}", self.0.subject_name()));
+        pub fn get_subject_name(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            write!(writeable, "{}", self.0.subject_name())?;
             writeable.flush();
-            Ok(()).into()
+            Ok(())
         }
 
-        pub fn get_issuer_name(&self, writeable: &mut DiplomatWriteable) -> DiplomatResult<(), Box<PickyError>> {
-            err_check!(write!(writeable, "{}", self.0.issuer_name()));
+        pub fn get_issuer_name(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            write!(writeable, "{}", self.0.issuer_name())?;
             writeable.flush();
-            Ok(()).into()
+            Ok(())
         }
     }
 }
