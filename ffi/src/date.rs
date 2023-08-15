@@ -1,7 +1,6 @@
 #[diplomat::bridge]
 pub mod ffi {
     use crate::error::ffi::PickyError;
-    use diplomat_runtime::DiplomatResult;
     use picky::x509::date;
 
     /// UTC date and time.
@@ -21,15 +20,15 @@ pub mod ffi {
             Box::new(Self(date::UtcDate::now()))
         }
 
-        pub fn from_timestamp(timestamp: i64) -> DiplomatResult<Box<UtcDate>, Box<PickyError>> {
-            let date = err_check!(time::OffsetDateTime::from_unix_timestamp(timestamp));
+        pub fn from_timestamp(timestamp: i64) -> Result<Box<UtcDate>, Box<PickyError>> {
+            let date = time::OffsetDateTime::from_unix_timestamp(timestamp)?;
             let date = Self(date.into());
-            Ok(Box::new(date)).into()
+            Ok(Box::new(date))
         }
 
-        pub fn get_timestamp(&self) -> DiplomatResult<i64, Box<PickyError>> {
-            let date = err_check!(time::OffsetDateTime::try_from(self.0.clone()));
-            Ok(date.unix_timestamp()).into()
+        pub fn get_timestamp(&self) -> Result<i64, Box<PickyError>> {
+            let date = time::OffsetDateTime::try_from(self.0.clone())?;
+            Ok(date.unix_timestamp())
         }
 
         pub fn get_month(&self) -> u8 {

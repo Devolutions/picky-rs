@@ -1,8 +1,15 @@
-use picky::jose::jwe::JweError;
+use std::fmt;
+
 use picky::jose::jws::JwsError;
 use picky::jose::jwt::JwtError;
+use picky::key::KeyError;
+use picky::pem::PemError;
 use picky::signature::SignatureError;
+use picky::ssh::certificate::SshCertificateGenerationError;
+use picky::ssh::private_key::SshPrivateKeyError;
+use picky::ssh::public_key::SshPublicKeyError;
 use picky::x509::certificate::CertError;
+use picky::{jose::jwe::JweError, ssh::certificate::SshCertificateError};
 
 use self::ffi::{PickyError, PickyErrorKind};
 
@@ -14,6 +21,66 @@ impl From<String> for PickyErrorKind {
 
 impl From<&str> for PickyErrorKind {
     fn from(_: &str) -> Self {
+        Self::Generic
+    }
+}
+
+impl From<fmt::Error> for PickyErrorKind {
+    fn from(_: fmt::Error) -> Self {
+        Self::Generic
+    }
+}
+
+impl From<PemError> for PickyErrorKind {
+    fn from(_: PemError) -> Self {
+        Self::Generic
+    }
+}
+
+impl From<SshCertificateError> for PickyErrorKind {
+    fn from(_: SshCertificateError) -> Self {
+        Self::Generic
+    }
+}
+
+impl From<SshPrivateKeyError> for PickyErrorKind {
+    fn from(_: SshPrivateKeyError) -> Self {
+        Self::Generic
+    }
+}
+
+impl From<SshPublicKeyError> for PickyErrorKind {
+    fn from(_: SshPublicKeyError) -> Self {
+        Self::Generic
+    }
+}
+
+impl From<std::io::Error> for PickyErrorKind {
+    fn from(_: std::io::Error) -> Self {
+        Self::Generic
+    }
+}
+
+impl From<KeyError> for PickyErrorKind {
+    fn from(_: KeyError) -> Self {
+        Self::Generic
+    }
+}
+
+impl From<serde_json::Error> for PickyErrorKind {
+    fn from(_: serde_json::Error) -> Self {
+        Self::Generic
+    }
+}
+
+impl From<SshCertificateGenerationError> for PickyErrorKind {
+    fn from(_: SshCertificateGenerationError) -> Self {
+        Self::Generic
+    }
+}
+
+impl From<time::error::ComponentRange> for PickyErrorKind {
+    fn from(_: time::error::ComponentRange) -> Self {
         Self::Generic
     }
 }
@@ -65,14 +132,14 @@ impl From<CertError> for PickyErrorKind {
     }
 }
 
-impl<T> From<T> for PickyError
+impl<T> From<T> for Box<PickyError>
 where
     T: Into<PickyErrorKind> + ToString,
 {
     fn from(value: T) -> Self {
         let repr = value.to_string();
         let kind = value.into();
-        Self(PickyErrorInner { repr, kind })
+        Box::new(PickyError(PickyErrorInner { repr, kind }))
     }
 }
 

@@ -88,7 +88,7 @@ const PFX_VERSION: u8 = 3;
 pub struct Pfx {
     safe_contents: Vec<SafeContents>,
     mac_data: Option<Pkcs12MacData>,
-    /// Pre-serialized auth safe data. Just an optiization to avoid re-serializing the auth safe
+    /// Pre-serialized auth safe data. Just an optimization to avoid re-serializing the auth safe
     /// data if it was already serialized for the MAC calculation.
     auth_safe_data: Option<Vec<u8>>,
 }
