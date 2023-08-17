@@ -18,7 +18,7 @@ edition = "2021"
 rust-version = "1.65"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Devolutions/picky-rs"
-include = ["src/**/*", "README.md", "CHANGELOG.md"]
+include = ["src/**/*", "README.md", "CHANGELOG.md", "LICENSE-*"]
 
 [dependencies]
 picky-asn1 = { version = "0.7", path = "../picky-asn1", features = ["zeroize"] }
