@@ -66,10 +66,6 @@ impl<C: CharSet> RestrictedString<C> {
         })
     }
 
-    pub fn from_string(s: String) -> Result<Self, CharSetError> {
-        Self::new(s.into_bytes())
-    }
-
     /// Converts into underlying bytes.
     pub fn into_bytes(self) -> Vec<u8> {
         self.data
@@ -86,14 +82,6 @@ impl<C: CharSet> Deref for RestrictedString<C> {
 
     fn deref(&self) -> &Self::Target {
         &self.data
-    }
-}
-
-impl<C: CharSet> FromStr for RestrictedString<C> {
-    type Err = CharSetError;
-
-    fn from_str(s: &str) -> Result<Self, CharSetError> {
-        Self::new(s.as_bytes())
     }
 }
 
@@ -188,7 +176,6 @@ impl<C> ser::Serialize for RestrictedString<C> {
 /// 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, and SPACE
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NumericCharSet;
-pub type NumericString = RestrictedString<NumericCharSet>;
 
 impl CharSet for NumericCharSet {
     const NAME: &'static str = "NUMERIC";
@@ -203,12 +190,35 @@ impl CharSet for NumericCharSet {
     }
 }
 
+pub type NumericString = RestrictedString<NumericCharSet>;
+
+impl NumericString {
+    pub fn from_string(s: String) -> Result<Self, CharSetError> {
+        Self::new(s.into_bytes())
+    }
+
+    pub fn as_utf8(&self) -> &str {
+        core::str::from_utf8(self.as_bytes()).expect("valid UTF-8 subset")
+    }
+
+    pub fn into_string(self) -> String {
+        String::from_utf8(self.into_bytes()).expect("valid UTF-8 subset")
+    }
+}
+
+impl FromStr for NumericString {
+    type Err = CharSetError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::new(s.as_bytes())
+    }
+}
+
 // === PrintableString === //
 
 /// a-z, A-Z, ' () +,-.?:/= and SPACE
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PrintableCharSet;
-pub type PrintableString = RestrictedString<PrintableCharSet>;
 
 impl CharSet for PrintableCharSet {
     const NAME: &'static str = "PRINTABLE";
@@ -236,13 +246,35 @@ impl CharSet for PrintableCharSet {
     }
 }
 
+pub type PrintableString = RestrictedString<PrintableCharSet>;
+
+impl PrintableString {
+    pub fn from_string(s: String) -> Result<Self, CharSetError> {
+        Self::new(s.into_bytes())
+    }
+
+    pub fn as_utf8(&self) -> &str {
+        core::str::from_utf8(self.as_bytes()).expect("valid UTF-8 subset")
+    }
+
+    pub fn into_string(self) -> String {
+        String::from_utf8(self.into_bytes()).expect("valid UTF-8 subset")
+    }
+}
+
+impl FromStr for PrintableString {
+    type Err = CharSetError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::new(s.as_bytes())
+    }
+}
+
 // === Utf8String === //
 
 /// any character from a recognized alphabet (including ASCII control characters)
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct Utf8CharSet;
-
-pub type Utf8String = RestrictedString<Utf8CharSet>;
 
 impl CharSet for Utf8CharSet {
     const NAME: &'static str = "UTF8";
@@ -252,14 +284,38 @@ impl CharSet for Utf8CharSet {
     }
 }
 
+pub type Utf8String = RestrictedString<Utf8CharSet>;
+
+impl Utf8String {
+    pub fn from_string(s: String) -> Result<Self, CharSetError> {
+        Self::new(s.into_bytes())
+    }
+
+    pub fn as_utf8(&self) -> &str {
+        core::str::from_utf8(self.as_bytes()).expect("valid UTF-8 subset")
+    }
+
+    pub fn into_string(self) -> String {
+        String::from_utf8(self.into_bytes()).expect("valid UTF-8 subset")
+    }
+}
+
+impl FromStr for Utf8String {
+    type Err = CharSetError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::new(s.as_bytes())
+    }
+}
+
 // === IA5String === //
+
+// FIXME: IA5 -> Ia5
 
 /// First 128 ASCII characters (values from `0x00` to `0x7F`)
 /// Used to represent ISO 646 (IA5) characters.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct IA5CharSet;
-
-pub type IA5String = RestrictedString<IA5CharSet>;
 
 impl CharSet for IA5CharSet {
     const NAME: &'static str = "IA5";
@@ -274,25 +330,87 @@ impl CharSet for IA5CharSet {
     }
 }
 
+pub type IA5String = RestrictedString<IA5CharSet>;
+
+impl IA5String {
+    pub fn from_string(s: String) -> Result<Self, CharSetError> {
+        Self::new(s.into_bytes())
+    }
+
+    pub fn as_utf8(&self) -> &str {
+        core::str::from_utf8(self.as_bytes()).expect("valid UTF-8 subset")
+    }
+
+    pub fn into_string(self) -> String {
+        String::from_utf8(self.into_bytes()).expect("valid UTF-8 subset")
+    }
+}
+
+impl FromStr for IA5String {
+    type Err = CharSetError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::new(s.as_bytes())
+    }
+}
+
+// === BmpString === //
+
+// FIXME: BMP -> Bmp
+
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct BMPCharSet;
-
-pub type BMPString = RestrictedString<BMPCharSet>;
 
 impl CharSet for BMPCharSet {
     const NAME: &'static str = "BMP";
 
     fn check(data: &[u8]) -> bool {
+        // BMP strings are two-byte characters
         if data.len() % 2 != 0 {
             return false;
         }
 
-        let u16_it = data
-            .chunks_exact(2)
-            .into_iter()
-            .map(|elem| u16::from_be_bytes([elem[1], elem[0]]));
+        let chunk_it = data.chunks_exact(2);
+        debug_assert!(chunk_it.remainder().is_empty());
 
-        core::char::decode_utf16(u16_it).all(|c| matches!(c, Ok(_)))
+        // Characters are encoded in big-endian
+        let u16_it = chunk_it.map(|code_unit| u16::from_be_bytes([code_unit[0], code_unit[1]]));
+
+        let mut count = 0;
+
+        for res in char::decode_utf16(u16_it) {
+            if res.is_err() {
+                return false;
+            }
+
+            count += 1;
+        }
+
+        // Unlike UTF-16, BMP encoding is not a variable-length encoding.
+        // (i.e.: BMP is only the first plane, "plane 0", of the Unicode standard.)
+        count == data.len() / 2
+    }
+}
+
+pub type BMPString = RestrictedString<BMPCharSet>;
+
+impl BMPString {
+    pub fn to_utf8(&self) -> String {
+        let chunk_it = self.as_bytes().chunks_exact(2);
+        debug_assert!(chunk_it.remainder().is_empty());
+        let u16_it = chunk_it.map(|code_unit| u16::from_be_bytes([code_unit[0], code_unit[1]]));
+        char::decode_utf16(u16_it)
+            .map(|res| res.expect("valid code point"))
+            .collect()
+    }
+}
+
+impl FromStr for BMPString {
+    type Err = CharSetError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let data: Vec<u8> = s.encode_utf16().flat_map(|code_unit| code_unit.to_be_bytes()).collect();
+        Self::new(data)
     }
 }
 
@@ -337,11 +455,32 @@ mod tests {
 
     #[test]
     fn valid_bmp_string() {
-        BMPString::from_str("语言处理").expect("valid unicode string");
+        assert_eq!(
+            BMPString::from_str("语言处理").expect("valid BMP string").to_utf8(),
+            "语言处理"
+        );
+
+        assert_eq!(
+            BMPString::new(vec![
+                0x00, 0x43, 0x00, 0x65, 0x00, 0x72, 0x00, 0x74, 0x00, 0x69, 0x00, 0x66, 0x00, 0x69, 0x00, 0x63, 0x00,
+                0x61, 0x00, 0x74, 0x00, 0x65, 0x00, 0x54, 0x00, 0x65, 0x00, 0x6d, 0x00, 0x70, 0x00, 0x6c, 0x00, 0x61,
+                0x00, 0x74, 0x00, 0x65,
+            ])
+            .expect("valid BMP string")
+            .to_utf8(),
+            "CertificateTemplate"
+        );
+
+        assert_eq!(
+            BMPString::new(vec![0x00, 0x55, 0x00, 0x73, 0x00, 0x65, 0x00, 0x72])
+                .expect("valid BMP string")
+                .to_utf8(),
+            "User"
+        );
     }
 
     #[test]
     fn invalid_bmp_string() {
-        assert!(BMPString::from_str("1224na÷日本語はむずかちー−×—«BUeisuteurnt").is_err())
+        assert!(BMPString::new("1224na÷日本語はむずかちー−×—«BUeisuteurnt".as_bytes()).is_err())
     }
 }
