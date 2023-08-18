@@ -1,6 +1,7 @@
+use std::str::FromStr as _;
+
 use crate::pkcs12::{pbkdf1, Pbkdf1Usage, Pkcs12Error, Pkcs12HashAlgorithm};
-use crate::string_conversion::utf8_to_bmpstring;
-use picky_asn1::wrapper::OctetStringAsn1;
+use picky_asn1::{restricted_string::BMPString, wrapper::OctetStringAsn1};
 pub use picky_asn1_x509::pkcs12::Pbes1AlgorithmKind as Pbes1Cipher;
 use picky_asn1_x509::pkcs12::{
     Pbes1Params as Pbes1ParamsAsn1, Pbes2AesCbcEncryption as Pbes2AesCbcEncryptionAsn1,
@@ -15,7 +16,9 @@ const DEFAULT_SALT_SIZE: usize = 8;
 const AES_BLOCK_SIZE: usize = 16;
 
 trait Pkcs12Rng: rand::RngCore + rand::CryptoRng {}
+
 impl<T: rand::RngCore + rand::CryptoRng> Pkcs12Rng for T {}
+
 /// Crypto operations context for PFX file parsing/building. Contains password inside as a secure
 /// string and RNG.
 pub struct Pkcs12CryptoContext {
@@ -48,7 +51,7 @@ impl Pkcs12CryptoContext {
 
     /// Returns password in PBES1 password representation - UCS2 encoded string with null terminator
     pub(crate) fn password_bytes_pbes1(&self) -> Result<zeroize::Zeroizing<Vec<u8>>, Pkcs12Error> {
-        let mut bmp = zeroize::Zeroizing::new(utf8_to_bmpstring(&self.password)?.into_bytes());
+        let mut bmp = zeroize::Zeroizing::new(BMPString::from_str(&self.password)?.into_bytes());
         bmp.extend_from_slice(&[0, 0]);
 
         Ok(bmp)

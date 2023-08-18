@@ -24,7 +24,6 @@ pub mod hash;
 pub mod key;
 pub mod pem;
 pub mod signature;
-pub mod string_conversion;
 
 pub use picky_asn1_x509::{oid, oids, AlgorithmIdentifier};
 

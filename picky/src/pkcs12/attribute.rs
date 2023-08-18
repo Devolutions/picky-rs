@@ -1,5 +1,6 @@
 use crate::pkcs12::Pkcs12Error;
-use picky_asn1::{restricted_string::BMPString as BmpStringAsn1, wrapper::OctetStringAsn1};
+use picky_asn1::restricted_string::BMPString;
+use picky_asn1::wrapper::OctetStringAsn1;
 use picky_asn1_der::Asn1RawDer;
 use picky_asn1_x509::{oid::ObjectIdentifier, pkcs12::Pkcs12Attribute as Pkcs12AttributeAsn1};
 use serde::{Deserialize, Serialize};
@@ -28,7 +29,7 @@ impl Pkcs12Attribute {
 
     /// Creates a new `friendly name` attribute. This attribute is used to store a human-readable
     /// name of the safe bag contents (e.g. certificate name).
-    pub fn new_friendly_name(value: BmpStringAsn1) -> Self {
+    pub fn new_friendly_name(value: BMPString) -> Self {
         let kind = Pkcs12AttributeKind::FriendlyName(value);
         let inner = kind.to_inner();
         Self { kind, inner }
@@ -60,7 +61,7 @@ impl Pkcs12Attribute {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Pkcs12AttributeKind {
-    FriendlyName(BmpStringAsn1),
+    FriendlyName(BMPString),
     LocalKeyId(Vec<u8>),
     Custom(CustomPkcs12Attribute),
 }
@@ -176,8 +177,9 @@ impl CustomPkcs12Attribute {
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use super::*;
-    use crate::string_conversion::utf8_to_bmpstring;
     use expect_test::expect;
 
     fn fake_oid() -> ObjectIdentifier {
@@ -186,9 +188,9 @@ mod tests {
 
     #[test]
     fn single_custom_attribute_roundtrip() {
-        let value = utf8_to_bmpstring("Microsoft Software Key Storage Provider").unwrap();
+        let value = BMPString::from_str("Microsoft Software Key Storage Provider").unwrap();
         let attr = CustomPkcs12Attribute::new_single_value(fake_oid(), &value).unwrap();
-        let decoded = attr.to_single_value::<BmpStringAsn1>().unwrap();
+        let decoded = attr.to_single_value::<BMPString>().unwrap();
         assert_eq!(decoded, value);
     }
 
@@ -196,7 +198,7 @@ mod tests {
     fn single_custom_attribute_roundtrip_no_value() {
         let attr = CustomPkcs12Attribute::new_empty(fake_oid());
         assert!(!attr.has_value());
-        let decoded = attr.to_single_value::<BmpStringAsn1>();
+        let decoded = attr.to_single_value::<BMPString>();
         expect![[r#"
             Err(
                 UnexpectedAttributeValuesCount {
@@ -212,7 +214,7 @@ mod tests {
     fn single_custom_attribute_roundtrip_too_many_values() {
         let value = vec![OctetStringAsn1(vec![0x01]), OctetStringAsn1(vec![0x02])];
         let attr = CustomPkcs12Attribute::new_multiple_values(fake_oid(), &value).unwrap();
-        let decoded = attr.to_single_value::<BmpStringAsn1>();
+        let decoded = attr.to_single_value::<BMPString>();
         expect![[r#"
             Err(
                 UnexpectedAttributeValuesCount {
