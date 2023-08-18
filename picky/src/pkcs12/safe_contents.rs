@@ -6,7 +6,7 @@ use picky_asn1_x509::pkcs12::{
 };
 
 /// Top-level PFX container object, which holds list of safe bags and could be encrypted or not.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SafeContents {
     kind: SafeContentsKind,
     inner: SafeContentsContentInfoAsn1,
@@ -129,8 +129,16 @@ impl SafeContents {
         &self.kind
     }
 
+    pub fn into_kind(self) -> SafeContentsKind {
+        self.kind
+    }
+
     pub fn inner(&self) -> &SafeContentsContentInfoAsn1 {
         &self.inner
+    }
+
+    pub fn into_inner(self) -> SafeContentsContentInfoAsn1 {
+        self.inner
     }
 }
 

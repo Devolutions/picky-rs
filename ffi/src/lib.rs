@@ -4,6 +4,7 @@ pub mod hash;
 pub mod jwt;
 pub mod key;
 pub mod pem;
+pub mod pkcs12;
 pub mod signature;
 pub mod ssh;
 pub mod x509;

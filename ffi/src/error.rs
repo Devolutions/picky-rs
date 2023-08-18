@@ -1,15 +1,17 @@
 use std::fmt;
 
+use picky::jose::jwe::JweError;
 use picky::jose::jws::JwsError;
 use picky::jose::jwt::JwtError;
 use picky::key::KeyError;
 use picky::pem::PemError;
+use picky::pkcs12::Pkcs12Error;
 use picky::signature::SignatureError;
+use picky::ssh::certificate::SshCertificateError;
 use picky::ssh::certificate::SshCertificateGenerationError;
 use picky::ssh::private_key::SshPrivateKeyError;
 use picky::ssh::public_key::SshPublicKeyError;
 use picky::x509::certificate::CertError;
-use picky::{jose::jwe::JweError, ssh::certificate::SshCertificateError};
 
 use self::ffi::{PickyError, PickyErrorKind};
 
@@ -75,6 +77,18 @@ impl From<serde_json::Error> for PickyErrorKind {
 
 impl From<SshCertificateGenerationError> for PickyErrorKind {
     fn from(_: SshCertificateGenerationError) -> Self {
+        Self::Generic
+    }
+}
+
+impl From<picky_asn1::restricted_string::CharSetError> for PickyErrorKind {
+    fn from(_: picky_asn1::restricted_string::CharSetError) -> Self {
+        Self::Generic
+    }
+}
+
+impl From<Pkcs12Error> for PickyErrorKind {
+    fn from(_: Pkcs12Error) -> Self {
         Self::Generic
     }
 }

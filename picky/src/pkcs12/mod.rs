@@ -71,7 +71,7 @@ use thiserror::Error;
 
 pub(crate) use pbkdf1::{pbkdf1, Pbkdf1Usage};
 
-pub use attribute::{CustomPkcs12Attribute, Pkcs12Attribute};
+pub use attribute::{CustomPkcs12Attribute, Pkcs12Attribute, Pkcs12AttributeKind};
 pub use encryption::{
     Pbes1Cipher, Pbes1Encryption, Pbes2Cipher, Pbes2Encryption, Pkcs12CryptoContext, Pkcs12Encryption,
     Pkcs12EncryptionKind,
@@ -153,8 +153,8 @@ impl Pfx {
     /// Parses a PKCS12 archive (PFX) from its DER representation.
     pub fn from_der(
         data: &[u8],
-        crypto_context: Pkcs12CryptoContext,
-        parsing_params: Pkcs12ParsingParams,
+        crypto_context: &Pkcs12CryptoContext,
+        parsing_params: &Pkcs12ParsingParams,
     ) -> Result<Self, Pkcs12Error> {
         let (auth_safe, mac_data) = if parsing_params.skip_mac_validation {
             let pfx_asn1: PfxAsn1 = picky_asn1_der::from_bytes(data)?;
@@ -188,7 +188,7 @@ impl Pfx {
             let auth_safe = match pfx_asn1.auth_safe {
                 AuthenticatedSafeContentInfoAsn1::Data(data) => {
                     if let Some(mac_data) = &mac_data {
-                        mac_data.validate(&crypto_context, data.0.as_slice())?;
+                        mac_data.validate(crypto_context, data.0.as_slice())?;
                     }
 
                     let parsed: Vec<SafeContentsContentInfoAsn1> = picky_asn1_der::from_bytes(data.0.as_slice())?;
@@ -204,7 +204,7 @@ impl Pfx {
 
         auth_safe
             .into_iter()
-            .map(|safe_contents| SafeContents::from_asn1(safe_contents, &crypto_context, &parsing_params))
+            .map(|safe_contents| SafeContents::from_asn1(safe_contents, crypto_context, parsing_params))
             .collect::<Result<Vec<_>, _>>()
             .map(|safe_contents| Self {
                 safe_contents,
@@ -225,14 +225,18 @@ impl Pfx {
 }
 
 /// Parameters which control some aspects of PFX file parsing process
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct Pkcs12ParsingParams {
     /// Continue parsing if conversion to high level picky data structure fails (e.g. due to
     /// unsupported private key or certificate kind)
     pub skip_soft_parsing_errors: bool,
+
     /// Continue parsing if decryption fails and keep data in encrypted form
     pub skip_decryption_errors: bool,
-    /// Continue parsing if MAC validation fails. Useful for parsing available unecrypted data from
+
+    /// Continue parsing if MAC validation fails.
+    ///
+    /// This is useful for parsing available unencrypted data from
     /// password-protected PFX files. Also could be useful if PFX integrity has been intentionally
     /// violated for testing purposes.
     pub skip_mac_validation: bool,
@@ -412,35 +416,35 @@ mod tests {
     fn pfx_certmgr_aes256() {
         let encoded = include_bytes!("../../../test_assets/pkcs12/certmgr_aes256.pfx");
         let crypto_context = Pkcs12CryptoContext::new_with_password("test");
-        let _decoded = Pfx::from_der(encoded, crypto_context, Pkcs12ParsingParams::default()).unwrap();
+        let _decoded = Pfx::from_der(encoded, &crypto_context, &Pkcs12ParsingParams::default()).unwrap();
     }
 
     #[test]
     fn pfx_certmgr_3des() {
         let encoded = include_bytes!("../../../test_assets/pkcs12/certmgr_3des.pfx");
         let crypto_context = Pkcs12CryptoContext::new_with_password("test");
-        let _decoded = Pfx::from_der(encoded, crypto_context, Pkcs12ParsingParams::default()).unwrap();
+        let _decoded = Pfx::from_der(encoded, &crypto_context, &Pkcs12ParsingParams::default()).unwrap();
     }
 
     #[test]
     fn pfx_certmgr_rc2() {
         let encoded = include_bytes!("../../../test_assets/pkcs12/leaf_password_is_abc.pfx");
         let crypto_context = Pkcs12CryptoContext::new_with_password("abc");
-        let _decoded = Pfx::from_der(encoded, crypto_context, Pkcs12ParsingParams::default()).unwrap();
+        let _decoded = Pfx::from_der(encoded, &crypto_context, &Pkcs12ParsingParams::default()).unwrap();
     }
 
     #[test]
     fn pfx_certmgr_rc2_empty_pass() {
         let encoded = include_bytes!("../../../test_assets/pkcs12/leaf_empty_password.pfx");
         let crypto_context = Pkcs12CryptoContext::new_without_password();
-        let _decoded = Pfx::from_der(encoded, crypto_context, Pkcs12ParsingParams::default()).unwrap();
+        let _decoded = Pfx::from_der(encoded, &crypto_context, &Pkcs12ParsingParams::default()).unwrap();
     }
 
     #[test]
     fn pfx_openssl_aes_empty_pass() {
         let encoded = include_bytes!("../../../test_assets/pkcs12/openssl_nocrypt.pfx");
         let crypto_context = Pkcs12CryptoContext::new_without_password();
-        let _decoded = Pfx::from_der(encoded, crypto_context, Pkcs12ParsingParams::default()).unwrap();
+        let _decoded = Pfx::from_der(encoded, &crypto_context, &Pkcs12ParsingParams::default()).unwrap();
     }
 
     fn stable_rand() -> impl rand::RngCore + rand::CryptoRng {
@@ -492,7 +496,7 @@ mod tests {
         let crypto_context = make_crypto_context(password);
 
         // Check that we can decode PFX encoded by picky itself
-        let _decoded = Pfx::from_der(der_data, crypto_context, Pkcs12ParsingParams::default()).unwrap();
+        let _decoded = Pfx::from_der(der_data, &crypto_context, &Pkcs12ParsingParams::default()).unwrap();
 
         #[cfg(windows)]
         {
