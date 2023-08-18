@@ -1,4 +1,5 @@
 using System;
+using System.Security.Cryptography.X509Certificates;
 
 using Xunit;
 
@@ -33,11 +34,38 @@ Ob8VZRzI9neWagqNdwvYkQsEjgfbKbYK7p2CNTUQ
         Pem pem = Pem.Parse(certPemRepr);
         Cert cert = Cert.FromPem(pem);
         UtcDate expirationDate = cert.ValidNotAfter;
+        UtcDate notBeforeDate = cert.ValidNotBefore;
 
         Assert.Equal(CertType.Root, cert.Ty);
+
         Assert.Equal("c4a7b1a47b2c71fadbe14b9075ffc41560858910", cert.SubjectKeyIdHex);
+
         Assert.Equal(2021, expirationDate.Year);
         Assert.Equal(09, expirationDate.Month);
         Assert.Equal(30, expirationDate.Day);
+
+        Assert.Equal(2000, notBeforeDate.Year);
+        Assert.Equal(09, notBeforeDate.Month);
+        Assert.Equal(30, notBeforeDate.Day);
+    }
+
+    [Fact]
+    public void X509Certificate2Conversion()
+    {
+        Pem pem = Pem.Parse(certPemRepr);
+        Cert cert = Cert.FromPem(pem);
+        X509Certificate2 cert2 = cert.ToX509Certificate2();
+
+        Assert.Equal(new DateTime(2021, 09, 30, 10, 1, 15), cert2.NotAfter);
+        Assert.Equal(new DateTime(2000, 09, 30, 17, 12, 19), cert2.NotBefore);
+        Assert.Equal("44AFB080D6A327BA893039862EF8406B", cert2.SerialNumber);
+
+        X509ExtensionCollection extensions = cert2.Extensions;
+        // This includes the ASN.1 DER tag and length of the actual value
+        Assert.Equal("0414C4A7B1A47B2C71FADBE14B9075FFC41560858910", Convert.ToHexString(extensions["subjectKeyIdentifier"].RawData));
+
+        Cert cert3 = Cert.FromX509Certificate2(cert2);
+        Pem pem3 = cert3.ToPem();
+        Assert.Equal(pem.ToData(), pem3.ToData());
     }
 }
