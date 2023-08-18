@@ -61,8 +61,10 @@ Ob8VZRzI9neWagqNdwvYkQsEjgfbKbYK7p2CNTUQ
         Assert.Equal("44AFB080D6A327BA893039862EF8406B", cert2.SerialNumber);
 
         X509ExtensionCollection extensions = cert2.Extensions;
-        // This includes the ASN.1 DER tag and length of the actual value
-        Assert.Equal("0414C4A7B1A47B2C71FADBE14B9075FFC41560858910", Convert.ToHexString(extensions["subjectKeyIdentifier"].RawData));
+        X509Extension? skiExt = extensions["subjectKeyIdentifier"];
+        Assert.NotNull(skiExt);
+        byte[] skiExtRawData = skiExt!.RawData; // includes the ASN.1 DER tag and length of the actual value
+        Assert.Equal("0414C4A7B1A47B2C71FADBE14B9075FFC41560858910", Convert.ToHexString(skiExtRawData));
 
         Cert cert3 = Cert.FromX509Certificate2(cert2);
         Pem pem3 = cert3.ToPem();

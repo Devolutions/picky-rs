@@ -242,8 +242,16 @@ impl SafeBag {
         &self.kind
     }
 
+    pub fn into_kind(self) -> SafeBagKind {
+        self.kind
+    }
+
     pub fn inner(&self) -> &SafeBagAsn1 {
         &self.inner
+    }
+
+    pub fn into_inner(self) -> SafeBagAsn1 {
+        self.inner
     }
 }
 

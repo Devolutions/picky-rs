@@ -7,7 +7,7 @@ namespace Devolutions.Picky;
 
 public partial class Pem
 {
-	// TODO: maybe this should be part of the Diplomat namespace in DiplomatRuntime.cs
+	// FIXME: maybe this should be part of the Diplomat namespace in DiplomatRuntime.cs
 #if __IOS__
     private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
 #else
