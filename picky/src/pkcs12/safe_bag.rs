@@ -20,7 +20,7 @@ pub struct SafeBag {
 }
 
 impl SafeBag {
-    /// Create new safe bag with private key
+    /// Create new safe bag holding a private key
     pub fn new_key(key: PrivateKey, attributes: Vec<Pkcs12Attribute>) -> Result<Self, Pkcs12Error> {
         // Convert to `PrivateKeyInfo` structure in DER representation
         let der_data = key.to_pkcs8()?;
@@ -224,6 +224,14 @@ impl SafeBag {
             attributes,
             inner: safe_bag,
         })
+    }
+
+    /// Adds a PKCS12 attribute to this safe bag.
+    ///
+    /// Note that there is an additional performance cost: the inner DER representation must be updated.
+    pub fn add_attribute(&mut self, attribute: Pkcs12Attribute) {
+        self.attributes.push(attribute);
+        self.inner.attributes = attributes_to_asn1(&self.attributes);
     }
 
     pub fn attributes(&self) -> &[Pkcs12Attribute] {

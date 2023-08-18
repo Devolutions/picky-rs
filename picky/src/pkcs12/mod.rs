@@ -56,7 +56,7 @@ mod pbkdf1;
 mod safe_bag;
 mod safe_contents;
 
-use crate::string_conversion::Asn1StringConversionError;
+use picky_asn1::restricted_string::CharSetError;
 use picky_asn1_der::Asn1RawDer;
 use picky_asn1_x509::pkcs12::{
     AuthenticatedSafeContentInfo as AuthenticatedSafeContentInfoAsn1,
@@ -82,8 +82,7 @@ pub use safe_contents::{SafeContents, SafeContentsKind};
 
 const PFX_VERSION: u8 = 3;
 
-/// Parsed PFX file representation. See module docs for more info on PFX file structure and API
-/// usage.
+/// Parsed PFX (PKCS12 archive). See module docs for more info on PFX file structure and API usage.
 #[derive(Debug)]
 pub struct Pfx {
     safe_contents: Vec<SafeContents>,
@@ -151,7 +150,7 @@ impl Pfx {
         }
     }
 
-    /// Parse PFX file from DER bytes
+    /// Parses a PKCS12 archive (PFX) from its DER representation.
     pub fn from_der(
         data: &[u8],
         crypto_context: Pkcs12CryptoContext,
@@ -343,7 +342,7 @@ pub enum Pkcs12Error {
     #[error("Failed to perform PBES2 crypto operation: {context}")]
     Pbes2 { context: String },
     #[error(transparent)]
-    StringConversion(#[from] Asn1StringConversionError),
+    CharSet(#[from] CharSetError),
     #[error(transparent)]
     Mac(#[from] mac::Pkcs12MacError),
     #[error("Invalid ASN.1 DER encoding")]
