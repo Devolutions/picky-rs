@@ -7,7 +7,7 @@ namespace Devolutions.Picky;
 
 public partial class PublicKey
 {
-	// FIXME: maybe this should be part of the Diplomat namespace in DiplomatRuntime.cs
+    // FIXME: maybe this should be part of the Diplomat namespace in DiplomatRuntime.cs
 #if __IOS__
     private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
 #else
@@ -22,7 +22,7 @@ public partial class PublicKey
     ///
     /// - `public_key` must be a pointer to a valid memory location containing a `PublicKey` object.
 	[DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PublicKey_pkcs1_encoded_len", ExactSpelling = true)]
-	internal static unsafe extern nuint PublicKey_pkcs1_encoded_len(Raw.PublicKey* public_key);
+    internal static unsafe extern nuint PublicKey_pkcs1_encoded_len(Raw.PublicKey* public_key);
 
     /// Serializes an RSA public key into a PKCS1 archive (DER representation).
     ///
@@ -33,7 +33,7 @@ public partial class PublicKey
     /// - `public_key` must be a pointer to a valid memory location containing a `PublicKey` object.
     /// - `dst` must be valid for writes of `count` bytes.
 	[DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PublicKey_to_pkcs1", ExactSpelling = true)]
-	internal static unsafe extern Raw.PickyError* PublicKey_to_pkcs1(Raw.PublicKey* public_key, byte* dst, nuint count);
+    internal static unsafe extern Raw.PickyError* PublicKey_to_pkcs1(Raw.PublicKey* public_key, byte* dst, nuint count);
 
     public byte[] ToPkcs1()
     {
@@ -44,9 +44,9 @@ public partial class PublicKey
                 throw new ObjectDisposedException("PublicKey");
             }
 
-			nuint count = PublicKey_pkcs1_encoded_len(_inner);
+            nuint count = PublicKey_pkcs1_encoded_len(_inner);
 
-			byte[] pkcs1 = new byte[count];
+            byte[] pkcs1 = new byte[count];
             Raw.PickyError* error;
 
             fixed (byte* pkcs1Ptr = pkcs1)
@@ -54,11 +54,12 @@ public partial class PublicKey
                 error = PublicKey_to_pkcs1(_inner, pkcs1Ptr, count);
             }
 
-            if (error != null) {
+            if (error != null)
+            {
                 throw new PickyException(new PickyError(error));
             }
 
-			return pkcs1;
+            return pkcs1;
         }
     }
 
