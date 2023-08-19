@@ -7,7 +7,7 @@ namespace Devolutions.Picky;
 
 public partial class Pfx
 {
-	// FIXME: maybe this should be part of the Diplomat namespace in DiplomatRuntime.cs
+    // FIXME: maybe this should be part of the Diplomat namespace in DiplomatRuntime.cs
 #if __IOS__
     private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
 #else
@@ -22,7 +22,7 @@ public partial class Pfx
     ///
     /// - `pfx` must be a pointer to a valid memory location containing a `Pfx` object.
 	[DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pfx_der_encoded_len", ExactSpelling = true)]
-	internal static unsafe extern nuint Pfx_der_encoded_len(Raw.Pfx* pfx);
+    internal static unsafe extern nuint Pfx_der_encoded_len(Raw.Pfx* pfx);
 
     /// Serializes the PKCS12 archive into DER representation.
     ///
@@ -33,7 +33,7 @@ public partial class Pfx
     /// - `pfx` must be a pointer to a valid memory location containing a `Pfx` object.
     /// - `dst` must be valid for writes of `count` bytes.
 	[DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pfx_to_der", ExactSpelling = true)]
-	internal static unsafe extern Raw.PickyError* Pfx_to_der(Raw.Pfx* pfx, byte* dst, nuint count);
+    internal static unsafe extern Raw.PickyError* Pfx_to_der(Raw.Pfx* pfx, byte* dst, nuint count);
 
     public byte[] ToDer()
     {
@@ -44,9 +44,9 @@ public partial class Pfx
                 throw new ObjectDisposedException("Pfx");
             }
 
-			nuint count = Pfx_der_encoded_len(_inner);
+            nuint count = Pfx_der_encoded_len(_inner);
 
-			byte[] der = new byte[count];
+            byte[] der = new byte[count];
             Raw.PickyError* error;
 
             fixed (byte* derPtr = der)
@@ -54,11 +54,12 @@ public partial class Pfx
                 error = Pfx_to_der(_inner, derPtr, count);
             }
 
-            if (error != null) {
+            if (error != null)
+            {
                 throw new PickyException(new PickyError(error));
             }
 
-			return der;
+            return der;
         }
     }
 }

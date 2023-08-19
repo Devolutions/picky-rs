@@ -8,11 +8,11 @@ namespace Devolutions.Picky.Tests;
 
 public class Pkcs12Tests
 {
-    static string leafPrivateKey = "../../../../../../../test_assets/private_keys/rsa-2048-pk_3.key";
-    static string leafCertPath = "../../../../../../../test_assets/pkcs12/asset_leaf.crt";
-    static string intermediateCertPath = "../../../../../../../test_assets/pkcs12/asset_intermediate.crt";
-    static string rootCertPath = "../../../../../../../test_assets/pkcs12/asset_root.crt";
-    static string pfxSample = "../../../../../../../test_assets/pkcs12/openssl_nocrypt.pfx";
+    static readonly string leafPrivateKey = "../../../../../../../test_assets/private_keys/rsa-2048-pk_3.key";
+    static readonly string leafCertPath = "../../../../../../../test_assets/pkcs12/asset_leaf.crt";
+    static readonly string intermediateCertPath = "../../../../../../../test_assets/pkcs12/asset_intermediate.crt";
+    static readonly string rootCertPath = "../../../../../../../test_assets/pkcs12/asset_root.crt";
+    static readonly string pfxSample = "../../../../../../../test_assets/pkcs12/openssl_nocrypt.pfx";
 
     [Fact]
     public void PfxBuild()
@@ -94,36 +94,37 @@ public class Pkcs12Tests
             switch (safeBag.Kind)
             {
                 case SafeBagKind.PrivateKey:
-                {
-                    privateKeyCount++;
-                    Assert.NotNull(safeBag.PrivateKey);
-                    Assert.True(safeBag.ContainsFriendlyName("my_cert"));
-                    Assert.True(safeBag.ContainsLocalKeyId(Convert.FromHexString("2A4D6C0CCDCBC90B195B68AE069DBC8922A97F40")));
-                    break;
-                }
-                case SafeBagKind.Certificate:
-                {
-                    certificateCount++;
-
-                    Assert.NotNull(safeBag.Certificate);
-
-                    if (safeBag.ContainsFriendlyName("my_cert")) {
-                        myCertCount++;
+                    {
+                        privateKeyCount++;
+                        Assert.NotNull(safeBag.PrivateKey);
+                        Assert.True(safeBag.ContainsFriendlyName("my_cert"));
                         Assert.True(safeBag.ContainsLocalKeyId(Convert.FromHexString("2A4D6C0CCDCBC90B195B68AE069DBC8922A97F40")));
+                        break;
                     }
+                case SafeBagKind.Certificate:
+                    {
+                        certificateCount++;
 
-                    break;
-                }
+                        Assert.NotNull(safeBag.Certificate);
+
+                        if (safeBag.ContainsFriendlyName("my_cert"))
+                        {
+                            myCertCount++;
+                            Assert.True(safeBag.ContainsLocalKeyId(Convert.FromHexString("2A4D6C0CCDCBC90B195B68AE069DBC8922A97F40")));
+                        }
+
+                        break;
+                    }
                 case SafeBagKind.Secret:
-                {
-                    secretCount++;
-                    break;
-                }
+                    {
+                        secretCount++;
+                        break;
+                    }
                 case SafeBagKind.Unknown:
-                {
-                    unknownCount++;
-                    break;
-                }
+                    {
+                        unknownCount++;
+                        break;
+                    }
             }
 
             Pkcs12AttributeIterator attrIt = safeBag.Attributes();
@@ -136,21 +137,21 @@ public class Pkcs12Tests
                 switch (attr.Kind)
                 {
                     case Pkcs12AttributeKind.FriendlyName:
-                    {
-                        friendlyNameCount++;
-                        Assert.Equal("my_cert", attr.FriendlyName);
-                        break;
-                    }
+                        {
+                            friendlyNameCount++;
+                            Assert.Equal("my_cert", attr.FriendlyName);
+                            break;
+                        }
                     case Pkcs12AttributeKind.LocalKeyId:
-                    {
-                        localKeyIdCount++;
-                        break;
-                    }
+                        {
+                            localKeyIdCount++;
+                            break;
+                        }
                     case Pkcs12AttributeKind.Custom:
-                    {
-                        customAttrCount++;
-                        break;
-                    }
+                        {
+                            customAttrCount++;
+                            break;
+                        }
                 }
 
                 attr = attrIt.Next();
