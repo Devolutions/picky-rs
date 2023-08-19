@@ -59,7 +59,7 @@ public partial class PublicKey: IDisposable
     }
 
     /// <summary>
-    /// Reads a public key from its DER encoding.
+    /// Reads a public key from its DER encoding (i.e.: SubjectPublicKeyInfo structure).
     /// </summary>
     /// <exception cref="PickyException"></exception>
     /// <returns>
@@ -73,6 +73,33 @@ public partial class PublicKey: IDisposable
             fixed (byte* derPtr = der)
             {
                 IntPtr resultPtr = Raw.PublicKey.FromDer(derPtr, derLength);
+                Raw.KeyFfiResultBoxPublicKeyBoxPickyError result = Marshal.PtrToStructure<Raw.KeyFfiResultBoxPublicKeyBoxPickyError>(resultPtr);
+                Raw.KeyFfiResultBoxPublicKeyBoxPickyError.Destroy(resultPtr);
+                if (!result.isOk)
+                {
+                    throw new PickyException(new PickyError(result.Err));
+                }
+                Raw.PublicKey* retVal = result.Ok;
+                return new PublicKey(retVal);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reads a RSA public key from its DER encoding (i.e.: PKCS1).
+    /// </summary>
+    /// <exception cref="PickyException"></exception>
+    /// <returns>
+    /// A <c>PublicKey</c> allocated on Rust side.
+    /// </returns>
+    public static PublicKey FromPkcs1(byte[] der)
+    {
+        unsafe
+        {
+            nuint derLength = (nuint)der.Length;
+            fixed (byte* derPtr = der)
+            {
+                IntPtr resultPtr = Raw.PublicKey.FromPkcs1(derPtr, derLength);
                 Raw.KeyFfiResultBoxPublicKeyBoxPickyError result = Marshal.PtrToStructure<Raw.KeyFfiResultBoxPublicKeyBoxPickyError>(resultPtr);
                 Raw.KeyFfiResultBoxPublicKeyBoxPickyError.Destroy(resultPtr);
                 if (!result.isOk)

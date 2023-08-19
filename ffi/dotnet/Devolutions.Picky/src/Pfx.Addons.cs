@@ -22,7 +22,7 @@ public partial class Pfx
     ///
     /// - `pfx` must be a pointer to a valid memory location containing a `Pfx` object.
 	[DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pfx_der_encoded_len", ExactSpelling = true)]
-	internal static unsafe extern nuint Pfx_der_encoded_len(Raw.Pfx* self);
+	internal static unsafe extern nuint Pfx_der_encoded_len(Raw.Pfx* pfx);
 
     /// Serializes the PKCS12 archive into DER representation.
     ///
@@ -33,7 +33,7 @@ public partial class Pfx
     /// - `pfx` must be a pointer to a valid memory location containing a `Pfx` object.
     /// - `dst` must be valid for writes of `count` bytes.
 	[DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pfx_to_der", ExactSpelling = true)]
-	internal static unsafe extern Raw.PickyError* Pfx_to_der(Raw.Pfx* self, byte* dst, nuint count);
+	internal static unsafe extern Raw.PickyError* Pfx_to_der(Raw.Pfx* pfx, byte* dst, nuint count);
 
     public byte[] ToDer()
     {

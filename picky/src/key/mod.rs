@@ -856,6 +856,17 @@ impl PublicKey {
         })
     }
 
+    pub fn to_pkcs1(&self) -> Result<Vec<u8>, KeyError> {
+        let picky_asn1_x509::PublicKey::Rsa(BitStringAsn1Container(rsa_public_key)) = &self.0.subject_public_key else {
+            return Err(KeyError::Rsa { context: String::from("can’t export a non-RSA key to PKCS#1 format") });
+        };
+
+        picky_asn1_der::to_vec(rsa_public_key).map_err(|e| KeyError::Asn1Serialization {
+            source: e,
+            element: "RSA public key",
+        })
+    }
+
     pub fn to_pem(&self) -> Result<Pem<'static>, KeyError> {
         let der = self.to_der()?;
         Ok(Pem::new(PUBLIC_KEY_PEM_LABEL, der))
@@ -868,7 +879,7 @@ impl PublicKey {
     pub fn from_pem(pem: &Pem) -> Result<Self, KeyError> {
         match pem.label() {
             PUBLIC_KEY_PEM_LABEL | EC_PUBLIC_KEY_PEM_LABEL => Self::from_der(pem.data()),
-            RSA_PUBLIC_KEY_PEM_LABEL => Self::from_rsa_der(pem.data()),
+            RSA_PUBLIC_KEY_PEM_LABEL => Self::from_pkcs1(pem.data()),
             _ => Err(KeyError::InvalidPemLabel {
                 label: pem.label().to_owned(),
             }),
@@ -889,7 +900,7 @@ impl PublicKey {
         })?))
     }
 
-    pub fn from_rsa_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, KeyError> {
+    pub fn from_pkcs1<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, KeyError> {
         use picky_asn1_x509::{AlgorithmIdentifier, PublicKey, RsaPublicKey};
 
         let public_key =
@@ -991,6 +1002,14 @@ mod tests {
     #[test]
     fn public_key_from_pem() {
         PublicKey::from_pem(&PUBLIC_KEY_PEM.parse::<Pem>().expect("pem")).expect("public key");
+    }
+
+    #[test]
+    fn public_key_to_and_from_pkcs1() {
+        let public_key = PublicKey::from_pem(&PUBLIC_KEY_PEM.parse::<Pem>().expect("pem")).expect("public key");
+        let pkcs1 = public_key.to_pkcs1().expect("PKCS1");
+        let public_key_round_trip = PublicKey::from_pkcs1(&pkcs1).expect("round trip parse");
+        assert_eq!(public_key_round_trip, public_key);
     }
 
     const RSA_PUBLIC_KEY_PEM: &str = "-----BEGIN RSA PUBLIC KEY-----\n\

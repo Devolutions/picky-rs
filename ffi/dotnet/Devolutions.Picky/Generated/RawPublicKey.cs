@@ -27,10 +27,16 @@ public partial struct PublicKey
     public static unsafe extern IntPtr FromPem(Pem* pem);
 
     /// <summary>
-    /// Reads a public key from its DER encoding.
+    /// Reads a public key from its DER encoding (i.e.: SubjectPublicKeyInfo structure).
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PublicKey_from_der", ExactSpelling = true)]
     public static unsafe extern IntPtr FromDer(byte* der, nuint derSz);
+
+    /// <summary>
+    /// Reads a RSA public key from its DER encoding (i.e.: PKCS1).
+    /// </summary>
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PublicKey_from_pkcs1", ExactSpelling = true)]
+    public static unsafe extern IntPtr FromPkcs1(byte* der, nuint derSz);
 
     /// <summary>
     /// Exports the public key into a PEM object
