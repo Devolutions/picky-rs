@@ -1,3 +1,5 @@
+use crate::error::ffi::PickyError;
+
 use self::ffi::{EcCurve, EdAlgorithm};
 
 impl From<picky::key::EcCurve> for EcCurve {
@@ -120,9 +122,15 @@ pub mod ffi {
             Ok(Box::new(PublicKey(key)))
         }
 
-        /// Reads a public key from its DER encoding.
+        /// Reads a public key from its DER encoding (i.e.: SubjectPublicKeyInfo structure).
         pub fn from_der(der: &[u8]) -> Result<Box<PublicKey>, Box<PickyError>> {
             let key = picky::key::PublicKey::from_der(der)?;
+            Ok(Box::new(PublicKey(key)))
+        }
+
+        /// Reads a RSA public key from its DER encoding (i.e.: PKCS1).
+        pub fn from_pkcs1(der: &[u8]) -> Result<Box<PublicKey>, Box<PickyError>> {
+            let key = picky::key::PublicKey::from_pkcs1(der)?;
             Ok(Box::new(PublicKey(key)))
         }
 
@@ -132,4 +140,59 @@ pub mod ffi {
             Ok(Box::new(Pem(pem)))
         }
     }
+}
+
+/// Returns the required space in bytes to write the DER representation of the PKCS1 archive.
+///
+/// When an error occurs, 0 is returned.
+///
+/// # Safety
+///
+/// - `public_key` must be a pointer to a valid memory location containing a `PublicKey` object.
+#[no_mangle]
+pub unsafe extern "C" fn PublicKey_pkcs1_encoded_len(public_key: Option<&ffi::PublicKey>) -> usize {
+    if let Some(data) = public_key.and_then(|k| k.0.to_pkcs1().ok()) {
+        data.len()
+    } else {
+        0
+    }
+}
+
+/// Serializes an RSA public key into a PKCS1 archive (DER representation).
+///
+/// Returns 0 (NULL) on success or a pointer to a `PickyError` on failure.
+///
+/// # Safety
+///
+/// - `public_key` must be a pointer to a valid memory location containing a `PublicKey` object.
+/// - `dst` must be valid for writes of `count` bytes.
+#[no_mangle]
+pub unsafe extern "C" fn PublicKey_to_pkcs1(
+    public_key: Option<&ffi::PublicKey>,
+    dst: *mut u8,
+    count: usize,
+) -> Option<Box<PickyError>> {
+    let Some(public_key) = public_key else {
+        return Some("received a null pointer".into());
+    };
+
+    let data = match public_key.0.to_pkcs1() {
+        Ok(data) => data,
+        Err(e) => return Some(e.into()),
+    };
+
+    let data_len = data.len();
+
+    if data_len > count {
+        return Some("not enough space to fit the DER-encoded PKCS1".into());
+    }
+
+    // Safety:
+    // - `src` is valid for reads of `data_len` bytes.
+    // - `dst` is valid for writes of `data_len` bytes, because it is valid for `count` bytes (caller is responsible for this invariant).
+    // - Both `src` and `dst` are always properly aligned: u8 aligment is 1.
+    // - Memory regions are not overlapping, `data` is created by us just above.
+    std::ptr::copy_nonoverlapping(data.as_ptr(), dst, data_len);
+
+    None
 }

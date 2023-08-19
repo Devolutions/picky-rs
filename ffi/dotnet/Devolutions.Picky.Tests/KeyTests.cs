@@ -53,4 +53,14 @@ vQIDAQAB
         PublicKey pub = priv.ToPublicKey();
         Assert.Equal(pubKeyPemRepr.Replace("\r", ""), pub.ToPem().ToRepr());
     }
+
+    [Fact]
+    public void PublicToAndFromPkcs1Smoke()
+    {
+        Pem pem = Pem.Parse(pubKeyPemRepr);
+        PublicKey key = PublicKey.FromPem(pem);
+        byte[] pkcs1 = key.ToPkcs1();
+        PublicKey key2 = PublicKey.FromPkcs1(pkcs1);
+        Assert.Equal(key.ToDer(), key2.ToDer());
+    }
 }
