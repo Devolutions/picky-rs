@@ -2,7 +2,7 @@
 use crate::pkcs7::content_info::SpcSpOpusInfo;
 use crate::{oids, Extension, Extensions};
 use picky_asn1::date::UTCTime;
-use picky_asn1::wrapper::{Asn1SequenceOf, Asn1SetOf, ObjectIdentifierAsn1, OctetStringAsn1, UTCTimeAsn1};
+use picky_asn1::wrapper::{Asn1SequenceOf, Asn1SetOf, ObjectIdentifierAsn1, OctetStringAsn1, UtcTimeAsn1};
 use serde::{de, ser};
 
 pub type Attributes = Asn1SequenceOf<Attribute>;
@@ -24,7 +24,7 @@ pub enum AttributeValues {
     ContentType(Asn1SetOf<ObjectIdentifierAsn1>),
     SpcStatementType(Asn1SetOf<Asn1SequenceOf<ObjectIdentifierAsn1>>),
     MessageDigest(Asn1SetOf<OctetStringAsn1>),
-    SigningTime(Asn1SetOf<UTCTimeAsn1>),
+    SigningTime(Asn1SetOf<UtcTimeAsn1>),
     #[cfg(feature = "pkcs7")]
     SpcSpOpusInfo(Asn1SetOf<SpcSpOpusInfo>),
     Custom(picky_asn1_der::Asn1RawDer), // fallback

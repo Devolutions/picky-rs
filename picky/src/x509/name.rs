@@ -1,6 +1,6 @@
 use crate::oid::ObjectIdentifier;
-use picky_asn1::restricted_string::{CharSetError, IA5String};
-use picky_asn1::wrapper::{Asn1SequenceOf, IA5StringAsn1};
+use picky_asn1::restricted_string::{CharSetError, Ia5String};
+use picky_asn1::wrapper::{Asn1SequenceOf, Ia5StringAsn1};
 use picky_asn1_x509::{
     DirectoryString, GeneralName as SerdeGeneralName, GeneralNames as SerdeGeneralNames, Name, NamePrettyFormatter,
     OtherName,
@@ -40,7 +40,7 @@ impl DirectoryName {
 
     /// Add an emailAddress attribute.
     /// NOTE: this attribute does not conform with the RFC 5280, email should be placed in SAN instead
-    pub fn add_email<S: Into<IA5StringAsn1>>(&mut self, value: S) {
+    pub fn add_email<S: Into<Ia5StringAsn1>>(&mut self, value: S) {
         self.0.add_email(value)
     }
 }
@@ -68,25 +68,25 @@ impl From<DirectoryName> for Name {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum GeneralName {
     OtherName(OtherName),
-    RFC822Name(IA5String),
-    DNSName(IA5String),
+    RFC822Name(Ia5String),
+    DNSName(Ia5String),
     DirectoryName(DirectoryName),
     EDIPartyName {
         name_assigner: Option<DirectoryString>,
         party_name: DirectoryString,
     },
-    URI(IA5String),
+    URI(Ia5String),
     IpAddress(Vec<u8>),
     RegisteredId(ObjectIdentifier),
 }
 
 impl GeneralName {
     pub fn new_rfc822_name<S: Into<String>>(name: S) -> Result<Self, CharSetError> {
-        Ok(Self::RFC822Name(IA5String::from_string(name.into())?))
+        Ok(Self::RFC822Name(Ia5String::from_string(name.into())?))
     }
 
     pub fn new_dns_name<S: Into<String>>(name: S) -> Result<Self, CharSetError> {
-        Ok(Self::DNSName(IA5String::from_string(name.into())?))
+        Ok(Self::DNSName(Ia5String::from_string(name.into())?))
     }
 
     pub fn new_directory_name<N: Into<DirectoryName>>(name: N) -> Self {
@@ -105,7 +105,7 @@ impl GeneralName {
     }
 
     pub fn new_uri<S: Into<String>>(uri: S) -> Result<Self, CharSetError> {
-        Ok(Self::URI(IA5String::from_string(uri.into())?))
+        Ok(Self::URI(Ia5String::from_string(uri.into())?))
     }
 
     pub fn new_ip_address<ADDR: Into<Vec<u8>>>(ip_address: ADDR) -> Self {
@@ -182,17 +182,17 @@ impl GeneralNames {
     /// let dns_name = GeneralName::new_dns_name("localhost").expect("invalid name string");
     /// let names = GeneralNames::new(dns_name);
     /// ```
-    pub fn new<GN: Into<GeneralName>>(gn: GN) -> Self {
+    pub fn new<Gn: Into<GeneralName>>(gn: Gn) -> Self {
         let gn = gn.into();
         Self(Asn1SequenceOf(vec![gn.into()]))
     }
 
-    pub fn new_directory_name<DN: Into<DirectoryName>>(name: DN) -> Self {
+    pub fn new_directory_name<Dn: Into<DirectoryName>>(name: Dn) -> Self {
         let gn = GeneralName::new_directory_name(name);
         Self::new(gn)
     }
 
-    pub fn with_directory_name<DN: Into<DirectoryName>>(mut self, name: DN) -> Self {
+    pub fn with_directory_name<Dn: Into<DirectoryName>>(mut self, name: Dn) -> Self {
         let gn = GeneralName::new_directory_name(name);
         (self.0).0.push(gn.into());
         self
@@ -211,11 +211,11 @@ impl GeneralNames {
     ///
     /// ```
     /// use picky::x509::name::GeneralNames;
-    /// use picky_asn1::restricted_string::IA5String;
+    /// use picky_asn1::restricted_string::Ia5String;
     ///
-    /// let names = GeneralNames::new_dns_name(IA5String::new("localhost").unwrap());
+    /// let names = GeneralNames::new_dns_name(Ia5String::new("localhost").unwrap());
     /// ```
-    pub fn new_dns_name<IA5: Into<IA5String>>(dns_name: IA5) -> Self {
+    pub fn new_dns_name<Ia5: Into<Ia5String>>(dns_name: Ia5) -> Self {
         let gn = GeneralName::DNSName(dns_name.into());
         Self::new(gn)
     }
@@ -224,18 +224,18 @@ impl GeneralNames {
     ///
     /// ```
     /// use picky::x509::name::{GeneralNames, DirectoryName};
-    /// use picky_asn1::restricted_string::IA5String;
+    /// use picky_asn1::restricted_string::Ia5String;
     ///
     /// let names = GeneralNames::new_directory_name(DirectoryName::new_common_name("MyName"))
-    ///         .with_dns_name(IA5String::new("localhost").unwrap());
+    ///         .with_dns_name(Ia5String::new("localhost").unwrap());
     /// ```
-    pub fn with_dns_name<IA5: Into<IA5String>>(mut self, dns_name: IA5) -> Self {
+    pub fn with_dns_name<Ia5: Into<Ia5String>>(mut self, dns_name: Ia5) -> Self {
         let gn = GeneralName::DNSName(dns_name.into());
         (self.0).0.push(gn.into());
         self
     }
 
-    pub fn find_dns_name(&self) -> Option<&IA5String> {
+    pub fn find_dns_name(&self) -> Option<&Ia5String> {
         for name in &(self.0).0 {
             if let SerdeGeneralName::DnsName(name) = name {
                 return Some(&name.0);
@@ -244,7 +244,7 @@ impl GeneralNames {
         None
     }
 
-    pub fn add_name<GN: Into<GeneralName>>(&mut self, name: GN) {
+    pub fn add_name<Gn: Into<GeneralName>>(&mut self, name: Gn) {
         let gn = name.into();
         (self.0).0.push(gn.into());
     }

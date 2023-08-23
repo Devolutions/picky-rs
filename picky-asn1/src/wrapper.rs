@@ -1,6 +1,6 @@
 use crate::bit_string::BitString;
 use crate::date::{GeneralizedTime, UTCTime};
-use crate::restricted_string::{BMPString, IA5String, NumericString, PrintableString, Utf8String};
+use crate::restricted_string::{BmpString, Ia5String, NumericString, PrintableString, Utf8String};
 use crate::tag::Tag;
 use crate::Asn1Type;
 use oid::ObjectIdentifier;
@@ -196,16 +196,23 @@ asn1_wrapper! { auto struct ObjectIdentifierAsn1(ObjectIdentifier), Tag::OID }
 asn1_wrapper! { auto struct Utf8StringAsn1(Utf8String),             Tag::UTF8_STRING }
 asn1_wrapper! { auto struct NumericStringAsn1(NumericString),       Tag::NUMERIC_STRING }
 asn1_wrapper! { auto struct PrintableStringAsn1(PrintableString),   Tag::PRINTABLE_STRING }
-asn1_wrapper! { auto struct IA5StringAsn1(IA5String),               Tag::IA5_STRING }
-asn1_wrapper! { auto struct BMPStringAsn1(BMPString),               Tag::BMP_STRING }
-asn1_wrapper! { auto struct UTCTimeAsn1(UTCTime),                   Tag::UTC_TIME }
+asn1_wrapper! { auto struct Ia5StringAsn1(Ia5String),               Tag::IA5_STRING }
+asn1_wrapper! { auto struct BmpStringAsn1(BmpString),               Tag::BMP_STRING }
+asn1_wrapper! { auto struct UtcTimeAsn1(UTCTime),                   Tag::UTC_TIME }
 asn1_wrapper! { auto struct GeneralizedTimeAsn1(GeneralizedTime),   Tag::GENERALIZED_TIME }
 // [RFC 4120 5.2.1](https://www.rfc-editor.org/rfc/rfc4120.txt)
 // Kerberos specification declares General String as IA5String
 // ```not-rust
 // KerberosString  ::= GeneralString (IA5String)
 // ```
-asn1_wrapper! { auto struct GeneralStringAsn1(IA5String),           Tag::GENERAL_STRING }
+asn1_wrapper! { auto struct GeneralStringAsn1(Ia5String),           Tag::GENERAL_STRING }
+
+#[deprecated = "Use BmpStringAsn1 instead"]
+pub use BmpStringAsn1 as BMPStringAsn1;
+#[deprecated = "Use Ia5StringAsn1 instead"]
+pub use Ia5StringAsn1 as IA5StringAsn1;
+#[deprecated = "Use UtcTimeAsn1 instead"]
+pub use UtcTimeAsn1 as UTCTimeAsn1;
 
 asn1_wrapper! { auto collection struct Asn1SequenceOf<T>, Tag::SEQUENCE }
 asn1_wrapper! { auto collection struct Asn1SetOf<T>,      Tag::SET }
@@ -252,15 +259,15 @@ impl Default for BitStringAsn1 {
     }
 }
 
-impl Default for IA5StringAsn1 {
+impl Default for Ia5StringAsn1 {
     fn default() -> Self {
-        IA5StringAsn1::from(IA5String::default())
+        Ia5StringAsn1::from(Ia5String::default())
     }
 }
 
-impl Default for BMPStringAsn1 {
+impl Default for BmpStringAsn1 {
     fn default() -> Self {
-        BMPStringAsn1::from(BMPString::default())
+        BmpStringAsn1::from(BmpString::default())
     }
 }
 

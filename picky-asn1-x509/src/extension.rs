@@ -565,7 +565,7 @@ mod tests {
     use super::*;
     use crate::GeneralName;
     use base64::{engine::general_purpose, Engine as _};
-    use picky_asn1::restricted_string::IA5String;
+    use picky_asn1::restricted_string::Ia5String;
 
     #[test]
     fn key_usage() {
@@ -618,11 +618,11 @@ mod tests {
             ])
             .into_non_critical(),
             Extension::new_subject_alt_name(vec![
-                GeneralName::DnsName(IA5String::from_string("devel.example.com".into()).unwrap().into()),
-                GeneralName::DnsName(IA5String::from_string("ipv6.example.com".into()).unwrap().into()),
-                GeneralName::DnsName(IA5String::from_string("ipv4.example.com".into()).unwrap().into()),
-                GeneralName::DnsName(IA5String::from_string("test.example.com".into()).unwrap().into()),
-                GeneralName::DnsName(IA5String::from_string("party.example.com".into()).unwrap().into()),
+                GeneralName::DnsName(Ia5String::from_string("devel.example.com".into()).unwrap().into()),
+                GeneralName::DnsName(Ia5String::from_string("ipv6.example.com".into()).unwrap().into()),
+                GeneralName::DnsName(Ia5String::from_string("ipv4.example.com".into()).unwrap().into()),
+                GeneralName::DnsName(Ia5String::from_string("test.example.com".into()).unwrap().into()),
+                GeneralName::DnsName(Ia5String::from_string("party.example.com".into()).unwrap().into()),
             ])
             .into_non_critical(),
         ]);

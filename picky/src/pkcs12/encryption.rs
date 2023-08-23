@@ -1,7 +1,7 @@
 use std::str::FromStr as _;
 
 use crate::pkcs12::{pbkdf1, Pbkdf1Usage, Pkcs12Error, Pkcs12HashAlgorithm};
-use picky_asn1::{restricted_string::BMPString, wrapper::OctetStringAsn1};
+use picky_asn1::{restricted_string::BmpString, wrapper::OctetStringAsn1};
 pub use picky_asn1_x509::pkcs12::Pbes1AlgorithmKind as Pbes1Cipher;
 use picky_asn1_x509::pkcs12::{
     Pbes1Params as Pbes1ParamsAsn1, Pbes2AesCbcEncryption as Pbes2AesCbcEncryptionAsn1,
@@ -51,7 +51,7 @@ impl Pkcs12CryptoContext {
 
     /// Returns password in PBES1 password representation - UCS2 encoded string with null terminator
     pub(crate) fn password_bytes_pbes1(&self) -> Result<zeroize::Zeroizing<Vec<u8>>, Pkcs12Error> {
-        let mut bmp = zeroize::Zeroizing::new(BMPString::from_str(&self.password)?.into_bytes());
+        let mut bmp = zeroize::Zeroizing::new(BmpString::from_str(&self.password)?.into_bytes());
         bmp.extend_from_slice(&[0, 0]);
 
         Ok(bmp)

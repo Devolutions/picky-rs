@@ -1,6 +1,6 @@
 use picky_asn1::date::{GeneralizedTime, UTCTime};
 use picky_asn1::tag::TagPeeker;
-use picky_asn1::wrapper::{GeneralizedTimeAsn1, UTCTimeAsn1};
+use picky_asn1::wrapper::{GeneralizedTimeAsn1, UtcTimeAsn1};
 use picky_asn1::Asn1Type;
 use serde::{de, ser, Deserialize, Serialize};
 use std::fmt;
@@ -13,12 +13,12 @@ pub struct Validity {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Time {
-    Utc(UTCTimeAsn1),
+    Utc(UtcTimeAsn1),
     Generalized(GeneralizedTimeAsn1),
 }
 
-impl From<UTCTimeAsn1> for Time {
-    fn from(time: UTCTimeAsn1) -> Self {
+impl From<UtcTimeAsn1> for Time {
+    fn from(time: UtcTimeAsn1) -> Self {
         Self::Utc(time)
     }
 }
@@ -73,7 +73,7 @@ impl<'de> de::Deserialize<'de> for Time {
             {
                 let tag_peeker: TagPeeker = seq_next_element!(seq, Time, "choice tag");
                 match tag_peeker.next_tag {
-                    UTCTimeAsn1::TAG => Ok(Time::Utc(seq_next_element!(seq, Time, "UTCTime"))),
+                    UtcTimeAsn1::TAG => Ok(Time::Utc(seq_next_element!(seq, Time, "UTCTime"))),
                     GeneralizedTimeAsn1::TAG => Ok(Time::Generalized(seq_next_element!(seq, Time, "GeneralizedTime"))),
                     _ => Err(serde_invalid_value!(
                         Time,

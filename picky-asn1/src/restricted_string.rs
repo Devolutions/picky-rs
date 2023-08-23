@@ -310,14 +310,12 @@ impl FromStr for Utf8String {
 
 // === IA5String === //
 
-// FIXME: IA5 -> Ia5
-
 /// First 128 ASCII characters (values from `0x00` to `0x7F`)
 /// Used to represent ISO 646 (IA5) characters.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
-pub struct IA5CharSet;
+pub struct Ia5CharSet;
 
-impl CharSet for IA5CharSet {
+impl CharSet for Ia5CharSet {
     const NAME: &'static str = "IA5";
 
     fn check(data: &[u8]) -> bool {
@@ -330,9 +328,12 @@ impl CharSet for IA5CharSet {
     }
 }
 
-pub type IA5String = RestrictedString<IA5CharSet>;
+pub type Ia5String = RestrictedString<Ia5CharSet>;
 
-impl IA5String {
+#[deprecated = "Use IA5String instead"]
+pub use Ia5String as IA5String;
+
+impl Ia5String {
     pub fn from_string(s: String) -> Result<Self, CharSetError> {
         Self::new(s.into_bytes())
     }
@@ -346,7 +347,7 @@ impl IA5String {
     }
 }
 
-impl FromStr for IA5String {
+impl FromStr for Ia5String {
     type Err = CharSetError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -356,12 +357,10 @@ impl FromStr for IA5String {
 
 // === BmpString === //
 
-// FIXME: BMP -> Bmp
-
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
-pub struct BMPCharSet;
+pub struct BmpCharSet;
 
-impl CharSet for BMPCharSet {
+impl CharSet for BmpCharSet {
     const NAME: &'static str = "BMP";
 
     fn check(data: &[u8]) -> bool {
@@ -392,9 +391,12 @@ impl CharSet for BMPCharSet {
     }
 }
 
-pub type BMPString = RestrictedString<BMPCharSet>;
+pub type BmpString = RestrictedString<BmpCharSet>;
 
-impl BMPString {
+#[deprecated = "Use BmpString instead"]
+pub use BmpString as BMPString;
+
+impl BmpString {
     pub fn to_utf8(&self) -> String {
         let chunk_it = self.as_bytes().chunks_exact(2);
         debug_assert!(chunk_it.remainder().is_empty());
@@ -405,7 +407,7 @@ impl BMPString {
     }
 }
 
-impl FromStr for BMPString {
+impl FromStr for BmpString {
     type Err = CharSetError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -440,12 +442,12 @@ mod tests {
 
     #[test]
     fn valid_ia5_string() {
-        IA5String::from_str("BUeisuteurnt").expect("valid string");
+        Ia5String::from_str("BUeisuteurnt").expect("valid string");
     }
 
     #[test]
     fn invalid_ia5_string() {
-        assert!(IA5String::from_str("BUéisuteurnt").is_err());
+        assert!(Ia5String::from_str("BUéisuteurnt").is_err());
     }
 
     #[test]
@@ -456,12 +458,12 @@ mod tests {
     #[test]
     fn valid_bmp_string() {
         assert_eq!(
-            BMPString::from_str("语言处理").expect("valid BMP string").to_utf8(),
+            BmpString::from_str("语言处理").expect("valid BMP string").to_utf8(),
             "语言处理"
         );
 
         assert_eq!(
-            BMPString::new(vec![
+            BmpString::new(vec![
                 0x00, 0x43, 0x00, 0x65, 0x00, 0x72, 0x00, 0x74, 0x00, 0x69, 0x00, 0x66, 0x00, 0x69, 0x00, 0x63, 0x00,
                 0x61, 0x00, 0x74, 0x00, 0x65, 0x00, 0x54, 0x00, 0x65, 0x00, 0x6d, 0x00, 0x70, 0x00, 0x6c, 0x00, 0x61,
                 0x00, 0x74, 0x00, 0x65,
@@ -472,7 +474,7 @@ mod tests {
         );
 
         assert_eq!(
-            BMPString::new(vec![0x00, 0x55, 0x00, 0x73, 0x00, 0x65, 0x00, 0x72])
+            BmpString::new(vec![0x00, 0x55, 0x00, 0x73, 0x00, 0x65, 0x00, 0x72])
                 .expect("valid BMP string")
                 .to_utf8(),
             "User"
@@ -481,6 +483,6 @@ mod tests {
 
     #[test]
     fn invalid_bmp_string() {
-        assert!(BMPString::new("1224na÷日本語はむずかちー−×—«BUeisuteurnt".as_bytes()).is_err())
+        assert!(BmpString::new("1224na÷日本語はむずかちー−×—«BUeisuteurnt".as_bytes()).is_err())
     }
 }

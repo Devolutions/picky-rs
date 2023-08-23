@@ -2,8 +2,8 @@ use crate::oids;
 use core::fmt;
 use oid::ObjectIdentifier;
 use picky_asn1::{
-    restricted_string::BMPString,
-    wrapper::{Asn1SetOf, BMPStringAsn1, ObjectIdentifierAsn1, OctetStringAsn1},
+    restricted_string::BmpString,
+    wrapper::{Asn1SetOf, BmpStringAsn1, ObjectIdentifierAsn1, OctetStringAsn1},
 };
 use picky_asn1_der::Asn1RawDer;
 use serde::{de, ser};
@@ -45,7 +45,7 @@ use serde::{de, ser};
 pub enum Pkcs12Attribute {
     /// Note that [`BMPString`] contains UCS-2 encoded string, internal bytes should be manually
     /// converted to/from UTF-8 if needed.
-    FriendlyName(BMPString),
+    FriendlyName(BmpString),
     LocalKeyId(OctetStringAsn1),
     Unknown {
         oid: ObjectIdentifier,
@@ -66,7 +66,7 @@ impl ser::Serialize for Pkcs12Attribute {
             Pkcs12Attribute::FriendlyName(name) => {
                 let oid: ObjectIdentifierAsn1 = oids::attribute_pkcs12_friendly_name().into();
                 seq.serialize_element(&oid)?;
-                let asn1_set = Asn1SetOf(vec![BMPStringAsn1(name.clone())]);
+                let asn1_set = Asn1SetOf(vec![BmpStringAsn1(name.clone())]);
                 seq.serialize_element(&asn1_set)?;
             }
             Pkcs12Attribute::LocalKeyId(id) => {
@@ -111,7 +111,7 @@ impl<'de> de::Deserialize<'de> for Pkcs12Attribute {
 
                 let attribute = match oid_str.as_str() {
                     oids::ATTRIBUTE_PKCS12_FRIENDLY_NAME => {
-                        let name: Asn1SetOf<BMPStringAsn1> =
+                        let name: Asn1SetOf<BmpStringAsn1> =
                             seq_next_element!(seq, Pkcs12Attribute, "friendly name attribute value");
                         if name.0.len() != 1 {
                             return Err(serde_invalid_value!(
@@ -220,7 +220,7 @@ mod tests {
     fn attribute_local_friendly_name_roundtrip() {
         let decoded: Pkcs12Attribute = picky_asn1_der::from_bytes(ATTRIBUTE_FRIENDLY_NAME).unwrap();
         let bmp_string_data = utf8_to_ucs2("{1CA2AF66-4CB5-443E-B91E-A74027D5CEC7}");
-        let expected = Pkcs12Attribute::FriendlyName(BMPString::new(bmp_string_data).unwrap());
+        let expected = Pkcs12Attribute::FriendlyName(BmpString::new(bmp_string_data).unwrap());
         pretty_assertions::assert_eq!(decoded, expected);
         check_serde!(decoded: Pkcs12Attribute in ATTRIBUTE_FRIENDLY_NAME);
     }
@@ -232,7 +232,7 @@ mod tests {
         let decoded: Pkcs12Attribute = picky_asn1_der::from_bytes(ATTRIBUTE_MS_KEY_PROVIDER_NAME).unwrap();
         // Manual comparison with `pretty_assertions` give less ugly results here than `expect_test`
         let bmp_string_data = utf8_to_ucs2("Microsoft Software Key Storage Provider");
-        let bmp_string: BMPStringAsn1 = BMPString::new(bmp_string_data).unwrap().into();
+        let bmp_string: BmpStringAsn1 = BmpString::new(bmp_string_data).unwrap().into();
         let expected = Pkcs12Attribute::Unknown {
             oid: ObjectIdentifier::try_from("1.3.6.1.4.1.311.17.1").unwrap(),
             value: vec![Asn1RawDer(picky_asn1_der::to_vec(&bmp_string).unwrap())],

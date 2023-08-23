@@ -278,7 +278,7 @@ pub struct KrbFinished {
 
 #[cfg(test)]
 mod tests {
-    use picky_asn1::restricted_string::IA5String;
+    use picky_asn1::restricted_string::Ia5String;
     use picky_asn1::wrapper::{
         Asn1SequenceOf, ExplicitContextTag0, ExplicitContextTag1, ImplicitContextTag0, ImplicitContextTag1,
         IntegerAsn1, OctetStringAsn1, Optional,
@@ -312,13 +312,13 @@ mod tests {
             ])),
             body: ExplicitContextTag1::from(Pku2uNegoBody {
                 realm: ExplicitContextTag0::from(KerberosStringAsn1::from(
-                    IA5String::from_string("WELLKNOWN:PKU2U".into()).unwrap(),
+                    Ia5String::from_string("WELLKNOWN:PKU2U".into()).unwrap(),
                 )),
                 sname: ExplicitContextTag1::from(PrincipalName {
                     name_type: ExplicitContextTag0::from(IntegerAsn1::from(vec![2])),
                     name_string: ExplicitContextTag1::from(Asn1SequenceOf::from(vec![
-                        KerberosStringAsn1::from(IA5String::from_string("TERMSRV".into()).unwrap()),
-                        KerberosStringAsn1::from(IA5String::from_string("AZRDOWN-W10".into()).unwrap()),
+                        KerberosStringAsn1::from(Ia5String::from_string("TERMSRV".into()).unwrap()),
+                        KerberosStringAsn1::from(Ia5String::from_string("AZRDOWN-W10".into()).unwrap()),
                     ])),
                 }),
             }),

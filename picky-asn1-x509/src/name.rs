@@ -98,7 +98,7 @@ impl Name {
 
     /// Add an emailAddress attribute.
     /// NOTE: this attribute does not conform with the RFC 5280, email should be placed in SAN instead
-    pub fn add_email<S: Into<IA5StringAsn1>>(&mut self, value: S) {
+    pub fn add_email<S: Into<Ia5StringAsn1>>(&mut self, value: S) {
         let set_val = Asn1SetOf(vec![AttributeTypeAndValue::new_email_address(value)]);
         ((self.0).0).push(set_val);
     }
@@ -194,12 +194,12 @@ pub type GeneralNames = Asn1SequenceOf<GeneralName>;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum GeneralName {
     OtherName(OtherName),
-    Rfc822Name(IA5StringAsn1),
-    DnsName(IA5StringAsn1),
+    Rfc822Name(Ia5StringAsn1),
+    DnsName(Ia5StringAsn1),
     //X400Address(ORAddress),
     DirectoryName(Name),
     EdiPartyName(EdiPartyName),
-    Uri(IA5StringAsn1),
+    Uri(Ia5StringAsn1),
     IpAddress(OctetStringAsn1),
     RegisteredId(ObjectIdentifierAsn1),
 }
@@ -274,16 +274,16 @@ impl<'de> de::Deserialize<'de> for GeneralName {
                         seq_next_element!(seq, OtherName, GeneralName, "OtherName"),
                     )),
                     (TagClass::ContextSpecific, Encoding::Primitive, 1) => Ok(GeneralName::Rfc822Name(
-                        seq_next_element!(seq, ImplicitContextTag1<IA5StringAsn1>, GeneralName, "RFC822Name").0,
+                        seq_next_element!(seq, ImplicitContextTag1<Ia5StringAsn1>, GeneralName, "RFC822Name").0,
                     )),
                     (TagClass::ContextSpecific, Encoding::Constructed, 1) => Ok(GeneralName::Rfc822Name(
-                        seq_next_element!(seq, ExplicitContextTag1<IA5StringAsn1>, GeneralName, "RFC822Name").0,
+                        seq_next_element!(seq, ExplicitContextTag1<Ia5StringAsn1>, GeneralName, "RFC822Name").0,
                     )),
                     (TagClass::ContextSpecific, Encoding::Primitive, 2) => Ok(GeneralName::DnsName(
-                        seq_next_element!(seq, ImplicitContextTag2<IA5StringAsn1>, GeneralName, "DNSName").0,
+                        seq_next_element!(seq, ImplicitContextTag2<Ia5StringAsn1>, GeneralName, "DNSName").0,
                     )),
                     (TagClass::ContextSpecific, Encoding::Constructed, 2) => Ok(GeneralName::DnsName(
-                        seq_next_element!(seq, ExplicitContextTag2<IA5StringAsn1>, GeneralName, "DNSName").0,
+                        seq_next_element!(seq, ExplicitContextTag2<Ia5StringAsn1>, GeneralName, "DNSName").0,
                     )),
                     (TagClass::ContextSpecific, _, 3) => Err(serde_invalid_value!(
                         GeneralName,
@@ -303,10 +303,10 @@ impl<'de> de::Deserialize<'de> for GeneralName {
                         seq_next_element!(seq, ExplicitContextTag5<EdiPartyName>, GeneralName, "EDIPartyName").0,
                     )),
                     (TagClass::ContextSpecific, Encoding::Primitive, 6) => Ok(GeneralName::Uri(
-                        seq_next_element!(seq, ImplicitContextTag6<IA5StringAsn1>, GeneralName, "URI").0,
+                        seq_next_element!(seq, ImplicitContextTag6<Ia5StringAsn1>, GeneralName, "URI").0,
                     )),
                     (TagClass::ContextSpecific, Encoding::Constructed, 6) => Ok(GeneralName::Uri(
-                        seq_next_element!(seq, ExplicitContextTag6<IA5StringAsn1>, GeneralName, "URI").0,
+                        seq_next_element!(seq, ExplicitContextTag6<Ia5StringAsn1>, GeneralName, "URI").0,
                     )),
                     (TagClass::ContextSpecific, Encoding::Primitive, 7) => Ok(GeneralName::IpAddress(
                         seq_next_element!(seq, ImplicitContextTag7<OctetStringAsn1>, GeneralName, "IpAddress").0,
@@ -384,7 +384,7 @@ mod tests {
     use super::*;
     use base64::{engine::general_purpose, Engine as _};
     use oid::ObjectIdentifier;
-    use picky_asn1::restricted_string::IA5String;
+    use picky_asn1::restricted_string::Ia5String;
     use picky_asn1_der::Asn1RawDer;
     use std::str::FromStr;
 
@@ -433,7 +433,7 @@ mod tests {
             ];
         let mut expected = Name::new_common_name("test.contoso.local");
         expected.add_attr(NameAttr::LocalityName, "Unknown");
-        let email = IA5StringAsn1(IA5String::from_str("some@contoso.local").unwrap());
+        let email = Ia5StringAsn1(Ia5String::from_str("some@contoso.local").unwrap());
         expected.add_email(email);
         check_serde!(expected: Name in encoded);
     }
@@ -445,7 +445,7 @@ mod tests {
             0x82, 0x11,
             0x64, 0x65, 0x76, 0x65, 0x6C, 0x2E, 0x65, 0x78, 0x61, 0x6D, 0x70, 0x6C, 0x65, 0x2E, 0x63, 0x6F, 0x6D,
         ];
-        let expected = GeneralName::DnsName(IA5String::from_string("devel.example.com".into()).unwrap().into());
+        let expected = GeneralName::DnsName(Ia5String::from_string("devel.example.com".into()).unwrap().into());
         check_serde!(expected: GeneralName in encoded);
     }
 

@@ -1,6 +1,6 @@
 use picky_asn1::restricted_string::{PrintableString, Utf8String};
 use picky_asn1::tag::{Tag, TagPeeker};
-use picky_asn1::wrapper::{BMPStringAsn1, PrintableStringAsn1};
+use picky_asn1::wrapper::{BmpStringAsn1, PrintableStringAsn1};
 use serde::{de, ser};
 use std::borrow::Cow;
 use std::fmt;
@@ -23,7 +23,7 @@ pub enum DirectoryString {
     PrintableString(PrintableStringAsn1),
     //UniversalString,
     Utf8String(String),
-    BmpString(BMPStringAsn1),
+    BmpString(BmpStringAsn1),
 }
 
 impl fmt::Display for DirectoryString {
@@ -80,8 +80,8 @@ impl From<PrintableStringAsn1> for DirectoryString {
     }
 }
 
-impl From<BMPStringAsn1> for DirectoryString {
-    fn from(string: BMPStringAsn1) -> Self {
+impl From<BmpStringAsn1> for DirectoryString {
+    fn from(string: BmpStringAsn1) -> Self {
         Self::BmpString(string)
     }
 }
