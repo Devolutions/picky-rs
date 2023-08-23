@@ -459,7 +459,7 @@ mod tests {
 
     use picky_asn1::bit_string::BitString;
     use picky_asn1::date::Date;
-    use picky_asn1::restricted_string::IA5String;
+    use picky_asn1::restricted_string::Ia5String;
     use picky_asn1::wrapper::{
         Asn1SequenceOf, BitStringAsn1, ExplicitContextTag0, ExplicitContextTag1, ExplicitContextTag10,
         ExplicitContextTag11, ExplicitContextTag2, ExplicitContextTag3, ExplicitContextTag4, ExplicitContextTag5,
@@ -535,13 +535,13 @@ mod tests {
                 ticket: ExplicitContextTag3::from(Ticket::from(TicketInner {
                     tkt_vno: ExplicitContextTag0::from(IntegerAsn1::from(vec![0x05])),
                     realm: ExplicitContextTag1::from(GeneralStringAsn1::from(
-                        IA5String::from_string("QKATION.COM".into()).unwrap(),
+                        Ia5String::from_string("QKATION.COM".into()).unwrap(),
                     )),
                     sname: ExplicitContextTag2::from(PrincipalName {
                         name_type: ExplicitContextTag0::from(IntegerAsn1::from(vec![0x02])),
                         name_string: ExplicitContextTag1::from(Asn1SequenceOf::from(vec![
-                            GeneralStringAsn1::from(IA5String::from_string("kadmin".into()).unwrap()),
-                            GeneralStringAsn1::from(IA5String::from_string("changepw".into()).unwrap()),
+                            GeneralStringAsn1::from(Ia5String::from_string("kadmin".into()).unwrap()),
+                            GeneralStringAsn1::from(Ia5String::from_string("changepw".into()).unwrap()),
                         ])),
                     }),
                     enc_part: ExplicitContextTag3::from(EncryptedData {
@@ -711,7 +711,7 @@ mod tests {
                 25, 2, 1, 26,
             ])),
             target_domain: Optional::from(Some(ExplicitContextTag1::from(GeneralStringAsn1::from(
-                IA5String::from_string("EXAMPLE.COM".to_owned()).unwrap(),
+                Ia5String::from_string("EXAMPLE.COM".to_owned()).unwrap(),
             )))),
             dclocator_hint: Optional::from(None),
         };
@@ -753,17 +753,17 @@ mod tests {
                 cname: Optional::from(Some(ExplicitContextTag1::from(PrincipalName {
                     name_type: ExplicitContextTag0::from(IntegerAsn1(vec![1])),
                     name_string: ExplicitContextTag1::from(Asn1SequenceOf::from(vec![GeneralStringAsn1::from(
-                        IA5String::from_string("myuser".to_owned()).unwrap(),
+                        Ia5String::from_string("myuser".to_owned()).unwrap(),
                     )])),
                 }))),
                 realm: ExplicitContextTag2::from(GeneralStringAsn1::from(
-                    IA5String::from_string("EXAMPLE.COM".to_owned()).unwrap(),
+                    Ia5String::from_string("EXAMPLE.COM".to_owned()).unwrap(),
                 )),
                 sname: Optional::from(Some(ExplicitContextTag3::from(PrincipalName {
                     name_type: ExplicitContextTag0::from(IntegerAsn1(vec![2])),
                     name_string: ExplicitContextTag1::from(Asn1SequenceOf::from(vec![
-                        KerberosStringAsn1::from(IA5String::from_string("krbtgt".to_owned()).unwrap()),
-                        KerberosStringAsn1::from(IA5String::from_string("EXAMPLE.COM".to_owned()).unwrap()),
+                        KerberosStringAsn1::from(Ia5String::from_string("krbtgt".to_owned()).unwrap()),
+                        KerberosStringAsn1::from(Ia5String::from_string("EXAMPLE.COM".to_owned()).unwrap()),
                     ])),
                 }))),
                 from: Optional::from(None),
@@ -823,17 +823,17 @@ mod tests {
                 cname: Optional::from(Some(ExplicitContextTag1::from(PrincipalName {
                     name_type: ExplicitContextTag0::from(IntegerAsn1(vec![1])),
                     name_string: ExplicitContextTag1::from(Asn1SequenceOf::from(vec![GeneralStringAsn1::from(
-                        IA5String::from_string("myuser".to_owned()).unwrap(),
+                        Ia5String::from_string("myuser".to_owned()).unwrap(),
                     )])),
                 }))),
                 realm: ExplicitContextTag2::from(GeneralStringAsn1::from(
-                    IA5String::from_string("EXAMPLE.COM".to_owned()).unwrap(),
+                    Ia5String::from_string("EXAMPLE.COM".to_owned()).unwrap(),
                 )),
                 sname: Optional::from(Some(ExplicitContextTag3::from(PrincipalName {
                     name_type: ExplicitContextTag0::from(IntegerAsn1(vec![2])),
                     name_string: ExplicitContextTag1::from(Asn1SequenceOf::from(vec![
-                        KerberosStringAsn1::from(IA5String::from_string("krbtgt".to_owned()).unwrap()),
-                        KerberosStringAsn1::from(IA5String::from_string("EXAMPLE.COM".to_owned()).unwrap()),
+                        KerberosStringAsn1::from(Ia5String::from_string("krbtgt".to_owned()).unwrap()),
+                        KerberosStringAsn1::from(Ia5String::from_string("EXAMPLE.COM".to_owned()).unwrap()),
                     ])),
                 }))),
                 from: Optional::from(None),
@@ -909,24 +909,24 @@ mod tests {
                 ])),
             }])))),
             crealm: ExplicitContextTag3::from(GeneralStringAsn1::from(
-                IA5String::from_string("EXAMPLE.COM".to_owned()).unwrap(),
+                Ia5String::from_string("EXAMPLE.COM".to_owned()).unwrap(),
             )),
             cname: ExplicitContextTag4::from(PrincipalName {
                 name_type: ExplicitContextTag0::from(IntegerAsn1(vec![1])),
                 name_string: ExplicitContextTag1::from(Asn1SequenceOf::from(vec![GeneralStringAsn1::from(
-                    IA5String::from_string("myuser".to_owned()).unwrap(),
+                    Ia5String::from_string("myuser".to_owned()).unwrap(),
                 )])),
             }),
             ticket: ExplicitContextTag5::from(Ticket::from(TicketInner {
                 tkt_vno: ExplicitContextTag0::from(IntegerAsn1(vec![5])),
                 realm: ExplicitContextTag1::from(GeneralStringAsn1::from(
-                    IA5String::from_string("EXAMPLE.COM".to_owned()).unwrap(),
+                    Ia5String::from_string("EXAMPLE.COM".to_owned()).unwrap(),
                 )),
                 sname: ExplicitContextTag2::from(PrincipalName {
                     name_type: ExplicitContextTag0::from(IntegerAsn1(vec![2])),
                     name_string: ExplicitContextTag1::from(Asn1SequenceOf::from(vec![
-                        KerberosStringAsn1::from(IA5String::from_string("krbtgt".to_owned()).unwrap()),
-                        KerberosStringAsn1::from(IA5String::from_string("EXAMPLE.COM".to_owned()).unwrap()),
+                        KerberosStringAsn1::from(Ia5String::from_string("krbtgt".to_owned()).unwrap()),
+                        KerberosStringAsn1::from(Ia5String::from_string("EXAMPLE.COM".to_owned()).unwrap()),
                     ])),
                 }),
                 enc_part: ExplicitContextTag3::from(EncryptedData {
@@ -996,26 +996,26 @@ mod tests {
             susec: ExplicitContextTag5::from(IntegerAsn1(vec![0x0a, 0x0c, 0x87])),
             error_code: ExplicitContextTag6::from(KRB_AP_ERR_INAPP_CKSUM),
             crealm: Optional::from(Some(ExplicitContextTag7::from(GeneralStringAsn1::from(
-                IA5String::from_string("EXAMPLE.COM".to_owned()).unwrap(),
+                Ia5String::from_string("EXAMPLE.COM".to_owned()).unwrap(),
             )))),
             cname: Optional::from(Some(ExplicitContextTag8::from(PrincipalName {
                 name_type: ExplicitContextTag0::from(IntegerAsn1(vec![1])),
                 name_string: ExplicitContextTag1::from(Asn1SequenceOf::from(vec![GeneralStringAsn1::from(
-                    IA5String::from_string("myuser".to_owned()).unwrap(),
+                    Ia5String::from_string("myuser".to_owned()).unwrap(),
                 )])),
             }))),
             realm: ExplicitContextTag9::from(GeneralStringAsn1::from(
-                IA5String::from_string("EXAMPLE.COM".to_owned()).unwrap(),
+                Ia5String::from_string("EXAMPLE.COM".to_owned()).unwrap(),
             )),
             sname: ExplicitContextTag10::from(PrincipalName {
                 name_type: ExplicitContextTag0::from(IntegerAsn1(vec![2])),
                 name_string: ExplicitContextTag1::from(Asn1SequenceOf::from(vec![
-                    KerberosStringAsn1::from(IA5String::from_string("somename".to_owned()).unwrap()),
-                    KerberosStringAsn1::from(IA5String::from_string("EXAMPLE.COM".to_owned()).unwrap()),
+                    KerberosStringAsn1::from(Ia5String::from_string("somename".to_owned()).unwrap()),
+                    KerberosStringAsn1::from(Ia5String::from_string("EXAMPLE.COM".to_owned()).unwrap()),
                 ])),
             }),
             e_text: Optional::from(Some(ExplicitContextTag11::from(GeneralStringAsn1::from(
-                IA5String::from_string("PROCESS_TGS".to_owned()).unwrap(),
+                Ia5String::from_string("PROCESS_TGS".to_owned()).unwrap(),
             )))),
             e_data: Optional::from(None),
         });
@@ -1047,26 +1047,26 @@ mod tests {
             susec: ExplicitContextTag5::from(IntegerAsn1(vec![12, 139, 242])),
             error_code: ExplicitContextTag6::from(KDC_ERR_C_PRINCIPAL_UNKNOWN),
             crealm: Optional::from(Some(ExplicitContextTag7::from(GeneralStringAsn1::from(
-                IA5String::from_string("EXAMPLE.COM".to_owned()).unwrap(),
+                Ia5String::from_string("EXAMPLE.COM".to_owned()).unwrap(),
             )))),
             cname: Optional::from(Some(ExplicitContextTag8::from(PrincipalName {
                 name_type: ExplicitContextTag0::from(IntegerAsn1(vec![1])),
                 name_string: ExplicitContextTag1::from(Asn1SequenceOf::from(vec![GeneralStringAsn1::from(
-                    IA5String::from_string("bad_user".to_owned()).unwrap(),
+                    Ia5String::from_string("bad_user".to_owned()).unwrap(),
                 )])),
             }))),
             realm: ExplicitContextTag9::from(GeneralStringAsn1::from(
-                IA5String::from_string("EXAMPLE.COM".to_owned()).unwrap(),
+                Ia5String::from_string("EXAMPLE.COM".to_owned()).unwrap(),
             )),
             sname: ExplicitContextTag10::from(PrincipalName {
                 name_type: ExplicitContextTag0::from(IntegerAsn1(vec![2])),
                 name_string: ExplicitContextTag1::from(Asn1SequenceOf::from(vec![
-                    KerberosStringAsn1::from(IA5String::from_string("krbtgt".to_owned()).unwrap()),
-                    KerberosStringAsn1::from(IA5String::from_string("EXAMPLE.COM".to_owned()).unwrap()),
+                    KerberosStringAsn1::from(Ia5String::from_string("krbtgt".to_owned()).unwrap()),
+                    KerberosStringAsn1::from(Ia5String::from_string("EXAMPLE.COM".to_owned()).unwrap()),
                 ])),
             }),
             e_text: Optional::from(Some(ExplicitContextTag11::from(GeneralStringAsn1::from(
-                IA5String::from_string("CLIENT_NOT_FOUND".to_owned()).unwrap(),
+                Ia5String::from_string("CLIENT_NOT_FOUND".to_owned()).unwrap(),
             )))),
             e_data: Optional::from(None),
         });
@@ -1146,13 +1146,13 @@ mod tests {
                 ]))),
                 cname: Optional::from(None),
                 realm: ExplicitContextTag2::from(Realm::from(
-                    IA5String::from_string("EXAMPLE.COM".to_owned()).unwrap(),
+                    Ia5String::from_string("EXAMPLE.COM".to_owned()).unwrap(),
                 )),
                 sname: Optional::from(Some(ExplicitContextTag3::from(PrincipalName {
                     name_type: ExplicitContextTag0::from(IntegerAsn1(vec![2])),
                     name_string: ExplicitContextTag1::from(Asn1SequenceOf::from(vec![
-                        KerberosStringAsn1::from(IA5String::from_string("somename".to_owned()).unwrap()),
-                        KerberosStringAsn1::from(IA5String::from_string("EXAMPLE.COM".to_owned()).unwrap()),
+                        KerberosStringAsn1::from(Ia5String::from_string("somename".to_owned()).unwrap()),
+                        KerberosStringAsn1::from(Ia5String::from_string("EXAMPLE.COM".to_owned()).unwrap()),
                     ])),
                 }))),
                 from: Optional::from(None),

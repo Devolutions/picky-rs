@@ -116,7 +116,7 @@ mod tests {
     use crate::{DirectoryName, Extension, GeneralName};
     use base64::{engine::general_purpose, Engine as _};
     use picky_asn1::bit_string::BitString;
-    use picky_asn1::restricted_string::{IA5String, PrintableString, Utf8String};
+    use picky_asn1::restricted_string::{Ia5String, PrintableString, Utf8String};
     use picky_asn1::wrapper::IntegerAsn1;
     use std::str::FromStr;
 
@@ -181,7 +181,7 @@ mod tests {
             .expect("invalid base64");
 
         let extensions = vec![Extension::new_subject_alt_name(vec![GeneralName::DnsName(
-            IA5String::from_string("localhost".into()).unwrap().into(),
+            Ia5String::from_string("localhost".into()).unwrap().into(),
         )])
         .into_non_critical()];
 

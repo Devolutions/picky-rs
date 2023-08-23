@@ -6,7 +6,7 @@ use num_bigint::ToBigInt;
 use oid::prelude::*;
 use picky_asn1::bit_string::BitString;
 use picky_asn1::date::{Date, GeneralizedTime, UTCTime};
-use picky_asn1::restricted_string::{IA5String, PrintableString, Utf8String};
+use picky_asn1::restricted_string::{Ia5String, PrintableString, Utf8String};
 use picky_asn1::wrapper::*;
 use pretty_assertions::assert_eq;
 use serde::{Deserialize, Serialize};
@@ -133,7 +133,7 @@ fn date() {
     let buffer = [
         0x17, 0x0D, 0x31, 0x39, 0x31, 0x30, 0x31, 0x37, 0x31, 0x37, 0x34, 0x31, 0x32, 0x38, 0x5A,
     ];
-    let timestamp = UTCTimeAsn1(Date::new(2019, 10, 17, 17, 41, 28).unwrap());
+    let timestamp = UtcTimeAsn1(Date::new(2019, 10, 17, 17, 41, 28).unwrap());
     check(&buffer, timestamp);
 }
 
@@ -142,7 +142,7 @@ fn utc_time() {
     let buffer = [
         0x17, 0x0D, 0x31, 0x39, 0x31, 0x30, 0x31, 0x37, 0x31, 0x37, 0x34, 0x31, 0x32, 0x38, 0x5A,
     ];
-    let time: UTCTimeAsn1 = UTCTime::new(2019, 10, 17, 17, 41, 28).unwrap().into();
+    let time: UtcTimeAsn1 = UTCTime::new(2019, 10, 17, 17, 41, 28).unwrap().into();
     check(&buffer, time);
 }
 
@@ -243,8 +243,8 @@ fn restricted_strings() {
     check::<Utf8StringAsn1>(utf8_string_buffer, utf8_string.into());
 
     let ia5_string_buffer = b"\x16\x10\x50\x6F\x6C\x61\x72\x53\x53\x4C\x20\x54\x65\x73\x74\x20\x43\x41";
-    let ia5_string = IA5String::from_str("PolarSSL Test CA").unwrap();
-    check::<IA5StringAsn1>(ia5_string_buffer, ia5_string.into());
+    let ia5_string = Ia5String::from_str("PolarSSL Test CA").unwrap();
+    check::<Ia5StringAsn1>(ia5_string_buffer, ia5_string.into());
 }
 
 #[test]

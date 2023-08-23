@@ -64,7 +64,7 @@ use picky_asn1::bit_string::BitString;
 use picky_asn1::date::Date;
 use picky_asn1::wrapper::{
     Asn1SequenceOf, Asn1SetOf, BitStringAsn1, ExplicitContextTag0, ExplicitContextTag3, IntegerAsn1,
-    ObjectIdentifierAsn1, OctetStringAsn1, Optional, UTCTimeAsn1,
+    ObjectIdentifierAsn1, OctetStringAsn1, Optional, UtcTimeAsn1,
 };
 use serde::{Deserialize, Serialize};
 
@@ -98,8 +98,8 @@ pub type Name = Asn1SequenceOf<RelativeDistinguishedName>;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct Validity {
-    not_before: UTCTimeAsn1,
-    not_after: UTCTimeAsn1,
+    not_before: UtcTimeAsn1,
+    not_after: UtcTimeAsn1,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]

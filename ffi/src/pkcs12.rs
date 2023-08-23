@@ -7,7 +7,7 @@ pub mod ffi {
     use crate::x509::ffi::Cert;
     use diplomat_runtime::DiplomatWriteable;
     use picky::pkcs12;
-    use picky_asn1::restricted_string::BMPString;
+    use picky_asn1::restricted_string::BmpString;
     use std::str::FromStr;
     use std::sync::{Arc, Mutex};
 
@@ -72,7 +72,7 @@ pub mod ffi {
         /// Creates a new `friendly name` attribute. This attribute is used to store a human-readable
         /// name of the safe bag contents (e.g. certificate name).
         pub fn new_friendly_name(name: &str) -> Result<Box<Pkcs12Attribute>, Box<PickyError>> {
-            let value = BMPString::from_str(name)?;
+            let value = BmpString::from_str(name)?;
             Ok(Box::new(Self(pkcs12::Pkcs12Attribute::new_friendly_name(value))))
         }
 

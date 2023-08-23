@@ -1,5 +1,5 @@
 use crate::{oids, DirectoryString};
-use picky_asn1::wrapper::{IA5StringAsn1, ObjectIdentifierAsn1};
+use picky_asn1::wrapper::{Ia5StringAsn1, ObjectIdentifierAsn1};
 use serde::{de, ser};
 use std::fmt;
 
@@ -14,7 +14,7 @@ pub enum AttributeTypeAndValueParameters {
     StreetName(DirectoryString),
     OrganizationName(DirectoryString),
     OrganizationalUnitName(DirectoryString),
-    EmailAddress(IA5StringAsn1),
+    EmailAddress(Ia5StringAsn1),
     GivenName(DirectoryString),
     Phone(DirectoryString),
     Custom(picky_asn1_der::Asn1RawDer),
@@ -90,7 +90,7 @@ impl AttributeTypeAndValue {
         }
     }
 
-    pub fn new_email_address<S: Into<IA5StringAsn1>>(name: S) -> Self {
+    pub fn new_email_address<S: Into<Ia5StringAsn1>>(name: S) -> Self {
         Self {
             ty: oids::email_address().into(),
             value: AttributeTypeAndValueParameters::EmailAddress(name.into()),
