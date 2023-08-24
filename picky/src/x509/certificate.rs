@@ -132,7 +132,7 @@ pub enum CertType {
     Unknown,
 }
 
-const CERT_PEM_LABELS: &[&str] = &["CERTIFICATE", "TRUSTED CERTIFICATE"];
+const CERT_PEM_LABELS: &[&str] = &["CERTIFICATE", "TRUSTED CERTIFICATE", "X509 CERTIFICATE"];
 
 /// CertificateOverview is used to validate signatures (using tbs_certificate der encoding) and encode back original certificate as is.
 /// Refer PSDiagnostics PowerShell module authenticode test for details as to why this is useful.
