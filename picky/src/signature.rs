@@ -5,7 +5,6 @@ use crate::key::ec::{EcComponent, EcCurve, NamedEcCurve};
 use crate::key::{KeyError, PrivateKey, PublicKey};
 
 use picky_asn1_x509::{oids, AlgorithmIdentifier};
-use rsa::{PublicKey as _, RsaPrivateKey, RsaPublicKey};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -39,6 +38,12 @@ pub enum SignatureError {
 
 impl From<rsa::errors::Error> for SignatureError {
     fn from(e: rsa::errors::Error) -> Self {
+        SignatureError::Rsa { context: e.to_string() }
+    }
+}
+
+impl From<rsa::signature::Error> for SignatureError {
+    fn from(e: rsa::signature::Error) -> Self {
         SignatureError::Rsa { context: e.to_string() }
     }
 }
@@ -129,11 +134,35 @@ impl SignatureAlgorithm {
     pub fn sign(self, msg: &[u8], private_key: &PrivateKey) -> Result<Vec<u8>, SignatureError> {
         match self {
             SignatureAlgorithm::RsaPkcs1v15(picky_hash_algo) => {
+                use rsa::signature::{SignatureEncoding as _, SignerMut as _};
+                use rsa::{pkcs1v15, RsaPrivateKey};
+
                 let rsa_private_key = RsaPrivateKey::try_from(private_key)?;
-                let digest = picky_hash_algo.digest(msg);
-                let rsa_hash_algo = rsa::Hash::from(picky_hash_algo);
-                let padding_scheme = rsa::PaddingScheme::new_pkcs1v15_sign(Some(rsa_hash_algo));
-                Ok(rsa_private_key.sign_blinded(&mut rand::rngs::OsRng, padding_scheme, &digest)?)
+
+                let signature = match picky_hash_algo {
+                    HashAlgorithm::MD5 => pkcs1v15::SigningKey::<md5::Md5>::new(rsa_private_key).try_sign(msg)?,
+                    HashAlgorithm::SHA1 => pkcs1v15::SigningKey::<sha1::Sha1>::new(rsa_private_key).try_sign(msg)?,
+                    HashAlgorithm::SHA2_224 => {
+                        pkcs1v15::SigningKey::<sha2::Sha224>::new(rsa_private_key).try_sign(msg)?
+                    }
+                    HashAlgorithm::SHA2_256 => {
+                        pkcs1v15::SigningKey::<sha2::Sha256>::new(rsa_private_key).try_sign(msg)?
+                    }
+                    HashAlgorithm::SHA2_384 => {
+                        pkcs1v15::SigningKey::<sha2::Sha384>::new(rsa_private_key).try_sign(msg)?
+                    }
+                    HashAlgorithm::SHA2_512 => {
+                        pkcs1v15::SigningKey::<sha2::Sha512>::new(rsa_private_key).try_sign(msg)?
+                    }
+                    HashAlgorithm::SHA3_384 => {
+                        pkcs1v15::SigningKey::<sha3::Sha3_384>::new(rsa_private_key).try_sign(msg)?
+                    }
+                    HashAlgorithm::SHA3_512 => {
+                        pkcs1v15::SigningKey::<sha3::Sha3_512>::new(rsa_private_key).try_sign(msg)?
+                    }
+                };
+
+                Ok(signature.to_vec())
             }
             SignatureAlgorithm::Ecdsa(picky_hash_algo) => {
                 use crate::key::ec::EcdsaKeypair;
@@ -202,20 +231,25 @@ impl SignatureAlgorithm {
 
                 match keypair.algorithm() {
                     NamedEdAlgorithm::Known(EdAlgorithm::Ed25519) => {
-                        let public_key = ed25519_dalek::PublicKey::from_bytes(public_key.data()).map_err(
+                        let public_key = public_key.data().try_into().map_err(|e| SignatureError::Ed {
+                            context: format!("invalid key size: {e}"),
+                        })?;
+                        let verifying_key = ed25519_dalek::VerifyingKey::from_bytes(public_key).map_err(
                             |e: ed25519_dalek::ed25519::Error| SignatureError::Ed {
                                 context: format!("Cannot decode ed25519 public key: {}", e),
                             },
                         )?;
 
-                        let private_key =
-                            ed25519_dalek::SecretKey::from_bytes(keypair.secret()).map_err(|e| SignatureError::Ed {
-                                context: format!("Cannot decode ed25519 secret key: {}", e),
+                        let secret_key: ed25519_dalek::SecretKey =
+                            keypair.secret().try_into().map_err(|e| SignatureError::Ed {
+                                context: format!("invalid secret key size: {e}"),
                             })?;
 
-                        let private_key = ed25519_dalek::ExpandedSecretKey::from(&private_key);
+                        let esk = ed25519_dalek::hazmat::ExpandedSecretKey::from(&secret_key);
 
-                        Ok(private_key.sign(msg, &public_key).to_bytes().to_vec())
+                        let signature = ed25519_dalek::hazmat::raw_sign::<sha2::Sha512>(&esk, msg, &verifying_key);
+
+                        Ok(signature.to_vec())
                     }
                     NamedEdAlgorithm::Known(EdAlgorithm::X25519) => Err(SignatureError::Ed {
                         context: "X25519 algorithm is not designed for signing".to_string(),
@@ -231,13 +265,39 @@ impl SignatureAlgorithm {
     pub fn verify(self, public_key: &PublicKey, msg: &[u8], signature: &[u8]) -> Result<(), SignatureError> {
         match self {
             SignatureAlgorithm::RsaPkcs1v15(picky_hash_algo) => {
+                use rsa::signature::Verifier as _;
+                use rsa::{pkcs1v15, RsaPublicKey};
+
                 let rsa_public_key = RsaPublicKey::try_from(public_key)?;
-                let digest = picky_hash_algo.digest(msg);
-                let rsa_hash_algo = rsa::Hash::from(picky_hash_algo);
-                let padding_scheme = rsa::PaddingScheme::new_pkcs1v15_sign(Some(rsa_hash_algo));
-                rsa_public_key
-                    .verify(padding_scheme, &digest, signature)
-                    .map_err(|_| SignatureError::BadSignature)?;
+                let signature = pkcs1v15::Signature::try_from(signature)?;
+
+                match picky_hash_algo {
+                    HashAlgorithm::MD5 => {
+                        pkcs1v15::VerifyingKey::<md5::Md5>::new(rsa_public_key).verify(msg, &signature)
+                    }
+                    HashAlgorithm::SHA1 => {
+                        pkcs1v15::VerifyingKey::<sha1::Sha1>::new(rsa_public_key).verify(msg, &signature)
+                    }
+                    HashAlgorithm::SHA2_224 => {
+                        pkcs1v15::VerifyingKey::<sha2::Sha224>::new(rsa_public_key).verify(msg, &signature)
+                    }
+                    HashAlgorithm::SHA2_256 => {
+                        pkcs1v15::VerifyingKey::<sha2::Sha256>::new(rsa_public_key).verify(msg, &signature)
+                    }
+                    HashAlgorithm::SHA2_384 => {
+                        pkcs1v15::VerifyingKey::<sha2::Sha384>::new(rsa_public_key).verify(msg, &signature)
+                    }
+                    HashAlgorithm::SHA2_512 => {
+                        pkcs1v15::VerifyingKey::<sha2::Sha512>::new(rsa_public_key).verify(msg, &signature)
+                    }
+                    HashAlgorithm::SHA3_384 => {
+                        pkcs1v15::VerifyingKey::<sha3::Sha3_384>::new(rsa_public_key).verify(msg, &signature)
+                    }
+                    HashAlgorithm::SHA3_512 => {
+                        pkcs1v15::VerifyingKey::<sha3::Sha3_512>::new(rsa_public_key).verify(msg, &signature)
+                    }
+                }
+                .map_err(|_| SignatureError::BadSignature)?;
             }
             SignatureAlgorithm::Ecdsa(picky_hash_algo) => {
                 let ec_pub_key = crate::key::ec::EcdsaPublicKey::try_from(public_key)?;
@@ -325,19 +385,21 @@ impl SignatureAlgorithm {
 
                 match public_key.algorithm() {
                     NamedEdAlgorithm::Known(EdAlgorithm::Ed25519) => {
-                        let public_key = ed25519_dalek::PublicKey::from_bytes(public_key.data()).map_err(
+                        let public_key = public_key.data().try_into().map_err(|e| SignatureError::Ed {
+                            context: format!("invalid key size: {e}"),
+                        })?;
+                        let verifying_key = ed25519_dalek::VerifyingKey::from_bytes(public_key).map_err(
                             |e: ed25519_dalek::ed25519::Error| SignatureError::Ed {
                                 context: format!("Cannot decode ed25519 public key: {}", e),
                             },
                         )?;
 
-                        let signature = ed25519_dalek::Signature::from_bytes(signature).map_err(
-                            |e: ed25519_dalek::SignatureError| SignatureError::Ed {
-                                context: format!("Cannot decode ed25519 signature: {}", e),
-                            },
-                        )?;
+                        let signature = signature.try_into().map_err(|e| SignatureError::Ed {
+                            context: format!("invalid signature size: {e}"),
+                        })?;
+                        let signature = ed25519_dalek::Signature::from_bytes(signature);
 
-                        public_key
+                        verifying_key
                             .verify(msg, &signature)
                             .map_err(|_| SignatureError::BadSignature)?;
                     }

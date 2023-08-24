@@ -12,7 +12,7 @@ use aes_gcm::{AeadInPlace, Aes128Gcm, Aes256Gcm, KeyInit, KeySizeUser};
 use base64::{engine::general_purpose, DecodeError, Engine as _};
 use digest::generic_array::GenericArray;
 use rand::RngCore;
-use rsa::{PaddingScheme, PublicKey as RsaPublicKeyInterface, RsaPrivateKey, RsaPublicKey};
+use rsa::{Oaep, Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -644,9 +644,9 @@ fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
                 let rsa_public_key = RsaPublicKey::try_from(public_key)?;
 
                 let padding = match jwe.header.alg {
-                    JweAlg::RsaPkcs1v15 => PaddingScheme::new_pkcs1v15_encrypt(),
-                    JweAlg::RsaOaep => PaddingScheme::new_oaep::<sha1::Sha1>(),
-                    JweAlg::RsaOaep256 => PaddingScheme::new_oaep::<sha2::Sha256>(),
+                    JweAlg::RsaPkcs1v15 => RsaPaddingScheme::Pkcs1v15Encrypt,
+                    JweAlg::RsaOaep => RsaPaddingScheme::Oaep(Oaep::new::<sha1::Sha1>()),
+                    JweAlg::RsaOaep256 => RsaPaddingScheme::Oaep(Oaep::new::<sha2::Sha256>()),
                     unsupported => {
                         return Err(JweError::UnsupportedAlgorithm {
                             algorithm: format!("{:?}", unsupported),
@@ -815,9 +815,9 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
                 let rsa_private_key = RsaPrivateKey::try_from(private_key)?;
 
                 let padding = match header.alg {
-                    JweAlg::RsaPkcs1v15 => PaddingScheme::new_pkcs1v15_encrypt(),
-                    JweAlg::RsaOaep => PaddingScheme::new_oaep::<sha1::Sha1>(),
-                    JweAlg::RsaOaep256 => PaddingScheme::new_oaep::<sha2::Sha256>(),
+                    JweAlg::RsaPkcs1v15 => RsaPaddingScheme::Pkcs1v15Encrypt,
+                    JweAlg::RsaOaep => RsaPaddingScheme::Oaep(Oaep::new::<sha1::Sha1>()),
+                    JweAlg::RsaOaep256 => RsaPaddingScheme::Oaep(Oaep::new::<sha2::Sha256>()),
                     unsupported => {
                         return Err(JweError::UnsupportedAlgorithm {
                             algorithm: format!("{:?}", unsupported),
@@ -1077,7 +1077,7 @@ fn generate_ecdh_shared_secret(
 
             match ed.algorithm() {
                 NamedEdAlgorithm::Known(EdAlgorithm::X25519) => {
-                    use rand_ed::rngs::OsRng;
+                    use rand::rngs::OsRng;
 
                     let public_key_data: [u8; X25519_FIELD_ELEMENT_SIZE] = ed.data().try_into().map_err(|e| {
                         let source = KeyError::ED {
@@ -1088,7 +1088,7 @@ fn generate_ecdh_shared_secret(
 
                     let public_key = x25519_dalek::PublicKey::from(public_key_data);
 
-                    let secret = x25519_dalek::EphemeralSecret::new(OsRng);
+                    let secret = x25519_dalek::EphemeralSecret::random_from_rng(OsRng);
 
                     let epk = PublicKey::from_ed_encoded_components(
                         &EdAlgorithm::X25519.into(),
@@ -1278,6 +1278,41 @@ fn generate_cek(alg: JweEnc) -> Zeroizing<Vec<u8>> {
     let mut rng = rand::rngs::OsRng;
     rng.fill_bytes(&mut cek);
     cek
+}
+
+enum RsaPaddingScheme {
+    Pkcs1v15Encrypt,
+    Oaep(Oaep),
+}
+
+impl rsa::traits::PaddingScheme for RsaPaddingScheme {
+    fn decrypt<Rng: rand_core::CryptoRngCore>(
+        self,
+        rng: Option<&mut Rng>,
+        priv_key: &RsaPrivateKey,
+        ciphertext: &[u8],
+    ) -> rsa::Result<Vec<u8>> {
+        match self {
+            RsaPaddingScheme::Pkcs1v15Encrypt => {
+                rsa::traits::PaddingScheme::decrypt(Pkcs1v15Encrypt, rng, priv_key, ciphertext)
+            }
+            RsaPaddingScheme::Oaep(oaep) => rsa::traits::PaddingScheme::decrypt(oaep, rng, priv_key, ciphertext),
+        }
+    }
+
+    fn encrypt<Rng: rand_core::CryptoRngCore>(
+        self,
+        rng: &mut Rng,
+        pub_key: &RsaPublicKey,
+        msg: &[u8],
+    ) -> rsa::Result<Vec<u8>> {
+        match self {
+            RsaPaddingScheme::Pkcs1v15Encrypt => {
+                rsa::traits::PaddingScheme::encrypt(Pkcs1v15Encrypt, rng, pub_key, msg)
+            }
+            RsaPaddingScheme::Oaep(oaep) => rsa::traits::PaddingScheme::encrypt(oaep, rng, pub_key, msg),
+        }
+    }
 }
 
 #[cfg(test)]

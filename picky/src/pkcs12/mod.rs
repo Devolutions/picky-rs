@@ -447,7 +447,7 @@ mod tests {
         let _decoded = Pfx::from_der(encoded, &crypto_context, &Pkcs12ParsingParams::default()).unwrap();
     }
 
-    fn stable_rand() -> impl rand::RngCore + rand::CryptoRng {
+    fn stable_rand() -> impl rand_core::CryptoRngCore {
         use rand::SeedableRng;
         rand_chacha::ChaChaRng::seed_from_u64(42)
     }
