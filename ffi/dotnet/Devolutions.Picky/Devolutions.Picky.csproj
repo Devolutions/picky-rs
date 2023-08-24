@@ -5,7 +5,7 @@
     <Company>Devolutions</Company>
     <Description>Bindings to Rust picky native library</Description>
     <LangVersion>latest</LangVersion>
-    <Version>2023.1.9.0</Version>
+    <Version>2023.8.24.0</Version>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
