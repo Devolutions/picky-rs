@@ -7,10 +7,10 @@ description = "A signtool like Authenticode sign and verify tool based on picky 
 publish = false
 
 [dependencies]
-anyhow = "1.0.69"
-clap = "2.34.0"
-walkdir = "2.3.2"
-base64 = "0.21.0"
-encoding_rs = "0.8.32"
+anyhow = "1.0.75"
+clap = "4.3.24"
+walkdir = "2.3.3"
+base64 = "0.21.2"
+encoding_rs = "0.8.33"
 lief-cwal = "0.1.0"
-picky = { version = "7.0.0-rc.3", default-features = false, features = ["wincert", "ctl", "ctl_http_fetch", "http_timestamp"] }
+picky = { version = "7.0.0-rc.7", default-features = false, features = ["wincert", "ctl", "ctl_http_fetch", "http_timestamp"] }

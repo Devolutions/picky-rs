@@ -34,21 +34,6 @@ pub enum HashAlgorithm {
     SHA3_512,
 }
 
-impl From<HashAlgorithm> for rsa::Hash {
-    fn from(v: HashAlgorithm) -> rsa::Hash {
-        match v {
-            HashAlgorithm::MD5 => rsa::Hash::MD5,
-            HashAlgorithm::SHA1 => rsa::Hash::SHA1,
-            HashAlgorithm::SHA2_224 => rsa::Hash::SHA2_224,
-            HashAlgorithm::SHA2_256 => rsa::Hash::SHA2_256,
-            HashAlgorithm::SHA2_384 => rsa::Hash::SHA2_384,
-            HashAlgorithm::SHA2_512 => rsa::Hash::SHA2_512,
-            HashAlgorithm::SHA3_384 => rsa::Hash::SHA3_384,
-            HashAlgorithm::SHA3_512 => rsa::Hash::SHA3_512,
-        }
-    }
-}
-
 impl TryFrom<HashAlgorithm> for ShaVariant {
     type Error = UnsupportedHashAlgorithmError;
 

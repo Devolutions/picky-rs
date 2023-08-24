@@ -16,12 +16,12 @@ repository = "https://github.com/Devolutions/picky-rs"
 readme = "README.md"
 
 [dependencies]
-serde = { version = "1.0.152", default-features = false, features = ["derive"] }
+serde = { version = "1.0.186", default-features = false, features = ["derive"] }
 oid = { version = "0.2.1", default-features = false, features = ["serde_support"] }
-serde_bytes = "0.11.9"
-chrono = { version = "0.4.23", default-features = false, optional = true }
-time = { version = "0.3.19", optional = true }
-zeroize = { version = "^1.5", optional = true }
+serde_bytes = "0.11.12"
+chrono = { version = "0.4.26", default-features = false, optional = true }
+time = { version = "0.3.27", optional = true }
+zeroize = { version = "1.6", optional = true }
 
 [dev-dependencies]
 picky-asn1-der = { path = "../picky-asn1-der" }

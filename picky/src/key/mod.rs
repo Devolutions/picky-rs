@@ -14,6 +14,7 @@ use picky_asn1_der::Asn1DerError;
 use picky_asn1_x509::{
     private_key_info, ECPrivateKey, PrivateKeyInfo, PrivateKeyValue, SubjectPublicKeyInfo, PRIVATE_KEY_INFO_VERSION_1,
 };
+use rsa::traits::{PrivateKeyParts as _, PublicKeyParts as _};
 use rsa::{RsaPrivateKey, RsaPublicKey};
 use thiserror::Error;
 use zeroize::Zeroize;
@@ -156,15 +157,19 @@ impl TryFrom<&'_ PrivateKey> for RsaPrivateKey {
             private_key_info::PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => {
                 let p1 = BigUint::from_bytes_be(key.prime_1.as_unsigned_bytes_be());
                 let p2 = BigUint::from_bytes_be(key.prime_2.as_unsigned_bytes_be());
-                Ok(RsaPrivateKey::from_components(
+
+                RsaPrivateKey::from_components(
                     BigUint::from_bytes_be(key.modulus.as_unsigned_bytes_be()),
                     BigUint::from_bytes_be(key.public_exponent.as_unsigned_bytes_be()),
                     BigUint::from_bytes_be(key.private_exponent.as_unsigned_bytes_be()),
                     vec![p1, p2],
-                ))
+                )
+                .map_err(|e| KeyError::Rsa {
+                    context: format!("failed to construct private key from components: {e}"),
+                })
             }
             _ => Err(KeyError::Rsa {
-                context: "RSA private key cannot be constructed from non-RSA private key.".to_string(),
+                context: "RSA private key cannot be constructed from non-RSA private key.".to_owned(),
             }),
         }
     }
@@ -371,25 +376,27 @@ impl PrivateKey {
             }
             PrivateKeyValue::ED(OctetStringAsn1Container(key)) => {
                 let algorithm = NamedEdAlgorithm::from(inner.private_key_algorithm.oid());
-                let private_key = key.to_vec();
+                let private_key = key.0.clone();
                 let public_key = match &algorithm {
                     NamedEdAlgorithm::Known(EdAlgorithm::Ed25519) => {
-                        let secret = ed25519_dalek::SecretKey::from_bytes(&private_key).map_err(|e| KeyError::ED {
-                            context: format!("Invalid Ed25519 private key: {e}"),
+                        let private_key = private_key.as_slice().try_into().map_err(|e| KeyError::ED {
+                            context: format!("invalid size for private key: {e}"),
                         })?;
+                        let private_key = ed25519_dalek::SigningKey::from_bytes(private_key);
 
-                        let public_key = ed25519_dalek::PublicKey::from(&secret);
+                        let public_key = private_key.verifying_key();
 
                         Some(public_key.to_bytes().to_vec())
                     }
                     NamedEdAlgorithm::Known(EdAlgorithm::X25519) => {
                         let len = private_key.len();
 
-                        let secret: X25519FieldElement = private_key.clone().try_into().map_err(|_| KeyError::ED {
-                            context: format!(
+                        let secret: X25519FieldElement =
+                            private_key.as_slice().try_into().map_err(|_| KeyError::ED {
+                                context: format!(
                                 "Invalid X25519 private key size. Expected: {X25519_FIELD_ELEMENT_SIZE}, actual: {len}"
                             ),
-                        })?;
+                            })?;
 
                         let secret = x25519_dalek::StaticSecret::from(secret);
                         let public_key = x25519_dalek::PublicKey::from(&secret);
@@ -594,7 +601,6 @@ impl PrivateKey {
     /// **Beware**: this is insanely slow in debug builds.
     pub fn generate_rsa(bits: usize) -> Result<Self, KeyError> {
         use rand::rngs::OsRng;
-        use rsa::PublicKeyParts;
 
         let key = RsaPrivateKey::new(&mut OsRng, bits)?;
 
@@ -658,26 +664,20 @@ impl PrivateKey {
     // `write_public_key` specifies whether to include public key in the private key file.
     // Note that OpenSSL does not support ed keys with public key included.
     pub fn generate_ed(algorithm: EdAlgorithm, write_public_key: bool) -> Result<Self, KeyError> {
-        use rand_ed::rngs::OsRng;
+        use rand::rngs::OsRng;
 
         let algorithm_oid: ObjectIdentifier = NamedEdAlgorithm::Known(algorithm).into();
 
         let (private_key, public_key) = match algorithm {
             EdAlgorithm::Ed25519 => {
-                let key = ed25519_dalek::SecretKey::generate(&mut OsRng);
-                let private = key.to_bytes().to_vec();
-
-                let public = ed25519_dalek::PublicKey::from(&key).to_bytes().to_vec();
-
-                (private, public)
+                let private = ed25519_dalek::SigningKey::generate(&mut OsRng);
+                let public = private.verifying_key();
+                (private.to_bytes().to_vec(), public.to_bytes().to_vec())
             }
             EdAlgorithm::X25519 => {
-                let key = x25519_dalek::StaticSecret::new(OsRng);
-                let private = key.to_bytes().to_vec();
-
-                let public = x25519_dalek::PublicKey::from(&key).as_bytes().to_vec();
-
-                (private, public)
+                let private = x25519_dalek::StaticSecret::random_from_rng(OsRng);
+                let public = x25519_dalek::PublicKey::from(&private);
+                (private.to_bytes().to_vec(), public.to_bytes().to_vec())
             }
         };
 
@@ -926,7 +926,7 @@ mod tests {
     use crate::hash::HashAlgorithm;
     use crate::key::ed::EdKeypair;
     use crate::signature::SignatureAlgorithm;
-    use rsa::PublicKeyParts;
+    use rsa::traits::PublicKeyParts;
     use rstest::rstest;
 
     cfg_if::cfg_if! { if #[cfg(feature = "x509")] {

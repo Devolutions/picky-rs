@@ -11,7 +11,8 @@ use crate::ssh::EcCurveSshExt as _;
 
 use byteorder::{BigEndian, WriteBytesExt};
 use rand::Rng;
-use rsa::{PublicKeyParts, RsaPublicKey};
+use rsa::traits::PublicKeyParts as _;
+use rsa::RsaPublicKey;
 use serde::Deserialize;
 use std::cell::RefCell;
 use std::convert::TryFrom;

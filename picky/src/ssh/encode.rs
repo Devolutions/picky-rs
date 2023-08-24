@@ -15,7 +15,8 @@ use aes::cipher::{KeyIvInit, StreamCipher};
 use base64::engine::general_purpose;
 use byteorder::{BigEndian, WriteBytesExt};
 use num_bigint_dig::{BigUint, ModInverse};
-use rsa::{PublicKeyParts, RsaPrivateKey, RsaPublicKey};
+use rsa::traits::{PrivateKeyParts as _, PublicKeyParts as _};
+use rsa::{RsaPrivateKey, RsaPublicKey};
 use std::io::{self, Write};
 
 pub trait SshWriteExt {
