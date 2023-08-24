@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.8.0] 2023-08-23
+
+### Fixed
+
+- License files are now correctly included in the published package
+- BMP string charset was incorrectly validated
+
+### Changed
+
+- Rename `UTCTime`, `IA5CharSet`, `IA5String`, `BMPCharSet` and `BMPString` into
+  `UtcTime`, `Ia5CharSet`, `Ia5String`, `BmpCharSet` and `BmpString` to follow the Rust convention
+  that is to count acronyms and contractions of compound words as one word.
+
+  Newer types are re-exported with the old naming in order to mitigate breaking downstream breakage,
+  but just in case this is not a "patch" bump.
+
+- Update dependencies
+
 ## [0.7.2] 2023-03-27
 
 ### Fixed

@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.12.0] 2023-08-24
+
+### Added
+
+- PKCS12 ASN.1 structures
+- USER_PRINCIPAL_NAME oid
+
+### Fixed
+
+- License files are now correctly included in the published package
+
+### Changed
+
+- Update dependencies
+
 ## [0.11.0] 2023-08-03
 
 ### Added
