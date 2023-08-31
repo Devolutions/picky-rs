@@ -39,10 +39,16 @@ public partial struct PublicKey
     public static unsafe extern IntPtr FromPkcs1(byte* der, nuint derSz);
 
     /// <summary>
-    /// Exports the public key into a PEM object
+    /// Exports the public key into a PEM object.
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PublicKey_to_pem", ExactSpelling = true)]
     public static unsafe extern IntPtr ToPem(PublicKey* self);
+
+    /// <summary>
+    /// Retrieves the key kind for this public key.
+    /// </summary>
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PublicKey_get_kind", ExactSpelling = true)]
+    public static unsafe extern KeyKind GetKind(PublicKey* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PublicKey_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(PublicKey* self);

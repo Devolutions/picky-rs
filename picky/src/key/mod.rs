@@ -100,6 +100,13 @@ impl From<PemError> for KeyError {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum KeyKind {
+    Rsa,
+    Ec,
+    Ed,
+}
+
 // === private key === //
 
 const PRIVATE_KEY_PEM_LABEL: &str = "PRIVATE KEY";
@@ -695,6 +702,14 @@ impl PrivateKey {
         Ok(Self { kind, inner })
     }
 
+    pub fn kind(&self) -> KeyKind {
+        match self.kind {
+            PrivateKeyKind::Rsa => KeyKind::Rsa,
+            PrivateKeyKind::Ec { .. } => KeyKind::Ec,
+            PrivateKeyKind::Ed { .. } => KeyKind::Ed,
+        }
+    }
+
     pub(crate) fn as_inner(&self) -> &PrivateKeyInfo {
         &self.inner
     }
@@ -913,6 +928,14 @@ impl PublicKey {
             algorithm: AlgorithmIdentifier::new_rsa_encryption(),
             subject_public_key: PublicKey::Rsa(public_key.into()),
         }))
+    }
+
+    pub fn kind(&self) -> KeyKind {
+        match self.0.subject_public_key {
+            picky_asn1_x509::PublicKey::Rsa(_) => KeyKind::Rsa,
+            picky_asn1_x509::PublicKey::Ec(_) => KeyKind::Ec,
+            picky_asn1_x509::PublicKey::Ed(_) => KeyKind::Ed,
+        }
     }
 
     pub(crate) fn as_inner(&self) -> &SubjectPublicKeyInfo {

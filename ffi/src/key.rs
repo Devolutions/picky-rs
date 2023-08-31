@@ -1,6 +1,6 @@
 use crate::error::ffi::PickyError;
 
-use self::ffi::{EcCurve, EdAlgorithm};
+use self::ffi::{EcCurve, EdAlgorithm, KeyKind};
 
 impl From<picky::key::EcCurve> for EcCurve {
     fn from(value: picky::key::EcCurve) -> Self {
@@ -38,6 +38,26 @@ impl From<EdAlgorithm> for picky::key::EdAlgorithm {
     }
 }
 
+impl From<KeyKind> for picky::key::KeyKind {
+    fn from(value: KeyKind) -> Self {
+        match value {
+            KeyKind::Rsa => picky::key::KeyKind::Rsa,
+            KeyKind::Ec => picky::key::KeyKind::Ec,
+            KeyKind::Ed => picky::key::KeyKind::Ed,
+        }
+    }
+}
+
+impl From<picky::key::KeyKind> for KeyKind {
+    fn from(value: picky::key::KeyKind) -> Self {
+        match value {
+            picky::key::KeyKind::Rsa => KeyKind::Rsa,
+            picky::key::KeyKind::Ec => KeyKind::Ec,
+            picky::key::KeyKind::Ed => KeyKind::Ed,
+        }
+    }
+}
+
 #[diplomat::bridge]
 pub mod ffi {
     use crate::error::ffi::PickyError;
@@ -59,6 +79,17 @@ pub mod ffi {
         Ed25519,
         /// X25519 key agreement algorithm
         X25519,
+    }
+
+    /// Known key kinds
+    #[derive(Clone, Copy)]
+    pub enum KeyKind {
+        /// RSA (Rivest–Shamir–Adleman)
+        Rsa,
+        /// Elliptic-curve
+        Ec,
+        /// Edwards-curve
+        Ed,
     }
 
     #[diplomat::opaque]
@@ -110,6 +141,11 @@ pub mod ffi {
             let key = self.0.to_public_key()?;
             Ok(Box::new(PublicKey(key)))
         }
+
+        /// Retrieves the key kind for this private key.
+        pub fn get_kind(&self) -> KeyKind {
+            self.0.kind().into()
+        }
     }
 
     #[diplomat::opaque]
@@ -134,10 +170,15 @@ pub mod ffi {
             Ok(Box::new(PublicKey(key)))
         }
 
-        /// Exports the public key into a PEM object
+        /// Exports the public key into a PEM object.
         pub fn to_pem(&self) -> Result<Box<Pem>, Box<PickyError>> {
             let pem = self.0.to_pem()?;
             Ok(Box::new(Pem(pem)))
+        }
+
+        /// Retrieves the key kind for this public key.
+        pub fn get_kind(&self) -> KeyKind {
+            self.0.kind().into()
         }
     }
 }

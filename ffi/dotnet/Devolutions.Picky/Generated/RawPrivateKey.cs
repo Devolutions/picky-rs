@@ -62,6 +62,12 @@ public partial struct PrivateKey
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PrivateKey_to_public_key", ExactSpelling = true)]
     public static unsafe extern IntPtr ToPublicKey(PrivateKey* self);
 
+    /// <summary>
+    /// Retrieves the key kind for this private key.
+    /// </summary>
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PrivateKey_get_kind", ExactSpelling = true)]
+    public static unsafe extern KeyKind GetKind(PrivateKey* self);
+
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PrivateKey_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(PrivateKey* self);
 }
