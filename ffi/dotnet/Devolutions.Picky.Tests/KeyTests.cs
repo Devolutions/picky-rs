@@ -50,7 +50,9 @@ vQIDAQAB
     {
         Pem pem = Pem.Parse(privKeyPemRepr);
         PrivateKey priv = PrivateKey.FromPem(pem);
+        Assert.Equal(KeyKind.Rsa, priv.Kind);
         PublicKey pub = priv.ToPublicKey();
+        Assert.Equal(KeyKind.Rsa, pub.Kind);
         Assert.Equal(pubKeyPemRepr.Replace("\r", ""), pub.ToPem().ToRepr());
     }
 
