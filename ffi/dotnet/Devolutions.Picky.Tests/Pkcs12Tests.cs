@@ -202,7 +202,6 @@ public class Pkcs12Tests
         parsingParams.SkipMacValidation = true;
 
         byte[] pfxBytes = File.ReadAllBytes(pfxSampleWithPassword);
-
         Pfx pfx = Pfx.FromDer(pfxBytes, cryptoContext, parsingParams);
         Assert.True(pfx.HasUnknown());
     }
