@@ -66,7 +66,7 @@ public partial class Pkcs12ParsingParams: IDisposable
     }
 
     /// <summary>
-    /// Continue parsing if conversion to high level picky data structure fails (e.g. due to
+    /// Continue parsing even if conversion to high level picky data structure fails (e.g. due to
     /// unsupported private key or certificate kind)
     /// </summary>
     public void SetSkipSoftParsingErrors(bool value)
@@ -82,7 +82,7 @@ public partial class Pkcs12ParsingParams: IDisposable
     }
 
     /// <summary>
-    /// Continue parsing if decryption fails and keep data in encrypted form
+    /// Continue parsing even if decryption fails and keep data in encrypted form
     /// </summary>
     public void SetSkipDecryptionErrors(bool value)
     {
@@ -97,7 +97,7 @@ public partial class Pkcs12ParsingParams: IDisposable
     }
 
     /// <summary>
-    /// Continue parsing if MAC validation fails.
+    /// Continue parsing even if MAC validation fails.
     /// </summary>
     /// <remarks>
     /// This is useful for parsing available unencrypted data from

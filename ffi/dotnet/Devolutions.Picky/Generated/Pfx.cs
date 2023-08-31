@@ -136,6 +136,29 @@ public partial class Pfx: IDisposable
     }
 
     /// <summary>
+    /// Crawls all safe contents and safe bags and returns true if one of them is unknown.
+    /// </summary>
+    /// <remarks>
+    /// "Unknown" in this context means that the content is encrypted and most
+    /// likely the provided password was wrong, or no password at all was provided.
+    /// It is required to relax parsing strictness by modifying parsing
+    /// parameters via the `Pkcs12ParsingParams` object in order to allow a
+    /// `Pfx` object with unknown items. This is useful for partial inspection.
+    /// </remarks>
+    public bool HasUnknown()
+    {
+        unsafe
+        {
+            if (_inner == null)
+            {
+                throw new ObjectDisposedException("Pfx");
+            }
+            bool retVal = Raw.Pfx.HasUnknown(_inner);
+            return retVal;
+        }
+    }
+
+    /// <summary>
     /// Returns the underlying raw handle.
     /// </summary>
     public unsafe Raw.Pfx* AsFFI()

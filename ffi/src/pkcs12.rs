@@ -19,18 +19,18 @@ pub mod ffi {
             Box::new(Self(pkcs12::Pkcs12ParsingParams::default()))
         }
 
-        /// Continue parsing if conversion to high level picky data structure fails (e.g. due to
+        /// Continue parsing even if conversion to high level picky data structure fails (e.g. due to
         /// unsupported private key or certificate kind)
         pub fn set_skip_soft_parsing_errors(&mut self, value: bool) {
             self.0.skip_soft_parsing_errors = value;
         }
 
-        /// Continue parsing if decryption fails and keep data in encrypted form
+        /// Continue parsing even if decryption fails and keep data in encrypted form
         pub fn set_skip_decryption_errors(&mut self, value: bool) {
             self.0.skip_decryption_errors = value;
         }
 
-        /// Continue parsing if MAC validation fails.
+        /// Continue parsing even if MAC validation fails.
         ///
         /// This is useful for parsing available unencrypted data from
         /// password-protected PFX files. Also could be useful if PFX integrity has been intentionally
@@ -354,6 +354,26 @@ pub mod ffi {
                 });
 
             Box::new(SafeBagIterator(Box::new(it)))
+        }
+
+        /// Crawls all safe contents and safe bags and returns true if one of them is unknown.
+        ///
+        /// "Unknown" in this context means that the content is encrypted and most
+        /// likely the provided password was wrong, or no password at all was provided.
+        /// It is required to relax parsing strictness by modifying parsing
+        /// parameters via the `Pkcs12ParsingParams` object in order to allow a
+        /// `Pfx` object with unknown items. This is useful for partial inspection.
+        pub fn has_unknown(&self) -> bool {
+            self.0
+                .safe_contents()
+                .iter()
+                .any(|safe_contents| match safe_contents.kind() {
+                    pkcs12::SafeContentsKind::SafeBags(safe_bags)
+                    | pkcs12::SafeContentsKind::EncryptedSafeBags { safe_bags, .. } => safe_bags
+                        .iter()
+                        .any(|safe_bag| matches!(safe_bag.kind(), pkcs12::SafeBagKind::Unknown)),
+                    pkcs12::SafeContentsKind::Unknown => true,
+                })
         }
     }
 }
