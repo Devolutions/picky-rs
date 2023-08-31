@@ -15,6 +15,14 @@ public partial class PublicKey: IDisposable
 {
     private unsafe Raw.PublicKey* _inner;
 
+    public KeyKind Kind
+    {
+        get
+        {
+            return GetKind();
+        }
+    }
+
     /// <summary>
     /// Creates a managed <c>PublicKey</c> from a raw handle.
     /// </summary>
@@ -113,7 +121,7 @@ public partial class PublicKey: IDisposable
     }
 
     /// <summary>
-    /// Exports the public key into a PEM object
+    /// Exports the public key into a PEM object.
     /// </summary>
     /// <exception cref="PickyException"></exception>
     /// <returns>
@@ -136,6 +144,25 @@ public partial class PublicKey: IDisposable
             }
             Raw.Pem* retVal = result.Ok;
             return new Pem(retVal);
+        }
+    }
+
+    /// <summary>
+    /// Retrieves the key kind for this public key.
+    /// </summary>
+    /// <returns>
+    /// A <c>KeyKind</c> allocated on C# side.
+    /// </returns>
+    public KeyKind GetKind()
+    {
+        unsafe
+        {
+            if (_inner == null)
+            {
+                throw new ObjectDisposedException("PublicKey");
+            }
+            Raw.KeyKind retVal = Raw.PublicKey.GetKind(_inner);
+            return (KeyKind)retVal;
         }
     }
 

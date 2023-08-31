@@ -15,6 +15,14 @@ public partial class PrivateKey: IDisposable
 {
     private unsafe Raw.PrivateKey* _inner;
 
+    public KeyKind Kind
+    {
+        get
+        {
+            return GetKind();
+        }
+    }
+
     /// <summary>
     /// Creates a managed <c>PrivateKey</c> from a raw handle.
     /// </summary>
@@ -209,6 +217,25 @@ public partial class PrivateKey: IDisposable
             }
             Raw.PublicKey* retVal = result.Ok;
             return new PublicKey(retVal);
+        }
+    }
+
+    /// <summary>
+    /// Retrieves the key kind for this private key.
+    /// </summary>
+    /// <returns>
+    /// A <c>KeyKind</c> allocated on C# side.
+    /// </returns>
+    public KeyKind GetKind()
+    {
+        unsafe
+        {
+            if (_inner == null)
+            {
+                throw new ObjectDisposedException("PrivateKey");
+            }
+            Raw.KeyKind retVal = Raw.PrivateKey.GetKind(_inner);
+            return (KeyKind)retVal;
         }
     }
 

@@ -59,8 +59,12 @@ vQIDAQAB
     {
         Pem pem = Pem.Parse(pubKeyPemRepr);
         PublicKey key = PublicKey.FromPem(pem);
+        Assert.Equal(KeyKind.Rsa, key.Kind);
         byte[] pkcs1 = key.ToPkcs1();
+
         PublicKey key2 = PublicKey.FromPkcs1(pkcs1);
+        Assert.Equal(KeyKind.Rsa, key2.Kind);
+
         Assert.Equal(key.ToDer(), key2.ToDer());
     }
 }
