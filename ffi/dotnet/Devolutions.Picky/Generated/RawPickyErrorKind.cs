@@ -32,4 +32,8 @@ public enum PickyErrorKind
     /// Bad signature for token or certificate
     /// </summary>
     BadSignature = 3,
+    /// <summary>
+    /// MAC validation failed (wrong password or corrupted data)
+    /// </summary>
+    Pkcs12MacValidation = 4,
 }

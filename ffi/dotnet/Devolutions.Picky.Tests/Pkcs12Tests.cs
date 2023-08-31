@@ -13,6 +13,7 @@ public class Pkcs12Tests
     static readonly string intermediateCertPath = "../../../../../../../test_assets/pkcs12/asset_intermediate.crt";
     static readonly string rootCertPath = "../../../../../../../test_assets/pkcs12/asset_root.crt";
     static readonly string pfxSample = "../../../../../../../test_assets/pkcs12/openssl_nocrypt.pfx";
+    static readonly string pfxSampleWithPassword = "../../../../../../../test_assets/pkcs12/certmgr_aes256.pfx";
 
     [Fact]
     public void PfxBuild()
@@ -170,5 +171,39 @@ public class Pkcs12Tests
         Assert.Equal(2, friendlyNameCount);
         Assert.Equal(2, localKeyIdCount);
         Assert.Equal(0, customAttrCount);
+    }
+
+    [Fact]
+    public void ReadWithWrongPassword()
+    {
+        Pkcs12CryptoContext cryptoContext = Pkcs12CryptoContext.WithPassword("shenanigans");
+        Pkcs12ParsingParams parsingParams = Pkcs12ParsingParams.New();
+
+        byte[] pfxBytes = File.ReadAllBytes(pfxSampleWithPassword);
+
+        try
+        {
+            Pfx.FromDer(pfxBytes, cryptoContext, parsingParams);
+            Assert.True(false, "Expected a PickyException to be thrown");
+        }
+        catch (PickyException e)
+        {
+            Assert.Equal(PickyErrorKind.Pkcs12MacValidation, e.Inner.Kind);
+        }
+    }
+
+    [Fact]
+    public void ReadWithWrongPasswordLenient()
+    {
+        Pkcs12CryptoContext cryptoContext = Pkcs12CryptoContext.WithPassword("bumfuzzle");
+
+        Pkcs12ParsingParams parsingParams = Pkcs12ParsingParams.New();
+        parsingParams.SkipDecryptionErrors = true;
+        parsingParams.SkipMacValidation = true;
+
+        byte[] pfxBytes = File.ReadAllBytes(pfxSampleWithPassword);
+
+        Pfx pfx = Pfx.FromDer(pfxBytes, cryptoContext, parsingParams);
+        Assert.True(pfx.HasUnknown());
     }
 }

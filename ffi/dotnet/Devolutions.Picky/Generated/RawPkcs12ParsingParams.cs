@@ -24,20 +24,20 @@ public partial struct Pkcs12ParsingParams
     public static unsafe extern Pkcs12ParsingParams* New();
 
     /// <summary>
-    /// Continue parsing if conversion to high level picky data structure fails (e.g. due to
+    /// Continue parsing even if conversion to high level picky data structure fails (e.g. due to
     /// unsupported private key or certificate kind)
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pkcs12ParsingParams_set_skip_soft_parsing_errors", ExactSpelling = true)]
     public static unsafe extern void SetSkipSoftParsingErrors(Pkcs12ParsingParams* self, [MarshalAs(UnmanagedType.U1)] bool value);
 
     /// <summary>
-    /// Continue parsing if decryption fails and keep data in encrypted form
+    /// Continue parsing even if decryption fails and keep data in encrypted form
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pkcs12ParsingParams_set_skip_decryption_errors", ExactSpelling = true)]
     public static unsafe extern void SetSkipDecryptionErrors(Pkcs12ParsingParams* self, [MarshalAs(UnmanagedType.U1)] bool value);
 
     /// <summary>
-    /// Continue parsing if MAC validation fails.
+    /// Continue parsing even if MAC validation fails.
     /// </summary>
     /// <remarks>
     /// This is useful for parsing available unencrypted data from

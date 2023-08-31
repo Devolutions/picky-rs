@@ -44,6 +44,20 @@ public partial struct Pfx
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pfx_safe_bags", ExactSpelling = true)]
     public static unsafe extern SafeBagIterator* SafeBags(Pfx* self);
 
+    /// <summary>
+    /// Crawls all safe contents and safe bags and returns true if one of them is unknown.
+    /// </summary>
+    /// <remarks>
+    /// "Unknown" in this context means that the content is encrypted and most
+    /// likely the provided password was wrong, or no password at all was provided.
+    /// It is required to relax parsing strictness by modifying parsing
+    /// parameters via the `Pkcs12ParsingParams` object in order to allow a
+    /// `Pfx` object with unknown items. This is useful for partial inspection.
+    /// </remarks>
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pfx_has_unknown", ExactSpelling = true)]
+    [return: MarshalAs(UnmanagedType.U1)]
+    public static unsafe extern bool HasUnknown(Pfx* self);
+
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pfx_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(Pfx* self);
 }

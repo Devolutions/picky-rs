@@ -6,6 +6,7 @@ use picky::jose::jwt::JwtError;
 use picky::key::KeyError;
 use picky::pem::PemError;
 use picky::pkcs12::Pkcs12Error;
+use picky::pkcs12::Pkcs12MacError;
 use picky::signature::SignatureError;
 use picky::ssh::certificate::SshCertificateError;
 use picky::ssh::certificate::SshCertificateGenerationError;
@@ -88,8 +89,11 @@ impl From<picky_asn1::restricted_string::CharSetError> for PickyErrorKind {
 }
 
 impl From<Pkcs12Error> for PickyErrorKind {
-    fn from(_: Pkcs12Error) -> Self {
-        Self::Generic
+    fn from(value: Pkcs12Error) -> Self {
+        match value {
+            Pkcs12Error::Mac(Pkcs12MacError::MacValidation) => Self::Pkcs12MacValidation,
+            _ => Self::Generic,
+        }
     }
 }
 
@@ -178,6 +182,8 @@ pub mod ffi {
         Expired,
         /// Bad signature for token or certificate
         BadSignature,
+        /// MAC validation failed (wrong password or corrupted data)
+        Pkcs12MacValidation,
     }
 
     /// Stringified Picky error along with an error kind.

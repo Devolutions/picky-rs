@@ -106,7 +106,7 @@ vQIDAQAB
         try
         {
             JwtSig jwt = JwtSig.Decode(signedJwt, key, validator);
-            Assert.True(false, "Expected a PickyException thrown");
+            Assert.True(false, "Expected a PickyException to be thrown");
         }
         catch (PickyException e)
         {
