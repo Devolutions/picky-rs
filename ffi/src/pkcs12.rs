@@ -154,7 +154,6 @@ pub mod ffi {
     pub struct Pkcs12AttributeIterator(pub(crate) Box<dyn Iterator<Item = pkcs12::Pkcs12Attribute>>);
 
     impl Pkcs12AttributeIterator {
-        #[allow(clippy::should_implement_trait)] // no traits for FFI
         pub fn next(&mut self) -> Option<Box<Pkcs12Attribute>> {
             self.0.next().map(|attr| Box::new(Pkcs12Attribute(attr)))
         }
@@ -275,7 +274,6 @@ pub mod ffi {
     pub struct SafeBagIterator(pub(crate) Box<dyn Iterator<Item = pkcs12::SafeBag>>);
 
     impl SafeBagIterator {
-        #[allow(clippy::should_implement_trait)] // no traits for FFI
         pub fn next(&mut self) -> Option<Box<SafeBag>> {
             self.0.next().map(|safe_bag| Box::new(SafeBag(safe_bag)))
         }
