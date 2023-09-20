@@ -92,7 +92,7 @@ public partial class SafeBag: IDisposable
     /// <returns>
     /// A <c>SafeBag</c> allocated on Rust side.
     /// </returns>
-    public static SafeBag NewEncryptedKey(PrivateKey key, Pkcs12CryptoContext cryptoContext)
+    public static SafeBag NewEncryptedKey(PrivateKey key, Pkcs12Encryption encryption, Pkcs12CryptoContext cryptoContext)
     {
         unsafe
         {
@@ -102,13 +102,19 @@ public partial class SafeBag: IDisposable
             {
                 throw new ObjectDisposedException("PrivateKey");
             }
+            Raw.Pkcs12Encryption* encryptionRaw;
+            encryptionRaw = encryption.AsFFI();
+            if (encryptionRaw == null)
+            {
+                throw new ObjectDisposedException("Pkcs12Encryption");
+            }
             Raw.Pkcs12CryptoContext* cryptoContextRaw;
             cryptoContextRaw = cryptoContext.AsFFI();
             if (cryptoContextRaw == null)
             {
                 throw new ObjectDisposedException("Pkcs12CryptoContext");
             }
-            IntPtr resultPtr = Raw.SafeBag.NewEncryptedKey(keyRaw, cryptoContextRaw);
+            IntPtr resultPtr = Raw.SafeBag.NewEncryptedKey(keyRaw, encryptionRaw, cryptoContextRaw);
             Raw.Pkcs12FfiResultBoxSafeBagBoxPickyError result = Marshal.PtrToStructure<Raw.Pkcs12FfiResultBoxSafeBagBoxPickyError>(resultPtr);
             Raw.Pkcs12FfiResultBoxSafeBagBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)

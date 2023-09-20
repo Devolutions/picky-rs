@@ -33,7 +33,7 @@ public partial struct SafeBag
     /// Creates new safe bag holding an encrypted private key.
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SafeBag_new_encrypted_key", ExactSpelling = true)]
-    public static unsafe extern IntPtr NewEncryptedKey(PrivateKey* key, Pkcs12CryptoContext* cryptoContext);
+    public static unsafe extern IntPtr NewEncryptedKey(PrivateKey* key, Pkcs12Encryption* encryption, Pkcs12CryptoContext* cryptoContext);
 
     /// <summary>
     /// Creates new safe bag holding a certificate.
