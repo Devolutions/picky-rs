@@ -11,6 +11,52 @@ pub mod ffi {
     use std::str::FromStr;
     use std::sync::{Arc, Mutex};
 
+    /// Encryption mode to use for the PFX file
+    #[diplomat::opaque]
+    pub struct Pkcs12Encryption(super::InnerPkcs12Encryption);
+
+    /// Hashing algorithm used for MAC or KDF in PFX file
+    pub enum Pkcs12HashAlgorithm {
+        Sha1,
+        Sha224,
+        Sha256,
+        Sha384,
+        Sha512,
+    }
+
+    /// PBES2 cipher algorithm
+    pub enum Pbes2Cipher {
+        Aes128Cbc,
+        Aes192Cbc,
+        Aes256Cbc,
+    }
+
+    /// Pkcs12Pbe is deprecated and should not be used in general.
+    pub enum Pbes1Cipher {
+        ShaAnd40BitRc2Cbc,
+        ShaAnd3Key3DesCbc,
+    }
+
+    impl Pkcs12Encryption {
+        pub fn default() -> Box<Pkcs12Encryption> {
+            Box::new(Self(super::InnerPkcs12Encryption::Pbes2 {
+                cipher: pkcs12::Pbes2Cipher::Aes256Cbc,
+                hmac_kdf: pkcs12::Pkcs12HashAlgorithm::Sha256,
+            }))
+        }
+
+        pub fn new_pbes2(cipher: Pbes2Cipher, hmac_kdf: Pkcs12HashAlgorithm) -> Box<Pkcs12Encryption> {
+            Box::new(Self(super::InnerPkcs12Encryption::Pbes2 {
+                cipher: cipher.into(),
+                hmac_kdf: hmac_kdf.into(),
+            }))
+        }
+
+        pub fn new_pbes1(cipher: Pbes1Cipher) -> Box<Pkcs12Encryption> {
+            Box::new(Self(super::InnerPkcs12Encryption::Pbes1 { cipher: cipher.into() }))
+        }
+    }
+
     #[diplomat::opaque]
     pub struct Pkcs12ParsingParams(pub(crate) pkcs12::Pkcs12ParsingParams);
 
@@ -108,7 +154,6 @@ pub mod ffi {
     pub struct Pkcs12AttributeIterator(pub(crate) Box<dyn Iterator<Item = pkcs12::Pkcs12Attribute>>);
 
     impl Pkcs12AttributeIterator {
-        #[allow(clippy::should_implement_trait)] // no traits for FFI
         pub fn next(&mut self) -> Option<Box<Pkcs12Attribute>> {
             self.0.next().map(|attr| Box::new(Pkcs12Attribute(attr)))
         }
@@ -135,13 +180,12 @@ pub mod ffi {
         /// Creates new safe bag holding an encrypted private key.
         pub fn new_encrypted_key(
             key: &PrivateKey,
+            encryption: &Pkcs12Encryption,
             crypto_context: &Pkcs12CryptoContext,
         ) -> Result<Box<SafeBag>, Box<PickyError>> {
             let mut crypto_context = crypto_context.0.lock().unwrap();
 
-            let pbes2_encryption =
-                pkcs12::Pbes2Encryption::new(pkcs12::Pbes2Cipher::Aes256Cbc, pkcs12::Pkcs12HashAlgorithm::Sha256);
-            let encryption = pkcs12::Pkcs12Encryption::new_pbes2(pbes2_encryption, &mut crypto_context);
+            let encryption = encryption.0.to_picky_encryption(&mut crypto_context);
 
             let safe_bag = pkcs12::SafeBag::new_encrypted_key(key.0.clone(), Vec::new(), encryption, &crypto_context)?;
 
@@ -230,7 +274,6 @@ pub mod ffi {
     pub struct SafeBagIterator(pub(crate) Box<dyn Iterator<Item = pkcs12::SafeBag>>);
 
     impl SafeBagIterator {
-        #[allow(clippy::should_implement_trait)] // no traits for FFI
         pub fn next(&mut self) -> Option<Box<SafeBag>> {
             self.0.next().map(|safe_bag| Box::new(SafeBag(safe_bag)))
         }
@@ -263,14 +306,15 @@ pub mod ffi {
             self.safe_contents.push(safe_contents);
         }
 
-        pub fn mark_encrypted_safe_contents_as_ready(&mut self) -> Result<(), Box<PickyError>> {
+        pub fn mark_encrypted_safe_contents_as_ready(
+            &mut self,
+            encryption: &Pkcs12Encryption,
+        ) -> Result<(), Box<PickyError>> {
             let mut crypto_context = self.crypto_context.lock().unwrap();
 
             let safe_bags = std::mem::take(&mut self.safe_bags_acc);
 
-            let pbes2_encryption =
-                pkcs12::Pbes2Encryption::new(pkcs12::Pbes2Cipher::Aes256Cbc, pkcs12::Pkcs12HashAlgorithm::Sha256);
-            let encryption = pkcs12::Pkcs12Encryption::new_pbes2(pbes2_encryption, &mut crypto_context);
+            let encryption = encryption.0.to_picky_encryption(&mut crypto_context);
 
             let safe_contents = pkcs12::SafeContents::new_encrypted(safe_bags, encryption, &crypto_context)?;
 
@@ -427,4 +471,63 @@ pub unsafe extern "C" fn Pfx_to_der(pfx: Option<&ffi::Pfx>, dst: *mut u8, count:
     std::ptr::copy_nonoverlapping(data.as_ptr(), dst, data_len);
 
     None
+}
+
+enum InnerPkcs12Encryption {
+    Pbes1 {
+        cipher: picky::pkcs12::Pbes1Cipher,
+    },
+    Pbes2 {
+        cipher: picky::pkcs12::Pbes2Cipher,
+        hmac_kdf: picky::pkcs12::Pkcs12HashAlgorithm,
+    },
+}
+
+impl InnerPkcs12Encryption {
+    fn to_picky_encryption(
+        &self,
+        crypto_context: &mut picky::pkcs12::Pkcs12CryptoContext,
+    ) -> picky::pkcs12::Pkcs12Encryption {
+        match self {
+            Self::Pbes1 { cipher } => {
+                let pbes1_encryption = picky::pkcs12::Pbes1Encryption::new(*cipher);
+                picky::pkcs12::Pkcs12Encryption::new_pbes1(pbes1_encryption, crypto_context)
+            }
+            Self::Pbes2 { cipher, hmac_kdf } => {
+                let pbes2_encryption = picky::pkcs12::Pbes2Encryption::new(*cipher, *hmac_kdf);
+                picky::pkcs12::Pkcs12Encryption::new_pbes2(pbes2_encryption, crypto_context)
+            }
+        }
+    }
+}
+
+impl From<ffi::Pkcs12HashAlgorithm> for picky::pkcs12::Pkcs12HashAlgorithm {
+    fn from(value: ffi::Pkcs12HashAlgorithm) -> Self {
+        match value {
+            ffi::Pkcs12HashAlgorithm::Sha1 => Self::Sha1,
+            ffi::Pkcs12HashAlgorithm::Sha224 => Self::Sha224,
+            ffi::Pkcs12HashAlgorithm::Sha256 => Self::Sha256,
+            ffi::Pkcs12HashAlgorithm::Sha384 => Self::Sha384,
+            ffi::Pkcs12HashAlgorithm::Sha512 => Self::Sha512,
+        }
+    }
+}
+
+impl From<ffi::Pbes2Cipher> for picky::pkcs12::Pbes2Cipher {
+    fn from(value: ffi::Pbes2Cipher) -> Self {
+        match value {
+            ffi::Pbes2Cipher::Aes128Cbc => Self::Aes128Cbc,
+            ffi::Pbes2Cipher::Aes192Cbc => Self::Aes192Cbc,
+            ffi::Pbes2Cipher::Aes256Cbc => Self::Aes256Cbc,
+        }
+    }
+}
+
+impl From<ffi::Pbes1Cipher> for picky::pkcs12::Pbes1Cipher {
+    fn from(value: ffi::Pbes1Cipher) -> Self {
+        match value {
+            ffi::Pbes1Cipher::ShaAnd40BitRc2Cbc => Self::ShaAnd40BitRc2Cbc,
+            ffi::Pbes1Cipher::ShaAnd3Key3DesCbc => Self::ShaAnd3Key3DesCbc,
+        }
+    }
 }

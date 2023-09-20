@@ -33,7 +33,7 @@ public partial struct PfxBuilder
     public static unsafe extern void MarkSafeContentsAsReady(PfxBuilder* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PfxBuilder_mark_encrypted_safe_contents_as_ready", ExactSpelling = true)]
-    public static unsafe extern IntPtr MarkEncryptedSafeContentsAsReady(PfxBuilder* self);
+    public static unsafe extern IntPtr MarkEncryptedSafeContentsAsReady(PfxBuilder* self, Pkcs12Encryption* encryption);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PfxBuilder_build", ExactSpelling = true)]
     public static unsafe extern IntPtr Build(PfxBuilder* self);

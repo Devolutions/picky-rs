@@ -19,6 +19,7 @@ public class Pkcs12Tests
     public void PfxBuild()
     {
         Pkcs12CryptoContext cryptoContext = Pkcs12CryptoContext.WithPassword("test");
+        Pkcs12Encryption encryption = Pkcs12Encryption.NewPbes2(Pbes2Cipher.Aes256Cbc, Pkcs12HashAlgorithm.Sha256);
 
         byte[] leafBytes = File.ReadAllBytes(leafCertPath);
         Cert leaf = Cert.FromDer(leafBytes);
@@ -29,7 +30,7 @@ public class Pkcs12Tests
         string leafKeyPemRepr = File.ReadAllText(leafPrivateKey);
         Pem leafKeyPem = Pem.Parse(leafKeyPemRepr);
         PrivateKey leafKey = PrivateKey.FromPem(leafKeyPem);
-        SafeBag leafKeySafeBag = SafeBag.NewEncryptedKey(leafKey, cryptoContext);
+        SafeBag leafKeySafeBag = SafeBag.NewEncryptedKey(leafKey, encryption, cryptoContext);
         leafKeySafeBag.AddAttribute(Pkcs12Attribute.NewFriendlyName("LEAF_CERT"));
         leafKeySafeBag.AddAttribute(Pkcs12Attribute.NewLocalKeyId(new byte[] { 0x01, 0x00, 0x00, 0x00 }));
 
@@ -48,7 +49,7 @@ public class Pkcs12Tests
         builder.AddSafeBagToCurrentSafeContents(leafSafeBag);
         builder.AddSafeBagToCurrentSafeContents(intermediateSafeBag);
         builder.AddSafeBagToCurrentSafeContents(rootSafeBag);
-        builder.MarkEncryptedSafeContentsAsReady();
+        builder.MarkEncryptedSafeContentsAsReady(encryption);
 
         builder.AddSafeBagToCurrentSafeContents(leafKeySafeBag);
         builder.MarkSafeContentsAsReady();

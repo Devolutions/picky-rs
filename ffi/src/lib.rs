@@ -1,3 +1,5 @@
+#![allow(clippy::should_implement_trait)] // FFI consumer can’t use Rust traits
+
 pub mod date;
 pub mod error;
 pub mod hash;
