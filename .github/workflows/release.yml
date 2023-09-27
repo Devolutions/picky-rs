@@ -21,7 +21,7 @@ jobs:
         id: get-commit
         shell: pwsh
         env:
-          GITHUB_TOKEN: ${{ secrets.DEVOLUTIONSBOT_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $RunJson = gh api /repos/devolutions/picky-rs/actions/runs/${{ github.event.inputs.run-id }}
           $Run = $RunJson | ConvertFrom-Json
@@ -78,7 +78,7 @@ jobs:
         id: download
         shell: pwsh
         env:
-          GITHUB_TOKEN: ${{ secrets.DEVOLUTIONSBOT_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh run download ${{ github.event.inputs.run-id }} --dir "$Env:RUNNER_TEMP" --name picky
           $SourceFile = "picky-server"
