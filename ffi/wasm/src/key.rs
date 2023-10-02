@@ -91,6 +91,7 @@ impl PrivateKey {
     }
 
     /// Generates new ed key pair with specified supported algorithm.
+    ///
     /// `write_public_key` specifies whether to include public key in the private key file.
     /// Note that OpenSSL does not support ed keys with public key included.
     pub fn generate_ed(algorithm: EdAlgorithm, write_public_key: bool) -> Result<PrivateKey, KeyError> {

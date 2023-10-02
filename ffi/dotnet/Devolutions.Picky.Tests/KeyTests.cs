@@ -69,4 +69,28 @@ vQIDAQAB
 
         Assert.Equal(key.ToDer(), key2.ToDer());
     }
+
+    [Fact]
+    public void GenerateRsa()
+    {
+        PrivateKey key = PrivateKey.GenerateRsa(2048);
+        Assert.Equal(KeyKind.Rsa, key.Kind);
+        key.ToPem().ToRepr();
+    }
+
+    [Fact]
+    public void GenerateEd()
+    {
+        PrivateKey key = PrivateKey.GenerateEd(EdAlgorithm.Ed25519, false);
+        Assert.Equal(KeyKind.Ed, key.Kind);
+        key.ToPem().ToRepr();
+    }
+
+    [Fact]
+    public void GenerateEc()
+    {
+        PrivateKey key = PrivateKey.GenerateEc(EcCurve.NistP384);
+        Assert.Equal(KeyKind.Ec, key.Kind);
+        key.ToPem().ToRepr();
+    }
 }

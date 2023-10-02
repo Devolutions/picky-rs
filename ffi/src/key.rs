@@ -122,9 +122,10 @@ pub mod ffi {
             Ok(Box::new(PrivateKey(key)))
         }
 
-        // Generates new ed key pair with specified supported algorithm.
-        // `write_public_key` specifies whether to include public key in the private key file.
-        // Note that OpenSSL does not support ed keys with public key included.
+        /// Generates new ed key pair with specified supported algorithm.
+        ///
+        /// `write_public_key` specifies whether to include public key in the private key file.
+        /// Note that OpenSSL does not support ed keys with public key included.
         pub fn generate_ed(algorithm: EdAlgorithm, write_public_key: bool) -> Result<Box<PrivateKey>, Box<PickyError>> {
             let key = picky::key::PrivateKey::generate_ed(algorithm.into(), write_public_key)?;
             Ok(Box::new(PrivateKey(key)))
