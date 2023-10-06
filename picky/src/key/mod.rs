@@ -667,9 +667,10 @@ impl PrivateKey {
         Ok(Self { kind, inner })
     }
 
-    // Generates new ed key pair with specified supported algorithm.
-    // `write_public_key` specifies whether to include public key in the private key file.
-    // Note that OpenSSL does not support ed keys with public key included.
+    /// Generates new ed key pair with specified supported algorithm.
+    ///
+    /// `write_public_key` specifies whether to include public key in the private key file.
+    /// Note that OpenSSL does not support ed keys with public key included.
     pub fn generate_ed(algorithm: EdAlgorithm, write_public_key: bool) -> Result<Self, KeyError> {
         use rand::rngs::OsRng;
 
@@ -1122,10 +1123,10 @@ mod tests {
         ring::signature::EcdsaKeyPair::from_pkcs8(signing_alg, &pkcs8).unwrap();
     }
 
-    #[test]
     // Read from x25519 keys is not supported in `ring`, because it is mainly used for key
     // exchange for which key serialization/deserialization is not needed at all. But we support,
     // just to be consistent with OpenSSL and RFC https://www.rfc-editor.org/rfc/rfc8410
+    #[test]
     fn ring_understands_picky_pkcs8_ed25519() {
         // Make sure we're generating pkcs8 understood by the `ring` crate.
         // `ring` is very specific about the format of the ED25519 private key, and in contrast

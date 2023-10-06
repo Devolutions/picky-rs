@@ -47,6 +47,13 @@ public partial struct PrivateKey
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PrivateKey_generate_ec", ExactSpelling = true)]
     public static unsafe extern IntPtr GenerateEc(EcCurve curve);
 
+    /// <summary>
+    /// Generates new ed key pair with specified supported algorithm.
+    /// </summary>
+    /// <remarks>
+    /// `write_public_key` specifies whether to include public key in the private key file.
+    /// Note that OpenSSL does not support ed keys with public key included.
+    /// </remarks>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PrivateKey_generate_ed", ExactSpelling = true)]
     public static unsafe extern IntPtr GenerateEd(EdAlgorithm algorithm, [MarshalAs(UnmanagedType.U1)] bool writePublicKey);
 

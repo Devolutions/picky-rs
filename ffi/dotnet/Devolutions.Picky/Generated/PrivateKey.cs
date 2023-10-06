@@ -144,6 +144,13 @@ public partial class PrivateKey: IDisposable
         }
     }
 
+    /// <summary>
+    /// Generates new ed key pair with specified supported algorithm.
+    /// </summary>
+    /// <remarks>
+    /// `write_public_key` specifies whether to include public key in the private key file.
+    /// Note that OpenSSL does not support ed keys with public key included.
+    /// </remarks>
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PrivateKey</c> allocated on Rust side.
