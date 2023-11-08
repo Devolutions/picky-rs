@@ -377,7 +377,7 @@ mod chrono_convert {
 
     impl<TR: TimeRepr> From<Date<TR>> for DateTime<Utc> {
         fn from(date: Date<TR>) -> Self {
-            DateTime::<Utc>::from_utc(date.into(), Utc)
+            DateTime::<Utc>::from_naive_utc_and_offset(date.into(), Utc)
         }
     }
 }
