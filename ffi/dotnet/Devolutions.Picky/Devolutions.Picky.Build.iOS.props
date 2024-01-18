@@ -1,7 +1,7 @@
 <Project>
 
   <PropertyGroup Condition="$(PackageId.EndsWith('iOS'))">
-    <TargetFrameworks>net6.0-ios</TargetFrameworks>
+    <TargetFrameworks>net8.0-ios</TargetFrameworks>
     <SupportedOSPlatformVersion>12.1</SupportedOSPlatformVersion>
   </PropertyGroup>
 
