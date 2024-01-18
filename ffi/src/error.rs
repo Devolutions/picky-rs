@@ -148,6 +148,18 @@ impl From<CertError> for PickyErrorKind {
     }
 }
 
+impl From<argon2::Error> for PickyErrorKind {
+    fn from(_: argon2::Error) -> Self {
+        Self::Generic
+    }
+}
+
+impl From<argon2::password_hash::Error> for PickyErrorKind {
+    fn from(_: argon2::password_hash::Error) -> Self {
+        Self::Generic
+    }
+}
+
 impl<T> From<T> for Box<PickyError>
 where
     T: Into<PickyErrorKind> + ToString,
