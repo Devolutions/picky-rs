@@ -50,11 +50,11 @@ public struct DiplomatWriteable : IDisposable
 
         IntPtr flushFuncPtr = Marshal.GetFunctionPointerForDelegate(flushFunc);
         IntPtr growFuncPtr = Marshal.GetFunctionPointerForDelegate(growFunc);
-        
+
         // flushFunc and growFunc are managed objects and might be disposed of by the garbage collector.
         // To prevent this, we make the context hold the references and protect the context itself
         // for automatic disposal by moving it behind a GCHandle.
-        DiplomatWriteableContext ctx = new DiplomatWriteableContext();        
+        DiplomatWriteableContext ctx = new DiplomatWriteableContext();
         ctx.flushFunc = flushFunc;
         ctx.growFunc = growFunc;
         GCHandle ctxHandle = GCHandle.Alloc(ctx);
