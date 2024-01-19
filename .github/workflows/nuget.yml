@@ -7,7 +7,7 @@ on:
         description: 'Dry run'
         required: true
         type: boolean
-        default: 'true'
+        default: true
   schedule:
     - cron: '21 3 * * 1' # 3:21 AM UTC every Monday
 
@@ -28,8 +28,6 @@ jobs:
         id: get-dry-run
         shell: pwsh
         run: |
-          Set-PSDebug -Trace 1
-
           $IsDryRun = '${{ github.event.inputs.dry-run }}' -Eq 'true' -Or '${{ github.event_name }}' -Eq 'schedule'
 
           if ($IsDryRun) {
@@ -93,9 +91,7 @@ jobs:
       - name: Configure Android NDK
         if: matrix.os == 'android'
         shell: pwsh
-        run: |
-          Set-PSDebug -Trace 1
-
+        run: |    
           $CargoConfigFile = "~/.cargo/config"
           $AndroidToolchain="${Env:ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64"
 
@@ -129,8 +125,6 @@ jobs:
       - name: Build picky (${{matrix.os}}-${{matrix.arch}})
         shell: pwsh
         run: |
-          Set-PSDebug -Trace 1
-
           $DotNetOs = '${{matrix.os}}'
           $DotNetArch = '${{matrix.arch}}'
           $DotNetRid = '${{matrix.os}}-${{matrix.arch}}'
@@ -208,8 +202,6 @@ jobs:
       - name: Configure runner
         shell: pwsh
         run: |
-          Set-PSDebug -Trace 1
-
           wget -q https://github.com/awakecoding/llvm-prebuilt/releases/download/v2021.2.4/cctools-x86_64-ubuntu-20.04.tar.xz
           tar -xf cctools-x86_64-ubuntu-20.04.tar.xz -C /tmp
           sudo mv /tmp/cctools-x86_64-ubuntu-20.04/bin/lipo /usr/local/bin
@@ -223,8 +215,6 @@ jobs:
       - name: Lipo native components
         shell: pwsh
         run: |
-          Set-PSDebug -Trace 1
-
           Set-Location "dependencies/runtimes"
           # No RID for universal binaries, see: https://github.com/dotnet/runtime/issues/53156
           $OutputPath = Join-Path "${{ matrix.os }}-universal" "native"
@@ -313,8 +303,6 @@ jobs:
       - name: Rename dependencies
         shell: pwsh
         run: |
-          Set-PSDebug -Trace 1
-
           Set-Location "dependencies/runtimes"
           $(Get-Item ".\picky-*") | ForEach-Object { Rename-Item $_ $_.Name.Replace("picky-", "") }
           Get-ChildItem * -Recurse
@@ -352,8 +340,6 @@ jobs:
       - name: Publish to nuget.org
         shell: pwsh
         run: |
-          Set-PSDebug -Trace 1
-
           $Files = Get-ChildItem -Recurse package/*.nupkg
     
           foreach ($File in $Files) {
@@ -373,3 +359,33 @@ jobs:
             $PushCmd = $PushCmd -Join ' '
             Invoke-Expression $PushCmd
           }
+
+  notify:
+    name: Notify failure
+    runs-on: ubuntu-latest
+    if: ${{ always() && contains(needs.*.result, 'failure') && github.event_name == 'schedule' }}
+    needs:
+      - preflight
+      - build-universal
+      - build-managed
+      - build-managed
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_ARCHITECTURE }}
+      SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+    steps:
+      - name: Send slack notification
+        id: slack
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*${{ github.repository }}* :fire::fire::fire::fire::fire: \n The scheduled build for *${{ github.repository }}* is <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|broken>"
+                  }
+                }
+              ]
+            }
