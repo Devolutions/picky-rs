@@ -368,7 +368,6 @@ jobs:
       - preflight
       - build-universal
       - build-managed
-      - build-managed
     env:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_ARCHITECTURE }}
       SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
