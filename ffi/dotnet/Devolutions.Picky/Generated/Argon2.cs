@@ -45,9 +45,7 @@ public partial class Argon2: IDisposable
             {
                 throw new ObjectDisposedException("Argon2Params");
             }
-            IntPtr resultPtr = Raw.Argon2.New(algorithmRaw, parametersRaw);
-            Raw.Argon2FfiResultBoxArgon2BoxPickyError result = Marshal.PtrToStructure<Raw.Argon2FfiResultBoxArgon2BoxPickyError>(resultPtr);
-            Raw.Argon2FfiResultBoxArgon2BoxPickyError.Destroy(resultPtr);
+            Raw.Argon2FfiResultBoxArgon2BoxPickyError result = Raw.Argon2.New(algorithmRaw, parametersRaw);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -70,9 +68,7 @@ public partial class Argon2: IDisposable
             nuint passwordBufLength = (nuint)passwordBuf.Length;
             fixed (byte* passwordBufPtr = passwordBuf)
             {
-                IntPtr resultPtr = Raw.Argon2.HashPassword(_inner, passwordBufPtr, passwordBufLength, &writeable);
-                Raw.Argon2FfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.Argon2FfiResultVoidBoxPickyError>(resultPtr);
-                Raw.Argon2FfiResultVoidBoxPickyError.Destroy(resultPtr);
+                Raw.Argon2FfiResultVoidBoxPickyError result = Raw.Argon2.HashPassword(_inner, passwordBufPtr, passwordBufLength, &writeable);
                 if (!result.isOk)
                 {
                     throw new PickyException(new PickyError(result.Err));
@@ -95,9 +91,7 @@ public partial class Argon2: IDisposable
             fixed (byte* passwordBufPtr = passwordBuf)
             {
                 DiplomatWriteable writeable = new DiplomatWriteable();
-                IntPtr resultPtr = Raw.Argon2.HashPassword(_inner, passwordBufPtr, passwordBufLength, &writeable);
-                Raw.Argon2FfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.Argon2FfiResultVoidBoxPickyError>(resultPtr);
-                Raw.Argon2FfiResultVoidBoxPickyError.Destroy(resultPtr);
+                Raw.Argon2FfiResultVoidBoxPickyError result = Raw.Argon2.HashPassword(_inner, passwordBufPtr, passwordBufLength, &writeable);
                 if (!result.isOk)
                 {
                     throw new PickyException(new PickyError(result.Err));

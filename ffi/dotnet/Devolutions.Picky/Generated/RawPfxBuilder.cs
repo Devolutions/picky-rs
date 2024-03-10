@@ -17,11 +17,7 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct PfxBuilder
 {
-#if __IOS__
-    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
-#else
     private const string NativeLib = "DevolutionsPicky";
-#endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PfxBuilder_init", ExactSpelling = true)]
     public static unsafe extern PfxBuilder* Init(Pkcs12CryptoContext* cryptoContext);
@@ -33,10 +29,10 @@ public partial struct PfxBuilder
     public static unsafe extern void MarkSafeContentsAsReady(PfxBuilder* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PfxBuilder_mark_encrypted_safe_contents_as_ready", ExactSpelling = true)]
-    public static unsafe extern IntPtr MarkEncryptedSafeContentsAsReady(PfxBuilder* self, Pkcs12Encryption* encryption);
+    public static unsafe extern Pkcs12FfiResultVoidBoxPickyError MarkEncryptedSafeContentsAsReady(PfxBuilder* self, Pkcs12Encryption* encryption);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PfxBuilder_build", ExactSpelling = true)]
-    public static unsafe extern IntPtr Build(PfxBuilder* self);
+    public static unsafe extern Pkcs12FfiResultBoxPfxBoxPickyError Build(PfxBuilder* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PfxBuilder_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(PfxBuilder* self);

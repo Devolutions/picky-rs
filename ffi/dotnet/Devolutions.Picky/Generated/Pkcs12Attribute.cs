@@ -64,9 +64,7 @@ public partial class Pkcs12Attribute: IDisposable
             nuint nameBufLength = (nuint)nameBuf.Length;
             fixed (byte* nameBufPtr = nameBuf)
             {
-                IntPtr resultPtr = Raw.Pkcs12Attribute.NewFriendlyName(nameBufPtr, nameBufLength);
-                Raw.Pkcs12FfiResultBoxPkcs12AttributeBoxPickyError result = Marshal.PtrToStructure<Raw.Pkcs12FfiResultBoxPkcs12AttributeBoxPickyError>(resultPtr);
-                Raw.Pkcs12FfiResultBoxPkcs12AttributeBoxPickyError.Destroy(resultPtr);
+                Raw.Pkcs12FfiResultBoxPkcs12AttributeBoxPickyError result = Raw.Pkcs12Attribute.NewFriendlyName(nameBufPtr, nameBufLength);
                 if (!result.isOk)
                 {
                     throw new PickyException(new PickyError(result.Err));
@@ -122,9 +120,7 @@ public partial class Pkcs12Attribute: IDisposable
             {
                 throw new ObjectDisposedException("Pkcs12Attribute");
             }
-            IntPtr resultPtr = Raw.Pkcs12Attribute.GetFriendlyName(_inner, &writeable);
-            Raw.Pkcs12FfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.Pkcs12FfiResultVoidBoxPickyError>(resultPtr);
-            Raw.Pkcs12FfiResultVoidBoxPickyError.Destroy(resultPtr);
+            Raw.Pkcs12FfiResultVoidBoxPickyError result = Raw.Pkcs12Attribute.GetFriendlyName(_inner, &writeable);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -142,9 +138,7 @@ public partial class Pkcs12Attribute: IDisposable
                 throw new ObjectDisposedException("Pkcs12Attribute");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            IntPtr resultPtr = Raw.Pkcs12Attribute.GetFriendlyName(_inner, &writeable);
-            Raw.Pkcs12FfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.Pkcs12FfiResultVoidBoxPickyError>(resultPtr);
-            Raw.Pkcs12FfiResultVoidBoxPickyError.Destroy(resultPtr);
+            Raw.Pkcs12FfiResultVoidBoxPickyError result = Raw.Pkcs12Attribute.GetFriendlyName(_inner, &writeable);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));

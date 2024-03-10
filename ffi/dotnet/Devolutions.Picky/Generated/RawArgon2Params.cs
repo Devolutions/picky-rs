@@ -14,11 +14,7 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct Argon2Params
 {
-#if __IOS__
-    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
-#else
     private const string NativeLib = "DevolutionsPicky";
-#endif
 
     /// <summary>
     /// Create new parameters.

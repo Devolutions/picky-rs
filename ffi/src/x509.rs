@@ -46,6 +46,8 @@ pub mod ffi {
     use crate::key::ffi::{PrivateKey, PublicKey};
     use crate::pem::ffi::Pem;
 
+    use picky::x509::pkcs7;
+
     pub enum CertType {
         Root,
         Intermediate,
@@ -213,6 +215,84 @@ pub mod ffi {
                 .build()?;
 
             Ok(Box::new(Cert(cert)))
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct CertVec(pub Vec<certificate::Cert>);
+
+    impl CertVec {
+        pub fn next(&mut self) -> Option<Box<Cert>> {
+            self.0.pop().map(|cert| Box::new(Cert(cert)))
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct EncapsulatedContentInfo(pub pkcs7::EncapsulatedContentInfo);
+
+    #[diplomat::opaque]
+    pub struct SignerInfo(pub pkcs7::SignerInfo);
+
+    #[diplomat::opaque]
+    pub struct SignerInfos(pub Vec<SignerInfo>);
+
+    impl SignerInfos {
+        pub fn next(&mut self) -> Option<Box<SignerInfo>> {
+            self.0.pop().map(Box::new)
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct Der(pub Vec<u8>);
+
+    impl Der {
+        pub fn is_empty(&self) -> bool {
+            self.0.is_empty()
+        }
+
+        pub fn len(&self) -> usize {
+            self.0.len()
+        }
+
+        pub fn fill<'a>(&'a self, buf: &'a mut [u8]) -> Result<(), Box<PickyError>> {
+            if buf.len() < self.0.len() {
+                return Err("Buffer too small".into());
+            }
+            buf.copy_from_slice(&self.0);
+            Ok(())
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct AlgorithmIdentifier(pub picky::AlgorithmIdentifier);
+
+    impl AlgorithmIdentifier {
+        pub fn is_a(&self, other: &str) -> Result<bool, Box<PickyError>> {
+            Ok(self
+                .0
+                .is_a(picky::oid::ObjectIdentifier::try_from(other).map_err(|_| "invalid OID")?))
+        }
+
+        pub fn oid(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            let string: String = self.0.oid().into();
+            write!(writable, "{}", string)?;
+            Ok(())
+        }
+
+        pub fn parameters(&self) -> Box<AlgorithmIdentifierParameters> {
+            Box::new(AlgorithmIdentifierParameters(self.0.parameters()))
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct AlgorithmIdentifierParameters<'a>(pub &'a picky::x509::AlgorithmIdentifierParameters);
+
+    #[diplomat::opaque]
+    pub struct AlgorithmIdentifiers(pub Vec<picky::AlgorithmIdentifier>);
+
+    impl AlgorithmIdentifiers {
+        pub fn next(&mut self) -> Option<Box<AlgorithmIdentifier>> {
+            self.0.pop().map(|algo| Box::new(AlgorithmIdentifier(algo)))
         }
     }
 }

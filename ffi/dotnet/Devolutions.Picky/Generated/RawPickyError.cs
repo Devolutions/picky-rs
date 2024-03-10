@@ -17,11 +17,7 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct PickyError
 {
-#if __IOS__
-    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
-#else
     private const string NativeLib = "DevolutionsPicky";
-#endif
 
     /// <summary>
     /// Returns the error as a string.

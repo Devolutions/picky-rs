@@ -14,20 +14,16 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct SignatureAlgorithm
 {
-#if __IOS__
-    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
-#else
     private const string NativeLib = "DevolutionsPicky";
-#endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SignatureAlgorithm_new_rsa_pkcs_1v15", ExactSpelling = true)]
-    public static unsafe extern IntPtr NewRsaPkcs1v15(HashAlgorithm hashAlgorithm);
+    public static unsafe extern SignatureFfiResultBoxSignatureAlgorithmBoxPickyError NewRsaPkcs1v15(HashAlgorithm hashAlgorithm);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SignatureAlgorithm_new_ecdsa", ExactSpelling = true)]
-    public static unsafe extern IntPtr NewEcdsa(HashAlgorithm hashAlgorithm);
+    public static unsafe extern SignatureFfiResultBoxSignatureAlgorithmBoxPickyError NewEcdsa(HashAlgorithm hashAlgorithm);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SignatureAlgorithm_verify", ExactSpelling = true)]
-    public static unsafe extern IntPtr Verify(SignatureAlgorithm* self, PublicKey* publicKey, byte* msg, nuint msgSz, byte* signature, nuint signatureSz);
+    public static unsafe extern SignatureFfiResultVoidBoxPickyError Verify(SignatureAlgorithm* self, PublicKey* publicKey, byte* msg, nuint msgSz, byte* signature, nuint signatureSz);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SignatureAlgorithm_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(SignatureAlgorithm* self);
