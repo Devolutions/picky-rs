@@ -17,11 +17,7 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct Pfx
 {
-#if __IOS__
-    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
-#else
     private const string NativeLib = "DevolutionsPicky";
-#endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pfx_builder", ExactSpelling = true)]
     public static unsafe extern PfxBuilder* Builder(Pkcs12CryptoContext* cryptoContext);
@@ -30,13 +26,13 @@ public partial struct Pfx
     /// Parses a PKCS12 archive (PFX) from its DER representation.
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pfx_from_der", ExactSpelling = true)]
-    public static unsafe extern IntPtr FromDer(byte* der, nuint derSz, Pkcs12CryptoContext* cryptoContext, Pkcs12ParsingParams* parsingParams);
+    public static unsafe extern Pkcs12FfiResultBoxPfxBoxPickyError FromDer(byte* der, nuint derSz, Pkcs12CryptoContext* cryptoContext, Pkcs12ParsingParams* parsingParams);
 
     /// <summary>
     /// Saves this PKCS12 archive to the filesystem.
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pfx_save_to_file", ExactSpelling = true)]
-    public static unsafe extern IntPtr SaveToFile(Pfx* self, byte* path, nuint pathSz);
+    public static unsafe extern Pkcs12FfiResultVoidBoxPickyError SaveToFile(Pfx* self, byte* path, nuint pathSz);
 
     /// <summary>
     /// Returns a `SafeBagIterator` to inspect PFX data

@@ -14,12 +14,6 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct Pkcs12FfiResultBoxPkcs12AttributeBoxPickyError
 {
-#if __IOS__
-    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
-#else
-    private const string NativeLib = "DevolutionsPicky";
-#endif
-
     [StructLayout(LayoutKind.Explicit)]
     private unsafe struct InnerUnion
     {
@@ -49,7 +43,4 @@ public partial struct Pkcs12FfiResultBoxPkcs12AttributeBoxPickyError
             return _inner.err;
         }
     }
-
-    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "result_box_Pkcs12Attribute_box_PickyError_destroy", ExactSpelling = true)]
-    public static unsafe extern void Destroy(IntPtr self);
 }

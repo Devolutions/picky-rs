@@ -14,11 +14,7 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct JwtSigBuilder
 {
-#if __IOS__
-    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
-#else
     private const string NativeLib = "DevolutionsPicky";
-#endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "JwtSigBuilder_init", ExactSpelling = true)]
     public static unsafe extern JwtSigBuilder* Init();
@@ -39,7 +35,7 @@ public partial struct JwtSigBuilder
     /// This additional header parameter may be either public or private.
     /// </remarks>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "JwtSigBuilder_add_additional_parameter_object", ExactSpelling = true)]
-    public static unsafe extern IntPtr AddAdditionalParameterObject(JwtSigBuilder* self, byte* name, nuint nameSz, byte* obj, nuint objSz);
+    public static unsafe extern JwtFfiResultVoidBoxPickyError AddAdditionalParameterObject(JwtSigBuilder* self, byte* name, nuint nameSz, byte* obj, nuint objSz);
 
     /// <summary>
     /// Adds a boolean as additional header parameter.
@@ -93,7 +89,7 @@ public partial struct JwtSigBuilder
     /// Claims should be a valid JSON payload.
     /// </remarks>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "JwtSigBuilder_set_claims", ExactSpelling = true)]
-    public static unsafe extern IntPtr SetClaims(JwtSigBuilder* self, byte* claims, nuint claimsSz);
+    public static unsafe extern JwtFfiResultVoidBoxPickyError SetClaims(JwtSigBuilder* self, byte* claims, nuint claimsSz);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "JwtSigBuilder_build", ExactSpelling = true)]
     public static unsafe extern JwtSig* Build(JwtSigBuilder* self);

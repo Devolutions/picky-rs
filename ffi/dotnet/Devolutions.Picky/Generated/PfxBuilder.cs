@@ -95,9 +95,7 @@ public partial class PfxBuilder: IDisposable
             {
                 throw new ObjectDisposedException("Pkcs12Encryption");
             }
-            IntPtr resultPtr = Raw.PfxBuilder.MarkEncryptedSafeContentsAsReady(_inner, encryptionRaw);
-            Raw.Pkcs12FfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.Pkcs12FfiResultVoidBoxPickyError>(resultPtr);
-            Raw.Pkcs12FfiResultVoidBoxPickyError.Destroy(resultPtr);
+            Raw.Pkcs12FfiResultVoidBoxPickyError result = Raw.PfxBuilder.MarkEncryptedSafeContentsAsReady(_inner, encryptionRaw);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -117,9 +115,7 @@ public partial class PfxBuilder: IDisposable
             {
                 throw new ObjectDisposedException("PfxBuilder");
             }
-            IntPtr resultPtr = Raw.PfxBuilder.Build(_inner);
-            Raw.Pkcs12FfiResultBoxPfxBoxPickyError result = Marshal.PtrToStructure<Raw.Pkcs12FfiResultBoxPfxBoxPickyError>(resultPtr);
-            Raw.Pkcs12FfiResultBoxPfxBoxPickyError.Destroy(resultPtr);
+            Raw.Pkcs12FfiResultBoxPfxBoxPickyError result = Raw.PfxBuilder.Build(_inner);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));

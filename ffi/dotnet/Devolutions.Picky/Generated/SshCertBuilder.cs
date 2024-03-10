@@ -318,9 +318,7 @@ public partial class SshCertBuilder: IDisposable
             {
                 throw new ObjectDisposedException("SshCertBuilder");
             }
-            IntPtr resultPtr = Raw.SshCertBuilder.Build(_inner);
-            Raw.SshFfiResultBoxSshCertBoxPickyError result = Marshal.PtrToStructure<Raw.SshFfiResultBoxSshCertBoxPickyError>(resultPtr);
-            Raw.SshFfiResultBoxSshCertBoxPickyError.Destroy(resultPtr);
+            Raw.SshFfiResultBoxSshCertBoxPickyError result = Raw.SshCertBuilder.Build(_inner);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));

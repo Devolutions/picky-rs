@@ -160,6 +160,15 @@ impl From<argon2::password_hash::Error> for PickyErrorKind {
     }
 }
 
+impl From<picky::x509::pkcs7::Pkcs7Error> for PickyErrorKind {
+    fn from(value: picky::x509::pkcs7::Pkcs7Error) -> Self {
+        match value {
+            picky::x509::pkcs7::Pkcs7Error::Cert(_) => PickyErrorKind::BadSignature,
+            picky::x509::pkcs7::Pkcs7Error::Asn1DerError(_) => PickyErrorKind::Generic,
+        }
+    }
+}
+
 impl<T> From<T> for Box<PickyError>
 where
     T: Into<PickyErrorKind> + ToString,

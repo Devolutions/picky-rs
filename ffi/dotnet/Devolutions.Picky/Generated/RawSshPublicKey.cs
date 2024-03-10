@@ -17,17 +17,13 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct SshPublicKey
 {
-#if __IOS__
-    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
-#else
     private const string NativeLib = "DevolutionsPicky";
-#endif
 
     /// <summary>
     /// Parses string representation of a SSH Public Key.
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshPublicKey_parse", ExactSpelling = true)]
-    public static unsafe extern IntPtr Parse(byte* repr, nuint reprSz);
+    public static unsafe extern SshFfiResultBoxSshPublicKeyBoxPickyError Parse(byte* repr, nuint reprSz);
 
     /// <summary>
     /// Returns the SSH Public Key string representation.
@@ -38,10 +34,10 @@ public partial struct SshPublicKey
     /// where (comment) is usually an email address.
     /// </remarks>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshPublicKey_to_repr", ExactSpelling = true)]
-    public static unsafe extern IntPtr ToRepr(SshPublicKey* self, DiplomatWriteable* writeable);
+    public static unsafe extern SshFfiResultVoidBoxPickyError ToRepr(SshPublicKey* self, DiplomatWriteable* writeable);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshPublicKey_get_comment", ExactSpelling = true)]
-    public static unsafe extern IntPtr GetComment(SshPublicKey* self, DiplomatWriteable* writeable);
+    public static unsafe extern SshFfiResultVoidBoxPickyError GetComment(SshPublicKey* self, DiplomatWriteable* writeable);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshPublicKey_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(SshPublicKey* self);

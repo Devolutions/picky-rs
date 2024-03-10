@@ -14,17 +14,13 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct Argon2
 {
-#if __IOS__
-    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
-#else
     private const string NativeLib = "DevolutionsPicky";
-#endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Argon2_new", ExactSpelling = true)]
-    public static unsafe extern IntPtr New(Argon2Algorithm algorithm, Argon2Params* parameters);
+    public static unsafe extern Argon2FfiResultBoxArgon2BoxPickyError New(Argon2Algorithm algorithm, Argon2Params* parameters);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Argon2_hash_password", ExactSpelling = true)]
-    public static unsafe extern IntPtr HashPassword(Argon2* self, byte* password, nuint passwordSz, DiplomatWriteable* writeable);
+    public static unsafe extern Argon2FfiResultVoidBoxPickyError HashPassword(Argon2* self, byte* password, nuint passwordSz, DiplomatWriteable* writeable);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Argon2_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(Argon2* self);
