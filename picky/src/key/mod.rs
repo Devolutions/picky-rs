@@ -874,7 +874,9 @@ impl PublicKey {
 
     pub fn to_pkcs1(&self) -> Result<Vec<u8>, KeyError> {
         let picky_asn1_x509::PublicKey::Rsa(BitStringAsn1Container(rsa_public_key)) = &self.0.subject_public_key else {
-            return Err(KeyError::Rsa { context: String::from("can’t export a non-RSA key to PKCS#1 format") });
+            return Err(KeyError::Rsa {
+                context: String::from("can’t export a non-RSA key to PKCS#1 format"),
+            });
         };
 
         picky_asn1_der::to_vec(rsa_public_key).map_err(|e| KeyError::Asn1Serialization {
