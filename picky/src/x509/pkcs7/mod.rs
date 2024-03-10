@@ -7,6 +7,7 @@ use picky_asn1_x509::pkcs7::Pkcs7Certificate;
 use picky_asn1_x509::signed_data::CertificateChoices;
 use thiserror::Error;
 
+pub use picky_asn1_x509::algorithm_identifier;
 pub use picky_asn1_x509::content_info::EncapsulatedContentInfo;
 pub use picky_asn1_x509::signer_info::SignerInfo;
 
