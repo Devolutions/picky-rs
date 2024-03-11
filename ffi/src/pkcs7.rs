@@ -3,9 +3,12 @@ pub mod ffi {
 
     use picky::x509::pkcs7::{self};
 
+    use crate::buffer::ffi::Buffer;
     use crate::error::ffi::PickyError;
     use crate::pem::ffi::Pem;
-    use crate::x509::ffi::{AlgorithmIdentifiers, CertVec, Der, EncapsulatedContentInfo, SignerInfo, SignerInfos};
+    use crate::x509::ffi::{
+        AlgorithmIdentifierIterator, CertIterator, EncapsulatedContentInfo, SignerInfo, SignerInfoIterator,
+    };
 
     #[diplomat::opaque]
     pub struct Pkcs7(pub pkcs7::Pkcs7);
@@ -26,8 +29,8 @@ pub mod ffi {
             Ok(Box::new(Pkcs7(pkcs7)))
         }
 
-        pub fn to_der(&self) -> Result<Box<Der>, Box<PickyError>> {
-            Ok(Box::new(Der(self.0.to_der()?)))
+        pub fn to_der(&self) -> Result<Box<Buffer>, Box<PickyError>> {
+            Ok(Box::new(Buffer(self.0.to_der()?)))
         }
 
         pub fn to_pem(&self) -> Result<Box<Pem>, Box<PickyError>> {
@@ -35,23 +38,25 @@ pub mod ffi {
             Ok(Box::new(Pem(pem)))
         }
 
-        pub fn digest_algorithms(&self) -> Box<AlgorithmIdentifiers> {
+        pub fn digest_algorithms(&self) -> Box<AlgorithmIdentifierIterator> {
             let algos = self.0.digest_algorithms();
-            Box::new(AlgorithmIdentifiers(algos.to_vec()))
+            Box::new(AlgorithmIdentifierIterator(algos.to_vec()))
         }
 
-        pub fn signer_infos(&self) -> Box<SignerInfos> {
+        pub fn signer_infos(&self) -> Box<SignerInfoIterator> {
             let infos = self.0.signer_infos();
-            Box::new(SignerInfos(infos.iter().map(|info| SignerInfo(info.clone())).collect()))
+            Box::new(SignerInfoIterator(
+                infos.iter().map(|info| SignerInfo(info.clone())).collect(),
+            ))
         }
 
         pub fn encapsulated_content_info(&self) -> Box<EncapsulatedContentInfo> {
             Box::new(EncapsulatedContentInfo(self.0.encapsulated_content_info().clone()))
         }
 
-        pub fn decode_certificates(&self) -> Box<CertVec> {
+        pub fn decode_certificates(&self) -> Box<CertIterator> {
             let certs = self.0.decode_certificates();
-            Box::new(CertVec(certs))
+            Box::new(CertIterator(certs))
         }
     }
 }
