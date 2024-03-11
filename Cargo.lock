@@ -1337,6 +1337,8 @@ dependencies = [
  "hex",
  "picky",
  "picky-asn1",
+ "picky-asn1-der",
+ "picky-asn1-x509",
  "serde_json",
  "time",
 ]

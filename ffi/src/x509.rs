@@ -44,10 +44,7 @@ pub mod ffi {
     use crate::date::ffi::UtcDate;
     use crate::error::ffi::PickyError;
     use crate::key::ffi::{PrivateKey, PublicKey};
-    use crate::octect_string::ffi::OctectStringAsn1;
     use crate::pem::ffi::Pem;
-
-    use picky::x509::pkcs7;
 
     pub enum CertType {
         Root,
@@ -229,7 +226,7 @@ pub mod ffi {
     }
 
     #[diplomat::opaque]
-    pub struct EncapsulatedContentInfo(pub pkcs7::EncapsulatedContentInfo);
+    pub struct EncapsulatedContentInfo(pub picky_asn1_x509::content_info::EncapsulatedContentInfo);
 
     impl EncapsulatedContentInfo {
         pub fn content_type(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
@@ -241,7 +238,7 @@ pub mod ffi {
 
     /// TODO: expose the SignerInfo struct public fields
     #[diplomat::opaque]
-    pub struct SignerInfo(pub pkcs7::SignerInfo);
+    pub struct SignerInfo(pub picky_asn1_x509::signer_info::SignerInfo);
 
     #[diplomat::opaque]
     pub struct SignerInfos(pub Vec<SignerInfo>);
@@ -347,13 +344,13 @@ pub mod ffi {
     }
 
     #[diplomat::opaque]
-    pub struct AesParameters(pub picky::x509::pkcs7::algorithm_identifier::AesParameters);
+    pub struct AesParameters(pub picky_asn1_x509::AesParameters);
 
     #[diplomat::opaque]
-    pub struct EcParameters(pub picky::x509::pkcs7::algorithm_identifier::EcParameters);
+    pub struct EcParameters(pub picky_asn1_x509::EcParameters);
 
     #[diplomat::opaque]
-    pub struct RsassaPssParameters(pub picky::x509::pkcs7::algorithm_identifier::RsassaPssParams);
+    pub struct RsassaPssParameters(pub picky_asn1_x509::RsassaPssParams);
 
     pub enum AesParametersType {
         Null,
@@ -363,21 +360,19 @@ pub mod ffi {
 
     impl AesParameters {
         pub fn get_type(&self) -> AesParametersType {
-            match &self.0 {
-                picky::x509::pkcs7::algorithm_identifier::AesParameters::Null => AesParametersType::Null,
-                picky::x509::pkcs7::algorithm_identifier::AesParameters::InitializationVector(_) => {
-                    AesParametersType::InitializationVector
-                }
-                picky::x509::pkcs7::algorithm_identifier::AesParameters::AuthenticatedEncryptionParameters(_) => {
+            match self.0 {
+                picky_asn1_x509::AesParameters::Null => AesParametersType::Null,
+                picky_asn1_x509::AesParameters::InitializationVector(_) => AesParametersType::InitializationVector,
+                picky_asn1_x509::AesParameters::AuthenticatedEncryptionParameters(_) => {
                     AesParametersType::AuthenticatedEncryptionParameters
                 }
             }
         }
 
-        pub fn to_initialization_vector(&self) -> Option<crate::octect_string::ffi::OctectStringAsn1> {
+        pub fn to_initialization_vector(&self) -> Option<crate::octet_string::ffi::OctectStringAsn1> {
             match &self.0 {
-                picky::x509::pkcs7::algorithm_identifier::AesParameters::InitializationVector(iv) => {
-                    Some(crate::octect_string::ffi::OctectStringAsn1::from_bytes(iv))
+                picky_asn1_x509::AesParameters::InitializationVector(iv) => {
+                    Some(crate::octet_string::ffi::OctectStringAsn1(iv.clone()))
                 }
                 _ => None,
             }
@@ -385,7 +380,7 @@ pub mod ffi {
 
         pub fn to_authenticated_encryption_parameters(&self) -> Option<Box<AesAuthEncParams>> {
             match &self.0 {
-                picky::x509::pkcs7::algorithm_identifier::AesParameters::AuthenticatedEncryptionParameters(params) => {
+                picky_asn1_x509::AesParameters::AuthenticatedEncryptionParameters(params) => {
                     Some(Box::new(AesAuthEncParams(params.clone())))
                 }
                 _ => None,
@@ -394,7 +389,7 @@ pub mod ffi {
     }
 
     #[diplomat::opaque]
-    pub struct AesAuthEncParams(pub picky::x509::pkcs7::algorithm_identifier::AesAuthEncParams);
+    pub struct AesAuthEncParams(pub picky_asn1_x509::AesAuthEncParams);
 
     #[diplomat::opaque]
     pub struct AlgorithmIdentifiers(pub Vec<picky::AlgorithmIdentifier>);
