@@ -260,13 +260,13 @@ pub mod ffi {
                 .is_a(picky::oid::ObjectIdentifier::try_from(other).map_err(|_| "invalid OID")?))
         }
 
-        pub fn oid(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn get_oid(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             let string: String = self.0.oid().into();
             write!(writable, "{}", string)?;
             Ok(())
         }
 
-        pub fn parameters<'a>(&'a self) -> Box<AlgorithmIdentifierParameters<'a>> {
+        pub fn get_parameters<'a>(&'a self) -> Box<AlgorithmIdentifierParameters<'a>> {
             Box::new(AlgorithmIdentifierParameters(self.0.parameters()))
         }
     }

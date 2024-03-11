@@ -24,11 +24,6 @@ pub mod ffi {
             Ok(Box::new(Pkcs7(pkcs7)))
         }
 
-        pub fn from_pem_str(pem_str: &str) -> Result<Box<Pkcs7>, Box<PickyError>> {
-            let pkcs7 = pkcs7::Pkcs7::from_pem_str(pem_str)?;
-            Ok(Box::new(Pkcs7(pkcs7)))
-        }
-
         pub fn to_der(&self) -> Result<Box<Buffer>, Box<PickyError>> {
             Ok(Box::new(Buffer(self.0.to_der()?)))
         }
