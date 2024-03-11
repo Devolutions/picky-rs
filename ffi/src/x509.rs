@@ -286,7 +286,7 @@ pub mod ffi {
             Ok(())
         }
 
-        pub fn parameters(&self) -> Box<AlgorithmIdentifierParameters> {
+        pub fn parameters<'a>(&'a self) -> Box<AlgorithmIdentifierParameters<'a>> {
             Box::new(AlgorithmIdentifierParameters(self.0.parameters()))
         }
     }
@@ -369,10 +369,10 @@ pub mod ffi {
             }
         }
 
-        pub fn to_initialization_vector(&self) -> Option<crate::octet_string::ffi::OctectStringAsn1> {
+        pub fn to_initialization_vector(&self) -> Option<Box<crate::octet_string::ffi::OctetStringAsn1>> {
             match &self.0 {
                 picky_asn1_x509::AesParameters::InitializationVector(iv) => {
-                    Some(crate::octet_string::ffi::OctectStringAsn1(iv.clone()))
+                    Some(Box::new(crate::octet_string::ffi::OctetStringAsn1(iv.clone())))
                 }
                 _ => None,
             }
