@@ -39,7 +39,9 @@ public partial class SignatureAlgorithm: IDisposable
         {
             Raw.HashAlgorithm hashAlgorithmRaw;
             hashAlgorithmRaw = (Raw.HashAlgorithm)hashAlgorithm;
-            Raw.SignatureFfiResultBoxSignatureAlgorithmBoxPickyError result = Raw.SignatureAlgorithm.NewRsaPkcs1v15(hashAlgorithmRaw);
+            IntPtr resultPtr = Raw.SignatureAlgorithm.NewRsaPkcs1v15(hashAlgorithmRaw);
+            Raw.SignatureFfiResultBoxSignatureAlgorithmBoxPickyError result = Marshal.PtrToStructure<Raw.SignatureFfiResultBoxSignatureAlgorithmBoxPickyError>(resultPtr);
+            Raw.SignatureFfiResultBoxSignatureAlgorithmBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -59,7 +61,9 @@ public partial class SignatureAlgorithm: IDisposable
         {
             Raw.HashAlgorithm hashAlgorithmRaw;
             hashAlgorithmRaw = (Raw.HashAlgorithm)hashAlgorithm;
-            Raw.SignatureFfiResultBoxSignatureAlgorithmBoxPickyError result = Raw.SignatureAlgorithm.NewEcdsa(hashAlgorithmRaw);
+            IntPtr resultPtr = Raw.SignatureAlgorithm.NewEcdsa(hashAlgorithmRaw);
+            Raw.SignatureFfiResultBoxSignatureAlgorithmBoxPickyError result = Marshal.PtrToStructure<Raw.SignatureFfiResultBoxSignatureAlgorithmBoxPickyError>(resultPtr);
+            Raw.SignatureFfiResultBoxSignatureAlgorithmBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -90,7 +94,9 @@ public partial class SignatureAlgorithm: IDisposable
             {
                 fixed (byte* signaturePtr = signature)
                 {
-                    Raw.SignatureFfiResultVoidBoxPickyError result = Raw.SignatureAlgorithm.Verify(_inner, publicKeyRaw, msgPtr, msgLength, signaturePtr, signatureLength);
+                    IntPtr resultPtr = Raw.SignatureAlgorithm.Verify(_inner, publicKeyRaw, msgPtr, msgLength, signaturePtr, signatureLength);
+                    Raw.SignatureFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.SignatureFfiResultVoidBoxPickyError>(resultPtr);
+                    Raw.SignatureFfiResultVoidBoxPickyError.Destroy(resultPtr);
                     if (!result.isOk)
                     {
                         throw new PickyException(new PickyError(result.Err));

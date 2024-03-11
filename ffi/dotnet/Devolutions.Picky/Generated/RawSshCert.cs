@@ -14,7 +14,11 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct SshCert
 {
+#if __IOS__
+    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
+#else
     private const string NativeLib = "DevolutionsPicky";
+#endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshCert_builder", ExactSpelling = true)]
     public static unsafe extern SshCertBuilder* Builder();
@@ -23,13 +27,13 @@ public partial struct SshCert
     /// Parses string representation of a SSH Certificate.
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshCert_parse", ExactSpelling = true)]
-    public static unsafe extern SshFfiResultBoxSshCertBoxPickyError Parse(byte* repr, nuint reprSz);
+    public static unsafe extern IntPtr Parse(byte* repr, nuint reprSz);
 
     /// <summary>
     /// Returns the SSH Certificate string representation.
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshCert_to_repr", ExactSpelling = true)]
-    public static unsafe extern SshFfiResultVoidBoxPickyError ToRepr(SshCert* self, DiplomatWriteable* writeable);
+    public static unsafe extern IntPtr ToRepr(SshCert* self, DiplomatWriteable* writeable);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshCert_get_public_key", ExactSpelling = true)]
     public static unsafe extern SshPublicKey* GetPublicKey(SshCert* self);
@@ -50,10 +54,10 @@ public partial struct SshCert
     public static unsafe extern SshPublicKey* GetSignatureKey(SshCert* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshCert_get_key_id", ExactSpelling = true)]
-    public static unsafe extern SshFfiResultVoidBoxPickyError GetKeyId(SshCert* self, DiplomatWriteable* writeable);
+    public static unsafe extern IntPtr GetKeyId(SshCert* self, DiplomatWriteable* writeable);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshCert_get_comment", ExactSpelling = true)]
-    public static unsafe extern SshFfiResultVoidBoxPickyError GetComment(SshCert* self, DiplomatWriteable* writeable);
+    public static unsafe extern IntPtr GetComment(SshCert* self, DiplomatWriteable* writeable);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshCert_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(SshCert* self);

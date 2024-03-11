@@ -76,7 +76,9 @@ public partial class Pfx: IDisposable
             }
             fixed (byte* derPtr = der)
             {
-                Raw.Pkcs12FfiResultBoxPfxBoxPickyError result = Raw.Pfx.FromDer(derPtr, derLength, cryptoContextRaw, parsingParamsRaw);
+                IntPtr resultPtr = Raw.Pfx.FromDer(derPtr, derLength, cryptoContextRaw, parsingParamsRaw);
+                Raw.Pkcs12FfiResultBoxPfxBoxPickyError result = Marshal.PtrToStructure<Raw.Pkcs12FfiResultBoxPfxBoxPickyError>(resultPtr);
+                Raw.Pkcs12FfiResultBoxPfxBoxPickyError.Destroy(resultPtr);
                 if (!result.isOk)
                 {
                     throw new PickyException(new PickyError(result.Err));
@@ -103,7 +105,9 @@ public partial class Pfx: IDisposable
             nuint pathBufLength = (nuint)pathBuf.Length;
             fixed (byte* pathBufPtr = pathBuf)
             {
-                Raw.Pkcs12FfiResultVoidBoxPickyError result = Raw.Pfx.SaveToFile(_inner, pathBufPtr, pathBufLength);
+                IntPtr resultPtr = Raw.Pfx.SaveToFile(_inner, pathBufPtr, pathBufLength);
+                Raw.Pkcs12FfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.Pkcs12FfiResultVoidBoxPickyError>(resultPtr);
+                Raw.Pkcs12FfiResultVoidBoxPickyError.Destroy(resultPtr);
                 if (!result.isOk)
                 {
                     throw new PickyException(new PickyError(result.Err));

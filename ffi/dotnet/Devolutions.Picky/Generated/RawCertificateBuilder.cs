@@ -14,7 +14,11 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct CertificateBuilder
 {
+#if __IOS__
+    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
+#else
     private const string NativeLib = "DevolutionsPicky";
+#endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "CertificateBuilder_new", ExactSpelling = true)]
     public static unsafe extern CertificateBuilder* New();
@@ -44,7 +48,7 @@ public partial struct CertificateBuilder
     public static unsafe extern void SetKpServerAuth(CertificateBuilder* self, [MarshalAs(UnmanagedType.U1)] bool enable);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "CertificateBuilder_build", ExactSpelling = true)]
-    public static unsafe extern X509FfiResultBoxCertBoxPickyError Build(CertificateBuilder* self);
+    public static unsafe extern IntPtr Build(CertificateBuilder* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "CertificateBuilder_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(CertificateBuilder* self);

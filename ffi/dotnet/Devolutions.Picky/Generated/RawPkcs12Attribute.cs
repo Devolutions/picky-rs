@@ -17,14 +17,18 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct Pkcs12Attribute
 {
+#if __IOS__
+    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
+#else
     private const string NativeLib = "DevolutionsPicky";
+#endif
 
     /// <summary>
     /// Creates a new `friendly name` attribute. This attribute is used to store a human-readable
     /// name of the safe bag contents (e.g. certificate name).
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pkcs12Attribute_new_friendly_name", ExactSpelling = true)]
-    public static unsafe extern Pkcs12FfiResultBoxPkcs12AttributeBoxPickyError NewFriendlyName(byte* name, nuint nameSz);
+    public static unsafe extern IntPtr NewFriendlyName(byte* name, nuint nameSz);
 
     /// <summary>
     /// Creates a new `local key id` attribute. This attribute is used to indicate relation between
@@ -37,7 +41,7 @@ public partial struct Pkcs12Attribute
     public static unsafe extern Pkcs12AttributeKind GetKind(Pkcs12Attribute* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pkcs12Attribute_get_friendly_name", ExactSpelling = true)]
-    public static unsafe extern Pkcs12FfiResultVoidBoxPickyError GetFriendlyName(Pkcs12Attribute* self, DiplomatWriteable* writeable);
+    public static unsafe extern IntPtr GetFriendlyName(Pkcs12Attribute* self, DiplomatWriteable* writeable);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pkcs12Attribute_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(Pkcs12Attribute* self);
