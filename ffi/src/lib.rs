@@ -6,7 +6,7 @@ pub mod error;
 pub mod hash;
 pub mod jwt;
 pub mod key;
-pub mod octect_string;
+pub mod octet_string;
 pub mod pem;
 pub mod pkcs12;
 pub mod pkcs7;
