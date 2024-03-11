@@ -237,9 +237,201 @@ pub mod ffi {
         }
     }
 
-    /// TODO: expose the SignerInfo struct public fields
     #[diplomat::opaque]
     pub struct SignerInfo(pub picky_asn1_x509::signer_info::SignerInfo);
+
+    pub enum CmsVersion {
+        V0,
+        V1,
+        V2,
+        V3,
+        V4,
+        V5,
+    }
+
+    impl SignerInfo {
+        pub fn get_version(&self) -> CmsVersion {
+            self.0.version.into()
+        }
+
+        pub fn get_sid(&self) -> Box<SingerIdentifier> {
+            Box::new(SingerIdentifier(self.0.sid.clone()))
+        }
+
+        pub fn get_digest_algorithm(&self) -> Box<AlgorithmIdentifier> {
+            Box::new(AlgorithmIdentifier(self.0.digest_algorithm.0.clone()))
+        }
+
+        pub fn get_signature_algorithm(&self) -> Box<AlgorithmIdentifier> {
+            Box::new(AlgorithmIdentifier(self.0.signature_algorithm.0.clone()))
+        }
+
+        pub fn get_signature(&self) -> Box<crate::buffer::ffi::Buffer> {
+            Box::new(crate::buffer::ffi::Buffer::from(&self.0.signature.0))
+        }
+
+        pub fn get_unsigned_attributes(&self) -> Box<UnsignedAttributeIterator> {
+            Box::new(UnsignedAttributeIterator(
+                self.0
+                    .unsigned_attrs
+                    .0
+                    .clone()
+                    .0
+                    .into_iter()
+                    .map(UnsignedAttribute)
+                    .collect(),
+            ))
+        }
+
+        //TODO: pub signed_attrs: Optional<Attributes>,
+    }
+
+    #[diplomat::opaque]
+    pub struct UnsignedAttribute(pub picky_asn1_x509::signer_info::UnsignedAttribute);
+
+    impl UnsignedAttribute {
+        pub fn get_type(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            let oid: String = self.0.ty.0.clone().into();
+            write!(writable, "{}", oid)?;
+            Ok(())
+        }
+
+        pub fn get_values(&self) -> Box<UnsignedAttributeValue> {
+            Box::new(UnsignedAttributeValue(self.0.value.clone()))
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct UnsignedAttributeValue(pub picky_asn1_x509::signer_info::UnsignedAttributeValue);
+
+    pub enum UnsignedAttributeValueType {
+        MsCounterSign,
+        CounterSign,
+    }
+
+    impl UnsignedAttributeValue {
+        pub fn get_type(&self) -> UnsignedAttributeValueType {
+            match &self.0 {
+                picky_asn1_x509::signer_info::UnsignedAttributeValue::MsCounterSign(_) => {
+                    UnsignedAttributeValueType::MsCounterSign
+                }
+                picky_asn1_x509::signer_info::UnsignedAttributeValue::CounterSign(_) => {
+                    UnsignedAttributeValueType::CounterSign
+                }
+            }
+        }
+
+        pub fn to_ms_counter_sign(&self) -> Option<Box<MsCounterSignIterator>> {
+            match &self.0 {
+                picky_asn1_x509::signer_info::UnsignedAttributeValue::MsCounterSign(ms_counter_sign) => {
+                    let vec: Vec<MsCounterSign> = ms_counter_sign.0.clone().into_iter().map(MsCounterSign).collect();
+                    Some(Box::new(MsCounterSignIterator(vec)))
+                }
+                _ => None,
+            }
+        }
+
+        pub fn to_counter_sign(&self) -> Option<Box<SignerInfoIterator>> {
+            match &self.0 {
+                picky_asn1_x509::signer_info::UnsignedAttributeValue::CounterSign(counter_sign) => Some(Box::new(
+                    SignerInfoIterator(counter_sign.0.clone().into_iter().map(SignerInfo).collect()),
+                )),
+                _ => None,
+            }
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct MsCounterSignIterator(pub Vec<MsCounterSign>);
+
+    impl MsCounterSignIterator {
+        pub fn next(&mut self) -> Option<Box<MsCounterSign>> {
+            self.0.pop().map(Box::new)
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct MsCounterSign(picky_asn1_x509::Pkcs7Certificate);
+
+    impl MsCounterSign {
+        pub fn get_oid(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            let oid_string: String = self.0.oid.0.clone().into();
+            write!(writable, "{}", oid_string)?;
+            Ok(())
+        }
+
+        pub fn get_signed_data(&self) -> Box<SignedData> {
+            Box::new(SignedData(self.0.signed_data.0.clone()))
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct SignedData(pub picky_asn1_x509::pkcs7::signed_data::SignedData);
+
+    impl SignedData {
+        pub fn get_version(&self) -> CmsVersion {
+            self.0.version.into()
+        }
+
+        pub fn get_digest_algorithms(&self) -> Box<AlgorithmIdentifierIterator> {
+            let vec: Vec<_> = self.0.digest_algorithms.0.iter().cloned().collect();
+            Box::new(AlgorithmIdentifierIterator(vec))
+        }
+
+        pub fn get_content_info(&self) -> Box<EncapsulatedContentInfo> {
+            Box::new(EncapsulatedContentInfo(self.0.content_info.clone()))
+        }
+        //TODO: pub certificates: Optional<CertificateSet>,
+        //TODO: pub crls: Option<RevocationInfoChoices>,
+        pub fn get_signers_infos(&self) -> Box<SignerInfoIterator> {
+            let signer_infos = &self.0.signers_infos;
+            let vec_signer_infos: Vec<_> = signer_infos.0.iter().cloned().map(SignerInfo).collect();
+            Box::new(SignerInfoIterator(vec_signer_infos))
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct UnsignedAttributeIterator(pub Vec<UnsignedAttribute>);
+
+    impl UnsignedAttributeIterator {
+        pub fn next(&mut self) -> Option<Box<UnsignedAttribute>> {
+            self.0.pop().map(Box::new)
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct SingerIdentifier(pub picky_asn1_x509::signer_info::SignerIdentifier);
+
+    impl SingerIdentifier {
+        pub fn get_issure_and_serial_number(&self) -> Option<Box<IssuerAndSerialNumber>> {
+            match &self.0 {
+                picky_asn1_x509::signer_info::SignerIdentifier::IssuerAndSerialNumber(issuer_and_serial_number) => {
+                    Some(Box::new(IssuerAndSerialNumber(issuer_and_serial_number.clone())))
+                }
+                _ => None,
+            }
+        }
+
+        pub fn get_subject_key_identifier(&self) -> Option<Box<crate::buffer::ffi::Buffer>> {
+            let picky_asn1_x509::signer_info::SignerIdentifier::SubjectKeyIdentifier(subject_key_identifier) = &self.0 else {
+                return None;
+            };
+
+            let buffer = crate::buffer::ffi::Buffer::from(&subject_key_identifier.0);
+            Some(Box::new(buffer))
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct IssuerAndSerialNumber(pub picky_asn1_x509::signer_info::IssuerAndSerialNumber);
+
+    impl IssuerAndSerialNumber {
+        pub fn get_issuer(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            let name_string = format!("{}", self.0.issuer);
+            write!(writable, "{}", name_string)?;
+            Ok(())
+        }
+    }
 
     #[diplomat::opaque]
     pub struct SignerInfoIterator(pub Vec<SignerInfo>);
@@ -375,6 +567,32 @@ pub mod ffi {
     impl AlgorithmIdentifierIterator {
         pub fn next(&mut self) -> Option<Box<AlgorithmIdentifier>> {
             self.0.pop().map(|algo| Box::new(AlgorithmIdentifier(algo)))
+        }
+    }
+}
+
+impl From<picky_asn1_x509::cmsversion::CmsVersion> for ffi::CmsVersion {
+    fn from(value: picky_asn1_x509::cmsversion::CmsVersion) -> Self {
+        match value {
+            picky_asn1_x509::cmsversion::CmsVersion::V0 => ffi::CmsVersion::V0,
+            picky_asn1_x509::cmsversion::CmsVersion::V1 => ffi::CmsVersion::V1,
+            picky_asn1_x509::cmsversion::CmsVersion::V2 => ffi::CmsVersion::V2,
+            picky_asn1_x509::cmsversion::CmsVersion::V3 => ffi::CmsVersion::V3,
+            picky_asn1_x509::cmsversion::CmsVersion::V4 => ffi::CmsVersion::V4,
+            picky_asn1_x509::cmsversion::CmsVersion::V5 => ffi::CmsVersion::V5,
+        }
+    }
+}
+
+impl From<ffi::CmsVersion> for picky_asn1_x509::cmsversion::CmsVersion {
+    fn from(val: ffi::CmsVersion) -> Self {
+        match val {
+            ffi::CmsVersion::V0 => picky_asn1_x509::cmsversion::CmsVersion::V0,
+            ffi::CmsVersion::V1 => picky_asn1_x509::cmsversion::CmsVersion::V1,
+            ffi::CmsVersion::V2 => picky_asn1_x509::cmsversion::CmsVersion::V2,
+            ffi::CmsVersion::V3 => picky_asn1_x509::cmsversion::CmsVersion::V3,
+            ffi::CmsVersion::V4 => picky_asn1_x509::cmsversion::CmsVersion::V4,
+            ffi::CmsVersion::V5 => picky_asn1_x509::cmsversion::CmsVersion::V5,
         }
     }
 }
