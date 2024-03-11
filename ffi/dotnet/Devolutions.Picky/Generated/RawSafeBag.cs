@@ -17,25 +17,29 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct SafeBag
 {
+#if __IOS__
+    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
+#else
     private const string NativeLib = "DevolutionsPicky";
+#endif
 
     /// <summary>
     /// Creates new safe bag holding a private key.
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SafeBag_new_key", ExactSpelling = true)]
-    public static unsafe extern Pkcs12FfiResultBoxSafeBagBoxPickyError NewKey(PrivateKey* key);
+    public static unsafe extern IntPtr NewKey(PrivateKey* key);
 
     /// <summary>
     /// Creates new safe bag holding an encrypted private key.
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SafeBag_new_encrypted_key", ExactSpelling = true)]
-    public static unsafe extern Pkcs12FfiResultBoxSafeBagBoxPickyError NewEncryptedKey(PrivateKey* key, Pkcs12Encryption* encryption, Pkcs12CryptoContext* cryptoContext);
+    public static unsafe extern IntPtr NewEncryptedKey(PrivateKey* key, Pkcs12Encryption* encryption, Pkcs12CryptoContext* cryptoContext);
 
     /// <summary>
     /// Creates new safe bag holding a certificate.
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SafeBag_new_certificate", ExactSpelling = true)]
-    public static unsafe extern Pkcs12FfiResultBoxSafeBagBoxPickyError NewCertificate(Cert* cert);
+    public static unsafe extern IntPtr NewCertificate(Cert* cert);
 
     /// <summary>
     /// Adds a PKCS12 attribute to this safe bag.

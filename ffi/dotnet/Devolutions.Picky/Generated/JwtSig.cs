@@ -91,7 +91,9 @@ public partial class JwtSig: IDisposable
             {
                 throw new ObjectDisposedException("JwtSig");
             }
-            Raw.JwtFfiResultVoidBoxPickyError result = Raw.JwtSig.GetContentType(_inner, &writeable);
+            IntPtr resultPtr = Raw.JwtSig.GetContentType(_inner, &writeable);
+            Raw.JwtFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.JwtFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.JwtFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -112,7 +114,9 @@ public partial class JwtSig: IDisposable
                 throw new ObjectDisposedException("JwtSig");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            Raw.JwtFfiResultVoidBoxPickyError result = Raw.JwtSig.GetContentType(_inner, &writeable);
+            IntPtr resultPtr = Raw.JwtSig.GetContentType(_inner, &writeable);
+            Raw.JwtFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.JwtFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.JwtFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -135,7 +139,9 @@ public partial class JwtSig: IDisposable
             {
                 throw new ObjectDisposedException("JwtSig");
             }
-            Raw.JwtFfiResultVoidBoxPickyError result = Raw.JwtSig.GetKid(_inner, &writeable);
+            IntPtr resultPtr = Raw.JwtSig.GetKid(_inner, &writeable);
+            Raw.JwtFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.JwtFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.JwtFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -156,7 +162,9 @@ public partial class JwtSig: IDisposable
                 throw new ObjectDisposedException("JwtSig");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            Raw.JwtFfiResultVoidBoxPickyError result = Raw.JwtSig.GetKid(_inner, &writeable);
+            IntPtr resultPtr = Raw.JwtSig.GetKid(_inner, &writeable);
+            Raw.JwtFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.JwtFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.JwtFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -179,7 +187,9 @@ public partial class JwtSig: IDisposable
             {
                 throw new ObjectDisposedException("JwtSig");
             }
-            Raw.JwtFfiResultVoidBoxPickyError result = Raw.JwtSig.GetHeader(_inner, &writeable);
+            IntPtr resultPtr = Raw.JwtSig.GetHeader(_inner, &writeable);
+            Raw.JwtFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.JwtFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.JwtFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -200,7 +210,9 @@ public partial class JwtSig: IDisposable
                 throw new ObjectDisposedException("JwtSig");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            Raw.JwtFfiResultVoidBoxPickyError result = Raw.JwtSig.GetHeader(_inner, &writeable);
+            IntPtr resultPtr = Raw.JwtSig.GetHeader(_inner, &writeable);
+            Raw.JwtFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.JwtFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.JwtFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -223,7 +235,9 @@ public partial class JwtSig: IDisposable
             {
                 throw new ObjectDisposedException("JwtSig");
             }
-            Raw.JwtFfiResultVoidBoxPickyError result = Raw.JwtSig.GetClaims(_inner, &writeable);
+            IntPtr resultPtr = Raw.JwtSig.GetClaims(_inner, &writeable);
+            Raw.JwtFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.JwtFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.JwtFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -244,7 +258,9 @@ public partial class JwtSig: IDisposable
                 throw new ObjectDisposedException("JwtSig");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            Raw.JwtFfiResultVoidBoxPickyError result = Raw.JwtSig.GetClaims(_inner, &writeable);
+            IntPtr resultPtr = Raw.JwtSig.GetClaims(_inner, &writeable);
+            Raw.JwtFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.JwtFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.JwtFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -282,7 +298,9 @@ public partial class JwtSig: IDisposable
             }
             fixed (byte* compactReprBufPtr = compactReprBuf)
             {
-                Raw.JwtFfiResultBoxJwtSigBoxPickyError result = Raw.JwtSig.Decode(compactReprBufPtr, compactReprBufLength, publicKeyRaw, validatorRaw);
+                IntPtr resultPtr = Raw.JwtSig.Decode(compactReprBufPtr, compactReprBufLength, publicKeyRaw, validatorRaw);
+                Raw.JwtFfiResultBoxJwtSigBoxPickyError result = Marshal.PtrToStructure<Raw.JwtFfiResultBoxJwtSigBoxPickyError>(resultPtr);
+                Raw.JwtFfiResultBoxJwtSigBoxPickyError.Destroy(resultPtr);
                 if (!result.isOk)
                 {
                     throw new PickyException(new PickyError(result.Err));
@@ -308,7 +326,9 @@ public partial class JwtSig: IDisposable
             nuint compactReprBufLength = (nuint)compactReprBuf.Length;
             fixed (byte* compactReprBufPtr = compactReprBuf)
             {
-                Raw.JwtFfiResultBoxJwtSigBoxPickyError result = Raw.JwtSig.DecodeUnchecked(compactReprBufPtr, compactReprBufLength);
+                IntPtr resultPtr = Raw.JwtSig.DecodeUnchecked(compactReprBufPtr, compactReprBufLength);
+                Raw.JwtFfiResultBoxJwtSigBoxPickyError result = Marshal.PtrToStructure<Raw.JwtFfiResultBoxJwtSigBoxPickyError>(resultPtr);
+                Raw.JwtFfiResultBoxJwtSigBoxPickyError.Destroy(resultPtr);
                 if (!result.isOk)
                 {
                     throw new PickyException(new PickyError(result.Err));
@@ -337,7 +357,9 @@ public partial class JwtSig: IDisposable
             {
                 throw new ObjectDisposedException("PrivateKey");
             }
-            Raw.JwtFfiResultVoidBoxPickyError result = Raw.JwtSig.Encode(_inner, keyRaw, &writeable);
+            IntPtr resultPtr = Raw.JwtSig.Encode(_inner, keyRaw, &writeable);
+            Raw.JwtFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.JwtFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.JwtFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -364,7 +386,9 @@ public partial class JwtSig: IDisposable
                 throw new ObjectDisposedException("PrivateKey");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            Raw.JwtFfiResultVoidBoxPickyError result = Raw.JwtSig.Encode(_inner, keyRaw, &writeable);
+            IntPtr resultPtr = Raw.JwtSig.Encode(_inner, keyRaw, &writeable);
+            Raw.JwtFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.JwtFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.JwtFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));

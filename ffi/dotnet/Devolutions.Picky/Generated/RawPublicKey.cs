@@ -14,31 +14,35 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct PublicKey
 {
+#if __IOS__
+    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
+#else
     private const string NativeLib = "DevolutionsPicky";
+#endif
 
     /// <summary>
     /// Extracts public key from PEM object.
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PublicKey_from_pem", ExactSpelling = true)]
-    public static unsafe extern KeyFfiResultBoxPublicKeyBoxPickyError FromPem(Pem* pem);
+    public static unsafe extern IntPtr FromPem(Pem* pem);
 
     /// <summary>
     /// Reads a public key from its DER encoding (i.e.: SubjectPublicKeyInfo structure).
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PublicKey_from_der", ExactSpelling = true)]
-    public static unsafe extern KeyFfiResultBoxPublicKeyBoxPickyError FromDer(byte* der, nuint derSz);
+    public static unsafe extern IntPtr FromDer(byte* der, nuint derSz);
 
     /// <summary>
     /// Reads a RSA public key from its DER encoding (i.e.: PKCS1).
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PublicKey_from_pkcs1", ExactSpelling = true)]
-    public static unsafe extern KeyFfiResultBoxPublicKeyBoxPickyError FromPkcs1(byte* der, nuint derSz);
+    public static unsafe extern IntPtr FromPkcs1(byte* der, nuint derSz);
 
     /// <summary>
     /// Exports the public key into a PEM object.
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PublicKey_to_pem", ExactSpelling = true)]
-    public static unsafe extern KeyFfiResultBoxPemBoxPickyError ToPem(PublicKey* self);
+    public static unsafe extern IntPtr ToPem(PublicKey* self);
 
     /// <summary>
     /// Retrieves the key kind for this public key.
