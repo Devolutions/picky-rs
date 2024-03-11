@@ -1,3 +1,4 @@
+#![allow(clippy::needless_lifetimes)] // Diplomat requires explicit lifetimes
 use picky::x509::certificate;
 
 impl From<ffi::CertType> for certificate::CertType {
@@ -217,9 +218,9 @@ pub mod ffi {
     }
 
     #[diplomat::opaque]
-    pub struct CertVec(pub Vec<certificate::Cert>);
+    pub struct CertIterator(pub Vec<certificate::Cert>);
 
-    impl CertVec {
+    impl CertIterator {
         pub fn next(&mut self) -> Option<Box<Cert>> {
             self.0.pop().map(|cert| Box::new(Cert(cert)))
         }
@@ -241,32 +242,11 @@ pub mod ffi {
     pub struct SignerInfo(pub picky_asn1_x509::signer_info::SignerInfo);
 
     #[diplomat::opaque]
-    pub struct SignerInfos(pub Vec<SignerInfo>);
+    pub struct SignerInfoIterator(pub Vec<SignerInfo>);
 
-    impl SignerInfos {
+    impl SignerInfoIterator {
         pub fn next(&mut self) -> Option<Box<SignerInfo>> {
             self.0.pop().map(Box::new)
-        }
-    }
-
-    #[diplomat::opaque]
-    pub struct Der(pub Vec<u8>);
-
-    impl Der {
-        pub fn is_empty(&self) -> bool {
-            self.0.is_empty()
-        }
-
-        pub fn len(&self) -> usize {
-            self.0.len()
-        }
-
-        pub fn fill<'a>(&'a self, buf: &'a mut [u8]) -> Result<(), Box<PickyError>> {
-            if buf.len() < self.0.len() {
-                return Err("Buffer too small".into());
-            }
-            buf.copy_from_slice(&self.0);
-            Ok(())
         }
     }
 
@@ -369,11 +349,9 @@ pub mod ffi {
             }
         }
 
-        pub fn to_initialization_vector(&self) -> Option<Box<crate::octet_string::ffi::OctetStringAsn1>> {
+        pub fn to_initialization_vector(&self) -> Option<Box<crate::buffer::ffi::Buffer>> {
             match &self.0 {
-                picky_asn1_x509::AesParameters::InitializationVector(iv) => {
-                    Some(Box::new(crate::octet_string::ffi::OctetStringAsn1(iv.clone())))
-                }
+                picky_asn1_x509::AesParameters::InitializationVector(iv) => Some(Box::new(iv.into())),
                 _ => None,
             }
         }
@@ -392,9 +370,9 @@ pub mod ffi {
     pub struct AesAuthEncParams(pub picky_asn1_x509::AesAuthEncParams);
 
     #[diplomat::opaque]
-    pub struct AlgorithmIdentifiers(pub Vec<picky::AlgorithmIdentifier>);
+    pub struct AlgorithmIdentifierIterator(pub Vec<picky::AlgorithmIdentifier>);
 
-    impl AlgorithmIdentifiers {
+    impl AlgorithmIdentifierIterator {
         pub fn next(&mut self) -> Option<Box<AlgorithmIdentifier>> {
             self.0.pop().map(|algo| Box::new(AlgorithmIdentifier(algo)))
         }
