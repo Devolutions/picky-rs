@@ -17,6 +17,9 @@ embed-resource = "2.2.0"
 [dependencies]
 picky = { path = "../picky/", default-features = false, features = ["ssh", "x509", "time_conversion", "jose", "pkcs12", "pkcs7"] }
 picky-asn1 = { path = "../picky-asn1", default-features = false }
+picky-asn1-der = { version = "0.4", path = "../picky-asn1-der" }
+picky-asn1-x509 = { version = "0.12", path = "../picky-asn1-x509", features = ["legacy", "zeroize"] }
+
 argon2 = "0.5"
 
 # FFI
