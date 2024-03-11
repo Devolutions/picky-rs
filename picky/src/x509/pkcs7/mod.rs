@@ -3,13 +3,11 @@ use crate::x509::certificate::{Cert, CertError};
 use crate::x509::utils::{from_der, from_pem, from_pem_str, to_der, to_pem};
 use crate::AlgorithmIdentifier;
 use picky_asn1_der::Asn1DerError;
+use picky_asn1_x509::content_info::EncapsulatedContentInfo;
 use picky_asn1_x509::pkcs7::Pkcs7Certificate;
 use picky_asn1_x509::signed_data::CertificateChoices;
+use picky_asn1_x509::signer_info::SignerInfo;
 use thiserror::Error;
-
-pub use picky_asn1_x509::algorithm_identifier;
-pub use picky_asn1_x509::content_info::EncapsulatedContentInfo;
-pub use picky_asn1_x509::signer_info::SignerInfo;
 
 pub mod authenticode;
 #[cfg(feature = "ctl")]
