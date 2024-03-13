@@ -894,7 +894,7 @@ pub mod ffi {
     }
 
     #[diplomat::opaque]
-    pub struct AlgorithmIdentifierParameters<'a>(pub &'a picky::x509::AlgorithmIdentifierParameters);
+    pub struct AlgorithmIdentifierParameters<'a>(pub &'a picky_asn1_x509::AlgorithmIdentifierParameters);
 
     pub enum AlgorithmIdentifierParametersType {
         None,
@@ -907,11 +907,11 @@ pub mod ffi {
     impl AlgorithmIdentifierParameters<'_> {
         pub fn get_type(&self) -> AlgorithmIdentifierParametersType {
             match self.0 {
-                picky::x509::AlgorithmIdentifierParameters::None => AlgorithmIdentifierParametersType::None,
-                picky::x509::AlgorithmIdentifierParameters::Null => AlgorithmIdentifierParametersType::Null,
-                picky::x509::AlgorithmIdentifierParameters::Aes(_) => AlgorithmIdentifierParametersType::Aes,
-                picky::x509::AlgorithmIdentifierParameters::Ec(_) => AlgorithmIdentifierParametersType::Ec,
-                picky::x509::AlgorithmIdentifierParameters::RsassaPss(_) => {
+                picky_asn1_x509::AlgorithmIdentifierParameters::None => AlgorithmIdentifierParametersType::None,
+                picky_asn1_x509::AlgorithmIdentifierParameters::Null => AlgorithmIdentifierParametersType::Null,
+                picky_asn1_x509::AlgorithmIdentifierParameters::Aes(_) => AlgorithmIdentifierParametersType::Aes,
+                picky_asn1_x509::AlgorithmIdentifierParameters::Ec(_) => AlgorithmIdentifierParametersType::Ec,
+                picky_asn1_x509::AlgorithmIdentifierParameters::RsassaPss(_) => {
                     AlgorithmIdentifierParametersType::RsassaPss
                 }
             }
@@ -919,7 +919,7 @@ pub mod ffi {
 
         pub fn to_aes(&self) -> Option<Box<AesParameters>> {
             match self.0 {
-                picky::x509::AlgorithmIdentifierParameters::Aes(ref params) => {
+                picky_asn1_x509::AlgorithmIdentifierParameters::Aes(ref params) => {
                     Some(Box::new(AesParameters(params.clone())))
                 }
                 _ => None,
@@ -928,7 +928,7 @@ pub mod ffi {
 
         pub fn to_ec(&self) -> Option<Box<EcParameters>> {
             match self.0 {
-                picky::x509::AlgorithmIdentifierParameters::Ec(ref params) => {
+                picky_asn1_x509::AlgorithmIdentifierParameters::Ec(ref params) => {
                     Some(Box::new(EcParameters(params.clone())))
                 }
                 _ => None,
@@ -937,7 +937,7 @@ pub mod ffi {
 
         pub fn to_rsassa_pss(&self) -> Option<Box<RsassaPssParameters>> {
             match self.0 {
-                picky::x509::AlgorithmIdentifierParameters::RsassaPss(ref params) => {
+                picky_asn1_x509::AlgorithmIdentifierParameters::RsassaPss(ref params) => {
                     Some(Box::new(RsassaPssParameters(params.clone())))
                 }
                 _ => None,
