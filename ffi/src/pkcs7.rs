@@ -1,6 +1,5 @@
 #[diplomat::bridge]
 pub mod ffi {
-
     use picky::x509::pkcs7::{self};
 
     use crate::buffer::ffi::Buffer;
