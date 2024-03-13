@@ -37,7 +37,7 @@ impl From<&picky_asn1::wrapper::OctetStringAsn1> for ffi::Buffer {
 }
 
 impl Buffer {
-    pub fn to_box(self) -> Box<Buffer> {
+    pub fn boxed(self) -> Box<Buffer> {
         Box::new(self)
     }
 }
