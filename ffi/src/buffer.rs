@@ -2,7 +2,6 @@ use self::ffi::Buffer;
 
 #[diplomat::bridge]
 pub mod ffi {
-
     #[diplomat::opaque]
     pub struct Buffer(pub Vec<u8>);
 
