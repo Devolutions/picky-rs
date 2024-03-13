@@ -1,3 +1,5 @@
+use self::ffi::Buffer;
+
 #[diplomat::bridge]
 pub mod ffi {
 
@@ -31,5 +33,11 @@ pub mod ffi {
 impl From<&picky_asn1::wrapper::OctetStringAsn1> for ffi::Buffer {
     fn from(octet_string: &picky_asn1::wrapper::OctetStringAsn1) -> Self {
         Self(octet_string.0.as_slice().to_vec())
+    }
+}
+
+impl Buffer {
+    pub fn to_box(self) -> Box<Buffer> {
+        Box::new(self)
     }
 }
