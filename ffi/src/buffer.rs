@@ -15,9 +15,9 @@ pub mod ffi {
             self.0.len()
         }
 
-        pub fn fill(&self, buffer: &mut [u8]) -> Result<(), OctectStringAsn1Error> {
+        pub fn fill(&self, buffer: &mut [u8]) -> Result<(), BufferError> {
             if buffer.len() < self.0.len() {
-                return Err(OctectStringAsn1Error::BufferTooSmall);
+                return Err(BufferError::BufferTooSmall);
             }
 
             buffer.copy_from_slice(&self.0);
@@ -25,7 +25,7 @@ pub mod ffi {
         }
     }
 
-    pub enum OctectStringAsn1Error {
+    pub enum BufferError {
         BufferTooSmall,
     }
 }
@@ -37,7 +37,7 @@ impl From<&picky_asn1::wrapper::OctetStringAsn1> for ffi::Buffer {
 }
 
 impl Buffer {
-    pub fn to_box(self) -> Box<Buffer> {
+    pub fn boxed(self) -> Box<Buffer> {
         Box::new(self)
     }
 }

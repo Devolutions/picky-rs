@@ -417,7 +417,7 @@ pub mod ffi {
         pub fn get_certificate(&self) -> Option<Box<Buffer>> {
             match &self.0 {
                 picky_asn1_x509::signed_data::CertificateChoices::Certificate(der) => {
-                    Some(Buffer::from_bytes(&der.0).to_box())
+                    Some(Buffer::from_bytes(&der.0).boxed())
                 }
                 _ => None,
             }
@@ -426,7 +426,7 @@ pub mod ffi {
         pub fn get_other(&self) -> Option<Box<Buffer>> {
             match &self.0 {
                 picky_asn1_x509::signed_data::CertificateChoices::Other(der) => {
-                    Some(Buffer::from_bytes(&der.0).to_box())
+                    Some(Buffer::from_bytes(&der.0).boxed())
                 }
                 _ => None,
             }
@@ -474,7 +474,7 @@ pub mod ffi {
         }
 
         pub fn get_signature_value(&self) -> Box<Buffer> {
-            Buffer::from_bytes(self.0.signature_value.clone().payload_view()).to_box()
+            Buffer::from_bytes(self.0.signature_value.clone().payload_view()).boxed()
         }
     }
     #[diplomat::opaque]
@@ -602,7 +602,7 @@ pub mod ffi {
     impl RevokedCertificate {
         pub fn get_user_certificate(&self) -> Box<Buffer> {
             let vec = self.0.user_certificate.0 .0.clone();
-            Buffer::from_bytes(&vec).to_box()
+            Buffer::from_bytes(&vec).boxed()
         }
 
         pub fn get_revocation_date(&self) -> Box<Time> {
@@ -697,7 +697,7 @@ pub mod ffi {
         pub fn to_subject_key_identifier(&'a self) -> Option<Box<crate::buffer::ffi::Buffer>> {
             match self.0 {
                 picky_asn1_x509::extension::ExtensionView::SubjectKeyIdentifier(value) => {
-                    let buffer = crate::buffer::ffi::Buffer::from_bytes(&value.0).to_box();
+                    let buffer = crate::buffer::ffi::Buffer::from_bytes(&value.0).boxed();
                     Some(buffer)
                 }
                 _ => None,
@@ -707,7 +707,7 @@ pub mod ffi {
         pub fn to_key_usage(&'a self) -> Option<Box<Buffer>> {
             match self.0 {
                 picky_asn1_x509::extension::ExtensionView::KeyUsage(value) => {
-                    Some(Buffer::from_bytes(value.as_bytes()).to_box())
+                    Some(Buffer::from_bytes(value.as_bytes()).boxed())
                 }
                 _ => None,
             }
@@ -752,7 +752,7 @@ pub mod ffi {
         pub fn to_generic(&'a self) -> Option<Box<crate::buffer::ffi::Buffer>> {
             match &self.0 {
                 picky_asn1_x509::extension::ExtensionView::Generic(value) => {
-                    Some(Buffer::from_bytes(&value.0).to_box())
+                    Some(Buffer::from_bytes(&value.0).boxed())
                 }
                 _ => None,
             }
@@ -761,7 +761,7 @@ pub mod ffi {
         pub fn to_crl_number(&'a self) -> Option<Box<crate::buffer::ffi::Buffer>> {
             match &self.0 {
                 picky_asn1_x509::extension::ExtensionView::CrlNumber(value) => {
-                    Some(Buffer::from_bytes(&value.0).to_box())
+                    Some(Buffer::from_bytes(&value.0).boxed())
                 }
                 _ => None,
             }
@@ -928,7 +928,7 @@ pub mod ffi {
 
         pub fn to_ec(&self) -> Option<Box<EcParameters>> {
             match self.0 {
-                picky_asn1_x509::AlgorithmIdentifierParameters::Ec(ref params) => {
+                picky::x509::AlgorithmIdentifierParameters::Ec(ref params) => {
                     Some(Box::new(EcParameters(params.clone())))
                 }
                 _ => None,
