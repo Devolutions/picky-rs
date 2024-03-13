@@ -42,6 +42,7 @@ pub mod ffi {
     use diplomat_runtime::DiplomatWriteable;
     use picky::x509::certificate;
 
+    use crate::buffer::ffi::Buffer;
     use crate::date::ffi::UtcDate;
     use crate::error::ffi::PickyError;
     use crate::key::ffi::{PrivateKey, PublicKey};
@@ -381,14 +382,443 @@ pub mod ffi {
         pub fn get_content_info(&self) -> Box<EncapsulatedContentInfo> {
             Box::new(EncapsulatedContentInfo(self.0.content_info.clone()))
         }
-        //TODO: pub certificates: Optional<CertificateSet>,
-        //TODO: pub crls: Option<RevocationInfoChoices>,
+
+        pub fn get_crls(&self) -> Option<Box<RevocationInfoChoiceIterator>> {
+            self.0
+                .crls
+                .as_ref()
+                .map(|crls| Box::new(RevocationInfoChoiceIterator(crls.clone())))
+        }
+
+        pub fn get_certificates(&self) -> Box<CertificateChoicesIterator> {
+            Box::new(CertificateChoicesIterator(self.0.certificates.0.clone()))
+        }
+
         pub fn get_signers_infos(&self) -> Box<SignerInfoIterator> {
             let signer_infos = &self.0.signers_infos;
             let vec_signer_infos: Vec<_> = signer_infos.0.iter().cloned().map(SignerInfo).collect();
             Box::new(SignerInfoIterator(vec_signer_infos))
         }
     }
+
+    #[diplomat::opaque]
+    pub struct CertificateChoicesIterator(pub picky_asn1_x509::signed_data::CertificateSet);
+
+    impl CertificateChoicesIterator {
+        pub fn next(&mut self) -> Option<Box<CertificateChoices>> {
+            self.0 .0.pop().map(|cert| Box::new(CertificateChoices(cert)))
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct CertificateChoices(pub picky_asn1_x509::signed_data::CertificateChoices);
+
+    impl CertificateChoices {
+        pub fn get_certificate(&self) -> Option<Box<Buffer>> {
+            match &self.0 {
+                picky_asn1_x509::signed_data::CertificateChoices::Certificate(der) => {
+                    Some(Buffer::from_bytes(&der.0).to_box())
+                }
+                _ => None,
+            }
+        }
+
+        pub fn get_other(&self) -> Option<Box<Buffer>> {
+            match &self.0 {
+                picky_asn1_x509::signed_data::CertificateChoices::Other(der) => {
+                    Some(Buffer::from_bytes(&der.0).to_box())
+                }
+                _ => None,
+            }
+        }
+
+        pub fn is_certificate(&self) -> bool {
+            matches!(
+                &self.0,
+                picky_asn1_x509::signed_data::CertificateChoices::Certificate(_)
+            )
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct RevocationInfoChoiceIterator(pub picky_asn1_x509::crls::RevocationInfoChoices);
+
+    impl RevocationInfoChoiceIterator {
+        pub fn next(&mut self) -> Option<Box<RevocationInfoChoice>> {
+            self.0 .0.pop().map(|v| Box::new(RevocationInfoChoice(v)))
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct RevocationInfoChoice(pub picky_asn1_x509::crls::RevocationInfoChoice);
+
+    impl RevocationInfoChoice {
+        pub fn get_crl(&self) -> Option<Box<CertificateList>> {
+            match &self.0 {
+                picky_asn1_x509::crls::RevocationInfoChoice::Crl(crl) => Some(Box::new(CertificateList(crl.clone()))),
+                _ => None,
+            }
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct CertificateList(pub picky_asn1_x509::crls::CertificateList);
+
+    impl CertificateList {
+        pub fn get_tbs_cert_list(&self) -> Box<TbsCertList> {
+            Box::new(TbsCertList(self.0.tbs_cert_list.clone()))
+        }
+
+        pub fn get_signature_algorithm(&self) -> Box<AlgorithmIdentifier> {
+            Box::new(AlgorithmIdentifier(self.0.signature_algorithm.clone()))
+        }
+
+        pub fn get_signature_value(&self) -> Box<Buffer> {
+            Buffer::from_bytes(self.0.signature_value.clone().payload_view()).to_box()
+        }
+    }
+    #[diplomat::opaque]
+    pub struct TbsCertList(pub picky_asn1_x509::crls::TbsCertList);
+
+    impl TbsCertList {
+        pub fn get_version(&self) -> Version {
+            match self.0.version.clone().map(|v| match v {
+                picky_asn1_x509::Version::V1 => Version::V1,
+                picky_asn1_x509::Version::V2 => Version::V2,
+                picky_asn1_x509::Version::V3 => Version::V3,
+            }) {
+                Some(v) => v,
+                None => Version::None,
+            }
+        }
+
+        pub fn get_signature_algorithm(&self) -> Box<AlgorithmIdentifier> {
+            Box::new(AlgorithmIdentifier(self.0.signature.clone()))
+        }
+
+        pub fn get_issuer(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            let name_string = format!("{}", self.0.issuer);
+            write!(writable, "{}", name_string)?;
+            Ok(())
+        }
+
+        pub fn get_this_upate(&self) -> Box<Time> {
+            Box::new(Time(self.0.this_update.clone()))
+        }
+
+        pub fn get_next_update(&self) -> Option<Box<Time>> {
+            self.0.next_update.clone().map(Time).map(Box::new)
+        }
+
+        pub fn get_revoked_certificates(&self) -> Option<Box<RevokedCertificateIterator>> {
+            self.0.revoked_certificates.as_ref().map(|revoked_certificates| {
+                let mut vec = vec![];
+                revoked_certificates.0.iter().for_each(|revoked_certificate| {
+                    vec.push(RevokedCertificate(revoked_certificate.clone()));
+                });
+                Box::new(RevokedCertificateIterator(vec))
+            })
+        }
+
+        pub fn get_extenstions(&self) -> Option<Box<ExtensionIterator>> {
+            self.0.crl_extension.as_ref().map(|extensions| {
+                Box::new(ExtensionIterator(
+                    extensions
+                        .0
+                        .iter()
+                        .map(|extension| Extension(extension.clone()))
+                        .collect(),
+                ))
+            })
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct Time(picky_asn1_x509::validity::Time);
+
+    impl Time {
+        pub fn get_year(&self) -> u16 {
+            match &self.0 {
+                picky_asn1_x509::validity::Time::Utc(utc_time) => utc_time.0.year(),
+                picky_asn1_x509::validity::Time::Generalized(generalized_time) => generalized_time.0.year(),
+            }
+        }
+
+        pub fn get_month(&self) -> u8 {
+            match &self.0 {
+                picky_asn1_x509::validity::Time::Utc(utc_time) => utc_time.0.month(),
+                picky_asn1_x509::validity::Time::Generalized(generalized_time) => generalized_time.0.month(),
+            }
+        }
+
+        pub fn get_day(&self) -> u8 {
+            match &self.0 {
+                picky_asn1_x509::validity::Time::Utc(utc_time) => utc_time.0.day(),
+                picky_asn1_x509::validity::Time::Generalized(generalized_time) => generalized_time.0.day(),
+            }
+        }
+
+        pub fn get_hour(&self) -> u8 {
+            match &self.0 {
+                picky_asn1_x509::validity::Time::Utc(utc_time) => utc_time.0.hour(),
+                picky_asn1_x509::validity::Time::Generalized(generalized_time) => generalized_time.0.hour(),
+            }
+        }
+
+        pub fn get_minute(&self) -> u8 {
+            match &self.0 {
+                picky_asn1_x509::validity::Time::Utc(utc_time) => utc_time.0.minute(),
+                picky_asn1_x509::validity::Time::Generalized(generalized_time) => generalized_time.0.minute(),
+            }
+        }
+
+        pub fn get_second(&self) -> u8 {
+            match &self.0 {
+                picky_asn1_x509::validity::Time::Utc(utc_time) => utc_time.0.second(),
+                picky_asn1_x509::validity::Time::Generalized(generalized_time) => generalized_time.0.second(),
+            }
+        }
+
+        pub fn is_utc(&self) -> bool {
+            matches!(&self.0, picky_asn1_x509::validity::Time::Utc(_))
+        }
+
+        pub fn is_generalized(&self) -> bool {
+            matches!(&self.0, picky_asn1_x509::validity::Time::Generalized(_))
+        }
+    }
+
+    /// Diplomat does not allow Option wrapped enums, so we have to use a None variant
+    pub enum Version {
+        None,
+        V1,
+        V2,
+        V3,
+    }
+
+    #[diplomat::opaque]
+    pub struct RevokedCertificate(picky_asn1_x509::crls::RevokedCertificate);
+
+    impl RevokedCertificate {
+        pub fn get_user_certificate(&self) -> Box<Buffer> {
+            let vec = self.0.user_certificate.0 .0.clone();
+            Buffer::from_bytes(&vec).to_box()
+        }
+
+        pub fn get_revocation_date(&self) -> Box<Time> {
+            Box::new(Time(self.0.revocation_data.clone()))
+        }
+
+        pub fn get_extensions(&self) -> Option<Box<ExtensionIterator>> {
+            self.0.crl_entry_extensions.as_ref().map(|extensions| {
+                Box::new(ExtensionIterator(
+                    extensions
+                        .0
+                        .iter()
+                        .map(|extension| Extension(extension.clone()))
+                        .collect(),
+                ))
+            })
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct RevokedCertificateIterator(pub Vec<RevokedCertificate>);
+
+    impl RevokedCertificateIterator {
+        pub fn next(&mut self) -> Option<Box<RevokedCertificate>> {
+            self.0.pop().map(Box::new)
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct Extension(pub picky_asn1_x509::extension::Extension);
+
+    impl Extension {
+        pub fn get_extn_id(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            let oid: String = self.0.extn_id().0.clone().into();
+            write!(writable, "{}", oid)?;
+            Ok(())
+        }
+
+        pub fn get_critical(&self) -> bool {
+            self.0.critical()
+        }
+
+        pub fn get_value<'a>(&'a self) -> Box<ExtensionView<'a>> {
+            let value = self.0.extn_value();
+            Box::new(ExtensionView(value))
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct ExtensionView<'a>(pub picky_asn1_x509::extension::ExtensionView<'a>);
+
+    pub enum ExtensionViewType {
+        AuthorityKeyIdentifier,
+        SubjectKeyIdentifier,
+        KeyUsage,
+        SubjectAltName,
+        IssuerAltName,
+        BasicConstraints,
+        ExtendedKeyUsage,
+        Generic,
+        CrlNumber,
+    }
+
+    impl<'a> ExtensionView<'a> {
+        pub fn get_type(&'a self) -> ExtensionViewType {
+            match self.0 {
+                picky_asn1_x509::extension::ExtensionView::AuthorityKeyIdentifier(_) => {
+                    ExtensionViewType::AuthorityKeyIdentifier
+                }
+                picky_asn1_x509::extension::ExtensionView::SubjectKeyIdentifier(_) => {
+                    ExtensionViewType::SubjectKeyIdentifier
+                }
+                picky_asn1_x509::extension::ExtensionView::KeyUsage(_) => ExtensionViewType::KeyUsage,
+                picky_asn1_x509::extension::ExtensionView::SubjectAltName(_) => ExtensionViewType::SubjectAltName,
+                picky_asn1_x509::extension::ExtensionView::IssuerAltName(_) => ExtensionViewType::IssuerAltName,
+                picky_asn1_x509::extension::ExtensionView::BasicConstraints(_) => ExtensionViewType::BasicConstraints,
+                picky_asn1_x509::extension::ExtensionView::ExtendedKeyUsage(_) => ExtensionViewType::ExtendedKeyUsage,
+                picky_asn1_x509::extension::ExtensionView::Generic(_) => ExtensionViewType::Generic,
+                picky_asn1_x509::extension::ExtensionView::CrlNumber(_) => ExtensionViewType::CrlNumber,
+            }
+        }
+
+        pub fn to_authority_key_identifier(&'a self) -> Option<Box<AuthorityKeyIdentifier>> {
+            match self.0 {
+                picky_asn1_x509::extension::ExtensionView::AuthorityKeyIdentifier(value) => {
+                    Some(Box::new(AuthorityKeyIdentifier(value.clone())))
+                }
+                _ => None,
+            }
+        }
+
+        pub fn to_subject_key_identifier(&'a self) -> Option<Box<crate::buffer::ffi::Buffer>> {
+            match self.0 {
+                picky_asn1_x509::extension::ExtensionView::SubjectKeyIdentifier(value) => {
+                    let buffer = crate::buffer::ffi::Buffer::from_bytes(&value.0).to_box();
+                    Some(buffer)
+                }
+                _ => None,
+            }
+        }
+
+        pub fn to_key_usage(&'a self) -> Option<Box<Buffer>> {
+            match self.0 {
+                picky_asn1_x509::extension::ExtensionView::KeyUsage(value) => {
+                    Some(Buffer::from_bytes(value.as_bytes()).to_box())
+                }
+                _ => None,
+            }
+        }
+
+        pub fn to_subject_alt_name(&'a self) -> Option<Box<crate::x509::ffi::GeneralNameIterator>> {
+            match &self.0 {
+                picky_asn1_x509::extension::ExtensionView::SubjectAltName(value) => Some(Box::new(
+                    crate::x509::ffi::GeneralNameIterator(value.clone().0.into_iter().map(GeneralName).collect()),
+                )),
+                _ => None,
+            }
+        }
+
+        pub fn to_issuer_alt_name(&'a self) -> Option<Box<crate::x509::ffi::GeneralNameIterator>> {
+            match &self.0 {
+                picky_asn1_x509::extension::ExtensionView::IssuerAltName(value) => Some(Box::new(
+                    crate::x509::ffi::GeneralNameIterator(value.clone().0.into_iter().map(GeneralName).collect()),
+                )),
+                _ => None,
+            }
+        }
+
+        pub fn to_basic_constraints(&'a self) -> Option<Box<BasicConstraints>> {
+            match self.0 {
+                picky_asn1_x509::extension::ExtensionView::BasicConstraints(value) => {
+                    Some(Box::new(BasicConstraints(value.clone())))
+                }
+                _ => None,
+            }
+        }
+
+        pub fn to_extended_key_usage(&'a self) -> Option<Box<crate::x509::ffi::ExtendedKeyUsage>> {
+            match self.0 {
+                picky_asn1_x509::extension::ExtensionView::ExtendedKeyUsage(value) => {
+                    Some(Box::new(crate::x509::ffi::ExtendedKeyUsage(value.clone())))
+                }
+                _ => None,
+            }
+        }
+
+        pub fn to_generic(&'a self) -> Option<Box<crate::buffer::ffi::Buffer>> {
+            match &self.0 {
+                picky_asn1_x509::extension::ExtensionView::Generic(value) => {
+                    Some(Buffer::from_bytes(&value.0).to_box())
+                }
+                _ => None,
+            }
+        }
+
+        pub fn to_crl_number(&'a self) -> Option<Box<crate::buffer::ffi::Buffer>> {
+            match &self.0 {
+                picky_asn1_x509::extension::ExtensionView::CrlNumber(value) => {
+                    Some(Buffer::from_bytes(&value.0).to_box())
+                }
+                _ => None,
+            }
+        }
+    }
+
+    #[diplomat::opaque] // TODO
+    pub struct ExtendedKeyUsage(pub picky_asn1_x509::ExtendedKeyUsage);
+
+    #[diplomat::opaque] // TODO
+    pub struct BasicConstraints(pub picky_asn1_x509::BasicConstraints);
+
+    #[diplomat::opaque]
+    pub struct GeneralNameIterator(pub Vec<GeneralName>);
+
+    impl GeneralNameIterator {
+        pub fn next(&mut self) -> Option<Box<GeneralName>> {
+            self.0.pop().map(Box::new)
+        }
+    }
+
+    #[diplomat::opaque] // TODO
+    pub struct GeneralName(pub picky_asn1_x509::name::GeneralName);
+
+    impl GeneralName {
+        pub fn get_type(&self) -> GeneralNameType {
+            match &self.0 {
+                picky_asn1_x509::name::GeneralName::OtherName(_) => GeneralNameType::OtherName,
+                picky_asn1_x509::name::GeneralName::Rfc822Name(_) => GeneralNameType::Rfc822Name,
+                picky_asn1_x509::name::GeneralName::DnsName(_) => GeneralNameType::DnsName,
+                picky_asn1_x509::name::GeneralName::DirectoryName(_) => GeneralNameType::DirectoryName,
+                picky_asn1_x509::name::GeneralName::EdiPartyName(_) => GeneralNameType::EdiPartyName,
+                picky_asn1_x509::name::GeneralName::Uri(_) => GeneralNameType::Uri,
+                picky_asn1_x509::name::GeneralName::IpAddress(_) => GeneralNameType::IpAddress,
+                picky_asn1_x509::name::GeneralName::RegisteredId(_) => GeneralNameType::RegisteredId,
+            }
+        }
+
+        // TODO: implement the rest of the methods
+    }
+
+    pub enum GeneralNameType {
+        OtherName,
+        Rfc822Name,
+        DnsName,
+        DirectoryName,
+        EdiPartyName,
+        Uri,
+        IpAddress,
+        RegisteredId,
+    }
+
+    #[diplomat::opaque] // TODO
+    pub struct AuthorityKeyIdentifier(pub picky_asn1_x509::AuthorityKeyIdentifier);
+
+    #[diplomat::opaque]
+    pub struct ExtensionIterator(pub Vec<Extension>);
 
     #[diplomat::opaque]
     pub struct UnsignedAttributeIterator(pub Vec<UnsignedAttribute>);
