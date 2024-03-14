@@ -34,8 +34,8 @@ pub mod ffi {
     pub struct BufferIterator(pub Vec<Buffer>);
 
     impl BufferIterator {
-        pub fn next(&mut self) -> Option<Buffer> {
-            self.0.pop()
+        pub fn next(&mut self) -> Option<Box<Buffer>> {
+            self.0.pop().map(Box::new)
         }
     }
 
@@ -60,8 +60,8 @@ pub mod ffi {
     pub struct StringNestedIterator(pub Vec<Vec<String>>);
 
     impl StringNestedIterator {
-        pub fn next(&mut self) -> Option<StringIterator> {
-            self.0.pop().map(StringIterator)
+        pub fn next(&mut self) -> Option<Box<StringIterator>> {
+            self.0.pop().map(StringIterator).map(Box::new)
         }
     }
 }

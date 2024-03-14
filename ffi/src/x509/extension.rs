@@ -170,12 +170,34 @@ pub mod ffi {
     pub struct BasicConstraints(pub picky_asn1_x509::BasicConstraints);
 
     impl BasicConstraints {
-        pub fn get_ca(&self) -> Option<bool> {
-            self.0.ca()
+        pub fn get_ca(&self) -> GetCaResult {
+            self.0.ca().map_or(GetCaResult::None, |ca| {
+                if ca {
+                    GetCaResult::True
+                } else {
+                    GetCaResult::False
+                }
+            })
         }
 
-        pub fn get_pathlen(&self) -> Option<u8> {
-            self.0.pathlen()
+        pub fn get_pathlen(&self) -> Option<Box<U8>> {
+            self.0.pathlen().map(U8).map(Box::new)
+        }
+    }
+
+    pub enum GetCaResult {
+        None,
+        True,
+        False,
+    }
+
+    /// Diplomat disallow Opion<T> where T is a primitive type, so we need to wrap it in a pointer
+    #[diplomat::opaque]
+    pub struct U8(pub u8);
+
+    impl U8 {
+        pub fn get_value(&self) -> u8 {
+            self.0
         }
     }
 
