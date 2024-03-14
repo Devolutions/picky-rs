@@ -42,11 +42,11 @@ pub mod ffi {
     use diplomat_runtime::DiplomatWriteable;
     use picky::x509::certificate;
 
-    use crate::buffer::ffi::Buffer;
     use crate::date::ffi::UtcDate;
     use crate::error::ffi::PickyError;
     use crate::key::ffi::{PrivateKey, PublicKey};
     use crate::pem::ffi::Pem;
+    use crate::utils::ffi::{Buffer, BufferIterator, StringIterator, StringNestedIterator};
 
     pub enum CertType {
         Root,
@@ -267,8 +267,8 @@ pub mod ffi {
             Box::new(AlgorithmIdentifier(self.0.signature_algorithm.0.clone()))
         }
 
-        pub fn get_signature(&self) -> Box<crate::buffer::ffi::Buffer> {
-            Box::new(crate::buffer::ffi::Buffer::from(&self.0.signature.0))
+        pub fn get_signature(&self) -> Box<crate::utils::ffi::Buffer> {
+            Box::new(crate::utils::ffi::Buffer::from(&self.0.signature.0))
         }
 
         pub fn get_unsigned_attributes(&self) -> Box<UnsignedAttributeIterator> {
@@ -284,7 +284,312 @@ pub mod ffi {
             ))
         }
 
-        //TODO: pub signed_attrs: Optional<Attributes>,
+        pub fn get_signed_attributes(&self) -> Box<AttributeIterator> {
+            let attributes = self.0.signed_attrs.0.clone();
+            let vec = attributes.0 .0.into_iter().map(Attribute).collect();
+            Box::new(AttributeIterator(vec))
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct Attribute(pub picky_asn1_x509::Attribute);
+
+    impl Attribute {
+        pub fn get_type(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            let oid: String = self.0.ty.0.clone().into();
+            write!(writable, "{}", oid)?;
+            Ok(())
+        }
+
+        pub fn get_values(&self) -> Box<AttributeValues> {
+            Box::new(AttributeValues(self.0.value.clone()))
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct AttributeValues(pub picky_asn1_x509::AttributeValues);
+
+    pub enum AttributeValueType {
+        Extensions,
+        ContentType,
+        SpcStatementType,
+        MessageDigest,
+        SigningTime,
+        SpcSpOpusInfo,
+        Custom,
+    }
+
+    impl AttributeValues {
+        pub fn get_type(&self) -> AttributeValueType {
+            match &self.0 {
+                picky_asn1_x509::AttributeValues::Extensions(_) => AttributeValueType::Extensions,
+                picky_asn1_x509::AttributeValues::ContentType(_) => AttributeValueType::ContentType,
+                picky_asn1_x509::AttributeValues::SpcStatementType(_) => AttributeValueType::SpcStatementType,
+                picky_asn1_x509::AttributeValues::MessageDigest(_) => AttributeValueType::MessageDigest,
+                picky_asn1_x509::AttributeValues::SigningTime(_) => AttributeValueType::SigningTime,
+                picky_asn1_x509::AttributeValues::SpcSpOpusInfo(_) => AttributeValueType::SpcSpOpusInfo,
+                picky_asn1_x509::AttributeValues::Custom(_) => AttributeValueType::Custom,
+            }
+        }
+
+        pub fn to_extensions(&self) -> Option<Box<ExtensionIterator>> {
+            match &self.0 {
+                picky_asn1_x509::AttributeValues::Extensions(extensions) => {
+                    // the set will always have 1 element in this variant
+                    let Some(extetions) = extensions.0.first() else {
+                        return None;
+                    };
+
+                    let vec: Vec<Extension> = extetions.0.clone().into_iter().map(Extension).collect();
+
+                    Some(Box::new(ExtensionIterator(vec)))
+                }
+                _ => None,
+            }
+        }
+
+        pub fn to_content_type(&self) -> Option<Box<StringIterator>> {
+            match &self.0 {
+                picky_asn1_x509::AttributeValues::ContentType(oids) => {
+                    let string_vec = oids.0.clone().into_iter().map(|oid| oid.0.into()).collect();
+                    Some(Box::new(StringIterator(string_vec)))
+                }
+                _ => None,
+            }
+        }
+
+        pub fn to_spc_statement_type(&self) -> Option<Box<StringNestedIterator>> {
+            match &self.0 {
+                picky_asn1_x509::AttributeValues::SpcStatementType(oid_array_set) => {
+                    let string_vec_vec: Vec<Vec<String>> = oid_array_set
+                        .0
+                        .clone()
+                        .into_iter()
+                        .map(|oid_array| oid_array.0.into_iter().map(|oid| oid.0.into()).collect())
+                        .collect();
+
+                    Some(Box::new(StringNestedIterator(string_vec_vec)))
+                }
+                _ => None,
+            }
+        }
+
+        pub fn to_message_digest(&self) -> Option<Box<StringIterator>> {
+            match &self.0 {
+                picky_asn1_x509::AttributeValues::MessageDigest(digests) => {
+                    let string_vec = digests
+                        .0
+                        .clone()
+                        .into_iter()
+                        .map(|digest| hex::encode(digest.0))
+                        .collect();
+                    Some(Box::new(StringIterator(string_vec)))
+                }
+                _ => None,
+            }
+        }
+
+        pub fn to_signing_time(&self) -> Option<Box<UTCTimeIterator>> {
+            match &self.0 {
+                picky_asn1_x509::AttributeValues::SigningTime(times) => {
+                    let time_vec = times.0.clone().into_iter().map(|time| UTCTime(time.0)).collect();
+                    Some(Box::new(UTCTimeIterator(time_vec)))
+                }
+                _ => None,
+            }
+        }
+
+        pub fn to_spc_sp_opus_info(&self) -> Option<Box<SpcSpOpusInfoIterator>> {
+            match &self.0 {
+                picky_asn1_x509::AttributeValues::SpcSpOpusInfo(spc_sp_opus_info) => {
+                    let vec = spc_sp_opus_info.0.clone().into_iter().map(SpcSpOpusInfo).collect();
+                    Some(Box::new(SpcSpOpusInfoIterator(vec)))
+                }
+                _ => None,
+            }
+        }
+
+        pub fn to_custom(&self) -> Option<Box<Buffer>> {
+            match &self.0 {
+                picky_asn1_x509::AttributeValues::Custom(der) => Some(Buffer::from_bytes(&der.0).boxed()),
+                _ => None,
+            }
+        }
+    }
+    #[diplomat::opaque] //TODO:
+    pub struct SpcSpOpusInfo(picky_asn1_x509::pkcs7::content_info::SpcSpOpusInfo);
+
+    impl SpcSpOpusInfo {
+        pub fn get_program_name(&self) -> Option<Box<SpcString>> {
+            self.0
+                .program_name
+                .as_ref()
+                .map(|program_name| Box::new(SpcString(program_name.0.clone())))
+        }
+
+        pub fn get_more_info(&self) -> Option<Box<SpcLink>> {
+            self.0
+                .more_info
+                .as_ref()
+                .map(|more_info| Box::new(SpcLink(more_info.0.clone())))
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct SpcString(picky_asn1_x509::pkcs7::content_info::SpcString);
+
+    pub enum SpcStringType {
+        Unicode,
+        Ancii,
+    }
+
+    impl SpcString {
+        pub fn get_type(&self) -> SpcStringType {
+            match &self.0 {
+                picky_asn1_x509::pkcs7::content_info::SpcString::Unicode(_) => SpcStringType::Unicode,
+                picky_asn1_x509::pkcs7::content_info::SpcString::Ancii(_) => SpcStringType::Ancii,
+            }
+        }
+
+        pub fn get_as_string(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            match &self.0 {
+                picky_asn1_x509::pkcs7::content_info::SpcString::Unicode(unicode) => {
+                    write!(writable, "{}", unicode.0 .0 .0)?;
+                }
+                picky_asn1_x509::pkcs7::content_info::SpcString::Ancii(ancii) => {
+                    write!(writable, "{}", ancii.0 .0 .0)?;
+                }
+            };
+            Ok(())
+        }
+
+        pub fn get_as_bytes(&self) -> Box<Buffer> {
+            match &self.0 {
+                picky_asn1_x509::pkcs7::content_info::SpcString::Unicode(unicode) => {
+                    Buffer::from_bytes(&unicode.0 .0 .0).boxed()
+                }
+                picky_asn1_x509::pkcs7::content_info::SpcString::Ancii(ancii) => {
+                    Buffer::from_bytes(&ancii.0 .0 .0).boxed()
+                }
+            }
+        }
+    }
+
+    #[diplomat::opaque] // TODO
+    pub struct SpcLink(picky_asn1_x509::pkcs7::content_info::SpcLink);
+
+    pub enum SpcLinkType {
+        Url,
+        Moniker,
+        File,
+    }
+
+    impl SpcLink {
+        pub fn get_type(&self) -> SpcLinkType {
+            match &self.0 {
+                picky_asn1_x509::pkcs7::content_info::SpcLink::Url(_) => SpcLinkType::Url,
+                picky_asn1_x509::pkcs7::content_info::SpcLink::Moniker(_) => SpcLinkType::Moniker,
+                picky_asn1_x509::pkcs7::content_info::SpcLink::File(_) => SpcLinkType::File,
+            }
+        }
+
+        pub fn get_url(&self) -> Option<Box<Buffer>> {
+            match &self.0 {
+                picky_asn1_x509::pkcs7::content_info::SpcLink::Url(url) => {
+                    let clone = url.0.clone();
+                    Some(Buffer::from_bytes(&clone.0 .0).boxed())
+                }
+                _ => None,
+            }
+        }
+
+        pub fn get_moniker(&self) -> Option<Box<SpcSerializedObject>> {
+            match &self.0 {
+                picky_asn1_x509::pkcs7::content_info::SpcLink::Moniker(moniker) => {
+                    Some(Box::new(SpcSerializedObject(moniker.0.clone().0 .0)))
+                }
+                _ => None,
+            }
+        }
+
+        pub fn get_file(&self) -> Option<Box<SpcString>> {
+            match &self.0 {
+                picky_asn1_x509::pkcs7::content_info::SpcLink::File(file) => {
+                    let clone = file.0.clone();
+                    Some(Box::new(SpcString(clone.0)))
+                }
+                _ => None,
+            }
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct SpcSerializedObject(picky_asn1_x509::pkcs7::content_info::SpcSerializedObject);
+
+    impl SpcSerializedObject {
+        pub fn get_class_id(&self) -> Box<Buffer> {
+            Buffer::from_bytes(&self.0.class_id.0 .0).boxed()
+        }
+
+        pub fn get_object_id(&self) -> Box<Buffer> {
+            Buffer::from_bytes(&self.0.serialized_data.0).boxed()
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct SpcSpOpusInfoIterator(pub Vec<SpcSpOpusInfo>);
+
+    impl SpcSpOpusInfoIterator {
+        pub fn next(&mut self) -> Option<Box<SpcSpOpusInfo>> {
+            self.0.pop().map(Box::new)
+        }
+    }
+
+    #[diplomat::opaque] // TODO
+    pub struct UTCTime(picky_asn1::date::UTCTime);
+
+    impl UTCTime {
+        pub fn get_year(&self) -> u16 {
+            self.0.year()
+        }
+
+        pub fn get_month(&self) -> u8 {
+            self.0.month()
+        }
+
+        pub fn get_day(&self) -> u8 {
+            self.0.day()
+        }
+
+        pub fn get_hour(&self) -> u8 {
+            self.0.hour()
+        }
+
+        pub fn get_minute(&self) -> u8 {
+            self.0.minute()
+        }
+
+        pub fn get_second(&self) -> u8 {
+            self.0.second()
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct UTCTimeIterator(pub Vec<UTCTime>);
+
+    impl UTCTimeIterator {
+        pub fn next(&mut self) -> Option<Box<UTCTime>> {
+            self.0.pop().map(Box::new)
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct AttributeIterator(pub Vec<Attribute>);
+
+    impl AttributeIterator {
+        pub fn next(&mut self) -> Option<Box<Attribute>> {
+            self.0.pop().map(Box::new)
+        }
     }
 
     #[diplomat::opaque]
@@ -694,10 +999,10 @@ pub mod ffi {
             }
         }
 
-        pub fn to_subject_key_identifier(&'a self) -> Option<Box<crate::buffer::ffi::Buffer>> {
+        pub fn to_subject_key_identifier(&'a self) -> Option<Box<crate::utils::ffi::Buffer>> {
             match self.0 {
                 picky_asn1_x509::extension::ExtensionView::SubjectKeyIdentifier(value) => {
-                    let buffer = crate::buffer::ffi::Buffer::from_bytes(&value.0).boxed();
+                    let buffer = crate::utils::ffi::Buffer::from_bytes(&value.0).boxed();
                     Some(buffer)
                 }
                 _ => None,
@@ -740,25 +1045,25 @@ pub mod ffi {
             }
         }
 
-        pub fn to_extended_key_usage(&'a self) -> Option<Box<crate::x509::ffi::ExtendedKeyUsage>> {
+        pub fn to_extended_key_usage(&'a self) -> Option<Box<crate::x509::ffi::OidIterator>> {
             match self.0 {
                 picky_asn1_x509::extension::ExtensionView::ExtendedKeyUsage(value) => {
-                    Some(Box::new(crate::x509::ffi::ExtendedKeyUsage(value.clone())))
+                    let vec = value.iter().map(|oid| oid.0.clone().into()).collect();
+
+                    Some(Box::new(crate::x509::ffi::OidIterator(vec)))
                 }
                 _ => None,
             }
         }
 
-        pub fn to_generic(&'a self) -> Option<Box<crate::buffer::ffi::Buffer>> {
+        pub fn to_generic(&'a self) -> Option<Box<crate::utils::ffi::Buffer>> {
             match &self.0 {
-                picky_asn1_x509::extension::ExtensionView::Generic(value) => {
-                    Some(Buffer::from_bytes(&value.0).boxed())
-                }
+                picky_asn1_x509::extension::ExtensionView::Generic(value) => Some(Buffer::from_bytes(&value.0).boxed()),
                 _ => None,
             }
         }
 
-        pub fn to_crl_number(&'a self) -> Option<Box<crate::buffer::ffi::Buffer>> {
+        pub fn to_crl_number(&'a self) -> Option<Box<crate::utils::ffi::Buffer>> {
             match &self.0 {
                 picky_asn1_x509::extension::ExtensionView::CrlNumber(value) => {
                     Some(Buffer::from_bytes(&value.0).boxed())
@@ -768,11 +1073,29 @@ pub mod ffi {
         }
     }
 
-    #[diplomat::opaque] // TODO
-    pub struct ExtendedKeyUsage(pub picky_asn1_x509::ExtendedKeyUsage);
+    #[diplomat::opaque]
+    pub struct OidIterator(pub Vec<String>);
 
-    #[diplomat::opaque] // TODO
+    impl OidIterator {
+        pub fn next(&mut self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            let oid = self.0.pop().ok_or("no more OIDs")?;
+            write!(writable, "{}", oid)?;
+            Ok(())
+        }
+    }
+
+    #[diplomat::opaque]
     pub struct BasicConstraints(pub picky_asn1_x509::BasicConstraints);
+
+    impl BasicConstraints {
+        pub fn get_ca(&self) -> Option<bool> {
+            self.0.ca()
+        }
+
+        pub fn get_pathlen(&self) -> Option<u8> {
+            self.0.pathlen()
+        }
+    }
 
     #[diplomat::opaque]
     pub struct GeneralNameIterator(pub Vec<GeneralName>);
@@ -783,7 +1106,7 @@ pub mod ffi {
         }
     }
 
-    #[diplomat::opaque] // TODO
+    #[diplomat::opaque]
     pub struct GeneralName(pub picky_asn1_x509::name::GeneralName);
 
     impl GeneralName {
@@ -800,7 +1123,378 @@ pub mod ffi {
             }
         }
 
-        // TODO: implement the rest of the methods
+        pub fn to_other_name(&self) -> Option<Box<OtherName>> {
+            match &self.0 {
+                picky_asn1_x509::name::GeneralName::OtherName(other_name) => {
+                    Some(Box::new(OtherName(other_name.clone())))
+                }
+                _ => None,
+            }
+        }
+
+        pub fn to_rfc822_name(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            match &self.0 {
+                picky_asn1_x509::name::GeneralName::Rfc822Name(rfc822_name) => {
+                    write!(writable, "{}", rfc822_name.0)?;
+                    Ok(())
+                }
+                _ => Err("not an RFC822 name".into()),
+            }
+        }
+
+        pub fn to_dns_name(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            match &self.0 {
+                picky_asn1_x509::name::GeneralName::DnsName(dns_name) => {
+                    write!(writable, "{}", dns_name.0)?;
+                    Ok(())
+                }
+                _ => Err("not a DNS name".into()),
+            }
+        }
+
+        pub fn to_directory_name(&self) -> Option<AttributeTypeAndValueNestedIterator> {
+            match &self.0 {
+                picky_asn1_x509::name::GeneralName::DirectoryName(directory_name) => {
+                    let mut vec = vec![];
+                    let clone = directory_name.0.clone();
+                    for names in clone.0 {
+                        vec.push(AttributeTypeAndValueIterator(
+                            names.0.clone().into_iter().map(AttributeTypeAndValue).collect(),
+                        ));
+                    }
+                    Some(AttributeTypeAndValueNestedIterator(vec))
+                }
+                _ => None,
+            }
+        }
+
+        pub fn to_edi_party_name(&self) -> Option<Box<EdiPartyName>> {
+            match &self.0 {
+                picky_asn1_x509::name::GeneralName::EdiPartyName(edi_party_name) => {
+                    Some(Box::new(EdiPartyName(edi_party_name.clone())))
+                }
+                _ => None,
+            }
+        }
+
+        pub fn to_uri(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            match &self.0 {
+                picky_asn1_x509::name::GeneralName::Uri(uri) => {
+                    write!(writable, "{}", uri.0)?;
+                    Ok(())
+                }
+                _ => Err("not a URI".into()),
+            }
+        }
+
+        pub fn to_ip_address(&self) -> Option<Box<Buffer>> {
+            match &self.0 {
+                picky_asn1_x509::name::GeneralName::IpAddress(ip_address) => {
+                    Some(Buffer::from_bytes(&ip_address.0).boxed())
+                }
+                _ => None,
+            }
+        }
+
+        pub fn to_registered_id(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            match &self.0 {
+                picky_asn1_x509::name::GeneralName::RegisteredId(registered_id) => {
+                    let oid: String = registered_id.0.clone().into();
+                    write!(writable, "{}", oid)?;
+                    Ok(())
+                }
+                _ => Err("not a registered ID".into()),
+            }
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct AttributeTypeAndValueIterator(pub Vec<AttributeTypeAndValue>);
+
+    impl AttributeTypeAndValueIterator {
+        pub fn next(&mut self) -> Option<Box<AttributeTypeAndValue>> {
+            self.0.pop().map(Box::new)
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct AttributeTypeAndValueNestedIterator(pub Vec<AttributeTypeAndValueIterator>);
+
+    impl AttributeTypeAndValueNestedIterator {
+        pub fn next(&mut self) -> Option<Box<AttributeTypeAndValueIterator>> {
+            self.0.pop().map(Box::new)
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct AttributeTypeAndValue(pub picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValue);
+
+    impl AttributeTypeAndValue {
+        pub fn get_type_id(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            let oid: String = self.0.ty.0.clone().into();
+            write!(writable, "{}", oid)?;
+            Ok(())
+        }
+
+        pub fn get_value(&self) -> Box<AttributeTypeAndValueParameters> {
+            Box::new(AttributeTypeAndValueParameters(self.0.value.clone()))
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct AttributeTypeAndValueParameters(
+        pub picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValueParameters,
+    );
+
+    pub enum AttributeTypeAndValueParametersType {
+        CommonName,
+        Surname,
+        SerialNumber,
+        CountryName,
+        LocalityName,
+        StateOrProvinceName,
+        StreetName,
+        OrganizationName,
+        OrganizationalUnitName,
+        EmailAddress,
+        GivenName,
+        Phone,
+        Custom,
+    }
+
+    impl AttributeTypeAndValueParameters {
+        pub fn get_type(&self) -> AttributeTypeAndValueParametersType {
+            match &self.0 {
+                picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValueParameters::CommonName(_) => {
+                    AttributeTypeAndValueParametersType::CommonName
+                }
+                picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValueParameters::Surname(_) => {
+                    AttributeTypeAndValueParametersType::Surname
+                }
+                picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValueParameters::SerialNumber(_) => {
+                    AttributeTypeAndValueParametersType::SerialNumber
+                }
+                picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValueParameters::CountryName(_) => {
+                    AttributeTypeAndValueParametersType::CountryName
+                }
+                picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValueParameters::LocalityName(_) => {
+                    AttributeTypeAndValueParametersType::LocalityName
+                }
+                picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValueParameters::StateOrProvinceName(_) => {
+                    AttributeTypeAndValueParametersType::StateOrProvinceName
+                }
+                picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValueParameters::StreetName(_) => {
+                    AttributeTypeAndValueParametersType::StreetName
+                }
+                picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValueParameters::OrganizationName(_) => {
+                    AttributeTypeAndValueParametersType::OrganizationName
+                }
+                picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValueParameters::OrganizationalUnitName(
+                    _,
+                ) => AttributeTypeAndValueParametersType::OrganizationalUnitName,
+                picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValueParameters::GivenName(_) => {
+                    AttributeTypeAndValueParametersType::GivenName
+                }
+                picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValueParameters::Phone(_) => {
+                    AttributeTypeAndValueParametersType::Phone
+                }
+                picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValueParameters::Custom(_) => {
+                    AttributeTypeAndValueParametersType::Custom
+                }
+                picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValueParameters::EmailAddress(_) => {
+                    AttributeTypeAndValueParametersType::EmailAddress
+                }
+            }
+        }
+
+        pub fn to_common_name(&self) -> Option<Box<DirectoryString>> {
+            match &self.0 {
+                picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValueParameters::CommonName(common_name) => {
+                    Some(Box::new(DirectoryString(common_name.clone())))
+                }
+                _ => None,
+            }
+        }
+
+        pub fn to_surname(&self) -> Option<Box<DirectoryString>> {
+            match &self.0 {
+                picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValueParameters::Surname(surname) => {
+                    Some(Box::new(DirectoryString(surname.clone())))
+                }
+                _ => None,
+            }
+        }
+
+        pub fn to_serial_number(&self) -> Option<Box<DirectoryString>> {
+            match &self.0 {
+                picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValueParameters::SerialNumber(
+                    serial_number,
+                ) => Some(Box::new(DirectoryString(serial_number.clone()))),
+                _ => None,
+            }
+        }
+
+        pub fn to_country_name(&self) -> Option<Box<DirectoryString>> {
+            match &self.0 {
+                picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValueParameters::CountryName(
+                    country_name,
+                ) => Some(Box::new(DirectoryString(country_name.clone()))),
+                _ => None,
+            }
+        }
+
+        pub fn to_locality_name(&self) -> Option<Box<DirectoryString>> {
+            match &self.0 {
+                picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValueParameters::LocalityName(
+                    locality_name,
+                ) => Some(Box::new(DirectoryString(locality_name.clone()))),
+                _ => None,
+            }
+        }
+
+        pub fn to_state_or_province_name(&self) -> Option<Box<DirectoryString>> {
+            match &self.0 {
+                picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValueParameters::StateOrProvinceName(
+                    state_or_province_name,
+                ) => Some(Box::new(DirectoryString(state_or_province_name.clone()))),
+                _ => None,
+            }
+        }
+
+        pub fn to_street_name(&self) -> Option<Box<DirectoryString>> {
+            match &self.0 {
+                picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValueParameters::StreetName(street_name) => {
+                    Some(Box::new(DirectoryString(street_name.clone())))
+                }
+                _ => None,
+            }
+        }
+
+        pub fn to_organization_name(&self) -> Option<Box<DirectoryString>> {
+            match &self.0 {
+                picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValueParameters::OrganizationName(
+                    organization_name,
+                ) => Some(Box::new(DirectoryString(organization_name.clone()))),
+                _ => None,
+            }
+        }
+
+        pub fn to_organizational_unit_name(&self) -> Option<Box<DirectoryString>> {
+            match &self.0 {
+                picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValueParameters::OrganizationalUnitName(
+                    organizational_unit_name,
+                ) => Some(Box::new(DirectoryString(organizational_unit_name.clone()))),
+                _ => None,
+            }
+        }
+
+        pub fn to_email_address(&self) -> Option<Box<Buffer>> {
+            match &self.0 {
+                picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValueParameters::EmailAddress(
+                    email_address,
+                ) => Some(Buffer::from_bytes(email_address.as_bytes()).boxed()),
+                _ => None,
+            }
+        }
+
+        pub fn to_given_name(&self) -> Option<Box<DirectoryString>> {
+            match &self.0 {
+                picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValueParameters::GivenName(given_name) => {
+                    Some(Box::new(DirectoryString(given_name.clone())))
+                }
+                _ => None,
+            }
+        }
+
+        pub fn to_phone(&self) -> Option<Box<DirectoryString>> {
+            match &self.0 {
+                picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValueParameters::Phone(phone) => {
+                    Some(Box::new(DirectoryString(phone.clone())))
+                }
+                _ => None,
+            }
+        }
+
+        pub fn to_custom(&self) -> Option<Box<Buffer>> {
+            match &self.0 {
+                picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValueParameters::Custom(custom) => {
+                    Some(Buffer::from_bytes(&custom.0).boxed())
+                }
+                _ => None,
+            }
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct DirectoryString(pub picky_asn1_x509::directory_string::DirectoryString);
+
+    pub enum DirectoryStringType {
+        PrintableString,
+        Utf8String,
+        BmpString,
+    }
+
+    impl DirectoryString {
+        pub fn get_type(&self) -> DirectoryStringType {
+            match &self.0 {
+                picky_asn1_x509::directory_string::DirectoryString::PrintableString(_) => {
+                    DirectoryStringType::PrintableString
+                }
+                picky_asn1_x509::directory_string::DirectoryString::Utf8String(_) => DirectoryStringType::Utf8String,
+                picky_asn1_x509::directory_string::DirectoryString::BmpString(_) => DirectoryStringType::BmpString,
+            }
+        }
+
+        pub fn get_as_string(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            let string: String = self.0.clone().into();
+            write!(writable, "{}", string)?;
+            Ok(())
+        }
+
+        pub fn get_as_bytes(&self) -> Box<Buffer> {
+            match &self.0 {
+                picky_asn1_x509::directory_string::DirectoryString::PrintableString(string) => {
+                    Buffer::from_bytes(string.as_bytes()).boxed()
+                }
+                picky_asn1_x509::directory_string::DirectoryString::Utf8String(string) => {
+                    Buffer::from_bytes(string.as_bytes()).boxed()
+                }
+                picky_asn1_x509::directory_string::DirectoryString::BmpString(string) => {
+                    Buffer::from_bytes(string.as_bytes()).boxed()
+                }
+            }
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct EdiPartyName(pub picky_asn1_x509::name::EdiPartyName);
+
+    impl EdiPartyName {
+        pub fn get_name_assigner(&self) -> Option<Box<DirectoryString>> {
+            self.0
+                .name_assigner
+                .as_ref()
+                .map(|name_assigner| Box::new(DirectoryString(name_assigner.0.clone())))
+        }
+
+        pub fn get_party_name(&self) -> Box<DirectoryString> {
+            Box::new(DirectoryString(self.0.party_name.0.clone()))
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct OtherName(pub picky_asn1_x509::name::OtherName);
+
+    impl OtherName {
+        pub fn get_type_id(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+            let oid: String = self.0.type_id.0.clone().into();
+            write!(writable, "{}", oid)?;
+            Ok(())
+        }
+
+        pub fn get_value(&self) -> Box<crate::utils::ffi::Buffer> {
+            Buffer::from_bytes(&self.0.value.0 .0).boxed()
+        }
     }
 
     pub enum GeneralNameType {
@@ -814,8 +1508,28 @@ pub mod ffi {
         RegisteredId,
     }
 
-    #[diplomat::opaque] // TODO
+    #[diplomat::opaque]
     pub struct AuthorityKeyIdentifier(pub picky_asn1_x509::AuthorityKeyIdentifier);
+
+    impl AuthorityKeyIdentifier {
+        pub fn get_key_identifier(&self) -> Option<Box<crate::utils::ffi::Buffer>> {
+            self.0
+                .key_identifier()
+                .map(|key_identifier| Buffer::from_bytes(&key_identifier).boxed())
+        }
+
+        pub fn get_authority_cert_issuer(&self) -> Option<Box<GeneralName>> {
+            self.0
+                .authority_cert_issuer()
+                .map(|general_name| Box::new(GeneralName(general_name.clone())))
+        }
+
+        pub fn get_authority_cert_serial_number(&self) -> Option<Box<crate::utils::ffi::Buffer>> {
+            self.0
+                .authority_cert_serial_number()
+                .map(|serial_number| Buffer::from_bytes(&serial_number.0).boxed())
+        }
+    }
 
     #[diplomat::opaque]
     pub struct ExtensionIterator(pub Vec<Extension>);
@@ -842,12 +1556,12 @@ pub mod ffi {
             }
         }
 
-        pub fn get_subject_key_identifier(&self) -> Option<Box<crate::buffer::ffi::Buffer>> {
+        pub fn get_subject_key_identifier(&self) -> Option<Box<crate::utils::ffi::Buffer>> {
             let picky_asn1_x509::signer_info::SignerIdentifier::SubjectKeyIdentifier(subject_key_identifier) = &self.0 else {
                 return None;
             };
 
-            let buffer = crate::buffer::ffi::Buffer::from(&subject_key_identifier.0);
+            let buffer = crate::utils::ffi::Buffer::from(&subject_key_identifier.0);
             Some(Box::new(buffer))
         }
     }
@@ -928,7 +1642,7 @@ pub mod ffi {
 
         pub fn to_ec(&self) -> Option<Box<EcParameters>> {
             match self.0 {
-                picky::x509::AlgorithmIdentifierParameters::Ec(ref params) => {
+                picky_asn1_x509::AlgorithmIdentifierParameters::Ec(ref params) => {
                     Some(Box::new(EcParameters(params.clone())))
                 }
                 _ => None,
@@ -971,7 +1685,7 @@ pub mod ffi {
             }
         }
 
-        pub fn to_initialization_vector(&self) -> Option<Box<crate::buffer::ffi::Buffer>> {
+        pub fn to_initialization_vector(&self) -> Option<Box<crate::utils::ffi::Buffer>> {
             match &self.0 {
                 picky_asn1_x509::AesParameters::InitializationVector(iv) => Some(Box::new(iv.into())),
                 _ => None,

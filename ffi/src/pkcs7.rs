@@ -2,9 +2,9 @@
 pub mod ffi {
     use picky::x509::pkcs7::{self};
 
-    use crate::buffer::ffi::Buffer;
     use crate::error::ffi::PickyError;
     use crate::pem::ffi::Pem;
+    use crate::utils::ffi::Buffer;
     use crate::x509::ffi::{
         AlgorithmIdentifierIterator, CertIterator, EncapsulatedContentInfo, SignerInfo, SignerInfoIterator,
     };
