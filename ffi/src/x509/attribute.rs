@@ -87,7 +87,7 @@ pub mod ffi {
         pub fn to_content_type(&self) -> Option<Box<StringIterator>> {
             match &self.0 {
                 picky_asn1_x509::AttributeValues::ContentType(oids) => {
-                    let string_itr = oids.0.clone().into_iter().map(|oid| oid.0.into()).into_iter();
+                    let string_itr = oids.0.clone().into_iter().map(|oid| oid.0.into());
                     Some(Box::new(StringIterator(Box::new(string_itr))))
                 }
                 _ => None,
