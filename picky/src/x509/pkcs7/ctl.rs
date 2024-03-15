@@ -102,6 +102,7 @@ mod tests {
     }
 
     #[cfg(feature = "ctl_http_fetch")]
+    #[ignore = "temporarily disabled for CI issues,which is under investigation"]
     #[test]
     fn create_ctl() {
         use super::http_fetch::CtlHttpFetch;
