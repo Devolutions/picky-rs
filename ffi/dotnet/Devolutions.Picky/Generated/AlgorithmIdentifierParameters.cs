@@ -11,6 +11,9 @@ namespace Devolutions.Picky;
 
 #nullable enable
 
+/// <summary>
+/// TODO/FIXME: Is having a reference here safe? We perhaps need to clone the parameters.
+/// </summary>
 public partial class AlgorithmIdentifierParameters: IDisposable
 {
     private unsafe Raw.AlgorithmIdentifierParameters* _inner;

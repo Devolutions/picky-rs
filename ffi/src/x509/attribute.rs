@@ -87,8 +87,8 @@ pub mod ffi {
         pub fn to_content_type(&self) -> Option<Box<StringIterator>> {
             match &self.0 {
                 picky_asn1_x509::AttributeValues::ContentType(oids) => {
-                    let string_vec = oids.0.clone().into_iter().map(|oid| oid.0.into()).collect();
-                    Some(Box::new(StringIterator(string_vec)))
+                    let string_itr = oids.0.clone().into_iter().map(|oid| oid.0.into()).into_iter();
+                    Some(Box::new(StringIterator(Box::new(string_itr))))
                 }
                 _ => None,
             }
@@ -97,11 +97,11 @@ pub mod ffi {
         pub fn to_spc_statement_type(&self) -> Option<Box<StringNestedIterator>> {
             match &self.0 {
                 picky_asn1_x509::AttributeValues::SpcStatementType(oid_array_set) => {
-                    let string_vec_vec: Vec<Vec<String>> = oid_array_set
+                    let string_vec_vec: Vec<StringIterator> = oid_array_set
                         .0
                         .clone()
                         .into_iter()
-                        .map(|oid_array| oid_array.0.into_iter().map(|oid| oid.0.into()).collect())
+                        .map(|oid_array| StringIterator(Box::new(oid_array.0.into_iter().map(|oid| oid.0.into()))))
                         .collect();
 
                     Some(Box::new(StringNestedIterator(string_vec_vec)))
@@ -113,13 +113,8 @@ pub mod ffi {
         pub fn to_message_digest(&self) -> Option<Box<StringIterator>> {
             match &self.0 {
                 picky_asn1_x509::AttributeValues::MessageDigest(digests) => {
-                    let string_vec = digests
-                        .0
-                        .clone()
-                        .into_iter()
-                        .map(|digest| hex::encode(digest.0))
-                        .collect();
-                    Some(Box::new(StringIterator(string_vec)))
+                    let string_itr = digests.0.clone().into_iter().map(|digest| hex::encode(digest.0));
+                    Some(Box::new(StringIterator(Box::new(string_itr))))
                 }
                 _ => None,
             }

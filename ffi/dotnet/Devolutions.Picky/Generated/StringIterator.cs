@@ -29,19 +29,7 @@ public partial class StringIterator: IDisposable
         _inner = handle;
     }
 
-    public bool HasNext()
-    {
-        unsafe
-        {
-            if (_inner == null)
-            {
-                throw new ObjectDisposedException("StringIterator");
-            }
-            bool retVal = Raw.StringIterator.HasNext(_inner);
-            return retVal;
-        }
-    }
-
+    /// <exception cref="PickyException"></exception>
     public void Next(DiplomatWriteable writable)
     {
         unsafe
@@ -50,10 +38,15 @@ public partial class StringIterator: IDisposable
             {
                 throw new ObjectDisposedException("StringIterator");
             }
-            Raw.StringIterator.Next(_inner, &writable);
+            Raw.UtilsFfiResultVoidBoxPickyError result = Raw.StringIterator.Next(_inner, &writable);
+            if (!result.isOk)
+            {
+                throw new PickyException(new PickyError(result.Err));
+            }
         }
     }
 
+    /// <exception cref="PickyException"></exception>
     public string Next()
     {
         unsafe
@@ -63,7 +56,11 @@ public partial class StringIterator: IDisposable
                 throw new ObjectDisposedException("StringIterator");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            Raw.StringIterator.Next(_inner, &writeable);
+            Raw.UtilsFfiResultVoidBoxPickyError result = Raw.StringIterator.Next(_inner, &writeable);
+            if (!result.isOk)
+            {
+                throw new PickyException(new PickyError(result.Err));
+            }
             string retVal = writeable.ToUnicode();
             writeable.Dispose();
             return retVal;
