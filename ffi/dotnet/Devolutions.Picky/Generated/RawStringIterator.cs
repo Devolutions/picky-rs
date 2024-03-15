@@ -16,9 +16,9 @@ public partial struct StringIterator
 {
     private const string NativeLib = "DevolutionsPicky";
 
-    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "StringIterator_have_next", ExactSpelling = true)]
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "StringIterator_has_next", ExactSpelling = true)]
     [return: MarshalAs(UnmanagedType.U1)]
-    public static unsafe extern bool HaveNext(StringIterator* self);
+    public static unsafe extern bool HasNext(StringIterator* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "StringIterator_next", ExactSpelling = true)]
     public static unsafe extern void Next(StringIterator* self, DiplomatWriteable* writable);
