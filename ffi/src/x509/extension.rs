@@ -191,7 +191,7 @@ pub mod ffi {
         False,
     }
 
-    /// Diplomat disallow Opion<T> where T is a primitive type, so we need to wrap it in a pointer
+    ///TODO: this could be fixed with future diplomat-tool Diplomat disallow Opion<T> where T is a primitive type, so we need to wrap it in a pointer
     #[diplomat::opaque]
     pub struct U8(pub u8);
 
