@@ -14,11 +14,7 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct JwtValidator
 {
-#if __IOS__
-    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
-#else
     private const string NativeLib = "DevolutionsPicky";
-#endif
 
     /// <summary>
     /// Check signature and the registered exp and nbf claims. If a claim is missing token is rejected.

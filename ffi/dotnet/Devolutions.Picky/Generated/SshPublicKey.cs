@@ -55,9 +55,7 @@ public partial class SshPublicKey: IDisposable
             nuint reprBufLength = (nuint)reprBuf.Length;
             fixed (byte* reprBufPtr = reprBuf)
             {
-                IntPtr resultPtr = Raw.SshPublicKey.Parse(reprBufPtr, reprBufLength);
-                Raw.SshFfiResultBoxSshPublicKeyBoxPickyError result = Marshal.PtrToStructure<Raw.SshFfiResultBoxSshPublicKeyBoxPickyError>(resultPtr);
-                Raw.SshFfiResultBoxSshPublicKeyBoxPickyError.Destroy(resultPtr);
+                Raw.SshFfiResultBoxSshPublicKeyBoxPickyError result = Raw.SshPublicKey.Parse(reprBufPtr, reprBufLength);
                 if (!result.isOk)
                 {
                     throw new PickyException(new PickyError(result.Err));
@@ -85,9 +83,7 @@ public partial class SshPublicKey: IDisposable
             {
                 throw new ObjectDisposedException("SshPublicKey");
             }
-            IntPtr resultPtr = Raw.SshPublicKey.ToRepr(_inner, &writeable);
-            Raw.SshFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.SshFfiResultVoidBoxPickyError>(resultPtr);
-            Raw.SshFfiResultVoidBoxPickyError.Destroy(resultPtr);
+            Raw.SshFfiResultVoidBoxPickyError result = Raw.SshPublicKey.ToRepr(_inner, &writeable);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -113,9 +109,7 @@ public partial class SshPublicKey: IDisposable
                 throw new ObjectDisposedException("SshPublicKey");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            IntPtr resultPtr = Raw.SshPublicKey.ToRepr(_inner, &writeable);
-            Raw.SshFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.SshFfiResultVoidBoxPickyError>(resultPtr);
-            Raw.SshFfiResultVoidBoxPickyError.Destroy(resultPtr);
+            Raw.SshFfiResultVoidBoxPickyError result = Raw.SshPublicKey.ToRepr(_inner, &writeable);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -135,9 +129,7 @@ public partial class SshPublicKey: IDisposable
             {
                 throw new ObjectDisposedException("SshPublicKey");
             }
-            IntPtr resultPtr = Raw.SshPublicKey.GetComment(_inner, &writeable);
-            Raw.SshFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.SshFfiResultVoidBoxPickyError>(resultPtr);
-            Raw.SshFfiResultVoidBoxPickyError.Destroy(resultPtr);
+            Raw.SshFfiResultVoidBoxPickyError result = Raw.SshPublicKey.GetComment(_inner, &writeable);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -155,9 +147,7 @@ public partial class SshPublicKey: IDisposable
                 throw new ObjectDisposedException("SshPublicKey");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            IntPtr resultPtr = Raw.SshPublicKey.GetComment(_inner, &writeable);
-            Raw.SshFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.SshFfiResultVoidBoxPickyError>(resultPtr);
-            Raw.SshFfiResultVoidBoxPickyError.Destroy(resultPtr);
+            Raw.SshFfiResultVoidBoxPickyError result = Raw.SshPublicKey.GetComment(_inner, &writeable);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));

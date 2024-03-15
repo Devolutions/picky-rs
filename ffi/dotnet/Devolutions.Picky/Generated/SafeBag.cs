@@ -73,9 +73,7 @@ public partial class SafeBag: IDisposable
             {
                 throw new ObjectDisposedException("PrivateKey");
             }
-            IntPtr resultPtr = Raw.SafeBag.NewKey(keyRaw);
-            Raw.Pkcs12FfiResultBoxSafeBagBoxPickyError result = Marshal.PtrToStructure<Raw.Pkcs12FfiResultBoxSafeBagBoxPickyError>(resultPtr);
-            Raw.Pkcs12FfiResultBoxSafeBagBoxPickyError.Destroy(resultPtr);
+            Raw.Pkcs12FfiResultBoxSafeBagBoxPickyError result = Raw.SafeBag.NewKey(keyRaw);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -114,9 +112,7 @@ public partial class SafeBag: IDisposable
             {
                 throw new ObjectDisposedException("Pkcs12CryptoContext");
             }
-            IntPtr resultPtr = Raw.SafeBag.NewEncryptedKey(keyRaw, encryptionRaw, cryptoContextRaw);
-            Raw.Pkcs12FfiResultBoxSafeBagBoxPickyError result = Marshal.PtrToStructure<Raw.Pkcs12FfiResultBoxSafeBagBoxPickyError>(resultPtr);
-            Raw.Pkcs12FfiResultBoxSafeBagBoxPickyError.Destroy(resultPtr);
+            Raw.Pkcs12FfiResultBoxSafeBagBoxPickyError result = Raw.SafeBag.NewEncryptedKey(keyRaw, encryptionRaw, cryptoContextRaw);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -143,9 +139,7 @@ public partial class SafeBag: IDisposable
             {
                 throw new ObjectDisposedException("Cert");
             }
-            IntPtr resultPtr = Raw.SafeBag.NewCertificate(certRaw);
-            Raw.Pkcs12FfiResultBoxSafeBagBoxPickyError result = Marshal.PtrToStructure<Raw.Pkcs12FfiResultBoxSafeBagBoxPickyError>(resultPtr);
-            Raw.Pkcs12FfiResultBoxSafeBagBoxPickyError.Destroy(resultPtr);
+            Raw.Pkcs12FfiResultBoxSafeBagBoxPickyError result = Raw.SafeBag.NewCertificate(certRaw);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
