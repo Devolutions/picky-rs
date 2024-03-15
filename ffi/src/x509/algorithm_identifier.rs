@@ -27,6 +27,7 @@ pub mod ffi {
         }
     }
 
+    /// TODO/FIXME: Is having a reference here safe? We perhaps need to clone the parameters.
     #[diplomat::opaque]
     pub struct AlgorithmIdentifierParameters<'a>(pub &'a picky_asn1_x509::AlgorithmIdentifierParameters);
 

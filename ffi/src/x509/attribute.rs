@@ -764,7 +764,7 @@ pub mod ffi {
         }
     }
 
-    /// Diplomat does not allow Option wrapped enums, so we have to use a None variant
+    /// TODO: this could be lifted in future diplomat-tool, Diplomat does not allow Option wrapped enums, so we have to use a None variant
     pub enum Version {
         None,
         V1,
