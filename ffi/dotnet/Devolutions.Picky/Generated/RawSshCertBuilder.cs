@@ -17,11 +17,7 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct SshCertBuilder
 {
-#if __IOS__
-    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
-#else
     private const string NativeLib = "DevolutionsPicky";
-#endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshCertBuilder_init", ExactSpelling = true)]
     public static unsafe extern SshCertBuilder* Init();
@@ -87,7 +83,7 @@ public partial struct SshCertBuilder
     public static unsafe extern void SetComment(SshCertBuilder* self, byte* comment, nuint commentSz);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshCertBuilder_build", ExactSpelling = true)]
-    public static unsafe extern IntPtr Build(SshCertBuilder* self);
+    public static unsafe extern SshFfiResultBoxSshCertBoxPickyError Build(SshCertBuilder* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshCertBuilder_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(SshCertBuilder* self);

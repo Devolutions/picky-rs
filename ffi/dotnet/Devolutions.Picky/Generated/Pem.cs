@@ -66,9 +66,7 @@ public partial class Pem: IDisposable
             {
                 fixed (byte* labelBufPtr = labelBuf)
                 {
-                    IntPtr resultPtr = Raw.Pem.New(labelBufPtr, labelBufLength, dataPtr, dataLength);
-                    Raw.PemFfiResultBoxPemBoxPickyError result = Marshal.PtrToStructure<Raw.PemFfiResultBoxPemBoxPickyError>(resultPtr);
-                    Raw.PemFfiResultBoxPemBoxPickyError.Destroy(resultPtr);
+                    Raw.PemFfiResultBoxPemBoxPickyError result = Raw.Pem.New(labelBufPtr, labelBufLength, dataPtr, dataLength);
                     if (!result.isOk)
                     {
                         throw new PickyException(new PickyError(result.Err));
@@ -95,9 +93,7 @@ public partial class Pem: IDisposable
             nuint pathBufLength = (nuint)pathBuf.Length;
             fixed (byte* pathBufPtr = pathBuf)
             {
-                IntPtr resultPtr = Raw.Pem.LoadFromFile(pathBufPtr, pathBufLength);
-                Raw.PemFfiResultBoxPemBoxPickyError result = Marshal.PtrToStructure<Raw.PemFfiResultBoxPemBoxPickyError>(resultPtr);
-                Raw.PemFfiResultBoxPemBoxPickyError.Destroy(resultPtr);
+                Raw.PemFfiResultBoxPemBoxPickyError result = Raw.Pem.LoadFromFile(pathBufPtr, pathBufLength);
                 if (!result.isOk)
                 {
                     throw new PickyException(new PickyError(result.Err));
@@ -124,9 +120,7 @@ public partial class Pem: IDisposable
             nuint pathBufLength = (nuint)pathBuf.Length;
             fixed (byte* pathBufPtr = pathBuf)
             {
-                IntPtr resultPtr = Raw.Pem.SaveToFile(_inner, pathBufPtr, pathBufLength);
-                Raw.PemFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.PemFfiResultVoidBoxPickyError>(resultPtr);
-                Raw.PemFfiResultVoidBoxPickyError.Destroy(resultPtr);
+                Raw.PemFfiResultVoidBoxPickyError result = Raw.Pem.SaveToFile(_inner, pathBufPtr, pathBufLength);
                 if (!result.isOk)
                 {
                     throw new PickyException(new PickyError(result.Err));
@@ -150,9 +144,7 @@ public partial class Pem: IDisposable
             nuint inputBufLength = (nuint)inputBuf.Length;
             fixed (byte* inputBufPtr = inputBuf)
             {
-                IntPtr resultPtr = Raw.Pem.Parse(inputBufPtr, inputBufLength);
-                Raw.PemFfiResultBoxPemBoxPickyError result = Marshal.PtrToStructure<Raw.PemFfiResultBoxPemBoxPickyError>(resultPtr);
-                Raw.PemFfiResultBoxPemBoxPickyError.Destroy(resultPtr);
+                Raw.PemFfiResultBoxPemBoxPickyError result = Raw.Pem.Parse(inputBufPtr, inputBufLength);
                 if (!result.isOk)
                 {
                     throw new PickyException(new PickyError(result.Err));
@@ -191,9 +183,7 @@ public partial class Pem: IDisposable
             {
                 throw new ObjectDisposedException("Pem");
             }
-            IntPtr resultPtr = Raw.Pem.GetLabel(_inner, &writeable);
-            Raw.PemFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.PemFfiResultVoidBoxPickyError>(resultPtr);
-            Raw.PemFfiResultVoidBoxPickyError.Destroy(resultPtr);
+            Raw.PemFfiResultVoidBoxPickyError result = Raw.Pem.GetLabel(_inner, &writeable);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -214,9 +204,7 @@ public partial class Pem: IDisposable
                 throw new ObjectDisposedException("Pem");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            IntPtr resultPtr = Raw.Pem.GetLabel(_inner, &writeable);
-            Raw.PemFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.PemFfiResultVoidBoxPickyError>(resultPtr);
-            Raw.PemFfiResultVoidBoxPickyError.Destroy(resultPtr);
+            Raw.PemFfiResultVoidBoxPickyError result = Raw.Pem.GetLabel(_inner, &writeable);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -239,9 +227,7 @@ public partial class Pem: IDisposable
             {
                 throw new ObjectDisposedException("Pem");
             }
-            IntPtr resultPtr = Raw.Pem.ToRepr(_inner, &writeable);
-            Raw.PemFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.PemFfiResultVoidBoxPickyError>(resultPtr);
-            Raw.PemFfiResultVoidBoxPickyError.Destroy(resultPtr);
+            Raw.PemFfiResultVoidBoxPickyError result = Raw.Pem.ToRepr(_inner, &writeable);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -262,9 +248,7 @@ public partial class Pem: IDisposable
                 throw new ObjectDisposedException("Pem");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            IntPtr resultPtr = Raw.Pem.ToRepr(_inner, &writeable);
-            Raw.PemFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.PemFfiResultVoidBoxPickyError>(resultPtr);
-            Raw.PemFfiResultVoidBoxPickyError.Destroy(resultPtr);
+            Raw.PemFfiResultVoidBoxPickyError result = Raw.Pem.ToRepr(_inner, &writeable);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
