@@ -29,7 +29,7 @@ public partial class StringIterator: IDisposable
         _inner = handle;
     }
 
-    public bool HaveNext()
+    public bool HasNext()
     {
         unsafe
         {
@@ -37,7 +37,7 @@ public partial class StringIterator: IDisposable
             {
                 throw new ObjectDisposedException("StringIterator");
             }
-            bool retVal = Raw.StringIterator.HaveNext(_inner);
+            bool retVal = Raw.StringIterator.HasNext(_inner);
             return retVal;
         }
     }
