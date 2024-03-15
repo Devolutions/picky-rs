@@ -73,7 +73,8 @@ pub mod ffi {
         }
 
         pub fn get_subject_key_identifier(&self) -> Option<Box<crate::utils::ffi::Buffer>> {
-            let picky_asn1_x509::signer_info::SignerIdentifier::SubjectKeyIdentifier(subject_key_identifier) = &self.0 else {
+            let picky_asn1_x509::signer_info::SignerIdentifier::SubjectKeyIdentifier(subject_key_identifier) = &self.0
+            else {
                 return None;
             };
 

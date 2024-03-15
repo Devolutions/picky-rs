@@ -2,8 +2,8 @@ use self::ffi::Buffer;
 
 #[diplomat::bridge]
 pub mod ffi {
-    use std::fmt::Write;
     use crate::error::ffi::PickyError;
+    use std::fmt::Write;
 
     #[diplomat::opaque]
     pub struct Buffer(pub Vec<u8>);
@@ -44,13 +44,12 @@ pub mod ffi {
     pub struct StringIterator(pub Box<dyn Iterator<Item = String>>);
 
     impl StringIterator {
-
-        pub fn next(&mut self, writable: &mut diplomat_runtime::DiplomatWriteable) -> Result<(), Box<PickyError>>{
+        pub fn next(&mut self, writable: &mut diplomat_runtime::DiplomatWriteable) -> Result<(), Box<PickyError>> {
             let next = self.0.next();
             if let Some(next) = next {
                 let _ = write!(writable, "{}", next);
                 writable.flush();
-                return Ok(())
+                return Ok(());
             }
 
             Err("No more elements".into())
