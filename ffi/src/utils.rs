@@ -3,6 +3,7 @@ use self::ffi::Buffer;
 #[diplomat::bridge]
 pub mod ffi {
     use std::fmt::Write;
+    use crate::error::ffi::PickyError;
 
     #[diplomat::opaque]
     pub struct Buffer(pub Vec<u8>);
@@ -40,28 +41,28 @@ pub mod ffi {
     }
 
     #[diplomat::opaque]
-    pub struct StringIterator(pub Vec<String>);
+    pub struct StringIterator(pub Box<dyn Iterator<Item = String>>);
 
     impl StringIterator {
-        pub fn has_next(&self) -> bool {
-            !self.0.is_empty()
-        }
 
-        pub fn next(&mut self, writable: &mut diplomat_runtime::DiplomatWriteable) {
-            let next = self.0.pop();
+        pub fn next(&mut self, writable: &mut diplomat_runtime::DiplomatWriteable) -> Result<(), Box<PickyError>>{
+            let next = self.0.next();
             if let Some(next) = next {
                 let _ = write!(writable, "{}", next);
                 writable.flush();
+                return Ok(())
             }
+
+            Err("No more elements".into())
         }
     }
 
     #[diplomat::opaque]
-    pub struct StringNestedIterator(pub Vec<Vec<String>>);
+    pub struct StringNestedIterator(pub Vec<StringIterator>);
 
     impl StringNestedIterator {
         pub fn next(&mut self) -> Option<Box<StringIterator>> {
-            self.0.pop().map(StringIterator).map(Box::new)
+            self.0.pop().map(Box::new)
         }
     }
 }

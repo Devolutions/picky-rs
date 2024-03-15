@@ -11,6 +11,9 @@ namespace Devolutions.Picky.Raw;
 
 #nullable enable
 
+/// <summary>
+/// TODO/FIXME: Is having a reference here safe? We perhaps need to clone the parameters.
+/// </summary>
 [StructLayout(LayoutKind.Sequential)]
 public partial struct AlgorithmIdentifierParameters
 {

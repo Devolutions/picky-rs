@@ -12,7 +12,7 @@ namespace Devolutions.Picky;
 #nullable enable
 
 /// <summary>
-/// Diplomat does not allow Option wrapped enums, so we have to use a None variant
+/// TODO: this could be lifted in future diplomat-tool, Diplomat does not allow Option wrapped enums, so we have to use a None variant
 /// </summary>
 public enum Version
 {
