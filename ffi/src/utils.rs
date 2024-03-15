@@ -43,7 +43,7 @@ pub mod ffi {
     pub struct StringIterator(pub Vec<String>);
 
     impl StringIterator {
-        pub fn have_next(&self) -> bool {
+        pub fn has_next(&self) -> bool {
             !self.0.is_empty()
         }
 
