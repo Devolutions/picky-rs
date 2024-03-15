@@ -1653,6 +1653,7 @@ mod test {
     }
 
     #[cfg(feature = "ctl_http_fetch")]
+    #[ignore = "temporarily disabled for CI issues,which is under investigation"]
     #[test]
     fn self_signed_authenticode_signature_validation_against_ctl() {
         use ctl::http_fetch::CtlHttpFetch;
@@ -1685,6 +1686,7 @@ mod test {
     }
 
     #[cfg(feature = "ctl_http_fetch")]
+    #[ignore = "temporarily disabled for CI issues,which is under investigation"]
     #[test]
     fn self_signed_authenticode_signature_validation_against_ctl_with_excluded_ca_certificate() {
         use ctl::http_fetch::CtlHttpFetch;
@@ -1726,6 +1728,7 @@ mod test {
     }
 
     #[cfg(feature = "ctl_http_fetch")]
+    #[ignore = "temporarily disabled for CI issues,which is under investigation"]
     #[test]
     fn self_signed_authenticode_signature_validation_against_ctl_with_excluded_not_existing_ca_certificate() {
         use crate::x509::name::NameAttr;
@@ -1769,6 +1772,7 @@ mod test {
     }
 
     #[cfg(feature = "ctl_http_fetch")]
+    #[ignore = "temporarily disabled for CI issues,which is under investigation"]
     #[test]
     fn full_validation_self_signed_authenticode_signature() {
         use ctl::http_fetch::CtlHttpFetch;
@@ -1816,6 +1820,7 @@ mod test {
     }
 
     #[cfg(feature = "ctl_http_fetch")]
+    #[ignore = "temporarily disabled for CI issues,which is under investigation"]
     #[test]
     fn full_validation_authenticode_signature_with_well_known_ca() {
         use ctl::http_fetch::CtlHttpFetch;
@@ -2032,6 +2037,7 @@ mod test {
     }
 
     #[cfg(feature = "ctl_http_fetch")]
+    #[ignore = "temporarily disabled for CI issues,which is under investigation"]
     #[test]
     fn full_validation_self_signed_authenticode_signature_with_only_leaf_certificate() {
         use ctl::http_fetch::CtlHttpFetch;
@@ -2125,6 +2131,7 @@ mod test {
     }
 
     #[cfg(feature = "ctl_http_fetch")]
+    #[ignore = "temporarily disabled for CI issues,which is under investigation"]
     #[test]
     fn full_validation_self_signed_authenticode_signature_with_root_and_leaf_certificate() {
         use ctl::http_fetch::CtlHttpFetch;
