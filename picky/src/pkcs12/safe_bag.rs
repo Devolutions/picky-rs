@@ -322,7 +322,7 @@ impl SecretSafeBag {
     }
 }
 
-fn attributes_to_asn1(attributes: &Vec<Pkcs12Attribute>) -> Option<Vec<Pkcs12AttributeAsn1>> {
+fn attributes_to_asn1(attributes: &[Pkcs12Attribute]) -> Option<Vec<Pkcs12AttributeAsn1>> {
     if attributes.is_empty() {
         None
     } else {

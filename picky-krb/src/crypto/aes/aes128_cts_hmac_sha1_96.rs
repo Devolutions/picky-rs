@@ -36,7 +36,7 @@ impl Cipher for Aes128CtsHmacSha196 {
             key_usage,
             payload,
             &AesSize::Aes128,
-            OsRng::default().gen::<[u8; AES_BLOCK_SIZE]>(),
+            OsRng.gen::<[u8; AES_BLOCK_SIZE]>(),
         )
     }
 

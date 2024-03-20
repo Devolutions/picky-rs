@@ -35,7 +35,7 @@ impl Cipher for Des3CbcSha1Kd {
     }
 
     fn encrypt(&self, key: &[u8], key_usage: i32, payload: &[u8]) -> KerberosCryptoResult<Vec<u8>> {
-        encrypt_message(key, key_usage, payload, OsRng::default().gen::<[u8; DES3_BLOCK_SIZE]>())
+        encrypt_message(key, key_usage, payload, OsRng.gen::<[u8; DES3_BLOCK_SIZE]>())
     }
 
     fn decrypt(&self, key: &[u8], key_usage: i32, cipher_data: &[u8]) -> KerberosCryptoResult<Vec<u8>> {
