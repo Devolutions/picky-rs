@@ -941,9 +941,9 @@ fn prepare_ecdh_decryption_key(
             wrapping_alg.decrypt_key(header.enc, encrypted_key, &shared_secret)
         }
         _ => {
-            return Err(JweError::UnsupportedAlgorithm {
+            Err(JweError::UnsupportedAlgorithm {
                 algorithm: format!("Algorithm `{}` is not supported for EC & ED keys", header.alg.name()),
-            });
+            })
         }
     }
 }
