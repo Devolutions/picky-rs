@@ -14,10 +14,14 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct EncapsulatedContentInfo
 {
+#if __IOS__
+    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
+#else
     private const string NativeLib = "DevolutionsPicky";
+#endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "EncapsulatedContentInfo_content_type", ExactSpelling = true)]
-    public static unsafe extern X509AttributeFfiResultVoidBoxPickyError ContentType(EncapsulatedContentInfo* self, DiplomatWriteable* writable);
+    public static unsafe extern IntPtr ContentType(EncapsulatedContentInfo* self, DiplomatWriteable* writable);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "EncapsulatedContentInfo_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(EncapsulatedContentInfo* self);

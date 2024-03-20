@@ -17,7 +17,11 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct UtcDate
 {
+#if __IOS__
+    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
+#else
     private const string NativeLib = "DevolutionsPicky";
+#endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "UtcDate_new", ExactSpelling = true)]
     public static unsafe extern UtcDate* New(ushort year, byte month, byte day, byte hour, byte minute, byte second);
@@ -29,10 +33,10 @@ public partial struct UtcDate
     public static unsafe extern UtcDate* Now();
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "UtcDate_from_timestamp", ExactSpelling = true)]
-    public static unsafe extern DateFfiResultBoxUtcDateBoxPickyError FromTimestamp(long timestamp);
+    public static unsafe extern IntPtr FromTimestamp(long timestamp);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "UtcDate_get_timestamp", ExactSpelling = true)]
-    public static unsafe extern DateFfiResultI64BoxPickyError GetTimestamp(UtcDate* self);
+    public static unsafe extern IntPtr GetTimestamp(UtcDate* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "UtcDate_get_month", ExactSpelling = true)]
     public static unsafe extern byte GetMonth(UtcDate* self);

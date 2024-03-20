@@ -14,13 +14,17 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct DirectoryString
 {
+#if __IOS__
+    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
+#else
     private const string NativeLib = "DevolutionsPicky";
+#endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "DirectoryString_get_type", ExactSpelling = true)]
     public static unsafe extern DirectoryStringType GetType(DirectoryString* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "DirectoryString_get_as_string", ExactSpelling = true)]
-    public static unsafe extern X509StringFfiResultVoidBoxPickyError GetAsString(DirectoryString* self, DiplomatWriteable* writable);
+    public static unsafe extern IntPtr GetAsString(DirectoryString* self, DiplomatWriteable* writable);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "DirectoryString_get_as_bytes", ExactSpelling = true)]
     public static unsafe extern Buffer* GetAsBytes(DirectoryString* self);

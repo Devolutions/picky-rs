@@ -14,10 +14,14 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct OidIterator
 {
+#if __IOS__
+    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
+#else
     private const string NativeLib = "DevolutionsPicky";
+#endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "OidIterator_next", ExactSpelling = true)]
-    public static unsafe extern X509ExtensionFfiResultVoidBoxPickyError Next(OidIterator* self, DiplomatWriteable* writable);
+    public static unsafe extern IntPtr Next(OidIterator* self, DiplomatWriteable* writable);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "OidIterator_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(OidIterator* self);

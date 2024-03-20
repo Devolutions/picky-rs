@@ -58,7 +58,9 @@ public partial class AlgorithmIdentifier: IDisposable
             nuint otherBufLength = (nuint)otherBuf.Length;
             fixed (byte* otherBufPtr = otherBuf)
             {
-                Raw.X509AlgorithmIdentifierFfiResultBoolBoxPickyError result = Raw.AlgorithmIdentifier.IsA(_inner, otherBufPtr, otherBufLength);
+                IntPtr resultPtr = Raw.AlgorithmIdentifier.IsA(_inner, otherBufPtr, otherBufLength);
+                Raw.X509AlgorithmIdentifierFfiResultBoolBoxPickyError result = Marshal.PtrToStructure<Raw.X509AlgorithmIdentifierFfiResultBoolBoxPickyError>(resultPtr);
+                Raw.X509AlgorithmIdentifierFfiResultBoolBoxPickyError.Destroy(resultPtr);
                 if (!result.isOk)
                 {
                     throw new PickyException(new PickyError(result.Err));
@@ -78,7 +80,9 @@ public partial class AlgorithmIdentifier: IDisposable
             {
                 throw new ObjectDisposedException("AlgorithmIdentifier");
             }
-            Raw.X509AlgorithmIdentifierFfiResultVoidBoxPickyError result = Raw.AlgorithmIdentifier.GetOid(_inner, &writable);
+            IntPtr resultPtr = Raw.AlgorithmIdentifier.GetOid(_inner, &writable);
+            Raw.X509AlgorithmIdentifierFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509AlgorithmIdentifierFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509AlgorithmIdentifierFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -96,7 +100,9 @@ public partial class AlgorithmIdentifier: IDisposable
                 throw new ObjectDisposedException("AlgorithmIdentifier");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            Raw.X509AlgorithmIdentifierFfiResultVoidBoxPickyError result = Raw.AlgorithmIdentifier.GetOid(_inner, &writeable);
+            IntPtr resultPtr = Raw.AlgorithmIdentifier.GetOid(_inner, &writeable);
+            Raw.X509AlgorithmIdentifierFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509AlgorithmIdentifierFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509AlgorithmIdentifierFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));

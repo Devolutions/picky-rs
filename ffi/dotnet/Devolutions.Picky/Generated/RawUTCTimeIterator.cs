@@ -14,7 +14,11 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct UTCTimeIterator
 {
+#if __IOS__
+    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
+#else
     private const string NativeLib = "DevolutionsPicky";
+#endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "UTCTimeIterator_next", ExactSpelling = true)]
     public static unsafe extern UTCTime* Next(UTCTimeIterator* self);

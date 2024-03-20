@@ -107,7 +107,9 @@ public partial class Cert: IDisposable
             nuint derLength = (nuint)der.Length;
             fixed (byte* derPtr = der)
             {
-                Raw.X509FfiResultBoxCertBoxPickyError result = Raw.Cert.FromDer(derPtr, derLength);
+                IntPtr resultPtr = Raw.Cert.FromDer(derPtr, derLength);
+                Raw.X509FfiResultBoxCertBoxPickyError result = Marshal.PtrToStructure<Raw.X509FfiResultBoxCertBoxPickyError>(resultPtr);
+                Raw.X509FfiResultBoxCertBoxPickyError.Destroy(resultPtr);
                 if (!result.isOk)
                 {
                     throw new PickyException(new PickyError(result.Err));
@@ -135,7 +137,9 @@ public partial class Cert: IDisposable
             {
                 throw new ObjectDisposedException("Pem");
             }
-            Raw.X509FfiResultBoxCertBoxPickyError result = Raw.Cert.FromPem(pemRaw);
+            IntPtr resultPtr = Raw.Cert.FromPem(pemRaw);
+            Raw.X509FfiResultBoxCertBoxPickyError result = Marshal.PtrToStructure<Raw.X509FfiResultBoxCertBoxPickyError>(resultPtr);
+            Raw.X509FfiResultBoxCertBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -160,7 +164,9 @@ public partial class Cert: IDisposable
             {
                 throw new ObjectDisposedException("Cert");
             }
-            Raw.X509FfiResultBoxPemBoxPickyError result = Raw.Cert.ToPem(_inner);
+            IntPtr resultPtr = Raw.Cert.ToPem(_inner);
+            Raw.X509FfiResultBoxPemBoxPickyError result = Marshal.PtrToStructure<Raw.X509FfiResultBoxPemBoxPickyError>(resultPtr);
+            Raw.X509FfiResultBoxPemBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -259,7 +265,9 @@ public partial class Cert: IDisposable
             {
                 throw new ObjectDisposedException("Cert");
             }
-            Raw.X509FfiResultVoidBoxPickyError result = Raw.Cert.GetSubjectKeyIdHex(_inner, &writeable);
+            IntPtr resultPtr = Raw.Cert.GetSubjectKeyIdHex(_inner, &writeable);
+            Raw.X509FfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509FfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509FfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -277,7 +285,9 @@ public partial class Cert: IDisposable
                 throw new ObjectDisposedException("Cert");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            Raw.X509FfiResultVoidBoxPickyError result = Raw.Cert.GetSubjectKeyIdHex(_inner, &writeable);
+            IntPtr resultPtr = Raw.Cert.GetSubjectKeyIdHex(_inner, &writeable);
+            Raw.X509FfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509FfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509FfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -297,7 +307,9 @@ public partial class Cert: IDisposable
             {
                 throw new ObjectDisposedException("Cert");
             }
-            Raw.X509FfiResultVoidBoxPickyError result = Raw.Cert.GetSubjectName(_inner, &writeable);
+            IntPtr resultPtr = Raw.Cert.GetSubjectName(_inner, &writeable);
+            Raw.X509FfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509FfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509FfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -315,7 +327,9 @@ public partial class Cert: IDisposable
                 throw new ObjectDisposedException("Cert");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            Raw.X509FfiResultVoidBoxPickyError result = Raw.Cert.GetSubjectName(_inner, &writeable);
+            IntPtr resultPtr = Raw.Cert.GetSubjectName(_inner, &writeable);
+            Raw.X509FfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509FfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509FfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -335,7 +349,9 @@ public partial class Cert: IDisposable
             {
                 throw new ObjectDisposedException("Cert");
             }
-            Raw.X509FfiResultVoidBoxPickyError result = Raw.Cert.GetIssuerName(_inner, &writeable);
+            IntPtr resultPtr = Raw.Cert.GetIssuerName(_inner, &writeable);
+            Raw.X509FfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509FfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509FfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -353,7 +369,9 @@ public partial class Cert: IDisposable
                 throw new ObjectDisposedException("Cert");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            Raw.X509FfiResultVoidBoxPickyError result = Raw.Cert.GetIssuerName(_inner, &writeable);
+            IntPtr resultPtr = Raw.Cert.GetIssuerName(_inner, &writeable);
+            Raw.X509FfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509FfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509FfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));

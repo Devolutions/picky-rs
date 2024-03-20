@@ -14,10 +14,14 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct MsCounterSign
 {
+#if __IOS__
+    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
+#else
     private const string NativeLib = "DevolutionsPicky";
+#endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "MsCounterSign_get_oid", ExactSpelling = true)]
-    public static unsafe extern X509AttributeFfiResultVoidBoxPickyError GetOid(MsCounterSign* self, DiplomatWriteable* writable);
+    public static unsafe extern IntPtr GetOid(MsCounterSign* self, DiplomatWriteable* writable);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "MsCounterSign_get_signed_data", ExactSpelling = true)]
     public static unsafe extern SignedData* GetSignedData(MsCounterSign* self);

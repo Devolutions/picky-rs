@@ -78,7 +78,9 @@ public partial class DirectoryString: IDisposable
             {
                 throw new ObjectDisposedException("DirectoryString");
             }
-            Raw.X509StringFfiResultVoidBoxPickyError result = Raw.DirectoryString.GetAsString(_inner, &writable);
+            IntPtr resultPtr = Raw.DirectoryString.GetAsString(_inner, &writable);
+            Raw.X509StringFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509StringFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509StringFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -96,7 +98,9 @@ public partial class DirectoryString: IDisposable
                 throw new ObjectDisposedException("DirectoryString");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            Raw.X509StringFfiResultVoidBoxPickyError result = Raw.DirectoryString.GetAsString(_inner, &writeable);
+            IntPtr resultPtr = Raw.DirectoryString.GetAsString(_inner, &writeable);
+            Raw.X509StringFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509StringFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509StringFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));

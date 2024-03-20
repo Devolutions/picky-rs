@@ -54,7 +54,9 @@ public partial class OtherName: IDisposable
             {
                 throw new ObjectDisposedException("OtherName");
             }
-            Raw.X509NameFfiResultVoidBoxPickyError result = Raw.OtherName.GetTypeId(_inner, &writable);
+            IntPtr resultPtr = Raw.OtherName.GetTypeId(_inner, &writable);
+            Raw.X509NameFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509NameFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509NameFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -72,7 +74,9 @@ public partial class OtherName: IDisposable
                 throw new ObjectDisposedException("OtherName");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            Raw.X509NameFfiResultVoidBoxPickyError result = Raw.OtherName.GetTypeId(_inner, &writeable);
+            IntPtr resultPtr = Raw.OtherName.GetTypeId(_inner, &writeable);
+            Raw.X509NameFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509NameFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509NameFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));

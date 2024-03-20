@@ -14,7 +14,11 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct RevokedCertificateIterator
 {
+#if __IOS__
+    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
+#else
     private const string NativeLib = "DevolutionsPicky";
+#endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "RevokedCertificateIterator_next", ExactSpelling = true)]
     public static unsafe extern RevokedCertificate* Next(RevokedCertificateIterator* self);

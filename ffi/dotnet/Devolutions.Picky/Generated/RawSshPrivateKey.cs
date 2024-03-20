@@ -17,7 +17,11 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct SshPrivateKey
 {
+#if __IOS__
+    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
+#else
     private const string NativeLib = "DevolutionsPicky";
+#endif
 
     /// <summary>
     /// Generates a new SSH RSA Private Key.
@@ -30,7 +34,7 @@ public partial struct SshPrivateKey
     /// This is slow in debug builds.
     /// </remarks>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshPrivateKey_generate_rsa", ExactSpelling = true)]
-    public static unsafe extern SshFfiResultBoxSshPrivateKeyBoxPickyError GenerateRsa(nuint bits, byte* passphrase, nuint passphraseSz, byte* comment, nuint commentSz);
+    public static unsafe extern IntPtr GenerateRsa(nuint bits, byte* passphrase, nuint passphraseSz, byte* comment, nuint commentSz);
 
     /// <summary>
     /// Generates a new SSH EC Private Key.
@@ -41,7 +45,7 @@ public partial struct SshPrivateKey
     /// No comment is set if `comment` is empty.
     /// </remarks>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshPrivateKey_generate_ec", ExactSpelling = true)]
-    public static unsafe extern SshFfiResultBoxSshPrivateKeyBoxPickyError GenerateEc(EcCurve curve, byte* passphrase, nuint passphraseSz, byte* comment, nuint commentSz);
+    public static unsafe extern IntPtr GenerateEc(EcCurve curve, byte* passphrase, nuint passphraseSz, byte* comment, nuint commentSz);
 
     /// <summary>
     /// Extracts SSH Private Key from PEM object.
@@ -50,28 +54,28 @@ public partial struct SshPrivateKey
     /// No passphrase is set if `passphrase` is empty.
     /// </remarks>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshPrivateKey_from_pem", ExactSpelling = true)]
-    public static unsafe extern SshFfiResultBoxSshPrivateKeyBoxPickyError FromPem(Pem* pem, byte* passphrase, nuint passphraseSz);
+    public static unsafe extern IntPtr FromPem(Pem* pem, byte* passphrase, nuint passphraseSz);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshPrivateKey_from_private_key", ExactSpelling = true)]
-    public static unsafe extern SshFfiResultBoxSshPrivateKeyBoxPickyError FromPrivateKey(PrivateKey* key);
+    public static unsafe extern IntPtr FromPrivateKey(PrivateKey* key);
 
     /// <summary>
     /// Exports the SSH Private Key into a PEM object
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshPrivateKey_to_pem", ExactSpelling = true)]
-    public static unsafe extern SshFfiResultBoxPemBoxPickyError ToPem(SshPrivateKey* self);
+    public static unsafe extern IntPtr ToPem(SshPrivateKey* self);
 
     /// <summary>
     /// Returns the SSH Private Key string representation.
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshPrivateKey_to_repr", ExactSpelling = true)]
-    public static unsafe extern SshFfiResultVoidBoxPickyError ToRepr(SshPrivateKey* self, DiplomatWriteable* writeable);
+    public static unsafe extern IntPtr ToRepr(SshPrivateKey* self, DiplomatWriteable* writeable);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshPrivateKey_get_cipher_name", ExactSpelling = true)]
-    public static unsafe extern SshFfiResultVoidBoxPickyError GetCipherName(SshPrivateKey* self, DiplomatWriteable* writeable);
+    public static unsafe extern IntPtr GetCipherName(SshPrivateKey* self, DiplomatWriteable* writeable);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshPrivateKey_get_comment", ExactSpelling = true)]
-    public static unsafe extern SshFfiResultVoidBoxPickyError GetComment(SshPrivateKey* self, DiplomatWriteable* writeable);
+    public static unsafe extern IntPtr GetComment(SshPrivateKey* self, DiplomatWriteable* writeable);
 
     /// <summary>
     /// Extracts the public part of this private key

@@ -46,7 +46,9 @@ public partial class IssuerAndSerialNumber: IDisposable
             {
                 throw new ObjectDisposedException("IssuerAndSerialNumber");
             }
-            Raw.X509SingerInfoFfiResultVoidBoxPickyError result = Raw.IssuerAndSerialNumber.GetIssuer(_inner, &writable);
+            IntPtr resultPtr = Raw.IssuerAndSerialNumber.GetIssuer(_inner, &writable);
+            Raw.X509SingerInfoFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509SingerInfoFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509SingerInfoFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -64,7 +66,9 @@ public partial class IssuerAndSerialNumber: IDisposable
                 throw new ObjectDisposedException("IssuerAndSerialNumber");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            Raw.X509SingerInfoFfiResultVoidBoxPickyError result = Raw.IssuerAndSerialNumber.GetIssuer(_inner, &writeable);
+            IntPtr resultPtr = Raw.IssuerAndSerialNumber.GetIssuer(_inner, &writeable);
+            Raw.X509SingerInfoFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509SingerInfoFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509SingerInfoFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));

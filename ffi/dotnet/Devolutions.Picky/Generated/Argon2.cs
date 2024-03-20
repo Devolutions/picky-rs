@@ -45,7 +45,9 @@ public partial class Argon2: IDisposable
             {
                 throw new ObjectDisposedException("Argon2Params");
             }
-            Raw.Argon2FfiResultBoxArgon2BoxPickyError result = Raw.Argon2.New(algorithmRaw, parametersRaw);
+            IntPtr resultPtr = Raw.Argon2.New(algorithmRaw, parametersRaw);
+            Raw.Argon2FfiResultBoxArgon2BoxPickyError result = Marshal.PtrToStructure<Raw.Argon2FfiResultBoxArgon2BoxPickyError>(resultPtr);
+            Raw.Argon2FfiResultBoxArgon2BoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -68,7 +70,9 @@ public partial class Argon2: IDisposable
             nuint passwordBufLength = (nuint)passwordBuf.Length;
             fixed (byte* passwordBufPtr = passwordBuf)
             {
-                Raw.Argon2FfiResultVoidBoxPickyError result = Raw.Argon2.HashPassword(_inner, passwordBufPtr, passwordBufLength, &writeable);
+                IntPtr resultPtr = Raw.Argon2.HashPassword(_inner, passwordBufPtr, passwordBufLength, &writeable);
+                Raw.Argon2FfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.Argon2FfiResultVoidBoxPickyError>(resultPtr);
+                Raw.Argon2FfiResultVoidBoxPickyError.Destroy(resultPtr);
                 if (!result.isOk)
                 {
                     throw new PickyException(new PickyError(result.Err));
@@ -91,7 +95,9 @@ public partial class Argon2: IDisposable
             fixed (byte* passwordBufPtr = passwordBuf)
             {
                 DiplomatWriteable writeable = new DiplomatWriteable();
-                Raw.Argon2FfiResultVoidBoxPickyError result = Raw.Argon2.HashPassword(_inner, passwordBufPtr, passwordBufLength, &writeable);
+                IntPtr resultPtr = Raw.Argon2.HashPassword(_inner, passwordBufPtr, passwordBufLength, &writeable);
+                Raw.Argon2FfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.Argon2FfiResultVoidBoxPickyError>(resultPtr);
+                Raw.Argon2FfiResultVoidBoxPickyError.Destroy(resultPtr);
                 if (!result.isOk)
                 {
                     throw new PickyException(new PickyError(result.Err));

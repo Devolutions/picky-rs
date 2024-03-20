@@ -14,19 +14,23 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct Pkcs7
 {
+#if __IOS__
+    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
+#else
     private const string NativeLib = "DevolutionsPicky";
+#endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pkcs7_from_der", ExactSpelling = true)]
-    public static unsafe extern Pkcs7FfiResultBoxPkcs7BoxPickyError FromDer(byte* data, nuint dataSz);
+    public static unsafe extern IntPtr FromDer(byte* data, nuint dataSz);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pkcs7_from_pem", ExactSpelling = true)]
-    public static unsafe extern Pkcs7FfiResultBoxPkcs7BoxPickyError FromPem(Pem* pem);
+    public static unsafe extern IntPtr FromPem(Pem* pem);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pkcs7_to_der", ExactSpelling = true)]
-    public static unsafe extern Pkcs7FfiResultBoxBufferBoxPickyError ToDer(Pkcs7* self);
+    public static unsafe extern IntPtr ToDer(Pkcs7* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pkcs7_to_pem", ExactSpelling = true)]
-    public static unsafe extern Pkcs7FfiResultBoxPemBoxPickyError ToPem(Pkcs7* self);
+    public static unsafe extern IntPtr ToPem(Pkcs7* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pkcs7_digest_algorithms", ExactSpelling = true)]
     public static unsafe extern AlgorithmIdentifierIterator* DigestAlgorithms(Pkcs7* self);

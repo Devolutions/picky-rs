@@ -38,7 +38,9 @@ public partial class StringIterator: IDisposable
             {
                 throw new ObjectDisposedException("StringIterator");
             }
-            Raw.UtilsFfiResultVoidBoxPickyError result = Raw.StringIterator.Next(_inner, &writable);
+            IntPtr resultPtr = Raw.StringIterator.Next(_inner, &writable);
+            Raw.UtilsFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.UtilsFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.UtilsFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -56,7 +58,9 @@ public partial class StringIterator: IDisposable
                 throw new ObjectDisposedException("StringIterator");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            Raw.UtilsFfiResultVoidBoxPickyError result = Raw.StringIterator.Next(_inner, &writeable);
+            IntPtr resultPtr = Raw.StringIterator.Next(_inner, &writeable);
+            Raw.UtilsFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.UtilsFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.UtilsFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));

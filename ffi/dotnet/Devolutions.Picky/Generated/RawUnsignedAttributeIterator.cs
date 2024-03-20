@@ -14,7 +14,11 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct UnsignedAttributeIterator
 {
+#if __IOS__
+    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
+#else
     private const string NativeLib = "DevolutionsPicky";
+#endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "UnsignedAttributeIterator_next", ExactSpelling = true)]
     public static unsafe extern UnsignedAttribute* Next(UnsignedAttributeIterator* self);

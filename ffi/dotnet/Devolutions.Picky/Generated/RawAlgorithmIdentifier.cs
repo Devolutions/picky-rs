@@ -14,13 +14,17 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct AlgorithmIdentifier
 {
+#if __IOS__
+    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
+#else
     private const string NativeLib = "DevolutionsPicky";
+#endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "AlgorithmIdentifier_is_a", ExactSpelling = true)]
-    public static unsafe extern X509AlgorithmIdentifierFfiResultBoolBoxPickyError IsA(AlgorithmIdentifier* self, byte* other, nuint otherSz);
+    public static unsafe extern IntPtr IsA(AlgorithmIdentifier* self, byte* other, nuint otherSz);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "AlgorithmIdentifier_get_oid", ExactSpelling = true)]
-    public static unsafe extern X509AlgorithmIdentifierFfiResultVoidBoxPickyError GetOid(AlgorithmIdentifier* self, DiplomatWriteable* writable);
+    public static unsafe extern IntPtr GetOid(AlgorithmIdentifier* self, DiplomatWriteable* writable);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "AlgorithmIdentifier_get_parameters", ExactSpelling = true)]
     public static unsafe extern AlgorithmIdentifierParameters* GetParameters(AlgorithmIdentifier* self);

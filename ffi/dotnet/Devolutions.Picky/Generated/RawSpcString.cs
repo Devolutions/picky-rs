@@ -14,13 +14,17 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct SpcString
 {
+#if __IOS__
+    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
+#else
     private const string NativeLib = "DevolutionsPicky";
+#endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SpcString_get_type", ExactSpelling = true)]
     public static unsafe extern SpcStringType GetType(SpcString* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SpcString_get_as_string", ExactSpelling = true)]
-    public static unsafe extern X509AttributeFfiResultVoidBoxPickyError GetAsString(SpcString* self, DiplomatWriteable* writable);
+    public static unsafe extern IntPtr GetAsString(SpcString* self, DiplomatWriteable* writable);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SpcString_get_as_bytes", ExactSpelling = true)]
     public static unsafe extern Buffer* GetAsBytes(SpcString* self);

@@ -14,7 +14,11 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct EdiPartyName
 {
+#if __IOS__
+    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
+#else
     private const string NativeLib = "DevolutionsPicky";
+#endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "EdiPartyName_get_name_assigner", ExactSpelling = true)]
     public static unsafe extern DirectoryString* GetNameAssigner(EdiPartyName* self);

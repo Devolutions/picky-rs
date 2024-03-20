@@ -38,7 +38,9 @@ public partial class EncapsulatedContentInfo: IDisposable
             {
                 throw new ObjectDisposedException("EncapsulatedContentInfo");
             }
-            Raw.X509AttributeFfiResultVoidBoxPickyError result = Raw.EncapsulatedContentInfo.ContentType(_inner, &writable);
+            IntPtr resultPtr = Raw.EncapsulatedContentInfo.ContentType(_inner, &writable);
+            Raw.X509AttributeFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509AttributeFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509AttributeFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -56,7 +58,9 @@ public partial class EncapsulatedContentInfo: IDisposable
                 throw new ObjectDisposedException("EncapsulatedContentInfo");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            Raw.X509AttributeFfiResultVoidBoxPickyError result = Raw.EncapsulatedContentInfo.ContentType(_inner, &writeable);
+            IntPtr resultPtr = Raw.EncapsulatedContentInfo.ContentType(_inner, &writeable);
+            Raw.X509AttributeFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509AttributeFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509AttributeFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));

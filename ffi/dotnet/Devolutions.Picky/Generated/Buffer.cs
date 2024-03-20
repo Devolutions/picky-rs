@@ -78,7 +78,9 @@ public partial class Buffer: IDisposable
             nuint bufferLength = (nuint)buffer.Length;
             fixed (byte* bufferPtr = buffer)
             {
-                Raw.UtilsFfiResultVoidBufferError result = Raw.Buffer.Fill(_inner, bufferPtr, bufferLength);
+                IntPtr resultPtr = Raw.Buffer.Fill(_inner, bufferPtr, bufferLength);
+                Raw.UtilsFfiResultVoidBufferError result = Marshal.PtrToStructure<Raw.UtilsFfiResultVoidBufferError>(resultPtr);
+                Raw.UtilsFfiResultVoidBufferError.Destroy(resultPtr);
                 if (!result.isOk)
                 {
                     throw new BufferException((BufferError)result.Err);

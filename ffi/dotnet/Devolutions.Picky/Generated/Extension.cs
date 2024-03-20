@@ -62,7 +62,9 @@ public partial class Extension: IDisposable
             {
                 throw new ObjectDisposedException("Extension");
             }
-            Raw.X509ExtensionFfiResultVoidBoxPickyError result = Raw.Extension.GetExtnId(_inner, &writable);
+            IntPtr resultPtr = Raw.Extension.GetExtnId(_inner, &writable);
+            Raw.X509ExtensionFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509ExtensionFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509ExtensionFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -80,7 +82,9 @@ public partial class Extension: IDisposable
                 throw new ObjectDisposedException("Extension");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            Raw.X509ExtensionFfiResultVoidBoxPickyError result = Raw.Extension.GetExtnId(_inner, &writeable);
+            IntPtr resultPtr = Raw.Extension.GetExtnId(_inner, &writeable);
+            Raw.X509ExtensionFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509ExtensionFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509ExtensionFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));

@@ -126,7 +126,9 @@ public partial class TbsCertList: IDisposable
             {
                 throw new ObjectDisposedException("TbsCertList");
             }
-            Raw.X509AttributeFfiResultVoidBoxPickyError result = Raw.TbsCertList.GetIssuer(_inner, &writable);
+            IntPtr resultPtr = Raw.TbsCertList.GetIssuer(_inner, &writable);
+            Raw.X509AttributeFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509AttributeFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509AttributeFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -144,7 +146,9 @@ public partial class TbsCertList: IDisposable
                 throw new ObjectDisposedException("TbsCertList");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            Raw.X509AttributeFfiResultVoidBoxPickyError result = Raw.TbsCertList.GetIssuer(_inner, &writeable);
+            IntPtr resultPtr = Raw.TbsCertList.GetIssuer(_inner, &writeable);
+            Raw.X509AttributeFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509AttributeFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509AttributeFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));

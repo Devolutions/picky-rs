@@ -17,7 +17,11 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct Pkcs12CryptoContext
 {
+#if __IOS__
+    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
+#else
     private const string NativeLib = "DevolutionsPicky";
+#endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pkcs12CryptoContext_with_password", ExactSpelling = true)]
     public static unsafe extern Pkcs12CryptoContext* WithPassword(byte* password, nuint passwordSz);

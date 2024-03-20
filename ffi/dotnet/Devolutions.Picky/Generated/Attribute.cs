@@ -54,7 +54,9 @@ public partial class Attribute: IDisposable
             {
                 throw new ObjectDisposedException("Attribute");
             }
-            Raw.X509AttributeFfiResultVoidBoxPickyError result = Raw.Attribute.GetType(_inner, &writable);
+            IntPtr resultPtr = Raw.Attribute.GetType(_inner, &writable);
+            Raw.X509AttributeFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509AttributeFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509AttributeFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -72,7 +74,9 @@ public partial class Attribute: IDisposable
                 throw new ObjectDisposedException("Attribute");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            Raw.X509AttributeFfiResultVoidBoxPickyError result = Raw.Attribute.GetType(_inner, &writeable);
+            IntPtr resultPtr = Raw.Attribute.GetType(_inner, &writeable);
+            Raw.X509AttributeFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509AttributeFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509AttributeFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));

@@ -54,7 +54,9 @@ public partial class MsCounterSign: IDisposable
             {
                 throw new ObjectDisposedException("MsCounterSign");
             }
-            Raw.X509AttributeFfiResultVoidBoxPickyError result = Raw.MsCounterSign.GetOid(_inner, &writable);
+            IntPtr resultPtr = Raw.MsCounterSign.GetOid(_inner, &writable);
+            Raw.X509AttributeFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509AttributeFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509AttributeFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -72,7 +74,9 @@ public partial class MsCounterSign: IDisposable
                 throw new ObjectDisposedException("MsCounterSign");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            Raw.X509AttributeFfiResultVoidBoxPickyError result = Raw.MsCounterSign.GetOid(_inner, &writeable);
+            IntPtr resultPtr = Raw.MsCounterSign.GetOid(_inner, &writeable);
+            Raw.X509AttributeFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509AttributeFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509AttributeFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));

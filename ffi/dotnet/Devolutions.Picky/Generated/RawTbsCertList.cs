@@ -14,7 +14,11 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct TbsCertList
 {
+#if __IOS__
+    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
+#else
     private const string NativeLib = "DevolutionsPicky";
+#endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "TbsCertList_get_version", ExactSpelling = true)]
     public static unsafe extern Version GetVersion(TbsCertList* self);
@@ -23,7 +27,7 @@ public partial struct TbsCertList
     public static unsafe extern AlgorithmIdentifier* GetSignatureAlgorithm(TbsCertList* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "TbsCertList_get_issuer", ExactSpelling = true)]
-    public static unsafe extern X509AttributeFfiResultVoidBoxPickyError GetIssuer(TbsCertList* self, DiplomatWriteable* writable);
+    public static unsafe extern IntPtr GetIssuer(TbsCertList* self, DiplomatWriteable* writable);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "TbsCertList_get_this_upate", ExactSpelling = true)]
     public static unsafe extern Time* GetThisUpate(TbsCertList* self);

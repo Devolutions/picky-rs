@@ -40,7 +40,9 @@ public partial class Pkcs7: IDisposable
             nuint dataLength = (nuint)data.Length;
             fixed (byte* dataPtr = data)
             {
-                Raw.Pkcs7FfiResultBoxPkcs7BoxPickyError result = Raw.Pkcs7.FromDer(dataPtr, dataLength);
+                IntPtr resultPtr = Raw.Pkcs7.FromDer(dataPtr, dataLength);
+                Raw.Pkcs7FfiResultBoxPkcs7BoxPickyError result = Marshal.PtrToStructure<Raw.Pkcs7FfiResultBoxPkcs7BoxPickyError>(resultPtr);
+                Raw.Pkcs7FfiResultBoxPkcs7BoxPickyError.Destroy(resultPtr);
                 if (!result.isOk)
                 {
                     throw new PickyException(new PickyError(result.Err));
@@ -65,7 +67,9 @@ public partial class Pkcs7: IDisposable
             {
                 throw new ObjectDisposedException("Pem");
             }
-            Raw.Pkcs7FfiResultBoxPkcs7BoxPickyError result = Raw.Pkcs7.FromPem(pemRaw);
+            IntPtr resultPtr = Raw.Pkcs7.FromPem(pemRaw);
+            Raw.Pkcs7FfiResultBoxPkcs7BoxPickyError result = Marshal.PtrToStructure<Raw.Pkcs7FfiResultBoxPkcs7BoxPickyError>(resultPtr);
+            Raw.Pkcs7FfiResultBoxPkcs7BoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -87,7 +91,9 @@ public partial class Pkcs7: IDisposable
             {
                 throw new ObjectDisposedException("Pkcs7");
             }
-            Raw.Pkcs7FfiResultBoxBufferBoxPickyError result = Raw.Pkcs7.ToDer(_inner);
+            IntPtr resultPtr = Raw.Pkcs7.ToDer(_inner);
+            Raw.Pkcs7FfiResultBoxBufferBoxPickyError result = Marshal.PtrToStructure<Raw.Pkcs7FfiResultBoxBufferBoxPickyError>(resultPtr);
+            Raw.Pkcs7FfiResultBoxBufferBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -109,7 +115,9 @@ public partial class Pkcs7: IDisposable
             {
                 throw new ObjectDisposedException("Pkcs7");
             }
-            Raw.Pkcs7FfiResultBoxPemBoxPickyError result = Raw.Pkcs7.ToPem(_inner);
+            IntPtr resultPtr = Raw.Pkcs7.ToPem(_inner);
+            Raw.Pkcs7FfiResultBoxPemBoxPickyError result = Marshal.PtrToStructure<Raw.Pkcs7FfiResultBoxPemBoxPickyError>(resultPtr);
+            Raw.Pkcs7FfiResultBoxPemBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));

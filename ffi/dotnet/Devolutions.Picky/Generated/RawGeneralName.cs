@@ -14,7 +14,11 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct GeneralName
 {
+#if __IOS__
+    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
+#else
     private const string NativeLib = "DevolutionsPicky";
+#endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "GeneralName_get_type", ExactSpelling = true)]
     public static unsafe extern GeneralNameType GetType(GeneralName* self);
@@ -23,22 +27,22 @@ public partial struct GeneralName
     public static unsafe extern OtherName* ToOtherName(GeneralName* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "GeneralName_to_rfc822_name", ExactSpelling = true)]
-    public static unsafe extern X509NameFfiResultVoidBoxPickyError ToRfc822Name(GeneralName* self, DiplomatWriteable* writable);
+    public static unsafe extern IntPtr ToRfc822Name(GeneralName* self, DiplomatWriteable* writable);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "GeneralName_to_dns_name", ExactSpelling = true)]
-    public static unsafe extern X509NameFfiResultVoidBoxPickyError ToDnsName(GeneralName* self, DiplomatWriteable* writable);
+    public static unsafe extern IntPtr ToDnsName(GeneralName* self, DiplomatWriteable* writable);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "GeneralName_to_edi_party_name", ExactSpelling = true)]
     public static unsafe extern EdiPartyName* ToEdiPartyName(GeneralName* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "GeneralName_to_uri", ExactSpelling = true)]
-    public static unsafe extern X509NameFfiResultVoidBoxPickyError ToUri(GeneralName* self, DiplomatWriteable* writable);
+    public static unsafe extern IntPtr ToUri(GeneralName* self, DiplomatWriteable* writable);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "GeneralName_to_ip_address", ExactSpelling = true)]
     public static unsafe extern Buffer* ToIpAddress(GeneralName* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "GeneralName_to_registered_id", ExactSpelling = true)]
-    public static unsafe extern X509NameFfiResultVoidBoxPickyError ToRegisteredId(GeneralName* self, DiplomatWriteable* writable);
+    public static unsafe extern IntPtr ToRegisteredId(GeneralName* self, DiplomatWriteable* writable);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "GeneralName_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(GeneralName* self);

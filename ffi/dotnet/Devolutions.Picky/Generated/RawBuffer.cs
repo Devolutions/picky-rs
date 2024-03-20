@@ -14,7 +14,11 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct Buffer
 {
+#if __IOS__
+    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
+#else
     private const string NativeLib = "DevolutionsPicky";
+#endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Buffer_from_bytes", ExactSpelling = true)]
     public static unsafe extern Buffer FromBytes(byte* bytes, nuint bytesSz);
@@ -23,7 +27,7 @@ public partial struct Buffer
     public static unsafe extern nuint GetLength(Buffer* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Buffer_fill", ExactSpelling = true)]
-    public static unsafe extern UtilsFfiResultVoidBufferError Fill(Buffer* self, byte* buffer, nuint bufferSz);
+    public static unsafe extern IntPtr Fill(Buffer* self, byte* buffer, nuint bufferSz);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Buffer_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(Buffer* self);

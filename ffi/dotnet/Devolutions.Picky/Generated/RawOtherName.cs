@@ -14,10 +14,14 @@ namespace Devolutions.Picky.Raw;
 [StructLayout(LayoutKind.Sequential)]
 public partial struct OtherName
 {
+#if __IOS__
+    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
+#else
     private const string NativeLib = "DevolutionsPicky";
+#endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "OtherName_get_type_id", ExactSpelling = true)]
-    public static unsafe extern X509NameFfiResultVoidBoxPickyError GetTypeId(OtherName* self, DiplomatWriteable* writable);
+    public static unsafe extern IntPtr GetTypeId(OtherName* self, DiplomatWriteable* writable);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "OtherName_get_value", ExactSpelling = true)]
     public static unsafe extern Buffer* GetValue(OtherName* self);

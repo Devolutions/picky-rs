@@ -241,7 +241,9 @@ public partial class CertificateBuilder: IDisposable
             {
                 throw new ObjectDisposedException("CertificateBuilder");
             }
-            Raw.X509FfiResultBoxCertBoxPickyError result = Raw.CertificateBuilder.Build(_inner);
+            IntPtr resultPtr = Raw.CertificateBuilder.Build(_inner);
+            Raw.X509FfiResultBoxCertBoxPickyError result = Marshal.PtrToStructure<Raw.X509FfiResultBoxCertBoxPickyError>(resultPtr);
+            Raw.X509FfiResultBoxCertBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));

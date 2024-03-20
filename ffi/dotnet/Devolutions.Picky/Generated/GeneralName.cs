@@ -82,7 +82,9 @@ public partial class GeneralName: IDisposable
             {
                 throw new ObjectDisposedException("GeneralName");
             }
-            Raw.X509NameFfiResultVoidBoxPickyError result = Raw.GeneralName.ToRfc822Name(_inner, &writable);
+            IntPtr resultPtr = Raw.GeneralName.ToRfc822Name(_inner, &writable);
+            Raw.X509NameFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509NameFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509NameFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -100,7 +102,9 @@ public partial class GeneralName: IDisposable
                 throw new ObjectDisposedException("GeneralName");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            Raw.X509NameFfiResultVoidBoxPickyError result = Raw.GeneralName.ToRfc822Name(_inner, &writeable);
+            IntPtr resultPtr = Raw.GeneralName.ToRfc822Name(_inner, &writeable);
+            Raw.X509NameFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509NameFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509NameFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -120,7 +124,9 @@ public partial class GeneralName: IDisposable
             {
                 throw new ObjectDisposedException("GeneralName");
             }
-            Raw.X509NameFfiResultVoidBoxPickyError result = Raw.GeneralName.ToDnsName(_inner, &writable);
+            IntPtr resultPtr = Raw.GeneralName.ToDnsName(_inner, &writable);
+            Raw.X509NameFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509NameFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509NameFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -138,7 +144,9 @@ public partial class GeneralName: IDisposable
                 throw new ObjectDisposedException("GeneralName");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            Raw.X509NameFfiResultVoidBoxPickyError result = Raw.GeneralName.ToDnsName(_inner, &writeable);
+            IntPtr resultPtr = Raw.GeneralName.ToDnsName(_inner, &writeable);
+            Raw.X509NameFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509NameFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509NameFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -178,7 +186,9 @@ public partial class GeneralName: IDisposable
             {
                 throw new ObjectDisposedException("GeneralName");
             }
-            Raw.X509NameFfiResultVoidBoxPickyError result = Raw.GeneralName.ToUri(_inner, &writable);
+            IntPtr resultPtr = Raw.GeneralName.ToUri(_inner, &writable);
+            Raw.X509NameFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509NameFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509NameFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -196,7 +206,9 @@ public partial class GeneralName: IDisposable
                 throw new ObjectDisposedException("GeneralName");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            Raw.X509NameFfiResultVoidBoxPickyError result = Raw.GeneralName.ToUri(_inner, &writeable);
+            IntPtr resultPtr = Raw.GeneralName.ToUri(_inner, &writeable);
+            Raw.X509NameFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509NameFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509NameFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -236,7 +248,9 @@ public partial class GeneralName: IDisposable
             {
                 throw new ObjectDisposedException("GeneralName");
             }
-            Raw.X509NameFfiResultVoidBoxPickyError result = Raw.GeneralName.ToRegisteredId(_inner, &writable);
+            IntPtr resultPtr = Raw.GeneralName.ToRegisteredId(_inner, &writable);
+            Raw.X509NameFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509NameFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509NameFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
@@ -254,7 +268,9 @@ public partial class GeneralName: IDisposable
                 throw new ObjectDisposedException("GeneralName");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            Raw.X509NameFfiResultVoidBoxPickyError result = Raw.GeneralName.ToRegisteredId(_inner, &writeable);
+            IntPtr resultPtr = Raw.GeneralName.ToRegisteredId(_inner, &writeable);
+            Raw.X509NameFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.X509NameFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.X509NameFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
