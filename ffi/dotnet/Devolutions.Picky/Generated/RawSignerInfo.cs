@@ -33,7 +33,7 @@ public partial struct SignerInfo
     public static unsafe extern AlgorithmIdentifier* GetSignatureAlgorithm(SignerInfo* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SignerInfo_get_signature", ExactSpelling = true)]
-    public static unsafe extern Buffer* GetSignature(SignerInfo* self);
+    public static unsafe extern RsBuffer* GetSignature(SignerInfo* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SignerInfo_get_unsigned_attributes", ExactSpelling = true)]
     public static unsafe extern UnsignedAttributeIterator* GetUnsignedAttributes(SignerInfo* self);

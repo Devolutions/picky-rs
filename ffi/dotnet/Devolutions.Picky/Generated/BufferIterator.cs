@@ -30,9 +30,9 @@ public partial class BufferIterator: IDisposable
     }
 
     /// <returns>
-    /// A <c>Buffer</c> allocated on Rust side.
+    /// A <c>RsBuffer</c> allocated on Rust side.
     /// </returns>
-    public Buffer? Next()
+    public RsBuffer? Next()
     {
         unsafe
         {
@@ -40,12 +40,12 @@ public partial class BufferIterator: IDisposable
             {
                 throw new ObjectDisposedException("BufferIterator");
             }
-            Raw.Buffer* retVal = Raw.BufferIterator.Next(_inner);
+            Raw.RsBuffer* retVal = Raw.BufferIterator.Next(_inner);
             if (retVal == null)
             {
                 return null;
             }
-            return new Buffer(retVal);
+            return new RsBuffer(retVal);
         }
     }
 

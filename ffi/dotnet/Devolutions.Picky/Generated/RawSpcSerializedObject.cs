@@ -21,10 +21,10 @@ public partial struct SpcSerializedObject
 #endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SpcSerializedObject_get_class_id", ExactSpelling = true)]
-    public static unsafe extern Buffer* GetClassId(SpcSerializedObject* self);
+    public static unsafe extern RsBuffer* GetClassId(SpcSerializedObject* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SpcSerializedObject_get_object_id", ExactSpelling = true)]
-    public static unsafe extern Buffer* GetObjectId(SpcSerializedObject* self);
+    public static unsafe extern RsBuffer* GetObjectId(SpcSerializedObject* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SpcSerializedObject_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(SpcSerializedObject* self);

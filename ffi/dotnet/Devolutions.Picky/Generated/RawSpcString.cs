@@ -27,7 +27,7 @@ public partial struct SpcString
     public static unsafe extern IntPtr GetAsString(SpcString* self, DiplomatWriteable* writable);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SpcString_get_as_bytes", ExactSpelling = true)]
-    public static unsafe extern Buffer* GetAsBytes(SpcString* self);
+    public static unsafe extern RsBuffer* GetAsBytes(SpcString* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SpcString_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(SpcString* self);

@@ -23,7 +23,7 @@ public partial class OtherName: IDisposable
         }
     }
 
-    public Buffer Value
+    public RsBuffer Value
     {
         get
         {
@@ -88,9 +88,9 @@ public partial class OtherName: IDisposable
     }
 
     /// <returns>
-    /// A <c>Buffer</c> allocated on Rust side.
+    /// A <c>RsBuffer</c> allocated on Rust side.
     /// </returns>
-    public Buffer GetValue()
+    public RsBuffer GetValue()
     {
         unsafe
         {
@@ -98,8 +98,8 @@ public partial class OtherName: IDisposable
             {
                 throw new ObjectDisposedException("OtherName");
             }
-            Raw.Buffer* retVal = Raw.OtherName.GetValue(_inner);
-            return new Buffer(retVal);
+            Raw.RsBuffer* retVal = Raw.OtherName.GetValue(_inner);
+            return new RsBuffer(retVal);
         }
     }
 

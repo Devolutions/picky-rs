@@ -15,7 +15,7 @@ public partial class DirectoryString: IDisposable
 {
     private unsafe Raw.DirectoryString* _inner;
 
-    public Buffer AsBytes
+    public RsBuffer AsBytes
     {
         get
         {
@@ -112,9 +112,9 @@ public partial class DirectoryString: IDisposable
     }
 
     /// <returns>
-    /// A <c>Buffer</c> allocated on Rust side.
+    /// A <c>RsBuffer</c> allocated on Rust side.
     /// </returns>
-    public Buffer GetAsBytes()
+    public RsBuffer GetAsBytes()
     {
         unsafe
         {
@@ -122,8 +122,8 @@ public partial class DirectoryString: IDisposable
             {
                 throw new ObjectDisposedException("DirectoryString");
             }
-            Raw.Buffer* retVal = Raw.DirectoryString.GetAsBytes(_inner);
-            return new Buffer(retVal);
+            Raw.RsBuffer* retVal = Raw.DirectoryString.GetAsBytes(_inner);
+            return new RsBuffer(retVal);
         }
     }
 

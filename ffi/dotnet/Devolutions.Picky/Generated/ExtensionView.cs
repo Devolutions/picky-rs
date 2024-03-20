@@ -74,9 +74,9 @@ public partial class ExtensionView: IDisposable
     }
 
     /// <returns>
-    /// A <c>Buffer</c> allocated on Rust side.
+    /// A <c>RsBuffer</c> allocated on Rust side.
     /// </returns>
-    public Buffer? ToSubjectKeyIdentifier()
+    public RsBuffer? ToSubjectKeyIdentifier()
     {
         unsafe
         {
@@ -84,19 +84,19 @@ public partial class ExtensionView: IDisposable
             {
                 throw new ObjectDisposedException("ExtensionView");
             }
-            Raw.Buffer* retVal = Raw.ExtensionView.ToSubjectKeyIdentifier(_inner);
+            Raw.RsBuffer* retVal = Raw.ExtensionView.ToSubjectKeyIdentifier(_inner);
             if (retVal == null)
             {
                 return null;
             }
-            return new Buffer(retVal);
+            return new RsBuffer(retVal);
         }
     }
 
     /// <returns>
-    /// A <c>Buffer</c> allocated on Rust side.
+    /// A <c>RsBuffer</c> allocated on Rust side.
     /// </returns>
-    public Buffer? ToKeyUsage()
+    public RsBuffer? ToKeyUsage()
     {
         unsafe
         {
@@ -104,12 +104,12 @@ public partial class ExtensionView: IDisposable
             {
                 throw new ObjectDisposedException("ExtensionView");
             }
-            Raw.Buffer* retVal = Raw.ExtensionView.ToKeyUsage(_inner);
+            Raw.RsBuffer* retVal = Raw.ExtensionView.ToKeyUsage(_inner);
             if (retVal == null)
             {
                 return null;
             }
-            return new Buffer(retVal);
+            return new RsBuffer(retVal);
         }
     }
 
@@ -194,9 +194,9 @@ public partial class ExtensionView: IDisposable
     }
 
     /// <returns>
-    /// A <c>Buffer</c> allocated on Rust side.
+    /// A <c>RsBuffer</c> allocated on Rust side.
     /// </returns>
-    public Buffer? ToGeneric()
+    public RsBuffer? ToGeneric()
     {
         unsafe
         {
@@ -204,19 +204,19 @@ public partial class ExtensionView: IDisposable
             {
                 throw new ObjectDisposedException("ExtensionView");
             }
-            Raw.Buffer* retVal = Raw.ExtensionView.ToGeneric(_inner);
+            Raw.RsBuffer* retVal = Raw.ExtensionView.ToGeneric(_inner);
             if (retVal == null)
             {
                 return null;
             }
-            return new Buffer(retVal);
+            return new RsBuffer(retVal);
         }
     }
 
     /// <returns>
-    /// A <c>Buffer</c> allocated on Rust side.
+    /// A <c>RsBuffer</c> allocated on Rust side.
     /// </returns>
-    public Buffer? ToCrlNumber()
+    public RsBuffer? ToCrlNumber()
     {
         unsafe
         {
@@ -224,12 +224,12 @@ public partial class ExtensionView: IDisposable
             {
                 throw new ObjectDisposedException("ExtensionView");
             }
-            Raw.Buffer* retVal = Raw.ExtensionView.ToCrlNumber(_inner);
+            Raw.RsBuffer* retVal = Raw.ExtensionView.ToCrlNumber(_inner);
             if (retVal == null)
             {
                 return null;
             }
-            return new Buffer(retVal);
+            return new RsBuffer(retVal);
         }
     }
 

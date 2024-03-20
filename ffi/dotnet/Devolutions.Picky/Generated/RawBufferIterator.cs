@@ -21,7 +21,7 @@ public partial struct BufferIterator
 #endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "BufferIterator_next", ExactSpelling = true)]
-    public static unsafe extern Buffer* Next(BufferIterator* self);
+    public static unsafe extern RsBuffer* Next(BufferIterator* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "BufferIterator_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(BufferIterator* self);

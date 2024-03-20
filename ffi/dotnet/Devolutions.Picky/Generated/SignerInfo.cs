@@ -31,7 +31,7 @@ public partial class SignerInfo: IDisposable
         }
     }
 
-    public Buffer Signature
+    public RsBuffer Signature
     {
         get
         {
@@ -150,9 +150,9 @@ public partial class SignerInfo: IDisposable
     }
 
     /// <returns>
-    /// A <c>Buffer</c> allocated on Rust side.
+    /// A <c>RsBuffer</c> allocated on Rust side.
     /// </returns>
-    public Buffer GetSignature()
+    public RsBuffer GetSignature()
     {
         unsafe
         {
@@ -160,8 +160,8 @@ public partial class SignerInfo: IDisposable
             {
                 throw new ObjectDisposedException("SignerInfo");
             }
-            Raw.Buffer* retVal = Raw.SignerInfo.GetSignature(_inner);
-            return new Buffer(retVal);
+            Raw.RsBuffer* retVal = Raw.SignerInfo.GetSignature(_inner);
+            return new RsBuffer(retVal);
         }
     }
 

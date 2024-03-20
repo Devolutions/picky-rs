@@ -54,9 +54,9 @@ public partial class AttributeValues: IDisposable
     }
 
     /// <returns>
-    /// A <c>Buffer</c> allocated on Rust side.
+    /// A <c>RsBuffer</c> allocated on Rust side.
     /// </returns>
-    public Buffer? ToCustom()
+    public RsBuffer? ToCustom()
     {
         unsafe
         {
@@ -64,12 +64,12 @@ public partial class AttributeValues: IDisposable
             {
                 throw new ObjectDisposedException("AttributeValues");
             }
-            Raw.Buffer* retVal = Raw.AttributeValues.ToCustom(_inner);
+            Raw.RsBuffer* retVal = Raw.AttributeValues.ToCustom(_inner);
             if (retVal == null)
             {
                 return null;
             }
-            return new Buffer(retVal);
+            return new RsBuffer(retVal);
         }
     }
 

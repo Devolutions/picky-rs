@@ -23,7 +23,7 @@ public partial class SingerIdentifier: IDisposable
         }
     }
 
-    public Buffer? SubjectKeyIdentifier
+    public RsBuffer? SubjectKeyIdentifier
     {
         get
         {
@@ -66,9 +66,9 @@ public partial class SingerIdentifier: IDisposable
     }
 
     /// <returns>
-    /// A <c>Buffer</c> allocated on Rust side.
+    /// A <c>RsBuffer</c> allocated on Rust side.
     /// </returns>
-    public Buffer? GetSubjectKeyIdentifier()
+    public RsBuffer? GetSubjectKeyIdentifier()
     {
         unsafe
         {
@@ -76,12 +76,12 @@ public partial class SingerIdentifier: IDisposable
             {
                 throw new ObjectDisposedException("SingerIdentifier");
             }
-            Raw.Buffer* retVal = Raw.SingerIdentifier.GetSubjectKeyIdentifier(_inner);
+            Raw.RsBuffer* retVal = Raw.SingerIdentifier.GetSubjectKeyIdentifier(_inner);
             if (retVal == null)
             {
                 return null;
             }
-            return new Buffer(retVal);
+            return new RsBuffer(retVal);
         }
     }
 

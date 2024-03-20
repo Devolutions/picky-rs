@@ -15,7 +15,7 @@ public partial class SpcString: IDisposable
 {
     private unsafe Raw.SpcString* _inner;
 
-    public Buffer AsBytes
+    public RsBuffer AsBytes
     {
         get
         {
@@ -112,9 +112,9 @@ public partial class SpcString: IDisposable
     }
 
     /// <returns>
-    /// A <c>Buffer</c> allocated on Rust side.
+    /// A <c>RsBuffer</c> allocated on Rust side.
     /// </returns>
-    public Buffer GetAsBytes()
+    public RsBuffer GetAsBytes()
     {
         unsafe
         {
@@ -122,8 +122,8 @@ public partial class SpcString: IDisposable
             {
                 throw new ObjectDisposedException("SpcString");
             }
-            Raw.Buffer* retVal = Raw.SpcString.GetAsBytes(_inner);
-            return new Buffer(retVal);
+            Raw.RsBuffer* retVal = Raw.SpcString.GetAsBytes(_inner);
+            return new RsBuffer(retVal);
         }
     }
 

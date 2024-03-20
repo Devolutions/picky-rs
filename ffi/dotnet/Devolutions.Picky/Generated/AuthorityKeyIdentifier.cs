@@ -23,7 +23,7 @@ public partial class AuthorityKeyIdentifier: IDisposable
         }
     }
 
-    public Buffer? AuthorityCertSerialNumber
+    public RsBuffer? AuthorityCertSerialNumber
     {
         get
         {
@@ -31,7 +31,7 @@ public partial class AuthorityKeyIdentifier: IDisposable
         }
     }
 
-    public Buffer? KeyIdentifier
+    public RsBuffer? KeyIdentifier
     {
         get
         {
@@ -54,9 +54,9 @@ public partial class AuthorityKeyIdentifier: IDisposable
     }
 
     /// <returns>
-    /// A <c>Buffer</c> allocated on Rust side.
+    /// A <c>RsBuffer</c> allocated on Rust side.
     /// </returns>
-    public Buffer? GetKeyIdentifier()
+    public RsBuffer? GetKeyIdentifier()
     {
         unsafe
         {
@@ -64,12 +64,12 @@ public partial class AuthorityKeyIdentifier: IDisposable
             {
                 throw new ObjectDisposedException("AuthorityKeyIdentifier");
             }
-            Raw.Buffer* retVal = Raw.AuthorityKeyIdentifier.GetKeyIdentifier(_inner);
+            Raw.RsBuffer* retVal = Raw.AuthorityKeyIdentifier.GetKeyIdentifier(_inner);
             if (retVal == null)
             {
                 return null;
             }
-            return new Buffer(retVal);
+            return new RsBuffer(retVal);
         }
     }
 
@@ -94,9 +94,9 @@ public partial class AuthorityKeyIdentifier: IDisposable
     }
 
     /// <returns>
-    /// A <c>Buffer</c> allocated on Rust side.
+    /// A <c>RsBuffer</c> allocated on Rust side.
     /// </returns>
-    public Buffer? GetAuthorityCertSerialNumber()
+    public RsBuffer? GetAuthorityCertSerialNumber()
     {
         unsafe
         {
@@ -104,12 +104,12 @@ public partial class AuthorityKeyIdentifier: IDisposable
             {
                 throw new ObjectDisposedException("AuthorityKeyIdentifier");
             }
-            Raw.Buffer* retVal = Raw.AuthorityKeyIdentifier.GetAuthorityCertSerialNumber(_inner);
+            Raw.RsBuffer* retVal = Raw.AuthorityKeyIdentifier.GetAuthorityCertSerialNumber(_inner);
             if (retVal == null)
             {
                 return null;
             }
-            return new Buffer(retVal);
+            return new RsBuffer(retVal);
         }
     }
 

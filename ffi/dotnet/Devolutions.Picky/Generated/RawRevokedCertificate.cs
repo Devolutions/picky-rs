@@ -21,7 +21,7 @@ public partial struct RevokedCertificate
 #endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "RevokedCertificate_get_user_certificate", ExactSpelling = true)]
-    public static unsafe extern Buffer* GetUserCertificate(RevokedCertificate* self);
+    public static unsafe extern RsBuffer* GetUserCertificate(RevokedCertificate* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "RevokedCertificate_get_revocation_date", ExactSpelling = true)]
     public static unsafe extern Time* GetRevocationDate(RevokedCertificate* self);

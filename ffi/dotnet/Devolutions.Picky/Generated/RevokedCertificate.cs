@@ -31,7 +31,7 @@ public partial class RevokedCertificate: IDisposable
         }
     }
 
-    public Buffer UserCertificate
+    public RsBuffer UserCertificate
     {
         get
         {
@@ -54,9 +54,9 @@ public partial class RevokedCertificate: IDisposable
     }
 
     /// <returns>
-    /// A <c>Buffer</c> allocated on Rust side.
+    /// A <c>RsBuffer</c> allocated on Rust side.
     /// </returns>
-    public Buffer GetUserCertificate()
+    public RsBuffer GetUserCertificate()
     {
         unsafe
         {
@@ -64,8 +64,8 @@ public partial class RevokedCertificate: IDisposable
             {
                 throw new ObjectDisposedException("RevokedCertificate");
             }
-            Raw.Buffer* retVal = Raw.RevokedCertificate.GetUserCertificate(_inner);
-            return new Buffer(retVal);
+            Raw.RsBuffer* retVal = Raw.RevokedCertificate.GetUserCertificate(_inner);
+            return new RsBuffer(retVal);
         }
     }
 

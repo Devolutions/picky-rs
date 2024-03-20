@@ -27,10 +27,10 @@ public partial struct ExtensionView
     public static unsafe extern AuthorityKeyIdentifier* ToAuthorityKeyIdentifier(ExtensionView* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "ExtensionView_to_subject_key_identifier", ExactSpelling = true)]
-    public static unsafe extern Buffer* ToSubjectKeyIdentifier(ExtensionView* self);
+    public static unsafe extern RsBuffer* ToSubjectKeyIdentifier(ExtensionView* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "ExtensionView_to_key_usage", ExactSpelling = true)]
-    public static unsafe extern Buffer* ToKeyUsage(ExtensionView* self);
+    public static unsafe extern RsBuffer* ToKeyUsage(ExtensionView* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "ExtensionView_to_subject_alt_name", ExactSpelling = true)]
     public static unsafe extern GeneralNameIterator* ToSubjectAltName(ExtensionView* self);
@@ -45,10 +45,10 @@ public partial struct ExtensionView
     public static unsafe extern OidIterator* ToExtendedKeyUsage(ExtensionView* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "ExtensionView_to_generic", ExactSpelling = true)]
-    public static unsafe extern Buffer* ToGeneric(ExtensionView* self);
+    public static unsafe extern RsBuffer* ToGeneric(ExtensionView* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "ExtensionView_to_crl_number", ExactSpelling = true)]
-    public static unsafe extern Buffer* ToCrlNumber(ExtensionView* self);
+    public static unsafe extern RsBuffer* ToCrlNumber(ExtensionView* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "ExtensionView_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(ExtensionView* self);

@@ -15,7 +15,7 @@ public partial class SpcSerializedObject: IDisposable
 {
     private unsafe Raw.SpcSerializedObject* _inner;
 
-    public Buffer ClassId
+    public RsBuffer ClassId
     {
         get
         {
@@ -23,7 +23,7 @@ public partial class SpcSerializedObject: IDisposable
         }
     }
 
-    public Buffer ObjectId
+    public RsBuffer ObjectId
     {
         get
         {
@@ -46,9 +46,9 @@ public partial class SpcSerializedObject: IDisposable
     }
 
     /// <returns>
-    /// A <c>Buffer</c> allocated on Rust side.
+    /// A <c>RsBuffer</c> allocated on Rust side.
     /// </returns>
-    public Buffer GetClassId()
+    public RsBuffer GetClassId()
     {
         unsafe
         {
@@ -56,15 +56,15 @@ public partial class SpcSerializedObject: IDisposable
             {
                 throw new ObjectDisposedException("SpcSerializedObject");
             }
-            Raw.Buffer* retVal = Raw.SpcSerializedObject.GetClassId(_inner);
-            return new Buffer(retVal);
+            Raw.RsBuffer* retVal = Raw.SpcSerializedObject.GetClassId(_inner);
+            return new RsBuffer(retVal);
         }
     }
 
     /// <returns>
-    /// A <c>Buffer</c> allocated on Rust side.
+    /// A <c>RsBuffer</c> allocated on Rust side.
     /// </returns>
-    public Buffer GetObjectId()
+    public RsBuffer GetObjectId()
     {
         unsafe
         {
@@ -72,8 +72,8 @@ public partial class SpcSerializedObject: IDisposable
             {
                 throw new ObjectDisposedException("SpcSerializedObject");
             }
-            Raw.Buffer* retVal = Raw.SpcSerializedObject.GetObjectId(_inner);
-            return new Buffer(retVal);
+            Raw.RsBuffer* retVal = Raw.SpcSerializedObject.GetObjectId(_inner);
+            return new RsBuffer(retVal);
         }
     }
 

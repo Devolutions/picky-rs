@@ -4,7 +4,7 @@ pub mod ffi {
 
     use crate::error::ffi::PickyError;
     use crate::pem::ffi::Pem;
-    use crate::utils::ffi::Buffer;
+    use crate::utils::ffi::RsBuffer;
     use crate::x509::ffi::CertIterator;
 
     #[diplomat::opaque]
@@ -21,8 +21,8 @@ pub mod ffi {
             Ok(Box::new(Pkcs7(pkcs7)))
         }
 
-        pub fn to_der(&self) -> Result<Box<Buffer>, Box<PickyError>> {
-            Ok(Box::new(Buffer(self.0.to_der()?)))
+        pub fn to_der(&self) -> Result<Box<RsBuffer>, Box<PickyError>> {
+            Ok(Box::new(RsBuffer(self.0.to_der()?)))
         }
 
         pub fn to_pem(&self) -> Result<Box<Pem>, Box<PickyError>> {

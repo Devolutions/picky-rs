@@ -1,7 +1,7 @@
 #[diplomat::bridge]
 pub mod ffi {
     use crate::error::ffi::PickyError;
-    use crate::utils::ffi::Buffer;
+    use crate::utils::ffi::RsBuffer;
     use crate::x509::string::ffi::DirectoryString;
     use diplomat_runtime::DiplomatWriteable;
     use std::fmt::Write;
@@ -107,10 +107,10 @@ pub mod ffi {
             }
         }
 
-        pub fn to_ip_address(&self) -> Option<Box<Buffer>> {
+        pub fn to_ip_address(&self) -> Option<Box<RsBuffer>> {
             match &self.0 {
                 picky_asn1_x509::name::GeneralName::IpAddress(ip_address) => {
-                    Some(Buffer::from_bytes(&ip_address.0).boxed())
+                    Some(RsBuffer::from_bytes(&ip_address.0).boxed())
                 }
                 _ => None,
             }
@@ -154,8 +154,8 @@ pub mod ffi {
             Ok(())
         }
 
-        pub fn get_value(&self) -> Box<crate::utils::ffi::Buffer> {
-            Buffer::from_bytes(&self.0.value.0 .0).boxed()
+        pub fn get_value(&self) -> Box<crate::utils::ffi::RsBuffer> {
+            RsBuffer::from_bytes(&self.0.value.0 .0).boxed()
         }
     }
 }

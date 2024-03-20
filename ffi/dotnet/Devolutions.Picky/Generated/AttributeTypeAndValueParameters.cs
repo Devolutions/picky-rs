@@ -234,9 +234,9 @@ public partial class AttributeTypeAndValueParameters: IDisposable
     }
 
     /// <returns>
-    /// A <c>Buffer</c> allocated on Rust side.
+    /// A <c>RsBuffer</c> allocated on Rust side.
     /// </returns>
-    public Buffer? ToEmailAddress()
+    public RsBuffer? ToEmailAddress()
     {
         unsafe
         {
@@ -244,12 +244,12 @@ public partial class AttributeTypeAndValueParameters: IDisposable
             {
                 throw new ObjectDisposedException("AttributeTypeAndValueParameters");
             }
-            Raw.Buffer* retVal = Raw.AttributeTypeAndValueParameters.ToEmailAddress(_inner);
+            Raw.RsBuffer* retVal = Raw.AttributeTypeAndValueParameters.ToEmailAddress(_inner);
             if (retVal == null)
             {
                 return null;
             }
-            return new Buffer(retVal);
+            return new RsBuffer(retVal);
         }
     }
 
@@ -294,9 +294,9 @@ public partial class AttributeTypeAndValueParameters: IDisposable
     }
 
     /// <returns>
-    /// A <c>Buffer</c> allocated on Rust side.
+    /// A <c>RsBuffer</c> allocated on Rust side.
     /// </returns>
-    public Buffer? ToCustom()
+    public RsBuffer? ToCustom()
     {
         unsafe
         {
@@ -304,12 +304,12 @@ public partial class AttributeTypeAndValueParameters: IDisposable
             {
                 throw new ObjectDisposedException("AttributeTypeAndValueParameters");
             }
-            Raw.Buffer* retVal = Raw.AttributeTypeAndValueParameters.ToCustom(_inner);
+            Raw.RsBuffer* retVal = Raw.AttributeTypeAndValueParameters.ToCustom(_inner);
             if (retVal == null)
             {
                 return null;
             }
-            return new Buffer(retVal);
+            return new RsBuffer(retVal);
         }
     }
 

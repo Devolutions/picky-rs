@@ -21,13 +21,13 @@ public partial struct AuthorityKeyIdentifier
 #endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "AuthorityKeyIdentifier_get_key_identifier", ExactSpelling = true)]
-    public static unsafe extern Buffer* GetKeyIdentifier(AuthorityKeyIdentifier* self);
+    public static unsafe extern RsBuffer* GetKeyIdentifier(AuthorityKeyIdentifier* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "AuthorityKeyIdentifier_get_authority_cert_issuer", ExactSpelling = true)]
     public static unsafe extern GeneralName* GetAuthorityCertIssuer(AuthorityKeyIdentifier* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "AuthorityKeyIdentifier_get_authority_cert_serial_number", ExactSpelling = true)]
-    public static unsafe extern Buffer* GetAuthorityCertSerialNumber(AuthorityKeyIdentifier* self);
+    public static unsafe extern RsBuffer* GetAuthorityCertSerialNumber(AuthorityKeyIdentifier* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "AuthorityKeyIdentifier_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(AuthorityKeyIdentifier* self);

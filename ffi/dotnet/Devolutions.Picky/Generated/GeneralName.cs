@@ -220,9 +220,9 @@ public partial class GeneralName: IDisposable
     }
 
     /// <returns>
-    /// A <c>Buffer</c> allocated on Rust side.
+    /// A <c>RsBuffer</c> allocated on Rust side.
     /// </returns>
-    public Buffer? ToIpAddress()
+    public RsBuffer? ToIpAddress()
     {
         unsafe
         {
@@ -230,12 +230,12 @@ public partial class GeneralName: IDisposable
             {
                 throw new ObjectDisposedException("GeneralName");
             }
-            Raw.Buffer* retVal = Raw.GeneralName.ToIpAddress(_inner);
+            Raw.RsBuffer* retVal = Raw.GeneralName.ToIpAddress(_inner);
             if (retVal == null)
             {
                 return null;
             }
-            return new Buffer(retVal);
+            return new RsBuffer(retVal);
         }
     }
 

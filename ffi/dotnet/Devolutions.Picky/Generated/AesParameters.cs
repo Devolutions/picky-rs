@@ -54,9 +54,9 @@ public partial class AesParameters: IDisposable
     }
 
     /// <returns>
-    /// A <c>Buffer</c> allocated on Rust side.
+    /// A <c>RsBuffer</c> allocated on Rust side.
     /// </returns>
-    public Buffer? ToInitializationVector()
+    public RsBuffer? ToInitializationVector()
     {
         unsafe
         {
@@ -64,12 +64,12 @@ public partial class AesParameters: IDisposable
             {
                 throw new ObjectDisposedException("AesParameters");
             }
-            Raw.Buffer* retVal = Raw.AesParameters.ToInitializationVector(_inner);
+            Raw.RsBuffer* retVal = Raw.AesParameters.ToInitializationVector(_inner);
             if (retVal == null)
             {
                 return null;
             }
-            return new Buffer(retVal);
+            return new RsBuffer(retVal);
         }
     }
 

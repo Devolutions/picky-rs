@@ -39,7 +39,7 @@ public partial struct GeneralName
     public static unsafe extern IntPtr ToUri(GeneralName* self, DiplomatWriteable* writable);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "GeneralName_to_ip_address", ExactSpelling = true)]
-    public static unsafe extern Buffer* ToIpAddress(GeneralName* self);
+    public static unsafe extern RsBuffer* ToIpAddress(GeneralName* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "GeneralName_to_registered_id", ExactSpelling = true)]
     public static unsafe extern IntPtr ToRegisteredId(GeneralName* self, DiplomatWriteable* writable);

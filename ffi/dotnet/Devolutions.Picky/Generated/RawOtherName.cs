@@ -24,7 +24,7 @@ public partial struct OtherName
     public static unsafe extern IntPtr GetTypeId(OtherName* self, DiplomatWriteable* writable);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "OtherName_get_value", ExactSpelling = true)]
-    public static unsafe extern Buffer* GetValue(OtherName* self);
+    public static unsafe extern RsBuffer* GetValue(OtherName* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "OtherName_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(OtherName* self);
