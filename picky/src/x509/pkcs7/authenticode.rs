@@ -172,7 +172,7 @@ impl AuthenticodeSignature {
 
         let certificates = pkcs7.decode_certificates();
 
-        let signing_cert = certificates.get(0).ok_or(AuthenticodeError::NoCertificates)?;
+        let signing_cert = certificates.first().ok_or(AuthenticodeError::NoCertificates)?;
 
         let issuer_and_serial_number = IssuerAndSerialNumber {
             issuer: signing_cert.issuer_name().into(),
@@ -786,7 +786,7 @@ impl<'a> AuthenticodeValidator<'a> {
                                         && !kp_lifetime_signing_is_present
                                     {
                                         // check if certificates in the timestamp have the right chain
-                                        if let Some(leaf) = certificates.get(0) {
+                                        if let Some(leaf) = certificates.first() {
                                             let timestamp_chain_validator = leaf.verifier();
                                             let timestamp_chain = certificates
                                                 .iter()
