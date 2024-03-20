@@ -270,7 +270,7 @@ impl<'a, 'se> serde::ser::Serializer for &'a mut Serializer<'se> {
         Err(Asn1DerError::UnsupportedType)
     }
 
-    fn serialize_newtype_struct<T: ?Sized + Serialize>(mut self, name: &'static str, value: &T) -> Result<Self::Ok> {
+    fn serialize_newtype_struct<T: ?Sized + Serialize>(self, name: &'static str, value: &T) -> Result<Self::Ok> {
         debug_log!("serialize_newtype_struct: {}", name);
 
         match name {

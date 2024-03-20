@@ -1,3 +1,4 @@
+#![allow(clippy::arc_with_non_send_sync)] // We have wrapped the `Arc<Mutex<...>>` in a `Box`, as required by the `diplomat` crate.
 use crate::error::ffi::PickyError;
 
 #[diplomat::bridge]

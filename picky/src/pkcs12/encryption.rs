@@ -640,9 +640,9 @@ mod tests {
     #[test]
     fn pbes1_3des_roundtrip() {
         let password = b"\0a\0b\0c\0\0";
-        let salt = (0..8).into_iter().collect::<Vec<u8>>();
+        let salt = (0..8).collect::<Vec<u8>>();
         let iterations = 2000;
-        let data = (0..123).into_iter().collect::<Vec<u8>>();
+        let data = (0..123).collect::<Vec<u8>>();
         let encrypted = encrypt_pbes1(Pbes1Cipher::ShaAnd3Key3DesCbc, password, &salt, iterations, &data).unwrap();
         let decrypted = decrypt_pbes1(Pbes1Cipher::ShaAnd3Key3DesCbc, password, &salt, iterations, &encrypted).unwrap();
         assert_eq!(decrypted, data);
@@ -651,9 +651,9 @@ mod tests {
     #[test]
     fn pbes1_rc2_roundtrip() {
         let password = b"\0b\0c\0a\0\0";
-        let salt = (0..8).into_iter().collect::<Vec<u8>>();
+        let salt = (0..8).collect::<Vec<u8>>();
         let iterations = 2048;
-        let data = (0..124).into_iter().collect::<Vec<u8>>();
+        let data = (0..124).collect::<Vec<u8>>();
         let encrypted = encrypt_pbes1(Pbes1Cipher::ShaAnd40BitRc2Cbc, password, &salt, iterations, &data).unwrap();
         let decrypted = decrypt_pbes1(Pbes1Cipher::ShaAnd40BitRc2Cbc, password, &salt, iterations, &encrypted).unwrap();
         assert_eq!(decrypted, data);
@@ -665,17 +665,17 @@ mod tests {
     #[case(Pbes2AesCbcEncryptionAsn1::Aes256)]
     fn pbes2_aes256_roundtrip(#[case] aes: Pbes2AesCbcEncryptionAsn1) {
         let password = b"test";
-        let data = (0..123).into_iter().collect::<Vec<u8>>();
+        let data = (0..123).collect::<Vec<u8>>();
         let params = Pbes2ParamsAsn1 {
             key_derivation_func: Pbes2KeyDerivationFuncAsn1::Pbkdf2(Pbkdf2ParamsAsn1 {
-                salt: Pbkdf2SaltSourceAsn1::Specified(OctetStringAsn1((0..8).into_iter().collect())),
+                salt: Pbkdf2SaltSourceAsn1::Specified(OctetStringAsn1((0..8).collect())),
                 iteration_count: 2000,
                 key_length: None,
                 prf: Some(Pbkdf2PrfAsn1::HmacWithSha256),
             }),
             encryption_scheme: Pbes2EncryptionSchemeAsn1::AesCbc {
                 kind: aes,
-                iv: OctetStringAsn1((0..16).into_iter().collect()),
+                iv: OctetStringAsn1((0..16).collect()),
             },
         };
         let encrypted = encrypt_pbes2(&params, password, &data).unwrap();
