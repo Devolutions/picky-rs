@@ -99,7 +99,7 @@ pub mod ffi {
             Ok(Box::new(Cert(cert.clone())))
         }
 
-        pub fn authenticode_verifier<'a>(&'a self) -> Box<AuthenticodeValidator<'a>> {
+        pub fn authenticode_verifier(&self) -> Box<AuthenticodeValidator<'_>> {
             let verifier = self.0.authenticode_verifier();
             Box::new(AuthenticodeValidator::new(verifier))
         }
