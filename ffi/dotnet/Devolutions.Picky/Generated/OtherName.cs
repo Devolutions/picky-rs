@@ -23,7 +23,7 @@ public partial class OtherName: IDisposable
         }
     }
 
-    public RsBuffer Value
+    public VecU8 Value
     {
         get
         {
@@ -88,9 +88,9 @@ public partial class OtherName: IDisposable
     }
 
     /// <returns>
-    /// A <c>RsBuffer</c> allocated on Rust side.
+    /// A <c>VecU8</c> allocated on Rust side.
     /// </returns>
-    public RsBuffer GetValue()
+    public VecU8 GetValue()
     {
         unsafe
         {
@@ -98,8 +98,8 @@ public partial class OtherName: IDisposable
             {
                 throw new ObjectDisposedException("OtherName");
             }
-            Raw.RsBuffer* retVal = Raw.OtherName.GetValue(_inner);
-            return new RsBuffer(retVal);
+            Raw.VecU8* retVal = Raw.OtherName.GetValue(_inner);
+            return new VecU8(retVal);
         }
     }
 

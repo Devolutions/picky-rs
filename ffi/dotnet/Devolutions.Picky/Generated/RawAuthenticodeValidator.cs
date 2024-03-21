@@ -45,7 +45,7 @@ public partial struct AuthenticodeValidator
     public static unsafe extern void IgnoreSigningCertificateCheck(AuthenticodeValidator* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "AuthenticodeValidator_require_basic_authenticode_validation", ExactSpelling = true)]
-    public static unsafe extern void RequireBasicAuthenticodeValidation(AuthenticodeValidator* self, RsBuffer* expectedFileHash);
+    public static unsafe extern void RequireBasicAuthenticodeValidation(AuthenticodeValidator* self, VecU8* expectedFileHash);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "AuthenticodeValidator_ignore_basic_authenticode_validation", ExactSpelling = true)]
     public static unsafe extern void IgnoreBasicAuthenticodeValidation(AuthenticodeValidator* self);

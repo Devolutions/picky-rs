@@ -39,7 +39,7 @@ public partial class SpcLink: IDisposable
         }
     }
 
-    public RsBuffer? Url
+    public VecU8? Url
     {
         get
         {
@@ -78,9 +78,9 @@ public partial class SpcLink: IDisposable
     }
 
     /// <returns>
-    /// A <c>RsBuffer</c> allocated on Rust side.
+    /// A <c>VecU8</c> allocated on Rust side.
     /// </returns>
-    public RsBuffer? GetUrl()
+    public VecU8? GetUrl()
     {
         unsafe
         {
@@ -88,12 +88,12 @@ public partial class SpcLink: IDisposable
             {
                 throw new ObjectDisposedException("SpcLink");
             }
-            Raw.RsBuffer* retVal = Raw.SpcLink.GetUrl(_inner);
+            Raw.VecU8* retVal = Raw.SpcLink.GetUrl(_inner);
             if (retVal == null)
             {
                 return null;
             }
-            return new RsBuffer(retVal);
+            return new VecU8(retVal);
         }
     }
 

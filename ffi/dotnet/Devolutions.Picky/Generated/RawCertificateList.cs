@@ -27,7 +27,7 @@ public partial struct CertificateList
     public static unsafe extern AlgorithmIdentifier* GetSignatureAlgorithm(CertificateList* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "CertificateList_get_signature_value", ExactSpelling = true)]
-    public static unsafe extern RsBuffer* GetSignatureValue(CertificateList* self);
+    public static unsafe extern VecU8* GetSignatureValue(CertificateList* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "CertificateList_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(CertificateList* self);

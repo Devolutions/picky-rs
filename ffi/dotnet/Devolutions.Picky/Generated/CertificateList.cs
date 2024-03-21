@@ -23,7 +23,7 @@ public partial class CertificateList: IDisposable
         }
     }
 
-    public RsBuffer SignatureValue
+    public VecU8 SignatureValue
     {
         get
         {
@@ -86,9 +86,9 @@ public partial class CertificateList: IDisposable
     }
 
     /// <returns>
-    /// A <c>RsBuffer</c> allocated on Rust side.
+    /// A <c>VecU8</c> allocated on Rust side.
     /// </returns>
-    public RsBuffer GetSignatureValue()
+    public VecU8 GetSignatureValue()
     {
         unsafe
         {
@@ -96,8 +96,8 @@ public partial class CertificateList: IDisposable
             {
                 throw new ObjectDisposedException("CertificateList");
             }
-            Raw.RsBuffer* retVal = Raw.CertificateList.GetSignatureValue(_inner);
-            return new RsBuffer(retVal);
+            Raw.VecU8* retVal = Raw.CertificateList.GetSignatureValue(_inner);
+            return new VecU8(retVal);
         }
     }
 

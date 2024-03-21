@@ -35,8 +35,8 @@ pub mod ffi {
             Box::new(AlgorithmIdentifier(self.0.signature_algorithm.0.clone()))
         }
 
-        pub fn get_signature(&self) -> Box<crate::utils::ffi::RsBuffer> {
-            Box::new(crate::utils::ffi::RsBuffer::from(&self.0.signature.0))
+        pub fn get_signature(&self) -> Box<crate::utils::ffi::VecU8> {
+            Box::new(crate::utils::ffi::VecU8::from(&self.0.signature.0))
         }
 
         pub fn get_unsigned_attributes(&self) -> Box<UnsignedAttributeIterator> {
@@ -72,13 +72,13 @@ pub mod ffi {
             }
         }
 
-        pub fn get_subject_key_identifier(&self) -> Option<Box<crate::utils::ffi::RsBuffer>> {
+        pub fn get_subject_key_identifier(&self) -> Option<Box<crate::utils::ffi::VecU8>> {
             let picky_asn1_x509::signer_info::SignerIdentifier::SubjectKeyIdentifier(subject_key_identifier) = &self.0
             else {
                 return None;
             };
 
-            let buffer = crate::utils::ffi::RsBuffer::from(&subject_key_identifier.0);
+            let buffer = crate::utils::ffi::VecU8::from(&subject_key_identifier.0);
             Some(Box::new(buffer))
         }
     }

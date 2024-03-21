@@ -4,7 +4,7 @@
 pub mod ffi {
 
     use crate::error::ffi::PickyError;
-    use crate::utils::ffi::RsBuffer;
+    use crate::utils::ffi::VecU8;
     use crate::x509::name::ffi::{GeneralName, GeneralNameIterator};
     use diplomat_runtime::DiplomatWriteable;
     use std::fmt::Write;
@@ -81,20 +81,20 @@ pub mod ffi {
             }
         }
 
-        pub fn to_subject_key_identifier(&'a self) -> Option<Box<crate::utils::ffi::RsBuffer>> {
+        pub fn to_subject_key_identifier(&'a self) -> Option<Box<crate::utils::ffi::VecU8>> {
             match self.0 {
                 picky_asn1_x509::extension::ExtensionView::SubjectKeyIdentifier(value) => {
-                    let buffer = crate::utils::ffi::RsBuffer::from_bytes(&value.0).boxed();
+                    let buffer = crate::utils::ffi::VecU8::from_bytes(&value.0).boxed();
                     Some(buffer)
                 }
                 _ => None,
             }
         }
 
-        pub fn to_key_usage(&'a self) -> Option<Box<RsBuffer>> {
+        pub fn to_key_usage(&'a self) -> Option<Box<VecU8>> {
             match self.0 {
                 picky_asn1_x509::extension::ExtensionView::KeyUsage(value) => {
-                    Some(RsBuffer::from_bytes(value.as_bytes()).boxed())
+                    Some(VecU8::from_bytes(value.as_bytes()).boxed())
                 }
                 _ => None,
             }
@@ -138,19 +138,17 @@ pub mod ffi {
             }
         }
 
-        pub fn to_generic(&'a self) -> Option<Box<crate::utils::ffi::RsBuffer>> {
+        pub fn to_generic(&'a self) -> Option<Box<crate::utils::ffi::VecU8>> {
             match &self.0 {
-                picky_asn1_x509::extension::ExtensionView::Generic(value) => {
-                    Some(RsBuffer::from_bytes(&value.0).boxed())
-                }
+                picky_asn1_x509::extension::ExtensionView::Generic(value) => Some(VecU8::from_bytes(&value.0).boxed()),
                 _ => None,
             }
         }
 
-        pub fn to_crl_number(&'a self) -> Option<Box<crate::utils::ffi::RsBuffer>> {
+        pub fn to_crl_number(&'a self) -> Option<Box<crate::utils::ffi::VecU8>> {
             match &self.0 {
                 picky_asn1_x509::extension::ExtensionView::CrlNumber(value) => {
-                    Some(RsBuffer::from_bytes(&value.0).boxed())
+                    Some(VecU8::from_bytes(&value.0).boxed())
                 }
                 _ => None,
             }
@@ -207,10 +205,10 @@ pub mod ffi {
     pub struct AuthorityKeyIdentifier(pub picky_asn1_x509::AuthorityKeyIdentifier);
 
     impl AuthorityKeyIdentifier {
-        pub fn get_key_identifier(&self) -> Option<Box<crate::utils::ffi::RsBuffer>> {
+        pub fn get_key_identifier(&self) -> Option<Box<crate::utils::ffi::VecU8>> {
             self.0
                 .key_identifier()
-                .map(|key_identifier| RsBuffer::from_bytes(key_identifier).boxed())
+                .map(|key_identifier| VecU8::from_bytes(key_identifier).boxed())
         }
 
         pub fn get_authority_cert_issuer(&self) -> Option<Box<GeneralName>> {
@@ -219,10 +217,10 @@ pub mod ffi {
                 .map(|general_name| Box::new(GeneralName(general_name)))
         }
 
-        pub fn get_authority_cert_serial_number(&self) -> Option<Box<crate::utils::ffi::RsBuffer>> {
+        pub fn get_authority_cert_serial_number(&self) -> Option<Box<crate::utils::ffi::VecU8>> {
             self.0
                 .authority_cert_serial_number()
-                .map(|serial_number| RsBuffer::from_bytes(&serial_number.0).boxed())
+                .map(|serial_number| VecU8::from_bytes(&serial_number.0).boxed())
         }
     }
 }

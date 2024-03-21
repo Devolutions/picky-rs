@@ -1,7 +1,7 @@
 #[diplomat::bridge]
 pub mod ffi {
     use crate::error::ffi::PickyError;
-    use crate::utils::ffi::RsBuffer;
+    use crate::utils::ffi::VecU8;
     use crate::x509::attribute::ffi::{
         AttributeTypeAndValue, AttributeTypeAndValueIterator, AttributeTypeAndValueNestedIterator,
     };
@@ -111,10 +111,10 @@ pub mod ffi {
             }
         }
 
-        pub fn to_ip_address(&self) -> Option<Box<RsBuffer>> {
+        pub fn to_ip_address(&self) -> Option<Box<VecU8>> {
             match &self.0 {
                 picky_asn1_x509::name::GeneralName::IpAddress(ip_address) => {
-                    Some(RsBuffer::from_bytes(&ip_address.0).boxed())
+                    Some(VecU8::from_bytes(&ip_address.0).boxed())
                 }
                 _ => None,
             }
@@ -158,8 +158,8 @@ pub mod ffi {
             Ok(())
         }
 
-        pub fn get_value(&self) -> Box<crate::utils::ffi::RsBuffer> {
-            RsBuffer::from_bytes(&self.0.value.0 .0).boxed()
+        pub fn get_value(&self) -> Box<crate::utils::ffi::VecU8> {
+            VecU8::from_bytes(&self.0.value.0 .0).boxed()
         }
     }
 

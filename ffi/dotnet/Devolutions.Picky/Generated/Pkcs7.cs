@@ -81,9 +81,9 @@ public partial class Pkcs7: IDisposable
 
     /// <exception cref="PickyException"></exception>
     /// <returns>
-    /// A <c>RsBuffer</c> allocated on Rust side.
+    /// A <c>VecU8</c> allocated on Rust side.
     /// </returns>
-    public RsBuffer ToDer()
+    public VecU8 ToDer()
     {
         unsafe
         {
@@ -92,14 +92,14 @@ public partial class Pkcs7: IDisposable
                 throw new ObjectDisposedException("Pkcs7");
             }
             IntPtr resultPtr = Raw.Pkcs7.ToDer(_inner);
-            Raw.Pkcs7FfiResultBoxRsBufferBoxPickyError result = Marshal.PtrToStructure<Raw.Pkcs7FfiResultBoxRsBufferBoxPickyError>(resultPtr);
-            Raw.Pkcs7FfiResultBoxRsBufferBoxPickyError.Destroy(resultPtr);
+            Raw.Pkcs7FfiResultBoxVecU8BoxPickyError result = Marshal.PtrToStructure<Raw.Pkcs7FfiResultBoxVecU8BoxPickyError>(resultPtr);
+            Raw.Pkcs7FfiResultBoxVecU8BoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
             }
-            Raw.RsBuffer* retVal = result.Ok;
-            return new RsBuffer(retVal);
+            Raw.VecU8* retVal = result.Ok;
+            return new VecU8(retVal);
         }
     }
 

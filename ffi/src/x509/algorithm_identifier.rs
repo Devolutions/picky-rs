@@ -106,7 +106,7 @@ pub mod ffi {
             }
         }
 
-        pub fn to_initialization_vector(&self) -> Option<Box<crate::utils::ffi::RsBuffer>> {
+        pub fn to_initialization_vector(&self) -> Option<Box<crate::utils::ffi::VecU8>> {
             match &self.0 {
                 picky_asn1_x509::AesParameters::InitializationVector(iv) => Some(Box::new(iv.into())),
                 _ => None,

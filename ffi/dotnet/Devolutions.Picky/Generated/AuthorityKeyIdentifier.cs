@@ -23,7 +23,7 @@ public partial class AuthorityKeyIdentifier: IDisposable
         }
     }
 
-    public RsBuffer? AuthorityCertSerialNumber
+    public VecU8? AuthorityCertSerialNumber
     {
         get
         {
@@ -31,7 +31,7 @@ public partial class AuthorityKeyIdentifier: IDisposable
         }
     }
 
-    public RsBuffer? KeyIdentifier
+    public VecU8? KeyIdentifier
     {
         get
         {
@@ -54,9 +54,9 @@ public partial class AuthorityKeyIdentifier: IDisposable
     }
 
     /// <returns>
-    /// A <c>RsBuffer</c> allocated on Rust side.
+    /// A <c>VecU8</c> allocated on Rust side.
     /// </returns>
-    public RsBuffer? GetKeyIdentifier()
+    public VecU8? GetKeyIdentifier()
     {
         unsafe
         {
@@ -64,12 +64,12 @@ public partial class AuthorityKeyIdentifier: IDisposable
             {
                 throw new ObjectDisposedException("AuthorityKeyIdentifier");
             }
-            Raw.RsBuffer* retVal = Raw.AuthorityKeyIdentifier.GetKeyIdentifier(_inner);
+            Raw.VecU8* retVal = Raw.AuthorityKeyIdentifier.GetKeyIdentifier(_inner);
             if (retVal == null)
             {
                 return null;
             }
-            return new RsBuffer(retVal);
+            return new VecU8(retVal);
         }
     }
 
@@ -94,9 +94,9 @@ public partial class AuthorityKeyIdentifier: IDisposable
     }
 
     /// <returns>
-    /// A <c>RsBuffer</c> allocated on Rust side.
+    /// A <c>VecU8</c> allocated on Rust side.
     /// </returns>
-    public RsBuffer? GetAuthorityCertSerialNumber()
+    public VecU8? GetAuthorityCertSerialNumber()
     {
         unsafe
         {
@@ -104,12 +104,12 @@ public partial class AuthorityKeyIdentifier: IDisposable
             {
                 throw new ObjectDisposedException("AuthorityKeyIdentifier");
             }
-            Raw.RsBuffer* retVal = Raw.AuthorityKeyIdentifier.GetAuthorityCertSerialNumber(_inner);
+            Raw.VecU8* retVal = Raw.AuthorityKeyIdentifier.GetAuthorityCertSerialNumber(_inner);
             if (retVal == null)
             {
                 return null;
             }
-            return new RsBuffer(retVal);
+            return new VecU8(retVal);
         }
     }
 

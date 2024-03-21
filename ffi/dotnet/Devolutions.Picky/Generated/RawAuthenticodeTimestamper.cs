@@ -24,7 +24,7 @@ public partial struct AuthenticodeTimestamper
     public static unsafe extern IntPtr New(byte* url, nuint urlSz);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "AuthenticodeTimestamper_timestamp", ExactSpelling = true)]
-    public static unsafe extern IntPtr Timestamp(AuthenticodeTimestamper* self, RsBuffer* digest, HashAlgorithm hashAlgo);
+    public static unsafe extern IntPtr Timestamp(AuthenticodeTimestamper* self, VecU8* digest, HashAlgorithm hashAlgo);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "AuthenticodeTimestamper_modify_signed_data", ExactSpelling = true)]
     public static unsafe extern void ModifySignedData(AuthenticodeTimestamper* self, Pkcs7* token, SignedData* signedData);

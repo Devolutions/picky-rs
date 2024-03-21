@@ -51,7 +51,7 @@ public partial struct AttributeTypeAndValueParameters
     public static unsafe extern DirectoryString* ToOrganizationalUnitName(AttributeTypeAndValueParameters* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "AttributeTypeAndValueParameters_to_email_address", ExactSpelling = true)]
-    public static unsafe extern RsBuffer* ToEmailAddress(AttributeTypeAndValueParameters* self);
+    public static unsafe extern VecU8* ToEmailAddress(AttributeTypeAndValueParameters* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "AttributeTypeAndValueParameters_to_given_name", ExactSpelling = true)]
     public static unsafe extern DirectoryString* ToGivenName(AttributeTypeAndValueParameters* self);
@@ -60,7 +60,7 @@ public partial struct AttributeTypeAndValueParameters
     public static unsafe extern DirectoryString* ToPhone(AttributeTypeAndValueParameters* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "AttributeTypeAndValueParameters_to_custom", ExactSpelling = true)]
-    public static unsafe extern RsBuffer* ToCustom(AttributeTypeAndValueParameters* self);
+    public static unsafe extern VecU8* ToCustom(AttributeTypeAndValueParameters* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "AttributeTypeAndValueParameters_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(AttributeTypeAndValueParameters* self);

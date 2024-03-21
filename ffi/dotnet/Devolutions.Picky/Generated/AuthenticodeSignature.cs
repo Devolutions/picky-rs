@@ -33,7 +33,7 @@ public partial class AuthenticodeSignature: IDisposable
     /// <returns>
     /// A <c>AuthenticodeSignature</c> allocated on Rust side.
     /// </returns>
-    public static AuthenticodeSignature New(Pkcs7 pkcs7, RsBuffer fileHash, ShaVariant hashAlgorithm, PrivateKey privateKey, RsString? programName)
+    public static AuthenticodeSignature New(Pkcs7 pkcs7, VecU8 fileHash, ShaVariant hashAlgorithm, PrivateKey privateKey, RsString? programName)
     {
         unsafe
         {
@@ -43,11 +43,11 @@ public partial class AuthenticodeSignature: IDisposable
             {
                 throw new ObjectDisposedException("Pkcs7");
             }
-            Raw.RsBuffer* fileHashRaw;
+            Raw.VecU8* fileHashRaw;
             fileHashRaw = fileHash.AsFFI();
             if (fileHashRaw == null)
             {
-                throw new ObjectDisposedException("RsBuffer");
+                throw new ObjectDisposedException("VecU8");
             }
             Raw.ShaVariant hashAlgorithmRaw;
             hashAlgorithmRaw = (Raw.ShaVariant)hashAlgorithm;
@@ -113,15 +113,15 @@ public partial class AuthenticodeSignature: IDisposable
     /// <returns>
     /// A <c>AuthenticodeSignature</c> allocated on Rust side.
     /// </returns>
-    public static AuthenticodeSignature FromDer(RsBuffer der)
+    public static AuthenticodeSignature FromDer(VecU8 der)
     {
         unsafe
         {
-            Raw.RsBuffer* derRaw;
+            Raw.VecU8* derRaw;
             derRaw = der.AsFFI();
             if (derRaw == null)
             {
-                throw new ObjectDisposedException("RsBuffer");
+                throw new ObjectDisposedException("VecU8");
             }
             IntPtr resultPtr = Raw.AuthenticodeSignature.FromDer(derRaw);
             Raw.X509AuthenticodeFfiResultBoxAuthenticodeSignatureBoxPickyError result = Marshal.PtrToStructure<Raw.X509AuthenticodeFfiResultBoxAuthenticodeSignatureBoxPickyError>(resultPtr);
@@ -188,9 +188,9 @@ public partial class AuthenticodeSignature: IDisposable
 
     /// <exception cref="PickyException"></exception>
     /// <returns>
-    /// A <c>RsBuffer</c> allocated on Rust side.
+    /// A <c>VecU8</c> allocated on Rust side.
     /// </returns>
-    public RsBuffer ToDer()
+    public VecU8 ToDer()
     {
         unsafe
         {
@@ -199,14 +199,14 @@ public partial class AuthenticodeSignature: IDisposable
                 throw new ObjectDisposedException("AuthenticodeSignature");
             }
             IntPtr resultPtr = Raw.AuthenticodeSignature.ToDer(_inner);
-            Raw.X509AuthenticodeFfiResultBoxRsBufferBoxPickyError result = Marshal.PtrToStructure<Raw.X509AuthenticodeFfiResultBoxRsBufferBoxPickyError>(resultPtr);
-            Raw.X509AuthenticodeFfiResultBoxRsBufferBoxPickyError.Destroy(resultPtr);
+            Raw.X509AuthenticodeFfiResultBoxVecU8BoxPickyError result = Marshal.PtrToStructure<Raw.X509AuthenticodeFfiResultBoxVecU8BoxPickyError>(resultPtr);
+            Raw.X509AuthenticodeFfiResultBoxVecU8BoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
             {
                 throw new PickyException(new PickyError(result.Err));
             }
-            Raw.RsBuffer* retVal = result.Ok;
-            return new RsBuffer(retVal);
+            Raw.VecU8* retVal = result.Ok;
+            return new VecU8(retVal);
         }
     }
 
@@ -281,9 +281,9 @@ public partial class AuthenticodeSignature: IDisposable
     }
 
     /// <returns>
-    /// A <c>RsBuffer</c> allocated on Rust side.
+    /// A <c>VecU8</c> allocated on Rust side.
     /// </returns>
-    public RsBuffer? FileHash()
+    public VecU8? FileHash()
     {
         unsafe
         {
@@ -291,12 +291,12 @@ public partial class AuthenticodeSignature: IDisposable
             {
                 throw new ObjectDisposedException("AuthenticodeSignature");
             }
-            Raw.RsBuffer* retVal = Raw.AuthenticodeSignature.FileHash(_inner);
+            Raw.VecU8* retVal = Raw.AuthenticodeSignature.FileHash(_inner);
             if (retVal == null)
             {
                 return null;
             }
-            return new RsBuffer(retVal);
+            return new VecU8(retVal);
         }
     }
 

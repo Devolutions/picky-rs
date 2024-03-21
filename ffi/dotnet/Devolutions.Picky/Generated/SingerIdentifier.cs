@@ -23,7 +23,7 @@ public partial class SingerIdentifier: IDisposable
         }
     }
 
-    public RsBuffer? SubjectKeyIdentifier
+    public VecU8? SubjectKeyIdentifier
     {
         get
         {
@@ -66,9 +66,9 @@ public partial class SingerIdentifier: IDisposable
     }
 
     /// <returns>
-    /// A <c>RsBuffer</c> allocated on Rust side.
+    /// A <c>VecU8</c> allocated on Rust side.
     /// </returns>
-    public RsBuffer? GetSubjectKeyIdentifier()
+    public VecU8? GetSubjectKeyIdentifier()
     {
         unsafe
         {
@@ -76,12 +76,12 @@ public partial class SingerIdentifier: IDisposable
             {
                 throw new ObjectDisposedException("SingerIdentifier");
             }
-            Raw.RsBuffer* retVal = Raw.SingerIdentifier.GetSubjectKeyIdentifier(_inner);
+            Raw.VecU8* retVal = Raw.SingerIdentifier.GetSubjectKeyIdentifier(_inner);
             if (retVal == null)
             {
                 return null;
             }
-            return new RsBuffer(retVal);
+            return new VecU8(retVal);
         }
     }
 

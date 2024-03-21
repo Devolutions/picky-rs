@@ -58,4 +58,18 @@ zEFv26UMfItGCUWhADEA
         Assert.Equal(pem.ToRepr(), newPem.ToRepr());
     }
 
+    // [Fact]
+    // public void SelfSignedAuthenticodeSignatureBasicValidation()
+    // {
+    //     Pem pem = Pem.Parse(p7bRepr);
+    //     Pkcs7 pkcs7 = Pkcs7.FromPem(pem);
+
+    //     byte[] FILE_HASH =  [
+    //         0xa7, 0x38, 0xda, 0x44, 0x46, 0xa4, 0xe7, 0x8a, 0xb6, 0x47, 0xdb, 0x7e, 0x53, 0x42, 0x7e, 0xb0, 0x79, 0x61,
+    //         0xc9, 0x94, 0x31, 0x7f, 0x4c, 0x59, 0xd7, 0xed, 0xbe, 0xa5, 0xcc, 0x78, 0x6d, 0x80,
+    //     ];
+
+    //     AuthenticodeSignature signature = AuthenticodeSignature.New(pkcs7,FILE)
+    // }
+
 }

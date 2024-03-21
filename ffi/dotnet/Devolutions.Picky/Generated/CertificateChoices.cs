@@ -15,7 +15,7 @@ public partial class CertificateChoices: IDisposable
 {
     private unsafe Raw.CertificateChoices* _inner;
 
-    public RsBuffer? Certificate
+    public VecU8? Certificate
     {
         get
         {
@@ -23,7 +23,7 @@ public partial class CertificateChoices: IDisposable
         }
     }
 
-    public RsBuffer? Other
+    public VecU8? Other
     {
         get
         {
@@ -46,9 +46,9 @@ public partial class CertificateChoices: IDisposable
     }
 
     /// <returns>
-    /// A <c>RsBuffer</c> allocated on Rust side.
+    /// A <c>VecU8</c> allocated on Rust side.
     /// </returns>
-    public RsBuffer? GetCertificate()
+    public VecU8? GetCertificate()
     {
         unsafe
         {
@@ -56,19 +56,19 @@ public partial class CertificateChoices: IDisposable
             {
                 throw new ObjectDisposedException("CertificateChoices");
             }
-            Raw.RsBuffer* retVal = Raw.CertificateChoices.GetCertificate(_inner);
+            Raw.VecU8* retVal = Raw.CertificateChoices.GetCertificate(_inner);
             if (retVal == null)
             {
                 return null;
             }
-            return new RsBuffer(retVal);
+            return new VecU8(retVal);
         }
     }
 
     /// <returns>
-    /// A <c>RsBuffer</c> allocated on Rust side.
+    /// A <c>VecU8</c> allocated on Rust side.
     /// </returns>
-    public RsBuffer? GetOther()
+    public VecU8? GetOther()
     {
         unsafe
         {
@@ -76,12 +76,12 @@ public partial class CertificateChoices: IDisposable
             {
                 throw new ObjectDisposedException("CertificateChoices");
             }
-            Raw.RsBuffer* retVal = Raw.CertificateChoices.GetOther(_inner);
+            Raw.VecU8* retVal = Raw.CertificateChoices.GetOther(_inner);
             if (retVal == null)
             {
                 return null;
             }
-            return new RsBuffer(retVal);
+            return new VecU8(retVal);
         }
     }
 

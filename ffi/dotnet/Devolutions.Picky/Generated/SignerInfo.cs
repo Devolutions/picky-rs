@@ -31,7 +31,7 @@ public partial class SignerInfo: IDisposable
         }
     }
 
-    public RsBuffer Signature
+    public VecU8 Signature
     {
         get
         {
@@ -150,9 +150,9 @@ public partial class SignerInfo: IDisposable
     }
 
     /// <returns>
-    /// A <c>RsBuffer</c> allocated on Rust side.
+    /// A <c>VecU8</c> allocated on Rust side.
     /// </returns>
-    public RsBuffer GetSignature()
+    public VecU8 GetSignature()
     {
         unsafe
         {
@@ -160,8 +160,8 @@ public partial class SignerInfo: IDisposable
             {
                 throw new ObjectDisposedException("SignerInfo");
             }
-            Raw.RsBuffer* retVal = Raw.SignerInfo.GetSignature(_inner);
-            return new RsBuffer(retVal);
+            Raw.VecU8* retVal = Raw.SignerInfo.GetSignature(_inner);
+            return new VecU8(retVal);
         }
     }
 

@@ -27,7 +27,7 @@ public partial struct DirectoryString
     public static unsafe extern IntPtr GetAsString(DirectoryString* self, DiplomatWriteable* writable);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "DirectoryString_get_as_bytes", ExactSpelling = true)]
-    public static unsafe extern RsBuffer* GetAsBytes(DirectoryString* self);
+    public static unsafe extern VecU8* GetAsBytes(DirectoryString* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "DirectoryString_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(DirectoryString* self);

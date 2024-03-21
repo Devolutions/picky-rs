@@ -24,7 +24,7 @@ public partial struct AesParameters
     public static unsafe extern AesParametersType GetType(AesParameters* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "AesParameters_to_initialization_vector", ExactSpelling = true)]
-    public static unsafe extern RsBuffer* ToInitializationVector(AesParameters* self);
+    public static unsafe extern VecU8* ToInitializationVector(AesParameters* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "AesParameters_to_authenticated_encryption_parameters", ExactSpelling = true)]
     public static unsafe extern AesAuthEncParams* ToAuthenticatedEncryptionParameters(AesParameters* self);

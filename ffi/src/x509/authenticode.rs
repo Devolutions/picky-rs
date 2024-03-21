@@ -9,7 +9,7 @@ pub mod ffi {
         key::ffi::PrivateKey,
         pem::ffi::Pem,
         pkcs7::ffi::Pkcs7,
-        utils::ffi::{RsBuffer, RsString},
+        utils::ffi::{RsString, VecU8},
         x509::{
             attribute::ffi::{Attribute, AttributeIterator, SignedData, UnsignedAttribute, UnsignedAttributeIterator},
             ffi::{Cert, CertIterator},
@@ -41,7 +41,7 @@ pub mod ffi {
     impl AuthenticodeSignature {
         pub fn new(
             pkcs7: &crate::pkcs7::ffi::Pkcs7,
-            file_hash: &RsBuffer,
+            file_hash: &VecU8,
             hash_algorithm: ShaVariant,
             private_key: &PrivateKey,
             program_name: Option<Box<RsString>>,
@@ -69,7 +69,7 @@ pub mod ffi {
             Ok(())
         }
 
-        pub fn from_der(der: &RsBuffer) -> Result<Box<AuthenticodeSignature>, Box<PickyError>> {
+        pub fn from_der(der: &VecU8) -> Result<Box<AuthenticodeSignature>, Box<PickyError>> {
             let inner = picky::x509::pkcs7::authenticode::AuthenticodeSignature::from_der(&der.0)?;
             Ok(Box::new(AuthenticodeSignature(inner)))
         }
@@ -84,9 +84,9 @@ pub mod ffi {
             Ok(Box::new(AuthenticodeSignature(inner)))
         }
 
-        pub fn to_der(&self) -> Result<Box<RsBuffer>, Box<PickyError>> {
+        pub fn to_der(&self) -> Result<Box<VecU8>, Box<PickyError>> {
             let der = self.0.to_der()?;
-            Ok(Box::new(RsBuffer(der)))
+            Ok(Box::new(VecU8(der)))
         }
 
         pub fn to_pem(&self) -> Result<Box<Pem>, Box<PickyError>> {
@@ -104,8 +104,8 @@ pub mod ffi {
             Box::new(AuthenticodeValidator::new(verifier))
         }
 
-        pub fn file_hash(&self) -> Option<Box<RsBuffer>> {
-            self.0.file_hash().map(RsBuffer).map(Box::new)
+        pub fn file_hash(&self) -> Option<Box<VecU8>> {
+            self.0.file_hash().map(VecU8).map(Box::new)
         }
 
         pub fn authenticate_attributes(&self) -> Box<AttributeIterator> {
@@ -170,7 +170,7 @@ pub mod ffi {
             self.inner.ignore_signing_certificate_check();
         }
 
-        pub fn require_basic_authenticode_validation(&'a self, expected_file_hash: &'a RsBuffer) {
+        pub fn require_basic_authenticode_validation(&'a self, expected_file_hash: &'a VecU8) {
             self.inner
                 .require_basic_authenticode_validation(expected_file_hash.0.clone());
         }
@@ -208,7 +208,7 @@ pub mod ffi {
             Ok(Box::new(AuthenticodeTimestamper(inner)))
         }
 
-        pub fn timestamp(&self, digest: &RsBuffer, hash_algo: HashAlgorithm) -> Result<Box<Pkcs7>, Box<PickyError>> {
+        pub fn timestamp(&self, digest: &VecU8, hash_algo: HashAlgorithm) -> Result<Box<Pkcs7>, Box<PickyError>> {
             Ok(self
                 .0
                 .timestamp(

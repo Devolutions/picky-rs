@@ -1,7 +1,7 @@
 #[diplomat::bridge]
 pub mod ffi {
     use crate::error::ffi::PickyError;
-    use crate::utils::ffi::RsBuffer;
+    use crate::utils::ffi::VecU8;
     use diplomat_runtime::DiplomatWriteable;
     use std::fmt::Write;
 
@@ -31,16 +31,16 @@ pub mod ffi {
             Ok(())
         }
 
-        pub fn get_as_bytes(&self) -> Box<RsBuffer> {
+        pub fn get_as_bytes(&self) -> Box<VecU8> {
             match &self.0 {
                 picky_asn1_x509::directory_string::DirectoryString::PrintableString(string) => {
-                    RsBuffer::from_bytes(string.as_bytes()).boxed()
+                    VecU8::from_bytes(string.as_bytes()).boxed()
                 }
                 picky_asn1_x509::directory_string::DirectoryString::Utf8String(string) => {
-                    RsBuffer::from_bytes(string.as_bytes()).boxed()
+                    VecU8::from_bytes(string.as_bytes()).boxed()
                 }
                 picky_asn1_x509::directory_string::DirectoryString::BmpString(string) => {
-                    RsBuffer::from_bytes(string.as_bytes()).boxed()
+                    VecU8::from_bytes(string.as_bytes()).boxed()
                 }
             }
         }

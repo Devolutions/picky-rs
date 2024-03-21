@@ -12,7 +12,7 @@ namespace Devolutions.Picky.Raw;
 #nullable enable
 
 [StructLayout(LayoutKind.Sequential)]
-public partial struct X509AuthenticodeFfiResultBoxRsBufferBoxPickyError
+public partial struct X509AuthenticodeFfiResultBoxVecU8BoxPickyError
 {
 #if __IOS__
     private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
@@ -24,7 +24,7 @@ public partial struct X509AuthenticodeFfiResultBoxRsBufferBoxPickyError
     private unsafe struct InnerUnion
     {
         [FieldOffset(0)]
-        internal RsBuffer* ok;
+        internal VecU8* ok;
         [FieldOffset(0)]
         internal PickyError* err;
     }
@@ -34,7 +34,7 @@ public partial struct X509AuthenticodeFfiResultBoxRsBufferBoxPickyError
     [MarshalAs(UnmanagedType.U1)]
     public bool isOk;
 
-    public unsafe RsBuffer* Ok
+    public unsafe VecU8* Ok
     {
         get
         {
@@ -50,6 +50,6 @@ public partial struct X509AuthenticodeFfiResultBoxRsBufferBoxPickyError
         }
     }
 
-    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "result_box_RsBuffer_box_PickyError_destroy", ExactSpelling = true)]
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "result_box_VecU8_box_PickyError_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(IntPtr self);
 }

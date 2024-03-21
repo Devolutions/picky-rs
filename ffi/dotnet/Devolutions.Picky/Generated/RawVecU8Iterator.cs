@@ -12,7 +12,7 @@ namespace Devolutions.Picky.Raw;
 #nullable enable
 
 [StructLayout(LayoutKind.Sequential)]
-public partial struct BufferIterator
+public partial struct VecU8Iterator
 {
 #if __IOS__
     private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
@@ -20,9 +20,9 @@ public partial struct BufferIterator
     private const string NativeLib = "DevolutionsPicky";
 #endif
 
-    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "BufferIterator_next", ExactSpelling = true)]
-    public static unsafe extern RsBuffer* Next(BufferIterator* self);
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "VecU8Iterator_next", ExactSpelling = true)]
+    public static unsafe extern VecU8* Next(VecU8Iterator* self);
 
-    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "BufferIterator_destroy", ExactSpelling = true)]
-    public static unsafe extern void Destroy(BufferIterator* self);
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "VecU8Iterator_destroy", ExactSpelling = true)]
+    public static unsafe extern void Destroy(VecU8Iterator* self);
 }

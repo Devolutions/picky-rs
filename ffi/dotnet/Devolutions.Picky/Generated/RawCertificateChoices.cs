@@ -21,10 +21,10 @@ public partial struct CertificateChoices
 #endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "CertificateChoices_get_certificate", ExactSpelling = true)]
-    public static unsafe extern RsBuffer* GetCertificate(CertificateChoices* self);
+    public static unsafe extern VecU8* GetCertificate(CertificateChoices* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "CertificateChoices_get_other", ExactSpelling = true)]
-    public static unsafe extern RsBuffer* GetOther(CertificateChoices* self);
+    public static unsafe extern VecU8* GetOther(CertificateChoices* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "CertificateChoices_is_certificate", ExactSpelling = true)]
     [return: MarshalAs(UnmanagedType.U1)]

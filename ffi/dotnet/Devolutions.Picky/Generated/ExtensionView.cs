@@ -74,9 +74,9 @@ public partial class ExtensionView: IDisposable
     }
 
     /// <returns>
-    /// A <c>RsBuffer</c> allocated on Rust side.
+    /// A <c>VecU8</c> allocated on Rust side.
     /// </returns>
-    public RsBuffer? ToSubjectKeyIdentifier()
+    public VecU8? ToSubjectKeyIdentifier()
     {
         unsafe
         {
@@ -84,19 +84,19 @@ public partial class ExtensionView: IDisposable
             {
                 throw new ObjectDisposedException("ExtensionView");
             }
-            Raw.RsBuffer* retVal = Raw.ExtensionView.ToSubjectKeyIdentifier(_inner);
+            Raw.VecU8* retVal = Raw.ExtensionView.ToSubjectKeyIdentifier(_inner);
             if (retVal == null)
             {
                 return null;
             }
-            return new RsBuffer(retVal);
+            return new VecU8(retVal);
         }
     }
 
     /// <returns>
-    /// A <c>RsBuffer</c> allocated on Rust side.
+    /// A <c>VecU8</c> allocated on Rust side.
     /// </returns>
-    public RsBuffer? ToKeyUsage()
+    public VecU8? ToKeyUsage()
     {
         unsafe
         {
@@ -104,12 +104,12 @@ public partial class ExtensionView: IDisposable
             {
                 throw new ObjectDisposedException("ExtensionView");
             }
-            Raw.RsBuffer* retVal = Raw.ExtensionView.ToKeyUsage(_inner);
+            Raw.VecU8* retVal = Raw.ExtensionView.ToKeyUsage(_inner);
             if (retVal == null)
             {
                 return null;
             }
-            return new RsBuffer(retVal);
+            return new VecU8(retVal);
         }
     }
 
@@ -194,9 +194,9 @@ public partial class ExtensionView: IDisposable
     }
 
     /// <returns>
-    /// A <c>RsBuffer</c> allocated on Rust side.
+    /// A <c>VecU8</c> allocated on Rust side.
     /// </returns>
-    public RsBuffer? ToGeneric()
+    public VecU8? ToGeneric()
     {
         unsafe
         {
@@ -204,19 +204,19 @@ public partial class ExtensionView: IDisposable
             {
                 throw new ObjectDisposedException("ExtensionView");
             }
-            Raw.RsBuffer* retVal = Raw.ExtensionView.ToGeneric(_inner);
+            Raw.VecU8* retVal = Raw.ExtensionView.ToGeneric(_inner);
             if (retVal == null)
             {
                 return null;
             }
-            return new RsBuffer(retVal);
+            return new VecU8(retVal);
         }
     }
 
     /// <returns>
-    /// A <c>RsBuffer</c> allocated on Rust side.
+    /// A <c>VecU8</c> allocated on Rust side.
     /// </returns>
-    public RsBuffer? ToCrlNumber()
+    public VecU8? ToCrlNumber()
     {
         unsafe
         {
@@ -224,12 +224,12 @@ public partial class ExtensionView: IDisposable
             {
                 throw new ObjectDisposedException("ExtensionView");
             }
-            Raw.RsBuffer* retVal = Raw.ExtensionView.ToCrlNumber(_inner);
+            Raw.VecU8* retVal = Raw.ExtensionView.ToCrlNumber(_inner);
             if (retVal == null)
             {
                 return null;
             }
-            return new RsBuffer(retVal);
+            return new VecU8(retVal);
         }
     }
 

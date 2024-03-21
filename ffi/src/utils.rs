@@ -1,4 +1,4 @@
-use self::ffi::RsBuffer;
+use self::ffi::VecU8;
 
 #[diplomat::bridge]
 pub mod ffi {
@@ -8,9 +8,9 @@ pub mod ffi {
     use std::fmt::Write;
 
     #[diplomat::opaque] // Named RsBuffer to avoid conflict with the Diplomat runtime Buffer
-    pub struct RsBuffer(pub Vec<u8>);
+    pub struct VecU8(pub Vec<u8>);
 
-    impl RsBuffer {
+    impl VecU8 {
         pub fn get_length(&self) -> usize {
             self.0.len()
         }
@@ -36,10 +36,10 @@ pub mod ffi {
     }
 
     #[diplomat::opaque]
-    pub struct BufferIterator(pub Vec<RsBuffer>);
+    pub struct VecU8Iterator(pub Vec<VecU8>);
 
-    impl BufferIterator {
-        pub fn next(&mut self) -> Option<Box<RsBuffer>> {
+    impl VecU8Iterator {
+        pub fn next(&mut self) -> Option<Box<VecU8>> {
             self.0.pop().map(Box::new)
         }
     }
@@ -79,14 +79,14 @@ pub mod ffi {
     }
 }
 
-impl From<&picky_asn1::wrapper::OctetStringAsn1> for ffi::RsBuffer {
+impl From<&picky_asn1::wrapper::OctetStringAsn1> for ffi::VecU8 {
     fn from(octet_string: &picky_asn1::wrapper::OctetStringAsn1) -> Self {
         Self(octet_string.0.as_slice().to_vec())
     }
 }
 
-impl RsBuffer {
-    pub fn boxed(self) -> Box<RsBuffer> {
+impl VecU8 {
+    pub fn boxed(self) -> Box<VecU8> {
         Box::new(self)
     }
 

@@ -24,7 +24,7 @@ public partial struct SpcLink
     public static unsafe extern SpcLinkType GetType(SpcLink* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SpcLink_get_url", ExactSpelling = true)]
-    public static unsafe extern RsBuffer* GetUrl(SpcLink* self);
+    public static unsafe extern VecU8* GetUrl(SpcLink* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SpcLink_get_moniker", ExactSpelling = true)]
     public static unsafe extern SpcSerializedObject* GetMoniker(SpcLink* self);

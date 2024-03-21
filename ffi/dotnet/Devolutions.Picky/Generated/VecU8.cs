@@ -11,9 +11,9 @@ namespace Devolutions.Picky;
 
 #nullable enable
 
-public partial class RsBuffer: IDisposable
+public partial class VecU8: IDisposable
 {
-    private unsafe Raw.RsBuffer* _inner;
+    private unsafe Raw.VecU8* _inner;
 
     public nuint Length
     {
@@ -24,7 +24,7 @@ public partial class RsBuffer: IDisposable
     }
 
     /// <summary>
-    /// Creates a managed <c>RsBuffer</c> from a raw handle.
+    /// Creates a managed <c>VecU8</c> from a raw handle.
     /// </summary>
     /// <remarks>
     /// Safety: you should not build two managed objects using the same raw handle (may causes use-after-free and double-free).
@@ -32,7 +32,7 @@ public partial class RsBuffer: IDisposable
     /// This constructor assumes the raw struct is allocated on Rust side.
     /// If implemented, the custom Drop implementation on Rust side WILL run on destruction.
     /// </remarks>
-    public unsafe RsBuffer(Raw.RsBuffer* handle)
+    public unsafe VecU8(Raw.VecU8* handle)
     {
         _inner = handle;
     }
@@ -43,9 +43,9 @@ public partial class RsBuffer: IDisposable
         {
             if (_inner == null)
             {
-                throw new ObjectDisposedException("RsBuffer");
+                throw new ObjectDisposedException("VecU8");
             }
-            nuint retVal = Raw.RsBuffer.GetLength(_inner);
+            nuint retVal = Raw.VecU8.GetLength(_inner);
             return retVal;
         }
     }
@@ -57,12 +57,12 @@ public partial class RsBuffer: IDisposable
         {
             if (_inner == null)
             {
-                throw new ObjectDisposedException("RsBuffer");
+                throw new ObjectDisposedException("VecU8");
             }
             nuint bufferLength = (nuint)buffer.Length;
             fixed (byte* bufferPtr = buffer)
             {
-                IntPtr resultPtr = Raw.RsBuffer.Fill(_inner, bufferPtr, bufferLength);
+                IntPtr resultPtr = Raw.VecU8.Fill(_inner, bufferPtr, bufferLength);
                 Raw.UtilsFfiResultVoidBoxBufferTooSmallError result = Marshal.PtrToStructure<Raw.UtilsFfiResultVoidBoxBufferTooSmallError>(resultPtr);
                 Raw.UtilsFfiResultVoidBoxBufferTooSmallError.Destroy(resultPtr);
                 if (!result.isOk)
@@ -76,7 +76,7 @@ public partial class RsBuffer: IDisposable
     /// <summary>
     /// Returns the underlying raw handle.
     /// </summary>
-    public unsafe Raw.RsBuffer* AsFFI()
+    public unsafe Raw.VecU8* AsFFI()
     {
         return _inner;
     }
@@ -93,14 +93,14 @@ public partial class RsBuffer: IDisposable
                 return;
             }
 
-            Raw.RsBuffer.Destroy(_inner);
+            Raw.VecU8.Destroy(_inner);
             _inner = null;
 
             GC.SuppressFinalize(this);
         }
     }
 
-    ~RsBuffer()
+    ~VecU8()
     {
         Dispose();
     }

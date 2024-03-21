@@ -1,7 +1,7 @@
 #[diplomat::bridge]
 pub mod ffi {
     use crate::error::ffi::PickyError;
-    use crate::utils::ffi::{RsBuffer, StringIterator, StringNestedIterator};
+    use crate::utils::ffi::{StringIterator, StringNestedIterator, VecU8};
     use crate::x509::algorithm_identifier::ffi::{AlgorithmIdentifier, AlgorithmIdentifierIterator};
     use crate::x509::extension::ffi::{Extension, ExtensionIterator};
     use crate::x509::singer_info::ffi::{CmsVersion, SignerInfo, SignerInfoIterator};
@@ -61,9 +61,9 @@ pub mod ffi {
             }
         }
 
-        pub fn to_custom(&self) -> Option<Box<RsBuffer>> {
+        pub fn to_custom(&self) -> Option<Box<VecU8>> {
             match &self.0 {
-                picky_asn1_x509::AttributeValues::Custom(der) => Some(RsBuffer::from_bytes(&der.0).boxed()),
+                picky_asn1_x509::AttributeValues::Custom(der) => Some(VecU8::from_bytes(&der.0).boxed()),
                 _ => None,
             }
         }
@@ -188,13 +188,13 @@ pub mod ffi {
             Ok(())
         }
 
-        pub fn get_as_bytes(&self) -> Box<RsBuffer> {
+        pub fn get_as_bytes(&self) -> Box<VecU8> {
             match &self.0 {
                 picky_asn1_x509::pkcs7::content_info::SpcString::Unicode(unicode) => {
-                    RsBuffer::from_bytes(&unicode.0 .0 .0).boxed()
+                    VecU8::from_bytes(&unicode.0 .0 .0).boxed()
                 }
                 picky_asn1_x509::pkcs7::content_info::SpcString::Ancii(ancii) => {
-                    RsBuffer::from_bytes(&ancii.0 .0 .0).boxed()
+                    VecU8::from_bytes(&ancii.0 .0 .0).boxed()
                 }
             }
         }
@@ -218,11 +218,11 @@ pub mod ffi {
             }
         }
 
-        pub fn get_url(&self) -> Option<Box<RsBuffer>> {
+        pub fn get_url(&self) -> Option<Box<VecU8>> {
             match &self.0 {
                 picky_asn1_x509::pkcs7::content_info::SpcLink::Url(url) => {
                     let clone = url.0.clone();
-                    Some(RsBuffer::from_bytes(&clone.0 .0).boxed())
+                    Some(VecU8::from_bytes(&clone.0 .0).boxed())
                 }
                 _ => None,
             }
@@ -252,12 +252,12 @@ pub mod ffi {
     pub struct SpcSerializedObject(picky_asn1_x509::pkcs7::content_info::SpcSerializedObject);
 
     impl SpcSerializedObject {
-        pub fn get_class_id(&self) -> Box<RsBuffer> {
-            RsBuffer::from_bytes(&self.0.class_id.0 .0).boxed()
+        pub fn get_class_id(&self) -> Box<VecU8> {
+            VecU8::from_bytes(&self.0.class_id.0 .0).boxed()
         }
 
-        pub fn get_object_id(&self) -> Box<RsBuffer> {
-            RsBuffer::from_bytes(&self.0.serialized_data.0).boxed()
+        pub fn get_object_id(&self) -> Box<VecU8> {
+            VecU8::from_bytes(&self.0.serialized_data.0).boxed()
         }
     }
 
@@ -453,11 +453,11 @@ pub mod ffi {
             }
         }
 
-        pub fn to_email_address(&self) -> Option<Box<RsBuffer>> {
+        pub fn to_email_address(&self) -> Option<Box<VecU8>> {
             match &self.0 {
                 picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValueParameters::EmailAddress(
                     email_address,
-                ) => Some(RsBuffer::from_bytes(email_address.as_bytes()).boxed()),
+                ) => Some(VecU8::from_bytes(email_address.as_bytes()).boxed()),
                 _ => None,
             }
         }
@@ -480,10 +480,10 @@ pub mod ffi {
             }
         }
 
-        pub fn to_custom(&self) -> Option<Box<RsBuffer>> {
+        pub fn to_custom(&self) -> Option<Box<VecU8>> {
             match &self.0 {
                 picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValueParameters::Custom(custom) => {
-                    Some(RsBuffer::from_bytes(&custom.0).boxed())
+                    Some(VecU8::from_bytes(&custom.0).boxed())
                 }
                 _ => None,
             }
@@ -640,20 +640,18 @@ pub mod ffi {
     pub struct CertificateChoices(pub picky_asn1_x509::signed_data::CertificateChoices);
 
     impl CertificateChoices {
-        pub fn get_certificate(&self) -> Option<Box<RsBuffer>> {
+        pub fn get_certificate(&self) -> Option<Box<VecU8>> {
             match &self.0 {
                 picky_asn1_x509::signed_data::CertificateChoices::Certificate(der) => {
-                    Some(RsBuffer::from_bytes(&der.0).boxed())
+                    Some(VecU8::from_bytes(&der.0).boxed())
                 }
                 _ => None,
             }
         }
 
-        pub fn get_other(&self) -> Option<Box<RsBuffer>> {
+        pub fn get_other(&self) -> Option<Box<VecU8>> {
             match &self.0 {
-                picky_asn1_x509::signed_data::CertificateChoices::Other(der) => {
-                    Some(RsBuffer::from_bytes(&der.0).boxed())
-                }
+                picky_asn1_x509::signed_data::CertificateChoices::Other(der) => Some(VecU8::from_bytes(&der.0).boxed()),
                 _ => None,
             }
         }
@@ -699,8 +697,8 @@ pub mod ffi {
             Box::new(AlgorithmIdentifier(self.0.signature_algorithm.clone()))
         }
 
-        pub fn get_signature_value(&self) -> Box<RsBuffer> {
-            RsBuffer::from_bytes(self.0.signature_value.clone().payload_view()).boxed()
+        pub fn get_signature_value(&self) -> Box<VecU8> {
+            VecU8::from_bytes(self.0.signature_value.clone().payload_view()).boxed()
         }
     }
     #[diplomat::opaque]
@@ -771,9 +769,9 @@ pub mod ffi {
     pub struct RevokedCertificate(picky_asn1_x509::crls::RevokedCertificate);
 
     impl RevokedCertificate {
-        pub fn get_user_certificate(&self) -> Box<RsBuffer> {
+        pub fn get_user_certificate(&self) -> Box<VecU8> {
             let vec = self.0.user_certificate.0 .0.clone();
-            RsBuffer::from_bytes(&vec).boxed()
+            VecU8::from_bytes(&vec).boxed()
         }
 
         pub fn get_revocation_date(&self) -> Box<Time> {

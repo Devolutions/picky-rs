@@ -24,7 +24,7 @@ public partial struct AttributeValues
     public static unsafe extern AttributeValueType GetType(AttributeValues* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "AttributeValues_to_custom", ExactSpelling = true)]
-    public static unsafe extern RsBuffer* ToCustom(AttributeValues* self);
+    public static unsafe extern VecU8* ToCustom(AttributeValues* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "AttributeValues_to_extensions", ExactSpelling = true)]
     public static unsafe extern ExtensionIterator* ToExtensions(AttributeValues* self);

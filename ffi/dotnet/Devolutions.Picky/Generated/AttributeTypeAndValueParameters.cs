@@ -234,9 +234,9 @@ public partial class AttributeTypeAndValueParameters: IDisposable
     }
 
     /// <returns>
-    /// A <c>RsBuffer</c> allocated on Rust side.
+    /// A <c>VecU8</c> allocated on Rust side.
     /// </returns>
-    public RsBuffer? ToEmailAddress()
+    public VecU8? ToEmailAddress()
     {
         unsafe
         {
@@ -244,12 +244,12 @@ public partial class AttributeTypeAndValueParameters: IDisposable
             {
                 throw new ObjectDisposedException("AttributeTypeAndValueParameters");
             }
-            Raw.RsBuffer* retVal = Raw.AttributeTypeAndValueParameters.ToEmailAddress(_inner);
+            Raw.VecU8* retVal = Raw.AttributeTypeAndValueParameters.ToEmailAddress(_inner);
             if (retVal == null)
             {
                 return null;
             }
-            return new RsBuffer(retVal);
+            return new VecU8(retVal);
         }
     }
 
@@ -294,9 +294,9 @@ public partial class AttributeTypeAndValueParameters: IDisposable
     }
 
     /// <returns>
-    /// A <c>RsBuffer</c> allocated on Rust side.
+    /// A <c>VecU8</c> allocated on Rust side.
     /// </returns>
-    public RsBuffer? ToCustom()
+    public VecU8? ToCustom()
     {
         unsafe
         {
@@ -304,12 +304,12 @@ public partial class AttributeTypeAndValueParameters: IDisposable
             {
                 throw new ObjectDisposedException("AttributeTypeAndValueParameters");
             }
-            Raw.RsBuffer* retVal = Raw.AttributeTypeAndValueParameters.ToCustom(_inner);
+            Raw.VecU8* retVal = Raw.AttributeTypeAndValueParameters.ToCustom(_inner);
             if (retVal == null)
             {
                 return null;
             }
-            return new RsBuffer(retVal);
+            return new VecU8(retVal);
         }
     }
 

@@ -143,7 +143,7 @@ public partial class AuthenticodeValidator: IDisposable
         }
     }
 
-    public void RequireBasicAuthenticodeValidation(RsBuffer expectedFileHash)
+    public void RequireBasicAuthenticodeValidation(VecU8 expectedFileHash)
     {
         unsafe
         {
@@ -151,11 +151,11 @@ public partial class AuthenticodeValidator: IDisposable
             {
                 throw new ObjectDisposedException("AuthenticodeValidator");
             }
-            Raw.RsBuffer* expectedFileHashRaw;
+            Raw.VecU8* expectedFileHashRaw;
             expectedFileHashRaw = expectedFileHash.AsFFI();
             if (expectedFileHashRaw == null)
             {
-                throw new ObjectDisposedException("RsBuffer");
+                throw new ObjectDisposedException("VecU8");
             }
             Raw.AuthenticodeValidator.RequireBasicAuthenticodeValidation(_inner, expectedFileHashRaw);
         }

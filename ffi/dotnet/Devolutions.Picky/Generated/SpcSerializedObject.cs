@@ -15,7 +15,7 @@ public partial class SpcSerializedObject: IDisposable
 {
     private unsafe Raw.SpcSerializedObject* _inner;
 
-    public RsBuffer ClassId
+    public VecU8 ClassId
     {
         get
         {
@@ -23,7 +23,7 @@ public partial class SpcSerializedObject: IDisposable
         }
     }
 
-    public RsBuffer ObjectId
+    public VecU8 ObjectId
     {
         get
         {
@@ -46,9 +46,9 @@ public partial class SpcSerializedObject: IDisposable
     }
 
     /// <returns>
-    /// A <c>RsBuffer</c> allocated on Rust side.
+    /// A <c>VecU8</c> allocated on Rust side.
     /// </returns>
-    public RsBuffer GetClassId()
+    public VecU8 GetClassId()
     {
         unsafe
         {
@@ -56,15 +56,15 @@ public partial class SpcSerializedObject: IDisposable
             {
                 throw new ObjectDisposedException("SpcSerializedObject");
             }
-            Raw.RsBuffer* retVal = Raw.SpcSerializedObject.GetClassId(_inner);
-            return new RsBuffer(retVal);
+            Raw.VecU8* retVal = Raw.SpcSerializedObject.GetClassId(_inner);
+            return new VecU8(retVal);
         }
     }
 
     /// <returns>
-    /// A <c>RsBuffer</c> allocated on Rust side.
+    /// A <c>VecU8</c> allocated on Rust side.
     /// </returns>
-    public RsBuffer GetObjectId()
+    public VecU8 GetObjectId()
     {
         unsafe
         {
@@ -72,8 +72,8 @@ public partial class SpcSerializedObject: IDisposable
             {
                 throw new ObjectDisposedException("SpcSerializedObject");
             }
-            Raw.RsBuffer* retVal = Raw.SpcSerializedObject.GetObjectId(_inner);
-            return new RsBuffer(retVal);
+            Raw.VecU8* retVal = Raw.SpcSerializedObject.GetObjectId(_inner);
+            return new VecU8(retVal);
         }
     }
 

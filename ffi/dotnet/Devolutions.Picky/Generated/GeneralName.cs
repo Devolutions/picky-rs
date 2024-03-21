@@ -240,9 +240,9 @@ public partial class GeneralName: IDisposable
     }
 
     /// <returns>
-    /// A <c>RsBuffer</c> allocated on Rust side.
+    /// A <c>VecU8</c> allocated on Rust side.
     /// </returns>
-    public RsBuffer? ToIpAddress()
+    public VecU8? ToIpAddress()
     {
         unsafe
         {
@@ -250,12 +250,12 @@ public partial class GeneralName: IDisposable
             {
                 throw new ObjectDisposedException("GeneralName");
             }
-            Raw.RsBuffer* retVal = Raw.GeneralName.ToIpAddress(_inner);
+            Raw.VecU8* retVal = Raw.GeneralName.ToIpAddress(_inner);
             if (retVal == null)
             {
                 return null;
             }
-            return new RsBuffer(retVal);
+            return new VecU8(retVal);
         }
     }
 

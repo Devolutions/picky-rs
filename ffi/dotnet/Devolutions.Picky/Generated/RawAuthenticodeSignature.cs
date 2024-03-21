@@ -21,13 +21,13 @@ public partial struct AuthenticodeSignature
 #endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "AuthenticodeSignature_new", ExactSpelling = true)]
-    public static unsafe extern IntPtr New(Pkcs7* pkcs7, RsBuffer* fileHash, ShaVariant hashAlgorithm, PrivateKey* privateKey, RsString* programName);
+    public static unsafe extern IntPtr New(Pkcs7* pkcs7, VecU8* fileHash, ShaVariant hashAlgorithm, PrivateKey* privateKey, RsString* programName);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "AuthenticodeSignature_timestamp", ExactSpelling = true)]
     public static unsafe extern IntPtr Timestamp(AuthenticodeSignature* self, AuthenticodeTimestamper* timestamper, HashAlgorithm hashAlgo);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "AuthenticodeSignature_from_der", ExactSpelling = true)]
-    public static unsafe extern IntPtr FromDer(RsBuffer* der);
+    public static unsafe extern IntPtr FromDer(VecU8* der);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "AuthenticodeSignature_from_pem", ExactSpelling = true)]
     public static unsafe extern IntPtr FromPem(Pem* pem);
@@ -48,7 +48,7 @@ public partial struct AuthenticodeSignature
     public static unsafe extern AuthenticodeValidator* AuthenticodeVerifier(AuthenticodeSignature* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "AuthenticodeSignature_file_hash", ExactSpelling = true)]
-    public static unsafe extern RsBuffer* FileHash(AuthenticodeSignature* self);
+    public static unsafe extern VecU8* FileHash(AuthenticodeSignature* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "AuthenticodeSignature_authenticate_attributes", ExactSpelling = true)]
     public static unsafe extern AttributeIterator* AuthenticateAttributes(AuthenticodeSignature* self);

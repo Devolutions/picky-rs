@@ -58,7 +58,7 @@ public partial class AuthenticodeTimestamper: IDisposable
     /// <returns>
     /// A <c>Pkcs7</c> allocated on Rust side.
     /// </returns>
-    public Pkcs7 Timestamp(RsBuffer digest, HashAlgorithm hashAlgo)
+    public Pkcs7 Timestamp(VecU8 digest, HashAlgorithm hashAlgo)
     {
         unsafe
         {
@@ -66,11 +66,11 @@ public partial class AuthenticodeTimestamper: IDisposable
             {
                 throw new ObjectDisposedException("AuthenticodeTimestamper");
             }
-            Raw.RsBuffer* digestRaw;
+            Raw.VecU8* digestRaw;
             digestRaw = digest.AsFFI();
             if (digestRaw == null)
             {
-                throw new ObjectDisposedException("RsBuffer");
+                throw new ObjectDisposedException("VecU8");
             }
             Raw.HashAlgorithm hashAlgoRaw;
             hashAlgoRaw = (Raw.HashAlgorithm)hashAlgo;

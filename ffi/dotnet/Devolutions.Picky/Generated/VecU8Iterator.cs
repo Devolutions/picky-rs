@@ -11,12 +11,12 @@ namespace Devolutions.Picky;
 
 #nullable enable
 
-public partial class BufferIterator: IDisposable
+public partial class VecU8Iterator: IDisposable
 {
-    private unsafe Raw.BufferIterator* _inner;
+    private unsafe Raw.VecU8Iterator* _inner;
 
     /// <summary>
-    /// Creates a managed <c>BufferIterator</c> from a raw handle.
+    /// Creates a managed <c>VecU8Iterator</c> from a raw handle.
     /// </summary>
     /// <remarks>
     /// Safety: you should not build two managed objects using the same raw handle (may causes use-after-free and double-free).
@@ -24,35 +24,35 @@ public partial class BufferIterator: IDisposable
     /// This constructor assumes the raw struct is allocated on Rust side.
     /// If implemented, the custom Drop implementation on Rust side WILL run on destruction.
     /// </remarks>
-    public unsafe BufferIterator(Raw.BufferIterator* handle)
+    public unsafe VecU8Iterator(Raw.VecU8Iterator* handle)
     {
         _inner = handle;
     }
 
     /// <returns>
-    /// A <c>RsBuffer</c> allocated on Rust side.
+    /// A <c>VecU8</c> allocated on Rust side.
     /// </returns>
-    public RsBuffer? Next()
+    public VecU8? Next()
     {
         unsafe
         {
             if (_inner == null)
             {
-                throw new ObjectDisposedException("BufferIterator");
+                throw new ObjectDisposedException("VecU8Iterator");
             }
-            Raw.RsBuffer* retVal = Raw.BufferIterator.Next(_inner);
+            Raw.VecU8* retVal = Raw.VecU8Iterator.Next(_inner);
             if (retVal == null)
             {
                 return null;
             }
-            return new RsBuffer(retVal);
+            return new VecU8(retVal);
         }
     }
 
     /// <summary>
     /// Returns the underlying raw handle.
     /// </summary>
-    public unsafe Raw.BufferIterator* AsFFI()
+    public unsafe Raw.VecU8Iterator* AsFFI()
     {
         return _inner;
     }
@@ -69,14 +69,14 @@ public partial class BufferIterator: IDisposable
                 return;
             }
 
-            Raw.BufferIterator.Destroy(_inner);
+            Raw.VecU8Iterator.Destroy(_inner);
             _inner = null;
 
             GC.SuppressFinalize(this);
         }
     }
 
-    ~BufferIterator()
+    ~VecU8Iterator()
     {
         Dispose();
     }

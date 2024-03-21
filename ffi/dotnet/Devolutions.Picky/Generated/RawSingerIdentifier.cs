@@ -24,7 +24,7 @@ public partial struct SingerIdentifier
     public static unsafe extern IssuerAndSerialNumber* GetIssureAndSerialNumber(SingerIdentifier* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SingerIdentifier_get_subject_key_identifier", ExactSpelling = true)]
-    public static unsafe extern RsBuffer* GetSubjectKeyIdentifier(SingerIdentifier* self);
+    public static unsafe extern VecU8* GetSubjectKeyIdentifier(SingerIdentifier* self);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SingerIdentifier_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(SingerIdentifier* self);
