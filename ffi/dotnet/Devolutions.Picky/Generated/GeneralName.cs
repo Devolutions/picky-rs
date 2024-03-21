@@ -158,6 +158,26 @@ public partial class GeneralName: IDisposable
     }
 
     /// <returns>
+    /// A <c>AttributeTypeAndValueNestedIterator</c> allocated on Rust side.
+    /// </returns>
+    public AttributeTypeAndValueNestedIterator? ToDirectoryName()
+    {
+        unsafe
+        {
+            if (_inner == null)
+            {
+                throw new ObjectDisposedException("GeneralName");
+            }
+            Raw.AttributeTypeAndValueNestedIterator* retVal = Raw.GeneralName.ToDirectoryName(_inner);
+            if (retVal == null)
+            {
+                return null;
+            }
+            return new AttributeTypeAndValueNestedIterator(retVal);
+        }
+    }
+
+    /// <returns>
     /// A <c>EdiPartyName</c> allocated on Rust side.
     /// </returns>
     public EdiPartyName? ToEdiPartyName()

@@ -2,9 +2,13 @@
 pub mod ffi {
     use crate::error::ffi::PickyError;
     use crate::utils::ffi::RsBuffer;
+    use crate::x509::attribute::ffi::{
+        AttributeTypeAndValue, AttributeTypeAndValueIterator, AttributeTypeAndValueNestedIterator,
+    };
     use crate::x509::string::ffi::DirectoryString;
     use diplomat_runtime::DiplomatWriteable;
     use std::fmt::Write;
+    use std::str::FromStr;
 
     #[diplomat::opaque]
     pub struct GeneralNameIterator(pub Vec<GeneralName>);
@@ -72,21 +76,21 @@ pub mod ffi {
             }
         }
 
-        // pub fn to_directory_name(&self) -> Option<AttributeTypeAndValueNestedIterator> {
-        //     match &self.0 {
-        //         picky_asn1_x509::name::GeneralName::DirectoryName(directory_name) => {
-        //             let mut vec = vec![];
-        //             let clone = directory_name.0.clone();
-        //             for names in clone.0 {
-        //                 vec.push(AttributeTypeAndValueIterator(
-        //                     names.0.clone().into_iter().map(AttributeTypeAndValue).collect(),
-        //                 ));
-        //             }
-        //             Some(AttributeTypeAndValueNestedIterator(vec))
-        //         }
-        //         _ => None,
-        //     }
-        // }
+        pub fn to_directory_name(&self) -> Option<Box<AttributeTypeAndValueNestedIterator>> {
+            match &self.0 {
+                picky_asn1_x509::name::GeneralName::DirectoryName(directory_name) => {
+                    let mut vec = vec![];
+                    let clone = directory_name.0.clone();
+                    for names in clone.0 {
+                        vec.push(AttributeTypeAndValueIterator(
+                            names.0.clone().into_iter().map(AttributeTypeAndValue).collect(),
+                        ));
+                    }
+                    Some(Box::new(AttributeTypeAndValueNestedIterator(vec)))
+                }
+                _ => None,
+            }
+        }
 
         pub fn to_edi_party_name(&self) -> Option<Box<EdiPartyName>> {
             match &self.0 {
@@ -156,6 +160,53 @@ pub mod ffi {
 
         pub fn get_value(&self) -> Box<crate::utils::ffi::RsBuffer> {
             RsBuffer::from_bytes(&self.0.value.0 .0).boxed()
+        }
+    }
+
+    #[diplomat::enum_convert(picky_asn1_x509::name::NameAttr)]
+    pub enum NameAttr {
+        CommonName,
+        Surname,
+        SerialNumber,
+        CountryName,
+        LocalityName,
+        StateOrProvinceName,
+        StreetName,
+        OrganizationName,
+        OrganizationalUnitName,
+        GivenName,
+        Phone,
+    }
+
+    #[diplomat::opaque]
+    pub struct DirectoryName(pub picky::x509::name::DirectoryName);
+
+    #[diplomat::opaque]
+    pub struct DirectoryNameIterator(pub Vec<DirectoryName>);
+
+    impl DirectoryName {
+        pub fn new() -> Box<DirectoryName> {
+            Box::new(DirectoryName(picky::x509::name::DirectoryName::new()))
+        }
+
+        pub fn new_common_name(name: &str) -> Box<DirectoryName> {
+            Box::new(DirectoryName(picky::x509::name::DirectoryName::new_common_name(name)))
+        }
+
+        pub fn find_common_name(&self) -> Option<Box<DirectoryString>> {
+            self.0
+                .find_common_name()
+                .map(|name| Box::new(DirectoryString(name.clone())))
+        }
+
+        pub fn add_attr(&mut self, attr: NameAttr, value: &str) {
+            self.0.add_attr(attr.into(), value);
+        }
+
+        pub fn add_email(&mut self, email: &str) -> Result<(), Box<PickyError>> {
+            let ia5_string = picky_asn1::restricted_string::IA5String::from_str(email)?;
+            self.0.add_email(ia5_string);
+            Ok(())
         }
     }
 }

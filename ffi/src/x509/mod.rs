@@ -2,6 +2,7 @@ use picky::x509::certificate;
 
 pub mod algorithm_identifier;
 pub mod attribute;
+pub mod authenticode;
 pub mod extension;
 pub mod name;
 pub mod singer_info;

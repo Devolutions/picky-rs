@@ -68,6 +68,15 @@ pub mod ffi {
             self.0.pop().map(Box::new)
         }
     }
+
+    #[diplomat::opaque]
+    pub struct RsString(pub String); // The reason we use this is to use string as optional in the bridge, this could be removed with future diplomat versions
+
+    impl RsString {
+        pub fn from_string(s: &str) -> Box<RsString> {
+            Box::new(RsString(s.to_string()))
+        }
+    }
 }
 
 impl From<&picky_asn1::wrapper::OctetStringAsn1> for ffi::RsBuffer {

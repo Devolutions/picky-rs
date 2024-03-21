@@ -32,6 +32,9 @@ public partial struct GeneralName
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "GeneralName_to_dns_name", ExactSpelling = true)]
     public static unsafe extern IntPtr ToDnsName(GeneralName* self, DiplomatWriteable* writable);
 
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "GeneralName_to_directory_name", ExactSpelling = true)]
+    public static unsafe extern AttributeTypeAndValueNestedIterator* ToDirectoryName(GeneralName* self);
+
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "GeneralName_to_edi_party_name", ExactSpelling = true)]
     public static unsafe extern EdiPartyName* ToEdiPartyName(GeneralName* self);
 

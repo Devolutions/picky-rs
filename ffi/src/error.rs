@@ -169,6 +169,23 @@ impl From<picky::x509::pkcs7::Pkcs7Error> for PickyErrorKind {
     }
 }
 
+impl From<picky::x509::pkcs7::authenticode::AuthenticodeError> for PickyErrorKind {
+    fn from(_value: picky::x509::pkcs7::authenticode::AuthenticodeError) -> Self {
+        // TODO/FIXME: map AuthenticodeError to PickyErrorKind properly, the error is too generic at the moment
+        PickyErrorKind::BadSignature
+    }
+}
+
+impl From<picky::x509::pkcs7::timestamp::TimestampError> for PickyErrorKind {
+    fn from(value: picky::x509::pkcs7::timestamp::TimestampError) -> Self {
+        match value {
+            picky::x509::pkcs7::timestamp::TimestampError::Asn1DerError(_) => PickyErrorKind::BadSignature,
+            picky::x509::pkcs7::timestamp::TimestampError::Pkcs7Error(_) => PickyErrorKind::BadSignature,
+            _ => PickyErrorKind::Generic,
+        }
+    }
+}
+
 impl<T> From<T> for Box<PickyError>
 where
     T: Into<PickyErrorKind> + ToString,
