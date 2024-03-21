@@ -127,10 +127,9 @@ pub mod ffi {
                     .collect(),
             ))
         }
-
     }
 
-    #[diplomat::opaque] 
+    #[diplomat::opaque]
     pub struct AuthenticodeValidator<'a> {
         pub inner: picky::x509::pkcs7::authenticode::AuthenticodeValidator<'a>,
         //'exclude_cert_authorities' method down there a few lines takes a reference to a Vec<DirectoryName>,

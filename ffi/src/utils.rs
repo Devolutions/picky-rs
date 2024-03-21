@@ -11,7 +11,6 @@ pub mod ffi {
     pub struct VecU8(pub Vec<u8>);
 
     impl VecU8 {
-        
         pub fn from_bytes(bytes: &[u8]) -> Box<VecU8> {
             Box::new(VecU8(bytes.to_vec()))
         }
