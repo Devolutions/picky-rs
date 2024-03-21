@@ -32,6 +32,9 @@ public partial struct PrivateKey
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PrivateKey_from_pkcs8", ExactSpelling = true)]
     public static unsafe extern IntPtr FromPkcs8(byte* pkcs8, nuint pkcs8Sz);
 
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PrivateKey_from_pem_str", ExactSpelling = true)]
+    public static unsafe extern IntPtr FromPemStr(byte* pem, nuint pemSz);
+
     /// <summary>
     /// Generates a new RSA private key.
     /// </summary>

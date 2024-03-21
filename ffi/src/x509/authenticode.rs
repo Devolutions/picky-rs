@@ -99,7 +99,7 @@ pub mod ffi {
             Ok(Box::new(Cert(cert.clone())))
         }
 
-        pub fn authenticode_verifier(&self) -> Box<AuthenticodeValidator<'_>> {
+        pub fn authenticode_verifier<'a>(&'a self) -> Box<AuthenticodeValidator<'a>> {
             let verifier = self.0.authenticode_verifier();
             Box::new(AuthenticodeValidator::new(verifier))
         }
@@ -127,13 +127,14 @@ pub mod ffi {
                     .collect(),
             ))
         }
+
     }
 
-    #[diplomat::opaque] //TODO
+    #[diplomat::opaque] 
     pub struct AuthenticodeValidator<'a> {
         pub inner: picky::x509::pkcs7::authenticode::AuthenticodeValidator<'a>,
-        //exclude_cert_authorities method takes a reference to a Vec<DirectoryName>, which I have to store in the struct
-        //So it have the same lifetime as the inner struct
+        //'exclude_cert_authorities' method down there a few lines takes a reference to a Vec<DirectoryName>,
+        // which I have to store in the struct so it have the same lifetime as the inner struct
         pub excluded_cert_authorities: Option<Vec<picky::x509::name::DirectoryName>>,
     }
 

@@ -20,6 +20,9 @@ public partial struct VecU8
     private const string NativeLib = "DevolutionsPicky";
 #endif
 
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "VecU8_from_bytes", ExactSpelling = true)]
+    public static unsafe extern VecU8* FromBytes(byte* bytes, nuint bytesSz);
+
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "VecU8_get_length", ExactSpelling = true)]
     public static unsafe extern nuint GetLength(VecU8* self);
 

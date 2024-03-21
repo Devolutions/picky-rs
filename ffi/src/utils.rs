@@ -11,6 +11,11 @@ pub mod ffi {
     pub struct VecU8(pub Vec<u8>);
 
     impl VecU8 {
+        
+        pub fn from_bytes(bytes: &[u8]) -> Box<VecU8> {
+            Box::new(VecU8(bytes.to_vec()))
+        }
+
         pub fn get_length(&self) -> usize {
             self.0.len()
         }
@@ -88,9 +93,5 @@ impl From<&picky_asn1::wrapper::OctetStringAsn1> for ffi::VecU8 {
 impl VecU8 {
     pub fn boxed(self) -> Box<VecU8> {
         Box::new(self)
-    }
-
-    pub fn from_bytes(bytes: &[u8]) -> Self {
-        Self(bytes.to_vec())
     }
 }
