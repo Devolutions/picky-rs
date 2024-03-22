@@ -103,10 +103,6 @@ dotnet-bindings:
     diplomat-tool dotnet {{dotnet_generated_path}} -l {{dotnet_diplomat_config}}
     @echo ">> .NET wrapper generated at {{dotnet_generated_path}}"
 
-build-dll:
-    cargo build
-    cp {{target_debug_folder}}"picky.dll" {{target_debug_folder}}"DevolutionsPicky.dll"
-
 # FIXME: js bindings not yet ready
 js-bindings:
     -rm {{js_generated_path}}*.js
