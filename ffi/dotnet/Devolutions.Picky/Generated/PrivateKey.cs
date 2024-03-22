@@ -93,6 +93,31 @@ public partial class PrivateKey: IDisposable
         }
     }
 
+    /// <exception cref="PickyException"></exception>
+    /// <returns>
+    /// A <c>PrivateKey</c> allocated on Rust side.
+    /// </returns>
+    public static PrivateKey FromPemStr(string pem)
+    {
+        unsafe
+        {
+            byte[] pemBuf = DiplomatUtils.StringToUtf8(pem);
+            nuint pemBufLength = (nuint)pemBuf.Length;
+            fixed (byte* pemBufPtr = pemBuf)
+            {
+                IntPtr resultPtr = Raw.PrivateKey.FromPemStr(pemBufPtr, pemBufLength);
+                Raw.KeyFfiResultBoxPrivateKeyBoxPickyError result = Marshal.PtrToStructure<Raw.KeyFfiResultBoxPrivateKeyBoxPickyError>(resultPtr);
+                Raw.KeyFfiResultBoxPrivateKeyBoxPickyError.Destroy(resultPtr);
+                if (!result.isOk)
+                {
+                    throw new PickyException(new PickyError(result.Err));
+                }
+                Raw.PrivateKey* retVal = result.Ok;
+                return new PrivateKey(retVal);
+            }
+        }
+    }
+
     /// <summary>
     /// Generates a new RSA private key.
     /// </summary>

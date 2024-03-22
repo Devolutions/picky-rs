@@ -108,6 +108,11 @@ pub mod ffi {
             Ok(Box::new(PrivateKey(key)))
         }
 
+        pub fn from_pem_str(pem: &str) -> Result<Box<PrivateKey>, Box<PickyError>> {
+            let key = picky::key::PrivateKey::from_pem_str(pem)?;
+            Ok(Box::new(PrivateKey(key)))
+        }
+
         /// Generates a new RSA private key.
         ///
         /// This is slow in debug builds.

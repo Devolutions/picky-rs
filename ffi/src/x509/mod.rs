@@ -1,5 +1,14 @@
 use picky::x509::certificate;
 
+pub mod algorithm_identifier;
+pub mod attribute;
+pub mod authenticode;
+pub mod extension;
+pub mod name;
+pub mod singer_info;
+pub mod string;
+pub mod time;
+
 impl From<ffi::CertType> for certificate::CertType {
     fn from(ty: ffi::CertType) -> Self {
         match ty {
@@ -213,6 +222,15 @@ pub mod ffi {
                 .build()?;
 
             Ok(Box::new(Cert(cert)))
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct CertIterator(pub Vec<certificate::Cert>);
+
+    impl CertIterator {
+        pub fn next(&mut self) -> Option<Box<Cert>> {
+            self.0.pop().map(|cert| Box::new(Cert(cert)))
         }
     }
 }
