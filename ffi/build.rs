@@ -19,7 +19,7 @@ mod win {
         let output_name = "DevolutionsPicky";
         let filename = format!("{}.dll", output_name);
         let company_name = "Devolutions Inc.";
-        let legal_copyright = format!("Copyright 2019-2022 {}", company_name);
+        let legal_copyright = format!("Copyright 2019-2024 {}", company_name);
 
         let version_number = env::var("CARGO_PKG_VERSION").unwrap() + ".0";
         let version_commas = version_number.replace('.', ",");
