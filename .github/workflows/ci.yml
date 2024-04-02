@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-20.04
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Check formatting
         shell: pwsh
@@ -48,7 +48,7 @@ jobs:
             runner: ubuntu-20.04
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Run clippy
         run: cargo clippy --locked --workspace --all-features --all-targets -- -D warnings
@@ -59,7 +59,7 @@ jobs:
     needs: formatting
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Run clippy
         run: cargo clippy --locked --all-features --all-targets --manifest-path ./ffi/wasm/Cargo.toml -- -D warnings
@@ -86,7 +86,7 @@ jobs:
             runner: ubuntu-20.04
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Run tests
         run: cargo test --locked --verbose --workspace --all-features
@@ -113,7 +113,7 @@ jobs:
             msvc: "1.65"
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Configure runner
         run: |
