@@ -22,7 +22,7 @@ jobs:
 
     steps:
       - name: Checkout ${{ github.repository }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Get dry run
         id: get-dry-run
@@ -86,7 +86,7 @@ jobs:
 
     steps:
       - name: Checkout ${{ github.repository }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Configure Android NDK
         if: matrix.os == 'android'
@@ -181,7 +181,7 @@ jobs:
           Copy-Item $OutputLibrary $(Join-Path $OutputPath $RenamedLibraryName)
 
       - name: Upload native components
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: picky-${{matrix.os}}-${{matrix.arch}}
           path: dependencies/runtimes/${{matrix.os}}-${{matrix.arch}}
@@ -197,7 +197,7 @@ jobs:
 
     steps:
       - name: Checkout ${{ github.repository }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Configure runner
         shell: pwsh
@@ -208,7 +208,7 @@ jobs:
           sudo mv /tmp/cctools-x86_64-ubuntu-20.04/bin/install_name_tool /usr/local/bin
 
       - name: Download native components
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: dependencies/runtimes
 
@@ -270,7 +270,7 @@ jobs:
           ((Get-Content -Path (Join-Path $FrameworkDir "Info.plist") -Raw) -Replace 'PropertyList-1.0.dtd"\[\]', 'PropertyList-1.0.dtd"') | Set-Content -Path (Join-Path $FrameworkDir "Info.plist")
 
       - name: Upload native components
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: picky-${{ matrix.os }}-universal
           path: dependencies/runtimes/${{ matrix.os }}-universal
@@ -282,10 +282,10 @@ jobs:
 
     steps:
       - name: Check out ${{ github.repository }}
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Add msbuild to PATH
-        uses: microsoft/setup-msbuild@v1.1
+        uses: microsoft/setup-msbuild@v2
 
       - name: Install ios workload
         run: dotnet workload install ios
@@ -296,7 +296,7 @@ jobs:
           New-Item -ItemType Directory -Path "dependencies/runtimes" | Out-Null
 
       - name: Download native components
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: dependencies/runtimes
 
@@ -316,7 +316,7 @@ jobs:
           dotnet build .\ffi\dotnet\Devolutions.Picky\Devolutions.Picky.csproj -c Release /p:PackageId=Devolutions.Picky.iOS
 
       - name: Upload managed components
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: picky-nupkg
           path: ffi/dotnet/Devolutions.Picky/bin/Release/*.nupkg
@@ -332,7 +332,7 @@ jobs:
 
     steps:
       - name: Download NuGet package artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: picky-nupkg
           path: package
