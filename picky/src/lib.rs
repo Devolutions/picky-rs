@@ -178,11 +178,30 @@ mod test_files {
         pub const SSH_PRIVATE_KEY_ED25519_ENCRYPTED: &str =
             include_str!("../../test_assets/ssh/ssh_encrypted_key_ed25519");
 
+        // ssh-keygen -t sk-ed25519 -C "test_ed25519@picky.com"
+        pub const SSH_PRIVATE_KEY_SK_ED25519: &str =
+            include_str!("../../test_assets/ssh/ssh_key_sk_ed25519");
+
+        // ssh-keygen -t sk-ed25519 -C "test_ed25519@picky.com"
+        pub const SSH_PRIVATE_KEY_SK_ED25519_ENCRYPTED: &str =
+            include_str!("../../test_assets/ssh/ssh_key_sk_ed25519_enc");
+
+        // ssh-keygen -t sk-ecdsa -C "test_ecdsa@picky.com"
+        pub const SSH_PRIVATE_KEY_SK_ECDSA: &str =
+            include_str!("../../test_assets/ssh/ssh_key_sk_ecdsa");
+
+        // ssh-keygen -t sk-ecdsa -C "test_ecdsa@picky.com"
+        pub const SSH_PRIVATE_KEY_SK_ECDSA_ENCRYPTED: &str =
+            include_str!("../../test_assets/ssh/ssh_key_sk_ecdsa_enc");
+
         pub const SSH_PUBLIC_KEY_EC_P256: &str = include_str!("../../test_assets/ssh/ssh_key_p256.pub");
         pub const SSH_PUBLIC_KEY_EC_P384: &str = include_str!("../../test_assets/ssh/ssh_key_p384.pub");
         pub const SSH_PUBLIC_KEY_EC_P521: &str = include_str!("../../test_assets/ssh/ssh_key_p521.pub");
 
         pub const SSH_PUBLIC_KEY_ED25519: &str = include_str!("../../test_assets/ssh/ssh_key_ed25519.pub");
+
+        pub const SSH_PUBLIC_KEY_SK_ECDSA: &str = include_str!("../../test_assets/ssh/ssh_key_sk_ecdsa.pub");
+        pub const SSH_PUBLIC_KEY_SK_ED25519: &str = include_str!("../../test_assets/ssh/ssh_key_sk_ed25519.pub");
 
         // ssh-keygen -h -s ./ssh_ca_key -V '+1000w' -I abcd -z 00001 -n server.example.com ./ssh_key_p256.pub
         pub const SSH_CERT_EC_P256: &str = include_str!("../../test_assets/ssh/ssh_cert_p256.crt");
@@ -191,6 +210,15 @@ mod test_files {
         // ssh-keygen -h -s ./ssh_ca_key -V '+1000w' -I abcd -z 00001 -n server.example.com ./ssh_key_ed25519.pub
         pub const SSH_CERT_ED25519: &str = include_str!("../../test_assets/ssh/ssh_cert_ed25519.crt");
 
+        // ssh-keygen -h  -s ./sk_ed25519 -V '+1000w' -I abcd -z 00001 -n server.example.com ./ssh_key_p256.pub
+        pub const SSH_CERT_SK_ED25519: &str = include_str!("../../test_assets/ssh/ssh_sk_ed25519_key_p256-cert.pub");
+        // ssh-keygen -h  -s ./sk_ecdsa -V '+1000w' -I abcd -z 00001 -n server.example.com ./ssh_key_p256.pub
+        pub const SSH_CERT_SK_ECDSA: &str = include_str!("../../test_assets/ssh/ssh_sk_ecdsa_key_p256-cert.pub");
+
+        // ssh-keygen -h  -s ./ssh_key_p256 -V '+1000w' -I abcd -z 00001 -n server.example.com ./sk_ecdsa.pub
+        pub const SSH_CERT_SK_ECDSA_SIG_EC: &str = include_str!("../../test_assets/ssh/ssh_p256_key_sk_ecdsa-cert.pub");
+        // ssh-keygen -h  -s ./ssh_key_p256 -V '+1000w' -I abcd -z 00001 -n server.example.com ./sk_ecdsa.pub
+        pub const SSH_CERT_SK_ED25519_SIG_EC: &str = include_str!("../../test_assets/ssh/ssh_p256_key_sk_ed25519-cert.pub");
     }}
 
     cfg_if::cfg_if! { if #[cfg(any(feature = "jose", feature = "x509"))] {
