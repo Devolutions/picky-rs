@@ -63,6 +63,8 @@ pub enum SshPrivateKeyError {
     KeyError(#[from] KeyError),
     #[error(transparent)]
     PemError(#[from] PemError),
+    #[error("Sk key does not contain private key data")]
+    SkKeyDoesNotContainPrivateKeyData,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Default)]
@@ -91,13 +93,15 @@ pub enum SshBasePrivateKey {
     Rsa(PrivateKey),
     Ec(PrivateKey),
     Ed(PrivateKey),
-    SkEcdsa {
+    /// U2F ecdsa SSH key
+    SkEcdsaSha2NistP256 {
         public_key: PublicKey,
         application: String,
         flags: u8,
         handle: Vec<u8>,
     },
-    SkEd {
+    /// U2F ed25519 SSH key
+    SkEd25519 {
         public_key: PublicKey,
         application: String,
         flags: u8,
@@ -111,10 +115,22 @@ impl SshBasePrivateKey {
             SshBasePrivateKey::Rsa(rsa) => SshBasePublicKey::Rsa(rsa.to_public_key()?),
             SshBasePrivateKey::Ec(ec) => SshBasePublicKey::Ec(ec.to_public_key()?),
             SshBasePrivateKey::Ed(ed) => SshBasePublicKey::Ed(ed.to_public_key()?),
-            SshBasePrivateKey::SkEcdsa { public_key, application, .. } =>
-                SshBasePublicKey::SkEc { base_key: public_key.clone(), application: application.clone() },
-            SshBasePrivateKey::SkEd { public_key, application, .. } =>
-                SshBasePublicKey::SkEd { base_key: public_key.clone(), application: application.clone() },
+            SshBasePrivateKey::SkEcdsaSha2NistP256 {
+                public_key,
+                application,
+                ..
+            } => SshBasePublicKey::SkEcdsaSha2NistP256 {
+                base_key: public_key.clone(),
+                application: application.clone(),
+            },
+            SshBasePrivateKey::SkEd25519 {
+                public_key,
+                application,
+                ..
+            } => SshBasePublicKey::SkEd25519 {
+                base_key: public_key.clone(),
+                application: application.clone(),
+            },
         };
 
         Ok(key)
@@ -187,6 +203,17 @@ impl SshPrivateKey {
 
     pub fn base_key(&self) -> &SshBasePrivateKey {
         &self.base_key
+    }
+
+    pub fn inner_key(&self) -> Result<&PrivateKey, SshPrivateKeyError> {
+        match self.base_key() {
+            SshBasePrivateKey::Rsa(key) => Ok(key),
+            SshBasePrivateKey::Ec(key) => Ok(key),
+            SshBasePrivateKey::Ed(key) => Ok(key),
+            SshBasePrivateKey::SkEcdsaSha2NistP256 { .. } | SshBasePrivateKey::SkEd25519 { .. } => {
+                Err(SshPrivateKeyError::SkKeyDoesNotContainPrivateKeyData)
+            }
+        }
     }
 
     fn h_picky_private_key_to_ssh_private_key(
@@ -624,7 +651,11 @@ pub mod tests {
 
     #[test]
     fn sk_ed25519_roundtrip_encrypted() {
-        let private_key = SshPrivateKey::from_pem_str(test_files::SSH_PRIVATE_KEY_SK_ED25519_ENCRYPTED, Some("test".to_string())).unwrap();
+        let private_key = SshPrivateKey::from_pem_str(
+            test_files::SSH_PRIVATE_KEY_SK_ED25519_ENCRYPTED,
+            Some("test".to_string()),
+        )
+        .unwrap();
         let encoded = private_key.to_string().unwrap();
         assert_eq!(test_files::SSH_PRIVATE_KEY_SK_ED25519_ENCRYPTED, encoded.as_str());
     }
@@ -638,7 +669,9 @@ pub mod tests {
 
     #[test]
     fn sk_ecdsa_roundtrip_encrypted() {
-        let private_key = SshPrivateKey::from_pem_str(test_files::SSH_PRIVATE_KEY_SK_ECDSA_ENCRYPTED, Some("test".to_string())).unwrap();
+        let private_key =
+            SshPrivateKey::from_pem_str(test_files::SSH_PRIVATE_KEY_SK_ECDSA_ENCRYPTED, Some("test".to_string()))
+                .unwrap();
         let encoded = private_key.to_string().unwrap();
         assert_eq!(test_files::SSH_PRIVATE_KEY_SK_ECDSA_ENCRYPTED, encoded.as_str());
     }

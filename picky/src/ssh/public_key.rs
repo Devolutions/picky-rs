@@ -27,11 +27,13 @@ pub enum SshBasePublicKey {
     Rsa(PublicKey),
     Ec(PublicKey),
     Ed(PublicKey),
-    SkEc {
+    /// U2F ecdsa SSH key
+    SkEcdsaSha2NistP256 {
         base_key: PublicKey,
         application: String,
     },
-    SkEd {
+    /// U2F ed25519 SSH key
+    SkEd25519 {
         base_key: PublicKey,
         application: String,
     },
@@ -50,13 +52,13 @@ impl SshPublicKey {
         Ok(String::from_utf8(buffer)?)
     }
 
-    pub fn crypto_key(&self) -> &PublicKey {
+    pub fn inner_key(&self) -> &PublicKey {
         match &self.inner_key {
             SshBasePublicKey::Rsa(key) => key,
             SshBasePublicKey::Ec(key) => key,
             SshBasePublicKey::Ed(key) => key,
-            SshBasePublicKey::SkEc { base_key, .. } => base_key,
-            SshBasePublicKey::SkEd { base_key, .. } => base_key,
+            SshBasePublicKey::SkEcdsaSha2NistP256 { base_key, .. } => base_key,
+            SshBasePublicKey::SkEd25519 { base_key, .. } => base_key,
         }
     }
 }

@@ -287,7 +287,7 @@ impl SshSignatureFormat {
             SshSignatureFormat::EcdsaSha2Nistp521 => "ecdsa-sha2-nistp521",
             SshSignatureFormat::SshEd25519 => "ssh-ed25519",
             SshSignatureFormat::SkEcdsaSha2NistP256 => "sk-ecdsa-sha2-nistp256@openssh.com",
-            SshSignatureFormat::SkEd25519 => "sk-ssh-ed25519@openssh.com"
+            SshSignatureFormat::SkEd25519 => "sk-ssh-ed25519@openssh.com",
         }
     }
 }
@@ -305,11 +305,7 @@ enum EcCurveIdentifier {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum SshSignatureBlob {
     Standard(Vec<u8>),
-    Sk {
-        data: Vec<u8>,
-        flags: u8,
-        counter: u32,
-    },
+    Sk { data: Vec<u8>, flags: u8, counter: u32 },
 }
 
 impl SshSignatureBlob {
@@ -675,7 +671,7 @@ impl SshCertificateBuilder {
                         .map_err(|err| SshCertificateGenerationError::SshPublicKeyError(err.into()))?;
                     buff.write_ssh_bytes(ed.data())?;
                 }
-                SshBasePublicKey::SkEc { base_key, application } => {
+                SshBasePublicKey::SkEcdsaSha2NistP256 { base_key, application } => {
                     let ec = EcdsaPublicKey::try_from(base_key)
                         .map_err(|err| SshCertificateGenerationError::SshPublicKeyError(err.into()))?;
                     let curve_identifier = ec
@@ -686,7 +682,7 @@ impl SshCertificateBuilder {
                     buff.write_ssh_bytes(ec.encoded_point())?;
                     buff.write_ssh_string(application)?;
                 }
-                SshBasePublicKey::SkEd { base_key, application } => {
+                SshBasePublicKey::SkEd25519 { base_key, application } => {
                     let ed = EdPublicKey::try_from(base_key)
                         .map_err(|err| SshCertificateGenerationError::SshPublicKeyError(err.into()))?;
                     buff.write_ssh_bytes(ed.data())?;
@@ -782,12 +778,12 @@ impl SshCertificateBuilder {
                 let signature = signature_algo.sign(&raw_signature, ed)?;
                 (SshSignatureBlob::Standard(signature), signature_format)
             }
-            SshBasePrivateKey::SkEd { .. } => {
+            SshBasePrivateKey::SkEd25519 { .. } => {
                 return Err(SshCertificateGenerationError::IncorrectSignatureAlgorithm(
                     "Signing with sk-ed25519 keys is not supported".to_owned(),
                 ))
             }
-            SshBasePrivateKey::SkEcdsa { .. } => {
+            SshBasePrivateKey::SkEcdsaSha2NistP256 { .. } => {
                 return Err(SshCertificateGenerationError::IncorrectSignatureAlgorithm(
                     "Signing with sk-ecdsa keys is not supported".to_owned(),
                 ))
