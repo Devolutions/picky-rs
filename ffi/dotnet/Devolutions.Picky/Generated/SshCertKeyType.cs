@@ -24,4 +24,6 @@ public enum SshCertKeyType
     EcdsaSha2Nistp384V01 = 5,
     EcdsaSha2Nistp521V01 = 6,
     SshEd25519V01 = 7,
+    SkSshSha2Nistp256V01 = 8,
+    SkSshEd25519V01 = 9,
 }

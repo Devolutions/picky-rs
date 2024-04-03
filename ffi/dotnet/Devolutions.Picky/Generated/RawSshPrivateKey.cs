@@ -48,6 +48,17 @@ public partial struct SshPrivateKey
     public static unsafe extern IntPtr GenerateEc(EcCurve curve, byte* passphrase, nuint passphraseSz, byte* comment, nuint commentSz);
 
     /// <summary>
+    /// Generates a new SSH ed25519 Private Key.
+    /// </summary>
+    /// <remarks>
+    /// No passphrase is set if `passphrase` is empty.
+    /// <br/>
+    /// No comment is set if `comment` is empty.
+    /// </remarks>
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshPrivateKey_generate_ed25519", ExactSpelling = true)]
+    public static unsafe extern IntPtr GenerateEd25519(byte* passphrase, nuint passphraseSz, byte* comment, nuint commentSz);
+
+    /// <summary>
     /// Extracts SSH Private Key from PEM object.
     /// </summary>
     /// <remarks>
