@@ -63,8 +63,6 @@ pub enum SshPrivateKeyError {
     KeyError(#[from] KeyError),
     #[error(transparent)]
     PemError(#[from] PemError),
-    #[error("Sk key does not contain private key data")]
-    SkKeyDoesNotContainPrivateKeyData,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Default)]
@@ -207,14 +205,12 @@ impl SshPrivateKey {
         &self.base_key
     }
 
-    pub fn inner_key(&self) -> Result<&PrivateKey, SshPrivateKeyError> {
+    pub fn inner_key(&self) -> Option<&PrivateKey> {
         match self.base_key() {
-            SshBasePrivateKey::Rsa(key) => Ok(key),
-            SshBasePrivateKey::Ec(key) => Ok(key),
-            SshBasePrivateKey::Ed(key) => Ok(key),
-            SshBasePrivateKey::SkEcdsaSha2NistP256 { .. } | SshBasePrivateKey::SkEd25519 { .. } => {
-                Err(SshPrivateKeyError::SkKeyDoesNotContainPrivateKeyData)
-            }
+            SshBasePrivateKey::Rsa(key) => Some(key),
+            SshBasePrivateKey::Ec(key) => Some(key),
+            SshBasePrivateKey::Ed(key) => Some(key),
+            SshBasePrivateKey::SkEcdsaSha2NistP256 { .. } | SshBasePrivateKey::SkEd25519 { .. } => None,
         }
     }
 

@@ -67,8 +67,8 @@ impl SshPrivateKey {
     }
 
     /// Returns inner private key from SSH private key
-    pub fn inner_key(&self) -> Result<PrivateKey, SshPrivateKeyError> {
-        Ok(PrivateKey(self.0.inner_key()?.clone()))
+    pub fn inner_key(&self) -> Option<PrivateKey> {
+        self.0.inner_key().map(|key| PrivateKey(key.clone()))
     }
 
     /// Extracts the public part from SSH private key
