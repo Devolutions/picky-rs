@@ -93,14 +93,16 @@ pub enum SshBasePrivateKey {
     Rsa(PrivateKey),
     Ec(PrivateKey),
     Ed(PrivateKey),
-    /// U2F ecdsa SSH key
+    /// U2F ecdsa SSH key. Note that this key does not contain the private key data, only handle
+    /// is stored which could be used to sign data via hardware U2F key.
     SkEcdsaSha2NistP256 {
         public_key: PublicKey,
         application: String,
         flags: u8,
         handle: Vec<u8>,
     },
-    /// U2F ed25519 SSH key
+    /// U2F ed25519 SSH key. Note that this key does not contain the private key data, only handle
+    /// is stored which could be used to sign data via hardware U2F key.
     SkEd25519 {
         public_key: PublicKey,
         application: String,

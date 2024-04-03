@@ -1478,18 +1478,20 @@ mod tests {
     #[case(test_files::EC_NIST256_PK_1, JweAlg::EcdhEsAesKeyWrap256, JweEnc::Aes256Gcm)]
     #[case(test_files::X25519_PEM_PK_1, JweAlg::EcdhEsAesKeyWrap256, JweEnc::Aes128Gcm)]
     fn jwe_ecdh_es_roundtrip(#[case] key_pem: &str, #[case] alg: JweAlg, #[case] enc: JweEnc) {
-        let private = PrivateKey::from_pem_str(key_pem).unwrap();
-        let public = private.to_public_key().unwrap();
+        for _ in 0..32 {
+            let private = PrivateKey::from_pem_str(key_pem).unwrap();
+            let public = private.to_public_key().unwrap();
 
-        let payload = b"Hello, world!".to_vec();
+            let payload = b"Hello, world!".to_vec();
 
-        let encoded = Jwe::new(alg, enc, payload.clone())
-            .encode(&public)
-            .expect("JWE encode failed");
+            let encoded = Jwe::new(alg, enc, payload.clone())
+                .encode(&public)
+                .expect("JWE encode failed");
 
-        let decoded = Jwe::decode(&encoded, &private).expect("JWE decode failed");
+            let decoded = Jwe::decode(&encoded, &private).expect("JWE decode failed");
 
-        assert_eq!(decoded.payload, payload);
+            assert_eq!(decoded.payload, payload);
+        }
     }
 
     #[rstest]
