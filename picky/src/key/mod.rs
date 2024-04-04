@@ -264,8 +264,8 @@ impl PrivateKey {
         use p384::EncodedPoint as EncodedPointP384;
 
         let curve_oid: ObjectIdentifier = NamedEcCurve::Known(curve).into();
-        let px_bytes = point_x.to_bytes_be();
-        let py_bytes = point_y.to_bytes_be();
+        let px_bytes = expand_ec_field(point_x.to_bytes_be(), curve);
+        let py_bytes = expand_ec_field(point_y.to_bytes_be(), curve);
 
         let px_validated = curve.validate_component(EcComponent::PointX(&px_bytes))?;
         let py_validated = curve.validate_component(EcComponent::PointY(&py_bytes))?;
@@ -827,8 +827,8 @@ impl PublicKey {
     /// arithmetic crate to use. If you want to use a curve that is not declared in [`EcCurve`],
     /// and encoded representation of the point is available - use [`Self::from_ec_encoded_components`]
     pub fn from_ec_components(curve: EcCurve, x: &BigUint, y: &BigUint) -> Result<Self, KeyError> {
-        let px_bytes = x.to_bytes_be();
-        let py_bytes = y.to_bytes_be();
+        let px_bytes = expand_ec_field(x.to_bytes_be(), curve);
+        let py_bytes = expand_ec_field(y.to_bytes_be(), curve);
 
         let px_validated = curve.validate_component(EcComponent::PointX(&px_bytes))?;
         let py_validated = curve.validate_component(EcComponent::PointY(&py_bytes))?;
@@ -943,6 +943,20 @@ impl PublicKey {
 
     pub(crate) fn as_inner(&self) -> &SubjectPublicKeyInfo {
         &self.0
+    }
+}
+
+/// EC field's BigUint -> bytes conversion does not include leading zeros, therefore we need to
+/// expand the bytes to the curve's field size.
+fn expand_ec_field(bytes: Vec<u8>, curve: EcCurve) -> Vec<u8> {
+    match curve.field_bytes_size().checked_sub(bytes.len()) {
+        None | Some(0) => bytes,
+        Some(leading_zeros) => {
+            let mut expanded = Vec::with_capacity(curve.field_bytes_size());
+            expanded.resize(leading_zeros, 0x00);
+            expanded.extend(bytes);
+            expanded
+        }
     }
 }
 

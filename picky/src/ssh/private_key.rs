@@ -1,4 +1,4 @@
-use crate::key::{EcCurve, EdAlgorithm, KeyError, PrivateKey, PrivateKeyKind};
+use crate::key::{EcCurve, EdAlgorithm, KeyError, PrivateKey, PrivateKeyKind, PublicKey};
 use crate::pem::{parse_pem, Pem, PemError};
 use crate::ssh::decode::{SshComplexTypeDecode, SshReadExt};
 use crate::ssh::encode::SshComplexTypeEncode;
@@ -91,6 +91,22 @@ pub enum SshBasePrivateKey {
     Rsa(PrivateKey),
     Ec(PrivateKey),
     Ed(PrivateKey),
+    /// U2F ecdsa SSH key. Note that this key does not contain the private key data, only handle
+    /// is stored which could be used to sign data via hardware U2F key.
+    SkEcdsaSha2NistP256 {
+        public_key: PublicKey,
+        application: String,
+        flags: u8,
+        handle: Vec<u8>,
+    },
+    /// U2F ed25519 SSH key. Note that this key does not contain the private key data, only handle
+    /// is stored which could be used to sign data via hardware U2F key.
+    SkEd25519 {
+        public_key: PublicKey,
+        application: String,
+        flags: u8,
+        handle: Vec<u8>,
+    },
 }
 
 impl SshBasePrivateKey {
@@ -99,6 +115,22 @@ impl SshBasePrivateKey {
             SshBasePrivateKey::Rsa(rsa) => SshBasePublicKey::Rsa(rsa.to_public_key()?),
             SshBasePrivateKey::Ec(ec) => SshBasePublicKey::Ec(ec.to_public_key()?),
             SshBasePrivateKey::Ed(ed) => SshBasePublicKey::Ed(ed.to_public_key()?),
+            SshBasePrivateKey::SkEcdsaSha2NistP256 {
+                public_key,
+                application,
+                ..
+            } => SshBasePublicKey::SkEcdsaSha2NistP256 {
+                base_key: public_key.clone(),
+                application: application.clone(),
+            },
+            SshBasePrivateKey::SkEd25519 {
+                public_key,
+                application,
+                ..
+            } => SshBasePublicKey::SkEd25519 {
+                base_key: public_key.clone(),
+                application: application.clone(),
+            },
         };
 
         Ok(key)
@@ -171,6 +203,15 @@ impl SshPrivateKey {
 
     pub fn base_key(&self) -> &SshBasePrivateKey {
         &self.base_key
+    }
+
+    pub fn inner_key(&self) -> Option<&PrivateKey> {
+        match self.base_key() {
+            SshBasePrivateKey::Rsa(key) => Some(key),
+            SshBasePrivateKey::Ec(key) => Some(key),
+            SshBasePrivateKey::Ed(key) => Some(key),
+            SshBasePrivateKey::SkEcdsaSha2NistP256 { .. } | SshBasePrivateKey::SkEd25519 { .. } => None,
+        }
     }
 
     fn h_picky_private_key_to_ssh_private_key(
@@ -273,6 +314,7 @@ impl SshPrivateKey {
         let base_public_key = base_key.base_public_key()?;
 
         let comment = cursor.read_ssh_string()?.trim_end().to_owned();
+
         Ok(SshPrivateKey {
             base_key,
             public_key: SshPublicKey {
@@ -596,6 +638,40 @@ pub mod tests {
             SshPrivateKey::from_pem_str(test_files::SSH_PRIVATE_KEY_ED25519_ENCRYPTED, passphrase).unwrap();
         let encoded = private_key.to_string().unwrap();
         assert_eq!(test_files::SSH_PRIVATE_KEY_ED25519_ENCRYPTED, encoded.as_str());
+    }
+
+    #[test]
+    fn sk_ed25519_roundtrip() {
+        let private_key = SshPrivateKey::from_pem_str(test_files::SSH_PRIVATE_KEY_SK_ED25519, None).unwrap();
+        let encoded = private_key.to_string().unwrap();
+        assert_eq!(test_files::SSH_PRIVATE_KEY_SK_ED25519, encoded.as_str());
+    }
+
+    #[test]
+    fn sk_ed25519_roundtrip_encrypted() {
+        let private_key = SshPrivateKey::from_pem_str(
+            test_files::SSH_PRIVATE_KEY_SK_ED25519_ENCRYPTED,
+            Some("test".to_string()),
+        )
+        .unwrap();
+        let encoded = private_key.to_string().unwrap();
+        assert_eq!(test_files::SSH_PRIVATE_KEY_SK_ED25519_ENCRYPTED, encoded.as_str());
+    }
+
+    #[test]
+    fn sk_ecdsa_roundtrip() {
+        let private_key = SshPrivateKey::from_pem_str(test_files::SSH_PRIVATE_KEY_SK_ECDSA, None).unwrap();
+        let encoded = private_key.to_string().unwrap();
+        assert_eq!(test_files::SSH_PRIVATE_KEY_SK_ECDSA, encoded.as_str());
+    }
+
+    #[test]
+    fn sk_ecdsa_roundtrip_encrypted() {
+        let private_key =
+            SshPrivateKey::from_pem_str(test_files::SSH_PRIVATE_KEY_SK_ECDSA_ENCRYPTED, Some("test".to_string()))
+                .unwrap();
+        let encoded = private_key.to_string().unwrap();
+        assert_eq!(test_files::SSH_PRIVATE_KEY_SK_ECDSA_ENCRYPTED, encoded.as_str());
     }
 
     #[test]

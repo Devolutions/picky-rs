@@ -27,6 +27,16 @@ pub enum SshBasePublicKey {
     Rsa(PublicKey),
     Ec(PublicKey),
     Ed(PublicKey),
+    /// U2F ecdsa SSH key
+    SkEcdsaSha2NistP256 {
+        base_key: PublicKey,
+        application: String,
+    },
+    /// U2F ed25519 SSH key
+    SkEd25519 {
+        base_key: PublicKey,
+        application: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -40,6 +50,16 @@ impl SshPublicKey {
         let mut buffer = Vec::with_capacity(1024);
         self.encode(&mut buffer)?;
         Ok(String::from_utf8(buffer)?)
+    }
+
+    pub fn inner_key(&self) -> &PublicKey {
+        match &self.inner_key {
+            SshBasePublicKey::Rsa(key) => key,
+            SshBasePublicKey::Ec(key) => key,
+            SshBasePublicKey::Ed(key) => key,
+            SshBasePublicKey::SkEcdsaSha2NistP256 { base_key, .. } => base_key,
+            SshBasePublicKey::SkEd25519 { base_key, .. } => base_key,
+        }
     }
 }
 
@@ -168,5 +188,19 @@ mod tests {
         let public_key = SshPublicKey::from_str(test_files::SSH_PUBLIC_KEY_ED25519).unwrap();
         let ssh_public_key_after = public_key.to_string().unwrap();
         assert_eq!(test_files::SSH_PUBLIC_KEY_ED25519, ssh_public_key_after.as_str());
+    }
+
+    #[test]
+    fn sk_ed25519_roundtrip() {
+        let public_key = SshPublicKey::from_str(test_files::SSH_PUBLIC_KEY_SK_ED25519).unwrap();
+        let ssh_public_key_after = public_key.to_string().unwrap();
+        assert_eq!(test_files::SSH_PUBLIC_KEY_SK_ED25519, ssh_public_key_after.as_str());
+    }
+
+    #[test]
+    fn sk_ecdsa_roundtrip() {
+        let public_key = SshPublicKey::from_str(test_files::SSH_PUBLIC_KEY_SK_ECDSA).unwrap();
+        let ssh_public_key_after = public_key.to_string().unwrap();
+        assert_eq!(test_files::SSH_PUBLIC_KEY_SK_ECDSA, ssh_public_key_after.as_str());
     }
 }

@@ -4,6 +4,7 @@ mod macros;
 pub mod jwt;
 pub mod key;
 pub mod pem;
+pub mod ssh;
 
 use wasm_bindgen::prelude::*;
 

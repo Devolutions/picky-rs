@@ -24,6 +24,8 @@ mod key_type {
     pub const ECDSA_SHA2_NIST_P384: &str = "ecdsa-sha2-nistp384";
     pub const ECDSA_SHA2_NIST_P521: &str = "ecdsa-sha2-nistp521";
     pub const ED25519: &str = "ssh-ed25519";
+    pub const SK_ECDSA_SHA2_NIST_P256: &str = "sk-ecdsa-sha2-nistp256@openssh.com";
+    pub const SK_ED25519: &str = "sk-ssh-ed25519@openssh.com";
 }
 
 mod key_identifier {

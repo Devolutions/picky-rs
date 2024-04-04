@@ -11,6 +11,8 @@ impl From<ffi::SshCertKeyType> for ssh::SshCertKeyType {
             ffi::SshCertKeyType::EcdsaSha2Nistp384V01 => ssh::SshCertKeyType::EcdsaSha2Nistp384V01,
             ffi::SshCertKeyType::EcdsaSha2Nistp521V01 => ssh::SshCertKeyType::EcdsaSha2Nistp521V01,
             ffi::SshCertKeyType::SshEd25519V01 => ssh::SshCertKeyType::SshEd25519V01,
+            ffi::SshCertKeyType::SkSshSha2Nistp256V01 => ssh::SshCertKeyType::SkSshSha2Nistp256V01,
+            ffi::SshCertKeyType::SkSshEd25519V01 => ssh::SshCertKeyType::SkSshEd25519V01,
         }
     }
 }
@@ -26,6 +28,8 @@ impl From<ssh::SshCertKeyType> for ffi::SshCertKeyType {
             ssh::SshCertKeyType::EcdsaSha2Nistp384V01 => ffi::SshCertKeyType::EcdsaSha2Nistp384V01,
             ssh::SshCertKeyType::EcdsaSha2Nistp521V01 => ffi::SshCertKeyType::EcdsaSha2Nistp521V01,
             ssh::SshCertKeyType::SshEd25519V01 => ffi::SshCertKeyType::SshEd25519V01,
+            ssh::SshCertKeyType::SkSshSha2Nistp256V01 => ffi::SshCertKeyType::SkSshSha2Nistp256V01,
+            ssh::SshCertKeyType::SkSshEd25519V01 => ffi::SshCertKeyType::SkSshEd25519V01,
         }
     }
 }
@@ -149,6 +153,28 @@ pub mod ffi {
             Ok(Box::new(SshPrivateKey(key)))
         }
 
+        /// Generates a new SSH ed25519 Private Key.
+        ///
+        /// No passphrase is set if `passphrase` is empty.
+        ///
+        /// No comment is set if `comment` is empty.
+        pub fn generate_ed25519(passphrase: &str, comment: &str) -> Result<Box<SshPrivateKey>, Box<PickyError>> {
+            let passphrase = if passphrase.is_empty() {
+                None
+            } else {
+                Some(passphrase.to_owned())
+            };
+
+            let comment = if comment.is_empty() {
+                None
+            } else {
+                Some(comment.to_owned())
+            };
+
+            let key = ssh::SshPrivateKey::generate_ed25519(passphrase, comment)?;
+            Ok(Box::new(SshPrivateKey(key)))
+        }
+
         /// Extracts SSH Private Key from PEM object.
         ///
         /// No passphrase is set if `passphrase` is empty.
@@ -210,6 +236,8 @@ pub mod ffi {
         EcdsaSha2Nistp384V01,
         EcdsaSha2Nistp521V01,
         SshEd25519V01,
+        SkSshSha2Nistp256V01,
+        SkSshEd25519V01,
     }
 
     /// SSH certificate type.

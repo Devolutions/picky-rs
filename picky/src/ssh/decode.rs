@@ -11,9 +11,11 @@ use crate::ssh::private_key::{KdfOption, SshBasePrivateKey, SshPrivateKeyError};
 use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
 use crate::ssh::{key_type, read_to_buffer_until_whitespace, Base64Reader, SSH_COMBO_ED25519_KEY_LENGTH};
 
+use super::certificate::SshSignatureBlob;
 use base64::engine::general_purpose;
 use byteorder::{BigEndian, ReadBytesExt};
 use num_bigint_dig::BigUint;
+use picky_asn1_x509::oid::ObjectIdentifier;
 use picky_asn1_x509::oids;
 use std::io::{self, Cursor, Read};
 
@@ -140,13 +142,25 @@ impl SshComplexTypeDecode for SshSignature {
 
     fn decode(mut stream: impl Read) -> Result<Self, Self::Error> {
         let _overall_size = stream.read_u32::<BigEndian>()?;
-        let format = stream.read_ssh_string()?;
-        let blob = stream.read_ssh_bytes()?;
 
-        Ok(Self {
-            format: SshSignatureFormat::new(format.as_str())?,
-            blob,
-        })
+        let format = SshSignatureFormat::new(stream.read_ssh_string()?.as_str())?;
+        let data = stream.read_ssh_bytes()?;
+
+        match format {
+            SshSignatureFormat::SkEd25519 | SshSignatureFormat::SkEcdsaSha2NistP256 => {
+                let flags = stream.read_u8()?;
+                let counter = stream.read_u32::<BigEndian>()?;
+
+                Ok(SshSignature {
+                    format,
+                    blob: SshSignatureBlob::Sk { data, flags, counter },
+                })
+            }
+            _ => Ok(SshSignature {
+                format,
+                blob: SshSignatureBlob::Standard(data),
+            }),
+        }
     }
 }
 
@@ -187,19 +201,33 @@ impl SshComplexTypeDecode for SshBasePublicKey {
                 Ok(SshBasePublicKey::Rsa(PublicKey::from_rsa_components(&n, &e)))
             }
             key_type::ECDSA_SHA2_NIST_P256 | key_type::ECDSA_SHA2_NIST_P384 | key_type::ECDSA_SHA2_NIST_P521 => {
-                let (curve, point) = decode_ec_public_key_body_impl(key_type.as_str(), stream)?;
+                let (curve, point) = decode_ec_public_key_body_impl(key_type.as_str(), &mut stream)?;
                 Ok(SshBasePublicKey::Ec(PublicKey::from_ec_encoded_components(
                     &curve.into(),
                     &point,
                 )))
             }
             key_type::ED25519 => {
-                let (algorithm, public_key) = decode_ed25519_public_key_body_impl(key_type.as_str(), stream)?;
+                let (algorithm, public_key) = decode_ed25519_public_key_body_impl(key_type.as_str(), &mut stream)?;
 
                 Ok(SshBasePublicKey::Ed(PublicKey::from_ed_encoded_components(
                     &algorithm.into(),
                     &public_key,
                 )))
+            }
+            key_type::SK_ECDSA_SHA2_NIST_P256 => {
+                let (curve, point) = decode_ec_public_key_body_impl(key_type.as_str(), &mut stream)?;
+                let base_key = PublicKey::from_ec_encoded_components(&curve.into(), &point);
+                let application = stream.read_ssh_string()?;
+
+                Ok(SshBasePublicKey::SkEcdsaSha2NistP256 { base_key, application })
+            }
+            key_type::SK_ED25519 => {
+                let (algorithm, public_key) = decode_ed25519_public_key_body_impl(key_type.as_str(), &mut stream)?;
+                let base_key = PublicKey::from_ed_encoded_components(&algorithm.into(), &public_key);
+                let application = stream.read_ssh_string()?;
+
+                Ok(SshBasePublicKey::SkEd25519 { base_key, application })
             }
             _ => Err(SshPublicKeyError::UnknownKeyType),
         }
@@ -208,10 +236,11 @@ impl SshComplexTypeDecode for SshBasePublicKey {
 
 fn decode_ed25519_public_key_body_impl(
     key_type: &str,
-    mut stream: impl Read,
+    stream: &mut impl Read,
 ) -> Result<(NamedEdAlgorithm, Vec<u8>), SshPublicKeyError> {
     let algorithm = match key_type {
         key_type::ED25519 => NamedEdAlgorithm::Known(EdAlgorithm::Ed25519),
+        key_type::SK_ED25519 => NamedEdAlgorithm::Known(EdAlgorithm::Ed25519),
         _ => {
             return Err(SshPublicKeyError::UnknownKeyType);
         }
@@ -222,12 +251,13 @@ fn decode_ed25519_public_key_body_impl(
 
 fn decode_ec_public_key_body_impl(
     key_type: &str,
-    mut stream: impl Read,
+    stream: &mut impl Read,
 ) -> Result<(NamedEcCurve, Vec<u8>), SshPublicKeyError> {
     let curve = match key_type {
         key_type::ECDSA_SHA2_NIST_P256 => NamedEcCurve::Known(EcCurve::NistP256),
         key_type::ECDSA_SHA2_NIST_P384 => NamedEcCurve::Known(EcCurve::NistP384),
         key_type::ECDSA_SHA2_NIST_P521 => NamedEcCurve::Unsupported(oids::secp521r1()),
+        key_type::SK_ECDSA_SHA2_NIST_P256 => NamedEcCurve::Known(EcCurve::NistP256),
         _ => {
             return Err(SshPublicKeyError::UnknownKeyType);
         }
@@ -259,7 +289,9 @@ impl SshComplexTypeDecode for SshPublicKey {
             | key_type::ECDSA_SHA2_NIST_P256
             | key_type::ECDSA_SHA2_NIST_P384
             | key_type::ECDSA_SHA2_NIST_P521
-            | key_type::ED25519 => {
+            | key_type::ED25519
+            | key_type::SK_ECDSA_SHA2_NIST_P256
+            | key_type::SK_ED25519 => {
                 read_to_buffer_until_whitespace(&mut stream, &mut buffer)?;
                 let mut slice = buffer.as_slice();
                 let decoder = Base64Reader::new(&mut slice, &general_purpose::STANDARD);
@@ -328,6 +360,42 @@ impl SshComplexTypeDecode for SshBasePrivateKey {
                     Some(&public_key),
                 )))
             }
+            key_type::SK_ECDSA_SHA2_NIST_P256 => {
+                let (_curve, point) = decode_ec_public_key_body_impl(key_type.as_str(), &mut stream)?;
+
+                let application = stream.read_ssh_string()?;
+                let flags = stream.read_u8()?;
+                let handle = stream.read_ssh_bytes()?;
+                let _reserved = stream.read_ssh_bytes()?;
+
+                Ok(SshBasePrivateKey::SkEcdsaSha2NistP256 {
+                    public_key: PublicKey::from_ec_encoded_components(
+                        &ObjectIdentifier::from(NamedEcCurve::Known(EcCurve::NistP256)),
+                        &point,
+                    ),
+                    application,
+                    flags,
+                    handle,
+                })
+            }
+            key_type::SK_ED25519 => {
+                let (_algorithm, public_key) = decode_ed25519_public_key_body_impl(key_type.as_str(), &mut stream)?;
+
+                let application = stream.read_ssh_string()?;
+                let flags = stream.read_u8()?;
+                let handle = stream.read_ssh_bytes()?;
+                let _reserved = stream.read_ssh_bytes()?;
+
+                Ok(SshBasePrivateKey::SkEd25519 {
+                    public_key: PublicKey::from_ed_encoded_components(
+                        &ObjectIdentifier::from(EdAlgorithm::Ed25519),
+                        &public_key,
+                    ),
+                    application,
+                    flags,
+                    handle,
+                })
+            }
             key_type => Err(SshPrivateKeyError::UnsupportedKeyType(key_type.to_owned())),
         }
     }
@@ -384,6 +452,31 @@ impl SshComplexTypeDecode for SshCertificate {
                 return Err(SshCertificateError::UnsupportedCertificateType(
                     cert_key_type.as_str().to_owned(),
                 ))
+            }
+            SshCertKeyType::SkSshSha2Nistp256V01 => {
+                let _curve_identifier = cert_data.read_ssh_string()?;
+                let public_key_data = cert_data.read_ssh_bytes()?;
+                let application = cert_data.read_ssh_string()?;
+
+                SshBasePublicKey::SkEcdsaSha2NistP256 {
+                    base_key: PublicKey::from_ec_encoded_components(
+                        &NamedEcCurve::Known(EcCurve::NistP256).into(),
+                        &public_key_data,
+                    ),
+                    application,
+                }
+            }
+            SshCertKeyType::SkSshEd25519V01 => {
+                let public_key_data = cert_data.read_ssh_bytes()?;
+                let application = cert_data.read_ssh_string()?;
+
+                SshBasePublicKey::SkEd25519 {
+                    base_key: PublicKey::from_ed_encoded_components(
+                        &NamedEdAlgorithm::Known(EdAlgorithm::Ed25519).into(),
+                        &public_key_data,
+                    ),
+                    application,
+                }
             }
         };
 

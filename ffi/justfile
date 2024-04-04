@@ -17,7 +17,7 @@ default: bindings
 # supporting dotnet framework 4.7.
 # Indeed, in older frameworks a few important types
 # are not blittables, causing Result types to not be
-# correctly send at the FFI boundary. 
+# correctly send at the FFI boundary.
 diplomat_repo := "https://github.com/CBenoit/diplomat.git"
 diplomat_rev  := "f4d93d57e93025c57e75e9711d2418faa9311a42"
 
@@ -79,7 +79,7 @@ js_wasm_lib_opt     := js_wasm_pkg_opt_dir + "picky.wasm"
 
 wasm-opt-install:
     sudo npm install -g wasm-opt
-        
+
 twiggy-install:
     cargo install twiggy
 
@@ -105,6 +105,9 @@ dotnet-bindings:
 
 # FIXME: js bindings not yet ready
 js-bindings:
+    -mkdir -p {{js_generated_path}}
+    -mkdir -p {{js_docs_path}}
+
     -rm {{js_generated_path}}*.js
     -rm {{js_generated_path}}*.d.ts
     -rm {{js_docs_path}}*.rst
@@ -117,7 +120,7 @@ test: test-dotnet
 
 test-dotnet: native-lib-debug dotnet-bindings
     dotnet test {{dotnet_solution_path}} --arch win-x64
-    
+
 # FIXME: js bindings not yet ready
 test-js: wasm-lib js-bindings
     cd js && npm install

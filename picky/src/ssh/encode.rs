@@ -11,6 +11,8 @@ use crate::ssh::private_key::{
 use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
 use crate::ssh::{key_type, Base64Writer, EcCurveSshExt as _, EdAlgorithmSshExt as _, SSH_COMBO_ED25519_KEY_LENGTH};
 
+use super::certificate::SshSignatureBlob;
+use super::key_identifier;
 use aes::cipher::{KeyIvInit, StreamCipher};
 use base64::engine::general_purpose;
 use byteorder::{BigEndian, WriteBytesExt};
@@ -127,10 +129,21 @@ impl SshComplexTypeEncode for SshSignature {
     type Error = SshSignatureError;
 
     fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
-        let overall_size = self.format.as_str().len() + self.blob.len() + 8;
+        let overall_size = self.format.as_str().len() + self.blob.size() + 8;
         stream.write_u32::<BigEndian>(overall_size as u32)?;
         stream.write_ssh_string(self.format.as_str())?;
-        stream.write_ssh_bytes(&self.blob)?;
+
+        match &self.blob {
+            SshSignatureBlob::Standard(data) => {
+                stream.write_ssh_bytes(data)?;
+            }
+            SshSignatureBlob::Sk { data, flags, counter } => {
+                stream.write_ssh_bytes(data)?;
+                stream.write_u8(*flags)?;
+                stream.write_u32::<BigEndian>(*counter)?;
+            }
+        };
+
         Ok(())
     }
 }
@@ -181,6 +194,27 @@ impl SshComplexTypeEncode for SshBasePublicKey {
                 let key = EdPublicKey::try_from(ed)?;
                 encode_ed_public_key_body(&mut stream, &key)
             }
+            SshBasePublicKey::SkEcdsaSha2NistP256 { base_key, application } => {
+                let key = EcdsaPublicKey::try_from(base_key)?;
+
+                stream.write_ssh_string(key_type::SK_ECDSA_SHA2_NIST_P256)?;
+                stream.write_ssh_string(key_identifier::ECDSA_SHA2_NIST_P256)?;
+                stream.write_ssh_bytes(key.encoded_point())?;
+
+                stream.write_ssh_string(application.as_str())?;
+
+                Ok(())
+            }
+            SshBasePublicKey::SkEd25519 { base_key, application } => {
+                let key = EdPublicKey::try_from(base_key)?;
+
+                stream.write_ssh_string(key_type::SK_ED25519)?;
+                stream.write_ssh_bytes(key.data())?;
+
+                stream.write_ssh_string(application.as_str())?;
+
+                Ok(())
+            }
         }
     }
 }
@@ -189,6 +223,7 @@ impl SshComplexTypeEncode for SshPublicKey {
     type Error = SshPublicKeyError;
 
     fn encode(&self, mut stream: impl Write) -> Result<(), Self::Error> {
+        // Write key type
         match &self.inner_key {
             SshBasePublicKey::Rsa(_) => {
                 stream.write_all(key_type::RSA.as_bytes())?;
@@ -200,6 +235,12 @@ impl SshComplexTypeEncode for SshPublicKey {
             SshBasePublicKey::Ed(key) => {
                 let key = EdPublicKey::try_from(key)?;
                 stream.write_all(key.algorithm().to_ed_ssh_key_type()?.as_bytes())?;
+            }
+            SshBasePublicKey::SkEcdsaSha2NistP256 { .. } => {
+                stream.write_all(key_type::SK_ECDSA_SHA2_NIST_P256.as_bytes())?;
+            }
+            SshBasePublicKey::SkEd25519 { .. } => {
+                stream.write_all(key_type::SK_ED25519.as_bytes())?;
             }
         };
 
@@ -263,6 +304,42 @@ impl SshComplexTypeEncode for SshBasePrivateKey {
                 secret.extend_from_slice(public_key.data());
 
                 stream.write_ssh_bytes(&secret)?;
+            }
+            SshBasePrivateKey::SkEcdsaSha2NistP256 {
+                public_key,
+                application,
+                flags,
+                handle,
+            } => {
+                let ec_key = EcdsaPublicKey::try_from(public_key)?;
+
+                // Encode the public key part
+                stream.write_ssh_string(key_type::SK_ECDSA_SHA2_NIST_P256)?;
+                stream.write_ssh_string(key_identifier::ECDSA_SHA2_NIST_P256)?;
+                stream.write_ssh_bytes(ec_key.encoded_point())?;
+
+                stream.write_ssh_string(application.as_str())?;
+                stream.write_u8(*flags)?;
+                stream.write_ssh_bytes(handle)?;
+                // Reserved
+                stream.write_ssh_bytes(&[])?;
+            }
+            SshBasePrivateKey::SkEd25519 {
+                public_key,
+                application,
+                flags,
+                handle,
+            } => {
+                let ed_key = EdPublicKey::try_from(public_key)?;
+
+                stream.write_ssh_string(key_type::SK_ED25519)?;
+                stream.write_ssh_bytes(ed_key.data())?;
+
+                stream.write_ssh_string(application.as_str())?;
+                stream.write_u8(*flags)?;
+                stream.write_ssh_bytes(handle)?;
+                // Reserved
+                stream.write_ssh_bytes(&[])?;
             }
         };
 
@@ -389,6 +466,17 @@ impl SshComplexTypeEncode for SshCertificate {
             SshBasePublicKey::Ed(ed) => {
                 let ed = EdPublicKey::try_from(ed)?;
                 cert_data.write_ssh_bytes(ed.data())?;
+            }
+            SshBasePublicKey::SkEcdsaSha2NistP256 { base_key, application } => {
+                let ec = EcdsaPublicKey::try_from(base_key)?;
+                cert_data.write_ssh_string(key_identifier::ECDSA_SHA2_NIST_P256)?;
+                cert_data.write_ssh_bytes(ec.encoded_point())?;
+                cert_data.write_ssh_string(application.as_str())?;
+            }
+            SshBasePublicKey::SkEd25519 { base_key, application } => {
+                let ed = EdPublicKey::try_from(base_key)?;
+                cert_data.write_ssh_bytes(ed.data())?;
+                cert_data.write_ssh_string(application.as_str())?;
             }
         };
 
