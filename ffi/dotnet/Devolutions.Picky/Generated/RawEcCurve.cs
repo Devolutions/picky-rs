@@ -24,4 +24,8 @@ public enum EcCurve
     /// NIST P-384
     /// </summary>
     NistP384 = 1,
+    /// <summary>
+    /// NIST P-521
+    /// </summary>
+    NistP521 = 2,
 }

@@ -44,9 +44,7 @@ impl EcCurveSshExt for NamedEcCurve {
         match self {
             NamedEcCurve::Known(EcCurve::NistP256) => Ok(key_type::ECDSA_SHA2_NIST_P256),
             NamedEcCurve::Known(EcCurve::NistP384) => Ok(key_type::ECDSA_SHA2_NIST_P384),
-            // Special handling: we don't support any arithmetic on P521, but we at least
-            // should be able to read and write it back correctly.
-            NamedEcCurve::Unsupported(_) if self.is_nist_p521() => Ok(key_type::ECDSA_SHA2_NIST_P521),
+            NamedEcCurve::Known(EcCurve::NistP521) => Ok(key_type::ECDSA_SHA2_NIST_P521),
             NamedEcCurve::Unsupported(oid) => Err(KeyError::unsupported_curve(oid, "ssh key type serialization")),
         }
     }
@@ -55,8 +53,7 @@ impl EcCurveSshExt for NamedEcCurve {
         match self {
             NamedEcCurve::Known(EcCurve::NistP256) => Ok(key_identifier::ECDSA_SHA2_NIST_P256),
             NamedEcCurve::Known(EcCurve::NistP384) => Ok(key_identifier::ECDSA_SHA2_NIST_P384),
-            // See comment inside function above
-            NamedEcCurve::Unsupported(_) if self.is_nist_p521() => Ok(key_identifier::ECDSA_SHA2_NIST_P521),
+            NamedEcCurve::Known(EcCurve::NistP521) => Ok(key_identifier::ECDSA_SHA2_NIST_P521),
             NamedEcCurve::Unsupported(oid) => Err(KeyError::unsupported_curve(oid, "ssh key identifier serialization")),
         }
     }

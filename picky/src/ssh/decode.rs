@@ -433,7 +433,7 @@ impl SshComplexTypeDecode for SshCertificate {
                 let curve = match cert_key_type {
                     SshCertKeyType::EcdsaSha2Nistp256V01 => NamedEcCurve::Known(EcCurve::NistP256),
                     SshCertKeyType::EcdsaSha2Nistp384V01 => NamedEcCurve::Known(EcCurve::NistP384),
-                    SshCertKeyType::EcdsaSha2Nistp521V01 => NamedEcCurve::new_nist_p521(),
+                    SshCertKeyType::EcdsaSha2Nistp521V01 => NamedEcCurve::Known(EcCurve::NistP521),
                     _ => unreachable!("Already validated in match above"),
                 };
 

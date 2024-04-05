@@ -42,6 +42,8 @@ pub enum EcCurve {
     NistP256,
     /// NIST P-384 curve (secp384r1)
     NistP384,
+    /// NIST P-521 curve (secp521r1)
+    NistP521,
 }
 
 impl EcCurve {
@@ -58,6 +60,11 @@ impl EcCurve {
                 use p384::elliptic_curve::generic_array::typenum::Unsigned;
                 use p384::elliptic_curve::FieldBytesSize;
                 <FieldBytesSize<p384::NistP384> as Unsigned>::USIZE
+            }
+            EcCurve::NistP521 => {
+                use p521::elliptic_curve::generic_array::typenum::Unsigned;
+                use p521::elliptic_curve::FieldBytesSize;
+                <FieldBytesSize<p521::NistP521> as Unsigned>::USIZE
             }
         }
     }
@@ -88,26 +95,12 @@ pub(crate) enum NamedEcCurve {
     Unsupported(ObjectIdentifier),
 }
 
-impl NamedEcCurve {
-    #[cfg(feature = "ssh")]
-    pub fn new_nist_p521() -> Self {
-        Self::Unsupported(oids::secp521r1())
-    }
-
-    #[cfg(feature = "ssh")]
-    pub fn is_nist_p521(&self) -> bool {
-        match self {
-            Self::Unsupported(oid) => oid == &oids::secp521r1(),
-            _ => false,
-        }
-    }
-}
-
 impl Display for EcCurve {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::NistP256 => write!(f, "NIST-P256"),
             Self::NistP384 => write!(f, "NIST-P384"),
+            Self::NistP521 => write!(f, "NIST-P521"),
         }
     }
 }
@@ -130,6 +123,7 @@ impl From<&'_ ObjectIdentifier> for NamedEcCurve {
         match oid.as_str() {
             oids::SECP256R1 => NamedEcCurve::Known(EcCurve::NistP256),
             oids::SECP384R1 => NamedEcCurve::Known(EcCurve::NistP384),
+            oids::SECP521R1 => NamedEcCurve::Known(EcCurve::NistP521),
             _ => NamedEcCurve::Unsupported(value.clone()),
         }
     }
@@ -141,6 +135,7 @@ impl From<NamedEcCurve> for ObjectIdentifier {
             NamedEcCurve::Known(curve) => match curve {
                 EcCurve::NistP256 => oids::secp256r1(),
                 EcCurve::NistP384 => oids::secp384r1(),
+                EcCurve::NistP521 => oids::secp521r1(),
             },
             NamedEcCurve::Unsupported(oid) => oid,
         }
@@ -206,6 +201,24 @@ pub(crate) fn calculate_public_ec_key(
             let secret_bytes = GenericArrayP384::from_slice(private_key_validated);
             let secret_key = SecretKeyP384::from_bytes(secret_bytes).map_err(|_| KeyError::EC {
                 context: "Failed to construct P384 SecretKey from private key bytes".to_string(),
+            })?;
+
+            // Calculate public key from secret key
+            let public_key = secret_key.public_key().as_affine().to_encoded_point(compress);
+
+            Ok(Some(public_key.to_bytes().to_vec()))
+        }
+        NamedEcCurve::Known(EcCurve::NistP521) => {
+            use p521::{
+                elliptic_curve::{generic_array::GenericArray as GenericArrayP521, sec1::ToEncodedPoint as _},
+                SecretKey as SecretKeyP521,
+            };
+
+            let private_key_validated = EcCurve::NistP521.validate_component(EcComponent::Secret(private_key))?;
+
+            let secret_bytes = GenericArrayP521::from_slice(private_key_validated);
+            let secret_key = SecretKeyP521::from_bytes(secret_bytes).map_err(|_| KeyError::EC {
+                context: "Failed to construct P521 SecretKey from private key bytes".to_string(),
             })?;
 
             // Calculate public key from secret key
@@ -312,25 +325,18 @@ mod tests {
     #[rstest]
     #[case(test_files::EC_NIST256_NOPUBLIC_DER_PK_1)]
     #[case(test_files::EC_NIST384_NOPUBLIC_DER_PK_1)]
+    #[case(test_files::EC_NIST521_NOPUBLIC_DER_PK_1)]
     fn ecdsa_private_key_without_public(#[case] key_pem: &str) {
         // This should succeed for supported curves
         let key = PrivateKey::from_pem_str(key_pem).unwrap();
         key.to_public_key().unwrap().to_pem_str().unwrap();
     }
 
-    #[test]
-    fn ecdsa_private_key_without_public_unsupported_curve() {
-        // We should be able to parse private keys without public keys and unknown curve,
-        // but we `to_public_key` will fail anyway because we don't implement arithmetic for that
-        // curve
-        let key = PrivateKey::from_pem_str(test_files::EC_NIST521_NOPUBLIC_DER_PK_1).unwrap();
-        key.to_public_key().unwrap_err();
-    }
-
     #[rstest]
     // Known curves
     #[case(test_files::EC_NIST256_PK_1_PUB)]
     #[case(test_files::EC_NIST384_PK_1_PUB)]
+    #[case(test_files::EC_NIST521_PK_1_PUB)]
     // Unsupported curve, should still work as long as pem contains the public key
     // (in that case no arithmetic operations are performed on the key)
     #[case(test_files::EC_PUBLIC_KEY_SECP256K1_PEM)]
@@ -354,7 +360,7 @@ mod tests {
     #[rstest]
     #[case(test_files::EC_NIST256_DER_PK_1, NamedEcCurve::Known(EcCurve::NistP256))]
     #[case(test_files::EC_NIST384_DER_PK_1, NamedEcCurve::Known(EcCurve::NistP384))]
-    #[case(test_files::EC_NIST521_DER_PK_1, NamedEcCurve::Unsupported(oids::secp521r1()))]
+    #[case(test_files::EC_NIST521_DER_PK_1, NamedEcCurve::Known(EcCurve::NistP521))]
     fn ecdsa_key_pair_from_ec_private_key(#[case] key: &str, #[case] curve: NamedEcCurve) {
         let pk = PrivateKey::from_pem_str(key).unwrap();
         let pair = EcdsaKeypair::try_from(&pk).unwrap();

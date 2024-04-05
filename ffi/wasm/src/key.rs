@@ -8,6 +8,7 @@ impl From<picky::key::EcCurve> for EcCurve {
         match value {
             picky::key::EcCurve::NistP256 => Self::NistP256,
             picky::key::EcCurve::NistP384 => Self::NistP384,
+            picky::key::EcCurve::NistP521 => Self::NistP521,
         }
     }
 }
@@ -17,6 +18,7 @@ impl From<EcCurve> for picky::key::EcCurve {
         match value {
             EcCurve::NistP256 => Self::NistP256,
             EcCurve::NistP384 => Self::NistP384,
+            EcCurve::NistP521 => Self::NistP521,
         }
     }
 }
@@ -29,6 +31,8 @@ pub enum EcCurve {
     NistP256,
     /// NIST P-384
     NistP384,
+    /// NIST P-521
+    NistP521,
 }
 
 impl From<picky::key::EdAlgorithm> for EdAlgorithm {

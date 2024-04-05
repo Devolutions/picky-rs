@@ -53,6 +53,7 @@ x25519-dalek = { version = "2", features = ["static_secrets"] }
 
 p256 = { version = "0.13", features = ["ecdh"] }
 p384 = { version = "0.13", features = ["ecdh"] }
+p521 = { version = "0.13", features = ["ecdh"] }
 
 rsa = { version = "0.9.2", features = ["std"] }
 

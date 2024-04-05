@@ -607,8 +607,6 @@ pub mod tests {
     #[rstest]
     #[case(test_files::SSH_PRIVATE_KEY_EC_P256)]
     #[case(test_files::SSH_PRIVATE_KEY_EC_P384)]
-    // Note that even if P521 curve arithmetic is not supported yet, we still can read and write
-    // ssh keys with this curve.
     #[case(test_files::SSH_PRIVATE_KEY_EC_P521)]
     fn ecdsa_keys_unencrypted(#[case] pem: &str) {
         let key = SshPrivateKey::from_pem_str(pem, None).unwrap();
@@ -688,9 +686,12 @@ pub mod tests {
         }
     }
 
-    #[test]
-    fn test_ec_private_key_generation() {
-        let private_key = SshPrivateKey::generate_ec(EcCurve::NistP256, Option::Some("123".to_string()), None).unwrap();
+    #[rstest]
+    #[case(EcCurve::NistP256)]
+    #[case(EcCurve::NistP384)]
+    #[case(EcCurve::NistP521)]
+    fn test_ec_private_key_generation(#[case] curve: EcCurve) {
+        let private_key = SshPrivateKey::generate_ec(curve, Option::Some("123".to_string()), None).unwrap();
         let data = private_key.to_pem().unwrap();
         let parsed = SshPrivateKey::from_pem(&data, Option::Some("123".to_string())).unwrap();
 
