@@ -1064,6 +1064,24 @@ fn generate_ecdh_shared_secret(
 
                     (shared_secret, epk)
                 }
+                NamedEcCurve::Known(EcCurve::NistP521) => {
+                    let public_key = p521::PublicKey::from_sec1_bytes(ec.encoded_point()).map_err(|e| {
+                        let source = KeyError::EC {
+                            context: format!("Cannot parse p521 encoded point from bytes: {e}"),
+                        };
+                        JweError::Key { source }
+                    })?;
+
+                    let secret = p521::ecdh::EphemeralSecret::random(&mut OsRng);
+
+                    let shared_secret = Zeroizing::new(secret.diffie_hellman(&public_key).raw_secret_bytes().to_vec());
+                    let epk = PublicKey::from_ec_encoded_components(
+                        &NamedEcCurve::Known(EcCurve::NistP521).into(),
+                        secret.public_key().to_sec1_bytes().as_ref(),
+                    );
+
+                    (shared_secret, epk)
+                }
                 NamedEcCurve::Unsupported(oid) => {
                     let source = KeyError::unsupported_curve(oid, "ECDH-ES JWE algorithm");
                     return Err(JweError::Key { source });
@@ -1194,6 +1212,32 @@ fn calculate_ecdh_shared_secret(
                     // p384 crate doesn't have high level API for static ECDH secrets
                     let shared_secret =
                         p384::elliptic_curve::ecdh::diffie_hellman(secret.to_nonzero_scalar(), public_key.as_affine())
+                            .raw_secret_bytes()
+                            .to_vec();
+
+                    Zeroizing::new(shared_secret)
+                }
+                NamedEcCurve::Known(EcCurve::NistP521) => {
+                    let public_key = p521::PublicKey::from_sec1_bytes(public_key.encoded_point()).map_err(|e| {
+                        let source = KeyError::EC {
+                            context: format!("Cannot parse p521 encoded point from bytes: {e}"),
+                        };
+                        JweError::Key { source }
+                    })?;
+
+                    let secret_bytes_validated =
+                        EcCurve::NistP521.validate_component(EcComponent::Secret(private_key.secret()))?;
+
+                    let secret = p521::SecretKey::from_bytes(
+                        p521::elliptic_curve::generic_array::GenericArray::from_slice(secret_bytes_validated),
+                    )
+                    .map_err(|e| KeyError::EC {
+                        context: format!("Cannot parse p521 secret from bytes: {e}"),
+                    })?;
+
+                    // p521 crate doesn't have high level API for static ECDH secrets
+                    let shared_secret =
+                        p521::elliptic_curve::ecdh::diffie_hellman(secret.to_nonzero_scalar(), public_key.as_affine())
                             .raw_secret_bytes()
                             .to_vec();
 

@@ -370,6 +370,24 @@ impl Jwk {
                             }),
                         }
                     }
+                    NamedEcCurve::Known(EcCurve::NistP521) => {
+                        let point = p521::EncodedPoint::from_bytes(ec_key.encoded_point()).map_err(|_| {
+                            JwkError::InvalidEcPublicKey {
+                                cause: "invalid P-521 EC point encoding".to_string(),
+                            }
+                        })?;
+
+                        match (point.x(), point.y()) {
+                            (Some(x), Some(y)) => Ok(Self::new(JwkKeyType::new_ec_key(
+                                JwkEcPublicKeyCurve::P521,
+                                x.as_slice(),
+                                y.as_slice(),
+                            ))),
+                            _ => Err(JwkError::InvalidEcPublicKey {
+                                cause: "Invalid P-521 curve EC public point coordinates".to_string(),
+                            }),
+                        }
+                    }
                     NamedEcCurve::Unsupported(_) => Err(JwkError::UnsupportedAlgorithm {
                         algorithm: "Unsupported EC curve",
                     }),
@@ -414,13 +432,7 @@ impl Jwk {
                 let curve = match ec.crv {
                     JwkEcPublicKeyCurve::P256 => EcCurve::NistP256,
                     JwkEcPublicKeyCurve::P384 => EcCurve::NistP384,
-                    JwkEcPublicKeyCurve::P521 => {
-                        // To construct encoded point from coponents we need to use curve-specific
-                        // arithmetic, which is currently not supported by picky.
-                        return Err(JwkError::UnsupportedAlgorithm {
-                            algorithm: "P-521 EC curve",
-                        });
-                    }
+                    JwkEcPublicKeyCurve::P521 => EcCurve::NistP521,
                 };
 
                 let x = BigUint::from_bytes_be(&ec.x_signed_bytes_be()?);
@@ -694,6 +706,7 @@ mod tests {
     #[rstest]
     #[case(test_files::JOSE_JWK_EC_P256_JSON)]
     #[case(test_files::JOSE_JWK_EC_P384_JSON)]
+    #[case(test_files::JOSE_JWK_EC_P521_JSON)]
     fn ecdsa_key_roundtrip(#[case] json: &str) {
         let decoded = Jwk::from_json(json).unwrap();
         let encoded = decoded.to_json().unwrap();

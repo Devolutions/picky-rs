@@ -320,12 +320,7 @@ impl Jws {
                 let curve = match self.header.alg {
                     JwsAlg::ES256 => EcCurve::NistP256,
                     JwsAlg::ES384 => EcCurve::NistP384,
-                    JwsAlg::ES512 => {
-                        return Err(SignatureError::Ec {
-                            context: "ECDSA with SHA-512 is not supported".to_string(),
-                        }
-                        .into())
-                    }
+                    JwsAlg::ES512 => EcCurve::NistP521,
                     _ => unreachable!("Checked in match above"),
                 };
 
@@ -455,12 +450,7 @@ pub fn verify_signature(encoded_token: &str, public_key: &PublicKey, algorithm: 
             let curve = match algorithm {
                 JwsAlg::ES256 => EcCurve::NistP256,
                 JwsAlg::ES384 => EcCurve::NistP384,
-                JwsAlg::ES512 => {
-                    return Err(SignatureError::Ec {
-                        context: "ECDSA with SHA-512 is not supported".to_string(),
-                    }
-                    .into())
-                }
+                JwsAlg::ES512 => EcCurve::NistP521,
                 _ => unreachable!("Checked in match above"),
             };
 
@@ -530,9 +520,10 @@ mod tests {
     }
 
     #[rstest]
-    #[case(JwsAlg::ES256, test_files::EC_NIST256_PK_1, test_files::JOSE_JWT_SIG_ES256)]
-    #[case(JwsAlg::ES384, test_files::EC_NIST384_PK_1, test_files::JOSE_JWT_SIG_ES384)]
-    fn ecdsa_algorithm(#[case] alg: JwsAlg, #[case] key_pem: &str, #[case] expected: &str) {
+    #[case(JwsAlg::ES256, test_files::EC_NIST256_PK_1)]
+    #[case(JwsAlg::ES384, test_files::EC_NIST384_PK_1)]
+    #[case(JwsAlg::ES512, test_files::EC_NIST521_PK_1)]
+    fn ecdsa_sign_verify(#[case] alg: JwsAlg, #[case] key_pem: &str) {
         let key = PrivateKey::from_pem_str(key_pem).unwrap();
 
         let jwt = Jws {
@@ -545,11 +536,25 @@ mod tests {
 
         // Check encode + sign
         let encoded = jwt.encode(&key).unwrap();
-        assert_eq!(encoded, expected);
 
         // Check decode + verify
         let jws = RawJws::decode(&encoded).unwrap();
-        jws.verify(&key.to_public_key().unwrap()).unwrap();
+        jws.clone().verify(&key.to_public_key().unwrap()).unwrap();
+
+        assert_eq!(&jws.header, &jwt.header);
+        assert_eq!(&jws.payload, &jwt.payload);
+    }
+
+    #[rstest]
+    #[case(test_files::EC_NIST256_PK_1, test_files::JOSE_JWT_SIG_ES256)]
+    #[case(test_files::EC_NIST384_PK_1, test_files::JOSE_JWT_SIG_ES384)]
+    #[case(test_files::EC_NIST521_PK_1, test_files::JOSE_JWT_SIG_ES512)]
+    fn ecdsa_parse_and_verify(#[case] key_pem: &str, #[case] signature: &str) {
+        let key = PrivateKey::from_pem_str(key_pem).unwrap();
+
+        // Check decode + verify
+        let jws = RawJws::decode(signature).unwrap();
+        jws.clone().verify(&key.to_public_key().unwrap()).unwrap();
     }
 
     const JWT_ED25519_BODY: &str = r#"{"username":"kataras"}"#;

@@ -61,6 +61,10 @@ mod test_files {
     // openssl ec -in ec-secp384r1-priv-key.pem -pubout > ec-secp384r1-pub-key.pem
     pub const EC_NIST384_PK_1_PUB: &str = include_str!("../../test_assets/public_keys/ec-nist384-pk_1.key");
 
+    // openssl ecparam -name secp521r1 -genkey -noout -out ec-secp521r1-priv-key.pem
+    // openssl ec -in ec-secp521r1-priv-key.pem -pubout > ec-secp521r1-pub-key.pem
+    pub const EC_NIST521_PK_1_PUB: &str = include_str!("../../test_assets/public_keys/ec-nist521-pk_1.key");
+
     // openssl ecparam -name secp256k1 -genkey -noout -out ec-secp256k1-priv-key.pem
     // openssl ec -in ec-secp256k1-priv-key.pem -pubout > ec-secp256k1-pub-key.pem
     pub const EC_PUBLIC_KEY_SECP256K1_PEM: &str = include_str!("../../test_assets/public_keys/ec-secp256k1-pk_1.key");
@@ -112,6 +116,8 @@ mod test_files {
     }}
 
     cfg_if::cfg_if! { if #[cfg(feature = "jose")] {
+        pub const EC_NIST521_PK_1: &str = include_str!("../../test_assets/private_keys/ec-nist521-pk_1.key");
+
         pub const JOSE_JWT_SIG_EXAMPLE: &str =
             include_str!("../../test_assets/jose/jwt_sig_example.txt");
         pub const JOSE_JWT_SIG_WITH_EXP: &str =
@@ -123,6 +129,8 @@ mod test_files {
             include_str!("../../test_assets/jose/jwk_ec_p256.json");
         pub const JOSE_JWK_EC_P384_JSON: &str =
             include_str!("../../test_assets/jose/jwk_ec_p384.json");
+        pub const JOSE_JWK_EC_P521_JSON: &str =
+            include_str!("../../test_assets/jose/jwk_ec_p521.json");
         pub const JOSE_JWK_ED25519_JSON: &str =
             include_str!("../../test_assets/jose/jwk_ed25519.json");
         pub const JOSE_JWK_X25519_JSON: &str =
@@ -132,6 +140,8 @@ mod test_files {
             include_str!("../../test_assets/jose/jwt_sig_es256.txt");
         pub const JOSE_JWT_SIG_ES384: &str =
             include_str!("../../test_assets/jose/jwt_sig_es384.txt");
+        pub const JOSE_JWT_SIG_ES512: &str =
+            include_str!("../../test_assets/jose/jwt_sig_es512.txt");
 
         /// Test data was gathered from https://github.com/golang-jwt/jwt
         pub const JOSE_JWT_SIG_ED25519_GO: &str =

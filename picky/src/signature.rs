@@ -219,6 +219,30 @@ impl SignatureAlgorithm {
                             ),
                         }),
                     },
+                    NamedEcCurve::Known(EcCurve::NistP521) => match picky_hash_algo {
+                        HashAlgorithm::SHA2_512 => {
+                            let secret_validated =
+                                EcCurve::NistP521.validate_component(EcComponent::Secret(ec_keypair.secret()))?;
+
+                            let key_bytes =
+                                p521::elliptic_curve::generic_array::GenericArray::from_slice(secret_validated);
+
+                            let key =
+                                p521::ecdsa::SigningKey::from_bytes(key_bytes).map_err(|e| SignatureError::Ec {
+                                    context: format!("Cannot decode p521 EC keypair: {}", e),
+                                })?;
+                            let sig: p521::ecdsa::Signature = key.try_sign(msg).map_err(|e| SignatureError::Ec {
+                                context: format!("Cannot produce p521 signature: {}", e),
+                            })?;
+                            Ok(sig.to_der().as_bytes().to_vec())
+                        }
+                        _ => Err(SignatureError::UnsupportedAlgorithm {
+                            algorithm: format!(
+                                "ECDSA P-521 curve with {:?} hash algorithm is not supported",
+                                picky_hash_algo
+                            ),
+                        }),
+                    },
                     NamedEcCurve::Unsupported(oid) => Err(KeyError::unsupported_curve(oid, "signing").into()),
                 }
             }
@@ -370,6 +394,37 @@ impl SignatureAlgorithm {
                             })?;
                         vkey.verify(msg, &signature).map_err(|_| SignatureError::BadSignature)?
                     }
+                    HashAlgorithm::SHA2_512 => {
+                        use p521::ecdsa::signature::Verifier;
+
+                        match curve {
+                            EcCurve::NistP521 => {}
+                            curve => {
+                                return Err(SignatureError::UnsupportedAlgorithm {
+                                    algorithm: format!("SHA512 hash algorithm can't be used with `{}` curve", curve),
+                                })
+                            }
+                        };
+
+                        let encoded_point =
+                            p521::EncodedPoint::from_bytes(ec_pub_key.encoded_point()).map_err(|e| {
+                                SignatureError::Ec {
+                                    context: format!("Cannot parse p521 public key from der bytes: {}", e),
+                                }
+                            })?;
+
+                        let vkey = p521::ecdsa::VerifyingKey::from_encoded_point(&encoded_point).map_err(|e| {
+                            SignatureError::Ec {
+                                context: format!("Cannot parse p521 encoded point: {}", e),
+                            }
+                        })?;
+
+                        let signature =
+                            p521::ecdsa::Signature::from_der(signature).map_err(|e| SignatureError::Ec {
+                                context: format!("Cannot parse p521 signature: {}", e),
+                            })?;
+                        vkey.verify(msg, &signature).map_err(|_| SignatureError::BadSignature)?
+                    }
                     _ => {
                         return Err(SignatureError::UnsupportedAlgorithm {
                             algorithm: format!("ECDSA with {:?} hash algorithm is not supported", picky_hash_algo),
@@ -430,6 +485,7 @@ impl SignatureAlgorithm {
 #[cfg(test)]
 mod ec_tests {
     use super::*;
+    use crate::test_files;
     use rstest::*;
 
     const EC_PRIVATE_KEY_NIST256_PEM: &str = r#"-----BEGIN EC PRIVATE KEY-----
@@ -443,14 +499,6 @@ MIGkAgEBBDDT8VOfdzHbIRaWOO1F0vgotY2qM2FfYS3zpdKE7Vqbh26hFsUw+iaG
 GmGnT+29kg+gBwYFK4EEACKhZANiAAQFvVVUKRdN3/bqaEpDA1aHu8FEd3ujuyS0
 AadG6QAiZxH37BGumBcyTTeGHyArqb+GTpsHTUXASbP+P+p5JgkfF9wBMF1SVTvu
 ACZOYcqzGbsAXXdMYqewckhc42ye0u0=
------END EC PRIVATE KEY-----"#;
-
-    const EC_PRIVATE_KEY_NIST512_PEM: &str = r#"-----BEGIN EC PRIVATE KEY-----
-MIHcAgEBBEIBhqphIGu2PmlcEb6xADhhSCpgPUulB0s4L2qOgolRgaBx4fNgINFE
-mBsSyHJncsWG8WFEuUzAYy/YKz2lP0Qx6Z2gBwYFK4EEACOhgYkDgYYABABwBevJ
-w/+Xh6I98ruzoTX3MNTsbgnc+glenJRCbEJkjbJrObFhbfgqP52r1lAy2RxuShGi
-NYJJzNPT6vR1abS32QFtvTH7YbYa6OWk9dtGNY/cYxgx1nQyhUuofdW7qbbfu/Ww
-TP2oFsPXRAavZCh4AbWUn8bAHmzNRyuJonQBKlQlVQ==
 -----END EC PRIVATE KEY-----"#;
 
     #[rstest]
@@ -495,9 +543,9 @@ csaQwO9jFvbQFIpCvcMRjaunLfhIWiYDdg==
     }
 
     #[rstest]
-    #[case(EC_PRIVATE_KEY_NIST256_PEM, HashAlgorithm::SHA2_256, true)]
-    #[case(EC_PRIVATE_KEY_NIST384_PEM, HashAlgorithm::SHA2_384, true)]
-    #[case(EC_PRIVATE_KEY_NIST512_PEM, HashAlgorithm::SHA2_512, false)] // EC Nist 512 is not supported by ring yet
+    #[case(test_files::EC_NIST256_PK_1, HashAlgorithm::SHA2_256, true)]
+    #[case(test_files::EC_NIST384_PK_1, HashAlgorithm::SHA2_384, true)]
+    #[case(test_files::EC_NIST521_PK_1, HashAlgorithm::SHA2_512, true)]
     fn sign_and_verify(#[case] key_pem: &str, #[case] hash: HashAlgorithm, #[case] sign_successful: bool) {
         let private_key = PrivateKey::from_pem_str(key_pem).unwrap();
 

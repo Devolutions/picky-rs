@@ -263,6 +263,9 @@ impl PrivateKey {
         use p384::elliptic_curve::generic_array::GenericArray as GenericArrayP384;
         use p384::EncodedPoint as EncodedPointP384;
 
+        use p521::elliptic_curve::generic_array::GenericArray as GenericArrayP521;
+        use p521::EncodedPoint as EncodedPointP521;
+
         let curve_oid: ObjectIdentifier = NamedEcCurve::Known(curve).into();
         let px_bytes = expand_ec_field(point_x.to_bytes_be(), curve);
         let py_bytes = expand_ec_field(point_y.to_bytes_be(), curve);
@@ -281,6 +284,12 @@ impl PrivateKey {
                 let x = GenericArrayP384::from_slice(px_validated);
                 let y = GenericArrayP384::from_slice(py_validated);
                 let point = EncodedPointP384::from_affine_coordinates(x, y, COMPRESS_EC_POINT_BY_DEFAULT);
+                point.as_bytes().to_vec()
+            }
+            EcCurve::NistP521 => {
+                let x = GenericArrayP521::from_slice(px_validated);
+                let y = GenericArrayP521::from_slice(py_validated);
+                let point = EncodedPointP521::from_affine_coordinates(x, y, COMPRESS_EC_POINT_BY_DEFAULT);
                 point.as_bytes().to_vec()
             }
         };
@@ -649,6 +658,18 @@ impl PrivateKey {
                     .to_vec();
                 (secret, point)
             }
+            EcCurve::NistP521 => {
+                use p521::elliptic_curve::sec1::ToEncodedPoint;
+
+                let key = p521::SecretKey::random(&mut OsRng);
+                let secret = key.to_bytes().to_vec();
+                let point = key
+                    .public_key()
+                    .to_encoded_point(COMPRESS_EC_POINT_BY_DEFAULT)
+                    .as_bytes()
+                    .to_vec();
+                (secret, point)
+            }
         };
 
         let inner = PrivateKeyInfo::new_ec_encryption(
@@ -854,6 +875,20 @@ impl PublicKey {
                 let p = p384::EncodedPoint::from_affine_coordinates(
                     GenericArrayP384::from_slice(px_validated),
                     GenericArrayP384::from_slice(py_validated),
+                    COMPRESS_EC_POINT_BY_DEFAULT,
+                );
+
+                Ok(Self::from_ec_encoded_components(
+                    &NamedEcCurve::Known(curve).into(),
+                    p.as_bytes(),
+                ))
+            }
+            EcCurve::NistP521 => {
+                use p521::elliptic_curve::generic_array::GenericArray as GenericArrayP521;
+
+                let p = p521::EncodedPoint::from_affine_coordinates(
+                    GenericArrayP521::from_slice(px_validated),
+                    GenericArrayP521::from_slice(py_validated),
                     COMPRESS_EC_POINT_BY_DEFAULT,
                 );
 
