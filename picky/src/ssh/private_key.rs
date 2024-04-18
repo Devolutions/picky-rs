@@ -214,7 +214,7 @@ impl SshPrivateKey {
         }
     }
 
-    fn h_picky_private_key_to_ssh_private_key(
+    pub(crate) fn h_picky_private_key_to_ssh_private_key(
         private_key: PrivateKey,
         passphrase: Option<String>,
         comment: Option<String>,
@@ -620,6 +620,13 @@ pub mod tests {
         let key = SshPrivateKey::from_pem_str(test_files::SSH_PRIVATE_KEY_EC_P256_ENCRYPTED, passphrase).unwrap();
         let encoded = key.to_string().unwrap();
         pretty_assertions::assert_eq!(encoded.as_str(), test_files::SSH_PRIVATE_KEY_EC_P256_ENCRYPTED);
+    }
+
+    #[test]
+    fn rsa_rounttrip() {
+        let private_key = SshPrivateKey::from_pem_str(test_files::SSH_PRIVATE_KEY_RSA, None).unwrap();
+        let encoded = private_key.to_string().unwrap();
+        assert_eq!(test_files::SSH_PRIVATE_KEY_RSA, encoded.as_str());
     }
 
     #[test]
