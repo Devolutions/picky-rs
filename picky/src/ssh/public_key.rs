@@ -173,6 +173,13 @@ mod tests {
         assert_eq!(ssh_public_key, ssh_public_key_after.as_str());
     }
 
+    #[test]
+    fn rsa_roundtrip() {
+        let public_key = SshPublicKey::from_str(test_files::SSH_PUBLIC_KEY_RSA).unwrap();
+        let ssh_public_key_after = public_key.to_string().unwrap();
+        assert_eq!(test_files::SSH_PUBLIC_KEY_RSA, ssh_public_key_after.as_str());
+    }
+
     #[rstest]
     #[case(test_files::SSH_PUBLIC_KEY_EC_P256)]
     #[case(test_files::SSH_PUBLIC_KEY_EC_P384)]
@@ -192,7 +199,7 @@ mod tests {
 
     #[test]
     fn sk_ed25519_roundtrip() {
-        let public_key = SshPublicKey::from_str(test_files::SSH_PUBLIC_KEY_SK_ED25519).unwrap();
+        let public_key: SshPublicKey = SshPublicKey::from_str(test_files::SSH_PUBLIC_KEY_SK_ED25519).unwrap();
         let ssh_public_key_after = public_key.to_string().unwrap();
         assert_eq!(test_files::SSH_PUBLIC_KEY_SK_ED25519, ssh_public_key_after.as_str());
     }

@@ -20,6 +20,9 @@ pub mod ssh;
 #[cfg(feature = "pkcs12")]
 pub mod pkcs12;
 
+#[cfg(feature = "putty")]
+pub mod putty;
+
 pub mod hash;
 pub mod key;
 pub mod pem;
@@ -204,6 +207,10 @@ mod test_files {
         pub const SSH_PRIVATE_KEY_SK_ECDSA_ENCRYPTED: &str =
             include_str!("../../test_assets/ssh/ssh_key_sk_ecdsa_enc");
 
+        // ssh-keygen -t rsa -C "test_rsa"
+        pub const SSH_PRIVATE_KEY_RSA: &str =
+            include_str!("../../test_assets/ssh/ssh_key_rsa");
+
         pub const SSH_PUBLIC_KEY_EC_P256: &str = include_str!("../../test_assets/ssh/ssh_key_p256.pub");
         pub const SSH_PUBLIC_KEY_EC_P384: &str = include_str!("../../test_assets/ssh/ssh_key_p384.pub");
         pub const SSH_PUBLIC_KEY_EC_P521: &str = include_str!("../../test_assets/ssh/ssh_key_p521.pub");
@@ -212,6 +219,8 @@ mod test_files {
 
         pub const SSH_PUBLIC_KEY_SK_ECDSA: &str = include_str!("../../test_assets/ssh/ssh_key_sk_ecdsa.pub");
         pub const SSH_PUBLIC_KEY_SK_ED25519: &str = include_str!("../../test_assets/ssh/ssh_key_sk_ed25519.pub");
+
+        pub const SSH_PUBLIC_KEY_RSA: &str = include_str!("../../test_assets/ssh/ssh_key_rsa.pub");
 
         // ssh-keygen -h -s ./ssh_ca_key -V '+1000w' -I abcd -z 00001 -n server.example.com ./ssh_key_p256.pub
         pub const SSH_CERT_EC_P256: &str = include_str!("../../test_assets/ssh/ssh_cert_p256.crt");
@@ -233,5 +242,18 @@ mod test_files {
 
     cfg_if::cfg_if! { if #[cfg(any(feature = "jose", feature = "x509"))] {
         pub const EC_NIST384_PK_1: &str = include_str!("../../test_assets/private_keys/ec-nist384-pk_1.key");
+    }}
+
+    cfg_if::cfg_if! { if #[cfg(feature = "putty")] {
+        pub const PUTTY_KEY_ED25519: &str = include_str!("../../test_assets/putty/ed25519.ppk");
+        pub const PUTTY_KEY_ED25519_ENCRYPTED: &str = include_str!("../../test_assets/putty/ed25519_encrypted.ppk");
+        pub const PUTTY_KEY_ED25519_PUBLIC: &str = include_str!("../../test_assets/putty/ed25519");
+
+
+        pub const PUTTY_KEY_ED25519_V2: &str = include_str!("../../test_assets/putty/ed25519_v2.ppk");
+        pub const PUTTY_KEY_ED25519_V2_ENCRYPTED: &str = include_str!("../../test_assets/putty/ed25519_v2_encrypted.ppk");
+
+        pub const PUTTY_KEY_RSA_PUBLIC_EMPTY_COMMENT: &str = include_str!("../../test_assets/putty/rsa_pub_empty_comment");
+        pub const PUTTY_KEY_RSA_PUBLIC_ESCAPED_COMMENT: &str = include_str!("../../test_assets/putty/rsa_pub_escaped_conmment");
     }}
 }

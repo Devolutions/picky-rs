@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Support for ECDSA p256 and ECDSA p384 signatures ([#132](https://github.com/Devolutions/picky-rs/pull/132) and [#208](https://github.com/Devolutions/picky-rs/pull/208))
+- Support for ECDSA p256 p384 and p521 signatures
 - Support for MD5 hashing
 - CTL implementation behind `ctl` feature
 - CTL fetching over HTTP is behind `ctl_http_fetch` feature
@@ -77,8 +77,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - JWS and JWK Ed25519 keys/signing support
 - Ed25519 support for SSH keys and certificates
 - Ed25519 x509 certificates verification/signing
-- Support for `ECDH-ES` JWE algorithm (P256 and P384 EC keys, X25519 ED keys)
+- Support for `ECDH-ES` JWE algorithm (P256, P384 and P521 EC keys, X25519 ED keys)
 - Support for `PKCS12`(PFX) files parsing/building
+- PuTTY PPK key format support
 
 ### Changed
 - Bump minimal rustc version to 1.65 (required by `sec1` transitive dependency after `p256`/`p384` update)
