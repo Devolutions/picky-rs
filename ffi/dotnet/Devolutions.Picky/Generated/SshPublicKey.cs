@@ -168,6 +168,78 @@ public partial class SshPublicKey: IDisposable
         }
     }
 
+    /// <exception cref="PickyException"></exception>
+    /// <returns>
+    /// A <c>VecU8</c> allocated on Rust side.
+    /// </returns>
+    public VecU8 FingerprintMd5()
+    {
+        unsafe
+        {
+            if (_inner == null)
+            {
+                throw new ObjectDisposedException("SshPublicKey");
+            }
+            IntPtr resultPtr = Raw.SshPublicKey.FingerprintMd5(_inner);
+            Raw.SshFfiResultBoxVecU8BoxPickyError result = Marshal.PtrToStructure<Raw.SshFfiResultBoxVecU8BoxPickyError>(resultPtr);
+            Raw.SshFfiResultBoxVecU8BoxPickyError.Destroy(resultPtr);
+            if (!result.isOk)
+            {
+                throw new PickyException(new PickyError(result.Err));
+            }
+            Raw.VecU8* retVal = result.Ok;
+            return new VecU8(retVal);
+        }
+    }
+
+    /// <exception cref="PickyException"></exception>
+    /// <returns>
+    /// A <c>VecU8</c> allocated on Rust side.
+    /// </returns>
+    public VecU8 FingerprintSha1()
+    {
+        unsafe
+        {
+            if (_inner == null)
+            {
+                throw new ObjectDisposedException("SshPublicKey");
+            }
+            IntPtr resultPtr = Raw.SshPublicKey.FingerprintSha1(_inner);
+            Raw.SshFfiResultBoxVecU8BoxPickyError result = Marshal.PtrToStructure<Raw.SshFfiResultBoxVecU8BoxPickyError>(resultPtr);
+            Raw.SshFfiResultBoxVecU8BoxPickyError.Destroy(resultPtr);
+            if (!result.isOk)
+            {
+                throw new PickyException(new PickyError(result.Err));
+            }
+            Raw.VecU8* retVal = result.Ok;
+            return new VecU8(retVal);
+        }
+    }
+
+    /// <exception cref="PickyException"></exception>
+    /// <returns>
+    /// A <c>VecU8</c> allocated on Rust side.
+    /// </returns>
+    public VecU8 FingerprintSha256()
+    {
+        unsafe
+        {
+            if (_inner == null)
+            {
+                throw new ObjectDisposedException("SshPublicKey");
+            }
+            IntPtr resultPtr = Raw.SshPublicKey.FingerprintSha256(_inner);
+            Raw.SshFfiResultBoxVecU8BoxPickyError result = Marshal.PtrToStructure<Raw.SshFfiResultBoxVecU8BoxPickyError>(resultPtr);
+            Raw.SshFfiResultBoxVecU8BoxPickyError.Destroy(resultPtr);
+            if (!result.isOk)
+            {
+                throw new PickyException(new PickyError(result.Err));
+            }
+            Raw.VecU8* retVal = result.Ok;
+            return new VecU8(retVal);
+        }
+    }
+
     /// <summary>
     /// Returns the underlying raw handle.
     /// </summary>
