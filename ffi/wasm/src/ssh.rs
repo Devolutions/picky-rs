@@ -107,4 +107,19 @@ impl SshPublicKey {
     pub fn inner_key(&self) -> PublicKey {
         PublicKey(self.0.inner_key().clone())
     }
+
+    pub fn fingerprint_md5(&self) -> Result<Vec<u8>, SshPublicKeyError> {
+        let md5 = self.0.fingerprint_md5()?;
+        Ok(md5.to_vec())
+    }
+
+    pub fn fingerprint_sha1(&self) -> Result<Vec<u8>, SshPublicKeyError> {
+        let sha1 = self.0.fingerprint_sha1()?;
+        Ok(sha1.to_vec())
+    }
+
+    pub fn fingerprint_sha256(&self) -> Result<Vec<u8>, SshPublicKeyError> {
+        let sha256 = self.0.fingerprint_sha256()?;
+        Ok(sha256.to_vec())
+    }
 }

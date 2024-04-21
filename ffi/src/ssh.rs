@@ -58,6 +58,7 @@ pub mod ffi {
     use crate::key::ffi::{EcCurve, PrivateKey};
     use crate::pem::ffi::Pem;
     use crate::signature::ffi::SignatureAlgorithm;
+    use crate::utils::ffi::VecU8;
     use diplomat_runtime::DiplomatWriteable;
     use picky::ssh;
     use std::borrow::ToOwned;
@@ -91,6 +92,21 @@ pub mod ffi {
             writeable.write_str(&self.0.comment)?;
             writeable.flush();
             Ok(())
+        }
+
+        pub fn fingerprint_md5(&self) -> Result<Box<VecU8>, Box<PickyError>> {
+            let md5 = self.0.fingerprint_md5()?;
+            Ok(Box::new(VecU8(md5.to_vec())))
+        }
+
+        pub fn fingerprint_sha1(&self) -> Result<Box<VecU8>, Box<PickyError>> {
+            let sha1 = self.0.fingerprint_sha1()?;
+            Ok(Box::new(VecU8(sha1.to_vec())))
+        }
+
+        pub fn fingerprint_sha256(&self) -> Result<Box<VecU8>, Box<PickyError>> {
+            let sha256 = self.0.fingerprint_sha256()?;
+            Ok(Box::new(VecU8(sha256.to_vec())))
         }
     }
 

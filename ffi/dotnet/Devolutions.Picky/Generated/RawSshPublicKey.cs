@@ -43,6 +43,15 @@ public partial struct SshPublicKey
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshPublicKey_get_comment", ExactSpelling = true)]
     public static unsafe extern IntPtr GetComment(SshPublicKey* self, DiplomatWriteable* writeable);
 
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshPublicKey_fingerprint_md5", ExactSpelling = true)]
+    public static unsafe extern IntPtr FingerprintMd5(SshPublicKey* self);
+
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshPublicKey_fingerprint_sha1", ExactSpelling = true)]
+    public static unsafe extern IntPtr FingerprintSha1(SshPublicKey* self);
+
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshPublicKey_fingerprint_sha256", ExactSpelling = true)]
+    public static unsafe extern IntPtr FingerprintSha256(SshPublicKey* self);
+
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshPublicKey_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(SshPublicKey* self);
 }

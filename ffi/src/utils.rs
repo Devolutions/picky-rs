@@ -7,7 +7,7 @@ pub mod ffi {
     use crate::error::ffi::PickyError;
     use std::fmt::Write;
 
-    #[diplomat::opaque] // Named RsBuffer to avoid conflict with the Diplomat runtime Buffer
+    #[diplomat::opaque]
     pub struct VecU8(pub Vec<u8>);
 
     impl VecU8 {
