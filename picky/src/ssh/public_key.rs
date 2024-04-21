@@ -61,6 +61,45 @@ impl SshPublicKey {
             SshBasePublicKey::SkEd25519 { base_key, .. } => base_key,
         }
     }
+
+    pub fn fingerprint_md5(&self) -> Result<[u8; 16], SshPublicKeyError> {
+        use md5::{Digest, Md5};
+
+        let mut encoded = Vec::new();
+        self.inner_key.encode(&mut encoded)?;
+
+        let mut hasher = Md5::new();
+        hasher.update(&encoded);
+        let fingerprint = hasher.finalize();
+
+        Ok(fingerprint.into())
+    }
+
+    pub fn fingerprint_sha1(&self) -> Result<[u8; 20], SshPublicKeyError> {
+        use sha1::{Digest, Sha1};
+
+        let mut encoded = Vec::new();
+        self.inner_key.encode(&mut encoded)?;
+
+        let mut hasher = Sha1::new();
+        hasher.update(&encoded);
+        let fingerprint = hasher.finalize();
+
+        Ok(fingerprint.into())
+    }
+
+    pub fn fingerprint_sha256(&self) -> Result<[u8; 32], SshPublicKeyError> {
+        use sha2::{Digest, Sha256};
+
+        let mut encoded = Vec::new();
+        self.inner_key.encode(&mut encoded)?;
+
+        let mut hasher = Sha256::new();
+        hasher.update(&encoded);
+        let fingerprint = hasher.finalize();
+
+        Ok(fingerprint.into())
+    }
 }
 
 impl FromStr for SshPublicKey {
@@ -76,6 +115,7 @@ mod tests {
     use super::*;
 
     use crate::test_files;
+    use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine};
     use num_bigint_dig::BigUint;
     use rstest::rstest;
 
@@ -209,5 +249,36 @@ mod tests {
         let public_key = SshPublicKey::from_str(test_files::SSH_PUBLIC_KEY_SK_ECDSA).unwrap();
         let ssh_public_key_after = public_key.to_string().unwrap();
         assert_eq!(test_files::SSH_PUBLIC_KEY_SK_ECDSA, ssh_public_key_after.as_str());
+    }
+
+    #[test]
+    fn fingerprint_md5_ssh_rsa_2048_public_key() {
+        let ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDI9ht2g2qOPgSG5huVYjFUouyaw59/6QuQqUVGwgnITlhRbM+bkvJQfcuiqcv+vD9/86Dfugk79sSfg/aVK+V/plqAAZoujz/wALDjEphSxAUcAR+t4i2F39Pa71MSc37I9L30z31tcba1X7od7hzrVMl9iurkOyBC4xcIWa1H8h0mDyoXyWPTqoTONDUe9dB1eu6GbixCfUcxvdVt0pAVJTdOmbNXKwRo5WXfMrsqKsFT2Acg4Vm4TfLShSSUW4rqM6GOBCfF6jnxFvTSDentH5hykjWL3lMCghD+1hJyOdnMHJC/5qTUGOB86MxsR4RCXqS+LZrGpMScVyDQge7r test2@picky.com\r\n";
+
+        let public_key: SshPublicKey = SshPublicKey::from_str(ssh_public_key).unwrap();
+        let md5 = hex::encode(public_key.fingerprint_md5().unwrap());
+
+        assert_eq!(md5, "7b6b9cc2e44452aec58c3a0a31d6258d");
+    }
+
+    #[test]
+    fn fingerprint_sha1_ssh_rsa_2048_public_key() {
+        let ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDI9ht2g2qOPgSG5huVYjFUouyaw59/6QuQqUVGwgnITlhRbM+bkvJQfcuiqcv+vD9/86Dfugk79sSfg/aVK+V/plqAAZoujz/wALDjEphSxAUcAR+t4i2F39Pa71MSc37I9L30z31tcba1X7od7hzrVMl9iurkOyBC4xcIWa1H8h0mDyoXyWPTqoTONDUe9dB1eu6GbixCfUcxvdVt0pAVJTdOmbNXKwRo5WXfMrsqKsFT2Acg4Vm4TfLShSSUW4rqM6GOBCfF6jnxFvTSDentH5hykjWL3lMCghD+1hJyOdnMHJC/5qTUGOB86MxsR4RCXqS+LZrGpMScVyDQge7r test2@picky.com\r\n";
+
+        let public_key: SshPublicKey = SshPublicKey::from_str(ssh_public_key).unwrap();
+        let sha1 = STANDARD_NO_PAD.encode(public_key.fingerprint_sha1().unwrap());
+
+        assert_eq!(sha1, "ezHoULh4V/R9NybfxCW2pL9ADcU");
+    }
+
+    #[test]
+    fn fingerprint_sha256_ssh_rsa_2048_public_key() {
+        let ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDI9ht2g2qOPgSG5huVYjFUouyaw59/6QuQqUVGwgnITlhRbM+bkvJQfcuiqcv+vD9/86Dfugk79sSfg/aVK+V/plqAAZoujz/wALDjEphSxAUcAR+t4i2F39Pa71MSc37I9L30z31tcba1X7od7hzrVMl9iurkOyBC4xcIWa1H8h0mDyoXyWPTqoTONDUe9dB1eu6GbixCfUcxvdVt0pAVJTdOmbNXKwRo5WXfMrsqKsFT2Acg4Vm4TfLShSSUW4rqM6GOBCfF6jnxFvTSDentH5hykjWL3lMCghD+1hJyOdnMHJC/5qTUGOB86MxsR4RCXqS+LZrGpMScVyDQge7r test2@picky.com\r\n";
+
+        let public_key: SshPublicKey = SshPublicKey::from_str(ssh_public_key).unwrap();
+
+        let sha256 = STANDARD_NO_PAD.encode(public_key.fingerprint_sha256().unwrap());
+
+        assert_eq!(sha256, "cTXkM4frGl07u46Bhzy+YMOS01lX51oE2j6STi7g568");
     }
 }
