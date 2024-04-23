@@ -186,6 +186,12 @@ impl From<picky::x509::pkcs7::timestamp::TimestampError> for PickyErrorKind {
     }
 }
 
+impl From<picky::putty::PuttyError> for PickyErrorKind {
+    fn from(_: picky::putty::PuttyError) -> Self {
+        Self::Generic
+    }
+}
+
 impl<T> From<T> for Box<PickyError>
 where
     T: Into<PickyErrorKind> + ToString,

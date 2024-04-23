@@ -104,7 +104,7 @@ ssh = ["dep:byteorder", "dep:aes", "dep:ctr", "dep:cbc", "dep:bcrypt-pbkdf", "de
 http_trait_impl = ["dep:http"]
 chrono_conversion = ["dep:chrono", "picky-asn1/chrono_conversion"]
 time_conversion = ["dep:time", "picky-asn1/time_conversion"]
-putty = ["dep:argon2", "ssh"]
+putty = ["dep:argon2", "dep:hmac", "ssh"]
 
 [package.metadata.docs.rs]
 # Enable all features when building documentation for docs.rs

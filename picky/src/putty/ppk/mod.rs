@@ -122,6 +122,7 @@ impl Ppk {
         .to_inner_key()
     }
 
+    /// Returns extracted public key in PuTTY format
     pub fn extract_putty_public_key(&self) -> Result<PuttyPublicKey, PuttyError> {
         Ok(PuttyPublicKey {
             base: PuttyBasePublicKey {
@@ -150,7 +151,7 @@ impl Ppk {
     ///
     /// NOTE: `PpkVersionKey::V2` is considered insecure and should not be used for new keys in
     /// normal circumstances.
-    pub fn into_version(&self, version: PpkVersionKey) -> Result<Ppk, PuttyError> {
+    pub fn to_version(&self, version: PpkVersionKey) -> Result<Ppk, PuttyError> {
         if self.is_encrypted() {
             return Err(PuttyError::Encrypted);
         }
