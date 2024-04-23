@@ -138,7 +138,7 @@ pub mod ffi {
         }
 
         /// Encode PPK key file to a string.
-        pub fn to_string(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn to_repr(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             writeable.write_str(&self.0.to_string()?)?;
             writeable.flush();
             Ok(())
@@ -164,13 +164,13 @@ pub mod ffi {
         }
 
         /// Get the public key from the PPK key file.
-        pub fn public_key(&self) -> Result<Box<PublicKey>, Box<PickyError>> {
+        pub fn get_public_key(&self) -> Result<Box<PublicKey>, Box<PickyError>> {
             let key = self.0.public_key()?;
             Ok(Box::new(PublicKey(key)))
         }
 
         /// Get the private key from the PPK key file.
-        pub fn private_key(&self) -> Result<Box<PrivateKey>, Box<PickyError>> {
+        pub fn get_private_key(&self) -> Result<Box<PrivateKey>, Box<PickyError>> {
             let key = self.0.private_key()?;
             Ok(Box::new(PrivateKey(key)))
         }
@@ -182,17 +182,17 @@ pub mod ffi {
         }
 
         /// Get the PPK key file version.
-        pub fn version(&self) -> PuttyPpkVersion {
+        pub fn get_version(&self) -> PuttyPpkVersion {
             self.0.version().into()
         }
 
         /// Get the PPK key file algorithm.
-        pub fn algorithm(&self) -> PuttyPpkKeyAlgorithm {
+        pub fn get_algorithm(&self) -> PuttyPpkKeyAlgorithm {
             self.0.algorithm().into()
         }
 
         /// Get the PPK key file comment.
-        pub fn comment(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn get_comment(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             writeable.write_str(self.0.comment())?;
             writeable.flush();
             Ok(())
@@ -260,14 +260,14 @@ pub mod ffi {
         }
 
         /// Get the comment of the public key.
-        pub fn comment(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn get_comment(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             writeable.write_str(self.0.comment())?;
             writeable.flush();
             Ok(())
         }
 
         /// Converts the public key to a string (PuTTY format).
-        pub fn to_string(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn to_repr(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             writeable.write_str(&self.0.to_string())?;
             writeable.flush();
             Ok(())
@@ -285,23 +285,23 @@ pub mod ffi {
     pub struct PuttyArgon2Params(picky::putty::Argon2Params);
 
     impl PuttyArgon2Params {
-        pub fn flavor(&self) -> PuttyArgon2Flavour {
+        pub fn get_flavor(&self) -> PuttyArgon2Flavour {
             self.0.flavor.into()
         }
 
-        pub fn memory(&self) -> u32 {
+        pub fn get_memory(&self) -> u32 {
             self.0.memory
         }
 
-        pub fn passes(&self) -> u32 {
+        pub fn get_passes(&self) -> u32 {
             self.0.passes
         }
 
-        pub fn parallelism(&self) -> u32 {
+        pub fn get_parallelism(&self) -> u32 {
             self.0.parallelism
         }
 
-        pub fn salt(&self) -> Box<VecU8> {
+        pub fn get_salt(&self) -> Box<VecU8> {
             Box::new(VecU8(self.0.salt.to_vec()))
         }
     }
@@ -315,7 +315,7 @@ pub mod ffi {
     pub struct PuttyPpkEncryptionConfig(picky::putty::PpkEncryptionConfig);
 
     impl PuttyPpkEncryptionConfig {
-        pub fn default() -> Box<Self> {
+        pub fn default() -> Box<PuttyPpkEncryptionConfig> {
             Box::new(PuttyPpkEncryptionConfig(picky::putty::PpkEncryptionConfig::default()))
         }
 
@@ -333,23 +333,23 @@ pub mod ffi {
     pub struct PuttyPpkEncryptionConfigBuilder(picky::putty::PpkEncryptionConfigBuilder);
 
     impl PuttyPpkEncryptionConfigBuilder {
-        pub fn argon2_flavour(&mut self, argon2_flavour: PuttyArgon2Flavour) {
+        pub fn get_argon2_flavour(&mut self, argon2_flavour: PuttyArgon2Flavour) {
             self.0.clone().argon2_flavour(argon2_flavour.into());
         }
 
-        pub fn argon2_memory(&mut self, argon2_memory: u32) {
+        pub fn set_argon2_memory(&mut self, argon2_memory: u32) {
             self.0.clone().argon2_memory(argon2_memory);
         }
 
-        pub fn argon2_passes(&mut self, argon2_passes: u32) {
+        pub fn set_argon2_passes(&mut self, argon2_passes: u32) {
             self.0.clone().argon2_passes(argon2_passes);
         }
 
-        pub fn argon2_parallelism(&mut self, argon2_parallelism: u32) {
+        pub fn set_argon2_parallelism(&mut self, argon2_parallelism: u32) {
             self.0.clone().argon2_parallelism(argon2_parallelism);
         }
 
-        pub fn argon2_salt_size(&mut self, argon2_salt_size: u32) {
+        pub fn set_argon2_salt_size(&mut self, argon2_salt_size: u32) {
             self.0.clone().argon2_salt_size(argon2_salt_size);
         }
 

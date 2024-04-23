@@ -18,6 +18,46 @@ public partial class PuttyArgon2Params: IDisposable
 {
     private unsafe Raw.PuttyArgon2Params* _inner;
 
+    public PuttyArgon2Flavour Flavor
+    {
+        get
+        {
+            return GetFlavor();
+        }
+    }
+
+    public uint Memory
+    {
+        get
+        {
+            return GetMemory();
+        }
+    }
+
+    public uint Parallelism
+    {
+        get
+        {
+            return GetParallelism();
+        }
+    }
+
+    public uint Passes
+    {
+        get
+        {
+            return GetPasses();
+        }
+    }
+
+    public VecU8 Salt
+    {
+        get
+        {
+            return GetSalt();
+        }
+    }
+
     /// <summary>
     /// Creates a managed <c>PuttyArgon2Params</c> from a raw handle.
     /// </summary>
@@ -35,7 +75,7 @@ public partial class PuttyArgon2Params: IDisposable
     /// <returns>
     /// A <c>PuttyArgon2Flavour</c> allocated on C# side.
     /// </returns>
-    public PuttyArgon2Flavour Flavor()
+    public PuttyArgon2Flavour GetFlavor()
     {
         unsafe
         {
@@ -43,12 +83,12 @@ public partial class PuttyArgon2Params: IDisposable
             {
                 throw new ObjectDisposedException("PuttyArgon2Params");
             }
-            Raw.PuttyArgon2Flavour retVal = Raw.PuttyArgon2Params.Flavor(_inner);
+            Raw.PuttyArgon2Flavour retVal = Raw.PuttyArgon2Params.GetFlavor(_inner);
             return (PuttyArgon2Flavour)retVal;
         }
     }
 
-    public uint Memory()
+    public uint GetMemory()
     {
         unsafe
         {
@@ -56,12 +96,12 @@ public partial class PuttyArgon2Params: IDisposable
             {
                 throw new ObjectDisposedException("PuttyArgon2Params");
             }
-            uint retVal = Raw.PuttyArgon2Params.Memory(_inner);
+            uint retVal = Raw.PuttyArgon2Params.GetMemory(_inner);
             return retVal;
         }
     }
 
-    public uint Passes()
+    public uint GetPasses()
     {
         unsafe
         {
@@ -69,12 +109,12 @@ public partial class PuttyArgon2Params: IDisposable
             {
                 throw new ObjectDisposedException("PuttyArgon2Params");
             }
-            uint retVal = Raw.PuttyArgon2Params.Passes(_inner);
+            uint retVal = Raw.PuttyArgon2Params.GetPasses(_inner);
             return retVal;
         }
     }
 
-    public uint Parallelism()
+    public uint GetParallelism()
     {
         unsafe
         {
@@ -82,7 +122,7 @@ public partial class PuttyArgon2Params: IDisposable
             {
                 throw new ObjectDisposedException("PuttyArgon2Params");
             }
-            uint retVal = Raw.PuttyArgon2Params.Parallelism(_inner);
+            uint retVal = Raw.PuttyArgon2Params.GetParallelism(_inner);
             return retVal;
         }
     }
@@ -90,7 +130,7 @@ public partial class PuttyArgon2Params: IDisposable
     /// <returns>
     /// A <c>VecU8</c> allocated on Rust side.
     /// </returns>
-    public VecU8 Salt()
+    public VecU8 GetSalt()
     {
         unsafe
         {
@@ -98,7 +138,7 @@ public partial class PuttyArgon2Params: IDisposable
             {
                 throw new ObjectDisposedException("PuttyArgon2Params");
             }
-            Raw.VecU8* retVal = Raw.PuttyArgon2Params.Salt(_inner);
+            Raw.VecU8* retVal = Raw.PuttyArgon2Params.GetSalt(_inner);
             return new VecU8(retVal);
         }
     }

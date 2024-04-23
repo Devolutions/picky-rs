@@ -32,6 +32,46 @@ public partial class PuttyPpk: IDisposable
 {
     private unsafe Raw.PuttyPpk* _inner;
 
+    public PuttyPpkKeyAlgorithm Algorithm
+    {
+        get
+        {
+            return GetAlgorithm();
+        }
+    }
+
+    public string Comment
+    {
+        get
+        {
+            return GetComment();
+        }
+    }
+
+    public PrivateKey PrivateKey
+    {
+        get
+        {
+            return GetPrivateKey();
+        }
+    }
+
+    public PublicKey PublicKey
+    {
+        get
+        {
+            return GetPublicKey();
+        }
+    }
+
+    public PuttyPpkVersion Version
+    {
+        get
+        {
+            return GetVersion();
+        }
+    }
+
     /// <summary>
     /// Creates a managed <c>PuttyPpk</c> from a raw handle.
     /// </summary>
@@ -46,6 +86,9 @@ public partial class PuttyPpk: IDisposable
         _inner = handle;
     }
 
+    /// <summary>
+    /// Generate a new RSA key file.
+    /// </summary>
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PuttyPpk</c> allocated on Rust side.
@@ -71,6 +114,9 @@ public partial class PuttyPpk: IDisposable
         }
     }
 
+    /// <summary>
+    /// Generate a new EC key file.
+    /// </summary>
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PuttyPpk</c> allocated on Rust side.
@@ -98,6 +144,9 @@ public partial class PuttyPpk: IDisposable
         }
     }
 
+    /// <summary>
+    /// Generate a new Ed25519 key file.
+    /// </summary>
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PuttyPpk</c> allocated on Rust side.
@@ -123,8 +172,11 @@ public partial class PuttyPpk: IDisposable
         }
     }
 
+    /// <summary>
+    /// Encode PPK key file to a string.
+    /// </summary>
     /// <exception cref="PickyException"></exception>
-    public void ToString(DiplomatWriteable writeable)
+    public void ToRepr(DiplomatWriteable writeable)
     {
         unsafe
         {
@@ -132,7 +184,7 @@ public partial class PuttyPpk: IDisposable
             {
                 throw new ObjectDisposedException("PuttyPpk");
             }
-            IntPtr resultPtr = Raw.PuttyPpk.ToString(_inner, &writeable);
+            IntPtr resultPtr = Raw.PuttyPpk.ToRepr(_inner, &writeable);
             Raw.PuttyFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.PuttyFfiResultVoidBoxPickyError>(resultPtr);
             Raw.PuttyFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
@@ -142,8 +194,11 @@ public partial class PuttyPpk: IDisposable
         }
     }
 
+    /// <summary>
+    /// Encode PPK key file to a string.
+    /// </summary>
     /// <exception cref="PickyException"></exception>
-    public string ToString()
+    public string ToRepr()
     {
         unsafe
         {
@@ -152,7 +207,7 @@ public partial class PuttyPpk: IDisposable
                 throw new ObjectDisposedException("PuttyPpk");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            IntPtr resultPtr = Raw.PuttyPpk.ToString(_inner, &writeable);
+            IntPtr resultPtr = Raw.PuttyPpk.ToRepr(_inner, &writeable);
             Raw.PuttyFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.PuttyFfiResultVoidBoxPickyError>(resultPtr);
             Raw.PuttyFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
@@ -165,6 +220,9 @@ public partial class PuttyPpk: IDisposable
         }
     }
 
+    /// <summary>
+    /// Parse a PPK key file from a string.
+    /// </summary>
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PuttyPpk</c> allocated on Rust side.
@@ -190,6 +248,9 @@ public partial class PuttyPpk: IDisposable
         }
     }
 
+    /// <summary>
+    /// Convert an OpenSSH private key to a PPK key file.
+    /// </summary>
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PuttyPpk</c> allocated on Rust side.
@@ -216,6 +277,9 @@ public partial class PuttyPpk: IDisposable
         }
     }
 
+    /// <summary>
+    /// Convert a PPK key file to an OpenSSH private key.
+    /// </summary>
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>SshPrivateKey</c> allocated on Rust side.
@@ -245,11 +309,14 @@ public partial class PuttyPpk: IDisposable
         }
     }
 
+    /// <summary>
+    /// Get the public key from the PPK key file.
+    /// </summary>
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PublicKey</c> allocated on Rust side.
     /// </returns>
-    public PublicKey PublicKey()
+    public PublicKey GetPublicKey()
     {
         unsafe
         {
@@ -257,7 +324,7 @@ public partial class PuttyPpk: IDisposable
             {
                 throw new ObjectDisposedException("PuttyPpk");
             }
-            IntPtr resultPtr = Raw.PuttyPpk.PublicKey(_inner);
+            IntPtr resultPtr = Raw.PuttyPpk.GetPublicKey(_inner);
             Raw.PuttyFfiResultBoxPublicKeyBoxPickyError result = Marshal.PtrToStructure<Raw.PuttyFfiResultBoxPublicKeyBoxPickyError>(resultPtr);
             Raw.PuttyFfiResultBoxPublicKeyBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
@@ -269,11 +336,14 @@ public partial class PuttyPpk: IDisposable
         }
     }
 
+    /// <summary>
+    /// Get the private key from the PPK key file.
+    /// </summary>
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PrivateKey</c> allocated on Rust side.
     /// </returns>
-    public PrivateKey PrivateKey()
+    public PrivateKey GetPrivateKey()
     {
         unsafe
         {
@@ -281,7 +351,7 @@ public partial class PuttyPpk: IDisposable
             {
                 throw new ObjectDisposedException("PuttyPpk");
             }
-            IntPtr resultPtr = Raw.PuttyPpk.PrivateKey(_inner);
+            IntPtr resultPtr = Raw.PuttyPpk.GetPrivateKey(_inner);
             Raw.PuttyFfiResultBoxPrivateKeyBoxPickyError result = Marshal.PtrToStructure<Raw.PuttyFfiResultBoxPrivateKeyBoxPickyError>(resultPtr);
             Raw.PuttyFfiResultBoxPrivateKeyBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
@@ -293,6 +363,9 @@ public partial class PuttyPpk: IDisposable
         }
     }
 
+    /// <summary>
+    /// Extract the public key file (PuTTY format) from the PPK key file.
+    /// </summary>
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PuttyPublicKey</c> allocated on Rust side.
@@ -317,10 +390,13 @@ public partial class PuttyPpk: IDisposable
         }
     }
 
+    /// <summary>
+    /// Get the PPK key file version.
+    /// </summary>
     /// <returns>
     /// A <c>PuttyPpkVersion</c> allocated on C# side.
     /// </returns>
-    public PuttyPpkVersion Version()
+    public PuttyPpkVersion GetVersion()
     {
         unsafe
         {
@@ -328,15 +404,18 @@ public partial class PuttyPpk: IDisposable
             {
                 throw new ObjectDisposedException("PuttyPpk");
             }
-            Raw.PuttyPpkVersion retVal = Raw.PuttyPpk.Version(_inner);
+            Raw.PuttyPpkVersion retVal = Raw.PuttyPpk.GetVersion(_inner);
             return (PuttyPpkVersion)retVal;
         }
     }
 
+    /// <summary>
+    /// Get the PPK key file algorithm.
+    /// </summary>
     /// <returns>
     /// A <c>PuttyPpkKeyAlgorithm</c> allocated on C# side.
     /// </returns>
-    public PuttyPpkKeyAlgorithm Algorithm()
+    public PuttyPpkKeyAlgorithm GetAlgorithm()
     {
         unsafe
         {
@@ -344,13 +423,16 @@ public partial class PuttyPpk: IDisposable
             {
                 throw new ObjectDisposedException("PuttyPpk");
             }
-            Raw.PuttyPpkKeyAlgorithm retVal = Raw.PuttyPpk.Algorithm(_inner);
+            Raw.PuttyPpkKeyAlgorithm retVal = Raw.PuttyPpk.GetAlgorithm(_inner);
             return (PuttyPpkKeyAlgorithm)retVal;
         }
     }
 
+    /// <summary>
+    /// Get the PPK key file comment.
+    /// </summary>
     /// <exception cref="PickyException"></exception>
-    public void Comment(DiplomatWriteable writeable)
+    public void GetComment(DiplomatWriteable writeable)
     {
         unsafe
         {
@@ -358,7 +440,7 @@ public partial class PuttyPpk: IDisposable
             {
                 throw new ObjectDisposedException("PuttyPpk");
             }
-            IntPtr resultPtr = Raw.PuttyPpk.Comment(_inner, &writeable);
+            IntPtr resultPtr = Raw.PuttyPpk.GetComment(_inner, &writeable);
             Raw.PuttyFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.PuttyFfiResultVoidBoxPickyError>(resultPtr);
             Raw.PuttyFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
@@ -368,8 +450,11 @@ public partial class PuttyPpk: IDisposable
         }
     }
 
+    /// <summary>
+    /// Get the PPK key file comment.
+    /// </summary>
     /// <exception cref="PickyException"></exception>
-    public string Comment()
+    public string GetComment()
     {
         unsafe
         {
@@ -378,7 +463,7 @@ public partial class PuttyPpk: IDisposable
                 throw new ObjectDisposedException("PuttyPpk");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            IntPtr resultPtr = Raw.PuttyPpk.Comment(_inner, &writeable);
+            IntPtr resultPtr = Raw.PuttyPpk.GetComment(_inner, &writeable);
             Raw.PuttyFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.PuttyFfiResultVoidBoxPickyError>(resultPtr);
             Raw.PuttyFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
@@ -391,6 +476,9 @@ public partial class PuttyPpk: IDisposable
         }
     }
 
+    /// <summary>
+    /// Convert the PPK key file to a different version.
+    /// </summary>
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PuttyPpk</c> allocated on Rust side.
@@ -417,6 +505,9 @@ public partial class PuttyPpk: IDisposable
         }
     }
 
+    /// <summary>
+    /// Check if the PPK key file is encrypted.
+    /// </summary>
     public bool IsEncrypted()
     {
         unsafe
@@ -430,6 +521,9 @@ public partial class PuttyPpk: IDisposable
         }
     }
 
+    /// <summary>
+    /// Get the Argon2 key derivation function parameters (if the key is encrypted).
+    /// </summary>
     /// <returns>
     /// A <c>PuttyArgon2Params</c> allocated on Rust side.
     /// </returns>
@@ -450,6 +544,9 @@ public partial class PuttyPpk: IDisposable
         }
     }
 
+    /// <summary>
+    /// Decrypt the PPK key file and return as a new instance.
+    /// </summary>
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PuttyPpk</c> allocated on Rust side.
@@ -479,6 +576,9 @@ public partial class PuttyPpk: IDisposable
         }
     }
 
+    /// <summary>
+    /// Encrypt the PPK key file and return as a new instance.
+    /// </summary>
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PuttyPpk</c> allocated on Rust side.

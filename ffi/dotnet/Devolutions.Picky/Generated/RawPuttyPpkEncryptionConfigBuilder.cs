@@ -26,20 +26,20 @@ public partial struct PuttyPpkEncryptionConfigBuilder
     private const string NativeLib = "DevolutionsPicky";
 #endif
 
-    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PuttyPpkEncryptionConfigBuilder_argon2_flavour", ExactSpelling = true)]
-    public static unsafe extern void Argon2Flavour(PuttyPpkEncryptionConfigBuilder* self, PuttyArgon2Flavour argon2Flavour);
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PuttyPpkEncryptionConfigBuilder_get_argon2_flavour", ExactSpelling = true)]
+    public static unsafe extern void GetArgon2Flavour(PuttyPpkEncryptionConfigBuilder* self, PuttyArgon2Flavour argon2Flavour);
 
-    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PuttyPpkEncryptionConfigBuilder_argon2_memory", ExactSpelling = true)]
-    public static unsafe extern void Argon2Memory(PuttyPpkEncryptionConfigBuilder* self, uint argon2Memory);
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PuttyPpkEncryptionConfigBuilder_set_argon2_memory", ExactSpelling = true)]
+    public static unsafe extern void SetArgon2Memory(PuttyPpkEncryptionConfigBuilder* self, uint argon2Memory);
 
-    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PuttyPpkEncryptionConfigBuilder_argon2_passes", ExactSpelling = true)]
-    public static unsafe extern void Argon2Passes(PuttyPpkEncryptionConfigBuilder* self, uint argon2Passes);
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PuttyPpkEncryptionConfigBuilder_set_argon2_passes", ExactSpelling = true)]
+    public static unsafe extern void SetArgon2Passes(PuttyPpkEncryptionConfigBuilder* self, uint argon2Passes);
 
-    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PuttyPpkEncryptionConfigBuilder_argon2_parallelism", ExactSpelling = true)]
-    public static unsafe extern void Argon2Parallelism(PuttyPpkEncryptionConfigBuilder* self, uint argon2Parallelism);
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PuttyPpkEncryptionConfigBuilder_set_argon2_parallelism", ExactSpelling = true)]
+    public static unsafe extern void SetArgon2Parallelism(PuttyPpkEncryptionConfigBuilder* self, uint argon2Parallelism);
 
-    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PuttyPpkEncryptionConfigBuilder_argon2_salt_size", ExactSpelling = true)]
-    public static unsafe extern void Argon2SaltSize(PuttyPpkEncryptionConfigBuilder* self, uint argon2SaltSize);
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PuttyPpkEncryptionConfigBuilder_set_argon2_salt_size", ExactSpelling = true)]
+    public static unsafe extern void SetArgon2SaltSize(PuttyPpkEncryptionConfigBuilder* self, uint argon2SaltSize);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PuttyPpkEncryptionConfigBuilder_build", ExactSpelling = true)]
     public static unsafe extern PuttyPpkEncryptionConfig* Build(PuttyPpkEncryptionConfigBuilder* self);

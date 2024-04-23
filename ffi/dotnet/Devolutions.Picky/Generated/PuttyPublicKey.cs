@@ -28,6 +28,14 @@ public partial class PuttyPublicKey: IDisposable
 {
     private unsafe Raw.PuttyPublicKey* _inner;
 
+    public string Comment
+    {
+        get
+        {
+            return GetComment();
+        }
+    }
+
     /// <summary>
     /// Creates a managed <c>PuttyPublicKey</c> from a raw handle.
     /// </summary>
@@ -42,6 +50,9 @@ public partial class PuttyPublicKey: IDisposable
         _inner = handle;
     }
 
+    /// <summary>
+    /// Converts an OpenSSH public key to a PuTTY public key.
+    /// </summary>
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PuttyPublicKey</c> allocated on Rust side.
@@ -68,6 +79,9 @@ public partial class PuttyPublicKey: IDisposable
         }
     }
 
+    /// <summary>
+    /// Converts the key to an OpenSSH public key.
+    /// </summary>
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>SshPublicKey</c> allocated on Rust side.
@@ -92,8 +106,11 @@ public partial class PuttyPublicKey: IDisposable
         }
     }
 
+    /// <summary>
+    /// Get the comment of the public key.
+    /// </summary>
     /// <exception cref="PickyException"></exception>
-    public void Comment(DiplomatWriteable writeable)
+    public void GetComment(DiplomatWriteable writeable)
     {
         unsafe
         {
@@ -101,7 +118,7 @@ public partial class PuttyPublicKey: IDisposable
             {
                 throw new ObjectDisposedException("PuttyPublicKey");
             }
-            IntPtr resultPtr = Raw.PuttyPublicKey.Comment(_inner, &writeable);
+            IntPtr resultPtr = Raw.PuttyPublicKey.GetComment(_inner, &writeable);
             Raw.PuttyFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.PuttyFfiResultVoidBoxPickyError>(resultPtr);
             Raw.PuttyFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
@@ -111,8 +128,11 @@ public partial class PuttyPublicKey: IDisposable
         }
     }
 
+    /// <summary>
+    /// Get the comment of the public key.
+    /// </summary>
     /// <exception cref="PickyException"></exception>
-    public string Comment()
+    public string GetComment()
     {
         unsafe
         {
@@ -121,7 +141,7 @@ public partial class PuttyPublicKey: IDisposable
                 throw new ObjectDisposedException("PuttyPublicKey");
             }
             DiplomatWriteable writeable = new DiplomatWriteable();
-            IntPtr resultPtr = Raw.PuttyPublicKey.Comment(_inner, &writeable);
+            IntPtr resultPtr = Raw.PuttyPublicKey.GetComment(_inner, &writeable);
             Raw.PuttyFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.PuttyFfiResultVoidBoxPickyError>(resultPtr);
             Raw.PuttyFfiResultVoidBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
@@ -134,6 +154,57 @@ public partial class PuttyPublicKey: IDisposable
         }
     }
 
+    /// <summary>
+    /// Converts the public key to a string (PuTTY format).
+    /// </summary>
+    /// <exception cref="PickyException"></exception>
+    public void ToRepr(DiplomatWriteable writeable)
+    {
+        unsafe
+        {
+            if (_inner == null)
+            {
+                throw new ObjectDisposedException("PuttyPublicKey");
+            }
+            IntPtr resultPtr = Raw.PuttyPublicKey.ToRepr(_inner, &writeable);
+            Raw.PuttyFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.PuttyFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.PuttyFfiResultVoidBoxPickyError.Destroy(resultPtr);
+            if (!result.isOk)
+            {
+                throw new PickyException(new PickyError(result.Err));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Converts the public key to a string (PuTTY format).
+    /// </summary>
+    /// <exception cref="PickyException"></exception>
+    public string ToRepr()
+    {
+        unsafe
+        {
+            if (_inner == null)
+            {
+                throw new ObjectDisposedException("PuttyPublicKey");
+            }
+            DiplomatWriteable writeable = new DiplomatWriteable();
+            IntPtr resultPtr = Raw.PuttyPublicKey.ToRepr(_inner, &writeable);
+            Raw.PuttyFfiResultVoidBoxPickyError result = Marshal.PtrToStructure<Raw.PuttyFfiResultVoidBoxPickyError>(resultPtr);
+            Raw.PuttyFfiResultVoidBoxPickyError.Destroy(resultPtr);
+            if (!result.isOk)
+            {
+                throw new PickyException(new PickyError(result.Err));
+            }
+            string retVal = writeable.ToUnicode();
+            writeable.Dispose();
+            return retVal;
+        }
+    }
+
+    /// <summary>
+    /// Parses and returns the inner key as standard picky key type.
+    /// </summary>
     /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>PublicKey</c> allocated on Rust side.

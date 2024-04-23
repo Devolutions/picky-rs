@@ -33,15 +33,33 @@ public partial struct PuttyPublicKey
     private const string NativeLib = "DevolutionsPicky";
 #endif
 
+    /// <summary>
+    /// Converts an OpenSSH public key to a PuTTY public key.
+    /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PuttyPublicKey_from_openssh", ExactSpelling = true)]
     public static unsafe extern IntPtr FromOpenssh(SshPublicKey* key);
 
+    /// <summary>
+    /// Converts the key to an OpenSSH public key.
+    /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PuttyPublicKey_to_openssh", ExactSpelling = true)]
     public static unsafe extern IntPtr ToOpenssh(PuttyPublicKey* self);
 
-    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PuttyPublicKey_comment", ExactSpelling = true)]
-    public static unsafe extern IntPtr Comment(PuttyPublicKey* self, DiplomatWriteable* writeable);
+    /// <summary>
+    /// Get the comment of the public key.
+    /// </summary>
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PuttyPublicKey_get_comment", ExactSpelling = true)]
+    public static unsafe extern IntPtr GetComment(PuttyPublicKey* self, DiplomatWriteable* writeable);
 
+    /// <summary>
+    /// Converts the public key to a string (PuTTY format).
+    /// </summary>
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PuttyPublicKey_to_repr", ExactSpelling = true)]
+    public static unsafe extern IntPtr ToRepr(PuttyPublicKey* self, DiplomatWriteable* writeable);
+
+    /// <summary>
+    /// Parses and returns the inner key as standard picky key type.
+    /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PuttyPublicKey_to_inner_key", ExactSpelling = true)]
     public static unsafe extern IntPtr ToInnerKey(PuttyPublicKey* self);
 

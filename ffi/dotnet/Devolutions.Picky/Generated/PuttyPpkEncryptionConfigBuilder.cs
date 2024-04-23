@@ -21,6 +21,38 @@ public partial class PuttyPpkEncryptionConfigBuilder: IDisposable
 {
     private unsafe Raw.PuttyPpkEncryptionConfigBuilder* _inner;
 
+    public uint Argon2Memory
+    {
+        set
+        {
+            SetArgon2Memory(value);
+        }
+    }
+
+    public uint Argon2Parallelism
+    {
+        set
+        {
+            SetArgon2Parallelism(value);
+        }
+    }
+
+    public uint Argon2Passes
+    {
+        set
+        {
+            SetArgon2Passes(value);
+        }
+    }
+
+    public uint Argon2SaltSize
+    {
+        set
+        {
+            SetArgon2SaltSize(value);
+        }
+    }
+
     /// <summary>
     /// Creates a managed <c>PuttyPpkEncryptionConfigBuilder</c> from a raw handle.
     /// </summary>
@@ -35,7 +67,7 @@ public partial class PuttyPpkEncryptionConfigBuilder: IDisposable
         _inner = handle;
     }
 
-    public void Argon2Flavour(PuttyArgon2Flavour argon2Flavour)
+    public void GetArgon2Flavour(PuttyArgon2Flavour argon2Flavour)
     {
         unsafe
         {
@@ -45,11 +77,11 @@ public partial class PuttyPpkEncryptionConfigBuilder: IDisposable
             }
             Raw.PuttyArgon2Flavour argon2FlavourRaw;
             argon2FlavourRaw = (Raw.PuttyArgon2Flavour)argon2Flavour;
-            Raw.PuttyPpkEncryptionConfigBuilder.Argon2Flavour(_inner, argon2FlavourRaw);
+            Raw.PuttyPpkEncryptionConfigBuilder.GetArgon2Flavour(_inner, argon2FlavourRaw);
         }
     }
 
-    public void Argon2Memory(uint argon2Memory)
+    public void SetArgon2Memory(uint argon2Memory)
     {
         unsafe
         {
@@ -57,11 +89,11 @@ public partial class PuttyPpkEncryptionConfigBuilder: IDisposable
             {
                 throw new ObjectDisposedException("PuttyPpkEncryptionConfigBuilder");
             }
-            Raw.PuttyPpkEncryptionConfigBuilder.Argon2Memory(_inner, argon2Memory);
+            Raw.PuttyPpkEncryptionConfigBuilder.SetArgon2Memory(_inner, argon2Memory);
         }
     }
 
-    public void Argon2Passes(uint argon2Passes)
+    public void SetArgon2Passes(uint argon2Passes)
     {
         unsafe
         {
@@ -69,11 +101,11 @@ public partial class PuttyPpkEncryptionConfigBuilder: IDisposable
             {
                 throw new ObjectDisposedException("PuttyPpkEncryptionConfigBuilder");
             }
-            Raw.PuttyPpkEncryptionConfigBuilder.Argon2Passes(_inner, argon2Passes);
+            Raw.PuttyPpkEncryptionConfigBuilder.SetArgon2Passes(_inner, argon2Passes);
         }
     }
 
-    public void Argon2Parallelism(uint argon2Parallelism)
+    public void SetArgon2Parallelism(uint argon2Parallelism)
     {
         unsafe
         {
@@ -81,11 +113,11 @@ public partial class PuttyPpkEncryptionConfigBuilder: IDisposable
             {
                 throw new ObjectDisposedException("PuttyPpkEncryptionConfigBuilder");
             }
-            Raw.PuttyPpkEncryptionConfigBuilder.Argon2Parallelism(_inner, argon2Parallelism);
+            Raw.PuttyPpkEncryptionConfigBuilder.SetArgon2Parallelism(_inner, argon2Parallelism);
         }
     }
 
-    public void Argon2SaltSize(uint argon2SaltSize)
+    public void SetArgon2SaltSize(uint argon2SaltSize)
     {
         unsafe
         {
@@ -93,7 +125,7 @@ public partial class PuttyPpkEncryptionConfigBuilder: IDisposable
             {
                 throw new ObjectDisposedException("PuttyPpkEncryptionConfigBuilder");
             }
-            Raw.PuttyPpkEncryptionConfigBuilder.Argon2SaltSize(_inner, argon2SaltSize);
+            Raw.PuttyPpkEncryptionConfigBuilder.SetArgon2SaltSize(_inner, argon2SaltSize);
         }
     }
 
