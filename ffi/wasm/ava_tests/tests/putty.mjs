@@ -6,12 +6,12 @@ function key_roundtrip(t, original) {
 
 	let encrypted = original.encrypt("test");
 
-	let encrypted_str = encrypted.to_string();
+	let encrypted_str = encrypted.to_repr();
 
 	let encryted_parsed = PuttyPpk.parse(encrypted_str);
 	let decrypted = encryted_parsed.decrypt("test");
 
-	let after_roundtrip = decrypted.to_string();
+	let after_roundtrip = decrypted.to_repr();
 
 	t.is(after_roundtrip, original_str);
 }

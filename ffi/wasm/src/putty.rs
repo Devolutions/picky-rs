@@ -1,5 +1,5 @@
 use crate::key::{EcCurve, PrivateKey, PublicKey};
-use crate::ssh::{SshPublicKey, SshPrivateKey};
+use crate::ssh::{SshPrivateKey, SshPublicKey};
 
 use wasm_bindgen::prelude::*;
 
@@ -138,14 +138,8 @@ pub struct PuttyPpkEncryptionConfig(picky::putty::PpkEncryptionConfig);
 
 #[wasm_bindgen]
 impl PuttyPpkEncryptionConfig {
-    pub fn default() -> Self {
-        PuttyPpkEncryptionConfig(picky::putty::PpkEncryptionConfig::default())
-    }
-
     pub fn builder() -> PuttyPpkEncryptionConfigBuilder {
-        PuttyPpkEncryptionConfigBuilder(
-            picky::putty::PpkEncryptionConfig::builder(),
-        )
+        PuttyPpkEncryptionConfigBuilder(picky::putty::PpkEncryptionConfig::builder())
     }
 }
 
@@ -215,7 +209,7 @@ impl PuttyPublicKey {
     }
 
     /// Converts the public key to a string (PuTTY format).
-    pub fn to_string(&self) -> String {
+    pub fn to_repr(&self) -> String {
         self.0.to_string()
     }
 
@@ -266,7 +260,7 @@ impl PuttyPpk {
     }
 
     /// Encode PPK key file to a string.
-    pub fn to_string(&self) -> Result<String, PuttyError> {
+    pub fn to_repr(&self) -> Result<String, PuttyError> {
         Ok(self.0.to_string()?)
     }
 
@@ -335,9 +329,7 @@ impl PuttyPpk {
 
     /// Get the Argon2 key derivation function parameters (if the key is encrypted).
     pub fn argon2_params(&self) -> Option<PuttyArgon2Params> {
-        self.0
-            .argon2_params()
-            .map(|params| PuttyArgon2Params(params.clone()))
+        self.0.argon2_params().map(|params| PuttyArgon2Params(params.clone()))
     }
 
     /// Decrypt the PPK key file and return as a new instance.
@@ -347,12 +339,10 @@ impl PuttyPpk {
     }
 
     /// Encrypt the PPK key file and return as a new instance.
-    pub fn encrypt(
-        &self,
-        passphrase: &str,
-        config: Option<PuttyPpkEncryptionConfig>,
-    ) -> Result<PuttyPpk, PuttyError> {
-        let ppk = self.0.encrypt(passphrase, config.map(|config| config.0).unwrap_or_default())?;
+    pub fn encrypt(&self, passphrase: &str, config: Option<PuttyPpkEncryptionConfig>) -> Result<PuttyPpk, PuttyError> {
+        let ppk = self
+            .0
+            .encrypt(passphrase, config.map(|config| config.0).unwrap_or_default())?;
         Ok(Self(ppk))
     }
 }
