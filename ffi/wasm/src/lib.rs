@@ -5,6 +5,7 @@ pub mod jwt;
 pub mod key;
 pub mod pem;
 pub mod ssh;
+pub mod putty;
 
 use wasm_bindgen::prelude::*;
 
