@@ -2,7 +2,7 @@ import test from "ava";
 import { PuttyPpk } from "@devolutions/picky";
 
 function key_roundtrip(t, original) {
-	const original_str = original.to_string();
+	const original_str = original.to_repr();
 
 	let encrypted = original.encrypt("test");
 
