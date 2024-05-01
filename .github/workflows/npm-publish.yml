@@ -79,3 +79,8 @@ jobs:
           Set-Location ./ffi/wasm
           npm config set "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}"
           ./publish.ps1
+
+      - name: Update Artifactory Cache
+        run: gh workflow run update-artifactory-cache.yml --repo Devolutions/scheduled-tasks --field package_name="devolutions-crypto"
+        env:
+          github_token: ${{ secrets.DEVOLUTIONSBOT_WRITE_TOKEN }}
