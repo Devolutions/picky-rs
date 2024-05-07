@@ -2,16 +2,16 @@ use crate::key::{KeyError, PublicKey};
 use crate::ssh::decode::SshComplexTypeDecode;
 use crate::ssh::encode::SshComplexTypeEncode;
 
+use std::io;
 use std::str::FromStr;
-use std::{io, string};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum SshPublicKeyError {
     #[error(transparent)]
     IoError(#[from] io::Error),
-    #[error(transparent)]
-    FromUtf8Error(#[from] string::FromUtf8Error),
+    #[error("invalid UTF-8")]
+    InvalidUtf8,
     #[error(transparent)]
     RsaError(#[from] rsa::errors::Error),
     #[error(transparent)]
@@ -20,6 +20,18 @@ pub enum SshPublicKeyError {
     UnknownKeyType,
     #[error(transparent)]
     KeyError(#[from] KeyError),
+}
+
+impl From<core::str::Utf8Error> for SshPublicKeyError {
+    fn from(_: core::str::Utf8Error) -> Self {
+        Self::InvalidUtf8
+    }
+}
+
+impl From<std::string::FromUtf8Error> for SshPublicKeyError {
+    fn from(_: std::string::FromUtf8Error) -> Self {
+        Self::InvalidUtf8
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -280,5 +292,15 @@ mod tests {
         let sha256 = STANDARD_NO_PAD.encode(public_key.fingerprint_sha256().unwrap());
 
         assert_eq!(sha256, "cTXkM4frGl07u46Bhzy+YMOS01lX51oE2j6STi7g568");
+    }
+
+    #[test]
+    fn decode_ssh_rsa_2024_public_key_with_multiwords_comment() {
+        // ssh-keygen -t rsa -b 2048 -C "test using several words"
+        let ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC+76yL1+ocu4iuVam4VO5YlODohmHbIuhjyQgiMGS8ZtdFKcltzAH0ot4zJDH/Z3ja6xO2IOc/4+UMABgPOgFwmzyl414/Zo42CYqk9OB5GJylFYI99HrATqH03Wz2qJ3dzP6QJVf8g05hY27RKaU5H+0fo471SACeHet9uqstRecsUcauPS91xwpPhrcpRXjGH1yLBdWTpDq5R6c1Wgh9SVuzY/ITMB3pq8rzwal8e2rR4T+wHc48l61LGwmuOTkhAo5/0sn72CzKWQZVd0CarfCr3biCW7cUai0FvH79aAfIBV/FIMXgtgqdpY/Qg7v+JWIyJk/OB8Be1ix8YVRV test using several words\r\n";
+
+        let public_key = SshPublicKey::from_str(ssh_public_key).unwrap();
+
+        assert_eq!(public_key.comment, "test using several words");
     }
 }

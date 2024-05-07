@@ -9,7 +9,7 @@ use crate::ssh::certificate::{
 };
 use crate::ssh::private_key::{KdfOption, SshBasePrivateKey, SshPrivateKeyError};
 use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
-use crate::ssh::{key_type, read_to_buffer_until_whitespace, Base64Reader, SSH_COMBO_ED25519_KEY_LENGTH};
+use crate::ssh::{key_type, read_until_linebreak, read_until_whitespace, Base64Reader, SSH_COMBO_ED25519_KEY_LENGTH};
 
 use super::certificate::SshSignatureBlob;
 use base64::engine::general_purpose;
@@ -38,7 +38,7 @@ where
         let mut buffer = vec![0; size];
         self.read_exact(&mut buffer)?;
 
-        Ok(String::from_utf8_lossy(&buffer).to_string())
+        Ok(String::from_utf8_lossy(&buffer).into_owned())
     }
 
     fn read_ssh_bytes(&mut self) -> Result<Vec<u8>, Self::Error> {
@@ -279,9 +279,9 @@ impl SshComplexTypeDecode for SshPublicKey {
     fn decode(mut stream: impl Read) -> Result<Self, Self::Error> {
         let mut buffer = Vec::with_capacity(1024);
 
-        read_to_buffer_until_whitespace(&mut stream, &mut buffer)?;
+        read_until_whitespace(&mut stream, &mut buffer)?;
 
-        let header = String::from_utf8_lossy(&buffer).to_string();
+        let header = String::from_utf8_lossy(&buffer).into_owned();
         buffer.clear();
 
         let inner_key = match header.as_str() {
@@ -292,7 +292,7 @@ impl SshComplexTypeDecode for SshPublicKey {
             | key_type::ED25519
             | key_type::SK_ECDSA_SHA2_NIST_P256
             | key_type::SK_ED25519 => {
-                read_to_buffer_until_whitespace(&mut stream, &mut buffer)?;
+                read_until_whitespace(&mut stream, &mut buffer)?;
                 let mut slice = buffer.as_slice();
                 let decoder = Base64Reader::new(&mut slice, &general_purpose::STANDARD);
                 SshComplexTypeDecode::decode(decoder)?
@@ -301,8 +301,8 @@ impl SshComplexTypeDecode for SshPublicKey {
         };
 
         buffer.clear();
-        read_to_buffer_until_whitespace(&mut stream, &mut buffer)?;
-        let comment = String::from_utf8(buffer)?.trim_end().to_owned();
+        read_until_linebreak(&mut stream, &mut buffer)?;
+        let comment = core::str::from_utf8(&buffer)?.trim_end().to_owned();
 
         Ok(SshPublicKey { inner_key, comment })
     }
@@ -406,12 +406,12 @@ impl SshComplexTypeDecode for SshCertificate {
 
     fn decode(mut stream: impl Read) -> Result<Self, Self::Error> {
         let mut cert_type = Vec::new();
-        read_to_buffer_until_whitespace(&mut stream, &mut cert_type)?;
+        read_until_whitespace(&mut stream, &mut cert_type)?;
 
         let _ = SshCertKeyType::try_from(String::from_utf8(cert_type)?)?;
 
         let mut cert_data = Vec::new();
-        read_to_buffer_until_whitespace(&mut stream, &mut cert_data)?;
+        read_until_whitespace(&mut stream, &mut cert_data)?;
 
         let mut cert_data = cert_data.as_slice();
         let mut cert_data = Base64Reader::new(&mut cert_data, &general_purpose::STANDARD);
@@ -503,8 +503,8 @@ impl SshComplexTypeDecode for SshCertificate {
         let signature = SshSignature::decode(cert_data)?;
 
         let mut comment = Vec::new();
-        read_to_buffer_until_whitespace(&mut stream, &mut comment)?;
-        let comment = String::from_utf8(comment)?.trim_end().to_owned();
+        read_until_linebreak(&mut stream, &mut comment)?;
+        let comment = core::str::from_utf8(&comment)?.trim_end().to_owned();
 
         Ok(SshCertificate {
             cert_key_type,
