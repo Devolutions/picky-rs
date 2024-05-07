@@ -198,6 +198,12 @@ pub mod ffi {
             Ok(())
         }
 
+        /// Returns a new PPK key instance with a different comment.
+        pub fn with_comment(&self, comment: &str) -> Result<Box<PuttyPpk>, Box<PickyError>> {
+            let ppk = self.0.with_comment(comment)?;
+            Ok(Box::new(PuttyPpk(ppk)))
+        }
+
         /// Convert the PPK key file to a different version.
         pub fn to_version(&self, version: PuttyPpkVersion) -> Result<Box<PuttyPpk>, Box<PickyError>> {
             let ppk = self.0.to_version(version.into())?;
@@ -264,6 +270,12 @@ pub mod ffi {
             writeable.write_str(self.0.comment())?;
             writeable.flush();
             Ok(())
+        }
+
+        /// Returns a new public key instance with a different comment.
+        pub fn with_comment(&self, comment: &str) -> Box<PuttyPublicKey> {
+            let ppk = self.0.with_comment(comment);
+            Box::new(PuttyPublicKey(ppk))
         }
 
         /// Converts the public key to a string (PuTTY format).

@@ -477,6 +477,38 @@ public partial class PuttyPpk: IDisposable
     }
 
     /// <summary>
+    /// Returns a new PPK key instance with a different comment.
+    /// </summary>
+    /// <exception cref="PickyException"></exception>
+    /// <returns>
+    /// A <c>PuttyPpk</c> allocated on Rust side.
+    /// </returns>
+    public PuttyPpk WithComment(string comment)
+    {
+        unsafe
+        {
+            if (_inner == null)
+            {
+                throw new ObjectDisposedException("PuttyPpk");
+            }
+            byte[] commentBuf = DiplomatUtils.StringToUtf8(comment);
+            nuint commentBufLength = (nuint)commentBuf.Length;
+            fixed (byte* commentBufPtr = commentBuf)
+            {
+                IntPtr resultPtr = Raw.PuttyPpk.WithComment(_inner, commentBufPtr, commentBufLength);
+                Raw.PuttyFfiResultBoxPuttyPpkBoxPickyError result = Marshal.PtrToStructure<Raw.PuttyFfiResultBoxPuttyPpkBoxPickyError>(resultPtr);
+                Raw.PuttyFfiResultBoxPuttyPpkBoxPickyError.Destroy(resultPtr);
+                if (!result.isOk)
+                {
+                    throw new PickyException(new PickyError(result.Err));
+                }
+                Raw.PuttyPpk* retVal = result.Ok;
+                return new PuttyPpk(retVal);
+            }
+        }
+    }
+
+    /// <summary>
     /// Convert the PPK key file to a different version.
     /// </summary>
     /// <exception cref="PickyException"></exception>

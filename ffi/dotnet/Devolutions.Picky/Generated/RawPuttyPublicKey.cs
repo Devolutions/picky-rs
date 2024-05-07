@@ -52,6 +52,12 @@ public partial struct PuttyPublicKey
     public static unsafe extern IntPtr GetComment(PuttyPublicKey* self, DiplomatWriteable* writeable);
 
     /// <summary>
+    /// Returns a new public key instance with a different comment.
+    /// </summary>
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PuttyPublicKey_with_comment", ExactSpelling = true)]
+    public static unsafe extern PuttyPublicKey* WithComment(PuttyPublicKey* self, byte* comment, nuint commentSz);
+
+    /// <summary>
     /// Converts the public key to a string (PuTTY format).
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PuttyPublicKey_to_repr", ExactSpelling = true)]

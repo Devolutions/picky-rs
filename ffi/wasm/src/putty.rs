@@ -208,6 +208,12 @@ impl PuttyPublicKey {
         self.0.comment().to_string()
     }
 
+    /// Returns a new PPK key instance with a different comment.
+    pub fn with_comment(&self, comment: &str) -> PuttyPublicKey {
+        let ppk = self.0.with_comment(comment);
+        PuttyPublicKey(ppk)
+    }
+
     /// Converts the public key to a string (PuTTY format).
     pub fn to_repr(&self) -> String {
         self.0.to_string()
@@ -314,6 +320,12 @@ impl PuttyPpk {
     /// Get the PPK key file comment.
     pub fn comment(&self) -> Result<String, PuttyError> {
         Ok(self.0.comment().to_string())
+    }
+
+    /// Returns a new PPK key instance with a different comment.
+    pub fn with_comment(&self, comment: &str) -> Result<PuttyPpk, PuttyError> {
+        let ppk = self.0.with_comment(comment)?;
+        Ok(PuttyPpk(ppk))
     }
 
     /// Convert the PPK key file to a different version.

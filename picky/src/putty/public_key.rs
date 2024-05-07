@@ -22,6 +22,7 @@ const PUTTY_PUBKEY_FOOTER: &str = "---- END SSH2 PUBLIC KEY ----";
 /// ### Notes
 /// - Although top-level containeris similar to PEM, it is not compatible with it because of
 ///   additional comment field after the header.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PuttyPublicKey {
     pub(crate) base: PuttyBasePublicKey,
     pub(crate) comment: String,
@@ -47,11 +48,20 @@ impl PuttyPublicKey {
         })
     }
 
+    /// Returns key comment.
     pub fn comment(&self) -> &str {
         &self.comment
     }
 
-    /// Parses and returns the inner key as standard picky key type
+    /// Returns a new public key instance with a different comment.
+    pub fn with_comment(&self, comment: &str) -> Self {
+        Self {
+            comment: comment.to_string(),
+            ..self.clone()
+        }
+    }
+
+    /// Parses and returns the inner key as standard picky key type.
     pub fn to_inner_key(&self) -> Result<PublicKey, PuttyError> {
         self.base.to_inner_key()
     }
@@ -137,6 +147,7 @@ impl FromStr for PuttyPublicKey {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct PuttyBasePublicKey {
     pub(crate) data: Vec<u8>,
 }

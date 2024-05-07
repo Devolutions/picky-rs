@@ -155,6 +155,30 @@ public partial class PuttyPublicKey: IDisposable
     }
 
     /// <summary>
+    /// Returns a new public key instance with a different comment.
+    /// </summary>
+    /// <returns>
+    /// A <c>PuttyPublicKey</c> allocated on Rust side.
+    /// </returns>
+    public PuttyPublicKey WithComment(string comment)
+    {
+        unsafe
+        {
+            if (_inner == null)
+            {
+                throw new ObjectDisposedException("PuttyPublicKey");
+            }
+            byte[] commentBuf = DiplomatUtils.StringToUtf8(comment);
+            nuint commentBufLength = (nuint)commentBuf.Length;
+            fixed (byte* commentBufPtr = commentBuf)
+            {
+                Raw.PuttyPublicKey* retVal = Raw.PuttyPublicKey.WithComment(_inner, commentBufPtr, commentBufLength);
+                return new PuttyPublicKey(retVal);
+            }
+        }
+    }
+
+    /// <summary>
     /// Converts the public key to a string (PuTTY format).
     /// </summary>
     /// <exception cref="PickyException"></exception>

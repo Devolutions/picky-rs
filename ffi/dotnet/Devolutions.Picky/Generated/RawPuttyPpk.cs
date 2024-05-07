@@ -116,6 +116,12 @@ public partial struct PuttyPpk
     public static unsafe extern IntPtr GetComment(PuttyPpk* self, DiplomatWriteable* writeable);
 
     /// <summary>
+    /// Returns a new PPK key instance with a different comment.
+    /// </summary>
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PuttyPpk_with_comment", ExactSpelling = true)]
+    public static unsafe extern IntPtr WithComment(PuttyPpk* self, byte* comment, nuint commentSz);
+
+    /// <summary>
     /// Convert the PPK key file to a different version.
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PuttyPpk_to_version", ExactSpelling = true)]

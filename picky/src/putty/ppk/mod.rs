@@ -30,7 +30,7 @@ pub use kdf::Argon2Params;
 ///   ppk is decrypted via [`Ppk::decrypt`].
 /// - Newly generated keys are always unencrypted. They should be encrypted via [`Ppk::encrypt`]
 ///   when required
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Ppk {
     version: PpkVersionKey,
     algorithm: PpkKeyAlgorithmValue,
@@ -57,8 +57,8 @@ impl Ppk {
         Self::from_openssh_private_key(&ssh_key)
     }
 
-    /// Converts the OpenSSH private key to a PPK key
-    pub fn from_openssh_private_key(key: &SshPrivateKey) -> Result<Ppk, PuttyError> {
+    /// Converts the OpenSSH private key to a PPK key.
+    pub fn from_openssh_private_key(key: &SshPrivateKey) -> Result<Self, PuttyError> {
         let PuttyPrivateKey { base, comment }: PuttyPrivateKey = PuttyPrivateKey::from_openssh(key)?;
 
         let mut ppk = Ppk {
@@ -76,7 +76,7 @@ impl Ppk {
         Ok(ppk)
     }
 
-    /// Converts the PPK key to an OpenSSH private key (with or without encryption)
+    /// Converts the PPK key to an OpenSSH private key (with or without encryption).
     pub fn to_openssh_private_key(&self, passphrase: Option<&str>) -> Result<SshPrivateKey, PuttyError> {
         if self.is_encrypted() {
             return Err(PuttyError::Encrypted);
@@ -98,7 +98,7 @@ impl Ppk {
         key.to_openssh(passphrase)
     }
 
-    /// Returns PPK public key
+    /// Returns PPK public key.
     pub fn public_key(&self) -> Result<PublicKey, PuttyError> {
         PuttyBasePublicKey {
             data: self.public_key.clone(),
@@ -106,7 +106,7 @@ impl Ppk {
         .to_inner_key()
     }
 
-    /// Returns PPK private key
+    /// Returns PPK private key.
     pub fn private_key(&self) -> Result<PrivateKey, PuttyError> {
         if self.is_encrypted() {
             return Err(PuttyError::Encrypted);
@@ -122,7 +122,7 @@ impl Ppk {
         .to_inner_key()
     }
 
-    /// Returns extracted public key in PuTTY format
+    /// Returns extracted public key in PuTTY format.
     pub fn extract_putty_public_key(&self) -> Result<PuttyPublicKey, PuttyError> {
         Ok(PuttyPublicKey {
             base: PuttyBasePublicKey {
@@ -132,22 +132,39 @@ impl Ppk {
         })
     }
 
-    /// Returns the version of the PPK file format
+    /// Returns a new PPK key instance with a different comment.
+    pub fn with_comment(&self, comment: &str) -> Result<Self, PuttyError> {
+        if self.is_encrypted() {
+            // We need to decrypt the key to change the comment (MAC should be recalculated).
+            return Err(PuttyError::Encrypted);
+        }
+
+        let mut ppk = Self {
+            comment: comment.to_string(),
+            ..self.clone()
+        };
+
+        ppk.mac = ppk.calculate_unencrypted_mac(ppk.private_key.as_slice())?;
+
+        Ok(ppk)
+    }
+
+    /// Returns the version of the PPK file format.
     pub fn version(&self) -> PpkVersionKey {
         self.version
     }
 
-    /// Returns the key algorithm
+    /// Returns the key algorithm.
     pub fn algorithm(&self) -> PpkKeyAlgorithmValue {
         self.algorithm
     }
 
-    /// Returns key comment
+    /// Returns key comment.
     pub fn comment(&self) -> &str {
         &self.comment
     }
 
-    /// Returns new PPK kew with the specified format version
+    /// Returns new PPK kew with the specified format version.
     ///
     /// NOTE: `PpkVersionKey::V2` is considered insecure and should not be used for new keys in
     /// normal circumstances.
