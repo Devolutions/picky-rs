@@ -9,16 +9,16 @@ Minimal rustc version bumps happen [only with minor number bumps in this project
 
 Provides implementation for types defined in [RFC 4120](https://www.rfc-editor.org/rfc/rfc4120.txt).
 
-## Serializing and Deserializing raw Kerberos
+## Serializing and deserializing Kerberos structures
 
-picky-krb serializes raw Kerberos bytes using `picky_asn1_der::from_bytes`, for example:
+Use `picky_asn1_der::from_bytes` for deserialization from binary, for example:
 
 ```rust
 use picky_krb::messages::AsRep;
 let as_rep: AsRep = picky_asn1_der::from_bytes(&raw).unwrap();
 ```
 
-Kerberos structures can be deserialized to raw bytes using `picky_asn1_der::to_vec`, for example:
+And `picky_asn1_der::to_vec` for serialization to binary, for example:
 
 ```rust
 use picky_krb::messages::TgsReq;
