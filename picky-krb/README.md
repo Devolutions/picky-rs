@@ -23,5 +23,5 @@ And `picky_asn1_der::to_vec` for serialization to binary, for example:
 ```rust
 use picky_krb::messages::TgsReq;
 let tgs_req: TgsReq = picky_asn1_der::from_bytes(&raw).unwrap();
-let tgs_req_raw = picky_asn1_der::to_vec(&tgs_req).unwrap();
+let tgs_req_encoded = picky_asn1_der::to_vec(&tgs_req).unwrap();
 ```
