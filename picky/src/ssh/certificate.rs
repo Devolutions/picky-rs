@@ -16,9 +16,9 @@ use rsa::RsaPublicKey;
 use serde::Deserialize;
 use std::cell::RefCell;
 use std::convert::TryFrom;
+use std::io;
 use std::ops::DerefMut;
 use std::str::FromStr;
-use std::{io, string};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -31,8 +31,8 @@ pub enum SshCertificateError {
     SshCriticalOptionError(#[from] SshCriticalOptionError),
     #[error(transparent)]
     SshExtensionError(#[from] SshExtensionError),
-    #[error("Can not parse. Expected UTF-8 valid text: {0:?}")]
-    FromUtf8Error(#[from] string::FromUtf8Error),
+    #[error("invalid UTF-8")]
+    InvalidUtf8,
     #[error("Invalid base64 string: {0:?}")]
     Base64DecodeError(#[from] base64::DecodeError),
     #[error(transparent)]
@@ -47,6 +47,18 @@ pub enum SshCertificateError {
     KeyError(#[from] KeyError),
     #[error(transparent)]
     SshSignatureError(#[from] SshSignatureError),
+}
+
+impl From<core::str::Utf8Error> for SshCertificateError {
+    fn from(_: core::str::Utf8Error) -> Self {
+        Self::InvalidUtf8
+    }
+}
+
+impl From<std::string::FromUtf8Error> for SshCertificateError {
+    fn from(_: std::string::FromUtf8Error) -> Self {
+        Self::InvalidUtf8
+    }
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize)]

@@ -77,7 +77,7 @@ impl EdAlgorithmSshExt for NamedEdAlgorithm {
     }
 }
 
-fn read_to_buffer_until_whitespace(stream: &mut dyn Read, buffer: &mut Vec<u8>) -> io::Result<()> {
+fn read_until_whitespace(stream: &mut dyn Read, buffer: &mut Vec<u8>) -> io::Result<()> {
     loop {
         match stream.read_u8() {
             Ok(symbol) => {
@@ -92,6 +92,21 @@ fn read_to_buffer_until_whitespace(stream: &mut dyn Read, buffer: &mut Vec<u8>) 
             }
             Err(e) => return Err(e),
         };
+    }
+
+    Ok(())
+}
+
+fn read_until_linebreak(stream: &mut dyn Read, buffer: &mut Vec<u8>) -> io::Result<()> {
+    loop {
+        match stream.read_u8() {
+            Ok(b'\r') | Ok(b'\n') => break,
+            Ok(c) => buffer.push(c),
+            Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => {
+                break;
+            }
+            Err(e) => return Err(e),
+        }
     }
 
     Ok(())
