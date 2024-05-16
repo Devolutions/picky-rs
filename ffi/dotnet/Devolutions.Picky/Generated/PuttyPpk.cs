@@ -255,7 +255,7 @@ public partial class PuttyPpk: IDisposable
     /// <returns>
     /// A <c>PuttyPpk</c> allocated on Rust side.
     /// </returns>
-    public static PuttyPpk FromOpensshPrivateKey(SshPrivateKey key)
+    public static PuttyPpk FromOpenssh(SshPrivateKey key)
     {
         unsafe
         {
@@ -265,7 +265,7 @@ public partial class PuttyPpk: IDisposable
             {
                 throw new ObjectDisposedException("SshPrivateKey");
             }
-            IntPtr resultPtr = Raw.PuttyPpk.FromOpensshPrivateKey(keyRaw);
+            IntPtr resultPtr = Raw.PuttyPpk.FromOpenssh(keyRaw);
             Raw.PuttyFfiResultBoxPuttyPpkBoxPickyError result = Marshal.PtrToStructure<Raw.PuttyFfiResultBoxPuttyPpkBoxPickyError>(resultPtr);
             Raw.PuttyFfiResultBoxPuttyPpkBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)
@@ -284,7 +284,7 @@ public partial class PuttyPpk: IDisposable
     /// <returns>
     /// A <c>SshPrivateKey</c> allocated on Rust side.
     /// </returns>
-    public SshPrivateKey ToOpensshPrivateKey(string passphrase)
+    public SshPrivateKey ToOpenssh(string passphrase)
     {
         unsafe
         {
@@ -296,7 +296,7 @@ public partial class PuttyPpk: IDisposable
             nuint passphraseBufLength = (nuint)passphraseBuf.Length;
             fixed (byte* passphraseBufPtr = passphraseBuf)
             {
-                IntPtr resultPtr = Raw.PuttyPpk.ToOpensshPrivateKey(_inner, passphraseBufPtr, passphraseBufLength);
+                IntPtr resultPtr = Raw.PuttyPpk.ToOpenssh(_inner, passphraseBufPtr, passphraseBufLength);
                 Raw.PuttyFfiResultBoxSshPrivateKeyBoxPickyError result = Marshal.PtrToStructure<Raw.PuttyFfiResultBoxSshPrivateKeyBoxPickyError>(resultPtr);
                 Raw.PuttyFfiResultBoxSshPrivateKeyBoxPickyError.Destroy(resultPtr);
                 if (!result.isOk)
@@ -306,6 +306,35 @@ public partial class PuttyPpk: IDisposable
                 Raw.SshPrivateKey* retVal = result.Ok;
                 return new SshPrivateKey(retVal);
             }
+        }
+    }
+
+    /// <summary>
+    /// Wrap a private key
+    /// </summary>
+    /// <exception cref="PickyException"></exception>
+    /// <returns>
+    /// A <c>PuttyPpk</c> allocated on Rust side.
+    /// </returns>
+    public static PuttyPpk FromKey(PrivateKey privateKey)
+    {
+        unsafe
+        {
+            Raw.PrivateKey* privateKeyRaw;
+            privateKeyRaw = privateKey.AsFFI();
+            if (privateKeyRaw == null)
+            {
+                throw new ObjectDisposedException("PrivateKey");
+            }
+            IntPtr resultPtr = Raw.PuttyPpk.FromKey(privateKeyRaw);
+            Raw.PuttyFfiResultBoxPuttyPpkBoxPickyError result = Marshal.PtrToStructure<Raw.PuttyFfiResultBoxPuttyPpkBoxPickyError>(resultPtr);
+            Raw.PuttyFfiResultBoxPuttyPpkBoxPickyError.Destroy(resultPtr);
+            if (!result.isOk)
+            {
+                throw new PickyException(new PickyError(result.Err));
+            }
+            Raw.PuttyPpk* retVal = result.Ok;
+            return new PuttyPpk(retVal);
         }
     }
 

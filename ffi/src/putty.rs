@@ -151,16 +151,23 @@ pub mod ffi {
         }
 
         /// Convert an OpenSSH private key to a PPK key file.
-        pub fn from_openssh_private_key(key: &SshPrivateKey) -> Result<Box<PuttyPpk>, Box<PickyError>> {
+        pub fn from_openssh(key: &SshPrivateKey) -> Result<Box<PuttyPpk>, Box<PickyError>> {
             let ppk = picky::putty::Ppk::from_openssh_private_key(&key.0)?;
             Ok(Box::new(PuttyPpk(ppk)))
         }
 
         /// Convert a PPK key file to an OpenSSH private key.
-        pub fn to_openssh_private_key(&self, passphrase: &str) -> Result<Box<SshPrivateKey>, Box<PickyError>> {
+        pub fn to_openssh(&self, passphrase: &str) -> Result<Box<SshPrivateKey>, Box<PickyError>> {
             let passphrase = if passphrase.is_empty() { None } else { Some(passphrase) };
             let key: picky::ssh::SshPrivateKey = self.0.to_openssh_private_key(passphrase)?;
             Ok(Box::new(SshPrivateKey(key)))
+        }
+
+        /// Wrap a private key
+        pub fn from_key(private_key: &PrivateKey) -> Result<Box<PuttyPpk>, Box<PickyError>> {
+            let key = picky::ssh::private_key::SshPrivateKey::try_from(private_key.0.clone())?;
+            let ppk = picky::putty::Ppk::from_openssh_private_key(&key)?;
+            Ok(Box::new(Self(ppk)))
         }
 
         /// Get the public key from the PPK key file.

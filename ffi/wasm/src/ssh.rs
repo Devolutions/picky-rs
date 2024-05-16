@@ -46,6 +46,12 @@ impl SshPrivateKey {
         Ok(Self(key))
     }
 
+    /// Wrap a private key
+    pub fn from_key(private_key: &PrivateKey) -> Result<SshPrivateKey, SshPrivateKeyError> {
+        let key = picky::ssh::private_key::SshPrivateKey::try_from(private_key.0.clone())?;
+        Ok(Self(key))
+    }
+
     /// Converts SSH private key to PEM object
     pub fn to_pem(&self) -> Result<Pem, SshPrivateKeyError> {
         Ok(Pem(self.0.to_pem()?))
