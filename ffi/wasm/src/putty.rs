@@ -5,6 +5,12 @@ use wasm_bindgen::prelude::*;
 
 define_error!(PuttyError, picky::putty::PuttyError);
 
+impl From<picky::ssh::private_key::SshPrivateKeyError> for PuttyError {
+    fn from(e: picky::ssh::private_key::SshPrivateKeyError) -> Self {
+        Self(picky::putty::PuttyError::from(e))
+    }
+}
+
 /// PuTTY Private Key (PPK) version.
 #[wasm_bindgen]
 #[derive(Clone, Copy)]
@@ -277,16 +283,23 @@ impl PuttyPpk {
     }
 
     /// Convert an OpenSSH private key to a PPK key file.
-    pub fn from_openssh_private_key(key: &SshPrivateKey) -> Result<PuttyPpk, PuttyError> {
+    pub fn from_openssh(key: &SshPrivateKey) -> Result<PuttyPpk, PuttyError> {
         let ppk = picky::putty::Ppk::from_openssh_private_key(&key.0)?;
         Ok(Self(ppk))
     }
 
     /// Convert a PPK key file to an OpenSSH private key.
-    pub fn to_openssh_private_key(&self, passphrase: &str) -> Result<SshPrivateKey, PuttyError> {
+    pub fn to_openssh(&self, passphrase: &str) -> Result<SshPrivateKey, PuttyError> {
         let passphrase = if passphrase.is_empty() { None } else { Some(passphrase) };
         let key = self.0.to_openssh_private_key(passphrase)?;
         Ok(SshPrivateKey(key))
+    }
+
+    /// Wrap a private key
+    pub fn from_key(private_key: &PrivateKey) -> Result<PuttyPpk, PuttyError> {
+        let key = picky::ssh::private_key::SshPrivateKey::try_from(private_key.0.clone())?;
+        let ppk = picky::putty::Ppk::from_openssh_private_key(&key)?;
+        Ok(Self(ppk))
     }
 
     /// Get the public key from the PPK key file.

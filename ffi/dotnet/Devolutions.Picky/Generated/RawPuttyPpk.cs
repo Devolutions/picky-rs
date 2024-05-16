@@ -70,14 +70,20 @@ public partial struct PuttyPpk
     /// <summary>
     /// Convert an OpenSSH private key to a PPK key file.
     /// </summary>
-    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PuttyPpk_from_openssh_private_key", ExactSpelling = true)]
-    public static unsafe extern IntPtr FromOpensshPrivateKey(SshPrivateKey* key);
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PuttyPpk_from_openssh", ExactSpelling = true)]
+    public static unsafe extern IntPtr FromOpenssh(SshPrivateKey* key);
 
     /// <summary>
     /// Convert a PPK key file to an OpenSSH private key.
     /// </summary>
-    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PuttyPpk_to_openssh_private_key", ExactSpelling = true)]
-    public static unsafe extern IntPtr ToOpensshPrivateKey(PuttyPpk* self, byte* passphrase, nuint passphraseSz);
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PuttyPpk_to_openssh", ExactSpelling = true)]
+    public static unsafe extern IntPtr ToOpenssh(PuttyPpk* self, byte* passphrase, nuint passphraseSz);
+
+    /// <summary>
+    /// Wrap a private key
+    /// </summary>
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PuttyPpk_from_key", ExactSpelling = true)]
+    public static unsafe extern IntPtr FromKey(PrivateKey* privateKey);
 
     /// <summary>
     /// Get the public key from the PPK key file.

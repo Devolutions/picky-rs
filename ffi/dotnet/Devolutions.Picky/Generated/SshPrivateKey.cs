@@ -207,7 +207,7 @@ public partial class SshPrivateKey: IDisposable
     /// <returns>
     /// A <c>SshPrivateKey</c> allocated on Rust side.
     /// </returns>
-    public static SshPrivateKey FromPrivateKey(PrivateKey key)
+    public static SshPrivateKey FromKey(PrivateKey key)
     {
         unsafe
         {
@@ -217,7 +217,7 @@ public partial class SshPrivateKey: IDisposable
             {
                 throw new ObjectDisposedException("PrivateKey");
             }
-            IntPtr resultPtr = Raw.SshPrivateKey.FromPrivateKey(keyRaw);
+            IntPtr resultPtr = Raw.SshPrivateKey.FromKey(keyRaw);
             Raw.SshFfiResultBoxSshPrivateKeyBoxPickyError result = Marshal.PtrToStructure<Raw.SshFfiResultBoxSshPrivateKeyBoxPickyError>(resultPtr);
             Raw.SshFfiResultBoxSshPrivateKeyBoxPickyError.Destroy(resultPtr);
             if (!result.isOk)

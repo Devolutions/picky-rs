@@ -205,7 +205,7 @@ pub mod ffi {
             Ok(Box::new(SshPrivateKey(key)))
         }
 
-        pub fn from_private_key(key: &PrivateKey) -> Result<Box<SshPrivateKey>, Box<PickyError>> {
+        pub fn from_key(key: &PrivateKey) -> Result<Box<SshPrivateKey>, Box<PickyError>> {
             let key = ssh::SshPrivateKey::try_from(key.0.clone())?;
             Ok(Box::new(SshPrivateKey(key)))
         }
