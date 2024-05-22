@@ -187,10 +187,13 @@ impl TryFrom<&'_ PrivateKey> for RsaPublicKey {
 
     fn try_from(v: &PrivateKey) -> Result<Self, Self::Error> {
         match &v.as_inner().private_key {
-            private_key_info::PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => Ok(RsaPublicKey::new(
-                BigUint::from_bytes_be(key.modulus.as_unsigned_bytes_be()),
-                BigUint::from_bytes_be(key.public_exponent.as_unsigned_bytes_be()),
-            )?),
+            private_key_info::PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => {
+                Ok(RsaPublicKey::new_with_max_size(
+                    BigUint::from_bytes_be(key.modulus.as_unsigned_bytes_be()),
+                    BigUint::from_bytes_be(key.public_exponent.as_unsigned_bytes_be()),
+                    8192,
+                )?)
+            }
             _ => Err(KeyError::Rsa {
                 context: "RSA public key cannot be constructed from non-RSA private key.".to_string(),
             }),
@@ -809,9 +812,10 @@ impl TryFrom<&'_ PublicKey> for RsaPublicKey {
         use picky_asn1_x509::PublicKey as InnerPublicKey;
 
         match &v.as_inner().subject_public_key {
-            InnerPublicKey::Rsa(BitStringAsn1Container(key)) => Ok(RsaPublicKey::new(
+            InnerPublicKey::Rsa(BitStringAsn1Container(key)) => Ok(RsaPublicKey::new_with_max_size(
                 BigUint::from_bytes_be(key.modulus.as_unsigned_bytes_be()),
                 BigUint::from_bytes_be(key.public_exponent.as_unsigned_bytes_be()),
+                8192,
             )?),
             InnerPublicKey::Ec(_) => Err(KeyError::UnsupportedAlgorithm {
                 algorithm: "elliptic curves",
