@@ -2,7 +2,7 @@
 
 $ErrorActionPreference = "Stop"
 
-wasm-pack build --target bundler --scope devolutions --out-name picky
+wasm-pack build --target web --scope devolutions --out-name picky
 
 if ($LastExitCode -ne 0)
 {

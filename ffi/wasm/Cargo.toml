@@ -1,7 +1,7 @@
 [package]
 name = "picky"
-version = "0.10.1"
-authors = ["Benoît CORTIER <bcortier@proton.me>"]
+version = "0.11.0"
+authors = ["Devolutions Inc."]
 edition = "2021"
 publish = false
 description = "Portable X.509, PKI, JOSE and HTTP signature implementation."
