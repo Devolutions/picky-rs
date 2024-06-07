@@ -161,7 +161,7 @@ impl TryFrom<&'_ PrivateKey> for RsaPrivateKey {
 
     fn try_from(v: &PrivateKey) -> Result<Self, Self::Error> {
         match &v.as_inner().private_key {
-            private_key_info::PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => {
+            private_key_info::PrivateKeyValue::Rsa(OctetStringAsn1Container(key)) => {
                 let p1 = BigUint::from_bytes_be(key.prime_1.as_unsigned_bytes_be());
                 let p2 = BigUint::from_bytes_be(key.prime_2.as_unsigned_bytes_be());
 
@@ -187,7 +187,7 @@ impl TryFrom<&'_ PrivateKey> for RsaPublicKey {
 
     fn try_from(v: &PrivateKey) -> Result<Self, Self::Error> {
         match &v.as_inner().private_key {
-            private_key_info::PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => {
+            private_key_info::PrivateKeyValue::Rsa(OctetStringAsn1Container(key)) => {
                 Ok(RsaPublicKey::new_with_max_size(
                     BigUint::from_bytes_be(key.modulus.as_unsigned_bytes_be()),
                     BigUint::from_bytes_be(key.public_exponent.as_unsigned_bytes_be()),
@@ -356,7 +356,7 @@ impl PrivateKey {
     pub fn from_pem(pem: &Pem) -> Result<Self, KeyError> {
         match pem.label() {
             PRIVATE_KEY_PEM_LABEL => Self::from_pkcs8(pem.data()),
-            RSA_PRIVATE_KEY_PEM_LABEL => Self::from_rsa_der(pem.data()),
+            RSA_PRIVATE_KEY_PEM_LABEL => Self::from_pkcs1(pem.data()),
             EC_PRIVATE_KEY_LABEL => Self::from_ec_der(pem.data()),
             _ => Err(KeyError::InvalidPemLabel {
                 label: pem.label().to_owned(),
@@ -377,7 +377,7 @@ impl PrivateKey {
             })?;
 
         match &inner.private_key {
-            PrivateKeyValue::RSA(_) => Ok(Self {
+            PrivateKeyValue::Rsa(_) => Ok(Self {
                 kind: PrivateKeyKind::Rsa,
                 inner,
             }),
@@ -440,7 +440,8 @@ impl PrivateKey {
         }
     }
 
-    pub fn from_rsa_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, KeyError> {
+    /// Decodes a DER-encoded RSA private key
+    pub fn from_pkcs1<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, KeyError> {
         use picky_asn1_x509::{AlgorithmIdentifier, RsaPrivateKey};
 
         let private_key =
@@ -452,7 +453,7 @@ impl PrivateKey {
         let inner = PrivateKeyInfo {
             version: PRIVATE_KEY_INFO_VERSION_1,
             private_key_algorithm: AlgorithmIdentifier::new_rsa_encryption(),
-            private_key: PrivateKeyValue::RSA(private_key.into()),
+            private_key: PrivateKeyValue::Rsa(private_key.into()),
             public_key: None,
         };
 
@@ -567,6 +568,20 @@ impl PrivateKey {
         })
     }
 
+    pub fn to_pkcs1(&self) -> Result<Vec<u8>, KeyError> {
+        let picky_asn1_x509::PrivateKeyValue::Rsa(OctetStringAsn1Container(rsa_private_key)) = &self.inner.private_key
+        else {
+            return Err(KeyError::Rsa {
+                context: String::from("can’t export a non-RSA key to PKCS#1 format"),
+            });
+        };
+
+        picky_asn1_der::to_vec(rsa_private_key).map_err(|e| KeyError::Asn1Serialization {
+            source: e,
+            element: "RSA private key (pkcs1)",
+        })
+    }
+
     pub fn to_pem(&self) -> Result<Pem<'static>, KeyError> {
         let pkcs8 = self.to_pkcs8()?;
         Ok(Pem::new(PRIVATE_KEY_PEM_LABEL, pkcs8))
@@ -576,10 +591,19 @@ impl PrivateKey {
         self.to_pem().map(|pem| pem.to_string())
     }
 
+    pub fn to_pkcs1_pem(&self) -> Result<Pem<'static>, KeyError> {
+        let pkcs1 = self.to_pkcs1()?;
+        Ok(Pem::new(RSA_PRIVATE_KEY_PEM_LABEL, pkcs1))
+    }
+
+    pub fn to_pkcs1_pem_str(&self) -> Result<String, KeyError> {
+        self.to_pkcs1_pem().map(|pem| pem.to_string())
+    }
+
     pub fn to_public_key(&self) -> Result<PublicKey, KeyError> {
         let key = match &self.kind {
             PrivateKeyKind::Rsa => match &self.inner.private_key {
-                PrivateKeyValue::RSA(OctetStringAsn1Container(key)) => {
+                PrivateKeyValue::Rsa(OctetStringAsn1Container(key)) => {
                     SubjectPublicKeyInfo::new_rsa_key(key.modulus.clone(), key.public_exponent.clone()).into()
                 }
                 _ => unreachable!("BUG: Non-RSA key data in RSA private key"),
@@ -933,6 +957,15 @@ impl PublicKey {
         self.to_pem().map(|pem| pem.to_string())
     }
 
+    pub fn to_pkcs1_pem(&self) -> Result<Pem<'static>, KeyError> {
+        let pkcs1 = self.to_pkcs1()?;
+        Ok(Pem::new(RSA_PUBLIC_KEY_PEM_LABEL, pkcs1))
+    }
+
+    pub fn to_pkcs1_pem_str(&self) -> Result<String, KeyError> {
+        self.to_pkcs1_pem().map(|pem| pem.to_string())
+    }
+
     pub fn from_pem(pem: &Pem) -> Result<Self, KeyError> {
         match pem.label() {
             PUBLIC_KEY_PEM_LABEL | EC_PUBLIC_KEY_PEM_LABEL => Self::from_der(pem.data()),
@@ -1035,37 +1068,51 @@ mod tests {
         generate_certificate_from_pk(private_key);
     }
 
-    const RSA_PRIVATE_KEY_PEM: &str = "-----BEGIN RSA PRIVATE KEY-----\n\
-                                       MIIEpAIBAAKCAQEA5Kz4i/+XZhiE+fyrgtx/4yI3i6C6HXbC4QJYpDuSUEKN2bO9\n\
-                                       RsE+Fnds/FizHtJVWbvya9ktvKdDPBdy58+CIM46HEKJhYLnBVlkEcg9N2RNgR3x\n\
-                                       HnpRbKfv+BmWjOpSmWrmJSDLY0dbw5X5YL8TU69ImoouCUfStyCgrpwkctR0GD3G\n\
-                                       fcGjbZRucV7VvVH9bS1jyaT/9yORyzPOSTwb+K9vOr6XlJX0CGvzQeIOcOimejHx\n\
-                                       ACFOCnhEKXiwMsmL8FMz0drkGeMuCODY/OHVmAdXDE5UhroL0oDhSmIrdZ8CxngO\n\
-                                       xHr1WD2yC0X0jAVP/mrxjSSfBwmmqhSMmONlvQIDAQABAoIBAQCJrBl3L8nWjayB\n\
-                                       VL1ta5MTC+alCX8DfhyVmvQC7FqKN4dvKecqUe0vWXcj9cLhK4B3JdAtXfNLQOgZ\n\
-                                       pYRoS2XsmjwiB20EFGtBrS+yBPvV/W0r7vrbfojHAdRXahBZhjl0ZAdrEvNgMfXt\n\
-                                       Kr2YoXDhUQZFBCvzKmqSFfKnLRpEhsCBOsp+Sx0ZbP3yVPASXnqiZmKblpY4qcE5\n\
-                                       KfYUO0nUWBSzY8I5c/29IY5oBbOUGS1DTMkx3R7V0BzbH/xmskVACn+cMzf467vp\n\
-                                       yupTKG9hIX8ff0QH4Ggx88uQTRTI9IvfrAMnICFtR6U7g70hLN6j9ujXkPNhmycw\n\
-                                       E5nQCmuBAoGBAPVbYtGBvnlySN73UrlyJ1NItUmOGhBt/ezpRjMIdMkJ6dihq7i2\n\
-                                       RpE76sRvwHY9Tmw8oxR/V1ITK3dM2jZP1SRcm1mn5Y1D3K38jwFS0C47AXzIN2N+\n\
-                                       LExekI1J4YOPV9o378vUKQuWpbQrQOOvylQBkRJ0Cd8DI3xhiBT/AVGbAoGBAO6Y\n\
-                                       WBP3GMloO2v6PHijhRqrNdaI0qht8tDhO5L1troFLst3sfpK9fUP/KTlhHOzNVBF\n\
-                                       fIJnNdcYAe9BISBbfSat+/R9F+GoUvpoC4j8ygHTQkT6ZMcMDfR8RQ4BlqGHIDKZ\n\
-                                       YaAJoPZVkg7hNRMcvIruYpzFrheDE/4xvnC51GeHAoGAHzCFyFIw72lKwCU6e956\n\
-                                       B0lH2ljZEVuaGuKwjM43YlMDSgmLNcjeAZpXRq9aDO3QKUwwAuwJIqLTNLAtURgm\n\
-                                       5R9slCIWuTV2ORvQ5f8r/aR8lOsyt1ATu4WN5JgOtdWj+laAAi4vJYz59YRGFGuF\n\
-                                       UdZ9JZZgptvUR/xx+xFLjp8CgYBMRzghaeXqvgABTUb36o8rL4FOzP9MCZqPXPKG\n\
-                                       0TdR0UZcli+4LS7k4e+LaDUoKCrrNsvPhN+ZnHtB2jiU96rTKtxaFYQFCKM+mvTV\n\
-                                       HrwWSUvucX62hAwSFYieKbPWgDSy+IZVe76SAllnmGg3bAB7CitMo4Y8zhMeORkB\n\
-                                       QOe/EQKBgQDgeNgRud7S9BvaT3iT7UtizOr0CnmMfoF05Ohd9+VE4ogvLdAoDTUF\n\
-                                       JFtdOT/0naQk0yqIwLDjzCjhe8+Ji5Y/21pjau8bvblTnASq26FRRjv5+hV8lmcR\n\
-                                       zzk3Y05KXvJL75ksJdomkzZZb0q+Omf3wyjMR8Xl5WueJH1fh4hpBw==\n\
-                                       -----END RSA PRIVATE KEY-----";
+    const PKCS1_PEM: &str = "-----BEGIN RSA PRIVATE KEY-----\n\
+                            MIIEpAIBAAKCAQEA5Kz4i/+XZhiE+fyrgtx/4yI3i6C6HXbC4QJYpDuSUEKN2bO9\n\
+                            RsE+Fnds/FizHtJVWbvya9ktvKdDPBdy58+CIM46HEKJhYLnBVlkEcg9N2RNgR3x\n\
+                            HnpRbKfv+BmWjOpSmWrmJSDLY0dbw5X5YL8TU69ImoouCUfStyCgrpwkctR0GD3G\n\
+                            fcGjbZRucV7VvVH9bS1jyaT/9yORyzPOSTwb+K9vOr6XlJX0CGvzQeIOcOimejHx\n\
+                            ACFOCnhEKXiwMsmL8FMz0drkGeMuCODY/OHVmAdXDE5UhroL0oDhSmIrdZ8CxngO\n\
+                            xHr1WD2yC0X0jAVP/mrxjSSfBwmmqhSMmONlvQIDAQABAoIBAQCJrBl3L8nWjayB\n\
+                            VL1ta5MTC+alCX8DfhyVmvQC7FqKN4dvKecqUe0vWXcj9cLhK4B3JdAtXfNLQOgZ\n\
+                            pYRoS2XsmjwiB20EFGtBrS+yBPvV/W0r7vrbfojHAdRXahBZhjl0ZAdrEvNgMfXt\n\
+                            Kr2YoXDhUQZFBCvzKmqSFfKnLRpEhsCBOsp+Sx0ZbP3yVPASXnqiZmKblpY4qcE5\n\
+                            KfYUO0nUWBSzY8I5c/29IY5oBbOUGS1DTMkx3R7V0BzbH/xmskVACn+cMzf467vp\n\
+                            yupTKG9hIX8ff0QH4Ggx88uQTRTI9IvfrAMnICFtR6U7g70hLN6j9ujXkPNhmycw\n\
+                            E5nQCmuBAoGBAPVbYtGBvnlySN73UrlyJ1NItUmOGhBt/ezpRjMIdMkJ6dihq7i2\n\
+                            RpE76sRvwHY9Tmw8oxR/V1ITK3dM2jZP1SRcm1mn5Y1D3K38jwFS0C47AXzIN2N+\n\
+                            LExekI1J4YOPV9o378vUKQuWpbQrQOOvylQBkRJ0Cd8DI3xhiBT/AVGbAoGBAO6Y\n\
+                            WBP3GMloO2v6PHijhRqrNdaI0qht8tDhO5L1troFLst3sfpK9fUP/KTlhHOzNVBF\n\
+                            fIJnNdcYAe9BISBbfSat+/R9F+GoUvpoC4j8ygHTQkT6ZMcMDfR8RQ4BlqGHIDKZ\n\
+                            YaAJoPZVkg7hNRMcvIruYpzFrheDE/4xvnC51GeHAoGAHzCFyFIw72lKwCU6e956\n\
+                            B0lH2ljZEVuaGuKwjM43YlMDSgmLNcjeAZpXRq9aDO3QKUwwAuwJIqLTNLAtURgm\n\
+                            5R9slCIWuTV2ORvQ5f8r/aR8lOsyt1ATu4WN5JgOtdWj+laAAi4vJYz59YRGFGuF\n\
+                            UdZ9JZZgptvUR/xx+xFLjp8CgYBMRzghaeXqvgABTUb36o8rL4FOzP9MCZqPXPKG\n\
+                            0TdR0UZcli+4LS7k4e+LaDUoKCrrNsvPhN+ZnHtB2jiU96rTKtxaFYQFCKM+mvTV\n\
+                            HrwWSUvucX62hAwSFYieKbPWgDSy+IZVe76SAllnmGg3bAB7CitMo4Y8zhMeORkB\n\
+                            QOe/EQKBgQDgeNgRud7S9BvaT3iT7UtizOr0CnmMfoF05Ohd9+VE4ogvLdAoDTUF\n\
+                            JFtdOT/0naQk0yqIwLDjzCjhe8+Ji5Y/21pjau8bvblTnASq26FRRjv5+hV8lmcR\n\
+                            zzk3Y05KXvJL75ksJdomkzZZb0q+Omf3wyjMR8Xl5WueJH1fh4hpBw==\n\
+                            -----END RSA PRIVATE KEY-----";
 
     #[test]
     fn private_key_from_rsa_pem() {
-        PrivateKey::from_pem(&RSA_PRIVATE_KEY_PEM.parse::<Pem>().expect("pem")).expect("private key");
+        PrivateKey::from_pem(&PKCS1_PEM.parse::<Pem>().expect("pem")).expect("private key");
+    }
+
+    #[test]
+    fn check_pkcs1() {
+        let private_pkcs1_pem = PKCS1_PEM.parse::<Pem>().expect("pem");
+        let private = PrivateKey::from_pem(&private_pkcs1_pem).expect("private key");
+
+        let private_pkcs1 = private.to_pkcs1().unwrap();
+        PrivateKey::from_pkcs1(&private_pkcs1).unwrap();
+        assert_eq!(private_pkcs1, private_pkcs1_pem.data());
+
+        let public = private.to_public_key().unwrap();
+        let public_pkcs1 = public.to_pkcs1().unwrap();
+        PublicKey::from_pkcs1(&public_pkcs1).unwrap();
     }
 
     const PUBLIC_KEY_PEM: &str = "-----BEGIN PUBLIC KEY-----\n\

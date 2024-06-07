@@ -95,7 +95,7 @@ impl PrivateKeyInfo {
         exponents: (IntegerAsn1, IntegerAsn1),
         coefficient: IntegerAsn1,
     ) -> Self {
-        let private_key = PrivateKeyValue::RSA(
+        let private_key = PrivateKeyValue::Rsa(
             RsaPrivateKey {
                 version: vec![0].into(),
                 modulus,
@@ -212,7 +212,7 @@ impl<'de> de::Deserialize<'de> for PrivateKeyInfo {
                     seq_next_element!(seq, PrivateKeyInfo, "private key algorithm");
 
                 let private_key = if private_key_algorithm.is_a(oids::rsa_encryption()) {
-                    PrivateKeyValue::RSA(seq_next_element!(seq, PrivateKeyInfo, "rsa oid"))
+                    PrivateKeyValue::Rsa(seq_next_element!(seq, PrivateKeyInfo, "rsa oid"))
                 } else if matches!(private_key_algorithm.parameters(), AlgorithmIdentifierParameters::Ec(_)) {
                     PrivateKeyValue::EC(seq_next_element!(seq, PrivateKeyInfo, "ec private key"))
                 } else if private_key_algorithm.is_one_of([oids::ed25519(), oids::x25519()]) {
@@ -262,7 +262,7 @@ impl<'de> de::Deserialize<'de> for PrivateKeyInfo {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum PrivateKeyValue {
-    RSA(OctetStringAsn1Container<RsaPrivateKey>),
+    Rsa(OctetStringAsn1Container<RsaPrivateKey>),
     EC(OctetStringAsn1Container<ECPrivateKey>),
     // Used by Ed25519, Ed448, X25519, and X448 keys
     ED(OctetStringAsn1Container<OctetStringAsn1>),
@@ -274,7 +274,7 @@ impl ser::Serialize for PrivateKeyValue {
         S: ser::Serializer,
     {
         match self {
-            PrivateKeyValue::RSA(rsa) => rsa.serialize(serializer),
+            PrivateKeyValue::Rsa(rsa) => rsa.serialize(serializer),
             PrivateKeyValue::EC(ec) => ec.serialize(serializer),
             PrivateKeyValue::ED(ed) => ed.serialize(serializer),
         }
@@ -488,7 +488,6 @@ impl RsaPrivateKey {
 ///      publicKey  [1] BIT STRING OPTIONAL
 ///    }
 /// ```
-
 #[derive(Serialize, Debug, Clone, PartialEq, Eq)]
 pub struct ECPrivateKey {
     pub version: IntegerAsn1,

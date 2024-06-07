@@ -148,6 +148,36 @@ public partial class PublicKey: IDisposable
     }
 
     /// <summary>
+    /// Exports the public key into a PEM object using the PKCS 1 format
+    /// </summary>
+    /// <remarks>
+    /// This format can only be used for RSA keys.
+    /// </remarks>
+    /// <exception cref="PickyException"></exception>
+    /// <returns>
+    /// A <c>Pem</c> allocated on Rust side.
+    /// </returns>
+    public Pem ToPkcs1Pem()
+    {
+        unsafe
+        {
+            if (_inner == null)
+            {
+                throw new ObjectDisposedException("PublicKey");
+            }
+            IntPtr resultPtr = Raw.PublicKey.ToPkcs1Pem(_inner);
+            Raw.KeyFfiResultBoxPemBoxPickyError result = Marshal.PtrToStructure<Raw.KeyFfiResultBoxPemBoxPickyError>(resultPtr);
+            Raw.KeyFfiResultBoxPemBoxPickyError.Destroy(resultPtr);
+            if (!result.isOk)
+            {
+                throw new PickyException(new PickyError(result.Err));
+            }
+            Raw.Pem* retVal = result.Ok;
+            return new Pem(retVal);
+        }
+    }
+
+    /// <summary>
     /// Retrieves the key kind for this public key.
     /// </summary>
     /// <returns>

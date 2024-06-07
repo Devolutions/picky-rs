@@ -146,6 +146,14 @@ pub mod ffi {
             Ok(Box::new(Pem(pem)))
         }
 
+        /// Exports the private key into a PEM object using the PKCS 1 format
+        ///
+        /// This format can only be used for RSA keys.
+        pub fn to_pkcs1_pem(&self) -> Result<Box<Pem>, Box<PickyError>> {
+            let pem = self.0.to_pkcs1_pem()?;
+            Ok(Box::new(Pem(pem)))
+        }
+
         /// Extracts the public part of this private key
         pub fn to_public_key(&self) -> Result<Box<PublicKey>, Box<PickyError>> {
             let key = self.0.to_public_key()?;
@@ -183,6 +191,14 @@ pub mod ffi {
         /// Exports the public key into a PEM object.
         pub fn to_pem(&self) -> Result<Box<Pem>, Box<PickyError>> {
             let pem = self.0.to_pem()?;
+            Ok(Box::new(Pem(pem)))
+        }
+
+        /// Exports the public key into a PEM object using the PKCS 1 format
+        ///
+        /// This format can only be used for RSA keys.
+        pub fn to_pkcs1_pem(&self) -> Result<Box<Pem>, Box<PickyError>> {
+            let pem = self.0.to_pkcs1_pem()?;
             Ok(Box::new(Pem(pem)))
         }
 

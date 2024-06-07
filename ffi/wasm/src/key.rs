@@ -109,6 +109,14 @@ impl PrivateKey {
         Ok(Pem(pem))
     }
 
+    /// Exports the private key into a PEM object using the PKCS 1 format
+    ///
+    /// This format can only be used for RSA keys.
+    pub fn to_pkcs1_pem(&self) -> Result<Pem, KeyError> {
+        let pem = self.0.to_pkcs1_pem()?;
+        Ok(Pem(pem))
+    }
+
     /// Extracts the public part of this private key
     pub fn to_public_key(&self) -> Result<PublicKey, KeyError> {
         Ok(PublicKey(self.0.to_public_key()?))
@@ -135,6 +143,14 @@ impl PublicKey {
     /// Exports the public key into a PEM object
     pub fn to_pem(&self) -> Result<Pem, KeyError> {
         let pem = self.0.to_pem()?;
+        Ok(Pem(pem))
+    }
+
+    /// Exports the public key into a PEM object using the PKCS 1 format
+    ///
+    /// This format can only be used for RSA keys.
+    pub fn to_pkcs1_pem(&self) -> Result<Pem, KeyError> {
+        let pem = self.0.to_pkcs1_pem()?;
         Ok(Pem(pem))
     }
 }
