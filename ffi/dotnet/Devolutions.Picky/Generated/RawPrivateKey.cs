@@ -67,6 +67,15 @@ public partial struct PrivateKey
     public static unsafe extern IntPtr ToPem(PrivateKey* self);
 
     /// <summary>
+    /// Exports the private key into a PEM object using the PKCS 1 format
+    /// </summary>
+    /// <remarks>
+    /// This format can only be used for RSA keys.
+    /// </remarks>
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PrivateKey_to_pkcs1_pem", ExactSpelling = true)]
+    public static unsafe extern IntPtr ToPkcs1Pem(PrivateKey* self);
+
+    /// <summary>
     /// Extracts the public part of this private key
     /// </summary>
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PrivateKey_to_public_key", ExactSpelling = true)]
