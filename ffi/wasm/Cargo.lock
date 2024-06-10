@@ -644,7 +644,7 @@ dependencies = [
 
 [[package]]
 name = "picky"
-version = "0.10.1"
+version = "0.11.0"
 dependencies = [
  "console_error_panic_hook",
  "getrandom",
