@@ -1,0 +1,33 @@
+{
+  "name": "@devolutions/picky",
+  "collaborators": [
+    "Benoît CORTIER <bcortier@proton.me>"
+  ],
+  "description": "Portable X.509, PKI, JOSE and HTTP signature implementation.",
+  "version": "0.10.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Devolutions/picky-rs"
+  },
+  "main": "./dist/picky.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "build:wasm": "wasm-pack build --target web --scope devolutions --out-name picky --out-dir ./pkg --release",
+    "clean": "npm run clean:win && npm run clean:lin",
+    "clean:win": "node -e \"if (process.platform === 'win32') process.exit(1)\" || (if exist dist rmdir /Q /S dist && if exist pkg rmdir /Q /S pkg)",
+    "clean:lin": "node -e \"if (process.platform !== 'win32') process.exit(1)\" || (rm -rf dist pkg)"
+  },
+  "author": "",
+  "license": "MIT OR Apache-2.0",
+  "types": "./dist/main.d.ts",
+  "type": "module",
+  "dependencies": {
+    "vite": "^4.2.12",
+    "vite-plugin-dts": "^3.9.1",
+    "vite-plugin-top-level-await": "^1.3.1",
+    "vite-plugin-wasm": "^3.2.2"
+  }
+}

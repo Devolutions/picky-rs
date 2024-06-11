@@ -2,14 +2,14 @@
 
 $ErrorActionPreference = "Stop"
 
-wasm-pack build --target bundler --scope devolutions --out-name picky
+npm run build:wasm && npm run build
 
 if ($LastExitCode -ne 0)
 {
     throw "wasm-pack build failed"
 }
 
-wasm-pack publish --access=public
+npm run publish 
 
 if ($LastExitCode -ne 0)
 {

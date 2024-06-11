@@ -11,15 +11,14 @@ This should be run in the CI.
 2. Build the package: 
 
     ```
-    $ wasm-pack build --target web --scope devolutions --out-name picky
+    $ npm run build:wasm 
+    $ npm run build
     ```
 
-3. Rename `@devolutions/picky-wasm` to `@devolutions/picky` in `pkg/package.json`.
-
-4. Publish to npm:
+3. Publish to npm:
 
     ```
-    $ wasm-pack publish
+    $ npm publish
     ```
 
 ## Testing
