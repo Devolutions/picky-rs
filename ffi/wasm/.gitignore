@@ -1,5 +1,6 @@
 bin/
 pkg/
+dist/
 node_modules/
 wasm-pack.log
 package-lock.json
