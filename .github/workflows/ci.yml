@@ -122,3 +122,18 @@ jobs:
 
       - name: cargo check ${{ matrix.crate }}
         run: cargo +${{ matrix.msvc }} check -p ${{ matrix.crate }}
+
+  success:
+    name: Success
+    runs-on: ubuntu-latest
+    if: ${{ success() }}
+    needs:
+      - formatting
+      - lints
+      - lints-wasm
+      - tests
+      - msrv
+
+    steps:
+      - name: CI succeeded
+        run: exit 0
