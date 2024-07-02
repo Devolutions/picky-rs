@@ -11,7 +11,6 @@ This should be run in the CI.
 2. Build the package: 
 
     ```
-    $ npm run build:wasm 
     $ npm run build
     ```
 

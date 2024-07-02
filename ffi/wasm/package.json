@@ -1,33 +1,42 @@
 {
   "name": "@devolutions/picky",
+  "version": "0.12.0",
+  "author": "Benoît CORTIER",
+  "email": "bcortier@devolutions.net",
   "collaborators": [
-    "Benoît CORTIER <bcortier@proton.me>"
+    "Vladyslav NIKONOV",
+    "Irving OU"
   ],
   "description": "Portable X.509, PKI, JOSE and HTTP signature implementation.",
-  "version": "0.10.1",
+  "license": "MIT OR Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/Devolutions/picky-rs"
   },
-  "main": "./dist/picky.js",
+  "scripts": {
+    "build": "npm run build:wasm && npm run build:vite",
+    "build:wasm": "wasm-pack build --target web --scope devolutions --out-name picky --out-dir ./pkg --release",
+    "build:vite": "vite build && node rewrite-location.js",
+    "clean": "rimraf dist && rimraf pkg"
+  },
+  "type": "module",
   "files": [
     "dist"
   ],
-  "scripts": {
-    "build": "vite build",
-    "build:wasm": "wasm-pack build --target web --scope devolutions --out-name picky --out-dir ./pkg --release",
-    "clean": "npm run clean:win && npm run clean:lin",
-    "clean:win": "node -e \"if (process.platform === 'win32') process.exit(1)\" || (if exist dist rmdir /Q /S dist && if exist pkg rmdir /Q /S pkg)",
-    "clean:lin": "node -e \"if (process.platform !== 'win32') process.exit(1)\" || (rm -rf dist pkg)"
+  "main": "./dist/picky.umd.cjs",
+  "module": "./dist/picky.js",
+  "types": "./dist/picky.d.ts",
+  "exports": {
+    ".": {
+      "require": "./dist/picky.umd.cjs",
+      "import": "./dist/picky.js"
+    }
   },
-  "author": "",
-  "license": "MIT OR Apache-2.0",
-  "types": "./dist/main.d.ts",
-  "type": "module",
-  "dependencies": {
-    "vite": "^4.2.12",
-    "vite-plugin-dts": "^3.9.1",
-    "vite-plugin-top-level-await": "^1.3.1",
-    "vite-plugin-wasm": "^3.2.2"
+  "devDependencies": {
+    "rimraf": "^5.0.7",
+    "vite": "^5.3.2",
+    "vite-plugin-static-copy": "^1.0.6",
+    "vite-plugin-top-level-await": "^1.4.1",
+    "vite-plugin-wasm": "^3.3.0"
   }
 }
