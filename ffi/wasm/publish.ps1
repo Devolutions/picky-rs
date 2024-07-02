@@ -2,14 +2,21 @@
 
 $ErrorActionPreference = "Stop"
 
-npm run build:wasm && npm run build
+npm install
 
 if ($LastExitCode -ne 0)
 {
-    throw "wasm-pack build failed"
+    throw "npm install failed"
 }
 
-npm run publish 
+npm run build
+
+if ($LastExitCode -ne 0)
+{
+    throw "npm run build failed"
+}
+
+npm publish --access public
 
 if ($LastExitCode -ne 0)
 {
