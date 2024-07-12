@@ -18,7 +18,7 @@ include = ["src/**/*", "README.md", "CHANGELOG.md", "LICENSE-*"]
 
 [dependencies]
 picky-asn1 = { version = "0.8", path = "../picky-asn1" }
-serde = { version = "1.0", default-features = false, features = ["derive"] }
+serde = { version = "1", default-features = false, features = ["derive"] }
 serde_bytes = "0.11"
 lazy_static = { version = "1.5", optional = true }
 
