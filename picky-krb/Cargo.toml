@@ -1,6 +1,6 @@
 [package]
 name = "picky-krb"
-version = "0.8.0"
+version = "0.9.0"
 authors = ["Devolutions Inc."]
 edition = "2021"
 rust-version = "1.60"
@@ -13,9 +13,9 @@ readme = "README.md"
 include = ["src/**/*", "README.md", "CHANGELOG.md", "LICENSE-*"]
 
 [dependencies]
-picky-asn1 = { version = "0.8", path = "../picky-asn1" }
-picky-asn1-der = { version = "0.4", path = "../picky-asn1-der" }
-picky-asn1-x509 = { version = "0.12", path = "../picky-asn1-x509" }
+picky-asn1 = { version = "0.3", path = "../picky-asn1" }
+picky-asn1-der = { version = "0.5", path = "../picky-asn1-der" }
+picky-asn1-x509 = { version = "0.13", path = "../picky-asn1-x509" }
 serde = { version = "1", features = ["derive"] }
 byteorder = "1.5"
 thiserror = "1"

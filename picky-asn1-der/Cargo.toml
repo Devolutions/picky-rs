@@ -1,6 +1,6 @@
 [package]
 name = "picky-asn1-der"
-version = "0.4.1"
+version = "0.5.0"
 edition = "2021"
 rust-version = "1.61"
 authors = [
@@ -17,7 +17,7 @@ readme = "README.md"
 include = ["src/**/*", "README.md", "CHANGELOG.md", "LICENSE-*"]
 
 [dependencies]
-picky-asn1 = { version = "0.8", path = "../picky-asn1" }
+picky-asn1 = { version = "0.9", path = "../picky-asn1" }
 serde = { version = "1", default-features = false, features = ["derive"] }
 serde_bytes = "0.11"
 lazy_static = { version = "1.5", optional = true }
