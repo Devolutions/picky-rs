@@ -1,10 +1,52 @@
 version: 2
 updates:
   - package-ecosystem: "cargo"
-    directory: "/"
+    directories:
+      - "/"
+      - "/ffi/wasm/"
     schedule:
       interval: "weekly"
     assignees:
       - "CBenoit"
-    # Disable version updates, we only want security updates.
-    open-pull-requests-limit: 0    
+    open-pull-requests-limit: 3
+    groups:
+      crypto:
+        patterns:
+          - "*x509*"
+          - "*crypto*"
+          - "*tls*"
+          - "*rand*"
+          - "*dalek*"
+          - "*pbkdf*"
+          - "*bigint*"
+          - "sha*"
+          - "pkcs*"
+          - "aes*"
+          - "rsa"
+          - "digest"
+          - "md-5"
+          - "md5"
+          - "md4"
+          - "p256"
+          - "p384"
+          - "p521"
+          - "der"
+          - "argon2"
+          - "ctr"
+          - "cbc"
+          - "des"
+          - "rc2"
+          - "hmac"
+          - "zeroize"
+          - "ring"
+      windows:
+        patterns:
+          - "windows*"
+          - "winreg"
+          - "winapi"
+      patch:
+        dependency-type: "production"
+        update-types:
+          - "patch"
+      dev:
+        dependency-type: "development"
