@@ -2,7 +2,7 @@
 name = "picky-asn1-der"
 version = "0.4.1"
 edition = "2021"
-rust-version = "1.60"
+rust-version = "1.61"
 authors = [
     "KizzyCode Software Labs./Keziah Biermann <development@kizzycode.de>",
     "Benoît CORTIER <bcortier@devolutions.net>",
