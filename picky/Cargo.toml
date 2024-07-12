@@ -24,30 +24,30 @@ include = ["src/**/*", "README.md", "CHANGELOG.md", "LICENSE-*"]
 picky-asn1 = { version = "0.8", path = "../picky-asn1", features = ["zeroize"] }
 picky-asn1-der = { version = "0.4", path = "../picky-asn1-der" }
 picky-asn1-x509 = { version = "0.12", path = "../picky-asn1-x509", features = ["legacy", "zeroize"] }
-serde = { version = "1.0.186", features = ["derive"] }
-base64 = "0.21.2"
-thiserror = "1.0.47"
-byteorder = { version = "1.4.3", optional = true }
-chrono = { version = "0.4.26", default-features = false, features = ["clock"], optional = true }
-time = { version = "0.3.27", optional = true }
-serde_json = { version = "1.0.105", optional = true }
-hex = "0.4.3"
-http = { version = "0.2.9", optional = true }
-cab = { version = "0.4.1", optional = true }
-lexical-sort = { version = "0.3.1", optional = true }
-zeroize = "1.6"
+serde = { version = "1", features = ["derive"] }
+base64 = "0.22"
+thiserror = "1"
+byteorder = { version = "1.5", optional = true }
+chrono = { version = "0.4", default-features = false, features = ["clock"], optional = true }
+time = { version = "0.3", optional = true }
+serde_json = { version = "1", optional = true }
+hex = "0.4"
+http = { version = "1.1", optional = true }
+cab = { version = "0.6", optional = true }
+lexical-sort = { version = "0.3", optional = true }
+zeroize = "1.8"
 
 # FIXME: either use ureq, or even better: do not require this kind of dependency at all to let user decide which lib to use.
 # (currently users should *really* not forget to use `spawn_blocking` when calling associated functions from async context)
-reqwest = { version = "0.11.20", default-features = false, features = ["blocking"], optional = true }
+reqwest = { version = "0.12", default-features = false, features = ["blocking"], optional = true }
 
 # /!\ ===== cryptography dependencies ===== /!\
 # These should be updated as soon as possible.
 # /!\ ===================================== /!\
 
-rand = "0.8.5"
-rand_core = "0.6.4"
-num-bigint-dig = "0.8.4"
+rand = "0.8"
+rand_core = "0.6"
+num-bigint-dig = "0.8"
 
 ed25519-dalek = { version = "2", features = ["hazmat", "rand_core"] }
 x25519-dalek = { version = "2", features = ["static_secrets"] }
@@ -56,33 +56,33 @@ p256 = { version = "0.13", features = ["ecdh"] }
 p384 = { version = "0.13", features = ["ecdh"] }
 p521 = { version = "0.13", features = ["ecdh"] }
 
-rsa = { version = "0.9.2", features = ["std"] }
+rsa = { version = "0.9", features = ["std"] }
 
-digest = "0.10.7"
-md5 = { package = "md-5", version = "0.10.5", features = ["oid"] }
-sha1 = { version = "0.10.5", features = ["oid"] }
-sha2 = { version = "0.10.7", features = ["oid"] }
-sha3 = { version = "0.10.8", features = ["oid"] }
+digest = "0.10"
+md5 = { package = "md-5", version = "0.10", features = ["oid"] }
+sha1 = { version = "0.10", features = ["oid"] }
+sha2 = { version = "0.10", features = ["oid"] }
+sha3 = { version = "0.10", features = ["oid"] }
 
 aes-gcm = { version = "0.10", optional = true }
-aes = { version = "0.8.3", optional = true }
-aes-kw = { version = "0.2.1", optional = true, features = ["std"] }
-argon2 = { version = "0.5.3", optional = true }
-ctr = { version = "0.9.2", optional = true }
-cbc = { version = "0.1.2", optional = true, features = ["alloc"] }
-bcrypt-pbkdf = { version = "0.10.0", optional = true }
+aes = { version = "0.8", optional = true }
+aes-kw = { version = "0.2", optional = true, features = ["std"] }
+argon2 = { version = "0.5", optional = true }
+ctr = { version = "0.9", optional = true }
+cbc = { version = "0.1", optional = true, features = ["alloc"] }
+bcrypt-pbkdf = { version = "0.10", optional = true }
 des = { version = "0.8", optional = true }
 rc2 = { version = "0.8", optional = true }
 pbkdf2 = { version = "0.12", optional = true }
 hmac = { version = "0.12", optional = true }
 
 [dev-dependencies]
-pretty_assertions = "1.4.0"
-cfg-if = "1.0.0"
-ring = "0.16.20"
-rstest = "0.18.2"
+pretty_assertions = "1.4"
+cfg-if = "1.0"
+ring = "0.17"
+rstest = "0.21"
 expect-test = "1"
-tempfile = "3.8"
+tempfile = "3.10"
 rand_chacha = "0.3"
 
 [features]

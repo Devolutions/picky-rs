@@ -1290,11 +1290,12 @@ impl<'a> AuthenticodeSignatureBuilder<'a> {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
     use crate::pem::parse_pem;
     use crate::x509::certificate::{CertType, CertificateBuilder};
     use crate::x509::{Csr, KeyIdGenMethod};
+    #[cfg(feature = "ctl")]
     use base64::{engine::general_purpose, Engine as _};
     use picky_asn1_x509::Extension;
 
