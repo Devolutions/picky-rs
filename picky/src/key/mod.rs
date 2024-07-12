@@ -1221,8 +1221,9 @@ mod tests {
         // Make sure we're generating pkcs8 understood by the `ring` crate
         let key = PrivateKey::generate_ec(curve).unwrap();
         let pkcs8 = key.to_pkcs8().unwrap();
+        let rng = ring::rand::SystemRandom::new();
 
-        ring::signature::EcdsaKeyPair::from_pkcs8(signing_alg, &pkcs8).unwrap();
+        ring::signature::EcdsaKeyPair::from_pkcs8(signing_alg, &pkcs8, &rng).unwrap();
     }
 
     // Read from x25519 keys is not supported in `ring`, because it is mainly used for key

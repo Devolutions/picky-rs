@@ -16,20 +16,20 @@ include = ["src/**/*", "README.md", "CHANGELOG.md", "LICENSE-*"]
 picky-asn1 = { version = "0.8", path = "../picky-asn1" }
 picky-asn1-der = { version = "0.4", path = "../picky-asn1-der" }
 picky-asn1-x509 = { version = "0.12", path = "../picky-asn1-x509" }
-serde = { version = "1.0.186", features = ["derive"] }
-byteorder = "1.4.3"
-thiserror = "1.0.47"
+serde = { version = "1.0", features = ["derive"] }
+byteorder = "1.5"
+thiserror = "1.0"
 
 pbkdf2 = { version = "0.12", features = ["sha1"] }
-hmac = "0.12.1"
-sha1 = "0.10.5"
+hmac = "0.12"
+sha1 = "0.10"
 
-crypto = "0.5.1"
-aes = "0.8.3"
-des = "0.8.1"
-cbc = "0.1.2"
-rand = "0.8.5"
+crypto = "0.5"
+aes = "0.8"
+des = "0.8"
+cbc = "0.1"
+rand = "0.8"
 
-uuid = { version = "1.4.1", default-features = false, features = ["serde"] }
-oid = "0.2.1"
-num-bigint-dig = { version = "0.8.4", features = ["rand"] }
+uuid = { version = "1.10", default-features = false, features = ["serde"] }
+oid = "0.2"
+num-bigint-dig = { version = "0.8", features = ["rand"] }

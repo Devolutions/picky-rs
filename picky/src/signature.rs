@@ -598,7 +598,10 @@ csaQwO9jFvbQFIpCvcMRjaunLfhIWiYDdg==
             _ => panic!("no this condition"),
         };
 
-        let keypair = ring::signature::EcdsaKeyPair::from_private_key_and_public_key(algorithm, &privk, &pubk).unwrap();
+        let rng = ring::rand::SystemRandom::new();
+
+        let keypair =
+            ring::signature::EcdsaKeyPair::from_private_key_and_public_key(algorithm, &privk, &pubk, &rng).unwrap();
 
         let rng = ring::rand::SystemRandom::new();
         let signature = keypair.sign(&rng, msg).unwrap();

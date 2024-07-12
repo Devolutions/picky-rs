@@ -12,7 +12,7 @@ test = false
 doctest = false
 
 [target.'cfg(windows)'.build-dependencies]
-embed-resource = "2.2.0"
+embed-resource = "2.4"
 
 [dependencies]
 picky = { path = "../picky/", default-features = false, features = ["ssh", "x509", "time_conversion", "jose", "pkcs12", "pkcs7", "http_timestamp", "putty"] }
@@ -26,9 +26,9 @@ argon2 = "0.5"
 diplomat = { git = "https://github.com/CBenoit/diplomat.git", rev = "f4d93d57e93025c57e75e9711d2418faa9311a42" }
 diplomat-runtime = { git = "https://github.com/CBenoit/diplomat.git", rev = "f4d93d57e93025c57e75e9711d2418faa9311a42" }
 
-time = "0.3.27"
-hex = "0.4.3"
-serde_json = "1.0.105"
+time = "0.3"
+hex = "0.4"
+serde_json = "1.0"
 
 # WASM support
 [target.'cfg(target_arch = "wasm32")'.dependencies]

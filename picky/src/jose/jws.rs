@@ -626,7 +626,10 @@ mod tests {
     fn decode_invalid_base64_err() {
         let public_key = get_private_key_1().to_public_key().unwrap();
         let err = Jws::decode("aieoè~†.tésp.à", &public_key).err().unwrap();
-        assert_eq!(err.to_string(), "couldn\'t decode base64: Invalid byte 195, offset 4.");
+        assert_eq!(
+            err.to_string(),
+            "couldn\'t decode base64: Invalid symbol 195, offset 4."
+        );
     }
 
     #[test]
