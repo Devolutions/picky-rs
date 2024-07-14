@@ -92,7 +92,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - (Breaking) `PrivateKey` now have private struct representation instead of open enum
 - (Breaking) Now all `PrivateKey::to_public` and all related APIs for private keys return `Result`
   instead of plain `PublicKey`. This change was required because added support for EC/ED keys is not
-  infallible in regards to public key extraction (public key could be missing from the file and could
+  infallible in regard to public key extraction (public key could be missing from the file and could
   not be generated because of an unsupported algorithm/curve)
 
 ### Removed
