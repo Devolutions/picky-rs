@@ -33,6 +33,14 @@ impl Pkcs12MacAlgorithmHmac {
         self.iterations = Some(iterations);
         self
     }
+
+    pub fn hash_algorithm(&self) -> Pkcs12HashAlgorithm {
+        self.hash_algorithm
+    }
+
+    pub fn iterations(&self) -> Option<u32> {
+        self.iterations
+    }
 }
 
 /// Parsed MAC algorithm parameters

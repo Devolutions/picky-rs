@@ -89,6 +89,26 @@ public partial class Pfx: IDisposable
         }
     }
 
+    /// <returns>
+    /// A <c>Pkcs12MacAlgorithmHmac</c> allocated on Rust side.
+    /// </returns>
+    public Pkcs12MacAlgorithmHmac? HmacAlgorithm()
+    {
+        unsafe
+        {
+            if (_inner == null)
+            {
+                throw new ObjectDisposedException("Pfx");
+            }
+            Raw.Pkcs12MacAlgorithmHmac* retVal = Raw.Pfx.HmacAlgorithm(_inner);
+            if (retVal == null)
+            {
+                return null;
+            }
+            return new Pkcs12MacAlgorithmHmac(retVal);
+        }
+    }
+
     /// <summary>
     /// Saves this PKCS12 archive to the filesystem.
     /// </summary>

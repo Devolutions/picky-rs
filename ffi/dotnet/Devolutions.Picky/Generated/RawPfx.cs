@@ -32,6 +32,9 @@ public partial struct Pfx
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pfx_from_der", ExactSpelling = true)]
     public static unsafe extern IntPtr FromDer(byte* der, nuint derSz, Pkcs12CryptoContext* cryptoContext, Pkcs12ParsingParams* parsingParams);
 
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pfx_hmac_algorithm", ExactSpelling = true)]
+    public static unsafe extern Pkcs12MacAlgorithmHmac* HmacAlgorithm(Pfx* self);
+
     /// <summary>
     /// Saves this PKCS12 archive to the filesystem.
     /// </summary>

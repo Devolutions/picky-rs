@@ -59,6 +59,32 @@ pub mod ffi {
     }
 
     #[diplomat::opaque]
+    pub struct Pkcs12MacAlgorithmHmac(pub(crate) pkcs12::Pkcs12MacAlgorithmHmac);
+
+    impl Pkcs12MacAlgorithmHmac {
+        pub fn new_hmac(hash_algorithm: Pkcs12HashAlgorithm) -> Box<Pkcs12MacAlgorithmHmac> {
+            Box::new(Self(pkcs12::Pkcs12MacAlgorithmHmac::new(hash_algorithm.into())))
+        }
+
+        pub fn new_hmac_with_iterations(
+            hash_algorithm: Pkcs12HashAlgorithm,
+            iterations: u32,
+        ) -> Box<Pkcs12MacAlgorithmHmac> {
+            Box::new(Self(
+                pkcs12::Pkcs12MacAlgorithmHmac::new(hash_algorithm.into()).with_iterations(iterations),
+            ))
+        }
+
+        pub fn hash_algorithm(&self) -> Pkcs12HashAlgorithm {
+            self.0.hash_algorithm().into()
+        }
+
+        pub fn iterations(&self) -> Option<Box<u32>> {
+            self.0.iterations().map(Box::new)
+        }
+    }
+
+    #[diplomat::opaque]
     pub struct Pkcs12ParsingParams(pub(crate) pkcs12::Pkcs12ParsingParams);
 
     impl Pkcs12ParsingParams {
@@ -286,6 +312,8 @@ pub mod ffi {
         safe_bags_acc: Vec<pkcs12::SafeBag>,
         safe_contents: Vec<pkcs12::SafeContents>,
         crypto_context: Arc<Mutex<pkcs12::Pkcs12CryptoContext>>,
+        hmac_algorithm: Option<pkcs12::Pkcs12MacAlgorithmHmac>,
+        detected_old_encryption: bool,
     }
 
     impl PfxBuilder {
@@ -294,6 +322,8 @@ pub mod ffi {
                 safe_bags_acc: Vec::new(),
                 safe_contents: Vec::new(),
                 crypto_context: crypto_context.0.clone(),
+                hmac_algorithm: None,
+                detected_old_encryption: false,
             })
         }
 
@@ -317,11 +347,19 @@ pub mod ffi {
 
             let encryption = encryption.0.to_picky_encryption(&mut crypto_context);
 
+            if let pkcs12::Pkcs12EncryptionKind::Pbes1(_) = encryption.kind() {
+                self.detected_old_encryption = true
+            }
+
             let safe_contents = pkcs12::SafeContents::new_encrypted(safe_bags, encryption, &crypto_context)?;
 
             self.safe_contents.push(safe_contents);
 
             Ok(())
+        }
+
+        pub fn set_hmac_algorithm(&mut self, mac_algorithm: &Pkcs12MacAlgorithmHmac) {
+            self.hmac_algorithm = Some(mac_algorithm.0.clone());
         }
 
         pub fn build(&mut self) -> Result<Box<Pfx>, Box<PickyError>> {
@@ -334,7 +372,14 @@ pub mod ffi {
                 safe_contents.push(pkcs12::SafeContents::new(safe_bags));
             }
 
-            let mac = pkcs12::Pkcs12MacAlgorithmHmac::new(pkcs12::Pkcs12HashAlgorithm::Sha256);
+            let mac = if let Some(mac_algorithm) = &self.hmac_algorithm {
+                mac_algorithm.clone()
+            } else if self.detected_old_encryption {
+                // Automaically use SHA1 for HMAC if old encryption was detected
+                pkcs12::Pkcs12MacAlgorithmHmac::new(pkcs12::Pkcs12HashAlgorithm::Sha1)
+            } else {
+                pkcs12::Pkcs12MacAlgorithmHmac::new(pkcs12::Pkcs12HashAlgorithm::Sha256)
+            };
 
             let pfx = pkcs12::Pfx::new_with_hmac(safe_contents, mac, &mut crypto_context)?;
 
@@ -360,6 +405,19 @@ pub mod ffi {
             let crypto_context = crypto_context.0.lock().unwrap();
             let pfx = pkcs12::Pfx::from_der(der, &crypto_context, &parsing_params.0)?;
             Ok(Box::new(Self(pfx)))
+        }
+
+        pub fn hmac_algorithm(&self) -> Option<Box<Pkcs12MacAlgorithmHmac>> {
+            let mac_data = if let Some(mac_data) = self.0.mac_data() {
+                mac_data
+            } else {
+                return None;
+            };
+
+            match mac_data.algorithm() {
+                pkcs12::Pkcs12MacAlgorithm::Hmac(mac) => Some(Box::new(Pkcs12MacAlgorithmHmac(mac.clone()))),
+                _ => None,
+            }
         }
 
         /// Saves this PKCS12 archive to the filesystem.
@@ -510,6 +568,18 @@ impl From<ffi::Pkcs12HashAlgorithm> for picky::pkcs12::Pkcs12HashAlgorithm {
             ffi::Pkcs12HashAlgorithm::Sha256 => Self::Sha256,
             ffi::Pkcs12HashAlgorithm::Sha384 => Self::Sha384,
             ffi::Pkcs12HashAlgorithm::Sha512 => Self::Sha512,
+        }
+    }
+}
+
+impl From<picky::pkcs12::Pkcs12HashAlgorithm> for ffi::Pkcs12HashAlgorithm {
+    fn from(value: picky::pkcs12::Pkcs12HashAlgorithm) -> Self {
+        match value {
+            picky::pkcs12::Pkcs12HashAlgorithm::Sha1 => Self::Sha1,
+            picky::pkcs12::Pkcs12HashAlgorithm::Sha224 => Self::Sha224,
+            picky::pkcs12::Pkcs12HashAlgorithm::Sha256 => Self::Sha256,
+            picky::pkcs12::Pkcs12HashAlgorithm::Sha384 => Self::Sha384,
+            picky::pkcs12::Pkcs12HashAlgorithm::Sha512 => Self::Sha512,
         }
     }
 }
