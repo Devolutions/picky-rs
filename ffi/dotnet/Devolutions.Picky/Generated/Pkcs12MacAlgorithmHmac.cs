@@ -73,23 +73,6 @@ public partial class Pkcs12MacAlgorithmHmac: IDisposable
         }
     }
 
-    public uint? Iterations()
-    {
-        unsafe
-        {
-            if (_inner == null)
-            {
-                throw new ObjectDisposedException("Pkcs12MacAlgorithmHmac");
-            }
-            uint* retVal = Raw.Pkcs12MacAlgorithmHmac.Iterations(_inner);
-            if (retVal == null)
-            {
-                return null;
-            }
-            return retVal;
-        }
-    }
-
     /// <summary>
     /// Returns the underlying raw handle.
     /// </summary>
