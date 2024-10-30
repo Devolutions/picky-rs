@@ -18,6 +18,14 @@ public partial class PfxBuilder: IDisposable
 {
     private unsafe Raw.PfxBuilder* _inner;
 
+    public Pkcs12MacAlgorithmHmac HmacAlgorithm
+    {
+        set
+        {
+            SetHmacAlgorithm(value);
+        }
+    }
+
     /// <summary>
     /// Creates a managed <c>PfxBuilder</c> from a raw handle.
     /// </summary>
@@ -102,6 +110,24 @@ public partial class PfxBuilder: IDisposable
             {
                 throw new PickyException(new PickyError(result.Err));
             }
+        }
+    }
+
+    public void SetHmacAlgorithm(Pkcs12MacAlgorithmHmac macAlgorithm)
+    {
+        unsafe
+        {
+            if (_inner == null)
+            {
+                throw new ObjectDisposedException("PfxBuilder");
+            }
+            Raw.Pkcs12MacAlgorithmHmac* macAlgorithmRaw;
+            macAlgorithmRaw = macAlgorithm.AsFFI();
+            if (macAlgorithmRaw == null)
+            {
+                throw new ObjectDisposedException("Pkcs12MacAlgorithmHmac");
+            }
+            Raw.PfxBuilder.SetHmacAlgorithm(_inner, macAlgorithmRaw);
         }
     }
 
