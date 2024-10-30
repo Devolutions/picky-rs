@@ -22,6 +22,7 @@ use crate::{oids, DigestInfo};
 ///
 ///  ContentType ::= OBJECT IDENTIFIER
 /// ```
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ContentValue {
     SpcIndirectDataContent(SpcIndirectDataContent),

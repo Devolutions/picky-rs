@@ -408,11 +408,7 @@ pub mod ffi {
         }
 
         pub fn hmac_algorithm(&self) -> Option<Box<Pkcs12MacAlgorithmHmac>> {
-            let mac_data = if let Some(mac_data) = self.0.mac_data() {
-                mac_data
-            } else {
-                return None;
-            };
+            let mac_data = self.0.mac_data()?;
 
             match mac_data.algorithm() {
                 pkcs12::Pkcs12MacAlgorithm::Hmac(mac) => Some(Box::new(Pkcs12MacAlgorithmHmac(mac.clone()))),
