@@ -78,10 +78,6 @@ pub mod ffi {
         pub fn hash_algorithm(&self) -> Pkcs12HashAlgorithm {
             self.0.hash_algorithm().into()
         }
-
-        pub fn iterations(&self) -> Option<Box<u32>> {
-            self.0.iterations().map(Box::new)
-        }
     }
 
     #[diplomat::opaque]

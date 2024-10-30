@@ -29,9 +29,6 @@ public partial struct Pkcs12MacAlgorithmHmac
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pkcs12MacAlgorithmHmac_hash_algorithm", ExactSpelling = true)]
     public static unsafe extern Pkcs12HashAlgorithm HashAlgorithm(Pkcs12MacAlgorithmHmac* self);
 
-    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pkcs12MacAlgorithmHmac_iterations", ExactSpelling = true)]
-    public static unsafe extern uint* Iterations(Pkcs12MacAlgorithmHmac* self);
-
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pkcs12MacAlgorithmHmac_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(Pkcs12MacAlgorithmHmac* self);
 }
