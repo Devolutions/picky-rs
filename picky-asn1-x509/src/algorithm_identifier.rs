@@ -1,10 +1,9 @@
 use crate::oids;
 use oid::ObjectIdentifier;
 use picky_asn1::tag::{Tag, TagPeeker};
-use picky_asn1::wrapper::ExplicitContextTag0;
-use picky_asn1::wrapper::ExplicitContextTag1;
-use picky_asn1::wrapper::ExplicitContextTag2;
-use picky_asn1::wrapper::{IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1};
+use picky_asn1::wrapper::{
+    ExplicitContextTag0, ExplicitContextTag1, ExplicitContextTag2, IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1,
+};
 use picky_asn1_der::Asn1RawDer;
 use serde::{de, ser, Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -243,6 +242,13 @@ impl AlgorithmIdentifier {
         }
     }
 
+    pub fn new_aes256_empty(mode: AesMode) -> Self {
+        Self {
+            algorithm: mode.to_256bit_oid(),
+            parameters: AlgorithmIdentifierParameters::None,
+        }
+    }
+
     pub fn new_sha(variant: ShaVariant) -> Self {
         Self {
             algorithm: variant.into(),
@@ -341,9 +347,13 @@ impl<'de> de::Deserialize<'de> for AlgorithmIdentifier {
                         "elliptic curves parameters"
                     )),
                     // AES
-                    x if x.starts_with("2.16.840.1.101.3.4.1.") => AlgorithmIdentifierParameters::Aes(
-                        seq_next_element!(seq, AlgorithmIdentifier, "aes algorithm identifier"),
-                    ),
+                    x if x.starts_with("2.16.840.1.101.3.4.1.") => {
+                        if let Some(aes_parameters) = seq.next_element()? {
+                            AlgorithmIdentifierParameters::Aes(aes_parameters)
+                        } else {
+                            AlgorithmIdentifierParameters::None
+                        }
+                    }
                     // SHA
                     x if x.starts_with("2.16.840.1.101.3.4.2.") || x == oids::SHA1 => {
                         seq_next_element!(seq, AlgorithmIdentifier, "sha algorithm identifier");
@@ -744,8 +754,8 @@ pub enum AesParameters {
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct AesAuthEncParams {
-    nonce: OctetStringAsn1,
-    icv_len: IntegerAsn1,
+    pub nonce: OctetStringAsn1,
+    pub icv_len: IntegerAsn1,
 }
 
 impl AesMode {
@@ -1030,7 +1040,8 @@ impl<'de> de::Deserialize<'de> for RawAlgorithmIdentifier {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use base64::{engine::general_purpose, Engine as _};
+    use base64::engine::general_purpose;
+    use base64::Engine as _;
 
     #[test]
     fn aes_null_params() {
