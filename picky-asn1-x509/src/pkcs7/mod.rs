@@ -3,6 +3,7 @@ pub mod content_info;
 pub mod crls;
 #[cfg(feature = "ctl")]
 pub mod ctl;
+pub mod enveloped_data;
 pub mod signed_data;
 pub mod signer_info;
 pub mod timestamp;
