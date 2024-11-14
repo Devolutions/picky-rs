@@ -754,8 +754,18 @@ pub enum AesParameters {
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct AesAuthEncParams {
-    nonce: OctetStringAsn1,
-    icv_len: IntegerAsn1,
+    pub(crate) nonce: OctetStringAsn1,
+    pub(crate) icv_len: IntegerAsn1,
+}
+
+impl AesAuthEncParams {
+    pub fn nonce(&self) -> &[u8] {
+        &self.nonce.0
+    }
+
+    pub fn icv_len(&self) -> &[u8] {
+        &self.icv_len.0
+    }
 }
 
 impl AesMode {
