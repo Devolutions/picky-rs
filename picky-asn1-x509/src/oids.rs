@@ -266,4 +266,11 @@ define_oid! {
     ATTRIBUTE_PKCS12_LOCAL_KEY_ID => attribute_pkcs12_local_key_id => "1.2.840.113549.1.9.21",
 
     USER_PRINCIPAL_NAME => user_principal_name => "1.3.6.1.4.1.311.20.2.3",
+
+    // Protection descriptor and its types
+    PROTECTION_DESCRIPTOR_TYPE => protection_descriptor_type => "1.3.6.1.4.1.311.74.1",
+    SID_PROTECTION_DESCRIPTOR => sid_protection_descriptor => "1.3.6.1.4.1.311.74.1.1",
+    KEY_FILE_PROTECTION_DESCRIPTOR => key_file_protection_descriptor => "1.3.6.1.4.1.311.74.1.2",
+    SSDL_PROTECTION_DESCRIPTOR => ssdl_protection_descriptor => "1.3.6.1.4.1.311.74.1.5",
+    LOCAL_PROTECTION_DESCRIPTOR => local_protection_descriptor => "1.3.6.1.4.1.311.74.1.8",
 }
