@@ -1,6 +1,5 @@
 use core::fmt;
 
-use picky_asn1::restricted_string::Utf8String;
 use picky_asn1::tag::{TagClass, TagPeeker};
 use picky_asn1::wrapper::{
     Asn1SequenceOf, Asn1SetOf, ExplicitContextTag2, GeneralizedTimeAsn1, ImplicitContextTag0, ImplicitContextTag1,
@@ -294,6 +293,7 @@ pub struct ProtectionDescriptor {
 
 #[cfg(test)]
 mod tests {
+    use picky_asn1::restricted_string::Utf8String;
     use picky_asn1::wrapper::IntegerAsn1;
 
     use super::*;
