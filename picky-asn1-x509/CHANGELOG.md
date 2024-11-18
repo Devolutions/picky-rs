@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.14.0] 2024-11-19
+
+### Added
+
+- `EnvelopedData` and related structures
+- API to query and set MAC algorithm for PFX
+- Protection descriptors OIDs
+
+### Fixed
+
+- Better algorithm identifier parsing
+
 ## [0.13.0] 2024-07-12
 
 ### Changed
