@@ -1,6 +1,6 @@
 [package]
 name = "picky"
-version = "7.0.0-rc.9"
+version = "7.0.0-rc.10"
 authors = [
     "Benoît CORTIER <bcortier@devolutions.net>",
     "Jonathan Trepanier <jtrepanier@devolutions.net>",
@@ -23,7 +23,7 @@ include = ["src/**/*", "README.md", "CHANGELOG.md", "LICENSE-*"]
 [dependencies]
 picky-asn1 = { version = "0.9", path = "../picky-asn1", features = ["zeroize"] }
 picky-asn1-der = { version = "0.5", path = "../picky-asn1-der" }
-picky-asn1-x509 = { version = "0.13", path = "../picky-asn1-x509", features = ["legacy", "zeroize"] }
+picky-asn1-x509 = { version = "0.14", path = "../picky-asn1-x509", features = ["legacy", "zeroize"] }
 serde = { version = "1", features = ["derive"] }
 base64 = "0.22"
 thiserror = "1"

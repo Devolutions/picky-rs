@@ -667,7 +667,7 @@ version = "0.0.0"
 dependencies = [
  "console_error_panic_hook",
  "getrandom",
- "picky 7.0.0-rc.9",
+ "picky 7.0.0-rc.10",
  "serde_json",
  "wasm-bindgen",
  "wasm-bindgen-test",
@@ -675,7 +675,7 @@ dependencies = [
 
 [[package]]
 name = "picky"
-version = "7.0.0-rc.9"
+version = "7.0.0-rc.10"
 dependencies = [
  "aes",
  "aes-gcm",
@@ -733,7 +733,7 @@ dependencies = [
 
 [[package]]
 name = "picky-asn1-x509"
-version = "0.13.0"
+version = "0.14.0"
 dependencies = [
  "base64",
  "num-bigint-dig",
