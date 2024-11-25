@@ -1362,16 +1362,15 @@ mod tests {
     use super::*;
     use crate::key::PrivateKey;
     use crate::pem::Pem;
-    use crate::test_files;
     use rstest::rstest;
 
     fn get_private_key_1() -> PrivateKey {
-        let pk_pem = crate::test_files::RSA_2048_PK_1.parse::<Pem>().unwrap();
+        let pk_pem = picky_test_data::RSA_2048_PK_1.parse::<Pem>().unwrap();
         PrivateKey::from_pem(&pk_pem).expect("private_key 1")
     }
 
     fn get_private_key_2() -> PrivateKey {
-        let pk_pem = crate::test_files::RSA_2048_PK_7.parse::<Pem>().unwrap();
+        let pk_pem = picky_test_data::RSA_2048_PK_7.parse::<Pem>().unwrap();
         PrivateKey::from_pem(&pk_pem).expect("private_key 7")
     }
 
@@ -1509,16 +1508,16 @@ mod tests {
 
     #[rstest]
     // Different asymmetrical keys and different symmetrical key sizes
-    #[case(test_files::EC_NIST256_PK_1, JweAlg::EcdhEs, JweEnc::Aes256Gcm)]
-    #[case(test_files::EC_NIST384_PK_1, JweAlg::EcdhEs, JweEnc::Aes192Gcm)]
-    #[case(test_files::X25519_PEM_PK_1, JweAlg::EcdhEs, JweEnc::Aes128Gcm)]
+    #[case(picky_test_data::EC_NIST256_PK_1, JweAlg::EcdhEs, JweEnc::Aes256Gcm)]
+    #[case(picky_test_data::EC_NIST384_PK_1, JweAlg::EcdhEs, JweEnc::Aes192Gcm)]
+    #[case(picky_test_data::X25519_PEM_PK_1, JweAlg::EcdhEs, JweEnc::Aes128Gcm)]
     // With key wrapping
-    #[case(test_files::X25519_PEM_PK_1, JweAlg::EcdhEsAesKeyWrap128, JweEnc::Aes256Gcm)]
-    #[case(test_files::EC_NIST256_PK_1, JweAlg::EcdhEsAesKeyWrap128, JweEnc::Aes128Gcm)]
-    #[case(test_files::EC_NIST384_PK_1, JweAlg::EcdhEsAesKeyWrap192, JweEnc::Aes256Gcm)]
-    #[case(test_files::X25519_PEM_PK_1, JweAlg::EcdhEsAesKeyWrap192, JweEnc::Aes128Gcm)]
-    #[case(test_files::EC_NIST256_PK_1, JweAlg::EcdhEsAesKeyWrap256, JweEnc::Aes256Gcm)]
-    #[case(test_files::X25519_PEM_PK_1, JweAlg::EcdhEsAesKeyWrap256, JweEnc::Aes128Gcm)]
+    #[case(picky_test_data::X25519_PEM_PK_1, JweAlg::EcdhEsAesKeyWrap128, JweEnc::Aes256Gcm)]
+    #[case(picky_test_data::EC_NIST256_PK_1, JweAlg::EcdhEsAesKeyWrap128, JweEnc::Aes128Gcm)]
+    #[case(picky_test_data::EC_NIST384_PK_1, JweAlg::EcdhEsAesKeyWrap192, JweEnc::Aes256Gcm)]
+    #[case(picky_test_data::X25519_PEM_PK_1, JweAlg::EcdhEsAesKeyWrap192, JweEnc::Aes128Gcm)]
+    #[case(picky_test_data::EC_NIST256_PK_1, JweAlg::EcdhEsAesKeyWrap256, JweEnc::Aes256Gcm)]
+    #[case(picky_test_data::X25519_PEM_PK_1, JweAlg::EcdhEsAesKeyWrap256, JweEnc::Aes128Gcm)]
     fn jwe_ecdh_es_roundtrip(#[case] key_pem: &str, #[case] alg: JweAlg, #[case] enc: JweEnc) {
         let private = PrivateKey::from_pem_str(key_pem).unwrap();
         let public = private.to_public_key().unwrap();
@@ -1535,8 +1534,11 @@ mod tests {
     }
 
     #[rstest]
-    #[case(test_files::JOSE_JWE_GCM256_EC_P256_ECDH, test_files::EC_NIST256_PK_1)]
-    #[case(test_files::JOSE_JWE_GCM128_EC_P384_ECDH_KW192, test_files::EC_NIST384_PK_1)]
+    #[case(picky_test_data::JOSE_JWE_GCM256_EC_P256_ECDH, picky_test_data::EC_NIST256_PK_1)]
+    #[case(
+        picky_test_data::JOSE_JWE_GCM128_EC_P384_ECDH_KW192,
+        picky_test_data::EC_NIST384_PK_1
+    )]
     fn picky_understands_jwcrypto(#[case] token: &str, #[case] key_pem: &str) {
         // Tokens were generated via `jwcrypto` library. To generate tokens use the following
         // code snippet:

@@ -1379,6 +1379,7 @@ dependencies = [
  "picky-asn1",
  "picky-asn1-der",
  "picky-asn1-x509",
+ "picky-test-data",
  "pretty_assertions",
  "rand",
  "rand_chacha",
@@ -1438,6 +1439,7 @@ dependencies = [
  "oid",
  "picky-asn1",
  "picky-asn1-der",
+ "picky-test-data",
  "pretty_assertions",
  "serde",
  "widestring",
@@ -1484,6 +1486,10 @@ dependencies = [
  "thiserror",
  "uuid",
 ]
+
+[[package]]
+name = "picky-test-data"
+version = "0.1.0"
 
 [[package]]
 name = "pin-project-lite"

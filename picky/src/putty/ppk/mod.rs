@@ -192,7 +192,7 @@ mod tests {
     use super::*;
     use rstest::rstest;
 
-    use crate::test_files::{
+    use picky_test_data::{
         PUTTY_KEY_ED25519, PUTTY_KEY_ED25519_ENCRYPTED, PUTTY_KEY_ED25519_V2, PUTTY_KEY_ED25519_V2_ENCRYPTED,
         SSH_PRIVATE_KEY_EC_P256, SSH_PRIVATE_KEY_EC_P384, SSH_PRIVATE_KEY_EC_P521, SSH_PRIVATE_KEY_ED25519,
         SSH_PRIVATE_KEY_RSA,

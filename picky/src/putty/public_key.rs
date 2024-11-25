@@ -190,7 +190,7 @@ impl PuttyBasePublicKey {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_files::{
+    use picky_test_data::{
         PUTTY_KEY_ED25519_PUBLIC, PUTTY_KEY_RSA_PUBLIC_EMPTY_COMMENT, PUTTY_KEY_RSA_PUBLIC_ESCAPED_COMMENT,
         SSH_PUBLIC_KEY_EC_P256, SSH_PUBLIC_KEY_EC_P384, SSH_PUBLIC_KEY_EC_P521, SSH_PUBLIC_KEY_ED25519,
         SSH_PUBLIC_KEY_RSA,

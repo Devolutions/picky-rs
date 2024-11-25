@@ -414,35 +414,35 @@ mod tests {
 
     #[test]
     fn pfx_certmgr_aes256() {
-        let encoded = include_bytes!("../../../test_assets/pkcs12/certmgr_aes256.pfx");
+        let encoded = picky_test_data::CERTMGR_AES256;
         let crypto_context = Pkcs12CryptoContext::new_with_password("test");
         let _decoded = Pfx::from_der(encoded, &crypto_context, &Pkcs12ParsingParams::default()).unwrap();
     }
 
     #[test]
     fn pfx_certmgr_3des() {
-        let encoded = include_bytes!("../../../test_assets/pkcs12/certmgr_3des.pfx");
+        let encoded = picky_test_data::CERTMGR_3DES;
         let crypto_context = Pkcs12CryptoContext::new_with_password("test");
         let _decoded = Pfx::from_der(encoded, &crypto_context, &Pkcs12ParsingParams::default()).unwrap();
     }
 
     #[test]
     fn pfx_certmgr_rc2() {
-        let encoded = include_bytes!("../../../test_assets/pkcs12/leaf_password_is_abc.pfx");
+        let encoded = picky_test_data::LEAF_PASSWORD_IS_ABC;
         let crypto_context = Pkcs12CryptoContext::new_with_password("abc");
         let _decoded = Pfx::from_der(encoded, &crypto_context, &Pkcs12ParsingParams::default()).unwrap();
     }
 
     #[test]
     fn pfx_certmgr_rc2_empty_pass() {
-        let encoded = include_bytes!("../../../test_assets/pkcs12/leaf_empty_password.pfx");
+        let encoded = picky_test_data::LEAF_EMPTY_PASSWORD;
         let crypto_context = Pkcs12CryptoContext::new_without_password();
         let _decoded = Pfx::from_der(encoded, &crypto_context, &Pkcs12ParsingParams::default()).unwrap();
     }
 
     #[test]
     fn pfx_openssl_aes_empty_pass() {
-        let encoded = include_bytes!("../../../test_assets/pkcs12/openssl_nocrypt.pfx");
+        let encoded = picky_test_data::OPENSSL_NOCRYPT;
         let crypto_context = Pkcs12CryptoContext::new_without_password();
         let _decoded = Pfx::from_der(encoded, &crypto_context, &Pkcs12ParsingParams::default()).unwrap();
     }
@@ -453,10 +453,9 @@ mod tests {
     }
 
     fn build_cert_bags() -> [SafeBag; 3] {
-        let leaf = crate::x509::Cert::from_der(include_bytes!("../../../test_assets/pkcs12/asset_leaf.crt")).unwrap();
-        let intermediate =
-            crate::x509::Cert::from_der(include_bytes!("../../../test_assets/pkcs12/asset_intermediate.crt")).unwrap();
-        let root = crate::x509::Cert::from_der(include_bytes!("../../../test_assets/pkcs12/asset_root.crt")).unwrap();
+        let leaf = crate::x509::Cert::from_der(picky_test_data::ASSERT_LEAF).unwrap();
+        let intermediate = crate::x509::Cert::from_der(picky_test_data::ASSERT_INTERMEDIATE).unwrap();
+        let root = crate::x509::Cert::from_der(picky_test_data::ASSERT_ROOT).unwrap();
 
         let leaf_cert_bag = SafeBag::new_certificate(leaf, build_leaf_attributes()).unwrap();
 
@@ -540,7 +539,7 @@ mod tests {
     }
 
     pub fn leaf_private_key_rsa() -> PrivateKey {
-        let pem = crate::test_files::RSA_2048_PK_3.parse::<Pem>().unwrap();
+        let pem = picky_test_data::RSA_2048_PK_3.parse::<Pem>().unwrap();
         PrivateKey::from_pkcs8(pem.data()).unwrap()
     }
 

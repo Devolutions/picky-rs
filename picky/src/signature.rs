@@ -485,7 +485,6 @@ impl SignatureAlgorithm {
 #[cfg(test)]
 mod ec_tests {
     use super::*;
-    use crate::test_files;
     use rstest::*;
 
     const EC_PRIVATE_KEY_NIST256_PEM: &str = r#"-----BEGIN EC PRIVATE KEY-----
@@ -543,9 +542,9 @@ csaQwO9jFvbQFIpCvcMRjaunLfhIWiYDdg==
     }
 
     #[rstest]
-    #[case(test_files::EC_NIST256_PK_1, HashAlgorithm::SHA2_256, true)]
-    #[case(test_files::EC_NIST384_PK_1, HashAlgorithm::SHA2_384, true)]
-    #[case(test_files::EC_NIST521_PK_1, HashAlgorithm::SHA2_512, true)]
+    #[case(picky_test_data::EC_NIST256_PK_1, HashAlgorithm::SHA2_256, true)]
+    #[case(picky_test_data::EC_NIST384_PK_1, HashAlgorithm::SHA2_384, true)]
+    #[case(picky_test_data::EC_NIST521_PK_1, HashAlgorithm::SHA2_512, true)]
     fn sign_and_verify(#[case] key_pem: &str, #[case] hash: HashAlgorithm, #[case] sign_successful: bool) {
         let private_key = PrivateKey::from_pem_str(key_pem).unwrap();
 

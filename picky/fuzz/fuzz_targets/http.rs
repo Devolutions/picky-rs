@@ -12,9 +12,7 @@ const HTTP_SIGNATURE_EXAMPLE: &str = "Signature keyId=\"my-rsa-key\", created=\"
      ky59Rsg/CpB8gP7szjK/wrCclA==\"";
 
 fn private_key_1() -> PrivateKey {
-    let pem = include_str!("../../../test_assets/private_keys/rsa-2048-pk_1.key")
-        .parse::<Pem>()
-        .expect("pem 1");
+    let pem = picky_test_data::RSA_2048_PK_1.parse::<Pem>().expect("pem 1");
     PrivateKey::from_pem(&pem).expect("private key 1")
 }
 

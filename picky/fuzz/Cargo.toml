@@ -11,6 +11,7 @@ cargo-fuzz = true
 
 [dependencies]
 picky = { path = "../" }
+picky-test-data = { path = "../../picky-test-data", version = "0.1" }
 libfuzzer-sys = { git = "https://github.com/rust-fuzz/libfuzzer-sys.git" }
 
 # Prevent this from interfering with workspaces

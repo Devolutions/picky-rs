@@ -301,7 +301,6 @@ impl<'a> TryFrom<&'a EcdsaKeypair> for EcdsaPublicKey<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_files;
     use rstest::*;
 
     const RSA_PUBLIC_KEY_PEM: &str = "-----BEGIN RSA PUBLIC KEY-----\n\
@@ -314,18 +313,18 @@ mod tests {
                                       -----END RSA PUBLIC KEY-----";
 
     #[rstest]
-    #[case(test_files::EC_NIST256_DER_PK_1)]
-    #[case(test_files::EC_NIST384_DER_PK_1)]
-    #[case(test_files::EC_NIST521_DER_PK_1)]
-    #[case(test_files::EC_NIST256_PK_1)] // PKCS8
+    #[case(picky_test_data::EC_NIST256_DER_PK_1)]
+    #[case(picky_test_data::EC_NIST384_DER_PK_1)]
+    #[case(picky_test_data::EC_NIST521_DER_PK_1)]
+    #[case(picky_test_data::EC_NIST256_PK_1)] // PKCS8
     fn private_key_from_ec_pem(#[case] key_pem: &str) {
         PrivateKey::from_pem_str(key_pem).unwrap();
     }
 
     #[rstest]
-    #[case(test_files::EC_NIST256_NOPUBLIC_DER_PK_1)]
-    #[case(test_files::EC_NIST384_NOPUBLIC_DER_PK_1)]
-    #[case(test_files::EC_NIST521_NOPUBLIC_DER_PK_1)]
+    #[case(picky_test_data::EC_NIST256_NOPUBLIC_DER_PK_1)]
+    #[case(picky_test_data::EC_NIST384_NOPUBLIC_DER_PK_1)]
+    #[case(picky_test_data::EC_NIST521_NOPUBLIC_DER_PK_1)]
     fn ecdsa_private_key_without_public(#[case] key_pem: &str) {
         // This should succeed for supported curves
         let key = PrivateKey::from_pem_str(key_pem).unwrap();
@@ -334,12 +333,12 @@ mod tests {
 
     #[rstest]
     // Known curves
-    #[case(test_files::EC_NIST256_PK_1_PUB)]
-    #[case(test_files::EC_NIST384_PK_1_PUB)]
-    #[case(test_files::EC_NIST521_PK_1_PUB)]
+    #[case(picky_test_data::EC_NIST256_PK_1_PUB)]
+    #[case(picky_test_data::EC_NIST384_PK_1_PUB)]
+    #[case(picky_test_data::EC_NIST521_PK_1_PUB)]
     // Unsupported curve, should still work as long as pem contains the public key
     // (in that case no arithmetic operations are performed on the key)
-    #[case(test_files::EC_PUBLIC_KEY_SECP256K1_PEM)]
+    #[case(picky_test_data::EC_PUBLIC_KEY_SECP256K1_PEM)]
     fn ecdsa_public_valid_key_conversions(#[case] key_pem: &str) {
         let pk: &PublicKey = &PublicKey::from_pem_str(key_pem).unwrap();
         let epk: Result<EcdsaPublicKey, KeyError> = pk.try_into();
@@ -358,9 +357,9 @@ mod tests {
     }
 
     #[rstest]
-    #[case(test_files::EC_NIST256_DER_PK_1, NamedEcCurve::Known(EcCurve::NistP256))]
-    #[case(test_files::EC_NIST384_DER_PK_1, NamedEcCurve::Known(EcCurve::NistP384))]
-    #[case(test_files::EC_NIST521_DER_PK_1, NamedEcCurve::Known(EcCurve::NistP521))]
+    #[case(picky_test_data::EC_NIST256_DER_PK_1, NamedEcCurve::Known(EcCurve::NistP256))]
+    #[case(picky_test_data::EC_NIST384_DER_PK_1, NamedEcCurve::Known(EcCurve::NistP384))]
+    #[case(picky_test_data::EC_NIST521_DER_PK_1, NamedEcCurve::Known(EcCurve::NistP521))]
     fn ecdsa_key_pair_from_ec_private_key(#[case] key: &str, #[case] curve: NamedEcCurve) {
         let pk = PrivateKey::from_pem_str(key).unwrap();
         let pair = EcdsaKeypair::try_from(&pk).unwrap();

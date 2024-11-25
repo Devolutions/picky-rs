@@ -830,7 +830,6 @@ impl SshCertificateBuilder {
 pub mod tests {
     use super::*;
     use crate::ssh::private_key::SshPrivateKey;
-    use crate::test_files;
     use rstest::rstest;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -947,8 +946,8 @@ pub mod tests {
     }
 
     #[rstest]
-    #[case(test_files::SSH_CERT_EC_P256)]
-    #[case(test_files::SSH_CERT_EC_P384)]
+    #[case(picky_test_data::SSH_CERT_EC_P256)]
+    #[case(picky_test_data::SSH_CERT_EC_P384)]
     fn ecdsa_roundtrip(#[case] cert_before: &str) {
         let cert: SshCertificate = SshCertificate::from_str(cert_before).unwrap();
         let cert_after = cert.to_string().unwrap();
@@ -957,43 +956,43 @@ pub mod tests {
 
     #[test]
     fn ed25519_roundtrip() {
-        let cert: SshCertificate = SshCertificate::from_str(test_files::SSH_CERT_ED25519).unwrap();
+        let cert: SshCertificate = SshCertificate::from_str(picky_test_data::SSH_CERT_ED25519).unwrap();
         let cert_after = cert.to_string().unwrap();
-        pretty_assertions::assert_eq!(test_files::SSH_CERT_ED25519, cert_after);
+        pretty_assertions::assert_eq!(picky_test_data::SSH_CERT_ED25519, cert_after);
     }
 
     #[test]
     fn sk_ed25519_signed_roundtrip() {
-        let cert: SshCertificate = SshCertificate::from_str(test_files::SSH_CERT_SK_ED25519).unwrap();
+        let cert: SshCertificate = SshCertificate::from_str(picky_test_data::SSH_CERT_SK_ED25519).unwrap();
         let cert_after = cert.to_string().unwrap();
-        pretty_assertions::assert_eq!(test_files::SSH_CERT_SK_ED25519, cert_after);
+        pretty_assertions::assert_eq!(picky_test_data::SSH_CERT_SK_ED25519, cert_after);
     }
 
     #[test]
     fn sk_ecdsa_signed_roundtrip() {
-        let cert: SshCertificate = SshCertificate::from_str(test_files::SSH_CERT_SK_ECDSA).unwrap();
+        let cert: SshCertificate = SshCertificate::from_str(picky_test_data::SSH_CERT_SK_ECDSA).unwrap();
         let cert_after = cert.to_string().unwrap();
-        pretty_assertions::assert_eq!(test_files::SSH_CERT_SK_ECDSA, cert_after);
+        pretty_assertions::assert_eq!(picky_test_data::SSH_CERT_SK_ECDSA, cert_after);
     }
 
     #[test]
     fn sk_ed25519_cert_roundtrip() {
-        let cert: SshCertificate = SshCertificate::from_str(test_files::SSH_CERT_SK_ED25519_SIG_EC).unwrap();
+        let cert: SshCertificate = SshCertificate::from_str(picky_test_data::SSH_CERT_SK_ED25519_SIG_EC).unwrap();
         let cert_after = cert.to_string().unwrap();
-        pretty_assertions::assert_eq!(test_files::SSH_CERT_SK_ED25519_SIG_EC, cert_after);
+        pretty_assertions::assert_eq!(picky_test_data::SSH_CERT_SK_ED25519_SIG_EC, cert_after);
     }
 
     #[test]
     fn sk_ecdsa_cert_roundtrip() {
-        let cert: SshCertificate = SshCertificate::from_str(test_files::SSH_CERT_SK_ECDSA_SIG_EC).unwrap();
+        let cert: SshCertificate = SshCertificate::from_str(picky_test_data::SSH_CERT_SK_ECDSA_SIG_EC).unwrap();
         let cert_after = cert.to_string().unwrap();
-        pretty_assertions::assert_eq!(test_files::SSH_CERT_SK_ECDSA_SIG_EC, cert_after);
+        pretty_assertions::assert_eq!(picky_test_data::SSH_CERT_SK_ECDSA_SIG_EC, cert_after);
     }
 
     #[rstest]
-    #[case(SshCertKeyType::EcdsaSha2Nistp256V01, test_files::SSH_PRIVATE_KEY_EC_P256)]
+    #[case(SshCertKeyType::EcdsaSha2Nistp256V01, picky_test_data::SSH_PRIVATE_KEY_EC_P256)]
     #[case(SshCertKeyType::RsaSha2_256V01, PRIVATE_KEY_PEM)]
-    #[case(SshCertKeyType::SshEd25519V01, test_files::SSH_PRIVATE_KEY_ED25519)]
+    #[case(SshCertKeyType::SshEd25519V01, picky_test_data::SSH_PRIVATE_KEY_ED25519)]
     fn test_certificate_generation(#[case] key_type: SshCertKeyType, #[case] ssh_key_pem: &str) {
         let certificate_builder = SshCertificateBuilder::init();
         certificate_builder.cert_key_type(key_type);

@@ -84,6 +84,7 @@ rstest = "0.23"
 expect-test = "1"
 tempfile = "3.13"
 rand_chacha = "0.3"
+picky-test-data = { path = "../picky-test-data", version = "0.1" }
 
 [features]
 default = ["x509", "jose", "http_signature", "http_trait_impl", "pkcs12"]

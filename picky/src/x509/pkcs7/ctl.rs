@@ -98,7 +98,7 @@ mod tests {
 
     #[test]
     fn parse_certificate_trust_list_in_der() {
-        Pkcs7::from_der(crate::test_files::CERTIFICATE_TRUST_LIST).unwrap();
+        Pkcs7::from_der(picky_test_data::CERTIFICATE_TRUST_LIST).unwrap();
     }
 
     #[cfg(feature = "ctl_http_fetch")]

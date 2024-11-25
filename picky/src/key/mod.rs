@@ -1176,16 +1176,16 @@ mod tests {
     #[test]
     fn invalid_coeff_private_key_regression() {
         println!("2048 PK 7");
-        check_pk(crate::test_files::RSA_2048_PK_7);
+        check_pk(picky_test_data::RSA_2048_PK_7);
         println!("4096 PK 3");
-        check_pk(crate::test_files::RSA_4096_PK_3);
+        check_pk(picky_test_data::RSA_4096_PK_3);
     }
 
     #[test]
     fn rsa_crate_private_key_conversion() {
         use rsa::pkcs8::DecodePrivateKey;
 
-        let pk_pem = crate::test_files::RSA_2048_PK_1.parse::<crate::pem::Pem>().unwrap();
+        let pk_pem = picky_test_data::RSA_2048_PK_1.parse::<crate::pem::Pem>().unwrap();
         let pk = PrivateKey::from_pem(&pk_pem).unwrap();
         let converted_rsa_private_key = RsaPrivateKey::try_from(&pk).unwrap();
         let expected_rsa_private_key = RsaPrivateKey::from_pkcs8_der(pk_pem.data()).unwrap();
