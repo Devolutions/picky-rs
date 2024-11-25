@@ -415,7 +415,6 @@ pub mod tests {
     use crate::key::ec::EcdsaKeypair;
     use crate::key::ed::EdKeypair;
     use crate::ssh::private_key::SshPrivateKey;
-    use crate::test_files;
     use rsa::RsaPrivateKey;
     use rstest::rstest;
 
@@ -605,9 +604,9 @@ pub mod tests {
     }
 
     #[rstest]
-    #[case(test_files::SSH_PRIVATE_KEY_EC_P256)]
-    #[case(test_files::SSH_PRIVATE_KEY_EC_P384)]
-    #[case(test_files::SSH_PRIVATE_KEY_EC_P521)]
+    #[case(picky_test_data::SSH_PRIVATE_KEY_EC_P256)]
+    #[case(picky_test_data::SSH_PRIVATE_KEY_EC_P384)]
+    #[case(picky_test_data::SSH_PRIVATE_KEY_EC_P521)]
     fn ecdsa_keys_unencrypted(#[case] pem: &str) {
         let key = SshPrivateKey::from_pem_str(pem, None).unwrap();
         let encoded = key.to_string().unwrap();
@@ -617,66 +616,68 @@ pub mod tests {
     #[test]
     fn ecdsa_keys_encrypted() {
         let passphrase = Some("test".to_string());
-        let key = SshPrivateKey::from_pem_str(test_files::SSH_PRIVATE_KEY_EC_P256_ENCRYPTED, passphrase).unwrap();
+        let key = SshPrivateKey::from_pem_str(picky_test_data::SSH_PRIVATE_KEY_EC_P256_ENCRYPTED, passphrase).unwrap();
         let encoded = key.to_string().unwrap();
-        pretty_assertions::assert_eq!(encoded.as_str(), test_files::SSH_PRIVATE_KEY_EC_P256_ENCRYPTED);
+        pretty_assertions::assert_eq!(encoded.as_str(), picky_test_data::SSH_PRIVATE_KEY_EC_P256_ENCRYPTED);
     }
 
     #[test]
     fn rsa_rounttrip() {
-        let private_key = SshPrivateKey::from_pem_str(test_files::SSH_PRIVATE_KEY_RSA, None).unwrap();
+        let private_key = SshPrivateKey::from_pem_str(picky_test_data::SSH_PRIVATE_KEY_RSA, None).unwrap();
         let encoded = private_key.to_string().unwrap();
-        assert_eq!(test_files::SSH_PRIVATE_KEY_RSA, encoded.as_str());
+        assert_eq!(picky_test_data::SSH_PRIVATE_KEY_RSA, encoded.as_str());
     }
 
     #[test]
     fn ed25519_roundtrip() {
-        let private_key = SshPrivateKey::from_pem_str(test_files::SSH_PRIVATE_KEY_ED25519, None).unwrap();
+        let private_key = SshPrivateKey::from_pem_str(picky_test_data::SSH_PRIVATE_KEY_ED25519, None).unwrap();
         let encoded = private_key.to_string().unwrap();
-        assert_eq!(test_files::SSH_PRIVATE_KEY_ED25519, encoded.as_str());
+        assert_eq!(picky_test_data::SSH_PRIVATE_KEY_ED25519, encoded.as_str());
     }
 
     #[test]
     fn ed25519_roundtrip_encrypted() {
         let passphrase = Some("test".to_string());
         let private_key =
-            SshPrivateKey::from_pem_str(test_files::SSH_PRIVATE_KEY_ED25519_ENCRYPTED, passphrase).unwrap();
+            SshPrivateKey::from_pem_str(picky_test_data::SSH_PRIVATE_KEY_ED25519_ENCRYPTED, passphrase).unwrap();
         let encoded = private_key.to_string().unwrap();
-        assert_eq!(test_files::SSH_PRIVATE_KEY_ED25519_ENCRYPTED, encoded.as_str());
+        assert_eq!(picky_test_data::SSH_PRIVATE_KEY_ED25519_ENCRYPTED, encoded.as_str());
     }
 
     #[test]
     fn sk_ed25519_roundtrip() {
-        let private_key = SshPrivateKey::from_pem_str(test_files::SSH_PRIVATE_KEY_SK_ED25519, None).unwrap();
+        let private_key = SshPrivateKey::from_pem_str(picky_test_data::SSH_PRIVATE_KEY_SK_ED25519, None).unwrap();
         let encoded = private_key.to_string().unwrap();
-        assert_eq!(test_files::SSH_PRIVATE_KEY_SK_ED25519, encoded.as_str());
+        assert_eq!(picky_test_data::SSH_PRIVATE_KEY_SK_ED25519, encoded.as_str());
     }
 
     #[test]
     fn sk_ed25519_roundtrip_encrypted() {
         let private_key = SshPrivateKey::from_pem_str(
-            test_files::SSH_PRIVATE_KEY_SK_ED25519_ENCRYPTED,
+            picky_test_data::SSH_PRIVATE_KEY_SK_ED25519_ENCRYPTED,
             Some("test".to_string()),
         )
         .unwrap();
         let encoded = private_key.to_string().unwrap();
-        assert_eq!(test_files::SSH_PRIVATE_KEY_SK_ED25519_ENCRYPTED, encoded.as_str());
+        assert_eq!(picky_test_data::SSH_PRIVATE_KEY_SK_ED25519_ENCRYPTED, encoded.as_str());
     }
 
     #[test]
     fn sk_ecdsa_roundtrip() {
-        let private_key = SshPrivateKey::from_pem_str(test_files::SSH_PRIVATE_KEY_SK_ECDSA, None).unwrap();
+        let private_key = SshPrivateKey::from_pem_str(picky_test_data::SSH_PRIVATE_KEY_SK_ECDSA, None).unwrap();
         let encoded = private_key.to_string().unwrap();
-        assert_eq!(test_files::SSH_PRIVATE_KEY_SK_ECDSA, encoded.as_str());
+        assert_eq!(picky_test_data::SSH_PRIVATE_KEY_SK_ECDSA, encoded.as_str());
     }
 
     #[test]
     fn sk_ecdsa_roundtrip_encrypted() {
-        let private_key =
-            SshPrivateKey::from_pem_str(test_files::SSH_PRIVATE_KEY_SK_ECDSA_ENCRYPTED, Some("test".to_string()))
-                .unwrap();
+        let private_key = SshPrivateKey::from_pem_str(
+            picky_test_data::SSH_PRIVATE_KEY_SK_ECDSA_ENCRYPTED,
+            Some("test".to_string()),
+        )
+        .unwrap();
         let encoded = private_key.to_string().unwrap();
-        assert_eq!(test_files::SSH_PRIVATE_KEY_SK_ECDSA_ENCRYPTED, encoded.as_str());
+        assert_eq!(picky_test_data::SSH_PRIVATE_KEY_SK_ECDSA_ENCRYPTED, encoded.as_str());
     }
 
     #[test]

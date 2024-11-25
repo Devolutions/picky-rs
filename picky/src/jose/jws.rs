@@ -491,18 +491,17 @@ pub fn verify_signature(encoded_token: &str, public_key: &PublicKey, algorithm: 
 mod tests {
     use super::*;
     use crate::pem::Pem;
-    use crate::test_files;
     use rstest::rstest;
 
     const PAYLOAD: &str = r#"{"sub":"1234567890","name":"John Doe","admin":true,"iat":1516239022}"#;
 
     fn get_private_key_1() -> PrivateKey {
-        let pk_pem = test_files::RSA_2048_PK_1.parse::<Pem>().unwrap();
+        let pk_pem = picky_test_data::RSA_2048_PK_1.parse::<Pem>().unwrap();
         PrivateKey::from_pem(&pk_pem).unwrap()
     }
 
     fn get_private_key_2() -> PrivateKey {
-        let pk_pem = test_files::RSA_2048_PK_7.parse::<Pem>().unwrap();
+        let pk_pem = picky_test_data::RSA_2048_PK_7.parse::<Pem>().unwrap();
         PrivateKey::from_pem(&pk_pem).unwrap()
     }
 
@@ -516,13 +515,13 @@ mod tests {
             payload: PAYLOAD.as_bytes().to_vec(),
         };
         let encoded = jwt.encode(&get_private_key_1()).unwrap();
-        assert_eq!(encoded, test_files::JOSE_JWT_SIG_EXAMPLE);
+        assert_eq!(encoded, picky_test_data::JOSE_JWT_SIG_EXAMPLE);
     }
 
     #[rstest]
-    #[case(JwsAlg::ES256, test_files::EC_NIST256_PK_1)]
-    #[case(JwsAlg::ES384, test_files::EC_NIST384_PK_1)]
-    #[case(JwsAlg::ES512, test_files::EC_NIST521_PK_1)]
+    #[case(JwsAlg::ES256, picky_test_data::EC_NIST256_PK_1)]
+    #[case(JwsAlg::ES384, picky_test_data::EC_NIST384_PK_1)]
+    #[case(JwsAlg::ES512, picky_test_data::EC_NIST521_PK_1)]
     fn ecdsa_sign_verify(#[case] alg: JwsAlg, #[case] key_pem: &str) {
         let key = PrivateKey::from_pem_str(key_pem).unwrap();
 
@@ -546,9 +545,9 @@ mod tests {
     }
 
     #[rstest]
-    #[case(test_files::EC_NIST256_PK_1, test_files::JOSE_JWT_SIG_ES256)]
-    #[case(test_files::EC_NIST384_PK_1, test_files::JOSE_JWT_SIG_ES384)]
-    #[case(test_files::EC_NIST521_PK_1, test_files::JOSE_JWT_SIG_ES512)]
+    #[case(picky_test_data::EC_NIST256_PK_1, picky_test_data::JOSE_JWT_SIG_ES256)]
+    #[case(picky_test_data::EC_NIST384_PK_1, picky_test_data::JOSE_JWT_SIG_ES384)]
+    #[case(picky_test_data::EC_NIST521_PK_1, picky_test_data::JOSE_JWT_SIG_ES512)]
     fn ecdsa_parse_and_verify(#[case] key_pem: &str, #[case] signature: &str) {
         let key = PrivateKey::from_pem_str(key_pem).unwrap();
 
@@ -564,14 +563,14 @@ mod tests {
     #[rstest]
     #[allow(deprecated)]
     #[case(
-        test_files::JOSE_JWT_SIG_ED25519_GO_PRIVATE_KEY,
-        test_files::JOSE_JWT_SIG_ED25519_GO,
+        picky_test_data::JOSE_JWT_SIG_ED25519_GO_PRIVATE_KEY,
+        picky_test_data::JOSE_JWT_SIG_ED25519_GO,
         JwsAlg::ED25519,
         JWT_ED25519_GO_BODY
     )]
     #[case(
-        test_files::JOSE_JWT_SIG_ED25519_PRIVATE_KEY,
-        test_files::JOSE_JWT_SIG_ED25519,
+        picky_test_data::JOSE_JWT_SIG_ED25519_PRIVATE_KEY,
+        picky_test_data::JOSE_JWT_SIG_ED25519,
         JwsAlg::EdDSA,
         JWT_ED25519_BODY
     )]
@@ -598,13 +597,13 @@ mod tests {
     #[test]
     fn decode_rsa_sha256() {
         let public_key = get_private_key_1().to_public_key().unwrap();
-        let jwt = Jws::decode(test_files::JOSE_JWT_SIG_EXAMPLE, &public_key).unwrap();
+        let jwt = Jws::decode(picky_test_data::JOSE_JWT_SIG_EXAMPLE, &public_key).unwrap();
         assert_eq!(jwt.payload.as_slice(), PAYLOAD.as_bytes());
     }
 
     #[test]
     fn decode_rsa_sha256_delayed_signature_check() {
-        let jws = RawJws::decode(test_files::JOSE_JWT_SIG_EXAMPLE).unwrap();
+        let jws = RawJws::decode(picky_test_data::JOSE_JWT_SIG_EXAMPLE).unwrap();
         println!("{}", String::from_utf8_lossy(&jws.payload));
         assert_eq!(jws.peek_payload(), PAYLOAD.as_bytes());
 
@@ -616,7 +615,7 @@ mod tests {
     #[test]
     fn decode_rsa_sha256_invalid_signature_err() {
         let public_key = get_private_key_2().to_public_key().unwrap();
-        let err = Jws::decode(test_files::JOSE_JWT_SIG_EXAMPLE, &public_key)
+        let err = Jws::decode(picky_test_data::JOSE_JWT_SIG_EXAMPLE, &public_key)
             .err()
             .unwrap();
         assert_eq!(err.to_string(), "signature error: invalid signature");

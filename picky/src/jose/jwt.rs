@@ -525,7 +525,7 @@ mod tests {
     }
 
     fn get_private_key_1() -> PrivateKey {
-        let pk_pem = crate::test_files::RSA_2048_PK_1.parse::<Pem>().unwrap();
+        let pk_pem = picky_test_data::RSA_2048_PK_1.parse::<Pem>().unwrap();
         PrivateKey::from_pkcs8(pk_pem.data()).unwrap()
     }
 
@@ -534,13 +534,13 @@ mod tests {
         let claims = get_strongly_typed_claims();
         let jwt = CheckedJwtSig::new(JwsAlg::RS256, claims);
         let encoded = jwt.encode(&get_private_key_1()).unwrap();
-        assert_eq!(encoded, crate::test_files::JOSE_JWT_SIG_EXAMPLE);
+        assert_eq!(encoded, picky_test_data::JOSE_JWT_SIG_EXAMPLE);
     }
 
     #[test]
     fn decode_jws_rsa_sha256() {
         let public_key = get_private_key_1().to_public_key().unwrap();
-        let jwt = JwtSig::decode(crate::test_files::JOSE_JWT_SIG_EXAMPLE, &public_key)
+        let jwt = JwtSig::decode(picky_test_data::JOSE_JWT_SIG_EXAMPLE, &public_key)
             .unwrap()
             .validate::<MyClaims>(&JwtValidator::no_check())
             .unwrap();
@@ -548,7 +548,7 @@ mod tests {
 
         // exp and nbf claims aren't present but this should pass with lenient validator
         let now = JwtDate::new(0);
-        JwtSig::decode(crate::test_files::JOSE_JWT_SIG_EXAMPLE, &public_key)
+        JwtSig::decode(picky_test_data::JOSE_JWT_SIG_EXAMPLE, &public_key)
             .unwrap()
             .validate::<MyClaims>(&JwtValidator::lenient(now))
             .unwrap();
@@ -560,7 +560,7 @@ mod tests {
         let validator = JwtValidator::no_check()
             .expiration_check_required()
             .not_before_check_optional();
-        let err = JwtSig::decode(crate::test_files::JOSE_JWT_SIG_EXAMPLE, &public_key)
+        let err = JwtSig::decode(picky_test_data::JOSE_JWT_SIG_EXAMPLE, &public_key)
             .unwrap()
             .validate::<MyClaims>(&validator)
             .err()
@@ -573,7 +573,7 @@ mod tests {
         let public_key = get_private_key_1().to_public_key().unwrap();
         let now = JwtDate::new(0);
         let validator = JwtValidator::strict(now);
-        let err = JwtSig::decode(crate::test_files::JOSE_JWT_SIG_EXAMPLE, &public_key)
+        let err = JwtSig::decode(picky_test_data::JOSE_JWT_SIG_EXAMPLE, &public_key)
             .unwrap()
             .validate::<MyClaims>(&validator)
             .err()
@@ -585,7 +585,7 @@ mod tests {
     fn decode_jws_rsa_sha256_using_json_value_claims() {
         let public_key = get_private_key_1().to_public_key().unwrap();
         let validator = JwtValidator::no_check();
-        let jwt = JwtSig::decode(crate::test_files::JOSE_JWT_SIG_EXAMPLE, &public_key)
+        let jwt = JwtSig::decode(picky_test_data::JOSE_JWT_SIG_EXAMPLE, &public_key)
             .unwrap()
             .validate::<serde_json::Value>(&validator)
             .unwrap();
@@ -619,7 +619,7 @@ mod tests {
     fn decode_jws_not_expired() {
         let public_key = get_private_key_1().to_public_key().unwrap();
 
-        let jwt = JwtSig::decode(crate::test_files::JOSE_JWT_SIG_WITH_EXP, &public_key)
+        let jwt = JwtSig::decode(picky_test_data::JOSE_JWT_SIG_WITH_EXP, &public_key)
             .unwrap()
             .validate::<MyExpirableClaims>(&JwtValidator::strict(JwtDate::new(1545263999)))
             .expect("couldn't decode jwt without leeway");
@@ -629,12 +629,12 @@ mod tests {
         assert_eq!(jwt.state.claims.msg, "THIS IS TIME SENSITIVE DATA");
 
         // alternatively, a leeway can account for small clock skew
-        JwtSig::decode(crate::test_files::JOSE_JWT_SIG_WITH_EXP, &public_key)
+        JwtSig::decode(picky_test_data::JOSE_JWT_SIG_WITH_EXP, &public_key)
             .unwrap()
             .validate::<MyExpirableClaims>(&JwtValidator::strict(JwtDate::new_with_leeway(1545264001, 10)))
             .expect("couldn't decode jwt with leeway for exp");
 
-        JwtSig::decode(crate::test_files::JOSE_JWT_SIG_WITH_EXP, &public_key)
+        JwtSig::decode(picky_test_data::JOSE_JWT_SIG_WITH_EXP, &public_key)
             .unwrap()
             .validate::<MyExpirableClaims>(&JwtValidator::strict(JwtDate::new_with_leeway(1545262999, 10)))
             .expect("couldn't decode jwt with leeway for nbf");
@@ -644,7 +644,7 @@ mod tests {
     fn decode_jws_invalid_date_err() {
         let public_key = get_private_key_1().to_public_key().unwrap();
 
-        let err = JwtSig::decode(crate::test_files::JOSE_JWT_SIG_WITH_EXP, &public_key)
+        let err = JwtSig::decode(picky_test_data::JOSE_JWT_SIG_WITH_EXP, &public_key)
             .unwrap()
             .validate::<MyExpirableClaims>(&JwtValidator::strict(JwtDate::new(1545264001)))
             .err()
@@ -655,7 +655,7 @@ mod tests {
             "token expired (not after: 1545264000, now: 1545264001 [leeway: 0])"
         );
 
-        let err = JwtSig::decode(crate::test_files::JOSE_JWT_SIG_WITH_EXP, &public_key)
+        let err = JwtSig::decode(picky_test_data::JOSE_JWT_SIG_WITH_EXP, &public_key)
             .unwrap()
             .validate::<MyExpirableClaims>(&JwtValidator::strict(JwtDate::new_with_leeway(1545262998, 1)))
             .err()

@@ -1024,7 +1024,7 @@ mod tests {
 
     #[test]
     fn read_pem_and_parse_certificate() {
-        let pem = parse_pem(crate::test_files::INTERMEDIATE_CA.as_bytes()).unwrap();
+        let pem = parse_pem(picky_test_data::INTERMEDIATE_CA.as_bytes()).unwrap();
         let cert = Cert::from_der(pem.data()).unwrap();
 
         assert_eq!(cert.serial_number(), &vec![1]);
@@ -1040,7 +1040,7 @@ mod tests {
 
     #[test]
     fn get_identifier() {
-        let pem = crate::test_files::RSA_2048_PK_1
+        let pem = picky_test_data::RSA_2048_PK_1
             .parse::<Pem>()
             .expect("couldn't parse pem");
         let private_key = PrivateKey::from_pkcs8(pem.data()).expect("couldn't extract private key from pkcs8");
@@ -1067,7 +1067,7 @@ mod tests {
     #[test]
     fn key_id_and_cert() {
         let kid = "c4a7b1a47b2c71fadbe14b9075ffc41560858910";
-        let pem = crate::test_files::ROOT_CA.parse::<Pem>().expect("couldn't parse PEM");
+        let pem = picky_test_data::ROOT_CA.parse::<Pem>().expect("couldn't parse PEM");
         let cert = Cert::from_der(pem.data()).expect("couldn't deserialize certificate");
         assert_eq!(cert.ty(), CertType::Root);
         let key_id = cert
@@ -1083,9 +1083,9 @@ mod tests {
 
     #[test]
     fn valid_ca_chain() {
-        let root_key = parse_key(crate::test_files::RSA_2048_PK_1);
-        let intermediate_key = parse_key(crate::test_files::RSA_2048_PK_2);
-        let leaf_key = parse_key(crate::test_files::RSA_2048_PK_3);
+        let root_key = parse_key(picky_test_data::RSA_2048_PK_1);
+        let intermediate_key = parse_key(picky_test_data::RSA_2048_PK_2);
+        let leaf_key = parse_key(picky_test_data::RSA_2048_PK_3);
 
         let root = CertificateBuilder::new()
             .validity(UtcDate::ymd(2065, 6, 15).unwrap(), UtcDate::ymd(2070, 6, 15).unwrap())
@@ -1241,9 +1241,9 @@ mod tests {
 
     #[test]
     fn ec_signing() {
-        let root_key = parse_key(crate::test_files::EC_NIST256_PK_1);
-        let intermediate_key = parse_key(crate::test_files::EC_NIST384_PK_1);
-        let leaf_key = parse_key(crate::test_files::EC_NIST256_PK_2);
+        let root_key = parse_key(picky_test_data::EC_NIST256_PK_1);
+        let intermediate_key = parse_key(picky_test_data::EC_NIST384_PK_1);
+        let leaf_key = parse_key(picky_test_data::EC_NIST256_PK_2);
 
         let root = CertificateBuilder::new()
             .validity(UtcDate::ymd(2065, 6, 15).unwrap(), UtcDate::ymd(2070, 6, 15).unwrap())
@@ -1293,9 +1293,9 @@ mod tests {
 
     #[test]
     fn ed25519_signing() {
-        let root_key = parse_key(crate::test_files::ED25519_PEM_PK_1);
-        let intermediate_key = parse_key(crate::test_files::ED25519_PEM_PK_2);
-        let leaf_key = parse_key(crate::test_files::ED25519_PEM_PK_3);
+        let root_key = parse_key(picky_test_data::ED25519_PEM_PK_1);
+        let intermediate_key = parse_key(picky_test_data::ED25519_PEM_PK_2);
+        let leaf_key = parse_key(picky_test_data::ED25519_PEM_PK_3);
 
         let root = CertificateBuilder::new()
             .validity(UtcDate::ymd(2065, 6, 15).unwrap(), UtcDate::ymd(2070, 6, 15).unwrap())
@@ -1345,10 +1345,10 @@ mod tests {
 
     #[test]
     fn malicious_ca_chain() {
-        let root_key = parse_key(crate::test_files::RSA_2048_PK_1);
-        let intermediate_key = parse_key(crate::test_files::RSA_2048_PK_2);
-        let leaf_key = parse_key(crate::test_files::RSA_2048_PK_3);
-        let malicious_root_key = parse_key(crate::test_files::RSA_2048_PK_4);
+        let root_key = parse_key(picky_test_data::RSA_2048_PK_1);
+        let intermediate_key = parse_key(picky_test_data::RSA_2048_PK_2);
+        let leaf_key = parse_key(picky_test_data::RSA_2048_PK_3);
+        let malicious_root_key = parse_key(picky_test_data::RSA_2048_PK_4);
 
         let root = CertificateBuilder::new()
             .validity(UtcDate::ymd(2065, 6, 15).unwrap(), UtcDate::ymd(2070, 6, 15).unwrap())
@@ -1417,9 +1417,9 @@ mod tests {
 
     #[test]
     fn invalid_basic_constraints_chain() {
-        let root_key = parse_key(crate::test_files::RSA_2048_PK_1);
-        let intermediate_key = parse_key(crate::test_files::RSA_2048_PK_2);
-        let leaf_key = parse_key(crate::test_files::RSA_2048_PK_3);
+        let root_key = parse_key(picky_test_data::RSA_2048_PK_1);
+        let intermediate_key = parse_key(picky_test_data::RSA_2048_PK_2);
+        let leaf_key = parse_key(picky_test_data::RSA_2048_PK_3);
 
         let root = CertificateBuilder::new()
             .validity(UtcDate::ymd(2065, 6, 15).unwrap(), UtcDate::ymd(2070, 6, 15).unwrap())
@@ -1492,7 +1492,7 @@ mod tests {
 
     #[test]
     fn bypass_serial_number_generator() {
-        let root_key = parse_key(crate::test_files::RSA_2048_PK_1);
+        let root_key = parse_key(picky_test_data::RSA_2048_PK_1);
 
         let unsigned_integer_bytes = [21, 84, 58, 122];
 
@@ -1513,7 +1513,7 @@ mod tests {
     fn validity_encoding() {
         use picky_asn1_x509::validity::Time;
 
-        let root_key = parse_key(crate::test_files::RSA_2048_PK_1);
+        let root_key = parse_key(picky_test_data::RSA_2048_PK_1);
 
         let cert = CertificateBuilder::new()
             .validity(UtcDate::ymd(2045, 6, 15).unwrap(), UtcDate::ymd(2055, 6, 15).unwrap())
@@ -1534,8 +1534,8 @@ mod tests {
     fn inherit_requested_extensions_by_csr() {
         use crate::x509::name::GeneralName;
 
-        let root_key = parse_key(crate::test_files::RSA_2048_PK_1);
-        let leaf_key = parse_key(crate::test_files::RSA_2048_PK_3);
+        let root_key = parse_key(picky_test_data::RSA_2048_PK_1);
+        let leaf_key = parse_key(picky_test_data::RSA_2048_PK_3);
 
         let root = CertificateBuilder::new()
             .validity(UtcDate::ymd(2065, 6, 15).unwrap(), UtcDate::ymd(2070, 6, 15).unwrap())
@@ -1617,9 +1617,9 @@ mod tests {
     /// this behavior.
     #[test]
     fn psdiag_constructed_context_tag_in_subject_alt_name_ext() {
-        let leaf = Cert::from_pem_str(crate::test_files::PSDIAG_LEAF).unwrap();
-        let inter = Cert::from_pem_str(crate::test_files::PSDIAG_INTER).unwrap();
-        let root = Cert::from_pem_str(crate::test_files::PSDIAG_ROOT).unwrap();
+        let leaf = Cert::from_pem_str(picky_test_data::PSDIAG_LEAF).unwrap();
+        let inter = Cert::from_pem_str(picky_test_data::PSDIAG_INTER).unwrap();
+        let root = Cert::from_pem_str(picky_test_data::PSDIAG_ROOT).unwrap();
 
         let chain = [inter, root];
         let unexpired_date = UtcDate::new(2021, 11, 21, 1, 0, 0).unwrap();

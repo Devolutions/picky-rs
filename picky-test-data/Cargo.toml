@@ -1,0 +1,4 @@
+[package]
+name = "picky-test-data"
+version = "0.1.0"
+description = "Test data for the picky crates"

@@ -930,12 +930,12 @@ mod tests {
          ky59Rsg/CpB8gP7szjK/wrCclA==";
 
     fn private_key_1() -> PrivateKey {
-        let pem = crate::test_files::RSA_2048_PK_7.parse::<Pem>().expect("pem 1");
+        let pem = picky_test_data::RSA_2048_PK_7.parse::<Pem>().expect("pem 1");
         PrivateKey::from_pem(&pem).expect("private key 1")
     }
 
     fn private_key_2() -> PrivateKey {
-        let pem = crate::test_files::RSA_2048_PK_1.parse::<Pem>().expect("pem 2");
+        let pem = picky_test_data::RSA_2048_PK_1.parse::<Pem>().expect("pem 2");
         PrivateKey::from_pem(&pem).expect("private key 2")
     }
 

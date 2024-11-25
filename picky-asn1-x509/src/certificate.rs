@@ -303,7 +303,7 @@ mod tests {
 
     #[test]
     fn missing_authority_key_identifier_field_accepted() {
-        let encoded = include_bytes!("../../test_assets/missing_authority_key_identifier_field.crt");
+        let encoded = picky_test_data::MISSING_AUTH_KEY_ID;
         let _decoded = picky_asn1_der::from_bytes::<Certificate>(encoded).unwrap();
     }
 }

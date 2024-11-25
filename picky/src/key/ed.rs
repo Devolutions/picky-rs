@@ -191,15 +191,14 @@ impl<'a> TryFrom<&'a PublicKey> for EdPublicKey<'a> {
 #[cfg(test)]
 mod tests {
     use crate::key::{PrivateKey, PublicKey};
-    use crate::test_files;
     use rstest::rstest;
 
     #[rstest]
-    #[case(test_files::ED25519_PEM_PK_1)]
-    #[case(test_files::X25519_PEM_PK_1)]
+    #[case(picky_test_data::ED25519_PEM_PK_1)]
+    #[case(picky_test_data::X25519_PEM_PK_1)]
     // Although X448 and ED448 are not supported, we should still be able to decode and encode them
-    #[case(test_files::ED448_PEM_PK_1)]
-    #[case(test_files::X448_PEM_PK_1)]
+    #[case(picky_test_data::ED448_PEM_PK_1)]
+    #[case(picky_test_data::X448_PEM_PK_1)]
     fn private_key_roundtrip(#[case] key_pem: &str) {
         let decoded = PrivateKey::from_pem_str(key_pem).unwrap();
         let encoded = decoded.to_pem_str().unwrap();
@@ -207,11 +206,11 @@ mod tests {
     }
 
     #[rstest]
-    #[case(test_files::ED25519_PEM_PK_1_PUB)]
-    #[case(test_files::X25519_PEM_PK_1_PUB)]
+    #[case(picky_test_data::ED25519_PEM_PK_1_PUB)]
+    #[case(picky_test_data::X25519_PEM_PK_1_PUB)]
     // Although X448 and ED448 are not supported, we should still be able to decode and encode them
-    #[case(test_files::ED448_PEM_PK_1_PUB)]
-    #[case(test_files::X448_PEM_PK_1_PUB)]
+    #[case(picky_test_data::ED448_PEM_PK_1_PUB)]
+    #[case(picky_test_data::X448_PEM_PK_1_PUB)]
     fn public_key_roundtrip(#[case] key_pem: &str) {
         let decoded = PublicKey::from_pem_str(key_pem).unwrap();
         let encoded = decoded.to_pem_str().unwrap();
@@ -219,8 +218,8 @@ mod tests {
     }
 
     #[rstest]
-    #[case(test_files::ED25519_PEM_PK_1, test_files::ED25519_PEM_PK_1_PUB)]
-    #[case(test_files::X25519_PEM_PK_1, test_files::X25519_PEM_PK_1_PUB)]
+    #[case(picky_test_data::ED25519_PEM_PK_1, picky_test_data::ED25519_PEM_PK_1_PUB)]
+    #[case(picky_test_data::X25519_PEM_PK_1, picky_test_data::X25519_PEM_PK_1_PUB)]
     fn extract_public_key(#[case] key_pem: &str, #[case] expected_public_pem: &str) {
         let private = PrivateKey::from_pem_str(key_pem).unwrap();
         let public = private.to_public_key().unwrap();
@@ -229,8 +228,8 @@ mod tests {
     }
 
     #[rstest]
-    #[case(test_files::ED448_PEM_PK_1)]
-    #[case(test_files::X448_PEM_PK_1)]
+    #[case(picky_test_data::ED448_PEM_PK_1)]
+    #[case(picky_test_data::X448_PEM_PK_1)]
     fn extract_public_key_for_unsupported_algorithm_fails(#[case] key_pem: &str) {
         let private = PrivateKey::from_pem_str(key_pem).unwrap();
         assert!(private.to_public_key().is_err());

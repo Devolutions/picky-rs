@@ -239,26 +239,23 @@ mod tests {
     use super::*;
     use std::io::BufReader;
 
-    const PEM_BYTES: &[u8] = include_bytes!("../../test_assets/intermediate_ca.crt");
-    const PEM_STR: &str = include_str!("../../test_assets/intermediate_ca.crt");
-
     #[test]
     fn parse() {
-        let pem_from_bytes = parse_pem(PEM_BYTES).unwrap();
+        let pem_from_bytes = parse_pem(picky_test_data::PEM_BYTES).unwrap();
         assert_eq!(pem_from_bytes.label, "CERTIFICATE");
 
-        let pem_from_str = PEM_STR.parse::<Pem>().unwrap();
+        let pem_from_str = picky_test_data::PEM_STR.parse::<Pem>().unwrap();
         pretty_assertions::assert_eq!(pem_from_bytes, pem_from_str);
     }
 
     #[test]
     fn reader_based() {
-        let mut reader = BufReader::new(PEM_BYTES);
+        let mut reader = BufReader::new(picky_test_data::PEM_BYTES);
 
         let pem_from_reader = read_pem(&mut reader).unwrap();
         assert_eq!(pem_from_reader.label, "CERTIFICATE");
 
-        let pem_from_str = PEM_STR.parse::<Pem>().unwrap();
+        let pem_from_str = picky_test_data::PEM_STR.parse::<Pem>().unwrap();
         pretty_assertions::assert_eq!(pem_from_reader, pem_from_str);
     }
 
@@ -266,9 +263,9 @@ mod tests {
     #[cfg(not(windows))]
     #[test]
     fn to_string() {
-        let pem = PEM_STR.parse::<Pem>().unwrap();
+        let pem = picky_test_data::PEM_STR.parse::<Pem>().unwrap();
         let reconverted_pem = pem.to_string();
-        pretty_assertions::assert_eq!(reconverted_pem, PEM_STR);
+        pretty_assertions::assert_eq!(reconverted_pem, picky_test_data::PEM_STR);
     }
 
     const FLATTENED_PEM: &str = "-----BEGIN GARBAGE-----R0FSQkFHRQo=-----END GARBAGE-----";

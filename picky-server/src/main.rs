@@ -21,16 +21,3 @@ async fn main() {
     http_server.run().await;
 }
 
-#[cfg(any(feature = "pre-gen-pk", all(debug_assertions, test)))]
-pub mod test_files {
-    pub const RSA_2048_PK_1: &str = include_str!("../../test_assets/private_keys/rsa-2048-pk_1.key");
-    pub const RSA_2048_PK_2: &str = include_str!("../../test_assets/private_keys/rsa-2048-pk_2.key");
-    pub const RSA_2048_PK_3: &str = include_str!("../../test_assets/private_keys/rsa-2048-pk_3.key");
-    pub const RSA_2048_PK_4: &str = include_str!("../../test_assets/private_keys/rsa-2048-pk_4.key");
-    pub const RSA_2048_PK_5: &str = include_str!("../../test_assets/private_keys/rsa-2048-pk_5.key");
-    pub const RSA_2048_PK_6: &str = include_str!("../../test_assets/private_keys/rsa-2048-pk_6.key");
-    pub const RSA_2048_PK_7: &str = include_str!("../../test_assets/private_keys/rsa-2048-pk_7.key");
-    pub const RSA_4096_PK_1: &str = include_str!("../../test_assets/private_keys/rsa-4096-pk_1.key");
-    pub const RSA_4096_PK_2: &str = include_str!("../../test_assets/private_keys/rsa-4096-pk_2.key");
-    pub const RSA_4096_PK_3: &str = include_str!("../../test_assets/private_keys/rsa-4096-pk_3.key");
-}

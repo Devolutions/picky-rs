@@ -128,7 +128,7 @@ mod tests {
         // This test validates PFX structure parsing and parsing of `Certificate`/`PrivateKeyInfo`
         // structures encapsulated inside PFX
 
-        let encoded = include_bytes!("../../../test_assets/pkcs12/openssl_nocrypt.pfx");
+        let encoded = picky_test_data::OPENSSL_NOCRYPT;
         let decoded: Pfx = picky_asn1_der::from_bytes(encoded).unwrap();
 
         // Validate parsed PFX structure via debug representation
@@ -194,7 +194,7 @@ mod tests {
 
     #[test]
     fn pfx_openssl_rc2_roundtrip() {
-        let encoded = include_bytes!("../../../test_assets/pkcs12/leaf_password_is_abc.pfx");
+        let encoded = picky_test_data::LEAF_PASSWORD_IS_ABC;
         let decoded: Pfx = picky_asn1_der::from_bytes(encoded).unwrap();
         // Validate parsed PFX structure via debug representation
         expect_file!["leaf_password_is_abc.parsed.txt"].assert_debug_eq(&decoded);
@@ -205,7 +205,7 @@ mod tests {
 
     #[test]
     fn pfx_certmgr_aes256_roundtrip() {
-        let encoded = include_bytes!("../../../test_assets/pkcs12/certmgr_aes256.pfx");
+        let encoded = picky_test_data::CERTMGR_AES256;
         let decoded: Pfx = picky_asn1_der::from_bytes(encoded).unwrap();
         expect_file!["certmgr_aes256.parsed.txt"].assert_debug_eq(&decoded);
         // For certmgr-generated PFXs, we can't compare the bytes directly because
@@ -216,7 +216,7 @@ mod tests {
 
     #[test]
     fn pfx_certmgr_3des_roundtrip() {
-        let encoded = include_bytes!("../../../test_assets/pkcs12/certmgr_3des.pfx");
+        let encoded = picky_test_data::CERTMGR_3DES;
         let decoded: Pfx = picky_asn1_der::from_bytes(encoded).unwrap();
 
         expect_file!["certmgr_3des.parsed.txt"].assert_debug_eq(&decoded);
@@ -224,7 +224,7 @@ mod tests {
 
     #[test]
     fn unparsed_auth_safe_openssl_rc2_roundtrip() {
-        let encoded = include_bytes!("../../../test_assets/pkcs12/leaf_password_is_abc.pfx");
+        let encoded = picky_test_data::LEAF_PASSWORD_IS_ABC;
         let decoded: RawPfx = picky_asn1_der::from_bytes(encoded).unwrap();
 
         let auth_safe = if let AuthenticatedSafeContentInfo::Data(auth_safe) = &decoded.auth_safe {

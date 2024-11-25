@@ -31,6 +31,7 @@ num-bigint-dig = "0.8"
 pretty_assertions = "1.4"
 hex = "0.4"
 expect-test = "1"
+picky-test-data = { path = "../picky-test-data", version = "0.1" }
 
 [features]
 legacy = ["num-bigint-dig"]

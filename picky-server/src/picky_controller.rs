@@ -158,7 +158,6 @@ impl Picky {
     /// It returns a random pre-generated private key from a pool: security-wise, this is extremely bad.
     #[cfg(any(feature = "pre-gen-pk", all(debug_assertions, test)))]
     pub fn generate_private_key(bits: usize) -> Result<PrivateKey, PickyError> {
-        use crate::test_files::*;
         use picky::pem::Pem;
         use rand::prelude::*;
 

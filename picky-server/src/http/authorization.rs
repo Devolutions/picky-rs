@@ -89,16 +89,12 @@ mod tests {
     use saphir::http::{request, Method};
 
     fn get_private_key_1() -> PrivateKey {
-        let pem = include_str!("../../../test_assets/private_keys/rsa-2048-pk_4.key")
-            .parse::<Pem>()
-            .expect("pem 1");
+        let pem = picky_test_data::RSA_2048_PK_1.parse::<Pem>().expect("pem 1");
         PrivateKey::from_pem(&pem).expect("key 1")
     }
 
     fn get_private_key_2() -> PrivateKey {
-        let pem = include_str!("../../../test_assets/private_keys/rsa-2048-pk_7.key")
-            .parse::<Pem>()
-            .expect("pem 2");
+        let pem = picky_test_data::RSA_2048_PK_7.parse::<Pem>().expect("pem 2");
         PrivateKey::from_pem(&pem).expect("key 2")
     }
 

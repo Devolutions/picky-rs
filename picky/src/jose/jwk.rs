@@ -597,7 +597,6 @@ mod tests {
     use super::*;
     use crate::jose::jws::JwsAlg;
     use crate::pem::Pem;
-    use crate::test_files;
     use rstest::rstest;
 
     const RSA_MODULUS: &str = "rpJjxW0nNZiq1mPC3ZAxqf9qNjmKurP7XuKrpWrfv3IOUldqChQVPNg8zCvDOMZIO-ZDuRmVH\
@@ -695,7 +694,7 @@ mod tests {
     #[test]
     fn rsa_key() {
         let expected = get_jwk_set();
-        let decoded = JwkSet::from_json(crate::test_files::JOSE_JWK_SET).unwrap();
+        let decoded = JwkSet::from_json(picky_test_data::JOSE_JWK_SET).unwrap();
         pretty_assertions::assert_eq!(decoded, expected);
 
         let encoded = expected.to_json_pretty().unwrap();
@@ -704,9 +703,9 @@ mod tests {
     }
 
     #[rstest]
-    #[case(test_files::JOSE_JWK_EC_P256_JSON)]
-    #[case(test_files::JOSE_JWK_EC_P384_JSON)]
-    #[case(test_files::JOSE_JWK_EC_P521_JSON)]
+    #[case(picky_test_data::JOSE_JWK_EC_P256_JSON)]
+    #[case(picky_test_data::JOSE_JWK_EC_P384_JSON)]
+    #[case(picky_test_data::JOSE_JWK_EC_P521_JSON)]
     fn ecdsa_key_roundtrip(#[case] json: &str) {
         let decoded = Jwk::from_json(json).unwrap();
         let encoded = decoded.to_json().unwrap();
@@ -714,8 +713,8 @@ mod tests {
     }
 
     #[rstest]
-    #[case(test_files::JOSE_JWK_ED25519_JSON)]
-    #[case(test_files::JOSE_JWK_X25519_JSON)]
+    #[case(picky_test_data::JOSE_JWK_ED25519_JSON)]
+    #[case(picky_test_data::JOSE_JWK_X25519_JSON)]
     fn ed_key_roundtrip(#[case] json: &str) {
         let decoded = Jwk::from_json(json).unwrap();
         let encoded = decoded.to_json().unwrap();
@@ -749,8 +748,8 @@ ZQIDAQAB
     }
 
     #[rstest]
-    #[case(test_files::EC_NIST256_PK_1_PUB)]
-    #[case(test_files::EC_NIST384_PK_1_PUB)]
+    #[case(picky_test_data::EC_NIST256_PK_1_PUB)]
+    #[case(picky_test_data::EC_NIST384_PK_1_PUB)]
     fn x509_and_jwk_conversion_ec(#[case] pem: &str) {
         let initial_key = PublicKey::from_pem(&pem.parse::<Pem>().expect("pem")).expect("public key");
         let jwk = Jwk::from_public_key(&initial_key).unwrap();

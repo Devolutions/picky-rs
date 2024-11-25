@@ -1424,7 +1424,7 @@ mod tests {
 
     #[test]
     fn decoding_into_authenticode_signature() {
-        let pem = parse_pem(crate::test_files::PKCS7.as_bytes()).unwrap();
+        let pem = parse_pem(picky_test_data::PKCS7.as_bytes()).unwrap();
         let pkcs7 = Pkcs7::from_pem(&pem).unwrap();
         let hash_type = ShaVariant::SHA2_256;
         let private_key = PrivateKey::from_pem_str(RSA_PRIVATE_KEY).unwrap();
@@ -2243,9 +2243,9 @@ mod tests {
         };
 
         // certificates generation code copied from `valid_ca_chain` unit test in certificate.rs :)
-        let root_key = parse_key(crate::test_files::RSA_2048_PK_1);
-        let intermediate_key = parse_key(crate::test_files::RSA_2048_PK_2);
-        let leaf_key = parse_key(crate::test_files::RSA_2048_PK_3);
+        let root_key = parse_key(picky_test_data::RSA_2048_PK_1);
+        let intermediate_key = parse_key(picky_test_data::RSA_2048_PK_2);
+        let leaf_key = parse_key(picky_test_data::RSA_2048_PK_3);
 
         let root = CertificateBuilder::new()
             .validity(UtcDate::ymd(2065, 6, 15).unwrap(), UtcDate::ymd(2070, 6, 15).unwrap())

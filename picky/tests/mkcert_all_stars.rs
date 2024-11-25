@@ -5,9 +5,6 @@
 use picky::pem::parse_pem;
 use picky::x509::Cert;
 use std::cmp::min;
-use std::fs;
-
-const ALL_STARS_FILE_PATH: &str = "../test_assets/mkcert_all_root_ca_2019_10.txt";
 
 fn print_context(contents: &str, cursor: usize) {
     eprintln!(
@@ -29,7 +26,7 @@ fn next_cursor(contents: &str, last_cursor: usize) -> Option<usize> {
 
 #[test]
 fn all_stars_parsing() {
-    let contents = fs::read_to_string(ALL_STARS_FILE_PATH).expect("couldn't read the mkcert file");
+    let contents = picky_test_data::ALL_STARS;
     let mut last_cursor: usize = 0;
     let mut number_decoded: usize = 0;
     let mut total_certificates: usize = 0;
