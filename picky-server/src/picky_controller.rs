@@ -202,7 +202,7 @@ impl Picky {
     pub fn parse_pk_from_magic_der(der: &[u8]) -> Result<PrivateKey, PickyError> {
         match PrivateKey::from_pkcs8(&der) {
             Ok(pk) => Ok(pk),
-            Err(pkcs8_err) => PrivateKey::from_rsa_der(der)
+            Err(pkcs8_err) => PrivateKey::from_pkcs1(der)
                 .map_err(|rsa_der_err| PickyError::PrivateKeyParsing { pkcs8_err, rsa_der_err }),
         }
     }
