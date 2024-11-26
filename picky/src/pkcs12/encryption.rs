@@ -15,10 +15,6 @@ const DEFAULT_KDF_ITERATIONS: usize = 2048;
 const DEFAULT_SALT_SIZE: usize = 8;
 const AES_BLOCK_SIZE: usize = 16;
 
-trait Pkcs12Rng: rand::RngCore + rand::CryptoRng {}
-
-impl<T: rand::RngCore + rand::CryptoRng> Pkcs12Rng for T {}
-
 /// Crypto operations context for PFX file parsing/building. Contains password inside as a secure
 /// string and RNG.
 pub struct Pkcs12CryptoContext {
