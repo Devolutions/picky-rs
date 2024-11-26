@@ -34,12 +34,12 @@ fn all_stars_parsing() {
     let mut number_decoded: usize = 0;
     let mut total_certificates: usize = 0;
 
-    while let Some(cursor) = next_cursor(&contents, last_cursor) {
+    while let Some(cursor) = next_cursor(contents, last_cursor) {
         let pem = match parse_pem(&contents[cursor..]) {
             Ok(pem) => pem,
             Err(e) => {
                 eprintln!("Couldn't parse pem at cursor = {}: {}", cursor, e);
-                print_context(&contents, cursor);
+                print_context(contents, cursor);
                 panic!("couldn't parse pem");
             }
         };
@@ -62,7 +62,7 @@ fn all_stars_parsing() {
                     );
                 } else {
                     eprintln!("Couldn't parse certificate (cursor = {}): {}", cursor, formatted_str);
-                    print_context(&contents, cursor);
+                    print_context(contents, cursor);
                     panic!("couldn't parse certificate")
                 }
             }
