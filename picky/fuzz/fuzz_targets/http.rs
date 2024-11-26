@@ -1,12 +1,6 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
-use picky::{
-    hash::HashAlgorithm,
-    http::http_signature::*,
-    key::PrivateKey,
-    pem::Pem,
-    signature::SignatureAlgorithm,
-};
+use picky::{hash::HashAlgorithm, http::http_signature::*, key::PrivateKey, pem::Pem, signature::SignatureAlgorithm};
 use std::str::FromStr;
 
 const HTTP_SIGNATURE_EXAMPLE: &str = "Signature keyId=\"my-rsa-key\", created=\"1402170695\", \
@@ -48,7 +42,7 @@ fuzz_target!(|data: &[u8]| {
                 .verifier()
                 .now(now)
                 .signature_method(
-                    &private_key_1().to_public_key(),
+                    &private_key_1().to_public_key().unwrap(),
                     SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256),
                 )
                 .pre_generated_signing_string(s)
