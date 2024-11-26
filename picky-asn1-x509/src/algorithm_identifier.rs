@@ -356,7 +356,8 @@ impl<'de> de::Deserialize<'de> for AlgorithmIdentifier {
                     }
                     // SHA
                     x if x.starts_with("2.16.840.1.101.3.4.2.") || x == oids::SHA1 => {
-                        seq_next_element!(seq, AlgorithmIdentifier, "sha algorithm identifier");
+                        type Unit = ();
+                        seq_next_element!(seq, Unit, AlgorithmIdentifier, "sha algorithm identifier");
                         AlgorithmIdentifierParameters::Null
                     }
                     _ => {
