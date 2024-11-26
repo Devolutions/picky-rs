@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.10.0] 2024-11-26
+
 ### Fixed
 
-- "picky-asn1-der" is now a dev-dependency of the released crate, to fix test build.
+- `picky-asn1-der` is now a dev-dependency of the released crate, to fix test build.
 
 ### Changed
 
