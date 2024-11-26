@@ -132,7 +132,7 @@ mod tests {
         let decoded: Pfx = picky_asn1_der::from_bytes(encoded).unwrap();
 
         // Validate parsed PFX structure via debug representation
-        expect_file!["../../../test_assets/pkcs12/openssl_nocrypt.parsed.bin"].assert_debug_eq(&decoded);
+        expect_file!["openssl_nocrypt.parsed.bin"].assert_debug_eq(&decoded);
 
         // OpenSSL-generated PFXs will have exactly the same bytes when re-encoded
         let reencoded = picky_asn1_der::to_vec(&decoded).unwrap();
@@ -197,7 +197,7 @@ mod tests {
         let encoded = include_bytes!("../../../test_assets/pkcs12/leaf_password_is_abc.pfx");
         let decoded: Pfx = picky_asn1_der::from_bytes(encoded).unwrap();
         // Validate parsed PFX structure via debug representation
-        expect_file!["../../../test_assets/pkcs12/leaf_password_is_abc.parsed.txt"].assert_debug_eq(&decoded);
+        expect_file!["leaf_password_is_abc.parsed.txt"].assert_debug_eq(&decoded);
         // OpenSSL-generated PFXs will have exactly the same bytes when re-encoded
         let reencoded = picky_asn1_der::to_vec(&decoded).unwrap();
         assert_eq!(encoded, reencoded.as_slice());
@@ -207,7 +207,7 @@ mod tests {
     fn pfx_certmgr_aes256_roundtrip() {
         let encoded = include_bytes!("../../../test_assets/pkcs12/certmgr_aes256.pfx");
         let decoded: Pfx = picky_asn1_der::from_bytes(encoded).unwrap();
-        expect_file!["../../../test_assets/pkcs12/certmgr_aes256.parsed.txt"].assert_debug_eq(&decoded);
+        expect_file!["certmgr_aes256.parsed.txt"].assert_debug_eq(&decoded);
         // For certmgr-generated PFXs, we can't compare the bytes directly because
         // certmgr omits serialization of NULL params of DigestAlgorithm, but we always serialize
         // them. (However certmgr will accept the PFX we generate as we serialize it the same way
@@ -219,7 +219,7 @@ mod tests {
         let encoded = include_bytes!("../../../test_assets/pkcs12/certmgr_3des.pfx");
         let decoded: Pfx = picky_asn1_der::from_bytes(encoded).unwrap();
 
-        expect_file!["../../../test_assets/pkcs12/certmgr_3des.parsed.txt"].assert_debug_eq(&decoded);
+        expect_file!["certmgr_3des.parsed.txt"].assert_debug_eq(&decoded);
     }
 
     #[test]
