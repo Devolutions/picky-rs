@@ -82,7 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - PuTTY PPK key format support
 
 ### Changed
-- Bump minimal rustc version to 1.65 (required by `sec1` transitive dependency after `p256`/`p384` update)
+- Bump minimal rustc version to 1.70
 - Updated `p256`/`p384` to latest version
 - (Breaking) Move Authenticode related code from `picky::x509::wincert` to `picky::x509::pkcs7::authenticode` module
 - (Breaking) Authenticode implementation is now behind `pkcs7` feature
@@ -94,6 +94,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of plain `PublicKey`. This change was required because added support for EC/ED keys is not
   infallible in regard to public key extraction (public key could be missing from the file and could
   not be generated because of an unsupported algorithm/curve)
+- "picky-test-data" is a new dev-dependency.
 
 ### Removed
 - (Breaking) `ec` non-default cargo feature (EC operations now enabled by default)

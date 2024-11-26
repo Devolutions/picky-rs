@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Fixed
+
+- "picky-asn1-der" is now a dev-dependency of the released crate, to fix test build.
+
+### Changed
+
+- Bump minimal rustc version to 1.70
+
 ## [0.9.0] 2024-07-12
 
 ### Changed
