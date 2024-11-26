@@ -1,6 +1,6 @@
 [package]
 name = "picky-asn1-x509"
-version = "0.14.0"
+version = "0.14.1"
 authors = [
     "Benoît CORTIER <bcortier@devolutions.net>",
     "Sergey Noskov <snoskov@avito.ru>",
@@ -17,7 +17,7 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/Devolutions/picky-rs"
 
 [dependencies]
-picky-asn1 = { version = "0.9", path = "../picky-asn1" }
+picky-asn1 = { version = "0.10", path = "../picky-asn1" }
 picky-asn1-der = { version = "0.5", path = "../picky-asn1-der" }
 serde = { version = "1", features = ["derive"] }
 oid = { version = "0.2", features = ["serde_support"] }
