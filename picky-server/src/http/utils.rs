@@ -9,16 +9,11 @@ pub trait StatusCodeResult<T> {
     fn bad_request_desc(self, desc: &str) -> Result<T, StatusCode>;
 
     fn not_found(self) -> Result<T, StatusCode>;
-    fn not_found_desc(self, desc: &str) -> Result<T, StatusCode>;
 
     fn internal_error(self) -> Result<T, StatusCode>;
     fn internal_error_desc(self, desc: &str) -> Result<T, StatusCode>;
 
     fn service_unavailable(self) -> Result<T, StatusCode>;
-    fn service_unavailable_desc(self, desc: &str) -> Result<T, StatusCode>;
-
-    fn unauthorized(self) -> Result<T, StatusCode>;
-    fn unauthorized_desc(self, desc: &str) -> Result<T, StatusCode>;
 }
 
 macro_rules! status_code_on_error {
@@ -55,10 +50,6 @@ impl<T, E: fmt::Display> StatusCodeResult<T> for Result<T, E> {
         status_code_on_error!(self, NOT_FOUND)
     }
 
-    fn not_found_desc(self, desc: &str) -> Result<T, StatusCode> {
-        status_code_on_error!(self, NOT_FOUND, desc)
-    }
-
     fn internal_error(self) -> Result<T, StatusCode> {
         status_code_on_error!(self, INTERNAL_SERVER_ERROR)
     }
@@ -69,18 +60,6 @@ impl<T, E: fmt::Display> StatusCodeResult<T> for Result<T, E> {
 
     fn service_unavailable(self) -> Result<T, StatusCode> {
         status_code_on_error!(self, SERVICE_UNAVAILABLE)
-    }
-
-    fn service_unavailable_desc(self, desc: &str) -> Result<T, StatusCode> {
-        status_code_on_error!(self, SERVICE_UNAVAILABLE, desc)
-    }
-
-    fn unauthorized(self) -> Result<T, StatusCode> {
-        status_code_on_error!(self, UNAUTHORIZED)
-    }
-
-    fn unauthorized_desc(self, desc: &str) -> Result<T, StatusCode> {
-        status_code_on_error!(self, UNAUTHORIZED, desc)
     }
 }
 
@@ -112,10 +91,6 @@ impl<T> StatusCodeResult<T> for Option<T> {
         status_code_on_none!(self, NOT_FOUND)
     }
 
-    fn not_found_desc(self, desc: &str) -> Result<T, StatusCode> {
-        status_code_on_none!(self, NOT_FOUND, desc)
-    }
-
     fn internal_error(self) -> Result<T, StatusCode> {
         status_code_on_none!(self, INTERNAL_SERVER_ERROR)
     }
@@ -126,18 +101,6 @@ impl<T> StatusCodeResult<T> for Option<T> {
 
     fn service_unavailable(self) -> Result<T, StatusCode> {
         status_code_on_none!(self, SERVICE_UNAVAILABLE)
-    }
-
-    fn service_unavailable_desc(self, desc: &str) -> Result<T, StatusCode> {
-        status_code_on_none!(self, SERVICE_UNAVAILABLE, desc)
-    }
-
-    fn unauthorized(self) -> Result<T, StatusCode> {
-        status_code_on_none!(self, UNAUTHORIZED)
-    }
-
-    fn unauthorized_desc(self, desc: &str) -> Result<T, StatusCode> {
-        status_code_on_none!(self, UNAUTHORIZED, desc)
     }
 }
 
