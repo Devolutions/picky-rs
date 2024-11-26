@@ -24,7 +24,7 @@ time = { version = "0.3", optional = true }
 zeroize = { version = "1.8", optional = true }
 
 [dev-dependencies]
-picky-asn1-der = { path = "../picky-asn1-der" }
+picky-asn1-der = { path = "../picky-asn1-der", version = "0.5" }
 
 [features]
 chrono_conversion = ["chrono"]
