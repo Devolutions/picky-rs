@@ -161,21 +161,16 @@ impl<'de> de::Deserialize<'de> for Pbkdf2Params {
 ///
 /// `id-hmacWithSHA512-224` and `id-hmacWithSHA512-256` are not supported directly as very not
 /// widely used.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum Pbkdf2Prf {
+    // As defined by PKCS#5 RFC 8018, section A.2.
+    #[default]
     HmacWithSha1,
     HmacWithSha224,
     HmacWithSha256,
     HmacWithSha384,
     HmacWithSha512,
     Unknown(RawAlgorithmIdentifier),
-}
-
-impl Default for Pbkdf2Prf {
-    fn default() -> Self {
-        // As defined by PKCS#5 RFC 8018, section A.2.
-        Pbkdf2Prf::HmacWithSha1
-    }
 }
 
 impl From<Pbkdf2Prf> for RawAlgorithmIdentifier {
