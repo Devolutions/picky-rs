@@ -1,37 +1,16 @@
 //! OIDs commonly used with X.509 certificates
 
-/// Unsafely marks a branch as unreachable.
-/// This won't panic if reached, however children will be sacrificed and dark magic performed.
-///
-/// # Unsafety
-///
-/// This is incredibly unsafe.
-/// You can already see Hades waving his hand at you from here.
-/// You shall not pass this bridge leading to insanity. Never.
-/// No one can tell you what would happen if you did.
-/// Only one thing is for sure: it leads to a land of desolation called UB.
-/// I mean, I'm literally creating infinity out of emptiness.
-/// If you don't care about your mental sanity, you can read the
-/// [nomicon on unchecked uninitialized memory](https://doc.rust-lang.org/nomicon/unchecked-uninit.html).
-unsafe fn unreachable() -> ! {
-    std::hint::unreachable_unchecked()
-}
-
 macro_rules! define_oid {
     ($uppercase:ident => $lowercase:ident => $str_value:literal) => {
         pub const $uppercase: &'static str = $str_value;
 
         pub fn $lowercase() -> ::oid::ObjectIdentifier {
-            use ::std::sync::Once;
+            use ::std::sync::OnceLock;
 
-            static mut OID: Option<::oid::ObjectIdentifier> = None;
-            static INIT: Once = Once::new();
-            unsafe {
-                INIT.call_once(|| {
-                    OID = Some($uppercase.try_into().unwrap())
-                });
-                if let Some(oid) = &OID { oid.clone() } else { unreachable() }
-            }
+            static OID: OnceLock<::oid::ObjectIdentifier> = OnceLock::new();
+            OID.get_or_init(|| {
+               $uppercase.try_into().unwrap()
+            }).clone()
         }
     };
     ( $( $uppercase:ident => $lowercase:ident => $str_value:literal, )+ ) => {

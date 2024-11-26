@@ -12,7 +12,7 @@ authors = [
 ]
 description = "Provides ASN1 types defined by X.509 related RFCs"
 edition = "2021"
-rust-version = "1.61"
+rust-version = "1.70"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Devolutions/picky-rs"
 
