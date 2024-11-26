@@ -136,7 +136,7 @@ mod tests {
         let key = get_private_key_1();
         let token = get_provider_token(&key);
         let saphir_req = build_saphir_req(&token);
-        let config = config(Some(key.to_public_key()));
+        let config = config(Some(key.to_public_key().unwrap()));
         check_authorization(&config, &saphir_req).expect("auth");
     }
 
@@ -144,7 +144,7 @@ mod tests {
     fn token_unauthorized_bad_signature() {
         let token = get_provider_token(&get_private_key_1());
         let saphir_req = build_saphir_req(&token);
-        let config = config(Some(get_private_key_2().to_public_key()));
+        let config = config(Some(get_private_key_2().to_public_key().unwrap()));
         let err = check_authorization(&config, &saphir_req).err().expect("auth err");
         assert_eq!(
             err,
