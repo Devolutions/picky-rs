@@ -7,3 +7,8 @@ package/
 c-api/examples/out
 picky_server_conf.yaml
 .DS_Store
+
+**/LICENSE-MIT
+**/LICENSE-APACHE
+!/LICENSE-MIT
+!/LICENSE-APACHE
