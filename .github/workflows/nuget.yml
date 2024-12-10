@@ -108,12 +108,19 @@ jobs:
 
           echo "[target.i686-linux-android]" >> $CargoConfigFile
           echo "linker=`"$AndroidToolchain/bin/i686-linux-android21-clang`"" >> $CargoConfigFile
+          echo "rustflags = [`"-C`", `"link-args=-zmax-page-size=16384`"]"
+
           echo "[target.x86_64-linux-android]" >> $CargoConfigFile
           echo "linker=`"$AndroidToolchain/bin/x86_64-linux-android21-clang`"" >> $CargoConfigFile
+          echo "rustflags = [`"-C`", `"link-args=-zmax-page-size=16384`"]"
+
           echo "[target.armv7-linux-androideabi]" >> $CargoConfigFile
           echo "linker=`"$AndroidToolchain/bin/armv7a-linux-androideabi21-clang`"" >> $CargoConfigFile
+          echo "rustflags = [`"-C`", `"link-args=-zmax-page-size=16384`"]"
+
           echo "[target.aarch64-linux-android]" >> $CargoConfigFile
           echo "linker=`"$AndroidToolchain/bin/aarch64-linux-android21-clang`"" >> $CargoConfigFile
+          echo "rustflags = [`"-C`", `"link-args=-zmax-page-size=16384`"]"
 
       - name: Setup build environment
         shell: pwsh
