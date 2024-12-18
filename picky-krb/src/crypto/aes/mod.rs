@@ -12,10 +12,10 @@ use super::{KerberosCryptoError, KerberosCryptoResult};
 
 /// [Kerberos Algorithm Profile Parameters](https://www.rfc-editor.org/rfc/rfc3962.html#section-6)
 /// cipher block size 16 octets
-const AES_BLOCK_SIZE: usize = 16;
+pub const AES_BLOCK_SIZE: usize = 16;
 /// [Kerberos Algorithm Profile Parameters](https://www.rfc-editor.org/rfc/rfc3962.html#section-6)
 /// HMAC output size = 12 octets
-const AES_MAC_SIZE: usize = 12;
+pub const AES_MAC_SIZE: usize = 12;
 
 /// [Assigned Numbers](https://www.rfc-editor.org/rfc/rfc3962.html#section-7)
 pub const AES128_KEY_SIZE: usize = 128 / 8;

@@ -2,15 +2,29 @@ use crate::constants::etypes::{AES128_CTS_HMAC_SHA1_96, AES256_CTS_HMAC_SHA1_96,
 
 use super::aes::{Aes128CtsHmacSha196, Aes256CtsHmacSha196};
 use super::des::Des3CbcSha1Kd;
-use super::{KerberosCryptoError, KerberosCryptoResult};
+use super::{ChecksumSuite, DecryptWithoutChecksum, EncryptWithoutChecksum, KerberosCryptoError, KerberosCryptoResult};
 
 pub trait Cipher {
     fn key_size(&self) -> usize;
     fn seed_bit_len(&self) -> usize;
     fn cipher_type(&self) -> CipherSuite;
+    fn checksum_type(&self) -> ChecksumSuite;
 
     fn encrypt(&self, key: &[u8], key_usage: i32, payload: &[u8]) -> KerberosCryptoResult<Vec<u8>>;
     fn decrypt(&self, key: &[u8], key_usage: i32, cipher_data: &[u8]) -> KerberosCryptoResult<Vec<u8>>;
+
+    fn encrypt_no_checksum(
+        &self,
+        key: &[u8],
+        key_usage: i32,
+        payload: &[u8],
+    ) -> KerberosCryptoResult<EncryptWithoutChecksum>;
+    fn decrypt_no_checksum(
+        &self,
+        key: &[u8],
+        key_usage: i32,
+        cipher_data: &[u8],
+    ) -> KerberosCryptoResult<DecryptWithoutChecksum>;
 
     fn generate_key_from_password(&self, password: &[u8], salt: &[u8]) -> KerberosCryptoResult<Vec<u8>>;
     fn random_to_key(&self, key: Vec<u8>) -> Vec<u8>;
