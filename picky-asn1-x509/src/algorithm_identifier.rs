@@ -760,6 +760,20 @@ pub struct AesAuthEncParams {
 }
 
 impl AesAuthEncParams {
+    pub fn new(nonce: Vec<u8>, icv_len: usize) -> Self {
+        Self {
+            nonce: OctetStringAsn1::from(nonce),
+            icv_len: IntegerAsn1::from(
+                icv_len
+                    .to_be_bytes()
+                    // Remove leading zeroes.
+                    .into_iter()
+                    .skip_while(|n| *n == 0)
+                    .collect::<Vec<_>>(),
+            ),
+        }
+    }
+
     pub fn nonce(&self) -> &[u8] {
         &self.nonce.0
     }
