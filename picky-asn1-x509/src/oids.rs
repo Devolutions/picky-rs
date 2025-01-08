@@ -49,6 +49,7 @@ define_oid! {
     SIGNED_DATA => signed_data => "1.2.840.113549.1.7.2",
     CONTENT_TYPE => content_type => "1.2.840.113549.1.9.3",
     MESSAGE_DIGEST => message_digest => "1.2.840.113549.1.9.4",
+    ENVELOPED_DATA => enveloped_data => "1.2.840.113549.1.7.3",
 
     // NIST
     DSA_WITH_SHA224 => dsa_with_sha224 => "2.16.840.1.101.3.4.3.1",
