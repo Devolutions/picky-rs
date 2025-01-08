@@ -2,8 +2,8 @@ use core::fmt;
 
 use picky_asn1::tag::{TagClass, TagPeeker};
 use picky_asn1::wrapper::{
-    Asn1SequenceOf, Asn1SetOf, ExplicitContextTag2, GeneralizedTimeAsn1, ImplicitContextTag0, ImplicitContextTag1,
-    ObjectIdentifierAsn1, OctetStringAsn1, Optional, Utf8StringAsn1,
+    Asn1SequenceOf, Asn1SetOf, ExplicitContextTag0, ExplicitContextTag2, GeneralizedTimeAsn1, ImplicitContextTag0,
+    ImplicitContextTag1, ObjectIdentifierAsn1, OctetStringAsn1, Optional, Utf8StringAsn1,
 };
 use picky_asn1_der::Asn1RawDer;
 use serde::{de, ser, Deserialize, Serialize};
@@ -12,6 +12,33 @@ use crate::cmsversion::CmsVersion;
 use crate::crls::RevocationInfoChoices;
 use crate::signed_data::CertificateSet;
 use crate::{AlgorithmIdentifier, Attribute};
+
+/// [ContentInfo](https://www.rfc-editor.org/rfc/rfc5652#section-3)
+///
+/// ```not_rust
+///  ContentInfo ::= SEQUENCE {
+///    contentType ContentType,
+///    content [0] EXPLICIT ANY DEFINED BY contentType }
+///
+///  ContentType ::= OBJECT IDENTIFIER
+/// ```
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct ContentInfo {
+    pub content_type: ObjectIdentifierAsn1,
+    pub content: ExplicitContextTag0<Asn1RawDer>,
+}
+
+impl ContentInfo {
+    /// Returns raw content bytes.
+    pub fn content(&self) -> &[u8] {
+        &self.content.0 .0
+    }
+
+    /// Tries to parse the content value and returns parsed object.
+    pub fn content_typed<'a, T: Deserialize<'a>>(&'a self) -> picky_asn1_der::Result<T> {
+        picky_asn1_der::from_bytes(&self.content.0 .0)
+    }
+}
 
 /// [EnvelopedData Type](https://www.rfc-editor.org/rfc/rfc5652#section-6.1)
 ///
