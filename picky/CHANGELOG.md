@@ -5,9 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-<!-- next-header -->
-
-## [Unreleased] – ReleaseDate
+## [7.0.0-rc.1 to 7.0.0-rc.11](https://github.com/Devolutions/picky-rs/compare/picky-6.4.0...picky-v7.0.0-rc.11)
 
 ### Added
 
@@ -82,6 +80,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - PuTTY PPK key format support
 
 ### Changed
+
 - Bump minimal rustc version to 1.70
 - Updated `p256`/`p384` to latest version
 - (Breaking) Move Authenticode related code from `picky::x509::wincert` to `picky::x509::pkcs7::authenticode` module
@@ -97,6 +96,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "picky-test-data" is a new dev-dependency.
 
 ### Removed
+
 - (Breaking) `ec` non-default cargo feature (EC operations now enabled by default)
 
 ### Fixed
@@ -119,13 +119,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed invalid padding logic of encrypted SSH keys
 - Fixed invalid generated SSH EC keys
 
-
 ### Removed
 
 - (Breaking) `Jwt::new_encrypted`
 - (Breaking) `Jwt::new_signed`
 
-## [6.4.0] – 2021-08-10
+## [6.4.0](https://github.com/Devolutions/picky-rs/compare/picky-6.3.0...picky-6.4.0) – 2021-08-10
 
 ### Changed
 
@@ -134,7 +133,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update `picky-asn1` dependency to `0.4`
 - More robust certification validation (see commit [f5f8cb60e41](https://github.com/Devolutions/picky-rs/commit/f5f8cb60e410ffe49aabace131f7b802e206ced0) for details)
 
-## [6.3.0] – 2021-05-27
+## [6.3.0](https://github.com/Devolutions/picky-rs/compare/picky-6.2.0...picky-6.3.0) – 2021-05-27
 
 ### Added
 
@@ -145,7 +144,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Update `aes-gcm` dependency to `0.9`
 
-## [6.2.0] – 2021-03-04
+## [6.2.0](https://github.com/Devolutions/picky-rs/compare/picky-6.1.1...picky-6.2.0) – 2021-03-04
 
 ### Added
 
@@ -251,9 +250,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated
 
 - `Cert::verify` and `Cert::verify_chain` methods in favor of the `Cert::verifier` method.
-
-<!-- next-url -->
-[Unreleased]: https://github.com/Devolutions/picky-rs/compare/picky-6.4.0...HEAD
-[6.4.0]: https://github.com/Devolutions/picky-rs/compare/picky-6.3.0...picky-6.4.0
-[6.3.0]: https://github.com/Devolutions/picky-rs/compare/picky-6.2.0...picky-6.3.0
-[6.2.0]: https://github.com/Devolutions/picky-rs/compare/picky-6.1.1...picky-6.2.0
