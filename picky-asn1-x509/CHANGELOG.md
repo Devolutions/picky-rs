@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [[0.14.2](https://github.com/Devolutions/picky-rs/compare/picky-asn1-x509-v0.14.1...picky-asn1-x509-v0.14.2)] - 2025-01-13
+
+### <!-- 1 -->Features
+
+- `AesAuthEncParams::new` method (#336) ([c33cf22bac](https://github.com/Devolutions/picky-rs/commit/c33cf22bac97a3147d5f99fb74028105b18f0f77)) 
+
+- Add enveloped-data oid (#335) ([c077c72ee9](https://github.com/Devolutions/picky-rs/commit/c077c72ee99caa2c8cf04162c1cccbaced0dc0f5)) 
+
+- Add `ContentInfo` in `pkcs7` module (#334) ([eaa43c36f6](https://github.com/Devolutions/picky-rs/commit/eaa43c36f6976aa8f54e51ee4a64fbe626d6938f)) 
+
+
 ## [0.14.1] 2024-11-26
 
 ### Changed
