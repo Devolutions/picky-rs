@@ -501,9 +501,9 @@ checksum = "8355be11b20d696c8f18f6cc018c4e372165b1fa8126cef092399c9951984ffa"
 
 [[package]]
 name = "log"
-version = "0.4.22"
+version = "0.4.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7a70ba024b9dc04c27ea2f0c0548feb474ec5c54bba33a7f72f873a39d07b24"
+checksum = "04cbf5b083de1c7e0222a7a51dbfdba1cbe1c6ab0b15e29fff3f6c077fd9cd9f"
 
 [[package]]
 name = "md-5"
@@ -673,7 +673,7 @@ version = "0.0.0"
 dependencies = [
  "console_error_panic_hook",
  "getrandom",
- "picky 7.0.0-rc.11",
+ "picky 7.0.0-rc.12",
  "serde_json",
  "wasm-bindgen",
  "wasm-bindgen-test",
@@ -681,7 +681,7 @@ dependencies = [
 
 [[package]]
 name = "picky"
-version = "7.0.0-rc.11"
+version = "7.0.0-rc.12"
 dependencies = [
  "aes",
  "aes-gcm",
@@ -720,7 +720,7 @@ dependencies = [
 
 [[package]]
 name = "picky-asn1"
-version = "0.10.0"
+version = "0.10.1"
 dependencies = [
  "oid",
  "serde",
@@ -730,7 +730,7 @@ dependencies = [
 
 [[package]]
 name = "picky-asn1-der"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "picky-asn1",
  "serde",
@@ -739,7 +739,7 @@ dependencies = [
 
 [[package]]
 name = "picky-asn1-x509"
-version = "0.14.2"
+version = "0.14.3"
 dependencies = [
  "base64",
  "num-bigint-dig",
