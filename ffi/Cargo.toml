@@ -12,7 +12,7 @@ test = false
 doctest = false
 
 [target.'cfg(windows)'.build-dependencies]
-embed-resource = "2.4"
+embed-resource = "3.0"
 
 [dependencies]
 picky = { path = "../picky/", default-features = false, features = ["ssh", "x509", "time_conversion", "jose", "pkcs12", "pkcs7", "http_timestamp", "putty"] }
