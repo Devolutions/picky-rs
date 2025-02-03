@@ -145,7 +145,7 @@ mod tests {
         let mut conf_with_plaintext: Vec<u8> = encryption_result.confounder;
         conf_with_plaintext.extend_from_slice(&plaintext);
         let pad_len = (DES3_BLOCK_SIZE - (conf_with_plaintext.len() % DES3_BLOCK_SIZE)) % DES3_BLOCK_SIZE;
-        conf_with_plaintext.extend_from_slice(&vec![0; pad_len]);
+        conf_with_plaintext.resize(conf_with_plaintext.len() + pad_len, 0);
 
         assert_eq!(
             hmac_sha1(&encryption_result.ki, &conf_with_plaintext, DES3_MAC_SIZE),

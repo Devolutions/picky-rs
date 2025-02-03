@@ -50,10 +50,12 @@ pub fn decrypt_message_no_checksum(
 
     let ki = derive_key(key, &usage_ki(key_usage))?;
 
+    // [0..DES3_BLOCK_SIZE] = the first block is random confounder bytes.
+    let (confounder, plaintext) = plaintext.split_at(DES3_BLOCK_SIZE);
+
     Ok(DecryptWithoutChecksum {
-        // [0..DES3_BLOCK_SIZE] = the first block is random confounder bytes. skip them
-        plaintext: plaintext[DES3_BLOCK_SIZE..].to_vec(),
-        confounder: plaintext[0..DES3_BLOCK_SIZE].to_vec(),
+        plaintext: plaintext.to_vec(),
+        confounder: confounder.to_vec(),
         checksum: checksum.to_vec(),
         ki,
     })

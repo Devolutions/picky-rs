@@ -61,10 +61,12 @@ pub fn decrypt_message_no_checksum(
 
     let ki = derive_key(key, &usage_ki(key_usage), aes_size)?;
 
+    // [0..AES_BLOCK_SIZE] = the first block is a random confounder bytes.
+    let (confounder, plaintext) = plaintext.split_at(AES_BLOCK_SIZE);
+
     Ok(DecryptWithoutChecksum {
-        // [0..AES_BLOCK_SIZE] = the first block is a random confounder bytes. skip them
-        plaintext: plaintext[AES_BLOCK_SIZE..].to_vec(),
-        confounder: plaintext[0..AES_BLOCK_SIZE].to_vec(),
+        plaintext: plaintext.to_vec(),
+        confounder: confounder.to_vec(),
         checksum: checksum.to_vec(),
         ki,
     })

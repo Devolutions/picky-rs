@@ -22,12 +22,13 @@ pub fn encrypt_message(
     // prepare for checksum generation
     let mut data_to_encrypt = vec![0; DES3_BLOCK_SIZE + payload.len()];
 
-    data_to_encrypt[0..DES3_BLOCK_SIZE].copy_from_slice(&confounder);
-    data_to_encrypt[DES3_BLOCK_SIZE..].copy_from_slice(payload);
+    let (confounder_buf, payload_buf) = data_to_encrypt.split_at_mut(DES3_BLOCK_SIZE);
+    confounder_buf.copy_from_slice(&confounder);
+    payload_buf.copy_from_slice(payload);
 
     let pad_len = (DES3_BLOCK_SIZE - (data_to_encrypt.len() % DES3_BLOCK_SIZE)) % DES3_BLOCK_SIZE;
     // pad
-    data_to_encrypt.extend_from_slice(&vec![0; pad_len]);
+    data_to_encrypt.resize(data_to_encrypt.len() + pad_len, 0);
 
     let hmac = hmac_sha1(&encryption_result.ki, &data_to_encrypt, DES3_MAC_SIZE);
 
@@ -51,12 +52,13 @@ pub fn encrypt_message_no_checksum(
 
     let mut data_to_encrypt = vec![0; DES3_BLOCK_SIZE + payload.len()];
 
-    data_to_encrypt[0..DES3_BLOCK_SIZE].copy_from_slice(&confounder);
-    data_to_encrypt[DES3_BLOCK_SIZE..].copy_from_slice(payload);
+    let (confounder_buf, payload_buf) = data_to_encrypt.split_at_mut(DES3_BLOCK_SIZE);
+    confounder_buf.copy_from_slice(&confounder);
+    payload_buf.copy_from_slice(payload);
 
     let pad_len = (DES3_BLOCK_SIZE - (data_to_encrypt.len() % DES3_BLOCK_SIZE)) % DES3_BLOCK_SIZE;
     // pad
-    data_to_encrypt.extend_from_slice(&vec![0; pad_len]);
+    data_to_encrypt.resize(data_to_encrypt.len() + pad_len, 0);
 
     let ke = derive_key(key, &usage_ke(key_usage))?;
     // (C1, newIV) = E(Ke, conf | plaintext | pad, oldstate.ivec)
@@ -79,7 +81,7 @@ pub fn encrypt_des(key: &[u8], payload: &[u8]) -> KerberosCryptoResult<Vec<u8>> 
     let pad_length = (DES3_BLOCK_SIZE - (payload.len() % DES3_BLOCK_SIZE)) % DES3_BLOCK_SIZE;
 
     let mut payload = payload.to_vec();
-    payload.extend_from_slice(&vec![0; pad_length]);
+    payload.resize(payload.len() + pad_length, 0);
 
     let payload_len = payload.len();
 

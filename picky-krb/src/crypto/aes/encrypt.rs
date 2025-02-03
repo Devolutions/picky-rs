@@ -24,10 +24,11 @@ pub fn encrypt_message(
 ) -> KerberosCryptoResult<Vec<u8>> {
     let mut encryption_result = encrypt_message_no_checksum(key, key_usage, payload, aes_size, confounder)?;
     // prepare for checksum generation
-    let mut data_to_encrypt = vec![0; aes_size.confounder_byte_size() + payload.len()];
+    let mut data_to_encrypt = vec![0; AES_BLOCK_SIZE + payload.len()];
 
-    data_to_encrypt[0..aes_size.confounder_byte_size()].copy_from_slice(&confounder);
-    data_to_encrypt[aes_size.confounder_byte_size()..].copy_from_slice(payload);
+    let (confounder_buf, payload_buf) = data_to_encrypt.split_at_mut(AES_BLOCK_SIZE);
+    confounder_buf.copy_from_slice(&confounder);
+    payload_buf.copy_from_slice(payload);
 
     // H1 = HMAC(Ki, conf | plaintext | pad)
     let hmac = hmac_sha1(&encryption_result.ki, &data_to_encrypt, AES_MAC_SIZE);
@@ -51,10 +52,11 @@ pub fn encrypt_message_no_checksum(
         return Err(KerberosCryptoError::KeyLength(key.len(), aes_size.key_length()));
     }
 
-    let mut data_to_encrypt = vec![0; aes_size.confounder_byte_size() + payload.len()];
+    let mut data_to_encrypt = vec![0; AES_BLOCK_SIZE + payload.len()];
 
-    data_to_encrypt[0..aes_size.confounder_byte_size()].copy_from_slice(&confounder);
-    data_to_encrypt[aes_size.confounder_byte_size()..].copy_from_slice(payload);
+    let (confounder_buf, payload_buf) = data_to_encrypt.split_at_mut(AES_BLOCK_SIZE);
+    confounder_buf.copy_from_slice(&confounder);
+    payload_buf.copy_from_slice(payload);
 
     let ke = derive_key(key, &usage_ke(key_usage), aes_size)?;
     // (C1, newIV) = E(Ke, conf | plaintext | pad, oldstate.ivec)
@@ -96,7 +98,7 @@ pub fn encrypt_aes_cts(key: &[u8], payload: &[u8], aes_size: &AesSize) -> Kerber
     let pad_length = (AES_BLOCK_SIZE - (payload.len() % AES_BLOCK_SIZE)) % AES_BLOCK_SIZE;
 
     let mut padded_payload = payload.to_vec();
-    padded_payload.extend_from_slice(&vec![0; pad_length]);
+    padded_payload.resize(padded_payload.len() + pad_length, 0);
 
     let mut cipher = encrypt_aes_cbc(key, &padded_payload, aes_size)?;
 

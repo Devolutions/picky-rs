@@ -45,10 +45,6 @@ impl AesSize {
     pub fn seed_bit_len(&self) -> usize {
         self.key_length() * 8
     }
-
-    fn confounder_byte_size(&self) -> usize {
-        AES_BLOCK_SIZE
-    }
 }
 
 pub fn swap_two_last_blocks(data: &mut [u8]) -> KerberosCryptoResult<()> {
