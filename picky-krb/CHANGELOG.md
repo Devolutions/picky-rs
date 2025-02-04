@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [[0.9.3](https://github.com/Devolutions/picky-rs/compare/picky-krb-v0.9.2...picky-krb-v0.9.3)] - 2025-02-04
+
+### <!-- 0 -->Security
+
+- Implement Kerberos encryption without a checksum ([#342](https://github.com/Devolutions/picky-rs/pull/342)) ([90eab0150a](https://github.com/Devolutions/picky-rs/commit/90eab0150a6645b667ad2eb49085f0de5556ebd2)) 
+
+  Added the possibility of Kerberos encryption but without a checksum.
+  This functionality is needed to support `SECBUFFER_READONLY` and
+  `SECBUFFER_READONLY_WITH_CHECKSUM` flags for security buffers in `sspi-rs`.
+
+### <!-- 4 -->Bug Fixes
+
+- Symlinks to license files in packages ([#339](https://github.com/Devolutions/picky-rs/pull/339)) ([1834c04f39](https://github.com/Devolutions/picky-rs/commit/1834c04f3930fb1bbf040deb6525b166e378b8aa)) 
+
+  Use symlinks instead of copying files to avoid a “dirty” state during
+  cargo publish and preserve VCS info. With #337 merged, CI handles
+  publishing consistently, so developer environments no longer matter.
+
+
 ## [0.9.2] 2024-11-26
 
 ### Changed
