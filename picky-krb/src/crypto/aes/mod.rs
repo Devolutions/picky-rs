@@ -12,10 +12,10 @@ use super::{KerberosCryptoError, KerberosCryptoResult};
 
 /// [Kerberos Algorithm Profile Parameters](https://www.rfc-editor.org/rfc/rfc3962.html#section-6)
 /// cipher block size 16 octets
-const AES_BLOCK_SIZE: usize = 16;
+pub const AES_BLOCK_SIZE: usize = 16;
 /// [Kerberos Algorithm Profile Parameters](https://www.rfc-editor.org/rfc/rfc3962.html#section-6)
 /// HMAC output size = 12 octets
-const AES_MAC_SIZE: usize = 12;
+pub const AES_MAC_SIZE: usize = 12;
 
 /// [Assigned Numbers](https://www.rfc-editor.org/rfc/rfc3962.html#section-7)
 pub const AES128_KEY_SIZE: usize = 128 / 8;
@@ -44,10 +44,6 @@ impl AesSize {
 
     pub fn seed_bit_len(&self) -> usize {
         self.key_length() * 8
-    }
-
-    fn confounder_byte_size(&self) -> usize {
-        AES_BLOCK_SIZE
     }
 }
 

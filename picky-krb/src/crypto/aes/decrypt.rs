@@ -4,7 +4,7 @@ use aes::{Aes128, Aes256};
 
 use crate::crypto::common::hmac_sha1;
 use crate::crypto::utils::{usage_ke, usage_ki};
-use crate::crypto::{KerberosCryptoError, KerberosCryptoResult};
+use crate::crypto::{DecryptWithoutChecksum, KerberosCryptoError, KerberosCryptoResult};
 
 use super::key_derivation::derive_key;
 use super::{swap_two_last_blocks, AesSize, AES_BLOCK_SIZE, AES_MAC_SIZE};
@@ -19,6 +19,32 @@ pub fn decrypt_message(
     cipher_data: &[u8],
     aes_size: &AesSize,
 ) -> KerberosCryptoResult<Vec<u8>> {
+    let decryption_result = decrypt_message_no_checksum(key, key_usage, cipher_data, aes_size)?;
+    let calculated_checksum = hmac_sha1(
+        &decryption_result.ki,
+        &[
+            decryption_result.confounder.as_slice(),
+            decryption_result.plaintext.as_slice(),
+        ]
+        .concat(),
+        AES_MAC_SIZE,
+    );
+
+    // if (H1 != HMAC(Ki, P1)[1..h])
+    if calculated_checksum != decryption_result.checksum {
+        return Err(KerberosCryptoError::IntegrityCheck);
+    }
+
+    Ok(decryption_result.plaintext)
+}
+
+/// Returns (Plaintext, conf, H1, Ki)
+pub fn decrypt_message_no_checksum(
+    key: &[u8],
+    key_usage: i32,
+    cipher_data: &[u8],
+    aes_size: &AesSize,
+) -> KerberosCryptoResult<DecryptWithoutChecksum> {
     if cipher_data.len() < AES_BLOCK_SIZE + AES_MAC_SIZE {
         return Err(KerberosCryptoError::CipherLength(
             cipher_data.len(),
@@ -34,15 +60,16 @@ pub fn decrypt_message(
     let plaintext = decrypt_aes_cts(&ke, cipher_data, aes_size)?;
 
     let ki = derive_key(key, &usage_ki(key_usage), aes_size)?;
-    let calculated_checksum = hmac_sha1(&ki, &plaintext, AES_MAC_SIZE);
 
-    // if (H1 != HMAC(Ki, P1)[1..h])
-    if calculated_checksum != checksum {
-        return Err(KerberosCryptoError::IntegrityCheck);
-    }
+    // [0..AES_BLOCK_SIZE] = the first block is a random confounder bytes.
+    let (confounder, plaintext) = plaintext.split_at(AES_BLOCK_SIZE);
 
-    // [0..AES_BLOCK_SIZE] = the first block is a random confounder bytes. skip them
-    Ok(plaintext[AES_BLOCK_SIZE..].to_vec())
+    Ok(DecryptWithoutChecksum {
+        plaintext: plaintext.to_vec(),
+        confounder: confounder.to_vec(),
+        checksum: checksum.to_vec(),
+        ki,
+    })
 }
 
 pub fn decrypt_aes_cbc(key: &[u8], cipher_data: &[u8], aes_size: &AesSize) -> KerberosCryptoResult<Vec<u8>> {

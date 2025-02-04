@@ -1,10 +1,13 @@
 use rand::rngs::OsRng;
 use rand::Rng;
 
-use crate::crypto::{Cipher, CipherSuite, KerberosCryptoError, KerberosCryptoResult};
+use crate::crypto::{
+    ChecksumSuite, Cipher, CipherSuite, DecryptWithoutChecksum, EncryptWithoutChecksum, KerberosCryptoError,
+    KerberosCryptoResult,
+};
 
-use super::decrypt::decrypt_message;
-use super::encrypt::encrypt_message;
+use super::decrypt::{decrypt_message, decrypt_message_no_checksum};
+use super::encrypt::{encrypt_message, encrypt_message_no_checksum};
 use super::key_derivation::random_to_key;
 use super::{derive_key_from_password, AesSize, AES128_KEY_SIZE, AES_BLOCK_SIZE};
 
@@ -30,6 +33,10 @@ impl Cipher for Aes128CtsHmacSha196 {
         CipherSuite::Aes128CtsHmacSha196
     }
 
+    fn checksum_type(&self) -> ChecksumSuite {
+        ChecksumSuite::HmacSha196Aes128
+    }
+
     fn encrypt(&self, key: &[u8], key_usage: i32, payload: &[u8]) -> Result<Vec<u8>, KerberosCryptoError> {
         encrypt_message(
             key,
@@ -40,8 +47,32 @@ impl Cipher for Aes128CtsHmacSha196 {
         )
     }
 
+    fn encrypt_no_checksum(
+        &self,
+        key: &[u8],
+        key_usage: i32,
+        payload: &[u8],
+    ) -> KerberosCryptoResult<EncryptWithoutChecksum> {
+        encrypt_message_no_checksum(
+            key,
+            key_usage,
+            payload,
+            &AesSize::Aes128,
+            OsRng.gen::<[u8; AES_BLOCK_SIZE]>(),
+        )
+    }
+
     fn decrypt(&self, key: &[u8], key_usage: i32, cipher_data: &[u8]) -> KerberosCryptoResult<Vec<u8>> {
         decrypt_message(key, key_usage, cipher_data, &AesSize::Aes128)
+    }
+
+    fn decrypt_no_checksum(
+        &self,
+        key: &[u8],
+        key_usage: i32,
+        cipher_data: &[u8],
+    ) -> KerberosCryptoResult<DecryptWithoutChecksum> {
+        decrypt_message_no_checksum(key, key_usage, cipher_data, &AesSize::Aes128)
     }
 
     fn generate_key_from_password(&self, password: &[u8], salt: &[u8]) -> KerberosCryptoResult<Vec<u8>> {
@@ -55,9 +86,11 @@ impl Cipher for Aes128CtsHmacSha196 {
 
 #[cfg(test)]
 mod tests {
-    use crate::crypto::aes::decrypt::decrypt_message;
-    use crate::crypto::aes::encrypt::encrypt_message;
-    use crate::crypto::aes::AesSize;
+    use crate::crypto::aes::decrypt::{decrypt_message, decrypt_message_no_checksum};
+    use crate::crypto::aes::encrypt::{encrypt_message, encrypt_message_no_checksum};
+    use crate::crypto::aes::{AesSize, AES_MAC_SIZE};
+    use crate::crypto::common::hmac_sha1;
+    use crate::crypto::{DecryptWithoutChecksum, EncryptWithoutChecksum};
 
     fn encrypt(plaintext: &[u8]) -> Vec<u8> {
         let key = [199, 196, 22, 102, 68, 93, 58, 102, 147, 19, 119, 57, 30, 138, 63, 230];
@@ -74,10 +107,31 @@ mod tests {
         .unwrap()
     }
 
+    fn encrypt_no_checksum(plaintext: &[u8]) -> EncryptWithoutChecksum {
+        let key = [199, 196, 22, 102, 68, 93, 58, 102, 147, 19, 119, 57, 30, 138, 63, 230];
+
+        encrypt_message_no_checksum(
+            &key,
+            5,
+            plaintext,
+            &AesSize::Aes128,
+            [
+                161, 52, 157, 33, 238, 232, 185, 93, 167, 130, 91, 180, 167, 165, 224, 78,
+            ],
+        )
+        .unwrap()
+    }
+
     fn decrypt(payload: &[u8]) -> Vec<u8> {
         let key = [199, 196, 22, 102, 68, 93, 58, 102, 147, 19, 119, 57, 30, 138, 63, 230];
 
         decrypt_message(&key, 5, payload, &AesSize::Aes128).unwrap()
+    }
+
+    fn decrypt_no_checksum(payload: &[u8]) -> DecryptWithoutChecksum {
+        let key = [199, 196, 22, 102, 68, 93, 58, 102, 147, 19, 119, 57, 30, 138, 63, 230];
+
+        decrypt_message_no_checksum(&key, 5, payload, &AesSize::Aes128).unwrap()
     }
 
     #[test]
@@ -317,6 +371,68 @@ mod tests {
                 112, 116, 111, 46, 114, 115, 46, 112, 105, 99, 107, 121, 45, 114, 115, 46,
             ],
             decrypt(&payload).as_slice()
+        );
+    }
+
+    #[test]
+    fn encrypt_decrypt_no_checksum() {
+        // three blocks
+        let plaintext = [
+            97, 101, 115, 50, 53, 54, 95, 99, 116, 115, 95, 104, 109, 97, 99, 95, 115, 104, 97, 49, 95, 57, 54, 46,
+            107, 101, 121, 95, 100, 101, 114, 105, 118, 97, 116, 105, 111, 110, 46, 114, 115, 46, 99, 114, 121, 112,
+            116, 111,
+        ];
+
+        let expected_encrypted = &[
+            78, 233, 222, 4, 134, 134, 236, 1, 140, 145, 53, 46, 29, 194, 87, 66, 104, 52, 200, 252, 181, 222, 143, 82,
+            225, 234, 197, 103, 164, 244, 40, 198, 6, 187, 115, 114, 107, 118, 157, 175, 46, 192, 246, 169, 229, 49,
+            110, 150, 233, 162, 172, 7, 161, 45, 150, 89, 88, 51, 29, 171, 216, 205, 143, 58, 133, 85, 45, 174, 47,
+            252, 197, 189, 115, 50, 75, 27,
+        ];
+
+        assert_eq!(expected_encrypted, encrypt(&plaintext).as_slice());
+
+        let expected_encrypted_no_checksum = &expected_encrypted[0..expected_encrypted.len() - AES_MAC_SIZE];
+
+        let encryption_result = encrypt_no_checksum(&plaintext);
+        assert_eq!(expected_encrypted_no_checksum, encryption_result.encrypted);
+
+        // prepare for checksum calculation
+        let mut conf_and_plaintext = encryption_result.confounder.clone();
+        conf_and_plaintext.extend_from_slice(&plaintext);
+
+        // verify that the same checksum is generated
+        assert_eq!(
+            hmac_sha1(&encryption_result.ki, &conf_and_plaintext, AES_MAC_SIZE),
+            expected_encrypted[expected_encrypted.len() - AES_MAC_SIZE..]
+        );
+
+        // verify that concatenating encrypted data and checksum gives expected result
+        let mut encrypted_with_checksum = encryption_result.encrypted;
+        encrypted_with_checksum.extend(&hmac_sha1(&encryption_result.ki, &conf_and_plaintext, AES_MAC_SIZE));
+        assert_eq!(encrypted_with_checksum, expected_encrypted);
+
+        // verify that decrypt functions produce the same result
+        let decryption_result = decrypt_no_checksum(expected_encrypted);
+        assert_eq!(decrypt(expected_encrypted), decryption_result.plaintext);
+
+        assert_eq!(decryption_result.confounder, encryption_result.confounder);
+
+        assert_eq!(
+            decryption_result.checksum,
+            expected_encrypted[expected_encrypted.len() - AES_MAC_SIZE..]
+        );
+
+        // generate checksum and validate it against the actual
+        let mut decrypted_confounder_with_plaintext = decryption_result.confounder.clone();
+        decrypted_confounder_with_plaintext.extend(decryption_result.plaintext);
+        assert_eq!(
+            hmac_sha1(
+                &decryption_result.ki,
+                &decrypted_confounder_with_plaintext,
+                AES_MAC_SIZE
+            ),
+            decryption_result.checksum
         );
     }
 }

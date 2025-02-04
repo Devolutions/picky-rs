@@ -49,6 +49,19 @@ impl From<PadError> for KerberosCryptoError {
     }
 }
 
+pub struct DecryptWithoutChecksum {
+    pub plaintext: Vec<u8>,
+    pub confounder: Vec<u8>,
+    pub checksum: Vec<u8>,
+    pub ki: Vec<u8>,
+}
+
+pub struct EncryptWithoutChecksum {
+    pub encrypted: Vec<u8>,
+    pub confounder: Vec<u8>,
+    pub ki: Vec<u8>,
+}
+
 pub type KerberosCryptoResult<T> = Result<T, KerberosCryptoError>;
 
 pub use checksum::{Checksum, ChecksumSuite};
