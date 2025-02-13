@@ -1,6 +1,8 @@
 use rand::rngs::OsRng;
 use rand::Rng;
 
+use crate::crypto::common::hmac_sha1;
+use crate::crypto::utils::usage_ki;
 use crate::crypto::{
     ChecksumSuite, Cipher, CipherSuite, DecryptWithoutChecksum, EncryptWithoutChecksum, KerberosCryptoResult,
 };
@@ -8,7 +10,7 @@ use crate::crypto::{
 use super::decrypt::{decrypt_message, decrypt_message_no_checksum};
 use super::encrypt::{encrypt_message, encrypt_message_no_checksum};
 use super::key_derivation::random_to_key;
-use super::{derive_key_from_password, DES3_BLOCK_SIZE, DES3_KEY_SIZE, DES3_SEED_LEN};
+use super::{derive_key, derive_key_from_password, DES3_BLOCK_SIZE, DES3_KEY_SIZE, DES3_MAC_SIZE, DES3_SEED_LEN};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Des3CbcSha1Kd;
@@ -64,6 +66,12 @@ impl Cipher for Des3CbcSha1Kd {
         cipher_data: &[u8],
     ) -> KerberosCryptoResult<DecryptWithoutChecksum> {
         decrypt_message_no_checksum(key, key_usage, cipher_data)
+    }
+
+    fn encryption_checksum(&self, key: &[u8], key_usage: i32, payload: &[u8]) -> KerberosCryptoResult<Vec<u8>> {
+        let ki = derive_key(key, &usage_ki(key_usage))?;
+
+        Ok(hmac_sha1(&ki, payload, DES3_MAC_SIZE))
     }
 
     fn generate_key_from_password(&self, password: &[u8], salt: &[u8]) -> KerberosCryptoResult<Vec<u8>> {

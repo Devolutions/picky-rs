@@ -1,6 +1,8 @@
 use rand::rngs::OsRng;
 use rand::Rng;
 
+use crate::crypto::common::hmac_sha1;
+use crate::crypto::utils::usage_ki;
 use crate::crypto::{
     ChecksumSuite, Cipher, CipherSuite, DecryptWithoutChecksum, EncryptWithoutChecksum, KerberosCryptoError,
     KerberosCryptoResult,
@@ -9,7 +11,7 @@ use crate::crypto::{
 use super::decrypt::{decrypt_message, decrypt_message_no_checksum};
 use super::encrypt::{encrypt_message, encrypt_message_no_checksum};
 use super::key_derivation::random_to_key;
-use super::{derive_key_from_password, AesSize, AES256_KEY_SIZE, AES_BLOCK_SIZE};
+use super::{derive_key, derive_key_from_password, AesSize, AES256_KEY_SIZE, AES_BLOCK_SIZE, AES_MAC_SIZE};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Aes256CtsHmacSha196;
@@ -69,6 +71,12 @@ impl Cipher for Aes256CtsHmacSha196 {
         cipher_data: &[u8],
     ) -> KerberosCryptoResult<DecryptWithoutChecksum> {
         decrypt_message_no_checksum(key, key_usage, cipher_data, &AesSize::Aes256)
+    }
+
+    fn encryption_checksum(&self, key: &[u8], key_usage: i32, payload: &[u8]) -> KerberosCryptoResult<Vec<u8>> {
+        let ki = derive_key(key, &usage_ki(key_usage), &AesSize::Aes256)?;
+
+        Ok(hmac_sha1(&ki, payload, AES_MAC_SIZE))
     }
 
     fn generate_key_from_password(&self, password: &[u8], salt: &[u8]) -> KerberosCryptoResult<Vec<u8>> {

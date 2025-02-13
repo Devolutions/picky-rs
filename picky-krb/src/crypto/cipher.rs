@@ -26,6 +26,11 @@ pub trait Cipher {
         cipher_data: &[u8],
     ) -> KerberosCryptoResult<DecryptWithoutChecksum>;
 
+    /// Calculates Kerberos checksum over the provided data.
+    ///
+    /// Note: the input `payload` should contain all data thar was used during encryption.
+    fn encryption_checksum(&self, key: &[u8], key_usage: i32, payload: &[u8]) -> KerberosCryptoResult<Vec<u8>>;
+
     fn generate_key_from_password(&self, password: &[u8], salt: &[u8]) -> KerberosCryptoResult<Vec<u8>>;
     fn random_to_key(&self, key: Vec<u8>) -> Vec<u8>;
 }
