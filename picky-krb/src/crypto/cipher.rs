@@ -28,7 +28,9 @@ pub trait Cipher {
 
     /// Calculates Kerberos checksum over the provided data.
     ///
-    /// Note: the input `payload` should contain all data thar was used during encryption.
+    /// Note: this method differs from [Checksum::checksum]. Key derivation processes for
+    /// encryption checksum and just checksum are different. More details:
+    /// * [Encryption and Checksum Specifications for Kerberos 5](https://datatracker.ietf.org/doc/html/rfc3961).
     fn encryption_checksum(&self, key: &[u8], key_usage: i32, payload: &[u8]) -> KerberosCryptoResult<Vec<u8>>;
 
     fn generate_key_from_password(&self, password: &[u8], salt: &[u8]) -> KerberosCryptoResult<Vec<u8>>;
