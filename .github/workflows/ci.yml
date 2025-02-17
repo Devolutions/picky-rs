@@ -11,7 +11,7 @@ on:
 jobs:
   formatting:
     name: Check formatting
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -45,7 +45,7 @@ jobs:
           - os: windows
             runner: windows-2019
           - os: linux
-            runner: ubuntu-20.04
+            runner: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -55,7 +55,7 @@ jobs:
 
   lints-wasm:
     name: Lints [wasm]
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     needs: formatting
 
     steps:
@@ -83,7 +83,7 @@ jobs:
           - os: windows
             runner: windows-2019
           - os: linux
-            runner: ubuntu-20.04
+            runner: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -96,7 +96,7 @@ jobs:
     # If this break, bump crate version minor number.
     # See https://github.com/Devolutions/picky-rs/issues/89
     name: Check MSRV [${{ matrix.crate }}]
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     needs: formatting
     strategy:
       fail-fast: false
