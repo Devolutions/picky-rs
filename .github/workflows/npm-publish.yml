@@ -14,7 +14,7 @@ on:
 jobs:
   preflight:
     name: Preflight
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     outputs:
       dry-run: ${{ steps.get-dry-run.outputs.dry-run }}
 
@@ -33,7 +33,7 @@ jobs:
 
   tests:
     name: Tests
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
@@ -57,7 +57,7 @@ jobs:
 
   publish:
     name: Publish package
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     environment: npm-publish
     needs:
       - preflight

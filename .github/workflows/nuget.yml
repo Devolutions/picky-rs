@@ -14,7 +14,7 @@ on:
 jobs:
   preflight:
     name: Preflight
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     outputs:
       dry-run: ${{ steps.get-dry-run.outputs.dry-run }}
       project-version: ${{ steps.get-version.outputs.project-version }}
@@ -197,7 +197,7 @@ jobs:
 
   build-universal:
     name: Universal build
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     needs: [preflight, build-native]
     strategy:
       fail-fast: false
@@ -211,10 +211,10 @@ jobs:
       - name: Configure runner
         shell: pwsh
         run: |
-          wget -q https://github.com/awakecoding/llvm-prebuilt/releases/download/v2021.2.4/cctools-x86_64-ubuntu-20.04.tar.xz
-          tar -xf cctools-x86_64-ubuntu-20.04.tar.xz -C /tmp
-          sudo mv /tmp/cctools-x86_64-ubuntu-20.04/bin/lipo /usr/local/bin
-          sudo mv /tmp/cctools-x86_64-ubuntu-20.04/bin/install_name_tool /usr/local/bin
+          wget -q https://github.com/awakecoding/llvm-prebuilt/releases/download/v2025.1.0/cctools-x86_64-ubuntu-24.04.tar.xz
+          tar -xf cctools-x86_64-ubuntu-24.04.tar.xz -C /tmp
+          sudo mv /tmp/cctools-x86_64-ubuntu-24.04/bin/lipo /usr/local/bin
+          sudo mv /tmp/cctools-x86_64-ubuntu-24.04/bin/install_name_tool /usr/local/bin
 
       - name: Download native components
         uses: actions/download-artifact@v4
@@ -326,7 +326,7 @@ jobs:
 
   publish:
     name: Publish NuGet package
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     environment: nuget-publish
     if: needs.preflight.outputs.dry-run == 'false'
     needs:
