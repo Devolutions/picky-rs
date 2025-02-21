@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### <!-- 1 -->Features
 
-- `encryption_checksum` for krb ciphers (#344) ([a75f0cdc50](https://github.com/Devolutions/picky-rs/commit/a75f0cdc5003d12ba0e6e64fe2385de34da1b32f)) 
+- `encryption_checksum` for krb ciphers ([#344](https://github.com/Devolutions/picky-rs/pull/344)) ([a75f0cdc50](https://github.com/Devolutions/picky-rs/commit/a75f0cdc5003d12ba0e6e64fe2385de34da1b32f)) 
 
 
 # Changelog
