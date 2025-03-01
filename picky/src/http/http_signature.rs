@@ -555,6 +555,9 @@ impl<'a> HttpSignatureBuilder<'a> {
                         let key = split.next().expect("there is always at least one element in the split");
                         if let Some(value) = split.next() {
                             match key {
+                                Header::REQUEST_TARGET_STR => {
+                                    headers.push(Header::RequestTarget);
+                                }
                                 Header::CREATED_STR => {
                                     headers.push(Header::Created);
                                     created = Some(value.trim().parse().map_err(|_| {
@@ -569,12 +572,6 @@ impl<'a> HttpSignatureBuilder<'a> {
                                 }
                                 header_name => headers.push(Header::new_name(header_name.to_owned())),
                             }
-                        } else if key.starts_with("get")
-                            || key.starts_with("post")
-                            || key.starts_with("put")
-                            || key.starts_with("delete")
-                        {
-                            headers.push(Header::RequestTarget);
                         } else {
                             return Err(HttpSignatureError::InvalidSigningString { line: line.to_owned() });
                         }
@@ -603,7 +600,8 @@ impl<'a> HttpSignatureBuilder<'a> {
                             }
                             Header::RequestTarget => {
                                 acc.push(format!(
-                                    "{} {}",
+                                    "{}: {} {}",
+                                    header.as_str(),
                                     http_request.get_lowercased_method()?,
                                     http_request.get_target()?
                                 ));
@@ -771,7 +769,8 @@ impl<'a> HttpSignatureVerifier<'a> {
                         }
                         Header::RequestTarget => {
                             acc.push(format!(
-                                "{} {}",
+                                "{}: {} {}",
+                                header.as_str(),
                                 http_request.get_lowercased_method()?,
                                 http_request.get_target()?
                             ));
@@ -914,20 +913,20 @@ mod tests {
     use picky_asn1_x509::{AlgorithmIdentifier, SubjectPublicKeyInfo};
 
     const HTTP_SIGNATURE_EXAMPLE: &str = "Signature keyId=\"my-rsa-key\",algorithm=\"rsa-sha256\"\
-         ,created=1402170695,headers=\"(request-target) (created) date\",\
-         signature=\"CM3Ui6l4Z6+yYdWaX5Cz10OAqUceS53Zy/qA+e4xG5Nabe215iTlnj/sfVJ3nBaMIOj/4e\
-         gxTKNDXAJbLm6nOF8zUOdJBuKQZNO1mfzrMKLsz7gc2PQI1eVxGNJoBZ40L7CouertpowQFpKyizNXqH/y\
-         YBgqPEnLk+p5ISkXeHd7P/YbAAQGnSe3hnJ/gkkJ5rS6mGuu2C8+Qm68tcSGz9qwVdNTFPpji5VPxprs2J\
-         2Z1vjsMVW97rsKOs8lo+qxPGfni27udledH2ZQABGZHOgZsChj59Xb3oVAA8/V3rjt5Un7gsz2AHQ6aY6o\
-         ky59Rsg/CpB8gP7szjK/wrCclA==\"";
+        ,created=1402170695,headers=\"(request-target) (created) date\",\
+        signature=\"bw579lDtTDsp7zif/F7Fy93KXrM6qUfCb43JMJtiL4+3nazIPlxcxVsRJEgZzK/QQPDoeUQ\
+        p4BYCzi2CbthYhHJMn/Wv008gNMcQQTuEw/KcnMrFWxqqUnVZQbCQvNai2y80WrBiOFZvN2VIdLUSO4SoIa\
+        OHvrvEoQhl3sqpv1z7yCVbQtJHwnPOWoy/11p+SU3X2ARJXN555q5wSn+DykM0Ohq1cXD84MHXP5ulI0Fa8\
+        4zQ5waxoXsieex4FI+zXSlngGmchBPXMUC437u2wXA1zLA4KGUL/uNScL1MKrTMqgV0MK4o6sR0LHOqHmIi\
+        MJ7h++UmOW/0Iw74CL2UGQ==\"";
 
     const HTTP_SIGNATURE_WEIRD_FORMAT: &str = "Signature keyId = my-rsa-key ,created= \"1402170695\",\
-         ,algorithm =\"rsa-sha256  \",headers=(request-target) (created) date  ,\
-         signature=CM3Ui6l4Z6+yYdWaX5Cz10OAqUceS53Zy/qA+e4xG5Nabe215iTlnj/sfVJ3nBaMIOj/4e\
-         gxTKNDXAJbLm6nOF8zUOdJBuKQZNO1mfzrMKLsz7gc2PQI1eVxGNJoBZ40L7CouertpowQFpKyizNXqH/y\
-         YBgqPEnLk+p5ISkXeHd7P/YbAAQGnSe3hnJ/gkkJ5rS6mGuu2C8+Qm68tcSGz9qwVdNTFPpji5VPxprs2J\
-         2Z1vjsMVW97rsKOs8lo+qxPGfni27udledH2ZQABGZHOgZsChj59Xb3oVAA8/V3rjt5Un7gsz2AHQ6aY6o\
-         ky59Rsg/CpB8gP7szjK/wrCclA==";
+        ,algorithm =\"rsa-sha256  \",headers=(request-target) (created) date  ,\
+        signature=bw579lDtTDsp7zif/F7Fy93KXrM6qUfCb43JMJtiL4+3nazIPlxcxVsRJEgZzK/QQPDoeUQ\
+        p4BYCzi2CbthYhHJMn/Wv008gNMcQQTuEw/KcnMrFWxqqUnVZQbCQvNai2y80WrBiOFZvN2VIdLUSO4SoIa\
+        OHvrvEoQhl3sqpv1z7yCVbQtJHwnPOWoy/11p+SU3X2ARJXN555q5wSn+DykM0Ohq1cXD84MHXP5ulI0Fa8\
+        4zQ5waxoXsieex4FI+zXSlngGmchBPXMUC437u2wXA1zLA4KGUL/uNScL1MKrTMqgV0MK4o6sR0LHOqHmIi\
+        MJ7h++UmOW/0Iw74CL2UGQ==";
 
     fn private_key_1() -> PrivateKey {
         let pem = picky_test_data::RSA_2048_PK_7.parse::<Pem>().expect("pem 1");
@@ -1136,7 +1135,7 @@ mod tests {
 
     #[test]
     fn sign_with_pre_generated_signing_string() {
-        let signing_string = "get /foo\n(created): 1402170695\ndate: Tue, 07 Jun 2014 20:51:35 GMT";
+        let signing_string = "(request-target): get /foo\n(created): 1402170695\ndate: Tue, 07 Jun 2014 20:51:35 GMT";
         let http_signature = HttpSignatureBuilder::new()
             .key_id("my-rsa-key")
             .signature_method(
@@ -1152,7 +1151,7 @@ mod tests {
 
     #[test]
     fn verify_with_pre_generated_signing_string() {
-        let signing_string = "get /foo\n(created): 1402170695\ndate: Tue, 07 Jun 2014 20:51:35 GMT";
+        let signing_string = "(request-target): get /foo\n(created): 1402170695\ndate: Tue, 07 Jun 2014 20:51:35 GMT";
         let http_signature = HttpSignature::from_str(HTTP_SIGNATURE_EXAMPLE).expect("http signature");
         http_signature
             .verifier()
@@ -1168,7 +1167,7 @@ mod tests {
 
     #[test]
     fn verify_with_leeway() {
-        let signing_string = "get /foo\n(created): 1402170695\ndate: Tue, 07 Jun 2014 20:51:35 GMT";
+        let signing_string = "(request-target): get /foo\n(created): 1402170695\ndate: Tue, 07 Jun 2014 20:51:35 GMT";
         let http_signature = HttpSignature::from_str(HTTP_SIGNATURE_EXAMPLE).expect("http signature");
         http_signature
             .verifier()
@@ -1207,12 +1206,12 @@ mod tests {
     }
 
     const HTTP_SIGNATURE_LEGACY: &str = "Signature keyId=my-rsa-key,created=1402170695,\
-         headers=(request-target) (created) date,\
-         signature=CM3Ui6l4Z6-yYdWaX5Cz10OAqUceS53Zy_qA-e4xG5Nabe215iTlnj_sfVJ3nBaMIOj_4e\
-         gxTKNDXAJbLm6nOF8zUOdJBuKQZNO1mfzrMKLsz7gc2PQI1eVxGNJoBZ40L7CouertpowQFpKyizNXqH_y\
-         YBgqPEnLk-p5ISkXeHd7P_YbAAQGnSe3hnJ_gkkJ5rS6mGuu2C8-Qm68tcSGz9qwVdNTFPpji5VPxprs2J\
-         2Z1vjsMVW97rsKOs8lo-qxPGfni27udledH2ZQABGZHOgZsChj59Xb3oVAA8_V3rjt5Un7gsz2AHQ6aY6o\
-         ky59Rsg_CpB8gP7szjK_wrCclA";
+        headers=(request-target) (created) date,\
+        signature=bw579lDtTDsp7zif_F7Fy93KXrM6qUfCb43JMJtiL4-3nazIPlxcxVsRJEgZzK_QQPDoeUQp4B\
+        YCzi2CbthYhHJMn_Wv008gNMcQQTuEw_KcnMrFWxqqUnVZQbCQvNai2y80WrBiOFZvN2VIdLUSO4SoIaOHvr\
+        vEoQhl3sqpv1z7yCVbQtJHwnPOWoy_11p-SU3X2ARJXN555q5wSn-DykM0Ohq1cXD84MHXP5ulI0Fa84zQ5w\
+        axoXsieex4FI-zXSlngGmchBPXMUC437u2wXA1zLA4KGUL_uNScL1MKrTMqgV0MK4o6sR0LHOqHmIiMJ7h--\
+        UmOW_0Iw74CL2UGQ";
 
     #[test]
     fn legacy() {
