@@ -84,11 +84,11 @@
 //!     http_signature_str,
 //!     "Signature keyId=\"my-rsa-key\",algorithm=\"rsa-sha224\",created=1402170695,\
 //!      headers=\"(request-target) (created) host date cache-control x-emptyheader x-example\",\
-//!      signature=\"QwuxxMSuvCdA5a2cDOjg+1WFEEGa/gD8fWwKm7gah4IUCssrie+bA5sp9wH7Jz8TQYh/XNDRUHKc\
-//!                  0oziBAIy1CsfDQWGRM+pAonfXEJufdt07v/i0OFhj5rBJfoOWPUcJ0cXzu0gs6svNhvimS3h2g30\
-//!                  gsnw1+Qjgv0+5HFwqZH4i+bHzaj0r9vIZZnnk3ecg8O2uOLuG5jCszJU9SBA0ug8l/NrQPJXMhCO\
-//!                  X59HkNVCkT4TPOovNZHyJQwu8IDhba0evPTCIvrzULpN4qY+ZAua2i3wGwWqFUgbm4eBJS2pwjWr\
-//!                  XyRusoELK0BjJ8a0KdOegmbEViIxy/Uqu0L2yQ==\""
+//!      signature=\"JueyecQbV5rQ3TI1EfqZRjAZMMOb4ABZNS0yDcBDgyfbOLORYipT2An2MCH8n/HequVJkEE\
+//!          86/vj9ZFLbyqFkV3a8uQGB6gaE79l9YNdzVeO5k7GBb1jskwBXnqVtGmn8aT2f+cJzkDtu6ptg+UtaU\
+//!          ZOQKdutc8aHq1NCLwvqMbA410XP0pA5r/VTbMg/yW8rHguue0Trh0WYCw8zHfNuZtheWxvWGLdYxvC0\
+//!          u5oJA0PdxFceqVd/304+RQsrDGLtX8J9vSeqEsQJfvswFyMTkdl1gDbP/YdXp7ADzc2D9IefT9zqvFd\
+//!          yEDDXEXKmZm+22395xRtnFmeWXu/+PM6wg==\""
 //! );
 //!
 //! // parse a http signature and verify it
@@ -108,7 +108,7 @@
 //! // alternatively you can provide a pre-generated signing string
 //!
 //! let signing_string =
-//!     "get /foo\n\
+//!     "(request-target): get /foo\n\
 //!      (created): 1402170695\n\
 //!      host: example.org\n\
 //!      date: Tue, 07 Jun 2014 20:51:35 GMT\n\
