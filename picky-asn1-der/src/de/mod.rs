@@ -204,7 +204,7 @@ impl<'de> Deserializer<'de> {
     }
 }
 
-impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
+impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     type Error = Asn1DerError;
 
     fn is_human_readable(&self) -> bool {

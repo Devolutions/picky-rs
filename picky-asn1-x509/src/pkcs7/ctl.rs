@@ -231,7 +231,8 @@ pub struct PolicyQualifier {
 mod tests {
     use super::*;
     use crate::{AlgorithmIdentifier, ShaVariant};
-    use base64::{engine::general_purpose, Engine as _};
+    use base64::engine::general_purpose;
+    use base64::Engine as _;
     use picky_asn1::date::UTCTime;
 
     #[test]

@@ -1,14 +1,14 @@
+//! [Encryption and Checksum Specifications for Kerberos 5](https://datatracker.ietf.org/doc/html/rfc3961)
+//! This RFC contains key derivation algorithm for triple DES
+//!
+//! [DES-Based Encryption and Checksum Types](https://datatracker.ietf.org/doc/html/rfc3961#section-6.2)
+//! This sections contains explanation and pseudo code of the implemented functions
+
 use crate::crypto::nfold::n_fold;
 use crate::crypto::{KerberosCryptoError, KerberosCryptoResult, KERBEROS};
 
 use super::encrypt::encrypt_des;
 use super::{DES3_BLOCK_SIZE, DES3_KEY_SIZE, DES3_SEED_LEN};
-
-/// [Encryption and Checksum Specifications for Kerberos 5](https://datatracker.ietf.org/doc/html/rfc3961)
-/// This RFC contains key derivation algorithm for triple DES
-///
-/// [DES-Based Encryption and Checksum Types](https://datatracker.ietf.org/doc/html/rfc3961#section-6.2)
-/// This sections contains explanation and pseudo code of the implemented functions
 
 // weak keys from https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-67r1.pdf
 const WEAK_KEYS: [[u8; 8]; 4] = [

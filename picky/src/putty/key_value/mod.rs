@@ -5,12 +5,13 @@ mod macros;
 mod reader;
 mod writer;
 
+use std::fmt;
+use std::str::FromStr;
+
 use base64::engine::general_purpose::STANDARD as BASE64_ENGINE;
 use base64::Engine;
 
-use std::str::FromStr;
-
-use macros::*;
+use self::macros::*;
 
 pub(crate) use reader::PuttyKvReader;
 pub(crate) use writer::PuttyKvWriter;
@@ -57,9 +58,9 @@ impl FromStr for Base64PpkValue {
     }
 }
 
-impl ToString for Base64PpkValue {
-    fn to_string(&self) -> String {
-        BASE64_ENGINE.encode(&self.0)
+impl fmt::Display for Base64PpkValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", BASE64_ENGINE.encode(&self.0))
     }
 }
 
@@ -91,9 +92,9 @@ impl FromStr for HexPpkValue {
     }
 }
 
-impl ToString for HexPpkValue {
-    fn to_string(&self) -> String {
-        hex::encode(&self.0)
+impl fmt::Display for HexPpkValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", hex::encode(&self.0))
     }
 }
 

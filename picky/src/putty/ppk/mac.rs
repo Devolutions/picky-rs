@@ -1,8 +1,7 @@
 //! PPK MAC calculation functions
 
 use crate::putty::key_value::{PpkEncryptionValue, PpkLiteral, PpkVersionKey};
-use crate::putty::Ppk;
-use crate::putty::PuttyError;
+use crate::putty::{Ppk, PuttyError};
 
 use digest::Digest;
 use hmac::Mac;

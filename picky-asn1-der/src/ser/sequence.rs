@@ -40,7 +40,7 @@ impl<'a, 'se> Sequence<'a, 'se> {
     }
 }
 
-impl<'a, 'se> serde::ser::SerializeSeq for Sequence<'a, 'se> {
+impl serde::ser::SerializeSeq for Sequence<'_, '_> {
     type Ok = usize;
     type Error = Asn1DerError;
 
@@ -52,7 +52,7 @@ impl<'a, 'se> serde::ser::SerializeSeq for Sequence<'a, 'se> {
     }
 }
 
-impl<'a, 'se> serde::ser::SerializeTuple for Sequence<'a, 'se> {
+impl serde::ser::SerializeTuple for Sequence<'_, '_> {
     type Ok = usize;
     type Error = Asn1DerError;
 
@@ -64,7 +64,7 @@ impl<'a, 'se> serde::ser::SerializeTuple for Sequence<'a, 'se> {
     }
 }
 
-impl<'a, 'se> serde::ser::SerializeStruct for Sequence<'a, 'se> {
+impl serde::ser::SerializeStruct for Sequence<'_, '_> {
     type Ok = usize;
     type Error = Asn1DerError;
 
@@ -76,7 +76,7 @@ impl<'a, 'se> serde::ser::SerializeStruct for Sequence<'a, 'se> {
     }
 }
 
-impl<'a, 'se> serde::ser::SerializeTupleStruct for Sequence<'a, 'se> {
+impl serde::ser::SerializeTupleStruct for Sequence<'_, '_> {
     type Ok = usize;
     type Error = Asn1DerError;
 

@@ -1,4 +1,5 @@
-use crate::{oids, pkcs12::SafeContentsContentInfo};
+use crate::oids;
+use crate::pkcs12::SafeContentsContentInfo;
 use core::fmt;
 use oid::ObjectIdentifier;
 use picky_asn1::wrapper::{ExplicitContextTag0, ObjectIdentifierAsn1, OctetStringAsn1, OctetStringAsn1Container};

@@ -4,7 +4,9 @@ pub mod encode;
 pub mod private_key;
 pub mod public_key;
 
-use crate::key::{ec::NamedEcCurve, ed::NamedEdAlgorithm, EcCurve, EdAlgorithm, KeyError};
+use crate::key::ec::NamedEcCurve;
+use crate::key::ed::NamedEdAlgorithm;
+use crate::key::{EcCurve, EdAlgorithm, KeyError};
 
 use byteorder::ReadBytesExt;
 use std::io::{self, Read};

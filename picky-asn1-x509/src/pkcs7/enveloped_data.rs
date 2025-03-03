@@ -230,12 +230,10 @@ impl<'de> Deserialize<'de> for RecipientInfo {
                             })?,
                         }))
                     }
-                    _ => {
-                        return Err(de::Error::invalid_value(
-                            de::Unexpected::Other("[RecipientInfo] unknown choice value"),
-                            &"a supported RecipientInfo choice",
-                        ))
-                    }
+                    _ => Err(de::Error::invalid_value(
+                        de::Unexpected::Other("[RecipientInfo] unknown choice value"),
+                        &"a supported RecipientInfo choice",
+                    )),
                 }
             }
         }

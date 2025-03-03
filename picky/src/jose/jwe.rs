@@ -9,7 +9,8 @@ use crate::key::{EcCurve, EdAlgorithm, KeyError, PrivateKey, PrivateKeyKind, Pub
 
 use aes_gcm::aead::generic_array::typenum::Unsigned;
 use aes_gcm::{AeadInPlace, Aes128Gcm, Aes256Gcm, KeyInit, KeySizeUser};
-use base64::{engine::general_purpose, DecodeError, Engine as _};
+use base64::engine::general_purpose;
+use base64::{DecodeError, Engine as _};
 use digest::generic_array::GenericArray;
 use rand::RngCore;
 use rsa::{Oaep, Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};

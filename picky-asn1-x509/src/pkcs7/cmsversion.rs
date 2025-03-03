@@ -47,7 +47,7 @@ impl<'de> Deserialize<'de> for CmsVersion {
     {
         struct Visitor;
 
-        impl<'de> de::Visitor<'de> for Visitor {
+        impl de::Visitor<'_> for Visitor {
             type Value = CmsVersion;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {

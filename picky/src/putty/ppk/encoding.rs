@@ -7,8 +7,7 @@ use crate::putty::key_value::{
     PpkVersionKey, PuttyKvReader, PuttyKvWriter,
 };
 use crate::putty::ppk::encryption::PpkEncryptionKind;
-use crate::putty::PuttyError;
-use crate::putty::{Argon2Params, Ppk};
+use crate::putty::{Argon2Params, Ppk, PuttyError};
 use std::str::FromStr;
 
 impl FromStr for Ppk {

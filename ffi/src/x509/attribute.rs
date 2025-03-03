@@ -6,8 +6,7 @@ pub mod ffi {
     use crate::x509::extension::ffi::{Extension, ExtensionIterator};
     use crate::x509::singer_info::ffi::{CmsVersion, SignerInfo, SignerInfoIterator};
     use crate::x509::string::ffi::DirectoryString;
-    use crate::x509::time::ffi::Time;
-    use crate::x509::time::ffi::{UTCTime, UTCTimeIterator};
+    use crate::x509::time::ffi::{Time, UTCTime, UTCTimeIterator};
     use diplomat_runtime::DiplomatWriteable;
     use std::fmt::Write;
 
@@ -71,12 +70,10 @@ pub mod ffi {
         pub fn to_extensions(&self) -> Option<Box<ExtensionIterator>> {
             match &self.0 {
                 picky_asn1_x509::AttributeValues::Extensions(extensions) => {
-                    // the set will always have 1 element in this variant
-                    let Some(extetions) = extensions.0.first() else {
-                        return None;
-                    };
+                    // The set will always have 1 element in this variant.
+                    let extension = extensions.0.first()?;
 
-                    let vec: Vec<Extension> = extetions.0.clone().into_iter().map(Extension).collect();
+                    let vec: Vec<Extension> = extension.0.clone().into_iter().map(Extension).collect();
 
                     Some(Box::new(ExtensionIterator(vec)))
                 }

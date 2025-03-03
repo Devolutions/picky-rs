@@ -4,7 +4,7 @@ use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use uuid::Uuid;
 
 use super::data_types::{
-    AuthScheme, AuthSchemeVector, ByteVector, Checksum, Extension, ExtensionVector, Guid, MessageHeader, MessageType,
+    AuthScheme, AuthSchemeVector, ByteVector, Checksum, Extension, ExtensionVector, MessageHeader, MessageType,
     CHECKSUM_HEADER_LEN,
 };
 use super::{
@@ -45,7 +45,7 @@ impl Nego {
         auth_schemes: Vec<Uuid>,
         extensions: Vec<Extension>,
     ) -> Self {
-        let auth_schemes: AuthSchemeVector = auth_schemes.into_iter().map(Guid::from).collect();
+        let auth_schemes: AuthSchemeVector = auth_schemes.into_iter().collect();
 
         let mut header = MessageHeader {
             signature: NEGOEXTS_MESSAGE_SIGNATURE,

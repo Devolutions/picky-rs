@@ -39,7 +39,8 @@
 // https://access.redhat.com/documentation/en-us/red_hat_certificate_system/9/html/administration_guide/online_certificate_status_protocol_responder
 // https://lapo.it/asn1js/#MEIwQDA-MDwwOjAJBgUrDgMCGgUABBT4cyABkyiCIhU4JpmIBewdDnn8ZgQUbyBZ44kgy35o7xW5BMzM8FTvyTwCAQE
 
-use base64::{engine::general_purpose, Engine as _};
+use base64::engine::general_purpose;
+use base64::Engine as _;
 use oid::prelude::*;
 use picky_asn1::wrapper::{ObjectIdentifierAsn1, OctetStringAsn1};
 use serde::{Deserialize, Serialize};

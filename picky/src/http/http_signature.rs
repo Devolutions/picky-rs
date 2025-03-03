@@ -2,7 +2,8 @@ use crate::hash::HashAlgorithm;
 use crate::http::http_request::{HttpRequest, HttpRequestError};
 use crate::key::{PrivateKey, PublicKey};
 use crate::signature::{SignatureAlgorithm, SignatureError};
-use base64::{engine::general_purpose, DecodeError, Engine as _};
+use base64::engine::general_purpose;
+use base64::{DecodeError, Engine as _};
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -375,7 +376,7 @@ impl FromStr for HttpSignature {
                 parameter: HTTP_SIGNATURE_SIGNATURE,
             })?;
 
-        let legacy = !signature.contains(|c: char| c == '/' || c == '+');
+        let legacy = !signature.contains(['/', '+']);
 
         Ok(HttpSignature {
             key_id: keys
@@ -413,7 +414,7 @@ enum SigningStringGenMethod<'a> {
     FromHttpRequest(&'a dyn HttpRequest),
 }
 
-impl<'a> Debug for SigningStringGenMethod<'a> {
+impl Debug for SigningStringGenMethod<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "SigningStringGenMethod::")?;
         match self {

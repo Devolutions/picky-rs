@@ -42,7 +42,7 @@ impl<'de> Deserialize<'de> for Version {
     {
         struct Visitor;
 
-        impl<'de> de::Visitor<'de> for Visitor {
+        impl de::Visitor<'_> for Visitor {
             type Value = Version;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -71,7 +71,8 @@ impl<'de> Deserialize<'de> for Version {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use base64::{engine::general_purpose, Engine as _};
+    use base64::engine::general_purpose;
+    use base64::Engine as _;
     use picky_asn1::wrapper::{ExplicitContextTag9, Optional};
     use picky_asn1_der::Asn1DerError;
 

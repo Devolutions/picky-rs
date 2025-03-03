@@ -54,7 +54,7 @@ impl ParseStr for Vec<u8> {
             line
         );
         to_parse.as_bytes().chunks(2).fold(Self::new(), |mut vec, pair| {
-            vec.push(decode(pair[0]) << 4 | decode(pair[1]));
+            vec.push((decode(pair[0]) << 4) | decode(pair[1]));
             vec
         })
     }

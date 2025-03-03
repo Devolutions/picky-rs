@@ -3,7 +3,8 @@
 //! Based on the RFC-7468
 //! ([Textual Encodings of PKIX, PKCS, and CMS Structures](https://tools.ietf.org/html/rfc7468)).
 
-use base64::{engine::general_purpose, DecodeError, Engine as _};
+use base64::engine::general_purpose;
+use base64::{DecodeError, Engine as _};
 use std::borrow::Cow;
 use std::fmt;
 use std::io::BufRead;
@@ -110,7 +111,7 @@ pub fn parse_pem<T: ?Sized + AsRef<[u8]>>(input: &T) -> Result<Pem<'static>, Pem
 fn parse_pem_impl(input: &[u8]) -> Result<Pem<'static>, PemError> {
     let header_start_idx = h_find(input, PEM_HEADER_START.as_bytes()).ok_or(PemError::HeaderNotFound)?;
 
-    let label_start_idx = header_start_idx + PEM_HEADER_START.as_bytes().len();
+    let label_start_idx = header_start_idx + PEM_HEADER_START.len();
     let label_end_idx = h_find(&input[label_start_idx..], b"-").ok_or(PemError::InvalidHeader)? + label_start_idx;
     let label = String::from_utf8_lossy(&input[label_start_idx..label_end_idx])
         .trim()
@@ -119,7 +120,7 @@ fn parse_pem_impl(input: &[u8]) -> Result<Pem<'static>, PemError> {
     let header_end_idx = h_find(&input[label_end_idx..], PEM_DASHES_BOUNDARIES.as_bytes())
         .ok_or(PemError::InvalidHeader)?
         + label_end_idx
-        + PEM_DASHES_BOUNDARIES.as_bytes().len();
+        + PEM_DASHES_BOUNDARIES.len();
 
     let footer_start_idx =
         h_find(&input[header_end_idx..], PEM_FOOTER_START.as_bytes()).ok_or(PemError::FooterNotFound)? + header_end_idx;
