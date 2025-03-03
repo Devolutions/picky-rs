@@ -311,7 +311,8 @@ impl Serialize for UnsignedAttributeValue {
 #[cfg(feature = "ctl")]
 mod tests {
     use super::*;
-    use base64::{engine::general_purpose, Engine as _};
+    use base64::engine::general_purpose;
+    use base64::Engine as _;
 
     #[test]
     fn decode_certificate_trust_list_signer_info() {

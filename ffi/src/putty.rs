@@ -68,8 +68,7 @@ impl From<ffi::PuttyArgon2Flavour> for picky::putty::Argon2Flavour {
 pub mod ffi {
     use crate::error::ffi::PickyError;
     use crate::key::ffi::{EcCurve, PrivateKey, PublicKey};
-    use crate::ssh::ffi::SshPrivateKey;
-    use crate::ssh::ffi::SshPublicKey;
+    use crate::ssh::ffi::{SshPrivateKey, SshPublicKey};
     use crate::utils::ffi::VecU8;
     use diplomat_runtime::DiplomatWriteable;
     use std::fmt::Write;

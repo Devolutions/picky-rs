@@ -271,7 +271,7 @@ impl<'de> de::Deserialize<'de> for TagPeeker {
     {
         struct Visitor;
 
-        impl<'de> de::Visitor<'de> for Visitor {
+        impl de::Visitor<'_> for Visitor {
             type Value = TagPeeker;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {

@@ -1,9 +1,8 @@
 use crate::key::ec::{EcdsaKeypair, EcdsaPublicKey};
 use crate::key::ed::{EdKeypair, EdPublicKey};
-use crate::ssh::certificate::Timestamp;
 use crate::ssh::certificate::{
     SshCertType, SshCertTypeError, SshCertificate, SshCertificateError, SshCriticalOption, SshCriticalOptionError,
-    SshExtension, SshExtensionError, SshSignature, SshSignatureError,
+    SshExtension, SshExtensionError, SshSignature, SshSignatureError, Timestamp,
 };
 use crate::ssh::private_key::{
     Aes256Ctr, KdfOption, SshBasePrivateKey, SshPrivateKey, SshPrivateKeyError, AES256_CTR, AUTH_MAGIC, BCRYPT, NONE,

@@ -5,11 +5,12 @@ pub trait UInt: Sized + Copy {
     /// Converts `num` into `Self`
     fn from_u128(num: u128) -> Result<Self>;
 }
+
 macro_rules! impl_uint {
 	($type:ident) => {
 		impl UInt for $type {
 			fn from_u128(num: u128) -> Result<Self> {
-				const MAX: u128 = $type::max_value() as u128;
+				const MAX: u128 = $type::MAX as u128;
 				match num {
 					_ if num > MAX => Err(Asn1DerError::UnsupportedValue),
 					_ => Ok(num as Self)
@@ -19,10 +20,12 @@ macro_rules! impl_uint {
 	};
 	($($type:ident),+) => ($( impl_uint!($type); )+)
 }
+
 impl_uint!(usize, u128, u64, u32, u16, u8);
 
 /// A deserializer for unsigned integers
 pub struct UnsignedInteger;
+
 impl UnsignedInteger {
     /// The deserialized integer for `data`
     pub fn deserialize<T: UInt>(data: &[u8]) -> Result<T> {

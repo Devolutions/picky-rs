@@ -161,7 +161,8 @@ fn extensions_are_empty(extensions: &Extensions) -> bool {
 mod tests {
     use super::*;
     use crate::{DirectoryName, Extension, KeyIdentifier, KeyUsage};
-    use base64::{engine::general_purpose, Engine as _};
+    use base64::engine::general_purpose;
+    use base64::Engine as _;
     use num_bigint_dig::BigInt;
     use picky_asn1::bit_string::BitString;
     use picky_asn1::date::UTCTime;

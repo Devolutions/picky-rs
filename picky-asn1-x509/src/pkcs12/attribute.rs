@@ -1,10 +1,8 @@
 use crate::oids;
 use core::fmt;
 use oid::ObjectIdentifier;
-use picky_asn1::{
-    restricted_string::BmpString,
-    wrapper::{Asn1SetOf, BmpStringAsn1, ObjectIdentifierAsn1, OctetStringAsn1},
-};
+use picky_asn1::restricted_string::BmpString;
+use picky_asn1::wrapper::{Asn1SetOf, BmpStringAsn1, ObjectIdentifierAsn1, OctetStringAsn1};
 use picky_asn1_der::Asn1RawDer;
 use serde::{de, ser};
 
@@ -197,7 +195,8 @@ mod tests {
     use super::test_data::*;
     use super::*;
 
-    use base64::{engine::general_purpose, Engine as _};
+    use base64::engine::general_purpose;
+    use base64::Engine as _;
 
     // "Close enough" UTF8 -> UCS2 conversion for testing purposes (works only with ASCII)
     fn utf8_to_ucs2(s: &str) -> Vec<u8> {

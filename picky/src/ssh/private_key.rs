@@ -278,7 +278,7 @@ impl SshPrivateKey {
     where
         Self: Sized,
     {
-        let mut auth_magic = [0; AUTH_MAGIC.as_bytes().len()];
+        let mut auth_magic = [0; AUTH_MAGIC.len()];
         stream.read_exact(&mut auth_magic)?;
         if auth_magic != AUTH_MAGIC.as_bytes() {
             return Err(SshPrivateKeyError::InvalidAuthMagicHeader);

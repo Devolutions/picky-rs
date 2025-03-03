@@ -502,7 +502,7 @@ where
 {
     struct Visitor<T>(std::marker::PhantomData<T>);
 
-    impl<'de, T> de::Visitor<'de> for Visitor<T>
+    impl<T> de::Visitor<'_> for Visitor<T>
     where
         T: Asn1Type,
     {

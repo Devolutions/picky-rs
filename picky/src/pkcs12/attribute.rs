@@ -2,7 +2,8 @@ use crate::pkcs12::Pkcs12Error;
 use picky_asn1::restricted_string::BmpString;
 use picky_asn1::wrapper::OctetStringAsn1;
 use picky_asn1_der::Asn1RawDer;
-use picky_asn1_x509::{oid::ObjectIdentifier, pkcs12::Pkcs12Attribute as Pkcs12AttributeAsn1};
+use picky_asn1_x509::oid::ObjectIdentifier;
+use picky_asn1_x509::pkcs12::Pkcs12Attribute as Pkcs12AttributeAsn1;
 use serde::{Deserialize, Serialize};
 
 /// Represents a PKCS#12 attributes which can be used to store additional information about safe

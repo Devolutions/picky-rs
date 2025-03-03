@@ -190,7 +190,8 @@ mod tests {
         oids, Certificate, EncapsulatedRsaPublicKey, Extension, Extensions, KeyIdentifier, Name, NameAttr, PublicKey,
         RsaPublicKey, SubjectPublicKeyInfo, TbsCertificate, Validity, Version,
     };
-    use base64::{engine::general_purpose, Engine as _};
+    use base64::engine::general_purpose;
+    use base64::Engine as _;
     use picky_asn1::bit_string::BitString;
     use picky_asn1::date::UTCTime;
     use picky_asn1::restricted_string::{IA5String, PrintableString};

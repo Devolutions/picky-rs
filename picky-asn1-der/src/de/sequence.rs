@@ -15,7 +15,7 @@ impl<'a, 'de> Sequence<'a, 'de> {
     }
 }
 
-impl<'a, 'de> SeqAccess<'de> for Sequence<'a, 'de> {
+impl<'de> SeqAccess<'de> for Sequence<'_, 'de> {
     type Error = Asn1DerError;
 
     fn next_element_seed<T: DeserializeSeed<'de>>(&mut self, seed: T) -> Result<Option<T::Value>> {

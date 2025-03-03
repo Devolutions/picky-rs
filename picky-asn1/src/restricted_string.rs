@@ -128,7 +128,7 @@ where
     {
         struct Visitor<C>(std::marker::PhantomData<C>);
 
-        impl<'de, C> de::Visitor<'de> for Visitor<C>
+        impl<C> de::Visitor<'_> for Visitor<C>
         where
             C: CharSet,
         {

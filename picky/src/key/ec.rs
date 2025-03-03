@@ -173,10 +173,9 @@ pub(crate) fn calculate_public_ec_key(
 
     match curve {
         NamedEcCurve::Known(EcCurve::NistP256) => {
-            use p256::{
-                elliptic_curve::{generic_array::GenericArray as GenericArrayP256, sec1::ToEncodedPoint as _},
-                SecretKey as SecretKeyP256,
-            };
+            use p256::elliptic_curve::generic_array::GenericArray as GenericArrayP256;
+            use p256::elliptic_curve::sec1::ToEncodedPoint as _;
+            use p256::SecretKey as SecretKeyP256;
 
             let private_key_validated = EcCurve::NistP256.validate_component(EcComponent::Secret(private_key))?;
 
@@ -191,10 +190,9 @@ pub(crate) fn calculate_public_ec_key(
             Ok(Some(public_key.to_bytes().to_vec()))
         }
         NamedEcCurve::Known(EcCurve::NistP384) => {
-            use p384::{
-                elliptic_curve::{generic_array::GenericArray as GenericArrayP384, sec1::ToEncodedPoint as _},
-                SecretKey as SecretKeyP384,
-            };
+            use p384::elliptic_curve::generic_array::GenericArray as GenericArrayP384;
+            use p384::elliptic_curve::sec1::ToEncodedPoint as _;
+            use p384::SecretKey as SecretKeyP384;
 
             let private_key_validated = EcCurve::NistP384.validate_component(EcComponent::Secret(private_key))?;
 
@@ -209,10 +207,9 @@ pub(crate) fn calculate_public_ec_key(
             Ok(Some(public_key.to_bytes().to_vec()))
         }
         NamedEcCurve::Known(EcCurve::NistP521) => {
-            use p521::{
-                elliptic_curve::{generic_array::GenericArray as GenericArrayP521, sec1::ToEncodedPoint as _},
-                SecretKey as SecretKeyP521,
-            };
+            use p521::elliptic_curve::generic_array::GenericArray as GenericArrayP521;
+            use p521::elliptic_curve::sec1::ToEncodedPoint as _;
+            use p521::SecretKey as SecretKeyP521;
 
             let private_key_validated = EcCurve::NistP521.validate_component(EcComponent::Secret(private_key))?;
 

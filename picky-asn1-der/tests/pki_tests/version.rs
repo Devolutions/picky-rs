@@ -43,7 +43,7 @@ impl<'de> Deserialize<'de> for Version {
     {
         struct Visitor;
 
-        impl<'de> de::Visitor<'de> for Visitor {
+        impl de::Visitor<'_> for Visitor {
             type Value = Version;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {

@@ -1,9 +1,7 @@
 use crate::{oids, AlgorithmIdentifier, AlgorithmIdentifierParameters};
 use oid::ObjectIdentifier;
-use picky_asn1::{
-    bit_string::BitString,
-    wrapper::{BitStringAsn1, BitStringAsn1Container, IntegerAsn1, OctetStringAsn1},
-};
+use picky_asn1::bit_string::BitString;
+use picky_asn1::wrapper::{BitStringAsn1, BitStringAsn1Container, IntegerAsn1, OctetStringAsn1};
 use serde::{de, ser, Deserialize, Serialize};
 use std::fmt;
 
@@ -136,7 +134,8 @@ impl<'de> de::Deserialize<'de> for SubjectPublicKeyInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use base64::{engine::general_purpose, Engine as _};
+    use base64::engine::general_purpose;
+    use base64::Engine as _;
     use num_bigint_dig::BigInt;
 
     #[test]

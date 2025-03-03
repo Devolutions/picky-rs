@@ -390,7 +390,7 @@ impl<'a, 'se> serde::ser::Serializer for &'a mut Serializer<'se> {
     }
 }
 
-impl<'a, 'se> serde::ser::SerializeTupleVariant for &'a mut Serializer<'se> {
+impl serde::ser::SerializeTupleVariant for &mut Serializer<'_> {
     type Ok = usize;
     type Error = Asn1DerError;
 
@@ -403,7 +403,7 @@ impl<'a, 'se> serde::ser::SerializeTupleVariant for &'a mut Serializer<'se> {
     }
 }
 
-impl<'a, 'se> serde::ser::SerializeMap for &'a mut Serializer<'se> {
+impl serde::ser::SerializeMap for &mut Serializer<'_> {
     type Ok = usize;
     type Error = Asn1DerError;
 
@@ -420,7 +420,7 @@ impl<'a, 'se> serde::ser::SerializeMap for &'a mut Serializer<'se> {
     }
 }
 
-impl<'a, 'se> serde::ser::SerializeStructVariant for &'a mut Serializer<'se> {
+impl serde::ser::SerializeStructVariant for &mut Serializer<'_> {
     type Ok = usize;
     type Error = Asn1DerError;
 

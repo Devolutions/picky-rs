@@ -163,7 +163,7 @@ impl TimeRepr for UTCTimeRepr {
     {
         struct Visitor;
 
-        impl<'de> de::Visitor<'de> for Visitor {
+        impl de::Visitor<'_> for Visitor {
             type Value = Date<UTCTimeRepr>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -249,7 +249,7 @@ impl TimeRepr for GeneralizedTimeRepr {
     {
         struct Visitor;
 
-        impl<'de> de::Visitor<'de> for Visitor {
+        impl de::Visitor<'_> for Visitor {
             type Value = Date<GeneralizedTimeRepr>;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {

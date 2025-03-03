@@ -1,11 +1,10 @@
 use crate::key::ec::{EcCurve, NamedEcCurve};
 use crate::key::ed::NamedEdAlgorithm;
 use crate::key::{EdAlgorithm, PrivateKey, PublicKey};
-use crate::ssh::certificate::Timestamp;
 use crate::ssh::certificate::{
     SshCertKeyType, SshCertType, SshCertTypeError, SshCertificate, SshCertificateError, SshCriticalOption,
     SshCriticalOptionError, SshCriticalOptionType, SshExtension, SshExtensionError, SshExtensionType, SshSignature,
-    SshSignatureError, SshSignatureFormat,
+    SshSignatureError, SshSignatureFormat, Timestamp,
 };
 use crate::ssh::private_key::{KdfOption, SshBasePrivateKey, SshPrivateKeyError};
 use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};

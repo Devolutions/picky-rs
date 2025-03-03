@@ -268,7 +268,7 @@ impl<'de> de::Deserialize<'de> for BitString {
     {
         struct Visitor;
 
-        impl<'de> de::Visitor<'de> for Visitor {
+        impl de::Visitor<'_> for Visitor {
             type Value = BitString;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {

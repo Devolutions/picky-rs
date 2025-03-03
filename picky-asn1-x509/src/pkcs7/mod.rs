@@ -67,7 +67,8 @@ mod tests {
     use super::Pkcs7Certificate;
     use crate::pkcs7::signer_info::UnsignedAttributeValue;
     use crate::{Attribute, AttributeValues};
-    use base64::{engine::general_purpose, Engine as _};
+    use base64::engine::general_purpose;
+    use base64::Engine as _;
     use picky_asn1::wrapper::{Asn1SetOf, OctetStringAsn1};
 
     #[test]

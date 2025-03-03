@@ -20,7 +20,7 @@ fn get_bit(data: &[u8], n: usize) -> u8 {
 
     let val_byte = data[pos_byte];
 
-    val_byte >> (8 - (pos_bit + 1)) & 0x0001
+    (val_byte >> (8 - (pos_bit + 1))) & 0x0001
 }
 
 fn set_bit(data: &mut [u8], pos: usize, val: u8) {

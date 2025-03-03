@@ -262,7 +262,8 @@ mod tests {
     use super::test_data::*;
     use super::*;
     use crate::pkcs12::test_data::build_arbitrary_algorithm_identifier;
-    use base64::{engine::general_purpose, Engine as _};
+    use base64::engine::general_purpose;
+    use base64::Engine as _;
     use expect_test::expect;
 
     #[test]

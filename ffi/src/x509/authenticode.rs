@@ -2,20 +2,18 @@
 pub mod ffi {
     use picky::x509::pkcs7::timestamp::Timestamper;
 
-    use crate::{
-        date::ffi::UtcDate,
-        error::ffi::PickyError,
-        hash::ffi::HashAlgorithm,
-        key::ffi::PrivateKey,
-        pem::ffi::Pem,
-        pkcs7::ffi::Pkcs7,
-        utils::ffi::{RsString, VecU8},
-        x509::{
-            attribute::ffi::{Attribute, AttributeIterator, SignedData, UnsignedAttribute, UnsignedAttributeIterator},
-            ffi::{Cert, CertIterator},
-            name::ffi::DirectoryNameIterator,
-        },
+    use crate::date::ffi::UtcDate;
+    use crate::error::ffi::PickyError;
+    use crate::hash::ffi::HashAlgorithm;
+    use crate::key::ffi::PrivateKey;
+    use crate::pem::ffi::Pem;
+    use crate::pkcs7::ffi::Pkcs7;
+    use crate::utils::ffi::{RsString, VecU8};
+    use crate::x509::attribute::ffi::{
+        Attribute, AttributeIterator, SignedData, UnsignedAttribute, UnsignedAttributeIterator,
     };
+    use crate::x509::ffi::{Cert, CertIterator};
+    use crate::x509::name::ffi::DirectoryNameIterator;
 
     #[diplomat::opaque]
     pub struct AuthenticodeSignature(pub picky::x509::pkcs7::authenticode::AuthenticodeSignature);
