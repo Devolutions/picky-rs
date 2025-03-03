@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[7.0.0-rc.13](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.12...picky-v7.0.0-rc.13)] - 2025-03-03
+
+### <!-- 4 -->Bug Fixes
+
+- [**breaking**] Comply with draft-cavage-http-signatures-12 when signing HTTP messages (#351) ([f043d04e14](https://github.com/Devolutions/picky-rs/commit/f043d04e1462cf0eddd9140f22a4d364cb3ad9cd)) 
+
+  Change request target handling to comply with draft-cavage-http-signatures-12 when signing HTTP messages.
+
 ## [[7.0.0-rc.12](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.11...picky-v7.0.0-rc.12)] - 2025-01-16
 
 ### <!-- 4 -->Bug Fixes
