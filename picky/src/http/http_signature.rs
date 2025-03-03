@@ -117,9 +117,9 @@ impl Header {
     }
 }
 
-impl ToString for Header {
-    fn to_string(&self) -> String {
-        self.as_str().to_owned()
+impl fmt::Display for Header {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.as_str())
     }
 }
 
@@ -230,18 +230,8 @@ impl HttpSignature {
             inner: Default::default(),
         }
     }
-}
 
-const HTTP_SIGNATURE_HEADER: &str = "Signature";
-const HTTP_SIGNATURE_KEY_ID: &str = "keyId";
-const HTTP_SIGNATURE_SIGNATURE: &str = "signature";
-const HTTP_SIGNATURE_CREATED: &str = "created";
-const HTTP_SIGNATURE_EXPIRES: &str = "expires";
-const HTTP_SIGNATURE_HEADERS: &str = "headers";
-const HTTP_SIGNATURE_ALGORITHM: &str = "algorithm";
-
-impl ToString for HttpSignature {
-    fn to_string(&self) -> String {
+    pub fn to_signing_string(&self) -> String {
         let mut acc = Vec::with_capacity(5);
 
         if self.legacy {
@@ -305,6 +295,20 @@ impl ToString for HttpSignature {
         }
 
         acc.join(",")
+    }
+}
+
+const HTTP_SIGNATURE_HEADER: &str = "Signature";
+const HTTP_SIGNATURE_KEY_ID: &str = "keyId";
+const HTTP_SIGNATURE_SIGNATURE: &str = "signature";
+const HTTP_SIGNATURE_CREATED: &str = "created";
+const HTTP_SIGNATURE_EXPIRES: &str = "expires";
+const HTTP_SIGNATURE_HEADERS: &str = "headers";
+const HTTP_SIGNATURE_ALGORITHM: &str = "algorithm";
+
+impl fmt::Display for HttpSignature {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_signing_string())
     }
 }
 
@@ -965,7 +969,7 @@ mod tests {
             .generate_signing_string_using_http_request(&parts)
             .build()
             .expect("couldn't generate http signature");
-        let http_signature_str = http_signature.to_string();
+        let http_signature_str = http_signature.to_signing_string();
 
         pretty_assertions::assert_eq!(http_signature_str, HTTP_SIGNATURE_EXAMPLE);
 
@@ -984,7 +988,7 @@ mod tests {
             .generate_signing_string_using_http_request(&parts_2)
             .build()
             .expect("couldn't generate http signature 2");
-        let http_signature_str_2 = http_signature_2.to_string();
+        let http_signature_str_2 = http_signature_2.to_signing_string();
 
         pretty_assertions::assert_eq!(http_signature_str_2, http_signature_str);
     }
@@ -1146,7 +1150,7 @@ mod tests {
             .pre_generated_signing_string(signing_string)
             .build()
             .expect("couldn't generate http signature using pre-generated signing string");
-        let http_signature_str = http_signature.to_string();
+        let http_signature_str = http_signature.to_signing_string();
         assert_eq!(http_signature_str, HTTP_SIGNATURE_EXAMPLE);
     }
 
@@ -1238,7 +1242,7 @@ mod tests {
                 .build()
                 .expect("build http signature");
 
-            pretty_assertions::assert_eq!(http_signature.to_string(), HTTP_SIGNATURE_LEGACY);
+            pretty_assertions::assert_eq!(http_signature.to_signing_string(), HTTP_SIGNATURE_LEGACY);
         }
 
         {
