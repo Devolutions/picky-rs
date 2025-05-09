@@ -1,8 +1,9 @@
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use picky_asn1::wrapper::{
-    Asn1SequenceOf, BitStringAsn1, ExplicitContextTag0, ExplicitContextTag1, ExplicitContextTag2, ExplicitContextTag3,
-    ExplicitContextTag4, ExplicitContextTag5, ExplicitContextTag6, ExplicitContextTag7, ExplicitContextTag8,
-    GeneralStringAsn1, GeneralizedTimeAsn1, IntegerAsn1, OctetStringAsn1, Optional,
+    Asn1SequenceOf, BitStringAsn1, ExplicitContextTag0, ExplicitContextTag1, ExplicitContextTag10, ExplicitContextTag2,
+    ExplicitContextTag3, ExplicitContextTag4, ExplicitContextTag5, ExplicitContextTag6, ExplicitContextTag7,
+    ExplicitContextTag8, ExplicitContextTag9, GeneralStringAsn1, GeneralizedTimeAsn1, IntegerAsn1, OctetStringAsn1,
+    Optional,
 };
 use picky_asn1_der::application_tag::ApplicationTag;
 use serde::de::Error;
@@ -67,6 +68,15 @@ pub struct HostAddress {
     pub addr_type: ExplicitContextTag0<IntegerAsn1>,
     pub address: ExplicitContextTag1<OctetStringAsn1>,
 }
+
+/// [RFC 4120 5.2.5](https://www.rfc-editor.org/rfc/rfc4120.txt)
+///
+/// ```not_rust
+/// HostAddresses   -- NOTE: subtly different from rfc1510,
+///                 -- but has a value mapping and encodes the same
+///         ::= SEQUENCE OF HostAddress
+/// ```
+pub type HostAddresses = Asn1SequenceOf<HostAddress>;
 
 /// [RFC 4120 5.2.6](https://www.rfc-editor.org/rfc/rfc4120.txt)
 ///
@@ -154,6 +164,55 @@ pub struct TicketInner {
 }
 
 pub type Ticket = ApplicationTag<TicketInner, TICKET_TYPE>;
+
+/// [RFC 4120 5.3](https://www.rfc-editor.org/rfc/rfc4120.txt)
+///
+/// ```not_rust
+/// TransitedEncoding       ::= SEQUENCE {
+///         tr-type         [0] Int32 -- must be registered --,
+///         contents        [1] OCTET STRING
+/// }
+/// ```
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub struct TransitedEncoding {
+    pub tr_type: ExplicitContextTag0<IntegerAsn1>,
+    pub contents: ExplicitContextTag1<OctetStringAsn1>,
+}
+
+/// [RFC 4120 5.3](https://www.rfc-editor.org/rfc/rfc4120.txt)
+///
+/// ```not_rust
+/// EncTicketPart   ::= [APPLICATION 3] SEQUENCE {
+///         flags                   [0] TicketFlags,
+///         key                     [1] EncryptionKey,
+///         crealm                  [2] Realm,
+///         cname                   [3] PrincipalName,
+///         transited               [4] TransitedEncoding,
+///         authtime                [5] KerberosTime,
+///         starttime               [6] KerberosTime OPTIONAL,
+///         endtime                 [7] KerberosTime,
+///         renew-till              [8] KerberosTime OPTIONAL,
+///         caddr                   [9] HostAddresses OPTIONAL,
+///         authorization-data      [10] AuthorizationData OPTIONAL
+/// }
+/// ```
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub struct EncTicketPart {
+    pub flags: ExplicitContextTag0<KerberosFlags>,
+    pub key: ExplicitContextTag1<EncryptionKey>,
+    pub crealm: ExplicitContextTag2<Realm>,
+    pub cname: ExplicitContextTag3<PrincipalName>,
+    pub transited: ExplicitContextTag4<TransitedEncoding>,
+    pub auth_time: ExplicitContextTag5<KerberosTime>,
+    pub starttime: Optional<Option<ExplicitContextTag6<KerberosTime>>>,
+    pub endtime: ExplicitContextTag7<KerberosTime>,
+    #[serde(default)]
+    pub renew_till: Optional<Option<ExplicitContextTag8<KerberosTime>>>,
+    #[serde(default)]
+    pub caddr: Optional<Option<ExplicitContextTag9<HostAddresses>>>,
+    #[serde(default)]
+    pub authorization_data: Optional<Option<ExplicitContextTag10<AuthorizationData>>>,
+}
 
 /// [RFC 4120 5.4.2](https://www.rfc-editor.org/rfc/rfc4120.txt)
 ///
