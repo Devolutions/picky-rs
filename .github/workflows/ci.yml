@@ -104,13 +104,13 @@ jobs:
         crate: [ picky-asn1, picky-asn1-der, picky-asn1-x509, picky ]
         include:
           - crate: picky-asn1
-            msvc: "1.61"
+            msvc: "1.68"
           - crate: picky-asn1-der
-            msvc: "1.61"
+            msvc: "1.68"
           - crate: picky-asn1-x509
             msvc: "1.70"
           - crate: picky
-            msvc: "1.70"
+            msvc: "1.81"
 
     steps:
       - uses: actions/checkout@v4

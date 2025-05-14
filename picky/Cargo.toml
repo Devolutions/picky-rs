@@ -1,6 +1,6 @@
 [package]
 name = "picky"
-version = "7.0.0-rc.13"
+version = "7.0.0-rc.14"
 authors = [
     "Benoît CORTIER <bcortier@devolutions.net>",
     "Jonathan Trepanier <jtrepanier@devolutions.net>",
@@ -15,7 +15,7 @@ authors = [
 description = "Portable X.509, PKI, JOSE and HTTP signature implementation."
 keywords = ["x509", "jwt", "signature", "jose", "pki"]
 edition = "2021"
-rust-version = "1.70"
+rust-version = "1.81"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Devolutions/picky-rs"
 include = ["src/**/*", "README.md", "CHANGELOG.md", "LICENSE-*"]

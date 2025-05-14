@@ -965,8 +965,6 @@ fn ecdh_concat_kdf(
         .map(|val| general_purpose::URL_SAFE_NO_PAD.decode(val))
         .transpose()?;
 
-    let div_ceiling = |a: usize, b: usize| (a + b - 1) / b;
-
     // Size of the resulting key in BITS
     let shared_key_len_bytes = ((shared_key_len * 8) as u32).to_be_bytes();
 
@@ -978,7 +976,7 @@ fn ecdh_concat_kdf(
 
     let block_size = Sha256::output_size();
 
-    let count = div_ceiling(shared_key_len, block_size);
+    let count = shared_key_len.div_ceil(block_size);
     let mut shared_key = Zeroizing::new(Vec::with_capacity(block_size * count));
 
     let mut hasher = Sha256::new();
