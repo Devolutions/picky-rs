@@ -19,7 +19,7 @@ use crate::constants::types::{
     KRB_ERROR_MSG_TYPE, KRB_PRIV, TGS_REP_MSG_TYPE, TGS_REQ_MSG_TYPE,
 };
 use crate::data_types::{
-    ApOptions, EncryptedData, EncryptionKey, HostAddress, KerberosFlags, KerberosStringAsn1, KerberosTime, LastReq,
+    ApOptions, EncryptedData, EncryptionKey, HostAddresses, KerberosFlags, KerberosStringAsn1, KerberosTime, LastReq,
     Microseconds, PaData, PrincipalName, Realm, Ticket,
 };
 
@@ -99,7 +99,7 @@ pub struct KdcReqBody {
     pub nonce: ExplicitContextTag7<IntegerAsn1>,
     pub etype: ExplicitContextTag8<Asn1SequenceOf<IntegerAsn1>>,
     #[serde(default)]
-    pub addresses: Optional<Option<ExplicitContextTag9<Asn1SequenceOf<HostAddress>>>>,
+    pub addresses: Optional<Option<ExplicitContextTag9<HostAddresses>>>,
     #[serde(default)]
     pub enc_authorization_data: Optional<Option<ExplicitContextTag10<EncryptedData>>>,
     #[serde(default)]
@@ -256,7 +256,7 @@ pub struct EncKdcRepPart {
     pub srealm: ExplicitContextTag9<Realm>,
     pub sname: ExplicitContextTag10<PrincipalName>,
     #[serde(default)]
-    pub caadr: Optional<Option<ExplicitContextTag11<HostAddress>>>,
+    pub caadr: Optional<Option<ExplicitContextTag11<HostAddresses>>>,
     // this field is not specified in RFC but present in real tickets
     #[serde(default)]
     pub encrypted_pa_data: Optional<Option<ExplicitContextTag12<Asn1SequenceOf<PaData>>>>,
