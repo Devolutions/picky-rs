@@ -14,11 +14,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Equivalent to HttpSignature::to_string().
 
-### <!-- 7 -->Build
-
-- Bump rstest from 0.23.0 to 0.25.0 (#356) ([5a2df5cc54](https://github.com/Devolutions/picky-rs/commit/5a2df5cc545656ddf86db59337048b99216160ac)) 
-
-
 # Changelog
 
 All notable changes to this project will be documented in this file.
