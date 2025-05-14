@@ -14,14 +14,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Equivalent to HttpSignature::to_string().
 
-# Changelog
-
-All notable changes to this project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-
 ## [[7.0.0-rc.13](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.12...picky-v7.0.0-rc.13)] - 2025-03-03
 
 ### <!-- 4 -->Bug Fixes
