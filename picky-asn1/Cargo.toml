@@ -2,7 +2,7 @@
 name = "picky-asn1"
 version = "0.10.1"
 edition = "2021"
-rust-version = "1.61"
+rust-version = "1.68"
 authors = [
     "Benoît CORTIER <bcortier@devolutions.net>",
     "Alexandr Yusuk <aleksandr.yusuk@apriorit.com>",
