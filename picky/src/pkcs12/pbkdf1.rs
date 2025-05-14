@@ -39,9 +39,7 @@ pub fn pbkdf1(
     // Construct "diversifier" string
     let d = vec![usage.to_id_byte(); v];
 
-    let ceil = |a, b| (a + b - 1) / b;
-
-    let expanded_length = |len| v * ceil(len, v);
+    let expanded_length = |len: usize| v * len.div_ceil(v);
 
     // Expand salt and password length to multiple of V
     let expanded_salt = salt.iter().cycle().take(expanded_length(salt.len()));
@@ -50,7 +48,7 @@ pub fn pbkdf1(
     // I = S || P
     let mut key_material: Vec<u8> = expanded_salt.chain(expanded_password).cloned().collect();
 
-    let c = ceil(output_size, u);
+    let c = output_size.div_ceil(u);
 
     let mut output: Vec<u8> = vec![];
 
