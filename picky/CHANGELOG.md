@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[7.0.0-rc.14](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.13...picky-v7.0.0-rc.14)] - 2025-05-14
+
+### <!-- 1 -->Features
+
+- Add HttpSignature::to_signing_string() method ([fe054c47f0](https://github.com/Devolutions/picky-rs/commit/fe054c47f04920383d93371bda948a961cbefdfd)) 
+
+  Equivalent to HttpSignature::to_string().
+
+### <!-- 7 -->Build
+
+- Bump rstest from 0.23.0 to 0.25.0 (#356) ([5a2df5cc54](https://github.com/Devolutions/picky-rs/commit/5a2df5cc545656ddf86db59337048b99216160ac)) 
+
+
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+
 ## [[7.0.0-rc.13](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.12...picky-v7.0.0-rc.13)] - 2025-03-03
 
 ### <!-- 4 -->Bug Fixes
