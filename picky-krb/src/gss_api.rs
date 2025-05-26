@@ -164,6 +164,8 @@ impl<T: ser::Serialize> ser::Serialize for KrbMessage<T> {
     {
         use serde::ser::Error;
 
+        // We encode `KrbMessage` fields using `KrbMessage::encode` method.
+        // We use the `Container` type to prepend the sequence tag and length to the encoded fields.
         #[derive(Serialize)]
         struct Container {
             buff: Asn1RawDer,
