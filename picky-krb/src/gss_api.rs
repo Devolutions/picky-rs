@@ -229,8 +229,7 @@ impl<T: ser::Serialize + Debug + PartialEq> ser::Serialize for ApplicationTag0<T
                 .map_err(|e| S::Error::custom(format!("cannot serialize GssApiMessage inner value: {:?}", e)))?;
         }
 
-        // Application tag 0.
-        buff[0] = 0x60;
+        buff[0] = Tag::application_constructed(0).inner();
 
         Asn1RawDer(buff).serialize(serializer)
     }
