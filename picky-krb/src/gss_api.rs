@@ -2,6 +2,7 @@ use std::fmt::Debug;
 use std::io::{self, Read, Write};
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use picky_asn1::tag::Tag;
 use picky_asn1::wrapper::{
     Asn1SequenceOf, BitStringAsn1, ExplicitContextTag0, ExplicitContextTag1, ExplicitContextTag2, ExplicitContextTag3,
     ObjectIdentifierAsn1, OctetStringAsn1, Optional,
@@ -121,9 +122,7 @@ impl<T: DeserializeOwned> KrbMessage<T> {
     pub fn decode_application_krb_message(
         mut data: &[u8],
     ) -> Result<ApplicationTag0<KrbMessage<T>>, GssApiMessageError> {
-        if data.is_empty() || data[0] != 0x60
-        /* Application tag 0 */
-        {
+        if data.is_empty() || Tag::from(data[0]) != Tag::application_constructed(0) {
             return Err(GssApiMessageError::Asn1Error(Asn1DerError::InvalidData));
         }
 
@@ -204,7 +203,7 @@ impl<'de, T: de::DeserializeOwned> de::Deserialize<'de> for ApplicationTag0<T> {
 
         if let Some(first) = raw.first_mut() {
             // ASN1 sequence tag.
-            *first = 48;
+            *first = Tag::SEQUENCE.inner();
         }
 
         let mut deserializer = picky_asn1_der::Deserializer::new_from_bytes(&raw);
