@@ -16,8 +16,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Bump uuid from 1.16.0 to 1.17.0 (#370) ([af8ac1be76](https://github.com/Devolutions/picky-rs/commit/af8ac1be7654fd5b54deb80bb816c7865883bc41)) 
 
-
-
 ## [[0.9.5](https://github.com/Devolutions/picky-rs/compare/picky-krb-v0.9.4...picky-krb-v0.9.5)] - 2025-05-14
 
 ### <!-- 1 -->Features
