@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[0.9.6](https://github.com/Devolutions/picky-rs/compare/picky-krb-v0.9.5...picky-krb-v0.9.6)] - 2025-05-26
+
+### <!-- 1 -->Features
+
+- Deserialize for `KrbMessage/ApplicationTag0` (#369) ([6eac340241](https://github.com/Devolutions/picky-rs/commit/6eac3402416981409bf1d211bed1ff3b99eaebcf)) 
+
+### <!-- 7 -->Build
+
+- Bump uuid from 1.16.0 to 1.17.0 (#370) ([af8ac1be76](https://github.com/Devolutions/picky-rs/commit/af8ac1be7654fd5b54deb80bb816c7865883bc41)) 
+
 ## [[0.9.5](https://github.com/Devolutions/picky-rs/compare/picky-krb-v0.9.4...picky-krb-v0.9.5)] - 2025-05-14
 
 ### <!-- 1 -->Features
