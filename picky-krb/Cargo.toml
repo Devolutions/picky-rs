@@ -28,7 +28,7 @@ crypto = "0.5"
 aes = "0.8"
 des = "0.8"
 cbc = "0.1"
-rand = "0.8"
+rand = "0.9"
 
 uuid = { version = "1.17", default-features = false, features = ["serde"] }
 oid = "0.2"
