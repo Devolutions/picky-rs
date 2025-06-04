@@ -10,16 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### <!-- 4 -->Bug Fixes
 
-- Typo in `AuthenticatorInner::authenticator_vno` (#373) ([b3ae4ab263](https://github.com/Devolutions/picky-rs/commit/b3ae4ab263234925b42e91d47ae36d52eeae1693)) 
-
-
-# Changelog
-
-All notable changes to this project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
+- **[breaking]** Fix typo in field name `AuthenticatorInner::authenticator_vno` (#373) ([b3ae4ab263](https://github.com/Devolutions/picky-rs/commit/b3ae4ab263234925b42e91d47ae36d52eeae1693)) 
 
 ## [[0.9.6](https://github.com/Devolutions/picky-rs/compare/picky-krb-v0.9.5...picky-krb-v0.9.6)] - 2025-05-26
 
