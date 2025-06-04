@@ -328,7 +328,7 @@ pub struct Checksum {
 /// ```
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct AuthenticatorInner {
-    pub authenticator_bno: ExplicitContextTag0<IntegerAsn1>,
+    pub authenticator_vno: ExplicitContextTag0<IntegerAsn1>,
     pub crealm: ExplicitContextTag1<Realm>,
     pub cname: ExplicitContextTag2<PrincipalName>,
     pub cksum: Optional<Option<ExplicitContextTag3<Checksum>>>,
@@ -840,7 +840,7 @@ mod tests {
         ];
 
         let expected: ApplicationTag<_, 2> = ApplicationTag(AuthenticatorInner {
-            authenticator_bno: ExplicitContextTag0::from(IntegerAsn1(vec![5])),
+            authenticator_vno: ExplicitContextTag0::from(IntegerAsn1(vec![5])),
             crealm: ExplicitContextTag1::from(GeneralStringAsn1::from(
                 Ia5String::from_string("EXAMPLE.COM".to_owned()).unwrap(),
             )),
