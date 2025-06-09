@@ -43,7 +43,7 @@ jobs:
         os: [ windows, linux ]
         include:
           - os: windows
-            runner: windows-2019
+            runner: windows-latest
           - os: linux
             runner: ubuntu-latest
 
@@ -81,7 +81,7 @@ jobs:
         os: [ windows, linux ]
         include:
           - os: windows
-            runner: windows-2019
+            runner: windows-latest
           - os: linux
             runner: ubuntu-latest
 
