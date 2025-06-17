@@ -159,7 +159,7 @@ impl AlgorithmIdentifier {
     pub fn new_ecdsa_with_sha512() -> Self {
         Self {
             algorithm: oids::ecdsa_with_sha512().into(),
-            parameters: AlgorithmIdentifierParameters::Null,
+            parameters: AlgorithmIdentifierParameters::None,
         }
     }
 
