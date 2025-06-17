@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[0.14.4](https://github.com/Devolutions/picky-rs/compare/picky-asn1-x509-v0.14.3...picky-asn1-x509-v0.14.4)] - 2025-06-17
+
+### <!-- 4 -->Bug Fixes
+
+- Invalid parameters for ecdsa with sha512 serialization (#377) ([ee3ed749e6](https://github.com/Devolutions/picky-rs/commit/ee3ed749e6b3d37337be688f8e71e3c799102073)) 
+
+
+
 ## [[0.14.3](https://github.com/Devolutions/picky-rs/compare/picky-asn1-x509-v0.14.2...picky-asn1-x509-v0.14.3)] - 2025-01-16
 
 ### <!-- 4 -->Bug Fixes
