@@ -110,7 +110,7 @@ jobs:
           - crate: picky-asn1-x509
             msvc: "1.70"
           - crate: picky
-            msvc: "1.81"
+            msvc: "1.85"
 
     steps:
       - uses: actions/checkout@v4
