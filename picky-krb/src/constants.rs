@@ -36,8 +36,10 @@ pub mod types {
     pub const PA_PK_AS_REQ: [u8; 1] = [0x10];
     pub const PA_PK_AS_REP: [u8; 1] = [17];
 
+    //= [Application Tag Numbers](https://www.rfc-editor.org/rfc/rfc4120#section-5.10) =//
     pub const TICKET_TYPE: u8 = 1;
     pub const AUTHENTICATOR_TYPE: u8 = 2;
+    pub const ENC_TICKET_PART_TYPE: u8 = 3;
     pub const ENC_AS_REP_PART_TYPE: u8 = 25;
     pub const ENC_TGS_REP_PART_TYPE: u8 = 26;
     pub const ENC_AP_REP_PART_TYPE: u8 = 27;
