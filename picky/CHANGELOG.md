@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[7.0.0-rc.15](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.14...picky-v7.0.0-rc.15)] - 2025-06-24
+
+### <!-- 7 -->Build
+
+- Bump MSVC to 1.85 (#379) ([302df9912d](https://github.com/Devolutions/picky-rs/commit/302df9912d6f038f21b64fc916bd82836944c382)) 
+
+
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+
 ## [[7.0.0-rc.14](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.13...picky-v7.0.0-rc.14)] - 2025-05-14
 
 ### <!-- 1 -->Features
