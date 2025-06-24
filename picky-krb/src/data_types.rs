@@ -14,7 +14,9 @@ use std::io::{Read, Write};
 use std::marker::PhantomData;
 use std::{fmt, io};
 
-use crate::constants::types::{AUTHENTICATOR_TYPE, ENC_AP_REP_PART_TYPE, KRB_PRIV_ENC_PART, TICKET_TYPE};
+use crate::constants::types::{
+    AUTHENTICATOR_TYPE, ENC_AP_REP_PART_TYPE, ENC_TICKET_PART_TYPE, KRB_PRIV_ENC_PART, TICKET_TYPE,
+};
 use crate::messages::KrbError;
 
 /// [RFC 4120 5.2.1](https://www.rfc-editor.org/rfc/rfc4120.txt)
@@ -197,7 +199,7 @@ pub struct TransitedEncoding {
 /// }
 /// ```
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
-pub struct EncTicketPart {
+pub struct EncTicketPartInner {
     pub flags: ExplicitContextTag0<KerberosFlags>,
     pub key: ExplicitContextTag1<EncryptionKey>,
     pub crealm: ExplicitContextTag2<Realm>,
@@ -213,6 +215,8 @@ pub struct EncTicketPart {
     #[serde(default)]
     pub authorization_data: Optional<Option<ExplicitContextTag10<AuthorizationData>>>,
 }
+
+pub type EncTicketPart = ApplicationTag<EncTicketPartInner, ENC_TICKET_PART_TYPE>;
 
 /// [RFC 4120 5.4.2](https://www.rfc-editor.org/rfc/rfc4120.txt)
 ///
