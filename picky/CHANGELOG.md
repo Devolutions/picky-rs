@@ -12,7 +12,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Bump MSVC to 1.85 (#379) ([302df9912d](https://github.com/Devolutions/picky-rs/commit/302df9912d6f038f21b64fc916bd82836944c382)) 
 
-
 # Changelog
 
 All notable changes to this project will be documented in this file.

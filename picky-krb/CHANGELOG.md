@@ -12,8 +12,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `EncTicketPart` structure; (#381) ([79ed323732](https://github.com/Devolutions/picky-rs/commit/79ed323732efbbef18030011ec1926239d8f6175)) 
 
-
-
 ## [[0.10.0](https://github.com/Devolutions/picky-rs/compare/picky-krb-v0.9.6...picky-krb-v0.10.0)] - 2025-06-04
 
 ### <!-- 4 -->Bug Fixes
