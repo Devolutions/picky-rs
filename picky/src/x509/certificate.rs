@@ -490,13 +490,20 @@ impl<'a, 'b, Chain: Iterator<Item = &'b Cert>> CertValidator<'a, 'b, Chain> {
         let mut current_cert = self.cert;
 
         for (number_certs, parent_cert) in chain.enumerate() {
-            // check basic constraints
+            // https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.9
+            // The cA boolean indicates whether the certified public key may be used
+            // to verify certificate signatures.  If the cA boolean is not asserted,
+            // then the keyCertSign bit in the key usage extension MUST NOT be
+            // asserted.  If the basic constraints extension is not present in a
+            // version 3 certificate, or the extension is present but the cA boolean
+            // is not asserted, then the certified public key MUST NOT be used to
+            // verify certificate signatures.
             match parent_cert
                 .basic_constraints()
                 .map(|bc| (bc.ca(), bc.pathlen()))
                 .unwrap_or((None, None))
             {
-                (Some(false), _) => {
+                (None | Some(false), _) => {
                     return Err(CaChainError::IssuerIsNotCA {
                         issuer_id: parent_cert.subject_name().to_string(),
                     })
@@ -1487,6 +1494,42 @@ mod tests {
         assert_eq!(
             invalid_issuer_err.to_string(),
             "CA chain error: issuer certificate \'CN=I Trust This V.E.R.Y Legitimate Intermediate Certificate\' is not a CA"
+        );
+    }
+
+    #[test]
+    fn issuer_missing_ca_basic_constraints() {
+        let root_key = parse_key(picky_test_data::RSA_2048_PK_1);
+        let intermediate = parse_key(picky_test_data::RSA_2048_PK_2);
+
+        let root = CertificateBuilder::new()
+            .validity(UtcDate::ymd(2065, 6, 15).unwrap(), UtcDate::ymd(2070, 6, 15).unwrap())
+            .self_signed(DirectoryName::new_common_name("VerySafe Root CA"), &root_key)
+            .pathlen(0)
+            .build()
+            .expect("couldn't build root ca");
+
+        let intermediate = CertificateBuilder::new()
+            .validity(UtcDate::ymd(2068, 1, 1).unwrap(), UtcDate::ymd(2071, 1, 1).unwrap())
+            .subject(
+                DirectoryName::new_common_name("V.E.R.Y Legitimate VerySafe Authority"),
+                intermediate.to_public_key().unwrap(),
+            )
+            .issuer_cert(&root, &root_key)
+            .ca(true)
+            .pathlen(1)
+            .build()
+            .expect("couldn't build intermediate ca");
+
+        let invalid_pathlen_err = intermediate
+            .verifier()
+            .chain([&root].into_iter())
+            .exact_date(&UtcDate::ymd(2069, 10, 1).unwrap())
+            .verify()
+            .unwrap_err();
+        assert_eq!(
+            invalid_pathlen_err.to_string(),
+            "CA chain error: issuer certificate 'CN=VerySafe Root CA' is not a CA"
         );
     }
 
