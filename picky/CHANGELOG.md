@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[7.0.0-rc.16](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.15...picky-v7.0.0-rc.16)] - 2025-07-15
+
+### <!-- 0 -->Security
+
+- Reject issuer certificates missing basic constraints (#385) ([4d8be23912](https://github.com/Devolutions/picky-rs/commit/4d8be239126cd34843a74de017118823699b8aa7)) 
+
+  As per RFC 5280:
+  
+  > The cA boolean indicates whether the certified public key may be used
+  > to verify certificate signatures.  If the cA boolean is not asserted,
+  > then the keyCertSign bit in the key usage extension MUST NOT be
+  > asserted.  If the basic constraints extension is not present in a
+  > version 3 certificate, or the extension is present but the cA boolean
+  > is not asserted, then the certified public key MUST NOT be used to
+  > verify certificate signatures.
+
 ## [[7.0.0-rc.15](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.14...picky-v7.0.0-rc.15)] - 2025-06-24
 
 ### <!-- 7 -->Build
