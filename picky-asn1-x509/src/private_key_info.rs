@@ -327,7 +327,13 @@ pub struct RsaPrivateKey {
 #[cfg(feature = "zeroize")]
 impl Drop for RsaPrivateKey {
     fn drop(&mut self) {
+        self.modulus.zeroize();
         self.private_exponent.zeroize();
+        self.prime_1.zeroize();
+        self.prime_2.zeroize();
+        self.exponent_1.zeroize();
+        self.exponent_2.zeroize();
+        self.coefficient.zeroize();
     }
 }
 
