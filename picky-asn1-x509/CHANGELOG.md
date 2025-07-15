@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[0.14.5](https://github.com/Devolutions/picky-rs/compare/picky-asn1-x509-v0.14.4...picky-asn1-x509-v0.14.5)] - 2025-07-15
+
+### <!-- 0 -->Security
+
+- Properly zeroize RsaPrivateKey (#386) ([ace208d604](https://github.com/Devolutions/picky-rs/commit/ace208d604a30f0eb244da1a6408caf145be9d18)) 
+
+  The Drop implementation of the RsaPrivateKey struct was only partially
+  zeroizing the secrets.
+
+
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+
 ## [[0.14.4](https://github.com/Devolutions/picky-rs/compare/picky-asn1-x509-v0.14.3...picky-asn1-x509-v0.14.4)] - 2025-06-24
 
 ### <!-- 4 -->Bug Fixes
