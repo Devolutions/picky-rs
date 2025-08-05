@@ -80,7 +80,7 @@ hmac = { version = "0.12", optional = true }
 pretty_assertions = "1.4"
 cfg-if = "1.0"
 ring = "0.17"
-rstest = "0.25"
+rstest = "0.26"
 expect-test = "1"
 tempfile = "3.13"
 rand_chacha = "0.3"
