@@ -245,6 +245,7 @@ define_oid! {
     ATTRIBUTE_PKCS12_FRIENDLY_NAME => attribute_pkcs12_friendly_name => "1.2.840.113549.1.9.20",
     ATTRIBUTE_PKCS12_LOCAL_KEY_ID => attribute_pkcs12_local_key_id => "1.2.840.113549.1.9.21",
 
+    SMART_CARD_LOGON => smart_card_logon => "1.3.6.1.4.1.311.20.2.2",
     USER_PRINCIPAL_NAME => user_principal_name => "1.3.6.1.4.1.311.20.2.3",
 
     // Protection descriptor and its types
