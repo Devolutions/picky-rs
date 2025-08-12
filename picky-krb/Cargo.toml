@@ -30,6 +30,6 @@ des = "0.8"
 cbc = "0.1"
 rand = "0.8"
 
-uuid = { version = "1.17", default-features = false, features = ["serde"] }
+uuid = { version = "1.18", default-features = false, features = ["serde"] }
 oid = "0.2"
 num-bigint-dig = { version = "0.8", features = ["rand"] }
