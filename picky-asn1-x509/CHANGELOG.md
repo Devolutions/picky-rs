@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[0.14.6](https://github.com/Devolutions/picky-rs/compare/picky-asn1-x509-v0.14.5...picky-asn1-x509-v0.14.6)] - 2025-08-18
+
+### <!-- 1 -->Features
+
+- Add smart card logon oid; (#394) ([df9a35283f](https://github.com/Devolutions/picky-rs/commit/df9a35283f757bb46d2671e79caeb7b3023ee5e4)) 
+
+
+
 ## [[0.14.5](https://github.com/Devolutions/picky-rs/compare/picky-asn1-x509-v0.14.4...picky-asn1-x509-v0.14.5)] - 2025-07-15
 
 ### <!-- 0 -->Security
