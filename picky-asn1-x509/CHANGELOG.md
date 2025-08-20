@@ -10,9 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### <!-- 1 -->Features
 
-- Add smart card logon oid; (#394) ([df9a35283f](https://github.com/Devolutions/picky-rs/commit/df9a35283f757bb46d2671e79caeb7b3023ee5e4)) 
-
-
+- Add smart card logon oid (#394) ([df9a35283f](https://github.com/Devolutions/picky-rs/commit/df9a35283f757bb46d2671e79caeb7b3023ee5e4)) 
 
 ## [[0.14.5](https://github.com/Devolutions/picky-rs/compare/picky-asn1-x509-v0.14.4...picky-asn1-x509-v0.14.5)] - 2025-07-15
 
