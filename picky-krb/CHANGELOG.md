@@ -12,7 +12,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Bump uuid from 1.17.0 to 1.18.0 (#393) ([c4c6280a2c](https://github.com/Devolutions/picky-rs/commit/c4c6280a2c51bef81a509edd06a96c165345f88d)) 
 
-
 # Changelog
 
 All notable changes to this project will be documented in this file.
