@@ -12,8 +12,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Bump rstest from 0.25.0 to 0.26.1 (#391) ([2a169deba2](https://github.com/Devolutions/picky-rs/commit/2a169deba2ba177685d58550f4214f59f25ebec0)) 
 
-
-
 ## [[7.0.0-rc.16](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.15...picky-v7.0.0-rc.16)] - 2025-07-15
 
 ### <!-- 0 -->Security
