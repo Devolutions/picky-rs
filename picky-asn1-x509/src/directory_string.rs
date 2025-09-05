@@ -33,7 +33,7 @@ impl fmt::Display for DirectoryString {
 }
 
 impl DirectoryString {
-    pub fn to_utf8_lossy(&self) -> Cow<str> {
+    pub fn to_utf8_lossy(&self) -> Cow<'_, str> {
         match &self {
             DirectoryString::PrintableString(string) => String::from_utf8_lossy(string.as_bytes()),
             DirectoryString::Utf8String(string) => Cow::Borrowed(string.as_str()),

@@ -547,11 +547,11 @@ impl ExtendedKeyUsage {
         )
     }
 
-    pub fn iter(&self) -> Iter<ObjectIdentifierAsn1> {
+    pub fn iter(&self) -> Iter<'_, ObjectIdentifierAsn1> {
         (self.0).0.iter()
     }
 
-    pub fn iter_mut(&mut self) -> IterMut<ObjectIdentifierAsn1> {
+    pub fn iter_mut(&mut self) -> IterMut<'_, ObjectIdentifierAsn1> {
         (self.0).0.iter_mut()
     }
 
