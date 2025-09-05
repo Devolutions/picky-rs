@@ -100,6 +100,20 @@ impl AlgorithmIdentifier {
         }
     }
 
+    pub fn new_sha3_224_with_rsa_encryption() -> Self {
+        Self {
+            algorithm: oids::id_rsassa_pkcs1_v1_5_with_sha3_224().into(),
+            parameters: AlgorithmIdentifierParameters::Null,
+        }
+    }
+
+    pub fn new_sha3_256_with_rsa_encryption() -> Self {
+        Self {
+            algorithm: oids::id_rsassa_pkcs1_v1_5_with_sha3_256().into(),
+            parameters: AlgorithmIdentifierParameters::Null,
+        }
+    }
+
     pub fn new_sha3_384_with_rsa_encryption() -> Self {
         Self {
             algorithm: oids::id_rsassa_pkcs1_v1_5_with_sha3_384().into(),
@@ -255,6 +269,34 @@ impl AlgorithmIdentifier {
             parameters: AlgorithmIdentifierParameters::Null,
         }
     }
+
+    pub fn new_ecdsa_with_sha3_224() -> Self {
+        Self {
+            algorithm: oids::id_ecdsa_with_sha3_224().into(),
+            parameters: AlgorithmIdentifierParameters::None,
+        }
+    }
+
+    pub fn new_ecdsa_with_sha3_256() -> Self {
+        Self {
+            algorithm: oids::id_ecdsa_with_sha3_256().into(),
+            parameters: AlgorithmIdentifierParameters::None,
+        }
+    }
+
+    pub fn new_ecdsa_with_sha3_384() -> Self {
+        Self {
+            algorithm: oids::id_ecdsa_with_sha3_384().into(),
+            parameters: AlgorithmIdentifierParameters::None,
+        }
+    }
+
+    pub fn new_ecdsa_with_sha3_512() -> Self {
+        Self {
+            algorithm: oids::id_ecdsa_with_sha3_512().into(),
+            parameters: AlgorithmIdentifierParameters::None,
+        }
+    }
 }
 
 impl ser::Serialize for AlgorithmIdentifier {
@@ -310,7 +352,11 @@ impl<'de> de::Deserialize<'de> for AlgorithmIdentifier {
                     | oids::SHA224_WITH_RSA_ENCRYPTION
                     | oids::SHA256_WITH_RSA_ENCRYPTION
                     | oids::SHA384_WITH_RSA_ENCRYPTION
-                    | oids::SHA512_WITH_RSA_ENCRYPTION => {
+                    | oids::SHA512_WITH_RSA_ENCRYPTION
+                    | oids::ID_RSASSA_PKCS1_V1_5_WITH_SHA3_224
+                    | oids::ID_RSASSA_PKCS1_V1_5_WITH_SHA3_256
+                    | oids::ID_RSASSA_PKCS1_V1_5_WITH_SHA3_384
+                    | oids::ID_RSASSA_PKCS1_V1_5_WITH_SHA3_512 => {
                         // Try to deserialize next element in sequence.
                         // Error is ignored because some implementations just leave no parameter at all for
                         // RSA encryption (ie: rsa-export-0.1.1 crate) but we still want to be able
@@ -326,6 +372,10 @@ impl<'de> de::Deserialize<'de> for AlgorithmIdentifier {
                     oids::ECDSA_WITH_SHA384
                     | oids::ECDSA_WITH_SHA256
                     | oids::ECDSA_WITH_SHA512
+                    | oids::ID_ECDSA_WITH_SHA3_224
+                    | oids::ID_ECDSA_WITH_SHA3_256
+                    | oids::ID_ECDSA_WITH_SHA3_384
+                    | oids::ID_ECDSA_WITH_SHA3_512
                     | oids::ED25519
                     | oids::ED448
                     | oids::X25519
@@ -502,17 +552,25 @@ pub enum HashAlgorithm {
     SHA256,
     SHA384,
     SHA512,
+
+    SHA3_224,
+    SHA3_256,
+    SHA3_384,
+    SHA3_512,
 }
 
 impl HashAlgorithm {
     pub fn len(&self) -> usize {
         use HashAlgorithm::*;
         match self {
-            //SHA1 => 20,
             SHA224 => 28,
             SHA256 => 32,
             SHA384 => 48,
             SHA512 => 64,
+            SHA3_224 => 28,
+            SHA3_256 => 32,
+            SHA3_384 => 48,
+            SHA3_512 => 64,
         }
     }
     pub fn is_empty(&self) -> bool {
@@ -528,6 +586,10 @@ impl From<&HashAlgorithm> for ObjectIdentifierAsn1 {
             SHA256 => oids::sha256().into(),
             SHA384 => oids::sha384().into(),
             SHA512 => oids::sha512().into(),
+            SHA3_224 => oids::sha3_224().into(),
+            SHA3_256 => oids::sha3_256().into(),
+            SHA3_384 => oids::sha384().into(),
+            SHA3_512 => oids::sha512().into(),
         }
     }
 }
@@ -542,6 +604,10 @@ impl TryFrom<ObjectIdentifierAsn1> for HashAlgorithm {
             oids::SHA256 => Ok(HashAlgorithm::SHA256),
             oids::SHA384 => Ok(HashAlgorithm::SHA384),
             oids::SHA512 => Ok(HashAlgorithm::SHA512),
+            oids::SHA3_224 => Ok(HashAlgorithm::SHA3_224),
+            oids::SHA3_256 => Ok(HashAlgorithm::SHA3_256),
+            oids::SHA3_384 => Ok(HashAlgorithm::SHA3_384),
+            oids::SHA3_512 => Ok(HashAlgorithm::SHA3_512),
             unsupported => Err(UnsupportedAlgorithmError {
                 algorithm: unsupported.to_string(),
             }),
@@ -1106,6 +1172,33 @@ mod tests {
     fn sha256() {
         let expected = [48, 13, 6, 9, 96, 134, 72, 1, 101, 3, 4, 2, 1, 5, 0];
         let sha = AlgorithmIdentifier::new_sha(ShaVariant::SHA2_256);
+        check_serde!(sha: AlgorithmIdentifier in expected);
+    }
+
+    #[test]
+    fn sha3_256() {
+        let expected = [
+            0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x08, 0x05, 0x00,
+        ];
+        let sha = AlgorithmIdentifier::new_sha(ShaVariant::SHA3_256);
+        check_serde!(sha: AlgorithmIdentifier in expected);
+    }
+
+    #[test]
+    fn rsa_enc_with_sha3_256() {
+        let expected = [
+            0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x0e, 0x05, 0x00,
+        ];
+        let sha = AlgorithmIdentifier::new_sha3_256_with_rsa_encryption();
+        check_serde!(sha: AlgorithmIdentifier in expected);
+    }
+
+    #[test]
+    fn ecdsa_with_sha3_512() {
+        let expected = [
+            0x30, 0x0B, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x0C,
+        ];
+        let sha = AlgorithmIdentifier::new_ecdsa_with_sha3_512();
         check_serde!(sha: AlgorithmIdentifier in expected);
     }
 
