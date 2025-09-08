@@ -45,8 +45,8 @@ reqwest = { version = "0.12", default-features = false, features = ["blocking"],
 # These should be updated as soon as possible.
 # /!\ ===================================== /!\
 
-rand = "0.8"
-rand_core = "0.6"
+rand = "0.9"
+rand_core = "0.9"
 num-bigint-dig = "0.8"
 
 ed25519-dalek = { version = "2", features = ["hazmat", "rand_core"] }
@@ -83,7 +83,7 @@ ring = "0.17"
 rstest = "0.26"
 expect-test = "1"
 tempfile = "3.13"
-rand_chacha = "0.3"
+rand_chacha = "0.9"
 picky-test-data = { path = "../picky-test-data", version = "0.1" }
 
 [features]
