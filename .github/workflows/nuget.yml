@@ -173,7 +173,7 @@ jobs:
 
           $OutputLibraryName = "${LibPrefix}picky$LibSuffix"
           $RenamedLibraryName = "${LibPrefix}DevolutionsPicky$LibSuffix"
-          $OutputLibrary = Join-Path "target" $RustTarget 'release' $OutputLibraryName
+          $OutputLibrary = Join-Path "target" $RustTarget 'ffi-production' $OutputLibraryName
           $OutputPath = Join-Path "dependencies" "runtimes" $DotNetRid "native"
           New-Item -ItemType Directory -Path $OutputPath | Out-Null
           Copy-Item $OutputLibrary $(Join-Path $OutputPath $RenamedLibraryName)
