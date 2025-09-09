@@ -164,7 +164,8 @@ jobs:
           $CargoParams = @(
               "build",
               "-p", "picky-ffi",
-              "--release",
+              "--profile",
+              "ffi-production",
               "--target", "$RustTarget"
           )
 
