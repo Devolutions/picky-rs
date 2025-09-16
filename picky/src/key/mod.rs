@@ -5,15 +5,16 @@ pub(crate) mod ed;
 
 use crate::oid::ObjectIdentifier;
 use crate::pem::{Pem, PemError, parse_pem};
+use crypto_bigint::{BoxedUint, NonZero};
 
-use num_bigint_dig::BigUint;
-use num_bigint_dig::traits::ModInverse;
 use picky_asn1::bit_string::BitString;
 use picky_asn1::wrapper::{BitStringAsn1Container, IntegerAsn1, OctetStringAsn1Container};
 use picky_asn1_der::Asn1DerError;
 use picky_asn1_x509::{
     ECPrivateKey, PRIVATE_KEY_INFO_VERSION_1, PrivateKeyInfo, PrivateKeyValue, SubjectPublicKeyInfo, private_key_info,
 };
+use rand_chacha::ChaCha20Rng;
+use rand_core::SeedableRng;
 use rsa::traits::{PrivateKeyParts as _, PublicKeyParts as _};
 use rsa::{RsaPrivateKey, RsaPublicKey};
 use thiserror::Error;
@@ -162,13 +163,13 @@ impl TryFrom<&'_ PrivateKey> for RsaPrivateKey {
     fn try_from(v: &PrivateKey) -> Result<Self, Self::Error> {
         match &v.as_inner().private_key {
             private_key_info::PrivateKeyValue::Rsa(OctetStringAsn1Container(key)) => {
-                let p1 = BigUint::from_bytes_be(key.prime_1.as_unsigned_bytes_be());
-                let p2 = BigUint::from_bytes_be(key.prime_2.as_unsigned_bytes_be());
+                let p1 = BoxedUint::from_be_slice_vartime(key.prime_1.as_unsigned_bytes_be());
+                let p2 = BoxedUint::from_be_slice_vartime(key.prime_2.as_unsigned_bytes_be());
 
                 RsaPrivateKey::from_components(
-                    BigUint::from_bytes_be(key.modulus.as_unsigned_bytes_be()),
-                    BigUint::from_bytes_be(key.public_exponent.as_unsigned_bytes_be()),
-                    BigUint::from_bytes_be(key.private_exponent.as_unsigned_bytes_be()),
+                    BoxedUint::from_be_slice_vartime(key.modulus.as_unsigned_bytes_be()),
+                    BoxedUint::from_be_slice_vartime(key.public_exponent.as_unsigned_bytes_be()),
+                    BoxedUint::from_be_slice_vartime(key.private_exponent.as_unsigned_bytes_be()),
                     vec![p1, p2],
                 )
                 .map_err(|e| KeyError::Rsa {
@@ -189,8 +190,8 @@ impl TryFrom<&'_ PrivateKey> for RsaPublicKey {
         match &v.as_inner().private_key {
             private_key_info::PrivateKeyValue::Rsa(OctetStringAsn1Container(key)) => {
                 Ok(RsaPublicKey::new_with_max_size(
-                    BigUint::from_bytes_be(key.modulus.as_unsigned_bytes_be()),
-                    BigUint::from_bytes_be(key.public_exponent.as_unsigned_bytes_be()),
+                    BoxedUint::from_be_slice_vartime(key.modulus.as_unsigned_bytes_be()),
+                    BoxedUint::from_be_slice_vartime(key.public_exponent.as_unsigned_bytes_be()),
                     8192,
                 )?)
             }
@@ -203,10 +204,10 @@ impl TryFrom<&'_ PrivateKey> for RsaPublicKey {
 
 impl PrivateKey {
     pub fn from_rsa_components(
-        modulus: &BigUint,
-        public_exponent: &BigUint,
-        private_exponent: &BigUint,
-        primes: &[BigUint],
+        modulus: &BoxedUint,
+        public_exponent: &BoxedUint,
+        private_exponent: &BoxedUint,
+        primes: &[BoxedUint],
     ) -> Result<Self, KeyError> {
         let mut primes_it = primes.iter();
         let prime_1 = primes_it.next().ok_or_else(|| KeyError::Rsa {
@@ -216,34 +217,42 @@ impl PrivateKey {
             context: format!("invalid number of primes provided: expected 2, got: {}", primes.len()),
         })?;
 
-        let exponent_1 = private_exponent.clone() % (prime_1 - 1u8);
-        let exponent_2 = private_exponent.clone() % (prime_2 - 1u8);
+        let exponent_1 = private_exponent
+            % NonZero::new(prime_1 - 1u8).into_option().ok_or_else(|| KeyError::Rsa {
+                context: "the first prime is not valid".to_string(),
+            })?;
+        let exponent_2 = private_exponent
+            % NonZero::new(prime_2 - 1u8).into_option().ok_or_else(|| KeyError::Rsa {
+                context: "the second prime is not valid".to_string(),
+            })?;
 
+        let prime_1 = NonZero::new(prime_1.clone())
+            .into_option()
+            .ok_or_else(|| KeyError::Rsa {
+                context: "the first prime is not valid".to_string(),
+            })?;
         let coefficient = prime_2
-            .mod_inverse(prime_1)
+            .invert_mod(&prime_1)
+            .into_option()
             .ok_or_else(|| KeyError::Rsa {
                 context: "no modular inverse for prime 1".to_string(),
-            })?
-            .to_biguint()
-            .ok_or_else(|| KeyError::Rsa {
-                context: "BigUint conversion failed".to_string(),
             })?;
 
         let inner = PrivateKeyInfo::new_rsa_encryption(
-            IntegerAsn1::from_bytes_be_unsigned(modulus.to_bytes_be()),
-            IntegerAsn1::from_bytes_be_unsigned(public_exponent.to_bytes_be()),
-            IntegerAsn1::from_bytes_be_unsigned(private_exponent.to_bytes_be()),
+            IntegerAsn1::from_bytes_be_unsigned(modulus.to_be_bytes_trimmed_vartime().into_vec()),
+            IntegerAsn1::from_bytes_be_unsigned(public_exponent.to_be_bytes_trimmed_vartime().into_vec()),
+            IntegerAsn1::from_bytes_be_unsigned(private_exponent.to_be_bytes_trimmed_vartime().into_vec()),
             (
                 // primes
-                IntegerAsn1::from_bytes_be_unsigned(prime_1.to_bytes_be()),
-                IntegerAsn1::from_bytes_be_unsigned(prime_2.to_bytes_be()),
+                IntegerAsn1::from_bytes_be_unsigned(prime_1.to_be_bytes_trimmed_vartime().into_vec()),
+                IntegerAsn1::from_bytes_be_unsigned(prime_2.to_be_bytes_trimmed_vartime().into_vec()),
             ),
             (
                 // exponents
-                IntegerAsn1::from_bytes_be_unsigned(exponent_1.to_bytes_be()),
-                IntegerAsn1::from_bytes_be_unsigned(exponent_2.to_bytes_be()),
+                IntegerAsn1::from_bytes_be_unsigned(exponent_1.to_be_bytes_trimmed_vartime().into_vec()),
+                IntegerAsn1::from_bytes_be_unsigned(exponent_2.to_be_bytes_trimmed_vartime().into_vec()),
             ),
-            IntegerAsn1::from_bytes_be_unsigned(coefficient.to_bytes_be()),
+            IntegerAsn1::from_bytes_be_unsigned(coefficient.to_be_bytes_trimmed_vartime().into_vec()),
         );
 
         Ok(Self {
@@ -256,48 +265,84 @@ impl PrivateKey {
     /// are supported for key generation.
     pub fn from_ec_components(
         curve: EcCurve,
-        secret: &BigUint,
-        point_x: &BigUint,
-        point_y: &BigUint,
+        secret: &BoxedUint,
+        point_x: &BoxedUint,
+        point_y: &BoxedUint,
     ) -> Result<Self, KeyError> {
         use p256::EncodedPoint as EncodedPointP256;
-        use p256::elliptic_curve::generic_array::GenericArray as GenericArrayP256;
+        use p256::elliptic_curve::array::Array as GenericArrayP256;
 
         use p384::EncodedPoint as EncodedPointP384;
-        use p384::elliptic_curve::generic_array::GenericArray as GenericArrayP384;
+        use p384::elliptic_curve::array::Array as GenericArrayP384;
 
         use p521::EncodedPoint as EncodedPointP521;
-        use p521::elliptic_curve::generic_array::GenericArray as GenericArrayP521;
+        use p521::elliptic_curve::array::Array as GenericArrayP521;
 
         let curve_oid: ObjectIdentifier = NamedEcCurve::Known(curve).into();
-        let px_bytes = expand_ec_field(point_x.to_bytes_be(), curve);
-        let py_bytes = expand_ec_field(point_y.to_bytes_be(), curve);
+        let px_bytes = point_x.to_be_bytes_trimmed_vartime().into_vec();
+        let py_bytes = point_y.to_be_bytes_trimmed_vartime().into_vec();
 
         let px_validated = curve.validate_component(EcComponent::PointX(&px_bytes))?;
         let py_validated = curve.validate_component(EcComponent::PointY(&py_bytes))?;
 
         let point_bytes = match curve {
             EcCurve::NistP256 => {
-                let x = GenericArrayP256::from_slice(px_validated);
-                let y = GenericArrayP256::from_slice(py_validated);
-                let point = EncodedPointP256::from_affine_coordinates(x, y, COMPRESS_EC_POINT_BY_DEFAULT);
+                let x = GenericArrayP256::try_from(px_validated).map_err(|_| KeyError::EC {
+                    context: format!(
+                        "validated PX slice is not right length(expected: {}, actual: {})",
+                        curve.field_bytes_size(),
+                        px_validated.len(),
+                    ),
+                })?;
+                let y = GenericArrayP256::try_from(py_validated).map_err(|_| KeyError::EC {
+                    context: format!(
+                        "validated PY slice is not right length(expected: {}, actual: {})",
+                        curve.field_bytes_size(),
+                        py_validated.len(),
+                    ),
+                })?;
+                let point = EncodedPointP256::from_affine_coordinates(&x, &y, COMPRESS_EC_POINT_BY_DEFAULT);
                 point.as_bytes().to_vec()
             }
             EcCurve::NistP384 => {
-                let x = GenericArrayP384::from_slice(px_validated);
-                let y = GenericArrayP384::from_slice(py_validated);
-                let point = EncodedPointP384::from_affine_coordinates(x, y, COMPRESS_EC_POINT_BY_DEFAULT);
+                let x = GenericArrayP384::try_from(px_validated).map_err(|_| KeyError::EC {
+                    context: format!(
+                        "validated PX slice is not right length(expected: {}, actual: {})",
+                        curve.field_bytes_size(),
+                        px_validated.len(),
+                    ),
+                })?;
+                let y = GenericArrayP384::try_from(py_validated).map_err(|_| KeyError::EC {
+                    context: format!(
+                        "validated PY slice is not right length(expected: {}, actual: {})",
+                        curve.field_bytes_size(),
+                        py_validated.len(),
+                    ),
+                })?;
+                let point = EncodedPointP384::from_affine_coordinates(&x, &y, COMPRESS_EC_POINT_BY_DEFAULT);
                 point.as_bytes().to_vec()
             }
             EcCurve::NistP521 => {
-                let x = GenericArrayP521::from_slice(px_validated);
-                let y = GenericArrayP521::from_slice(py_validated);
-                let point = EncodedPointP521::from_affine_coordinates(x, y, COMPRESS_EC_POINT_BY_DEFAULT);
-                point.as_bytes().to_vec()
+                let x = GenericArrayP521::try_from(px_validated).map_err(|_| KeyError::EC {
+                    context: format!(
+                        "validated PX slice is not right length(expected: {}, actual: {})",
+                        curve.field_bytes_size(),
+                        px_validated.len(),
+                    ),
+                })?;
+                let y = GenericArrayP521::try_from(py_validated).map_err(|_| KeyError::EC {
+                    context: format!(
+                        "validated PY slice is not right length(expected: {}, actual: {})",
+                        curve.field_bytes_size(),
+                        py_validated.len(),
+                    ),
+                })?;
+                let point = EncodedPointP521::from_affine_coordinates(&x, &y, COMPRESS_EC_POINT_BY_DEFAULT);
+                point.to_bytes().into_vec()
             }
         };
 
-        let secret = secret.to_bytes_be();
+        let secret = secret.to_be_bytes_trimmed_vartime().into_vec();
 
         let inner = PrivateKeyInfo::new_ec_encryption(
             curve_oid.clone(),
@@ -643,9 +688,7 @@ impl PrivateKey {
 
     /// **Beware**: this is insanely slow in debug builds.
     pub fn generate_rsa(bits: usize) -> Result<Self, KeyError> {
-        use rand::rngs::OsRng;
-
-        let key = RsaPrivateKey::new(&mut OsRng, bits)?;
+        let key = RsaPrivateKey::new(&mut ChaCha20Rng::from_os_rng(), bits)?;
 
         let modulus = key.n();
         let public_exponent = key.e();
@@ -656,15 +699,13 @@ impl PrivateKey {
 
     /// Generates new ec key pair with specified supported curve.
     pub fn generate_ec(curve: EcCurve) -> Result<Self, KeyError> {
-        use rand::rngs::OsRng;
-
         let curve_oid: ObjectIdentifier = NamedEcCurve::Known(curve).into();
 
         let (secret, point) = match curve {
             EcCurve::NistP256 => {
                 use p256::elliptic_curve::sec1::ToEncodedPoint;
 
-                let key = p256::SecretKey::random(&mut OsRng);
+                let key = p256::SecretKey::random(&mut ChaCha20Rng::from_os_rng());
                 let secret = key.to_bytes().to_vec();
                 let point = key
                     .public_key()
@@ -676,7 +717,7 @@ impl PrivateKey {
             EcCurve::NistP384 => {
                 use p384::elliptic_curve::sec1::ToEncodedPoint;
 
-                let key = p384::SecretKey::random(&mut OsRng);
+                let key = p384::SecretKey::random(&mut ChaCha20Rng::from_os_rng());
                 let secret = key.to_bytes().to_vec();
                 let point = key
                     .public_key()
@@ -688,7 +729,7 @@ impl PrivateKey {
             EcCurve::NistP521 => {
                 use p521::elliptic_curve::sec1::ToEncodedPoint;
 
-                let key = p521::SecretKey::random(&mut OsRng);
+                let key = p521::SecretKey::random(&mut ChaCha20Rng::from_os_rng());
                 let secret = key.to_bytes().to_vec();
                 let point = key
                     .public_key()
@@ -720,18 +761,16 @@ impl PrivateKey {
     /// `write_public_key` specifies whether to include public key in the private key file.
     /// Note that OpenSSL does not support ed keys with public key included.
     pub fn generate_ed(algorithm: EdAlgorithm, write_public_key: bool) -> Result<Self, KeyError> {
-        use rand::rngs::OsRng;
-
         let algorithm_oid: ObjectIdentifier = NamedEdAlgorithm::Known(algorithm).into();
 
         let (private_key, public_key) = match algorithm {
             EdAlgorithm::Ed25519 => {
-                let private = ed25519_dalek::SigningKey::generate(&mut OsRng);
+                let private = ed25519_dalek::SigningKey::generate(&mut ChaCha20Rng::from_os_rng());
                 let public = private.verifying_key();
                 (private.to_bytes().to_vec(), public.to_bytes().to_vec())
             }
             EdAlgorithm::X25519 => {
-                let private = x25519_dalek::StaticSecret::random_from_rng(OsRng);
+                let private = x25519_dalek::StaticSecret::random_from_rng(&mut ChaCha20Rng::from_os_rng());
                 let public = x25519_dalek::PublicKey::from(&private);
                 (private.to_bytes().to_vec(), public.to_bytes().to_vec())
             }
@@ -837,8 +876,8 @@ impl TryFrom<&'_ PublicKey> for RsaPublicKey {
 
         match &v.as_inner().subject_public_key {
             InnerPublicKey::Rsa(BitStringAsn1Container(key)) => Ok(RsaPublicKey::new_with_max_size(
-                BigUint::from_bytes_be(key.modulus.as_unsigned_bytes_be()),
-                BigUint::from_bytes_be(key.public_exponent.as_unsigned_bytes_be()),
+                BoxedUint::from_be_slice_vartime(key.modulus.as_unsigned_bytes_be()),
+                BoxedUint::from_be_slice_vartime(key.public_exponent.as_unsigned_bytes_be()),
                 8192,
             )?),
             InnerPublicKey::Ec(_) => Err(KeyError::UnsupportedAlgorithm {
@@ -852,10 +891,10 @@ impl TryFrom<&'_ PublicKey> for RsaPublicKey {
 }
 
 impl PublicKey {
-    pub fn from_rsa_components(modulus: &BigUint, public_exponent: &BigUint) -> Self {
+    pub fn from_rsa_components(modulus: &BoxedUint, public_exponent: &BoxedUint) -> Self {
         PublicKey(SubjectPublicKeyInfo::new_rsa_key(
-            IntegerAsn1::from_bytes_be_unsigned(modulus.to_bytes_be()),
-            IntegerAsn1::from_bytes_be_unsigned(public_exponent.to_bytes_be()),
+            IntegerAsn1::from_bytes_be_unsigned(modulus.to_be_bytes_trimmed_vartime().into_vec()),
+            IntegerAsn1::from_bytes_be_unsigned(public_exponent.to_be_bytes_trimmed_vartime().into_vec()),
         ))
     }
 
@@ -875,20 +914,32 @@ impl PublicKey {
     /// supported. For correct encoding of the point, we need to know which curve-specific
     /// arithmetic crate to use. If you want to use a curve that is not declared in [`EcCurve`],
     /// and encoded representation of the point is available - use [`Self::from_ec_encoded_components`]
-    pub fn from_ec_components(curve: EcCurve, x: &BigUint, y: &BigUint) -> Result<Self, KeyError> {
-        let px_bytes = expand_ec_field(x.to_bytes_be(), curve);
-        let py_bytes = expand_ec_field(y.to_bytes_be(), curve);
+    pub fn from_ec_components(curve: EcCurve, x: &BoxedUint, y: &BoxedUint) -> Result<Self, KeyError> {
+        let px_bytes = x.to_be_bytes_trimmed_vartime();
+        let py_bytes = y.to_be_bytes_trimmed_vartime();
 
         let px_validated = curve.validate_component(EcComponent::PointX(&px_bytes))?;
         let py_validated = curve.validate_component(EcComponent::PointY(&py_bytes))?;
 
         match curve {
             EcCurve::NistP256 => {
-                use p256::elliptic_curve::generic_array::GenericArray as GenericArrayP256;
+                use p256::elliptic_curve::array::Array as GenericArrayP256;
 
                 let p = p256::EncodedPoint::from_affine_coordinates(
-                    GenericArrayP256::from_slice(px_validated),
-                    GenericArrayP256::from_slice(py_validated),
+                    &GenericArrayP256::try_from(px_validated).map_err(|_| KeyError::EC {
+                        context: format!(
+                            "validated PX slice is not right length(expected: {}, actual: {})",
+                            curve.field_bytes_size(),
+                            px_validated.len(),
+                        ),
+                    })?,
+                    &GenericArrayP256::try_from(py_validated).map_err(|_| KeyError::EC {
+                        context: format!(
+                            "validated PY slice is not right length(expected: {}, actual: {})",
+                            curve.field_bytes_size(),
+                            py_validated.len(),
+                        ),
+                    })?,
                     COMPRESS_EC_POINT_BY_DEFAULT,
                 );
 
@@ -898,11 +949,23 @@ impl PublicKey {
                 ))
             }
             EcCurve::NistP384 => {
-                use p256::elliptic_curve::generic_array::GenericArray as GenericArrayP384;
+                use p256::elliptic_curve::array::Array as GenericArrayP384;
 
                 let p = p384::EncodedPoint::from_affine_coordinates(
-                    GenericArrayP384::from_slice(px_validated),
-                    GenericArrayP384::from_slice(py_validated),
+                    &GenericArrayP384::try_from(px_validated).map_err(|_| KeyError::EC {
+                        context: format!(
+                            "validated PX slice is not right length(expected: {}, actual: {})",
+                            curve.field_bytes_size(),
+                            px_validated.len(),
+                        ),
+                    })?,
+                    &GenericArrayP384::try_from(py_validated).map_err(|_| KeyError::EC {
+                        context: format!(
+                            "validated PY slice is not right length(expected: {}, actual: {})",
+                            curve.field_bytes_size(),
+                            py_validated.len(),
+                        ),
+                    })?,
                     COMPRESS_EC_POINT_BY_DEFAULT,
                 );
 
@@ -912,11 +975,23 @@ impl PublicKey {
                 ))
             }
             EcCurve::NistP521 => {
-                use p521::elliptic_curve::generic_array::GenericArray as GenericArrayP521;
+                use p521::elliptic_curve::array::Array as GenericArrayP521;
 
                 let p = p521::EncodedPoint::from_affine_coordinates(
-                    GenericArrayP521::from_slice(px_validated),
-                    GenericArrayP521::from_slice(py_validated),
+                    &GenericArrayP521::try_from(px_validated).map_err(|_| KeyError::EC {
+                        context: format!(
+                            "validated PX slice is not right length(expected: {}, actual: {})",
+                            curve.field_bytes_size(),
+                            px_validated.len(),
+                        ),
+                    })?,
+                    &GenericArrayP521::try_from(py_validated).map_err(|_| KeyError::EC {
+                        context: format!(
+                            "validated PY slice is not right length(expected: {}, actual: {})",
+                            curve.field_bytes_size(),
+                            py_validated.len(),
+                        ),
+                    })?,
                     COMPRESS_EC_POINT_BY_DEFAULT,
                 );
 
@@ -1015,20 +1090,6 @@ impl PublicKey {
 
     pub(crate) fn as_inner(&self) -> &SubjectPublicKeyInfo {
         &self.0
-    }
-}
-
-/// EC field's BigUint -> bytes conversion does not include leading zeros, therefore we need to
-/// expand the bytes to the curve's field size.
-fn expand_ec_field(bytes: Vec<u8>, curve: EcCurve) -> Vec<u8> {
-    match curve.field_bytes_size().checked_sub(bytes.len()) {
-        None | Some(0) => bytes,
-        Some(leading_zeros) => {
-            let mut expanded = Vec::with_capacity(curve.field_bytes_size());
-            expanded.resize(leading_zeros, 0x00);
-            expanded.extend(bytes);
-            expanded
-        }
     }
 }
 

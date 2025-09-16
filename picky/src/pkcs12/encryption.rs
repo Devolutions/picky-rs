@@ -1,5 +1,3 @@
-use std::str::FromStr as _;
-
 use crate::pkcs12::{Pbkdf1Usage, Pkcs12Error, Pkcs12HashAlgorithm, pbkdf1};
 use picky_asn1::restricted_string::BmpString;
 use picky_asn1::wrapper::OctetStringAsn1;
@@ -10,6 +8,9 @@ use picky_asn1_x509::pkcs12::{
     Pbes2Params as Pbes2ParamsAsn1, Pbkdf2Params as Pbkdf2ParamsAsn1, Pbkdf2Prf as Pbkdf2PrfAsn1,
     Pbkdf2SaltSource as Pbkdf2SaltSourceAsn1, Pkcs12EncryptionAlgorithm as Pkcs12EncryptionAsn1,
 };
+use rand_chacha::ChaCha20Rng;
+use rand_core::SeedableRng;
+use std::str::FromStr as _;
 
 /// Same default KDF iterations as in OpenSSL
 const DEFAULT_KDF_ITERATIONS: usize = 2048;
@@ -28,12 +29,12 @@ impl Pkcs12CryptoContext {
     pub fn new_with_password(password: &str) -> Self {
         Self {
             password: password.to_string().into(),
-            rng: Box::new(rand::rngs::OsRng),
+            rng: Box::new(ChaCha20Rng::from_os_rng()),
         }
     }
 
     /// Sets RNG for this context
-    pub fn with_rng(mut self, rng: impl rand::RngCore + rand::CryptoRng + 'static) -> Self {
+    pub fn with_rng(mut self, rng: impl rand::CryptoRng + 'static) -> Self {
         self.rng = Box::new(rng);
         self
     }
@@ -42,7 +43,7 @@ impl Pkcs12CryptoContext {
     pub fn new_without_password() -> Self {
         Self {
             password: String::new().into(),
-            rng: Box::new(rand::rngs::OsRng),
+            rng: Box::new(ChaCha20Rng::from_os_rng()),
         }
     }
 
@@ -424,9 +425,10 @@ fn prepare_pbes2_cipher_inputs(
 fn decrypt_pbes2(params: &Pbes2ParamsAsn1, password: &[u8], data: &[u8]) -> Result<Vec<u8>, Pkcs12Error> {
     let Pbes2CipherInputs { key, iv, cipher } = prepare_pbes2_cipher_inputs(params, password, "decryption")?;
 
+    use aes::cipher::BlockModeDecrypt;
     use cbc::Decryptor;
+    use cbc::cipher::KeyIvInit;
     use cbc::cipher::block_padding::Pkcs7;
-    use cbc::cipher::{BlockDecryptMut, KeyIvInit};
 
     let decrypted = match cipher {
         Pbes2Cipher::Aes128Cbc => {
@@ -437,10 +439,9 @@ fn decrypt_pbes2(params: &Pbes2ParamsAsn1, password: &[u8], data: &[u8]) -> Resu
                 context: "AES128 decryptor initialization failed".to_string(),
             })?;
 
-            aes.decrypt_padded_vec_mut::<Pkcs7>(data)
-                .map_err(|_| Pkcs12Error::Pbes2 {
-                    context: "AES128 decryption with padding failed".to_string(),
-                })?
+            aes.decrypt_padded_vec::<Pkcs7>(data).map_err(|_| Pkcs12Error::Pbes2 {
+                context: "AES128 decryption with padding failed".to_string(),
+            })?
         }
         Pbes2Cipher::Aes192Cbc => {
             use aes::Aes192;
@@ -450,10 +451,9 @@ fn decrypt_pbes2(params: &Pbes2ParamsAsn1, password: &[u8], data: &[u8]) -> Resu
                 context: "AES192 decryptor initialization failed".to_string(),
             })?;
 
-            aes.decrypt_padded_vec_mut::<Pkcs7>(data)
-                .map_err(|_| Pkcs12Error::Pbes2 {
-                    context: "AES192 decryption with padding failed".to_string(),
-                })?
+            aes.decrypt_padded_vec::<Pkcs7>(data).map_err(|_| Pkcs12Error::Pbes2 {
+                context: "AES192 decryption with padding failed".to_string(),
+            })?
         }
         Pbes2Cipher::Aes256Cbc => {
             use aes::Aes256;
@@ -463,10 +463,9 @@ fn decrypt_pbes2(params: &Pbes2ParamsAsn1, password: &[u8], data: &[u8]) -> Resu
                 context: "AES256 decryptor initialization failed".to_string(),
             })?;
 
-            aes.decrypt_padded_vec_mut::<Pkcs7>(data)
-                .map_err(|_| Pkcs12Error::Pbes2 {
-                    context: "AES256 decryption with padding failed".to_string(),
-                })?
+            aes.decrypt_padded_vec::<Pkcs7>(data).map_err(|_| Pkcs12Error::Pbes2 {
+                context: "AES256 decryption with padding failed".to_string(),
+            })?
         }
     };
 
@@ -476,9 +475,10 @@ fn decrypt_pbes2(params: &Pbes2ParamsAsn1, password: &[u8], data: &[u8]) -> Resu
 fn encrypt_pbes2(params: &Pbes2ParamsAsn1, password: &[u8], data: &[u8]) -> Result<Vec<u8>, Pkcs12Error> {
     let Pbes2CipherInputs { key, iv, cipher } = prepare_pbes2_cipher_inputs(params, password, "encryption")?;
 
+    use aes::cipher::BlockModeEncrypt;
     use cbc::Encryptor;
+    use cbc::cipher::KeyIvInit;
     use cbc::cipher::block_padding::Pkcs7;
-    use cbc::cipher::{BlockEncryptMut, KeyIvInit};
 
     let encrypted = match cipher {
         Pbes2Cipher::Aes128Cbc => {
@@ -489,7 +489,7 @@ fn encrypt_pbes2(params: &Pbes2ParamsAsn1, password: &[u8], data: &[u8]) -> Resu
                 context: "AES128 encryptor initialization failed".to_string(),
             })?;
 
-            aes.encrypt_padded_vec_mut::<Pkcs7>(data)
+            aes.encrypt_padded_vec::<Pkcs7>(data)
         }
         Pbes2Cipher::Aes192Cbc => {
             use aes::Aes192;
@@ -499,7 +499,7 @@ fn encrypt_pbes2(params: &Pbes2ParamsAsn1, password: &[u8], data: &[u8]) -> Resu
                 context: "AES192 encryptor initialization failed".to_string(),
             })?;
 
-            aes.encrypt_padded_vec_mut::<Pkcs7>(data)
+            aes.encrypt_padded_vec::<Pkcs7>(data)
         }
         Pbes2Cipher::Aes256Cbc => {
             use aes::Aes256;
@@ -509,7 +509,7 @@ fn encrypt_pbes2(params: &Pbes2ParamsAsn1, password: &[u8], data: &[u8]) -> Resu
                 context: "AES256 encryptor initialization failed".to_string(),
             })?;
 
-            aes.encrypt_padded_vec_mut::<Pkcs7>(data)
+            aes.encrypt_padded_vec::<Pkcs7>(data)
         }
     };
 
@@ -556,7 +556,7 @@ fn encrypt_pbes1(
 ) -> Result<Vec<u8>, Pkcs12Error> {
     use cbc::Encryptor;
     use cbc::cipher::block_padding::Pkcs7;
-    use cbc::cipher::{BlockEncryptMut, KeyIvInit};
+    use cbc::cipher::{BlockModeEncrypt, KeyIvInit};
 
     let (dk, iv) = generate_pbes1_key_and_iv(scheme, password, salt, kdf_iterations);
 
@@ -568,7 +568,7 @@ fn encrypt_pbes1(
             let rc2 = Rc2Cbc::new_from_slices(&dk, &iv).map_err(|_| Pkcs12Error::Pbes1 {
                 context: "RC2 encryption initialization failed".to_string(),
             })?;
-            Ok(rc2.encrypt_padded_vec_mut::<Pkcs7>(data))
+            Ok(rc2.encrypt_padded_vec::<Pkcs7>(data))
         }
         Pbes1Cipher::ShaAnd3Key3DesCbc => {
             use des::TdesEde3;
@@ -577,7 +577,7 @@ fn encrypt_pbes1(
             let tdes = TDesCbc::new_from_slices(&dk, &iv).map_err(|_| Pkcs12Error::Pbes1 {
                 context: "3DES encryptor initialization failed".to_string(),
             })?;
-            Ok(tdes.encrypt_padded_vec_mut::<Pkcs7>(data))
+            Ok(tdes.encrypt_padded_vec::<Pkcs7>(data))
         }
     }
 }
@@ -591,7 +591,7 @@ fn decrypt_pbes1(
 ) -> Result<Vec<u8>, Pkcs12Error> {
     use cbc::Decryptor;
     use cbc::cipher::block_padding::Pkcs7;
-    use cbc::cipher::{BlockDecryptMut, KeyIvInit};
+    use cbc::cipher::{BlockModeDecrypt, KeyIvInit};
 
     let (dk, iv) = generate_pbes1_key_and_iv(scheme, password, salt, kdf_iterations);
 
@@ -603,10 +603,9 @@ fn decrypt_pbes1(
             let rc2 = Rc2Cbc::new_from_slices(&dk, &iv).map_err(|_| Pkcs12Error::Pbes1 {
                 context: "RC2 decryptor initialization failed".to_string(),
             })?;
-            rc2.decrypt_padded_vec_mut::<Pkcs7>(data)
-                .map_err(|_| Pkcs12Error::Pbes1 {
-                    context: "RC2 decryption with padding failed".to_string(),
-                })
+            rc2.decrypt_padded_vec::<Pkcs7>(data).map_err(|_| Pkcs12Error::Pbes1 {
+                context: "RC2 decryption with padding failed".to_string(),
+            })
         }
         Pbes1Cipher::ShaAnd3Key3DesCbc => {
             use des::TdesEde3;
@@ -615,10 +614,9 @@ fn decrypt_pbes1(
             let tdes = TDesCbc::new_from_slices(&dk, &iv).map_err(|_| Pkcs12Error::Pbes1 {
                 context: "3DES decryptor initialization failed".to_string(),
             })?;
-            tdes.decrypt_padded_vec_mut::<Pkcs7>(data)
-                .map_err(|_| Pkcs12Error::Pbes1 {
-                    context: "3DES decryption with padding failed".to_string(),
-                })
+            tdes.decrypt_padded_vec::<Pkcs7>(data).map_err(|_| Pkcs12Error::Pbes1 {
+                context: "3DES decryption with padding failed".to_string(),
+            })
         }
     }
 }

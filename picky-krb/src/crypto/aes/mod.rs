@@ -69,7 +69,7 @@ pub fn checksum_sha_aes(
 ) -> KerberosCryptoResult<Vec<u8>> {
     let kc = derive_key(key, &usage_kc(key_usage), aes_size)?;
 
-    Ok(hmac_sha1(&kc, payload, AES_MAC_SIZE))
+    Ok(hmac_sha1(&kc, payload, AES_MAC_SIZE)?)
 }
 
 pub use aes128_cts_hmac_sha1_96::Aes128CtsHmacSha196;

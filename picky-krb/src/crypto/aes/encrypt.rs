@@ -1,12 +1,13 @@
-use aes::cipher::block_padding::NoPadding;
-use aes::cipher::{BlockEncryptMut, KeyIvInit};
-use aes::{Aes128, Aes256};
-use cbc::Encryptor;
-
 use crate::crypto::aes::key_derivation::derive_key;
 use crate::crypto::common::hmac_sha1;
 use crate::crypto::utils::{usage_ke, usage_ki};
 use crate::crypto::{EncryptWithoutChecksum, KerberosCryptoError, KerberosCryptoResult};
+use aes::cipher::{Array, KeyIvInit};
+use aes::{Aes128, Aes256};
+use cbc::Encryptor;
+use cbc::cipher::BlockModeEncrypt;
+use cbc::cipher::block_padding::NoPadding;
+use inout::InOutBufReserved;
 
 use super::{AES_BLOCK_SIZE, AES_MAC_SIZE, AesSize, swap_two_last_blocks};
 
@@ -31,7 +32,7 @@ pub fn encrypt_message(
     payload_buf.copy_from_slice(payload);
 
     // H1 = HMAC(Ki, conf | plaintext | pad)
-    let hmac = hmac_sha1(&encryption_result.ki, &data_to_encrypt, AES_MAC_SIZE);
+    let hmac = hmac_sha1(&encryption_result.ki, &data_to_encrypt, AES_MAC_SIZE)?;
 
     // ciphertext =  C1 | H1[1..h]
     encryption_result.encrypted.extend_from_slice(&hmac);
@@ -72,21 +73,23 @@ pub fn encrypt_message_no_checksum(
 }
 
 pub fn encrypt_aes_cbc(key: &[u8], plaintext: &[u8], aes_size: &AesSize) -> KerberosCryptoResult<Vec<u8>> {
-    let iv = vec![0; AES_BLOCK_SIZE];
+    let iv = [0; AES_BLOCK_SIZE];
 
     let mut payload = plaintext.to_vec();
     let payload_len = payload.len();
 
     match aes_size {
         AesSize::Aes256 => {
-            let cipher = Aes256CbcEncryptor::new(key.into(), iv.as_slice().into());
-            cipher
-                .encrypt_padded_mut::<NoPadding>(&mut payload, payload_len)
-                .unwrap();
+            let key = Array::try_from(key)?;
+            let cipher = Aes256CbcEncryptor::new(&key, &iv.into());
+            let inout = InOutBufReserved::from_mut_slice(&mut payload, payload_len)?;
+            cipher.encrypt_padded_inout::<NoPadding>(inout)?;
         }
         AesSize::Aes128 => {
-            let cipher = Aes128CbcEncryptor::new(key.into(), iv.as_slice().into());
-            cipher.encrypt_padded_mut::<NoPadding>(&mut payload, payload_len)?;
+            let key = Array::try_from(key)?;
+            let cipher = Aes128CbcEncryptor::new(&key, &iv.into());
+            let inout = InOutBufReserved::from_mut_slice(&mut payload, payload_len)?;
+            cipher.encrypt_padded_inout::<NoPadding>(inout)?;
         }
     }
 

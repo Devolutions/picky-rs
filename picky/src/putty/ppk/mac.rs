@@ -4,7 +4,7 @@ use crate::putty::key_value::{PpkEncryptionValue, PpkLiteral, PpkVersionKey};
 use crate::putty::{Ppk, PuttyError};
 
 use digest::Digest;
-use hmac::Mac;
+use hmac::{KeyInit, Mac};
 
 impl Ppk {
     pub(super) fn calculate_mac_v3(

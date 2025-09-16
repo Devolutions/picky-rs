@@ -1,10 +1,10 @@
-use aes::cipher::block_padding::NoPadding;
-use aes::cipher::{BlockDecryptMut, KeyIvInit};
-use aes::{Aes128, Aes256};
-
 use crate::crypto::common::hmac_sha1;
 use crate::crypto::utils::{usage_ke, usage_ki};
 use crate::crypto::{DecryptWithoutChecksum, KerberosCryptoError, KerberosCryptoResult};
+use aes::cipher::{Array, KeyIvInit};
+use aes::{Aes128, Aes256};
+use cbc::cipher::BlockModeDecrypt;
+use cbc::cipher::block_padding::NoPadding;
 
 use super::key_derivation::derive_key;
 use super::{AES_BLOCK_SIZE, AES_MAC_SIZE, AesSize, swap_two_last_blocks};
@@ -28,7 +28,7 @@ pub fn decrypt_message(
         ]
         .concat(),
         AES_MAC_SIZE,
-    );
+    )?;
 
     // if (H1 != HMAC(Ki, P1)[1..h])
     if calculated_checksum != decryption_result.checksum {
@@ -75,16 +75,18 @@ pub fn decrypt_message_no_checksum(
 pub fn decrypt_aes_cbc(key: &[u8], cipher_data: &[u8], aes_size: &AesSize) -> KerberosCryptoResult<Vec<u8>> {
     let mut cipher_data = cipher_data.to_vec();
 
-    let iv = vec![0; AES_BLOCK_SIZE];
+    let iv = [0; AES_BLOCK_SIZE];
 
     match aes_size {
         AesSize::Aes256 => {
-            let cipher = Aes256CbcDecryptor::new(key.into(), iv.as_slice().into());
-            cipher.decrypt_padded_mut::<NoPadding>(&mut cipher_data)?;
+            let key = Array::try_from(key)?;
+            let cipher = Aes256CbcDecryptor::new(&key, &iv.into());
+            cipher.decrypt_padded_inout::<NoPadding>(cipher_data.as_mut_slice().into())?;
         }
         AesSize::Aes128 => {
-            let cipher = Aes128CbcDecryptor::new(key.into(), iv.as_slice().into());
-            cipher.decrypt_padded_mut::<NoPadding>(&mut cipher_data)?;
+            let key = Array::try_from(key)?;
+            let cipher = Aes128CbcDecryptor::new(&key, &iv.into());
+            cipher.decrypt_padded_inout::<NoPadding>(cipher_data.as_mut_slice().into())?;
         }
     }
 

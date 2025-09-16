@@ -13,7 +13,7 @@ use crate::ssh::{Base64Reader, SSH_COMBO_ED25519_KEY_LENGTH, key_type, read_unti
 use super::certificate::SshSignatureBlob;
 use base64::engine::general_purpose;
 use byteorder::{BigEndian, ReadBytesExt};
-use num_bigint_dig::BigUint;
+use crypto_bigint::BoxedUint;
 use picky_asn1_x509::oid::ObjectIdentifier;
 use picky_asn1_x509::oids;
 use std::io::{self, Cursor, Read};
@@ -23,7 +23,7 @@ pub trait SshReadExt {
 
     fn read_ssh_string(&mut self) -> Result<String, Self::Error>;
     fn read_ssh_bytes(&mut self) -> Result<Vec<u8>, Self::Error>;
-    fn read_ssh_mpint(&mut self) -> Result<BigUint, Self::Error>;
+    fn read_ssh_mpint(&mut self) -> Result<BoxedUint, Self::Error>;
 }
 
 impl<T> SshReadExt for T
@@ -48,7 +48,7 @@ where
         Ok(buffer)
     }
 
-    fn read_ssh_mpint(&mut self) -> Result<BigUint, Self::Error> {
+    fn read_ssh_mpint(&mut self) -> Result<BoxedUint, Self::Error> {
         let size = self.read_u32::<BigEndian>()? as usize;
         let mut buffer = vec![0; size];
         self.read_exact(&mut buffer)?;
@@ -57,7 +57,7 @@ where
             buffer.remove(0);
         }
 
-        Ok(BigUint::from_bytes_be(&buffer))
+        Ok(BoxedUint::from_be_slice_vartime(&buffer))
     }
 }
 
@@ -331,7 +331,7 @@ impl SshComplexTypeDecode for SshBasePrivateKey {
             key_type::ECDSA_SHA2_NIST_P256 | key_type::ECDSA_SHA2_NIST_P384 | key_type::ECDSA_SHA2_NIST_P521 => {
                 let (curve, point) = decode_ec_public_key_body_impl(key_type.as_str(), &mut stream)?;
 
-                let private_key_secret = stream.read_ssh_mpint()?.to_bytes_be();
+                let private_key_secret = stream.read_ssh_mpint()?.to_be_bytes_trimmed_vartime();
 
                 Ok(SshBasePrivateKey::Ec(PrivateKey::from_ec_encoded_components(
                     curve.into(),
@@ -342,7 +342,7 @@ impl SshComplexTypeDecode for SshBasePrivateKey {
             key_type::ED25519 => {
                 let (algorithm, public_key) = decode_ed25519_public_key_body_impl(key_type.as_str(), &mut stream)?;
 
-                let private_key_secret = stream.read_ssh_mpint()?.to_bytes_be();
+                let private_key_secret = stream.read_ssh_mpint()?.to_be_bytes_trimmed_vartime();
 
                 // OpenSSH is really strange in regards to private ed25519 keys. It stores them as
                 // 64 byte-array, but actually only first 32 bytes are the private key, and the rest
@@ -580,16 +580,16 @@ mod test {
         ]);
         let mpint = cursor.read_ssh_mpint().unwrap();
         assert_eq!(
-            mpint.to_bytes_be(),
-            vec![0x09, 0xa3, 0x78, 0xf9, 0xb2, 0xe3, 0x32, 0xa7]
+            mpint.to_be_bytes_trimmed_vartime().as_ref(),
+            &[0x09, 0xa3, 0x78, 0xf9, 0xb2, 0xe3, 0x32, 0xa7]
         );
 
         let mut cursor = Cursor::new(vec![0x00, 0x00, 0x00, 0x02, 0x00, 0x80]);
         let mpint = cursor.read_ssh_mpint().unwrap();
-        assert_eq!(mpint.to_bytes_be(), vec![0x80]);
+        assert_eq!(mpint.to_be_bytes_trimmed_vartime().as_ref(), [0x80]);
 
         let mut cursor = Cursor::new(vec![0x00, 0x00, 0x00, 0x02, 0xed, 0xcc]);
         let mpint = cursor.read_ssh_mpint().unwrap();
-        assert_eq!(mpint.to_bytes_be(), vec![0xed, 0xcc]);
+        assert_eq!(mpint.to_be_bytes_trimmed_vartime().as_ref(), &[0xed, 0xcc]);
     }
 }

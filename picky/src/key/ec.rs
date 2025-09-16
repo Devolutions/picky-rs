@@ -53,17 +53,17 @@ impl EcCurve {
         match self {
             EcCurve::NistP256 => {
                 use p256::elliptic_curve::FieldBytesSize;
-                use p256::elliptic_curve::generic_array::typenum::Unsigned;
+                use p256::elliptic_curve::array::typenum::Unsigned;
                 <FieldBytesSize<p256::NistP256> as Unsigned>::USIZE
             }
             EcCurve::NistP384 => {
                 use p384::elliptic_curve::FieldBytesSize;
-                use p384::elliptic_curve::generic_array::typenum::Unsigned;
+                use p384::elliptic_curve::array::typenum::Unsigned;
                 <FieldBytesSize<p384::NistP384> as Unsigned>::USIZE
             }
             EcCurve::NistP521 => {
                 use p521::elliptic_curve::FieldBytesSize;
-                use p521::elliptic_curve::generic_array::typenum::Unsigned;
+                use p521::elliptic_curve::array::typenum::Unsigned;
                 <FieldBytesSize<p521::NistP521> as Unsigned>::USIZE
             }
         }
@@ -174,13 +174,19 @@ pub(crate) fn calculate_public_ec_key(
     match curve {
         NamedEcCurve::Known(EcCurve::NistP256) => {
             use p256::SecretKey as SecretKeyP256;
-            use p256::elliptic_curve::generic_array::GenericArray as GenericArrayP256;
+            use p256::elliptic_curve::array::Array as GenericArrayP256;
             use p256::elliptic_curve::sec1::ToEncodedPoint as _;
 
             let private_key_validated = EcCurve::NistP256.validate_component(EcComponent::Secret(private_key))?;
 
-            let secret_bytes = GenericArrayP256::from_slice(private_key_validated);
-            let secret_key = SecretKeyP256::from_bytes(secret_bytes).map_err(|_| KeyError::EC {
+            let secret_bytes = GenericArrayP256::try_from(private_key_validated).map_err(|_| KeyError::EC {
+                context: format!(
+                    "validated private key is the not right length(expected: {}, actual: {})",
+                    EcCurve::NistP256.field_bytes_size(),
+                    private_key_validated.len()
+                ),
+            })?;
+            let secret_key = SecretKeyP256::from_bytes(&secret_bytes).map_err(|_| KeyError::EC {
                 context: "Failed to construct P256 SecretKey from private key bytes".to_string(),
             })?;
 
@@ -191,13 +197,19 @@ pub(crate) fn calculate_public_ec_key(
         }
         NamedEcCurve::Known(EcCurve::NistP384) => {
             use p384::SecretKey as SecretKeyP384;
-            use p384::elliptic_curve::generic_array::GenericArray as GenericArrayP384;
+            use p384::elliptic_curve::array::Array as GenericArrayP384;
             use p384::elliptic_curve::sec1::ToEncodedPoint as _;
 
             let private_key_validated = EcCurve::NistP384.validate_component(EcComponent::Secret(private_key))?;
 
-            let secret_bytes = GenericArrayP384::from_slice(private_key_validated);
-            let secret_key = SecretKeyP384::from_bytes(secret_bytes).map_err(|_| KeyError::EC {
+            let secret_bytes = GenericArrayP384::try_from(private_key_validated).map_err(|_| KeyError::EC {
+                context: format!(
+                    "validated private key is the not right length(expected: {}, actual: {})",
+                    EcCurve::NistP384.field_bytes_size(),
+                    private_key_validated.len()
+                ),
+            })?;
+            let secret_key = SecretKeyP384::from_bytes(&secret_bytes).map_err(|_| KeyError::EC {
                 context: "Failed to construct P384 SecretKey from private key bytes".to_string(),
             })?;
 
@@ -208,13 +220,19 @@ pub(crate) fn calculate_public_ec_key(
         }
         NamedEcCurve::Known(EcCurve::NistP521) => {
             use p521::SecretKey as SecretKeyP521;
-            use p521::elliptic_curve::generic_array::GenericArray as GenericArrayP521;
+            use p521::elliptic_curve::array::Array as GenericArrayP521;
             use p521::elliptic_curve::sec1::ToEncodedPoint as _;
 
             let private_key_validated = EcCurve::NistP521.validate_component(EcComponent::Secret(private_key))?;
 
-            let secret_bytes = GenericArrayP521::from_slice(private_key_validated);
-            let secret_key = SecretKeyP521::from_bytes(secret_bytes).map_err(|_| KeyError::EC {
+            let secret_bytes = GenericArrayP521::try_from(private_key_validated).map_err(|_| KeyError::EC {
+                context: format!(
+                    "validated private key is the not right length(expected: {}, actual: {})",
+                    EcCurve::NistP521.field_bytes_size(),
+                    private_key_validated.len()
+                ),
+            })?;
+            let secret_key = SecretKeyP521::from_bytes(&secret_bytes).map_err(|_| KeyError::EC {
                 context: "Failed to construct P521 SecretKey from private key bytes".to_string(),
             })?;
 

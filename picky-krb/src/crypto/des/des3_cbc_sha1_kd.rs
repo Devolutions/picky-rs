@@ -1,4 +1,4 @@
-use rand::Rng;
+use rand::TryRngCore;
 use rand::rngs::OsRng;
 
 use crate::crypto::common::hmac_sha1;
@@ -43,7 +43,9 @@ impl Cipher for Des3CbcSha1Kd {
     }
 
     fn encrypt(&self, key: &[u8], key_usage: i32, payload: &[u8]) -> KerberosCryptoResult<Vec<u8>> {
-        encrypt_message(key, key_usage, payload, OsRng.r#gen::<[u8; DES3_BLOCK_SIZE]>())
+        let mut cofounder = [0; DES3_BLOCK_SIZE];
+        OsRng.try_fill_bytes(&mut cofounder)?;
+        encrypt_message(key, key_usage, payload, cofounder)
     }
 
     fn encrypt_no_checksum(
@@ -52,7 +54,9 @@ impl Cipher for Des3CbcSha1Kd {
         key_usage: i32,
         payload: &[u8],
     ) -> KerberosCryptoResult<EncryptWithoutChecksum> {
-        encrypt_message_no_checksum(key, key_usage, payload, OsRng.r#gen::<[u8; DES3_BLOCK_SIZE]>())
+        let mut cofounder = [0; DES3_BLOCK_SIZE];
+        OsRng.try_fill_bytes(&mut cofounder)?;
+        encrypt_message_no_checksum(key, key_usage, payload, cofounder)
     }
 
     fn decrypt(&self, key: &[u8], key_usage: i32, cipher_data: &[u8]) -> KerberosCryptoResult<Vec<u8>> {
@@ -71,7 +75,7 @@ impl Cipher for Des3CbcSha1Kd {
     fn encryption_checksum(&self, key: &[u8], key_usage: i32, payload: &[u8]) -> KerberosCryptoResult<Vec<u8>> {
         let ki = derive_key(key, &usage_ki(key_usage))?;
 
-        Ok(hmac_sha1(&ki, payload, DES3_MAC_SIZE))
+        Ok(hmac_sha1(&ki, payload, DES3_MAC_SIZE)?)
     }
 
     fn generate_key_from_password(&self, password: &[u8], salt: &[u8]) -> KerberosCryptoResult<Vec<u8>> {
@@ -158,12 +162,13 @@ mod tests {
         conf_with_plaintext.resize(conf_with_plaintext.len() + pad_len, 0);
 
         assert_eq!(
-            hmac_sha1(&encryption_result.ki, &conf_with_plaintext, DES3_MAC_SIZE),
+            hmac_sha1(&encryption_result.ki, &conf_with_plaintext, DES3_MAC_SIZE).unwrap(),
             expected_encrypted_data_with_checksum[expected_encrypted_data_with_checksum.len() - DES3_MAC_SIZE..]
         );
 
         let mut cipher_data_with_checksum = encryption_result.encrypted;
-        cipher_data_with_checksum.extend(hmac_sha1(&encryption_result.ki, &conf_with_plaintext, DES3_MAC_SIZE));
+        cipher_data_with_checksum
+            .extend(hmac_sha1(&encryption_result.ki, &conf_with_plaintext, DES3_MAC_SIZE).unwrap());
 
         assert_eq!(cipher_data_with_checksum, expected_encrypted_data_with_checksum);
 
@@ -201,7 +206,7 @@ mod tests {
         conf_with_padded_plaintext.extend(decryption_result.plaintext);
 
         assert_eq!(
-            hmac_sha1(&decryption_result.ki, &conf_with_padded_plaintext, DES3_MAC_SIZE),
+            hmac_sha1(&decryption_result.ki, &conf_with_padded_plaintext, DES3_MAC_SIZE).unwrap(),
             decryption_result.checksum
         );
     }

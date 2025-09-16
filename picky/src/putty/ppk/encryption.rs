@@ -119,7 +119,7 @@ impl Ppk {
         &self,
         passphrase: &str,
         config: PpkEncryptionConfig,
-        mut rng: impl rand::RngCore,
+        mut rng: impl rand::TryRngCore,
     ) -> Result<Ppk, PuttyError> {
         if self.encryption.is_some() {
             return Err(PuttyError::AlreadyEncrypted);
@@ -129,7 +129,8 @@ impl Ppk {
             PpkVersionKey::V2 => {
                 let key_material = kdf::derive_key_material_v2(passphrase)?;
 
-                let mut private_key = ppk_aes::make_padding(self.private_key.clone(), rng);
+                let mut private_key = ppk_aes::make_padding(self.private_key.clone(), rng)
+                    .map_err(|error| PuttyError::RandError(format!("{error}")))?;
                 let mac = self.calculate_mac_v2(passphrase, &private_key, PpkEncryptionValue::Aes256Cbc)?;
                 ppk_aes::encrypt(&mut private_key, key_material.key(), KeyMaterialV2::iv())?;
 
@@ -145,7 +146,8 @@ impl Ppk {
             }
             PpkVersionKey::V3 => {
                 let mut argon2_salt = vec![0u8; config.argon2_salt_size as usize];
-                rng.fill_bytes(&mut argon2_salt);
+                rng.try_fill_bytes(&mut argon2_salt)
+                    .map_err(|error| PuttyError::RandError(format!("{error}")))?;
                 let argon2_params = Argon2Params {
                     flavor: config.argon2_flavour,
                     memory: config.argon2_memory,
@@ -156,7 +158,8 @@ impl Ppk {
 
                 let key_material = kdf::derive_key_material_v3(&argon2_params, passphrase)?;
 
-                let mut private_key = ppk_aes::make_padding(self.private_key.clone(), rng);
+                let mut private_key = ppk_aes::make_padding(self.private_key.clone(), rng)
+                    .map_err(|error| PuttyError::RandError(format!("{error}")))?;
                 let mac =
                     self.calculate_mac_v3(key_material.hmac_key(), &private_key, PpkEncryptionValue::Aes256Cbc)?;
                 ppk_aes::encrypt(&mut private_key, key_material.key(), key_material.iv())?;
