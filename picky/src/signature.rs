@@ -4,7 +4,7 @@ use crate::hash::HashAlgorithm;
 use crate::key::ec::{EcComponent, EcCurve, NamedEcCurve};
 use crate::key::{KeyError, PrivateKey, PublicKey};
 
-use picky_asn1_x509::{oids, AlgorithmIdentifier};
+use picky_asn1_x509::{AlgorithmIdentifier, oids};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -135,7 +135,7 @@ impl SignatureAlgorithm {
         match self {
             SignatureAlgorithm::RsaPkcs1v15(picky_hash_algo) => {
                 use rsa::signature::{SignatureEncoding as _, SignerMut as _};
-                use rsa::{pkcs1v15, RsaPrivateKey};
+                use rsa::{RsaPrivateKey, pkcs1v15};
 
                 let rsa_private_key = RsaPrivateKey::try_from(private_key)?;
 
@@ -290,7 +290,7 @@ impl SignatureAlgorithm {
         match self {
             SignatureAlgorithm::RsaPkcs1v15(picky_hash_algo) => {
                 use rsa::signature::Verifier as _;
-                use rsa::{pkcs1v15, RsaPublicKey};
+                use rsa::{RsaPublicKey, pkcs1v15};
 
                 let rsa_public_key = RsaPublicKey::try_from(public_key)?;
                 let signature = pkcs1v15::Signature::try_from(signature)?;
@@ -340,7 +340,7 @@ impl SignatureAlgorithm {
                             curve => {
                                 return Err(SignatureError::UnsupportedAlgorithm {
                                     algorithm: format!("SHA256 hash algorithm can't be used with `{}` curve", curve),
-                                })
+                                });
                             }
                         };
 
@@ -371,7 +371,7 @@ impl SignatureAlgorithm {
                             curve => {
                                 return Err(SignatureError::UnsupportedAlgorithm {
                                     algorithm: format!("SHA384 hash algorithm can't be used with `{}` curve", curve),
-                                })
+                                });
                             }
                         };
 
@@ -402,7 +402,7 @@ impl SignatureAlgorithm {
                             curve => {
                                 return Err(SignatureError::UnsupportedAlgorithm {
                                     algorithm: format!("SHA512 hash algorithm can't be used with `{}` curve", curve),
-                                })
+                                });
                             }
                         };
 
@@ -428,7 +428,7 @@ impl SignatureAlgorithm {
                     _ => {
                         return Err(SignatureError::UnsupportedAlgorithm {
                             algorithm: format!("ECDSA with {:?} hash algorithm is not supported", picky_hash_algo),
-                        })
+                        });
                     }
                 }
             }

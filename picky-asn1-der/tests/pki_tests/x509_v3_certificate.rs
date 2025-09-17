@@ -56,9 +56,9 @@
 
 use crate::pki_tests::ocsp_request::AlgorithmIdentifier;
 use crate::pki_tests::rsa_public_key::{RSAPublicKey, SubjectPublicKeyInfoRsa};
-use crate::pki_tests::version::{implicit_app0_version_is_default, Version};
-use base64::engine::general_purpose;
+use crate::pki_tests::version::{Version, implicit_app0_version_is_default};
 use base64::Engine as _;
+use base64::engine::general_purpose;
 use num_bigint_dig::BigInt;
 use oid::prelude::*;
 use picky_asn1::bit_string::BitString;

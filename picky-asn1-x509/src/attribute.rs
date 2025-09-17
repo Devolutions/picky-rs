@@ -1,6 +1,6 @@
 #[cfg(feature = "pkcs7")]
 use crate::pkcs7::content_info::SpcSpOpusInfo;
-use crate::{oids, Extension, Extensions};
+use crate::{Extension, Extensions, oids};
 use picky_asn1::date::UTCTime;
 use picky_asn1::wrapper::{Asn1SequenceOf, Asn1SetOf, ObjectIdentifierAsn1, OctetStringAsn1, UtcTimeAsn1};
 use serde::{de, ser};

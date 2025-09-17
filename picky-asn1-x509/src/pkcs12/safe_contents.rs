@@ -7,7 +7,7 @@ use picky_asn1::wrapper::{
     OctetStringAsn1Container,
 };
 use picky_asn1_der::Asn1RawDer;
-use serde::{de, ser, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de, ser};
 
 /// `ContentInfo`(PKCS#7) wrapper which provides only kinds relevant to PKCS#12 `SafeContents`
 /// representation in raw and encrypted form.
@@ -104,7 +104,7 @@ impl<'de> de::Deserialize<'de> for SafeContentsContentInfo {
                     oids::CONTENT_INFO_TYPE_DATA => {
                         let content: ExplicitContextTag0<OctetStringAsn1Container<SafeContents>> =
                             seq_next_element!(seq, SafeContentsContentInfo, "ContentInfo<SafeContents> content");
-                        Ok(SafeContentsContentInfo::Data(content.0 .0))
+                        Ok(SafeContentsContentInfo::Data(content.0.0))
                     }
                     oids::CONTENT_INFO_TYPE_ENCRYPTED_DATA => {
                         let content: ExplicitContextTag0<EncrytedDataWrapper> = seq_next_element!(

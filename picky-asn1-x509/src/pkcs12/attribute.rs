@@ -195,8 +195,8 @@ mod tests {
     use super::test_data::*;
     use super::*;
 
-    use base64::engine::general_purpose;
     use base64::Engine as _;
+    use base64::engine::general_purpose;
 
     // "Close enough" UTF8 -> UCS2 conversion for testing purposes (works only with ASCII)
     fn utf8_to_ucs2(s: &str) -> Vec<u8> {

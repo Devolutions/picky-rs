@@ -231,8 +231,8 @@ impl<'de> de::Deserialize<'de> for SafeBag {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pkcs12::pbes2::test_data::build_expected_pbes2_params;
     use crate::pkcs12::Pkcs12EncryptionAlgorithm;
+    use crate::pkcs12::pbes2::test_data::build_expected_pbes2_params;
     use expect_test::expect;
     use picky_asn1::wrapper::OctetStringAsn1;
 

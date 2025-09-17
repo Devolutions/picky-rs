@@ -5,10 +5,10 @@ mod kdf;
 mod mac;
 
 use crate::key::{EcCurve, PrivateKey, PublicKey};
+use crate::putty::PuttyError;
 use crate::putty::key_value::{PpkKeyAlgorithmValue, PpkVersionKey};
 use crate::putty::private_key::{PuttyBasePrivateKey, PuttyPrivateKey};
 use crate::putty::public_key::{PuttyBasePublicKey, PuttyPublicKey};
-use crate::putty::PuttyError;
 use crate::ssh::SshPrivateKey;
 
 use self::encryption::PpkEncryptionKind;

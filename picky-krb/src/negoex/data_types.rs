@@ -3,7 +3,7 @@ use std::io::{self, Read, Write};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use uuid::Uuid;
 
-use super::{NegoexDataType, CHECKSUM_SCHEME_RFC3961, NEGOEXTS_MESSAGE_SIGNATURE};
+use super::{CHECKSUM_SCHEME_RFC3961, NEGOEXTS_MESSAGE_SIGNATURE, NegoexDataType};
 
 const GUID_SIZE: usize = 16;
 pub(crate) const CHECKSUM_HEADER_LEN: u32 = 4 /* header_len */ + 4 /* checksum_scheme */ + 4 /* type */ + 8 /* checksum vector header */;
@@ -411,10 +411,10 @@ mod tests {
     use uuid::Uuid;
 
     use crate::constants::cksum_types::HMAC_SHA1_96_AES256;
-    use crate::negoex::data_types::Guid;
     use crate::negoex::NegoexDataType;
+    use crate::negoex::data_types::Guid;
 
-    use super::{Checksum, Extension, MessageHeader, MessageType, CHECKSUM_SCHEME_RFC3961, NEGOEXTS_MESSAGE_SIGNATURE};
+    use super::{CHECKSUM_SCHEME_RFC3961, Checksum, Extension, MessageHeader, MessageType, NEGOEXTS_MESSAGE_SIGNATURE};
 
     #[test]
     fn guid_encode() {

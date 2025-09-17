@@ -1,5 +1,5 @@
-use crate::misc::Length;
 use crate::Asn1RawDer;
+use crate::misc::Length;
 use picky_asn1::tag::{Tag, TagPeeker};
 use serde::de::{Error, SeqAccess};
 use serde::{de, ser};

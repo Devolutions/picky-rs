@@ -2,7 +2,7 @@
 name = "picky"
 version = "0.0.0"
 authors = ["Benoît CORTIER <bcortier@proton.me>"]
-edition = "2021"
+edition = "2024"
 publish = false
 description = "Portable X.509, PKI, JOSE and HTTP signature implementation."
 keywords = ["x509", "jwt", "signature", "jose", "pki"]

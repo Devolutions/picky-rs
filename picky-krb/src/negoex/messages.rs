@@ -4,11 +4,11 @@ use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use uuid::Uuid;
 
 use super::data_types::{
-    AuthScheme, AuthSchemeVector, ByteVector, Checksum, Extension, ExtensionVector, MessageHeader, MessageType,
-    CHECKSUM_HEADER_LEN,
+    AuthScheme, AuthSchemeVector, ByteVector, CHECKSUM_HEADER_LEN, Checksum, Extension, ExtensionVector, MessageHeader,
+    MessageType,
 };
 use super::{
-    NegoexDataType, NegoexMessage, CHECKSUM_SCHEME_RFC3961, NEGOEXTS_MESSAGE_SIGNATURE, PROTOCOL_VERSION,
+    CHECKSUM_SCHEME_RFC3961, NEGOEXTS_MESSAGE_SIGNATURE, NegoexDataType, NegoexMessage, PROTOCOL_VERSION,
     RANDOM_ARRAY_SIZE,
 };
 
@@ -287,7 +287,7 @@ mod tests {
 
     use crate::constants::cksum_types::HMAC_SHA1_96_AES256;
     use crate::negoex::data_types::{Checksum, Guid, MessageHeader, MessageType};
-    use crate::negoex::{NegoexMessage, CHECKSUM_SCHEME_RFC3961, NEGOEXTS_MESSAGE_SIGNATURE};
+    use crate::negoex::{CHECKSUM_SCHEME_RFC3961, NEGOEXTS_MESSAGE_SIGNATURE, NegoexMessage};
 
     use super::{Exchange, Nego, Verify};
 

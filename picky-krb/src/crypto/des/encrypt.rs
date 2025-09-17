@@ -6,7 +6,7 @@ use crate::crypto::common::hmac_sha1;
 use crate::crypto::utils::{usage_ke, usage_ki};
 use crate::crypto::{EncryptWithoutChecksum, KerberosCryptoError, KerberosCryptoResult};
 
-use super::{derive_key, DES3_BLOCK_SIZE, DES3_KEY_SIZE, DES3_MAC_SIZE};
+use super::{DES3_BLOCK_SIZE, DES3_KEY_SIZE, DES3_MAC_SIZE, derive_key};
 
 type DesCbcCipher = cbc::Encryptor<TdesEde3>;
 

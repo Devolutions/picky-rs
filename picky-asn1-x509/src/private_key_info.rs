@@ -1,4 +1,4 @@
-use crate::{oids, AlgorithmIdentifier, AlgorithmIdentifierParameters, EcParameters, EncapsulatedEcPoint};
+use crate::{AlgorithmIdentifier, AlgorithmIdentifierParameters, EcParameters, EncapsulatedEcPoint, oids};
 
 use picky_asn1::tag::TagPeeker;
 use picky_asn1::wrapper::{
@@ -7,13 +7,13 @@ use picky_asn1::wrapper::{
 };
 #[cfg(not(feature = "legacy"))]
 use serde::Deserialize;
-use serde::{de, ser, Serialize};
+use serde::{Serialize, de, ser};
 #[cfg(feature = "zeroize")]
 use zeroize::Zeroize;
 
 use oid::ObjectIdentifier;
-use picky_asn1::bit_string::BitString;
 use picky_asn1::Asn1Type;
+use picky_asn1::bit_string::BitString;
 use std::fmt;
 
 /// When `PrivateKeyInfo` have this version specified, it should not have `public_key` field set.
@@ -285,7 +285,7 @@ impl ser::Serialize for PrivateKeyValue {
 impl Drop for PrivateKeyValue {
     fn drop(&mut self) {
         if let PrivateKeyValue::ED(ed) = self {
-            ed.0 .0.zeroize()
+            ed.0.0.zeroize()
         }
     }
 }
@@ -581,8 +581,8 @@ impl Drop for ECPrivateKey {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use base64::engine::general_purpose;
     use base64::Engine as _;
+    use base64::engine::general_purpose;
     use picky_asn1::bit_string::BitString;
 
     #[test]

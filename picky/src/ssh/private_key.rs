@@ -1,5 +1,5 @@
 use crate::key::{EcCurve, EdAlgorithm, KeyError, PrivateKey, PrivateKeyKind, PublicKey};
-use crate::pem::{parse_pem, Pem, PemError};
+use crate::pem::{Pem, PemError, parse_pem};
 use crate::ssh::decode::{SshComplexTypeDecode, SshReadExt};
 use crate::ssh::encode::SshComplexTypeEncode;
 use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
@@ -225,7 +225,7 @@ impl SshPrivateKey {
                 let rounds = 16;
                 let mut rnd = rand::thread_rng();
                 for _ in 0..rounds {
-                    salt.push(rnd.gen::<u8>());
+                    salt.push(rnd.r#gen::<u8>());
                 }
 
                 let kdf = Kdf {

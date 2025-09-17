@@ -78,9 +78,9 @@ pub(crate) mod misc;
 mod raw_der;
 mod ser;
 
-pub use crate::de::{from_bytes, from_reader, from_reader_with_max_len, Deserializer};
+pub use crate::de::{Deserializer, from_bytes, from_reader, from_reader_with_max_len};
 pub use crate::raw_der::Asn1RawDer;
-pub use crate::ser::{to_byte_buf, to_bytes, to_vec, to_writer, Serializer};
+pub use crate::ser::{Serializer, to_byte_buf, to_bytes, to_vec, to_writer};
 
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};

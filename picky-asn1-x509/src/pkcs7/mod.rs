@@ -12,7 +12,7 @@ use crate::oids;
 use signed_data::SignedData;
 
 use picky_asn1::wrapper::{ExplicitContextTag0, ObjectIdentifierAsn1};
-use serde::{de, Serialize};
+use serde::{Serialize, de};
 
 #[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct Pkcs7Certificate {
@@ -50,7 +50,7 @@ impl<'de> de::Deserialize<'de> for Pkcs7Certificate {
                             Pkcs7Certificate,
                             "unknown oid type",
                             "SignedData oid"
-                        ))
+                        ));
                     }
                 };
 
@@ -67,8 +67,8 @@ mod tests {
     use super::Pkcs7Certificate;
     use crate::pkcs7::signer_info::UnsignedAttributeValue;
     use crate::{Attribute, AttributeValues};
-    use base64::engine::general_purpose;
     use base64::Engine as _;
+    use base64::engine::general_purpose;
     use picky_asn1::wrapper::{Asn1SetOf, OctetStringAsn1};
 
     #[test]
@@ -378,10 +378,10 @@ mod tests {
             .signed_data
             .signers_infos
             .0
-             .0
+            .0
             .first()
             .expect("One SignedInfo always is present");
-        let unsigned_attrs = signer_info.unsigned_attrs.0 .0.first().unwrap();
+        let unsigned_attrs = signer_info.unsigned_attrs.0.0.first().unwrap();
         let mc_counter_sign = match &unsigned_attrs.value {
             UnsignedAttributeValue::MsCounterSign(mc_counter_sign) => mc_counter_sign,
             _ => unreachable!(),

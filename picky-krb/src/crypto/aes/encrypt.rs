@@ -8,7 +8,7 @@ use crate::crypto::common::hmac_sha1;
 use crate::crypto::utils::{usage_ke, usage_ki};
 use crate::crypto::{EncryptWithoutChecksum, KerberosCryptoError, KerberosCryptoResult};
 
-use super::{swap_two_last_blocks, AesSize, AES_BLOCK_SIZE, AES_MAC_SIZE};
+use super::{AES_BLOCK_SIZE, AES_MAC_SIZE, AesSize, swap_two_last_blocks};
 
 pub type Aes256CbcEncryptor = Encryptor<Aes256>;
 pub type Aes128CbcEncryptor = Encryptor<Aes128>;

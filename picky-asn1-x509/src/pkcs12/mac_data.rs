@@ -91,8 +91,8 @@ mod tests {
     use super::test_data::*;
     use super::*;
 
-    use base64::engine::general_purpose;
     use base64::Engine as _;
+    use base64::engine::general_purpose;
     use expect_test::expect;
 
     #[test]

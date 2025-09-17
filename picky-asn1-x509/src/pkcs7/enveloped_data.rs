@@ -6,7 +6,7 @@ use picky_asn1::wrapper::{
     ImplicitContextTag1, ObjectIdentifierAsn1, OctetStringAsn1, Optional, Utf8StringAsn1,
 };
 use picky_asn1_der::Asn1RawDer;
-use serde::{de, ser, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de, ser};
 
 use crate::cmsversion::CmsVersion;
 use crate::crls::RevocationInfoChoices;
@@ -31,12 +31,12 @@ pub struct ContentInfo {
 impl ContentInfo {
     /// Returns raw content bytes.
     pub fn content(&self) -> &[u8] {
-        &self.content.0 .0
+        &self.content.0.0
     }
 
     /// Tries to parse the content value and returns parsed object.
     pub fn content_typed<'a, T: Deserialize<'a>>(&'a self) -> picky_asn1_der::Result<T> {
-        picky_asn1_der::from_bytes(&self.content.0 .0)
+        picky_asn1_der::from_bytes(&self.content.0.0)
     }
 }
 
@@ -322,7 +322,7 @@ mod tests {
     use picky_asn1::wrapper::IntegerAsn1;
 
     use super::*;
-    use crate::{oids, AesAuthEncParams, AesMode, AesParameters};
+    use crate::{AesAuthEncParams, AesMode, AesParameters, oids};
 
     #[test]
     fn general_protection_descriptor_encoding_decoding() {

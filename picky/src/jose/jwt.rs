@@ -3,8 +3,8 @@ use crate::jose::jwe::{JweAlg, JweEnc, JweError, JweHeader};
 use crate::jose::jws::{Jws, JwsAlg, JwsError, JwsHeader};
 use crate::key::{PrivateKey, PublicKey};
 use core::fmt;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use thiserror::Error;
 
 // === error type === //
@@ -444,7 +444,7 @@ fn h_decode_and_validate_claims<C: DeserializeOwned>(
         (None, CheckStrictness::Required, _) | (None, _, CheckStrictness::Required) => {
             return Err(JwtError::InvalidValidator {
                 description: "current date is missing",
-            })
+            });
         }
         (Some(current_date), nbf_strictness, exp_strictness) => {
             let claims = serde_json::from_slice::<serde_json::Value>(claims_json)?;
@@ -455,7 +455,7 @@ fn h_decode_and_validate_claims<C: DeserializeOwned>(
                 (CheckStrictness::Required, None) => {
                     return Err(JwtError::RequiredClaimMissing {
                         claim: NOT_BEFORE_CLAIM,
-                    })
+                    });
                 }
                 (_, Some(nbf)) => {
                     let nbf_i64 = nbf.as_i64().ok_or(JwtError::InvalidRegisteredClaimType {
@@ -476,7 +476,7 @@ fn h_decode_and_validate_claims<C: DeserializeOwned>(
                 (CheckStrictness::Required, None) => {
                     return Err(JwtError::RequiredClaimMissing {
                         claim: EXPIRATION_TIME_CLAIM,
-                    })
+                    });
                 }
                 (_, Some(exp)) => {
                     let exp_i64 = exp.as_i64().ok_or(JwtError::InvalidRegisteredClaimType {

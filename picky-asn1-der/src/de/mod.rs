@@ -11,11 +11,11 @@ use crate::de::sequence::Sequence;
 use crate::de::utf8_string::Utf8String;
 use crate::misc::{Length, PeekableReader, ReadExt};
 use crate::{Asn1DerError, Asn1RawDer, Result};
+use picky_asn1::Asn1Type;
 use picky_asn1::tag::Tag;
 use picky_asn1::wrapper::*;
-use picky_asn1::Asn1Type;
-use serde::de::Visitor;
 use serde::Deserialize;
+use serde::de::Visitor;
 use std::io::{Cursor, Read};
 
 const DEFAULT_MAX_LEN: usize = 10240;

@@ -2,7 +2,7 @@ use crate::attribute::{Attribute, Attributes};
 use crate::{AlgorithmIdentifier, Name, SubjectPublicKeyInfo};
 use picky_asn1::tag::Tag;
 use picky_asn1::wrapper::{Asn1SequenceOf, BitStringAsn1};
-use serde::{de, ser, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de, ser};
 
 /// [RFC 2986 #4](https://tools.ietf.org/html/rfc2986#section-4)
 ///
@@ -114,8 +114,8 @@ mod tests {
     use super::*;
     use crate::name::*;
     use crate::{DirectoryName, Extension, GeneralName};
-    use base64::engine::general_purpose;
     use base64::Engine as _;
+    use base64::engine::general_purpose;
     use picky_asn1::bit_string::BitString;
     use picky_asn1::restricted_string::{Ia5String, PrintableString, Utf8String};
     use picky_asn1::wrapper::IntegerAsn1;
@@ -181,10 +181,12 @@ mod tests {
             )
             .expect("invalid base64");
 
-        let extensions = vec![Extension::new_subject_alt_name(vec![GeneralName::DnsName(
-            Ia5String::from_string("localhost".into()).unwrap().into(),
-        )])
-        .into_non_critical()];
+        let extensions = vec![
+            Extension::new_subject_alt_name(vec![GeneralName::DnsName(
+                Ia5String::from_string("localhost".into()).unwrap().into(),
+            )])
+            .into_non_critical(),
+        ];
 
         let mut dn = DirectoryName::new();
         dn.add_attr(NameAttr::CountryName, PrintableString::from_str("XX").unwrap());

@@ -1,6 +1,6 @@
+pub use picky_asn1_x509::ShaVariant;
 pub use picky_asn1_x509::attribute::Attribute;
 pub use picky_asn1_x509::pkcs7::content_info;
-pub use picky_asn1_x509::ShaVariant;
 
 use crate::hash::{HashAlgorithm, UnsupportedHashAlgorithmError};
 use crate::key::PrivateKey;
@@ -21,6 +21,7 @@ use picky_asn1_der::Asn1DerError;
 use picky_asn1_x509::algorithm_identifier::{AlgorithmIdentifier, UnsupportedAlgorithmError};
 use picky_asn1_x509::cmsversion::CmsVersion;
 use picky_asn1_x509::extension::ExtensionView;
+use picky_asn1_x509::pkcs7::Pkcs7Certificate;
 use picky_asn1_x509::pkcs7::content_info::{
     ContentValue, EncapsulatedContentInfo, SpcAttributeAndOptionalValue, SpcAttributeAndOptionalValueValue,
     SpcIndirectDataContent, SpcLink, SpcPeImageData, SpcPeImageFlags, SpcSpOpusInfo, SpcString,
@@ -34,8 +35,7 @@ use picky_asn1_x509::pkcs7::signer_info::{
     SignatureAlgorithmIdentifier, SignatureValue, SignerIdentifier, SignerInfo, UnsignedAttribute,
     UnsignedAttributeValue, UnsignedAttributes,
 };
-use picky_asn1_x509::pkcs7::Pkcs7Certificate;
-use picky_asn1_x509::{oids, AttributeValues, Certificate, DigestInfo, Name};
+use picky_asn1_x509::{AttributeValues, Certificate, DigestInfo, Name, oids};
 use std::cell::RefCell;
 use std::iter::Iterator;
 use std::ops::DerefMut;
@@ -61,7 +61,9 @@ pub enum AuthenticodeError {
     HashMismatch,
     #[error("Actual file hash is {actual:?}, but expected {expected:?}")]
     FileHashMismatch { actual: Vec<u8>, expected: Vec<u8> },
-    #[error("Authenticode signatures support only one signer, digestAlgorithms must contain only one digestAlgorithmIdentifier, but {incorrect_count} entries present")]
+    #[error(
+        "Authenticode signatures support only one signer, digestAlgorithms must contain only one digestAlgorithmIdentifier, but {incorrect_count} entries present"
+    )]
     IncorrectDigestAlgorithmsCount { incorrect_count: usize },
     #[error(
         "Authenticode uses issuerAndSerialNumber to identify the signer, but got subjectKeyIdentifier identification"
@@ -254,21 +256,21 @@ impl AuthenticodeSignature {
     ) -> Result<(), AuthenticodeError> {
         let signer_info = self
             .0
-             .0
+            .0
             .signed_data
             .signers_infos
             .0
-             .0
+            .0
             .first()
             .expect("Exactly one SignedInfo should be present");
 
-        let encrypted_digest = signer_info.signature.0 .0.clone();
+        let encrypted_digest = signer_info.signature.0.0.clone();
 
         let token = timestamper
             .timestamp(encrypted_digest, hash_algo)
             .map_err(AuthenticodeError::TimestampError)?;
 
-        timestamper.modify_signed_data(token, &mut self.0 .0.signed_data);
+        timestamper.modify_signed_data(token, &mut self.0.0.signed_data);
 
         Ok(())
     }
@@ -296,15 +298,15 @@ impl AuthenticodeSignature {
     }
 
     pub fn to_der(&self) -> AuthenticodeResult<Vec<u8>> {
-        Ok(to_der(&self.0 .0, pkcs7::ELEMENT_NAME)?)
+        Ok(to_der(&self.0.0, pkcs7::ELEMENT_NAME)?)
     }
 
     pub fn to_pem(&self) -> AuthenticodeResult<Pem<'static>> {
-        Ok(to_pem(&self.0 .0, pkcs7::PKCS7_PEM_LABEL, pkcs7::ELEMENT_NAME)?)
+        Ok(to_pem(&self.0.0, pkcs7::PKCS7_PEM_LABEL, pkcs7::ELEMENT_NAME)?)
     }
 
     pub fn signing_certificate<'a>(&'a self, certificates: &'a [Cert]) -> AuthenticodeResult<&'a Cert> {
-        let signer_infos = &self.0 .0.signed_data.signers_infos.0;
+        let signer_infos = &self.0.0.signed_data.signers_infos.0;
 
         let signer_info = signer_infos.first().ok_or(AuthenticodeError::MultipleSignerInfo {
             count: signer_infos.len(),
@@ -324,7 +326,7 @@ impl AuthenticodeSignature {
             .ok_or_else(
                 || AuthenticodeError::NoCertificatesAssociatedWithIssuerAndSerialNumber {
                     issuer: issuer_and_serial_number.issuer.clone(),
-                    serial_number: issuer_and_serial_number.serial_number.0 .0.clone(),
+                    serial_number: issuer_and_serial_number.serial_number.0.0.clone(),
                 },
             )
     }
@@ -344,7 +346,7 @@ impl AuthenticodeSignature {
     }
 
     pub fn file_hash(&self) -> Option<Vec<u8>> {
-        let spc_indirect_data_content = match &self.0 .0.signed_data.content_info.content {
+        let spc_indirect_data_content = match &self.0.0.signed_data.content_info.content {
             Some(content_value) => match &content_value.0 {
                 ContentValue::SpcIndirectDataContent(spc_indirect_data_content) => spc_indirect_data_content,
                 _ => return None,
@@ -363,22 +365,22 @@ impl AuthenticodeSignature {
             .expect("Exactly one SignerInfo should be present")
             .signed_attrs
             .0
-             .0
+            .0
     }
 
     pub fn unauthenticated_attributes(&self) -> &[UnsignedAttribute] {
         &self
             .0
-             .0
+            .0
             .signed_data
             .signers_infos
             .0
-             .0
+            .0
             .first()
             .expect("Exactly one SignerInfo should be present")
             .unsigned_attrs
             .0
-             .0
+            .0
     }
 }
 
@@ -558,7 +560,7 @@ impl<'a> AuthenticodeValidator<'a> {
 
     fn h_verify_authenticode_basic(&self, certificates: &[Cert]) -> AuthenticodeResult<()> {
         // 1. SignedData version field must be set to 1.
-        let version = self.authenticode_signature.0 .0.signed_data.version;
+        let version = self.authenticode_signature.0.0.signed_data.version;
         if version != CmsVersion::V1 {
             return Err(AuthenticodeError::IncorrectVersion {
                 expected: 1,
@@ -649,7 +651,7 @@ impl<'a> AuthenticodeValidator<'a> {
             .map_err(AuthenticodeError::UnsupportedAlgorithmError)?;
         let signature_algorithm = SignatureAlgorithm::from_algorithm_identifier(&signature_algorithm_identifier)?;
         signature_algorithm
-            .verify(public_key, &raw_attributes, &signer_info.signature.0 .0)
+            .verify(public_key, &raw_attributes, &signer_info.signature.0.0)
             .map_err(AuthenticodeError::SignatureError)?;
 
         // 8. PKCS9_MESSAGE_DIGEST attribute exists and that its value matches hash of ContentInfo.
@@ -772,7 +774,7 @@ impl<'a> AuthenticodeValidator<'a> {
                                         .signed_data
                                         .certificates
                                         .0
-                                         .0
+                                        .0
                                         .iter()
                                         .filter_map(|cert| match cert {
                                             CertificateChoices::Certificate(certificate) => {
@@ -935,12 +937,7 @@ impl<'a> AuthenticodeValidator<'a> {
                     Asn1SetOf UnknownReservedPropId127 should contain exactly one value",
                     );
                     let eku_code_signing_oid = oids::kp_code_signing();
-                    if set_of_eku_oids
-                        .0
-                         .0
-                        .iter()
-                        .any(|kp_oid| kp_oid == &eku_code_signing_oid)
-                    {
+                    if set_of_eku_oids.0.0.iter().any(|kp_oid| kp_oid == &eku_code_signing_oid) {
                         return Err(AuthenticodeError::CaCertificateNotYetValid {
                             not_before: not_before.into(),
                             now: now.into(),
@@ -1206,7 +1203,7 @@ impl<'a> AuthenticodeSignatureBuilder<'a> {
             .ok_or_else(
                 || AuthenticodeError::NoCertificatesAssociatedWithIssuerAndSerialNumber {
                     issuer: issuer_and_serial_number.issuer.clone(),
-                    serial_number: issuer_and_serial_number.serial_number.0 .0.clone(),
+                    serial_number: issuer_and_serial_number.serial_number.0.0.clone(),
                 },
             )
             .map_err(AuthenticodeSignatureBuilderError::AuthenticodeError)?;
@@ -1231,7 +1228,7 @@ impl<'a> AuthenticodeSignatureBuilder<'a> {
 
         let signature_algo = SignatureAlgorithm::from_algorithm_identifier(&digest_encryption_algorithm)?;
 
-        let to_sign_data = if let Some(ref authenticated_attributes) = authenticated_attributes {
+        let to_sign_data = if let Some(authenticated_attributes) = authenticated_attributes {
             let mut auth_raw_data = picky_asn1_der::to_vec(&authenticated_attributes)?;
             // According to the RFC:
             //
@@ -1296,7 +1293,7 @@ mod tests {
     use crate::x509::certificate::{CertType, CertificateBuilder};
     use crate::x509::{Csr, KeyIdGenMethod};
     #[cfg(feature = "ctl")]
-    use base64::{engine::general_purpose, Engine as _};
+    use base64::{Engine as _, engine::general_purpose};
     use picky_asn1_x509::Extension;
 
     const RSA_PRIVATE_KEY: &str = "-----BEGIN RSA PRIVATE KEY-----\n\
@@ -1434,7 +1431,7 @@ mod tests {
             AuthenticodeSignature::new(&pkcs7, FILE_HASH.to_vec(), hash_type, &private_key, Some(program_name))
                 .unwrap();
 
-        let pkcs7certificate = authenticode_signature.0 .0;
+        let pkcs7certificate = authenticode_signature.0.0;
 
         let Pkcs7Certificate { signed_data, .. } = pkcs7certificate;
 
@@ -1459,12 +1456,12 @@ mod tests {
 
         pretty_assertions::assert_eq!(message_digest.digest.0, FILE_HASH);
 
-        assert_eq!(signed_data.signers_infos.0 .0.len(), 1);
+        assert_eq!(signed_data.signers_infos.0.0.len(), 1);
 
-        let singer_info = signed_data.signers_infos.0 .0.first().unwrap();
+        let singer_info = signed_data.signers_infos.0.0.first().unwrap();
         assert_eq!(singer_info.digest_algorithm.0, hash_algo);
 
-        let authenticated_attributes = &singer_info.signed_attrs.0 .0;
+        let authenticated_attributes = &singer_info.signed_attrs.0.0;
 
         if !authenticated_attributes
             .iter()
@@ -1511,16 +1508,18 @@ mod tests {
             .unwrap();
 
         let code_signing_ext_key_usage = Extension::new_extended_key_usage(vec![oids::kp_code_signing()]);
-        assert!(!certificate
-            .tbs_certificate
-            .extensions
-            .0
-             .0
-            .iter()
-            .any(|extension| extension == &code_signing_ext_key_usage));
+        assert!(
+            !certificate
+                .tbs_certificate
+                .extensions
+                .0
+                .0
+                .iter()
+                .any(|extension| extension == &code_signing_ext_key_usage)
+        );
 
         let public_key = certificate.tbs_certificate.subject_public_key_info;
-        let encrypted_digest = singer_info.signature.0 .0.as_ref();
+        let encrypted_digest = singer_info.signature.0.0.as_ref();
 
         let mut auth_raw_data = picky_asn1_der::to_vec(&authenticated_attributes).unwrap();
         auth_raw_data[0] = Tag::SET.inner();

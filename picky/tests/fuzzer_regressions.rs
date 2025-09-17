@@ -6,7 +6,7 @@ use picky::jose::jwe::Jwe;
 use picky::jose::jwk::Jwk;
 use picky::jose::jws::RawJws;
 use picky::key::{PrivateKey, PublicKey};
-use picky::pem::{parse_pem, Pem};
+use picky::pem::{Pem, parse_pem};
 use picky::x509::certificate::Cert;
 use picky::x509::csr::Csr;
 use std::fs;

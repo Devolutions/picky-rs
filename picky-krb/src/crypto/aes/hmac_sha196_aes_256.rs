@@ -1,6 +1,6 @@
 use crate::crypto::{Checksum, ChecksumSuite, KerberosCryptoResult};
 
-use super::{checksum_sha_aes, AesSize};
+use super::{AesSize, checksum_sha_aes};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct HmacSha196Aes256;

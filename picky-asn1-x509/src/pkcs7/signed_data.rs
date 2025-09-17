@@ -1,12 +1,12 @@
 use super::content_info::EncapsulatedContentInfo;
 use super::crls::RevocationInfoChoices;
 use super::signer_info::SignerInfo;
-use crate::cmsversion::CmsVersion;
 use crate::AlgorithmIdentifier;
+use crate::cmsversion::CmsVersion;
 use picky_asn1::tag::{Tag, TagClass, TagPeeker};
 use picky_asn1::wrapper::{Asn1SetOf, Optional};
 use picky_asn1_der::Asn1RawDer;
-use serde::{de, ser, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de, ser};
 
 /// [RFC 5652 #5.1](https://datatracker.ietf.org/doc/html/rfc5652#section-5.1)
 /// ``` not_rust
@@ -187,11 +187,11 @@ mod tests {
     use super::*;
     use crate::crls::*;
     use crate::{
-        oids, Certificate, EncapsulatedRsaPublicKey, Extension, Extensions, KeyIdentifier, Name, NameAttr, PublicKey,
-        RsaPublicKey, SubjectPublicKeyInfo, TbsCertificate, Validity, Version,
+        Certificate, EncapsulatedRsaPublicKey, Extension, Extensions, KeyIdentifier, Name, NameAttr, PublicKey,
+        RsaPublicKey, SubjectPublicKeyInfo, TbsCertificate, Validity, Version, oids,
     };
-    use base64::engine::general_purpose;
     use base64::Engine as _;
+    use base64::engine::general_purpose;
     use picky_asn1::bit_string::BitString;
     use picky_asn1::date::UTCTime;
     use picky_asn1::restricted_string::{IA5String, PrintableString};

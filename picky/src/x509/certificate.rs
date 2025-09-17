@@ -11,8 +11,9 @@ use picky_asn1::bit_string::BitString;
 use picky_asn1::wrapper::{ExplicitContextTag0, ExplicitContextTag3, IntegerAsn1};
 use picky_asn1_der::{Asn1DerError, Asn1RawDer};
 use picky_asn1_x509::{
-    oids, AlgorithmIdentifier, AuthorityKeyIdentifier, BasicConstraints, Certificate, ExtendedKeyUsage, Extension,
+    AlgorithmIdentifier, AuthorityKeyIdentifier, BasicConstraints, Certificate, ExtendedKeyUsage, Extension,
     ExtensionView, Extensions, KeyIdentifier, KeyUsage, Name, SubjectPublicKeyInfo, TbsCertificate, Validity, Version,
+    oids,
 };
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
@@ -1026,7 +1027,7 @@ fn generate_serial_number() -> IntegerAsn1 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pem::{parse_pem, Pem};
+    use crate::pem::{Pem, parse_pem};
     use crate::x509::csr::Attribute;
 
     #[test]

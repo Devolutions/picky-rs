@@ -1,4 +1,4 @@
-use picky_asn1_der::{from_bytes, to_vec, Asn1DerError};
+use picky_asn1_der::{Asn1DerError, from_bytes, to_vec};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]

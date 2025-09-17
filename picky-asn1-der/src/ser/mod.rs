@@ -11,9 +11,9 @@ use crate::ser::null::Null;
 use crate::ser::sequence::Sequence;
 use crate::ser::utf8_string::Utf8String;
 use crate::{Asn1DerError, Asn1RawDer, Result};
+use picky_asn1::Asn1Type;
 use picky_asn1::tag::Tag;
 use picky_asn1::wrapper::*;
-use picky_asn1::Asn1Type;
 use serde::Serialize;
 use std::io::{Cursor, Write};
 

@@ -1,7 +1,7 @@
 use crate::{AttributeTypeAndValue, AttributeTypeAndValueParameters, DirectoryString};
 use picky_asn1::tag::{Encoding, Tag, TagClass, TagPeeker};
 use picky_asn1::wrapper::*;
-use serde::{de, ser, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de, ser};
 use std::fmt;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -382,8 +382,8 @@ pub struct EdiPartyName {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use base64::engine::general_purpose;
     use base64::Engine as _;
+    use base64::engine::general_purpose;
     use oid::ObjectIdentifier;
     use picky_asn1::restricted_string::Ia5String;
     use picky_asn1_der::Asn1RawDer;

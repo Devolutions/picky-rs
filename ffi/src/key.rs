@@ -216,7 +216,7 @@ pub mod ffi {
 /// # Safety
 ///
 /// - `public_key` must be a pointer to a valid memory location containing a `PublicKey` object.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn PublicKey_pkcs1_encoded_len(public_key: Option<&ffi::PublicKey>) -> usize {
     if let Some(data) = public_key.and_then(|k| k.0.to_pkcs1().ok()) {
         data.len()
@@ -233,7 +233,7 @@ pub unsafe extern "C" fn PublicKey_pkcs1_encoded_len(public_key: Option<&ffi::Pu
 ///
 /// - `public_key` must be a pointer to a valid memory location containing a `PublicKey` object.
 /// - `dst` must be valid for writes of `count` bytes.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn PublicKey_to_pkcs1(
     public_key: Option<&ffi::PublicKey>,
     dst: *mut u8,
@@ -259,7 +259,7 @@ pub unsafe extern "C" fn PublicKey_to_pkcs1(
     // - `dst` is valid for writes of `data_len` bytes, because it is valid for `count` bytes (caller is responsible for this invariant).
     // - Both `src` and `dst` are always properly aligned: u8 aligment is 1.
     // - Memory regions are not overlapping, `data` is created by us just above.
-    std::ptr::copy_nonoverlapping(data.as_ptr(), dst, data_len);
+    unsafe { std::ptr::copy_nonoverlapping(data.as_ptr(), dst, data_len) };
 
     None
 }

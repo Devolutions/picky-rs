@@ -1,14 +1,14 @@
 use crate::key::ec::{EcdsaKeypair, EcdsaPublicKey, NamedEcCurve};
 use crate::key::ed::{EdKeypair, EdPublicKey, NamedEdAlgorithm};
 use crate::key::{EcCurve, EdAlgorithm, PrivateKey};
+use crate::putty::PuttyError;
 use crate::putty::key_value::PpkKeyAlgorithmValue;
 use crate::putty::public_key::PuttyBasePublicKey;
-use crate::putty::PuttyError;
+use crate::ssh::SshPrivateKey;
 use crate::ssh::decode::SshReadExt;
 use crate::ssh::encode::SshWriteExt;
 use crate::ssh::private_key::SshBasePrivateKey;
 use crate::ssh::public_key::SshBasePublicKey;
-use crate::ssh::SshPrivateKey;
 use num_bigint_dig::BigUint;
 use rsa::traits::{PrivateKeyParts, PublicKeyParts};
 use rsa::{RsaPrivateKey, RsaPublicKey};
@@ -110,7 +110,7 @@ impl PuttyBasePrivateKey {
                     _ => {
                         return Err(PuttyError::NotSupported {
                             feature: "unknown EC curve",
-                        })
+                        });
                     }
                 };
 
@@ -131,12 +131,12 @@ impl PuttyBasePrivateKey {
                 let algorithm = match ed_key.algorithm() {
                     NamedEdAlgorithm::Known(EdAlgorithm::Ed25519) => PpkKeyAlgorithmValue::Ed25519,
                     NamedEdAlgorithm::Known(EdAlgorithm::X25519) => {
-                        return Err(PuttyError::NotSupported { feature: "X25519 keys" })
+                        return Err(PuttyError::NotSupported { feature: "X25519 keys" });
                     }
                     _ => {
                         return Err(PuttyError::NotSupported {
                             feature: "unknown EdDSA algorithm",
-                        })
+                        });
                     }
                 };
 

@@ -73,7 +73,7 @@ use picky_asn1_x509::pkcs12::{
 use std::fmt::Display;
 use thiserror::Error;
 
-pub(crate) use pbkdf1::{pbkdf1, Pbkdf1Usage};
+pub(crate) use pbkdf1::{Pbkdf1Usage, pbkdf1};
 
 pub use attribute::{CustomPkcs12Attribute, Pkcs12Attribute, Pkcs12AttributeKind};
 pub use encryption::{

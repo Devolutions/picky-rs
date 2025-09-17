@@ -1,13 +1,13 @@
 use crate::key::PublicKey;
 use crate::putty::PuttyError;
+use crate::ssh::SshPublicKey;
 use crate::ssh::decode::SshComplexTypeDecode;
 use crate::ssh::encode::SshComplexTypeEncode;
 use crate::ssh::public_key::SshBasePublicKey;
-use crate::ssh::SshPublicKey;
 use std::str::FromStr;
 
-use base64::engine::general_purpose::STANDARD as BASE64_ENGINE;
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD as BASE64_ENGINE;
 
 const PUTTY_PUBKEY_HEADER: &str = "---- BEGIN SSH2 PUBLIC KEY ----";
 const PUTTY_PUBKEY_FOOTER: &str = "---- END SSH2 PUBLIC KEY ----";

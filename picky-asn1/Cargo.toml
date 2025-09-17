@@ -1,8 +1,8 @@
 [package]
 name = "picky-asn1"
 version = "0.10.1"
-edition = "2021"
-rust-version = "1.68"
+edition = "2024"
+rust-version = "1.85"
 authors = [
     "Benoît CORTIER <bcortier@devolutions.net>",
     "Alexandr Yusuk <aleksandr.yusuk@apriorit.com>",

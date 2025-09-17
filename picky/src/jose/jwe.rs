@@ -651,7 +651,7 @@ fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
                     unsupported => {
                         return Err(JweError::UnsupportedAlgorithm {
                             algorithm: format!("{:?}", unsupported),
-                        })
+                        });
                     }
                 };
 
@@ -706,7 +706,7 @@ fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
         unsupported => {
             return Err(JweError::UnsupportedAlgorithm {
                 algorithm: format!("{:?}", unsupported),
-            })
+            });
         }
     };
 
@@ -822,7 +822,7 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
                     unsupported => {
                         return Err(JweError::UnsupportedAlgorithm {
                             algorithm: format!("{:?}", unsupported),
-                        })
+                        });
                     }
                 };
 
@@ -889,7 +889,7 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
         unsupported => {
             return Err(JweError::UnsupportedAlgorithm {
                 algorithm: format!("{:?}", unsupported),
-            })
+            });
         }
     };
 
@@ -1488,7 +1488,9 @@ mod tests {
         );
         assert_eq!(
             tag.as_slice(),
-            &[92, 80, 104, 49, 133, 25, 161, 215, 173, 101, 219, 211, 136, 91, 210, 145]
+            &[
+                92, 80, 104, 49, 133, 25, 161, 215, 173, 101, 219, 211, 136, 91, 210, 145
+            ]
         );
 
         // 7: Complete Representation
@@ -1502,7 +1504,10 @@ mod tests {
             general_purpose::URL_SAFE_NO_PAD.encode(tag),
         );
 
-        assert_eq!(token, "eyJhbGciOiJSU0EtT0FFUCIsImVuYyI6IkEyNTZHQ00ifQ.OKOawDo13gRp2ojaHV7LFpZcgV7T6DVZKTyKOMTYUmKoTCVJRgckCL9kiMT03JGeipsEdY3mx_etLbbWSrFr05kLzcSr4qKAq7YN7e9jwQRb23nfa6c9d-StnImGyFDbSv04uVuxIp5Zms1gNxKKK2Da14B8S4rzVRltdYwam_lDp5XnZAYpQdb76FdIKLaVmqgfwX7XWRxv2322i-vDxRfqNzo_tETKzpVLzfiwQyeyPGLBIO56YJ7eObdv0je81860ppamavo35UgoRdbYaBcoh9QcfylQr66oc6vFWXRcZ_ZT2LawVCWTIy3brGPi6UklfCpIMfIjf7iGdXKHzg.48V1_ALb6US04U3b.5eym8TW_c8SuK0ltJ3rpYIzOeDQz7TALvtu6UG9oMo4vpzs9tX_EFShS8iB7j6jiSdiwkIr3ajwQzaBtQD_A.XFBoMYUZodetZdvTiFvSkQ");
+        assert_eq!(
+            token,
+            "eyJhbGciOiJSU0EtT0FFUCIsImVuYyI6IkEyNTZHQ00ifQ.OKOawDo13gRp2ojaHV7LFpZcgV7T6DVZKTyKOMTYUmKoTCVJRgckCL9kiMT03JGeipsEdY3mx_etLbbWSrFr05kLzcSr4qKAq7YN7e9jwQRb23nfa6c9d-StnImGyFDbSv04uVuxIp5Zms1gNxKKK2Da14B8S4rzVRltdYwam_lDp5XnZAYpQdb76FdIKLaVmqgfwX7XWRxv2322i-vDxRfqNzo_tETKzpVLzfiwQyeyPGLBIO56YJ7eObdv0je81860ppamavo35UgoRdbYaBcoh9QcfylQr66oc6vFWXRcZ_ZT2LawVCWTIy3brGPi6UklfCpIMfIjf7iGdXKHzg.48V1_ALb6US04U3b.5eym8TW_c8SuK0ltJ3rpYIzOeDQz7TALvtu6UG9oMo4vpzs9tX_EFShS8iB7j6jiSdiwkIr3ajwQzaBtQD_A.XFBoMYUZodetZdvTiFvSkQ"
+        );
     }
 
     #[rstest]

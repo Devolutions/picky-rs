@@ -2,7 +2,7 @@ use crate::key::{KeyError, PrivateKey, PrivateKeyKind, PublicKey};
 use crate::oid::ObjectIdentifier;
 
 use picky_asn1::wrapper::BitStringAsn1;
-use picky_asn1_x509::{oids, EcParameters};
+use picky_asn1_x509::{EcParameters, oids};
 use std::fmt::Display;
 use zeroize::Zeroize;
 
@@ -52,18 +52,18 @@ impl EcCurve {
     pub(crate) fn field_bytes_size(self) -> usize {
         match self {
             EcCurve::NistP256 => {
-                use p256::elliptic_curve::generic_array::typenum::Unsigned;
                 use p256::elliptic_curve::FieldBytesSize;
+                use p256::elliptic_curve::generic_array::typenum::Unsigned;
                 <FieldBytesSize<p256::NistP256> as Unsigned>::USIZE
             }
             EcCurve::NistP384 => {
-                use p384::elliptic_curve::generic_array::typenum::Unsigned;
                 use p384::elliptic_curve::FieldBytesSize;
+                use p384::elliptic_curve::generic_array::typenum::Unsigned;
                 <FieldBytesSize<p384::NistP384> as Unsigned>::USIZE
             }
             EcCurve::NistP521 => {
-                use p521::elliptic_curve::generic_array::typenum::Unsigned;
                 use p521::elliptic_curve::FieldBytesSize;
+                use p521::elliptic_curve::generic_array::typenum::Unsigned;
                 <FieldBytesSize<p521::NistP521> as Unsigned>::USIZE
             }
         }
@@ -173,9 +173,9 @@ pub(crate) fn calculate_public_ec_key(
 
     match curve {
         NamedEcCurve::Known(EcCurve::NistP256) => {
+            use p256::SecretKey as SecretKeyP256;
             use p256::elliptic_curve::generic_array::GenericArray as GenericArrayP256;
             use p256::elliptic_curve::sec1::ToEncodedPoint as _;
-            use p256::SecretKey as SecretKeyP256;
 
             let private_key_validated = EcCurve::NistP256.validate_component(EcComponent::Secret(private_key))?;
 
@@ -190,9 +190,9 @@ pub(crate) fn calculate_public_ec_key(
             Ok(Some(public_key.to_bytes().to_vec()))
         }
         NamedEcCurve::Known(EcCurve::NistP384) => {
+            use p384::SecretKey as SecretKeyP384;
             use p384::elliptic_curve::generic_array::GenericArray as GenericArrayP384;
             use p384::elliptic_curve::sec1::ToEncodedPoint as _;
-            use p384::SecretKey as SecretKeyP384;
 
             let private_key_validated = EcCurve::NistP384.validate_component(EcComponent::Secret(private_key))?;
 
@@ -207,9 +207,9 @@ pub(crate) fn calculate_public_ec_key(
             Ok(Some(public_key.to_bytes().to_vec()))
         }
         NamedEcCurve::Known(EcCurve::NistP521) => {
+            use p521::SecretKey as SecretKeyP521;
             use p521::elliptic_curve::generic_array::GenericArray as GenericArrayP521;
             use p521::elliptic_curve::sec1::ToEncodedPoint as _;
-            use p521::SecretKey as SecretKeyP521;
 
             let private_key_validated = EcCurve::NistP521.validate_component(EcComponent::Secret(private_key))?;
 
@@ -256,7 +256,7 @@ impl<'a> TryFrom<&'a PublicKey> for EcdsaPublicKey<'a> {
             _ => {
                 return Err(KeyError::EC {
                     context: "EC public key cannot be constructed from non-EC public key".to_string(),
-                })
+                });
             }
         };
 

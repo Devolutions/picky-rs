@@ -1,6 +1,6 @@
 use std::str::FromStr as _;
 
-use crate::pkcs12::{pbkdf1, Pbkdf1Usage, Pkcs12Error, Pkcs12HashAlgorithm};
+use crate::pkcs12::{Pbkdf1Usage, Pkcs12Error, Pkcs12HashAlgorithm, pbkdf1};
 use picky_asn1::restricted_string::BmpString;
 use picky_asn1::wrapper::OctetStringAsn1;
 pub use picky_asn1_x509::pkcs12::Pbes1AlgorithmKind as Pbes1Cipher;
@@ -424,9 +424,9 @@ fn prepare_pbes2_cipher_inputs(
 fn decrypt_pbes2(params: &Pbes2ParamsAsn1, password: &[u8], data: &[u8]) -> Result<Vec<u8>, Pkcs12Error> {
     let Pbes2CipherInputs { key, iv, cipher } = prepare_pbes2_cipher_inputs(params, password, "decryption")?;
 
+    use cbc::Decryptor;
     use cbc::cipher::block_padding::Pkcs7;
     use cbc::cipher::{BlockDecryptMut, KeyIvInit};
-    use cbc::Decryptor;
 
     let decrypted = match cipher {
         Pbes2Cipher::Aes128Cbc => {
@@ -476,9 +476,9 @@ fn decrypt_pbes2(params: &Pbes2ParamsAsn1, password: &[u8], data: &[u8]) -> Resu
 fn encrypt_pbes2(params: &Pbes2ParamsAsn1, password: &[u8], data: &[u8]) -> Result<Vec<u8>, Pkcs12Error> {
     let Pbes2CipherInputs { key, iv, cipher } = prepare_pbes2_cipher_inputs(params, password, "encryption")?;
 
+    use cbc::Encryptor;
     use cbc::cipher::block_padding::Pkcs7;
     use cbc::cipher::{BlockEncryptMut, KeyIvInit};
-    use cbc::Encryptor;
 
     let encrypted = match cipher {
         Pbes2Cipher::Aes128Cbc => {
@@ -554,9 +554,9 @@ fn encrypt_pbes1(
     kdf_iterations: usize,
     data: &[u8],
 ) -> Result<Vec<u8>, Pkcs12Error> {
+    use cbc::Encryptor;
     use cbc::cipher::block_padding::Pkcs7;
     use cbc::cipher::{BlockEncryptMut, KeyIvInit};
-    use cbc::Encryptor;
 
     let (dk, iv) = generate_pbes1_key_and_iv(scheme, password, salt, kdf_iterations);
 
@@ -589,9 +589,9 @@ fn decrypt_pbes1(
     kdf_iterations: usize,
     data: &[u8],
 ) -> Result<Vec<u8>, Pkcs12Error> {
+    use cbc::Decryptor;
     use cbc::cipher::block_padding::Pkcs7;
     use cbc::cipher::{BlockDecryptMut, KeyIvInit};
-    use cbc::Decryptor;
 
     let (dk, iv) = generate_pbes1_key_and_iv(scheme, password, salt, kdf_iterations);
 

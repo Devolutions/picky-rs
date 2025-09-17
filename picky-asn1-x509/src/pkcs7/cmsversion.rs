@@ -1,4 +1,4 @@
-use serde::{de, ser, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de, ser};
 use std::fmt;
 
 /// [RFC 5682 #10.2.5](https://datatracker.ietf.org/doc/html/rfc5652#section-10.2.5)

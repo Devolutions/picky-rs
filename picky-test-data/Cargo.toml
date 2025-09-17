@@ -1,9 +1,9 @@
 [package]
 name = "picky-test-data"
 version = "0.1.1"
-edition = "2021"
+edition = "2024"
 description = "Test data for the picky crates"
-rust-version = "1.56.0"
+rust-version = "1.85"
 authors = ["Marc-André Lureau <marcandre.lureau@redhat.com>"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Devolutions/picky-rs"
