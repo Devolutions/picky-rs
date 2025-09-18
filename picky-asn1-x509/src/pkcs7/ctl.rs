@@ -1,9 +1,9 @@
-use crate::{oids, AlgorithmIdentifier};
+use crate::{AlgorithmIdentifier, oids};
 use picky_asn1::wrapper::{
     Asn1SequenceOf, Asn1SetOf, BitStringAsn1, IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1,
     OctetStringAsn1Container, UTCTimeAsn1,
 };
-use serde::{de, ser, Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, de, ser};
 
 /// ``` not_rust
 /// CTL ::= SEQUENCE {
@@ -231,8 +231,8 @@ pub struct PolicyQualifier {
 mod tests {
     use super::*;
     use crate::{AlgorithmIdentifier, ShaVariant};
-    use base64::engine::general_purpose;
     use base64::Engine as _;
+    use base64::engine::general_purpose;
     use picky_asn1::date::UTCTime;
 
     #[test]
@@ -262,10 +262,12 @@ mod tests {
         let cert_root_program_chain_policies_prop_id_entry = CTLEntryAttribute {
             oid: oids::cert_root_program_chain_policies_prop_id().into(),
             value: CTLEntryAttributeValues::CertRootProgramChainPolicy(
-                vec![RootProgramChainPolicy {
-                    oid: oids::auto_update_end_revocation().into(),
-                }
-                .into()]
+                vec![
+                    RootProgramChainPolicy {
+                        oid: oids::auto_update_end_revocation().into(),
+                    }
+                    .into(),
+                ]
                 .into(),
             ),
         };

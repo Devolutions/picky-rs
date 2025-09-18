@@ -1,5 +1,5 @@
-use rand::rngs::OsRng;
 use rand::Rng;
+use rand::rngs::OsRng;
 
 use crate::crypto::common::hmac_sha1;
 use crate::crypto::utils::usage_ki;
@@ -11,7 +11,7 @@ use crate::crypto::{
 use super::decrypt::{decrypt_message, decrypt_message_no_checksum};
 use super::encrypt::{encrypt_message, encrypt_message_no_checksum};
 use super::key_derivation::random_to_key;
-use super::{derive_key, derive_key_from_password, AesSize, AES128_KEY_SIZE, AES_BLOCK_SIZE, AES_MAC_SIZE};
+use super::{AES_BLOCK_SIZE, AES_MAC_SIZE, AES128_KEY_SIZE, AesSize, derive_key, derive_key_from_password};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Aes128CtsHmacSha196;
@@ -45,7 +45,7 @@ impl Cipher for Aes128CtsHmacSha196 {
             key_usage,
             payload,
             &AesSize::Aes128,
-            OsRng.gen::<[u8; AES_BLOCK_SIZE]>(),
+            OsRng.r#gen::<[u8; AES_BLOCK_SIZE]>(),
         )
     }
 
@@ -60,7 +60,7 @@ impl Cipher for Aes128CtsHmacSha196 {
             key_usage,
             payload,
             &AesSize::Aes128,
-            OsRng.gen::<[u8; AES_BLOCK_SIZE]>(),
+            OsRng.r#gen::<[u8; AES_BLOCK_SIZE]>(),
         )
     }
 
@@ -96,7 +96,7 @@ impl Cipher for Aes128CtsHmacSha196 {
 mod tests {
     use crate::crypto::aes::decrypt::{decrypt_message, decrypt_message_no_checksum};
     use crate::crypto::aes::encrypt::{encrypt_message, encrypt_message_no_checksum};
-    use crate::crypto::aes::{AesSize, AES_MAC_SIZE};
+    use crate::crypto::aes::{AES_MAC_SIZE, AesSize};
     use crate::crypto::common::hmac_sha1;
     use crate::crypto::{DecryptWithoutChecksum, EncryptWithoutChecksum};
 
@@ -301,7 +301,9 @@ mod tests {
         ];
 
         assert_eq!(
-            &[97, 101, 115, 50, 53, 54, 95, 99, 116, 115, 95, 104, 109, 97, 99, 95, 115, 104, 97, 49, 95, 57, 54,],
+            &[
+                97, 101, 115, 50, 53, 54, 95, 99, 116, 115, 95, 104, 109, 97, 99, 95, 115, 104, 97, 49, 95, 57, 54,
+            ],
             decrypt(&plaintext).as_slice()
         );
     }

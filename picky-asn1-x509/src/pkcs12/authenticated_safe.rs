@@ -4,7 +4,7 @@ use core::fmt;
 use oid::ObjectIdentifier;
 use picky_asn1::wrapper::{ExplicitContextTag0, ObjectIdentifierAsn1, OctetStringAsn1, OctetStringAsn1Container};
 use picky_asn1_der::Asn1RawDer;
-use serde::{de, ser, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de, ser};
 
 /// Top-level `ContentInfo` type used in context of `AuthenticatedSafe` for PKCS#12 `PFX` structure.
 /// Defined in [PKCS #12](https://datatracker.ietf.org/doc/html/rfc7292#section-3.4)
@@ -83,7 +83,7 @@ impl<'de, R: AuthenticatedSafeDataRepr> de::Deserialize<'de> for AuthenticatedSa
                     oids::CONTENT_INFO_TYPE_DATA => {
                         let content: ExplicitContextTag0<OctetStringAsn1Container<R>> =
                             seq_next_element!(seq, OctetStringAsn1, "ContentInfo<AuthenticatedSafe> content");
-                        Ok(AuthenticatedSafeContentInfo::Data(content.0 .0.into_repr()))
+                        Ok(AuthenticatedSafeContentInfo::Data(content.0.0.into_repr()))
                     }
                     _ => {
                         let content: Option<ExplicitContextTag0<Asn1RawDer>> = seq.next_element()?;

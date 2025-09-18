@@ -2,10 +2,10 @@ use pbkdf2::pbkdf2_hmac;
 use sha1::Sha1;
 
 use crate::crypto::nfold::n_fold;
-use crate::crypto::{KerberosCryptoResult, KERBEROS};
+use crate::crypto::{KERBEROS, KerberosCryptoResult};
 
-use super::encrypt::encrypt_aes_cbc;
 use super::AesSize;
+use super::encrypt::encrypt_aes_cbc;
 
 /// https://www.rfc-editor.org/rfc/rfc3962.html#section-6
 /// Default iteration count (rounds) for pbkdf2 function:

@@ -171,11 +171,7 @@ impl JwkKeyType {
 
 /// Strips leading zero for any number bigger than 0x7F.
 fn h_strip_unrequired_leading_zero(value: &[u8]) -> &[u8] {
-    if let [0x00, rest @ ..] = value {
-        rest
-    } else {
-        value
-    }
+    if let [0x00, rest @ ..] = value { rest } else { value }
 }
 
 /// Big integers from 0x00 to 0x7F are all base64-encoded using two ASCII characters ranging from "AA" to "fw".
@@ -404,7 +400,7 @@ impl Jwk {
                     NamedEdAlgorithm::Unsupported(_) => {
                         return Err(JwkError::UnsupportedAlgorithm {
                             algorithm: "Unsupported ED algorithm",
-                        })
+                        });
                     }
                 };
 

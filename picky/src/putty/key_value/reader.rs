@@ -1,4 +1,4 @@
-use super::{PpkKeyValue, PpkLiteral, PpkMultilineKeyValue, PpkValueParsingError, KV_DELIMITER};
+use super::{KV_DELIMITER, PpkKeyValue, PpkLiteral, PpkMultilineKeyValue, PpkValueParsingError};
 use crate::putty::PuttyError;
 
 /// Reader for PPK key-value format.

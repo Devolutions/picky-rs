@@ -5,7 +5,7 @@ use picky_asn1::wrapper::{
     Optional,
 };
 use picky_asn1_x509::AlgorithmIdentifier;
-use serde::{de, ser, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de, ser};
 
 use crate::data_types::{Checksum, KerberosTime, PrincipalName, Realm};
 
@@ -225,7 +225,7 @@ impl<'de> Deserialize<'de> for PaPkAsRep {
                         return Err(de::Error::invalid_value(
                             de::Unexpected::Other("[PaPkAsRep] unknown choice value"),
                             &"a supported PA-PK-AS-REP choice",
-                        ))
+                        ));
                     }
                 };
 

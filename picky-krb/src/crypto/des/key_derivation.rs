@@ -5,7 +5,7 @@
 //! This sections contains explanation and pseudo code of the implemented functions
 
 use crate::crypto::nfold::n_fold;
-use crate::crypto::{KerberosCryptoError, KerberosCryptoResult, KERBEROS};
+use crate::crypto::{KERBEROS, KerberosCryptoError, KerberosCryptoResult};
 
 use super::encrypt::encrypt_des;
 use super::{DES3_BLOCK_SIZE, DES3_KEY_SIZE, DES3_SEED_LEN};

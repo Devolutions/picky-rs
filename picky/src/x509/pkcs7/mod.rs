@@ -1,7 +1,7 @@
+use crate::AlgorithmIdentifier;
 use crate::pem::Pem;
 use crate::x509::certificate::{Cert, CertError};
 use crate::x509::utils::{from_der, from_pem, from_pem_str, to_der, to_pem};
-use crate::AlgorithmIdentifier;
 use picky_asn1_der::Asn1DerError;
 use picky_asn1_x509::content_info::EncapsulatedContentInfo;
 use picky_asn1_x509::pkcs7::Pkcs7Certificate;
@@ -53,7 +53,7 @@ impl Pkcs7 {
     }
 
     pub fn digest_algorithms(&self) -> &[AlgorithmIdentifier] {
-        self.0.signed_data.digest_algorithms.0 .0.as_slice()
+        self.0.signed_data.digest_algorithms.0.0.as_slice()
     }
 
     pub fn signer_infos(&self) -> &[SignerInfo] {
@@ -69,7 +69,7 @@ impl Pkcs7 {
             .signed_data
             .certificates
             .0
-             .0
+            .0
             .iter()
             .filter_map(|cert| match cert {
                 CertificateChoices::Certificate(certificate) => Cert::from_der(&certificate.0).ok(),

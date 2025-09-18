@@ -74,9 +74,9 @@ pub mod ffi {
         }
 
         pub fn hash_password(&self, password: &str, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
-            use argon2::password_hash::rand_core::OsRng;
-            use argon2::password_hash::SaltString;
             use argon2::PasswordHasher as _;
+            use argon2::password_hash::SaltString;
+            use argon2::password_hash::rand_core::OsRng;
             use std::fmt::Write as _;
 
             let salt = SaltString::generate(&mut OsRng);

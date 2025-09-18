@@ -1,10 +1,10 @@
+use crate::Asn1Type;
 use crate::bit_string::BitString;
 use crate::date::{GeneralizedTime, UTCTime};
 use crate::restricted_string::{BmpString, Ia5String, NumericString, PrintableString, Utf8String};
 use crate::tag::Tag;
-use crate::Asn1Type;
 use oid::ObjectIdentifier;
-use serde::{de, ser, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de, ser};
 use std::fmt;
 use std::ops::{Deref, DerefMut};
 
@@ -381,11 +381,7 @@ impl IntegerAsn1 {
 
     pub fn as_unsigned_bytes_be(&self) -> &[u8] {
         if self.0.len() > 1 {
-            if self.0[0] == 0x00 {
-                &self.0[1..]
-            } else {
-                &self.0
-            }
+            if self.0[0] == 0x00 { &self.0[1..] } else { &self.0 }
         } else if self.0.is_empty() {
             &[0]
         } else {
@@ -394,11 +390,7 @@ impl IntegerAsn1 {
     }
 
     pub fn as_signed_bytes_be(&self) -> &[u8] {
-        if self.0.is_empty() {
-            &[0]
-        } else {
-            &self.0
-        }
+        if self.0.is_empty() { &[0] } else { &self.0 }
     }
 
     pub fn from_bytes_be_signed(bytes: Vec<u8>) -> Self {

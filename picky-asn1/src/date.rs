@@ -1,4 +1,4 @@
-use serde::{de, ser, Deserializer, Serializer};
+use serde::{Deserializer, Serializer, de, ser};
 use std::fmt;
 
 pub trait TimeRepr
@@ -183,11 +183,7 @@ impl TimeRepr for UTCTimeRepr {
 
                 let yyyy = {
                     let yy = v.read_and_merge_with_next(0) as u16;
-                    if yy >= 50 {
-                        1900 + yy
-                    } else {
-                        2000 + yy
-                    }
+                    if yy >= 50 { 1900 + yy } else { 2000 + yy }
                 };
                 let month = v.read_and_merge_with_next(2);
                 let day = v.read_and_merge_with_next(4);

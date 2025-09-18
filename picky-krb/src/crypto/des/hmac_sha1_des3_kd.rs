@@ -2,7 +2,7 @@ use crate::crypto::common::hmac_sha1;
 use crate::crypto::utils::usage_ki;
 use crate::crypto::{Checksum, ChecksumSuite, KerberosCryptoResult};
 
-use super::{derive_key, DES3_MAC_SIZE};
+use super::{DES3_MAC_SIZE, derive_key};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct HmacSha1Des3Kd;

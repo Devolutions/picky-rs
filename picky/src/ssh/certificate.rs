@@ -1,18 +1,18 @@
 use crate::hash::HashAlgorithm;
+use crate::key::KeyError;
 use crate::key::ec::EcdsaPublicKey;
 use crate::key::ed::EdPublicKey;
-use crate::key::KeyError;
 use crate::signature::{SignatureAlgorithm, SignatureError};
+use crate::ssh::EcCurveSshExt as _;
 use crate::ssh::decode::SshComplexTypeDecode;
 use crate::ssh::encode::{SshComplexTypeEncode, SshWriteExt};
 use crate::ssh::private_key::{SshBasePrivateKey, SshPrivateKey, SshPrivateKeyError};
 use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
-use crate::ssh::EcCurveSshExt as _;
 
 use byteorder::{BigEndian, WriteBytesExt};
 use rand::Rng;
-use rsa::traits::PublicKeyParts as _;
 use rsa::RsaPublicKey;
+use rsa::traits::PublicKeyParts as _;
 use serde::Deserialize;
 use std::cell::RefCell;
 use std::convert::TryFrom;
@@ -564,7 +564,7 @@ impl SshCertificateBuilder {
             SshCertKeyType::SshDssV01 | SshCertKeyType::EcdsaSha2Nistp521V01 => {
                 return Err(SshCertificateGenerationError::UnsupportedCertificateKeyType(
                     cert_key_type.as_str().to_owned(),
-                ))
+                ));
             }
         }
 
@@ -580,7 +580,7 @@ impl SshCertificateBuilder {
         let mut nonce = Vec::new();
         let mut rnd = rand::thread_rng();
         for _ in 0..32 {
-            nonce.push(rnd.gen::<u8>());
+            nonce.push(rnd.r#gen::<u8>());
         }
 
         let valid_after = valid_after.take().ok_or(SshCertificateGenerationError::InvalidTime)?;
@@ -737,19 +737,19 @@ impl SshCertificateBuilder {
                             return Err(SshCertificateGenerationError::IncorrectSignatureAlgorithm(format!(
                                 "Invalid signature format hash algorithm. Only sha1, sha2-256 and ssh2-521 are in use in OpenSSH for RSA keys, but got {:?} hash",
                                 hash_algo
-                            )))
+                            )));
                         }
                     },
                     SignatureAlgorithm::Ecdsa(_) => {
                         return Err(SshCertificateGenerationError::IncorrectSignatureAlgorithm(
                             "ECDSA signature algorithm can't be used with RSA keys".to_owned(),
-                        ))
+                        ));
                     }
                     SignatureAlgorithm::Ed25519 => {
                         return Err(SshCertificateGenerationError::IncorrectSignatureAlgorithm(
                             "Ed25519 signature algorithm can't be used with RSA keys".to_owned(),
-                        ))
-                    },
+                        ));
+                    }
                 };
 
                 let signature = signature_algo.sign(&raw_signature, rsa)?;
@@ -765,20 +765,19 @@ impl SshCertificateBuilder {
                             return Err(SshCertificateGenerationError::IncorrectSignatureAlgorithm(format!(
                                 "Invalid signature format hash algorithm. Only sha2-256, sha2-384 and ssh2-521 are in use in OpenSSH for ECDSA keys, but got {:?} hash",
                                 hash_algo
-                            )))
+                            )));
                         }
                     },
                     SignatureAlgorithm::RsaPkcs1v15(_) => {
                         return Err(SshCertificateGenerationError::IncorrectSignatureAlgorithm(
                             "RSA signature algorithm can't be used with ECDSA keys".to_owned(),
-                        ))
+                        ));
                     }
                     SignatureAlgorithm::Ed25519 => {
                         return Err(SshCertificateGenerationError::IncorrectSignatureAlgorithm(
                             "Ed25519 signature algorithm can't be used with ECDSA keys".to_owned(),
-                        ))
-                    },
-
+                        ));
+                    }
                 };
 
                 let signature = signature_algo.sign(&raw_signature, ec)?;
@@ -793,12 +792,12 @@ impl SshCertificateBuilder {
             SshBasePrivateKey::SkEd25519 { .. } => {
                 return Err(SshCertificateGenerationError::IncorrectSignatureAlgorithm(
                     "Signing with sk-ed25519 keys is not supported".to_owned(),
-                ))
+                ));
             }
             SshBasePrivateKey::SkEcdsaSha2NistP256 { .. } => {
                 return Err(SshCertificateGenerationError::IncorrectSignatureAlgorithm(
                     "Signing with sk-ecdsa keys is not supported".to_owned(),
-                ))
+                ));
             }
         };
 

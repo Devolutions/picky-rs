@@ -4,7 +4,7 @@ use picky_asn1::tag::{Tag, TagClass, TagPeeker};
 use picky_asn1::wrapper::{
     Asn1SequenceOf, BitStringAsn1, ExplicitContextTag0, ImplicitContextTag1, ObjectIdentifierAsn1,
 };
-use serde::{de, ser, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de, ser};
 
 /// [RFC 5652 #10.2.1](https://datatracker.ietf.org/doc/html/rfc5652#section-10.2.1)
 ///

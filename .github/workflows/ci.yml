@@ -104,11 +104,11 @@ jobs:
         crate: [ picky-asn1, picky-asn1-der, picky-asn1-x509, picky ]
         include:
           - crate: picky-asn1
-            msvc: "1.68"
+            msvc: "1.85"
           - crate: picky-asn1-der
-            msvc: "1.68"
+            msvc: "1.85"
           - crate: picky-asn1-x509
-            msvc: "1.70"
+            msvc: "1.85"
           - crate: picky
             msvc: "1.85"
 

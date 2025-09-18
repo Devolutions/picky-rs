@@ -1,11 +1,11 @@
 use crate::cmsversion::CmsVersion;
 use crate::pkcs7::Pkcs7Certificate;
-use crate::{oids, AlgorithmIdentifier, Attribute, Name, SubjectKeyIdentifier};
+use crate::{AlgorithmIdentifier, Attribute, Name, SubjectKeyIdentifier, oids};
 use picky_asn1::tag::{Tag, TagClass, TagPeeker};
 use picky_asn1::wrapper::{
     Asn1SequenceOf, Asn1SetOf, ImplicitContextTag0, IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1, Optional,
 };
-use serde::{de, ser, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de, ser};
 
 /// [RFC 5652 #5.3](https://datatracker.ietf.org/doc/html/rfc5652#section-5.3)
 /// ``` not_rust
@@ -277,7 +277,7 @@ impl<'de> de::Deserialize<'de> for UnsignedAttribute {
                             UnsignedAttributeValue,
                             "unknown oid type",
                             "MS_COUNTER_SIGN or CounterSign oid"
-                        ))
+                        ));
                     }
                 };
 
@@ -311,8 +311,8 @@ impl Serialize for UnsignedAttributeValue {
 #[cfg(feature = "ctl")]
 mod tests {
     use super::*;
-    use base64::engine::general_purpose;
     use base64::Engine as _;
+    use base64::engine::general_purpose;
 
     #[test]
     fn decode_certificate_trust_list_signer_info() {

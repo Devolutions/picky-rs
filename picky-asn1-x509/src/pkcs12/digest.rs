@@ -1,4 +1,4 @@
-use crate::{oids, RawAlgorithmIdentifier};
+use crate::{RawAlgorithmIdentifier, oids};
 use core::fmt;
 use picky_asn1::wrapper::OctetStringAsn1;
 use serde::{de, ser};
@@ -142,8 +142,8 @@ mod tests {
     use super::test_data::*;
     use super::*;
 
-    use base64::engine::general_purpose;
     use base64::Engine as _;
+    use base64::engine::general_purpose;
     use expect_test::expect;
 
     #[test]

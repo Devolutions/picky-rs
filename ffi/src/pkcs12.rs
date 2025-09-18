@@ -480,7 +480,7 @@ pub mod ffi {
 /// # Safety
 ///
 /// - `pfx` must be a pointer to a valid memory location containing a `Pfx` object.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn Pfx_der_encoded_len(pfx: Option<&ffi::Pfx>) -> usize {
     if let Some(data) = pfx.and_then(|pfx| pfx.0.to_der().ok()) {
         data.len()
@@ -497,7 +497,7 @@ pub unsafe extern "C" fn Pfx_der_encoded_len(pfx: Option<&ffi::Pfx>) -> usize {
 ///
 /// - `pfx` must be a pointer to a valid memory location containing a `Pfx` object.
 /// - `dst` must be valid for writes of `count` bytes.
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn Pfx_to_der(pfx: Option<&ffi::Pfx>, dst: *mut u8, count: usize) -> Option<Box<PickyError>> {
     let Some(pfx) = pfx else {
         return Some("received a null pointer".into());
@@ -519,7 +519,7 @@ pub unsafe extern "C" fn Pfx_to_der(pfx: Option<&ffi::Pfx>, dst: *mut u8, count:
     // - `dst` is valid for writes of `data_len` bytes, because it is valid for `count` bytes (caller is responsible for this invariant).
     // - Both `src` and `dst` are always properly aligned: u8 aligment is 1.
     // - Memory regions are not overlapping, `data` is created by us just above.
-    std::ptr::copy_nonoverlapping(data.as_ptr(), dst, data_len);
+    unsafe { std::ptr::copy_nonoverlapping(data.as_ptr(), dst, data_len) };
 
     None
 }

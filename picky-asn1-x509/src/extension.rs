@@ -1,13 +1,13 @@
-use crate::{oids, GeneralName, GeneralNames};
+use crate::{GeneralName, GeneralNames, oids};
 use core::slice::{Iter, IterMut};
+use picky_asn1::Asn1Type as _;
 use picky_asn1::bit_string::BitString;
 use picky_asn1::tag::TagPeeker;
 use picky_asn1::wrapper::{
     Asn1SequenceOf, BitStringAsn1, ExplicitContextTag1, ImplicitContextTag0, ImplicitContextTag2, IntegerAsn1,
     ObjectIdentifierAsn1, OctetStringAsn1, OctetStringAsn1Container, Optional,
 };
-use picky_asn1::Asn1Type as _;
-use serde::{de, ser, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de, ser};
 use std::fmt;
 
 /// [RFC 5280 #4.1.2.9](https://tools.ietf.org/html/rfc5280#section-4.1.2.9)
@@ -564,8 +564,8 @@ impl ExtendedKeyUsage {
 mod tests {
     use super::*;
     use crate::GeneralName;
-    use base64::engine::general_purpose;
     use base64::Engine as _;
+    use base64::engine::general_purpose;
     use picky_asn1::restricted_string::Ia5String;
 
     #[test]

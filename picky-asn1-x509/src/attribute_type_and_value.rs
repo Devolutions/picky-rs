@@ -1,4 +1,4 @@
-use crate::{oids, DirectoryString};
+use crate::{DirectoryString, oids};
 use picky_asn1::wrapper::{Ia5StringAsn1, ObjectIdentifierAsn1};
 use serde::{de, ser};
 use std::fmt;

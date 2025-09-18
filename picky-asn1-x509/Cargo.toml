@@ -11,8 +11,8 @@ authors = [
     "Alexandr Yusuk <aleksandr.yusuk@apriorit.com>",
 ]
 description = "Provides ASN1 types defined by X.509 related RFCs"
-edition = "2021"
-rust-version = "1.70"
+edition = "2024"
+rust-version = "1.85"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Devolutions/picky-rs"
 

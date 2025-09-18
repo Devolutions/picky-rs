@@ -6,13 +6,13 @@ use picky_asn1::wrapper::{
     BMPStringAsn1, BitStringAsn1, ExplicitContextTag0, ExplicitContextTag1, ExplicitContextTag2, IA5StringAsn1,
     ImplicitContextTag0, ImplicitContextTag1, IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1, Optional,
 };
-use serde::{de, ser, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de, ser};
 use widestring::U16String;
 
 #[cfg(feature = "ctl")]
 use super::ctl::Ctl;
 
-use crate::{oids, DigestInfo};
+use crate::{DigestInfo, oids};
 
 /// ``` not_rust
 /// [RFC 5652 #5.2](https://datatracker.ietf.org/doc/html/rfc5652#section-5.2)
@@ -393,7 +393,7 @@ impl<'de> Deserialize<'de> for SpcLink {
                             SpcString,
                             "unknown choice value",
                             "a supported SpcString choice"
-                        ))
+                        ));
                     }
                 };
 

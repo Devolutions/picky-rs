@@ -40,7 +40,7 @@ pub trait Timestamper: Sized {
 #[cfg(feature = "http_timestamp")]
 pub mod http_timestamp {
     use super::*;
-    use base64::engine::{general_purpose, Engine as _};
+    use base64::engine::{Engine as _, general_purpose};
     use picky_asn1_x509::pkcs7::signer_info::{UnsignedAttribute, UnsignedAttributeValue};
     use reqwest::blocking::Client;
     use reqwest::header::{CACHE_CONTROL, CONTENT_LENGTH, CONTENT_TYPE};
@@ -117,13 +117,13 @@ pub mod http_timestamp {
             let signer_info = signed_data
                 .signers_infos
                 .0
-                 .0
+                .0
                 .first_mut()
                 .expect("Exactly one SignedInfo should be present");
 
-            signer_info.unsigned_attrs.0 .0.push(unsigned_attribute);
+            signer_info.unsigned_attrs.0.0.push(unsigned_attribute);
 
-            signed_data.certificates.0 .0.extend(certificates.0 .0);
+            signed_data.certificates.0.0.extend(certificates.0.0);
         }
     }
 }

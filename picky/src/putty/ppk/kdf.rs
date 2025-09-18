@@ -1,7 +1,7 @@
 //! Key derivation utilities for PPK files.
 
 use crate::putty::key_value::Argon2FlavourValue;
-use crate::putty::ppk::{aes as ppk_aes, PuttyError};
+use crate::putty::ppk::{PuttyError, aes as ppk_aes};
 
 use digest::Digest;
 use zeroize::Zeroizing;

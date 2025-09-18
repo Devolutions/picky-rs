@@ -4,23 +4,23 @@ pub(crate) mod ec;
 pub(crate) mod ed;
 
 use crate::oid::ObjectIdentifier;
-use crate::pem::{parse_pem, Pem, PemError};
+use crate::pem::{Pem, PemError, parse_pem};
 
-use num_bigint_dig::traits::ModInverse;
 use num_bigint_dig::BigUint;
+use num_bigint_dig::traits::ModInverse;
 use picky_asn1::bit_string::BitString;
 use picky_asn1::wrapper::{BitStringAsn1Container, IntegerAsn1, OctetStringAsn1Container};
 use picky_asn1_der::Asn1DerError;
 use picky_asn1_x509::{
-    private_key_info, ECPrivateKey, PrivateKeyInfo, PrivateKeyValue, SubjectPublicKeyInfo, PRIVATE_KEY_INFO_VERSION_1,
+    ECPrivateKey, PRIVATE_KEY_INFO_VERSION_1, PrivateKeyInfo, PrivateKeyValue, SubjectPublicKeyInfo, private_key_info,
 };
 use rsa::traits::{PrivateKeyParts as _, PublicKeyParts as _};
 use rsa::{RsaPrivateKey, RsaPublicKey};
 use thiserror::Error;
 use zeroize::Zeroize;
 
-use ec::{calculate_public_ec_key, EcComponent, NamedEcCurve};
-use ed::{NamedEdAlgorithm, X25519FieldElement, X25519_FIELD_ELEMENT_SIZE};
+use ec::{EcComponent, NamedEcCurve, calculate_public_ec_key};
+use ed::{NamedEdAlgorithm, X25519_FIELD_ELEMENT_SIZE, X25519FieldElement};
 
 pub use ec::EcCurve;
 pub use ed::EdAlgorithm;
@@ -260,14 +260,14 @@ impl PrivateKey {
         point_x: &BigUint,
         point_y: &BigUint,
     ) -> Result<Self, KeyError> {
-        use p256::elliptic_curve::generic_array::GenericArray as GenericArrayP256;
         use p256::EncodedPoint as EncodedPointP256;
+        use p256::elliptic_curve::generic_array::GenericArray as GenericArrayP256;
 
-        use p384::elliptic_curve::generic_array::GenericArray as GenericArrayP384;
         use p384::EncodedPoint as EncodedPointP384;
+        use p384::elliptic_curve::generic_array::GenericArray as GenericArrayP384;
 
-        use p521::elliptic_curve::generic_array::GenericArray as GenericArrayP521;
         use p521::EncodedPoint as EncodedPointP521;
+        use p521::elliptic_curve::generic_array::GenericArray as GenericArrayP521;
 
         let curve_oid: ObjectIdentifier = NamedEcCurve::Known(curve).into();
         let px_bytes = expand_ec_field(point_x.to_bytes_be(), curve);
@@ -478,7 +478,7 @@ impl PrivateKey {
         decoded: &ECPrivateKey,
     ) -> Result<Self, KeyError> {
         // Generate the public key if it's not present in the `ECPrivateKey` representation
-        let (public_key, public_key_is_generated) = match &decoded.public_key.0 .0 {
+        let (public_key, public_key_is_generated) = match &decoded.public_key.0.0 {
             Some(bit_string) => (Some(bit_string.payload_view().to_vec()), false),
             None => (
                 calculate_public_ec_key(&curve_oid, &decoded.private_key.0, COMPRESS_EC_POINT_BY_DEFAULT)?,
@@ -549,7 +549,7 @@ impl PrivateKey {
         // By specification (https://www.rfc-editor.org/rfc/rfc5915) `parameters` files SHOULD
         // be present when EC key is encoded as standalone DER. However, some implementations
         // do not include parameters, so we have to check for that.
-        let curve_oid = match &private_key.parameters.0 .0 {
+        let curve_oid = match &private_key.parameters.0.0 {
             Some(params) => params.curve_oid().clone(),
             None => {
                 return Err(KeyError::EC {

@@ -126,8 +126,8 @@ impl FromStr for SshPublicKey {
 mod tests {
     use super::*;
 
-    use base64::engine::general_purpose::STANDARD_NO_PAD;
     use base64::Engine;
+    use base64::engine::general_purpose::STANDARD_NO_PAD;
     use num_bigint_dig::BigUint;
     use rstest::rstest;
 

@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::certificate::CertError;
-use crate::pem::{parse_pem, Pem};
+use crate::pem::{Pem, parse_pem};
 
 pub(super) fn from_der<'a, T, V>(data: &'a V, element: &'static str) -> Result<T, CertError>
 where

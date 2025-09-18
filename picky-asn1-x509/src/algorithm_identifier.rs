@@ -5,7 +5,7 @@ use picky_asn1::wrapper::{
     ExplicitContextTag0, ExplicitContextTag1, ExplicitContextTag2, IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1,
 };
 use picky_asn1_der::Asn1RawDer;
-use serde::{de, ser, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de, ser};
 use std::cmp::Ordering;
 use std::error::Error;
 use std::fmt;
@@ -153,7 +153,7 @@ impl AlgorithmIdentifier {
             _ => {
                 return Err(UnsupportedAlgorithmError {
                     algorithm: format!("{:?}", variant),
-                })
+                });
             }
         };
 
@@ -788,7 +788,7 @@ impl<'de> de::Deserialize<'de> for EcParameters {
                             EcParameters,
                             "unsupported or unknown elliptic curve parameter",
                             "a supported elliptic curve parameter"
-                        ))
+                        ));
                     }
                 };
 
@@ -1059,11 +1059,7 @@ impl RawAlgorithmIdentifier {
             // `params` field is always present and set to NULL if no parameters are needed.
             // therefore, we need special handling to show absence of parameters in
             // `RawAlgorithmIdentifier` API
-            if raw.0 == [0x05, 0x00] {
-                None
-            } else {
-                Some(raw)
-            }
+            if raw.0 == [0x05, 0x00] { None } else { Some(raw) }
         });
 
         Self { algorithm, parameters }
@@ -1131,8 +1127,8 @@ impl<'de> de::Deserialize<'de> for RawAlgorithmIdentifier {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use base64::engine::general_purpose;
     use base64::Engine as _;
+    use base64::engine::general_purpose;
 
     #[test]
     fn aes_null_params() {

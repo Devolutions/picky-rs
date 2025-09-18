@@ -7,7 +7,7 @@ use crate::crypto::utils::{usage_ke, usage_ki};
 use crate::crypto::{DecryptWithoutChecksum, KerberosCryptoError, KerberosCryptoResult};
 
 use super::key_derivation::derive_key;
-use super::{swap_two_last_blocks, AesSize, AES_BLOCK_SIZE, AES_MAC_SIZE};
+use super::{AES_BLOCK_SIZE, AES_MAC_SIZE, AesSize, swap_two_last_blocks};
 
 pub type Aes256CbcDecryptor = cbc::Decryptor<Aes256>;
 pub type Aes128CbcDecryptor = cbc::Decryptor<Aes128>;

@@ -1,4 +1,4 @@
-use crate::pkcs12::{pbkdf1, Pbkdf1Usage, Pkcs12CryptoContext, Pkcs12Error, Pkcs12HashAlgorithm};
+use crate::pkcs12::{Pbkdf1Usage, Pkcs12CryptoContext, Pkcs12Error, Pkcs12HashAlgorithm, pbkdf1};
 use picky_asn1::wrapper::OctetStringAsn1;
 use picky_asn1_x509::pkcs12::{MacData as MacDataAsn1, Pkcs12DigestInfo as Pkcs12DigestInfoAsn1};
 use thiserror::Error;

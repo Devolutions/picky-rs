@@ -172,11 +172,7 @@ pub mod ffi {
     impl BasicConstraints {
         pub fn get_ca(&self) -> GetCaResult {
             self.0.ca().map_or(GetCaResult::None, |ca| {
-                if ca {
-                    GetCaResult::True
-                } else {
-                    GetCaResult::False
-                }
+                if ca { GetCaResult::True } else { GetCaResult::False }
             })
         }
 

@@ -1,5 +1,5 @@
 use picky_asn1::wrapper::{ExplicitContextTag0, Optional};
-use serde::{de, ser, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de, ser};
 use std::fmt;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

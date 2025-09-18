@@ -1,4 +1,4 @@
-use serde::{de, ser, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de, ser};
 use std::fmt;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -71,8 +71,8 @@ impl<'de> Deserialize<'de> for Version {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use base64::engine::general_purpose;
     use base64::Engine as _;
+    use base64::engine::general_purpose;
     use picky_asn1::wrapper::{ExplicitContextTag9, Optional};
     use picky_asn1_der::Asn1DerError;
 

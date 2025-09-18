@@ -8,7 +8,7 @@ use crate::ssh::certificate::{
 };
 use crate::ssh::private_key::{KdfOption, SshBasePrivateKey, SshPrivateKeyError};
 use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
-use crate::ssh::{key_type, read_until_linebreak, read_until_whitespace, Base64Reader, SSH_COMBO_ED25519_KEY_LENGTH};
+use crate::ssh::{Base64Reader, SSH_COMBO_ED25519_KEY_LENGTH, key_type, read_until_linebreak, read_until_whitespace};
 
 use super::certificate::SshSignatureBlob;
 use base64::engine::general_purpose;
@@ -450,7 +450,7 @@ impl SshComplexTypeDecode for SshCertificate {
             SshCertKeyType::SshDssV01 => {
                 return Err(SshCertificateError::UnsupportedCertificateType(
                     cert_key_type.as_str().to_owned(),
-                ))
+                ));
             }
             SshCertKeyType::SkSshSha2Nistp256V01 => {
                 let _curve_identifier = cert_data.read_ssh_string()?;

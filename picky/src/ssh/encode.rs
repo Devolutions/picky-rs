@@ -5,10 +5,10 @@ use crate::ssh::certificate::{
     SshExtension, SshExtensionError, SshSignature, SshSignatureError, Timestamp,
 };
 use crate::ssh::private_key::{
-    Aes256Ctr, KdfOption, SshBasePrivateKey, SshPrivateKey, SshPrivateKeyError, AES256_CTR, AUTH_MAGIC, BCRYPT, NONE,
+    AES256_CTR, AUTH_MAGIC, Aes256Ctr, BCRYPT, KdfOption, NONE, SshBasePrivateKey, SshPrivateKey, SshPrivateKeyError,
 };
 use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
-use crate::ssh::{key_type, Base64Writer, EcCurveSshExt as _, EdAlgorithmSshExt as _, SSH_COMBO_ED25519_KEY_LENGTH};
+use crate::ssh::{Base64Writer, EcCurveSshExt as _, EdAlgorithmSshExt as _, SSH_COMBO_ED25519_KEY_LENGTH, key_type};
 
 use super::certificate::SshSignatureBlob;
 use super::key_identifier;

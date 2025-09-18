@@ -14,7 +14,7 @@ authors = [
 ]
 description = "Portable X.509, PKI, JOSE and HTTP signature implementation."
 keywords = ["x509", "jwt", "signature", "jose", "pki"]
-edition = "2021"
+edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Devolutions/picky-rs"

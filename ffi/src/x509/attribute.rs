@@ -176,10 +176,10 @@ pub mod ffi {
         pub fn get_as_string(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             match &self.0 {
                 picky_asn1_x509::pkcs7::content_info::SpcString::Unicode(unicode) => {
-                    write!(writable, "{}", unicode.0 .0 .0)?;
+                    write!(writable, "{}", unicode.0.0.0)?;
                 }
                 picky_asn1_x509::pkcs7::content_info::SpcString::Ancii(ancii) => {
-                    write!(writable, "{}", ancii.0 .0 .0)?;
+                    write!(writable, "{}", ancii.0.0.0)?;
                 }
             };
             Ok(())
@@ -188,10 +188,10 @@ pub mod ffi {
         pub fn get_as_bytes(&self) -> Box<VecU8> {
             match &self.0 {
                 picky_asn1_x509::pkcs7::content_info::SpcString::Unicode(unicode) => {
-                    VecU8::from_bytes(&unicode.0 .0 .0).boxed()
+                    VecU8::from_bytes(&unicode.0.0.0).boxed()
                 }
                 picky_asn1_x509::pkcs7::content_info::SpcString::Ancii(ancii) => {
-                    VecU8::from_bytes(&ancii.0 .0 .0).boxed()
+                    VecU8::from_bytes(&ancii.0.0.0).boxed()
                 }
             }
         }
@@ -219,7 +219,7 @@ pub mod ffi {
             match &self.0 {
                 picky_asn1_x509::pkcs7::content_info::SpcLink::Url(url) => {
                     let clone = url.0.clone();
-                    Some(VecU8::from_bytes(&clone.0 .0).boxed())
+                    Some(VecU8::from_bytes(&clone.0.0).boxed())
                 }
                 _ => None,
             }
@@ -228,7 +228,7 @@ pub mod ffi {
         pub fn get_moniker(&self) -> Option<Box<SpcSerializedObject>> {
             match &self.0 {
                 picky_asn1_x509::pkcs7::content_info::SpcLink::Moniker(moniker) => {
-                    Some(Box::new(SpcSerializedObject(moniker.0.clone().0 .0)))
+                    Some(Box::new(SpcSerializedObject(moniker.0.clone().0.0)))
                 }
                 _ => None,
             }
@@ -250,7 +250,7 @@ pub mod ffi {
 
     impl SpcSerializedObject {
         pub fn get_class_id(&self) -> Box<VecU8> {
-            VecU8::from_bytes(&self.0.class_id.0 .0).boxed()
+            VecU8::from_bytes(&self.0.class_id.0.0).boxed()
         }
 
         pub fn get_object_id(&self) -> Box<VecU8> {
@@ -629,7 +629,7 @@ pub mod ffi {
 
     impl CertificateChoicesIterator {
         pub fn next(&mut self) -> Option<Box<CertificateChoices>> {
-            self.0 .0.pop().map(|cert| Box::new(CertificateChoices(cert)))
+            self.0.0.pop().map(|cert| Box::new(CertificateChoices(cert)))
         }
     }
 
@@ -666,7 +666,7 @@ pub mod ffi {
 
     impl RevocationInfoChoiceIterator {
         pub fn next(&mut self) -> Option<Box<RevocationInfoChoice>> {
-            self.0 .0.pop().map(|v| Box::new(RevocationInfoChoice(v)))
+            self.0.0.pop().map(|v| Box::new(RevocationInfoChoice(v)))
         }
     }
 
@@ -767,7 +767,7 @@ pub mod ffi {
 
     impl RevokedCertificate {
         pub fn get_user_certificate(&self) -> Box<VecU8> {
-            let vec = self.0.user_certificate.0 .0.clone();
+            let vec = self.0.user_certificate.0.0.clone();
             VecU8::from_bytes(&vec).boxed()
         }
 

@@ -54,7 +54,7 @@ pub mod ffi {
 
         pub fn get_signed_attributes(&self) -> Box<AttributeIterator> {
             let attributes = self.0.signed_attrs.0.clone();
-            let vec = attributes.0 .0.into_iter().map(Attribute).collect();
+            let vec = attributes.0.0.into_iter().map(Attribute).collect();
             Box::new(AttributeIterator(vec))
         }
     }

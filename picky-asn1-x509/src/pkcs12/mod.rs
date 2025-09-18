@@ -244,7 +244,7 @@ mod tests {
 
 #[cfg(test)]
 pub(crate) mod test_data {
-    use crate::{oids, RawAlgorithmIdentifier};
+    use crate::{RawAlgorithmIdentifier, oids};
     use picky_asn1_der::Asn1RawDer;
 
     pub fn build_arbitrary_algorithm_identifier() -> RawAlgorithmIdentifier {

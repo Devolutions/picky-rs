@@ -1,10 +1,10 @@
 mod pbkdf2;
 
-use crate::{oids, RawAlgorithmIdentifier};
+use crate::{RawAlgorithmIdentifier, oids};
 use core::fmt;
 use oid::ObjectIdentifier;
 use picky_asn1::wrapper::{ObjectIdentifierAsn1, OctetStringAsn1};
-use serde::{de, ser, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de, ser};
 
 pub use pbkdf2::*;
 
@@ -262,8 +262,8 @@ mod tests {
     use super::test_data::*;
     use super::*;
     use crate::pkcs12::test_data::build_arbitrary_algorithm_identifier;
-    use base64::engine::general_purpose;
     use base64::Engine as _;
+    use base64::engine::general_purpose;
     use expect_test::expect;
 
     #[test]

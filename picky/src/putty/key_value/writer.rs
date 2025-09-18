@@ -1,4 +1,4 @@
-use super::{PpkKeyValue, PpkLiteral as _, PpkMultilineKeyValue, KV_DELIMITER};
+use super::{KV_DELIMITER, PpkKeyValue, PpkLiteral as _, PpkMultilineKeyValue};
 
 /// Writer for PPK key-value format.
 pub(crate) struct PuttyKvWriter {

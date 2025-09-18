@@ -54,7 +54,7 @@ pub mod ffi {
 
         pub fn to_aes(&self) -> Option<Box<AesParameters>> {
             match self.0 {
-                picky_asn1_x509::AlgorithmIdentifierParameters::Aes(ref params) => {
+                picky_asn1_x509::AlgorithmIdentifierParameters::Aes(params) => {
                     Some(Box::new(AesParameters(params.clone())))
                 }
                 _ => None,
@@ -63,7 +63,7 @@ pub mod ffi {
 
         pub fn to_ec(&self) -> Option<Box<EcParameters>> {
             match self.0 {
-                picky_asn1_x509::AlgorithmIdentifierParameters::Ec(ref params) => {
+                picky_asn1_x509::AlgorithmIdentifierParameters::Ec(params) => {
                     Some(Box::new(EcParameters(params.clone())))
                 }
                 _ => None,
@@ -72,7 +72,7 @@ pub mod ffi {
 
         pub fn to_rsassa_pss(&self) -> Option<Box<RsassaPssParameters>> {
             match self.0 {
-                picky_asn1_x509::AlgorithmIdentifierParameters::RsassaPss(ref params) => {
+                picky_asn1_x509::AlgorithmIdentifierParameters::RsassaPss(params) => {
                     Some(Box::new(RsassaPssParameters(params.clone())))
                 }
                 _ => None,

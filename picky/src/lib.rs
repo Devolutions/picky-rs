@@ -28,4 +28,4 @@ pub mod key;
 pub mod pem;
 pub mod signature;
 
-pub use picky_asn1_x509::{oid, oids, AlgorithmIdentifier};
+pub use picky_asn1_x509::{AlgorithmIdentifier, oid, oids};

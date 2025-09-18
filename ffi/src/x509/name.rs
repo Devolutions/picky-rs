@@ -159,7 +159,7 @@ pub mod ffi {
         }
 
         pub fn get_value(&self) -> Box<crate::utils::ffi::VecU8> {
-            VecU8::from_bytes(&self.0.value.0 .0).boxed()
+            VecU8::from_bytes(&self.0.value.0.0).boxed()
         }
     }
 
