@@ -15,7 +15,7 @@ include = ["src/**/*", "README.md", "CHANGELOG.md", "LICENSE-*"]
 [dependencies]
 picky-asn1 = { version = "0.10", path = "../picky-asn1" }
 picky-asn1-der = { version = "0.5", path = "../picky-asn1-der" }
-picky-asn1-x509 = { version = "0.14", path = "../picky-asn1-x509" }
+picky-asn1-x509 = { version = "0.15", path = "../picky-asn1-x509" }
 serde = { version = "1", features = ["derive"] }
 byteorder = "1.5"
 thiserror = "1"
