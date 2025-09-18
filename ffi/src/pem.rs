@@ -63,20 +63,33 @@ pub mod ffi {
     }
 }
 
-/// Retuns data contained in this Pem object.
+/// Returns a borrowed pointer to the bytes contained in this `Pem`.
+///
+/// On success, writes the length of the data to `len` and returns a non-null
+/// pointer to the first byte. If `pem` is `None`, writes `0` to `len` and
+/// returns a null pointer.
 ///
 /// # Safety
 ///
-/// * `len` mustn't point to a NULL-pointer.
-/// * returned data should not be modified.
+/// * `len` must be a valid, non-null, properly aligned pointer to writable
+///   memory for a `usize`. This function will write to `*len`.
+/// * If `pem` is non-NULL, it must reference a live, valid `Pem`.
+/// * The returned pointer is **borrowed**. It is only valid for as long as
+///   the referenced `pem` remains alive and is not mutated in a way that could
+///   reallocate or invalidate its internal buffer.
+/// * The returned memory must be treated as read-only. Do not write to it and
+///   do not free it. The bytes are not NUL-terminated; use the length written
+///   to `len`.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn Pem_peek_data(pem: Option<&ffi::Pem>, len: *mut usize) -> *const u8 {
     if let Some(pem) = pem {
         let data = pem.0.data();
-        // Safety: `len` is not a NULL-pointer.
-        unsafe { *len = data.len() };
+        // SAFETY: caller guarantees `len` is non-null, properly aligned, and writable.
+        unsafe { len.write(data.len()) };
         data.as_ptr()
     } else {
+        // SAFETY: caller guarantees `len` is non-null, properly aligned, and writable.
+        unsafe { len.write(0) };
         core::ptr::null()
     }
 }
