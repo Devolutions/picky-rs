@@ -28,7 +28,7 @@ pub fn decrypt_message(
         ]
         .concat(),
         AES_MAC_SIZE,
-    )?;
+    );
 
     // if (H1 != HMAC(Ki, P1)[1..h])
     if calculated_checksum != decryption_result.checksum {

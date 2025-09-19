@@ -15,6 +15,6 @@ impl Checksum for HmacSha1Des3Kd {
     fn checksum(&self, key: &[u8], key_usage: i32, payload: &[u8]) -> KerberosCryptoResult<Vec<u8>> {
         let ki = derive_key(key, &usage_ki(key_usage))?;
 
-        Ok(hmac_sha1(&ki, payload, DES3_MAC_SIZE)?)
+        Ok(hmac_sha1(&ki, payload, DES3_MAC_SIZE))
     }
 }

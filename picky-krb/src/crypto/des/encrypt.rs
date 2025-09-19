@@ -31,7 +31,7 @@ pub fn encrypt_message(
     // pad
     data_to_encrypt.resize(data_to_encrypt.len() + pad_len, 0);
 
-    let hmac = hmac_sha1(&encryption_result.ki, &data_to_encrypt, DES3_MAC_SIZE)?;
+    let hmac = hmac_sha1(&encryption_result.ki, &data_to_encrypt, DES3_MAC_SIZE);
 
     // ciphertext =  C1 | H1[1..h]
     encryption_result.encrypted.extend_from_slice(&hmac);

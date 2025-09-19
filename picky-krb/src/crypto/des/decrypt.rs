@@ -22,7 +22,7 @@ pub fn decrypt_message(key: &[u8], key_usage: i32, cipher_data: &[u8]) -> Kerber
         ]
         .concat(),
         DES3_MAC_SIZE,
-    )?;
+    );
 
     // if (H1 != HMAC(Ki, P1)[1..h])
     if calculated_hmac != decryption_result.checksum {

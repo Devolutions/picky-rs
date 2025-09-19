@@ -74,7 +74,7 @@ impl Cipher for Aes128CtsHmacSha196 {
     fn encryption_checksum(&self, key: &[u8], key_usage: i32, payload: &[u8]) -> KerberosCryptoResult<Vec<u8>> {
         let ki = derive_key(key, &usage_ki(key_usage), &AesSize::Aes128)?;
 
-        Ok(hmac_sha1(&ki, payload, AES_MAC_SIZE)?)
+        Ok(hmac_sha1(&ki, payload, AES_MAC_SIZE))
     }
 
     fn generate_key_from_password(&self, password: &[u8], salt: &[u8]) -> KerberosCryptoResult<Vec<u8>> {
@@ -407,13 +407,13 @@ mod tests {
 
         // verify that the same checksum is generated
         assert_eq!(
-            hmac_sha1(&encryption_result.ki, &conf_and_plaintext, AES_MAC_SIZE).unwrap(),
+            hmac_sha1(&encryption_result.ki, &conf_and_plaintext, AES_MAC_SIZE),
             expected_encrypted[expected_encrypted.len() - AES_MAC_SIZE..]
         );
 
         // verify that concatenating encrypted data and checksum gives expected result
         let mut encrypted_with_checksum = encryption_result.encrypted;
-        encrypted_with_checksum.extend(&hmac_sha1(&encryption_result.ki, &conf_and_plaintext, AES_MAC_SIZE).unwrap());
+        encrypted_with_checksum.extend(&hmac_sha1(&encryption_result.ki, &conf_and_plaintext, AES_MAC_SIZE));
         assert_eq!(encrypted_with_checksum, expected_encrypted);
 
         // verify that decrypt functions produce the same result
@@ -435,8 +435,7 @@ mod tests {
                 &decryption_result.ki,
                 &decrypted_confounder_with_plaintext,
                 AES_MAC_SIZE
-            )
-            .unwrap(),
+            ),
             decryption_result.checksum
         );
     }

@@ -32,7 +32,7 @@ pub fn encrypt_message(
     payload_buf.copy_from_slice(payload);
 
     // H1 = HMAC(Ki, conf | plaintext | pad)
-    let hmac = hmac_sha1(&encryption_result.ki, &data_to_encrypt, AES_MAC_SIZE)?;
+    let hmac = hmac_sha1(&encryption_result.ki, &data_to_encrypt, AES_MAC_SIZE);
 
     // ciphertext =  C1 | H1[1..h]
     encryption_result.encrypted.extend_from_slice(&hmac);
