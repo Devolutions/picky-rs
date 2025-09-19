@@ -98,7 +98,7 @@ pub fn generate_key_from_shared_secret(
 /// ZZ = g ^ (xb * xa) mod p
 /// ZZ = (yb ^ xa)  mod p  = (ya ^ xb)  mod p
 /// where ^ denotes exponentiation
-pub fn generate_dh_shared_secret(public_key: &[u8], private_key: &[u8], p: &[u8]) -> DiffieHellmanResult<Vec<u8>> {
+fn generate_dh_shared_secret(public_key: &[u8], private_key: &[u8], p: &[u8]) -> DiffieHellmanResult<Vec<u8>> {
     let public_key = BoxedUint::from_be_slice_vartime(public_key);
     let private_key = BoxedUint::from_be_slice_vartime(private_key);
     let p = Odd::new(BoxedUint::from_be_slice_vartime(p))
