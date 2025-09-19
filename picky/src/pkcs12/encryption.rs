@@ -8,9 +8,9 @@ use picky_asn1_x509::pkcs12::{
     Pbes2Params as Pbes2ParamsAsn1, Pbkdf2Params as Pbkdf2ParamsAsn1, Pbkdf2Prf as Pbkdf2PrfAsn1,
     Pbkdf2SaltSource as Pbkdf2SaltSourceAsn1, Pkcs12EncryptionAlgorithm as Pkcs12EncryptionAsn1,
 };
-use std::str::FromStr as _;
 use rand::rngs::StdRng;
 use rand_core::SeedableRng;
+use std::str::FromStr as _;
 
 /// Same default KDF iterations as in OpenSSL
 const DEFAULT_KDF_ITERATIONS: usize = 2048;

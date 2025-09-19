@@ -5,7 +5,7 @@ use aes::cipher::KeyIvInit;
 use aes::cipher::block_padding::NoPadding;
 use cbc::cipher::{BlockModeDecrypt, BlockModeEncrypt};
 use inout::InOutBufReserved;
-use rand_core::{RngCore};
+use rand_core::RngCore;
 
 pub const KEY_SIZE: usize = 32;
 pub const BLOCK_SIZE: usize = 16;

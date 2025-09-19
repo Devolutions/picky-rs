@@ -1,11 +1,11 @@
 //! PPK encryption/decryption types and fucntions
 
-use rand_core::SeedableRng;
 use crate::putty::PuttyError;
 use crate::putty::key_value::{Argon2FlavourValue, PpkEncryptionValue, PpkVersionKey};
 use crate::putty::ppk::kdf::{self, KeyMaterialV2};
 use crate::putty::ppk::{Argon2Params, Ppk, aes as ppk_aes};
 use crate::ssh::decode::SshReadExt;
+use rand_core::SeedableRng;
 
 /// PPK encryption configuration builder.
 ///
