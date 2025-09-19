@@ -578,9 +578,9 @@ impl SshCertificateBuilder {
         let key_id = key_id.take().unwrap_or_default();
 
         let mut nonce = Vec::new();
-        let mut rnd = rand::thread_rng();
+        let mut rnd = rand::rng();
         for _ in 0..32 {
-            nonce.push(rnd.r#gen::<u8>());
+            nonce.push(rnd.random::<u8>());
         }
 
         let valid_after = valid_after.take().ok_or(SshCertificateGenerationError::InvalidTime)?;

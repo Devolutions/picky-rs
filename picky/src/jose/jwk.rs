@@ -9,7 +9,7 @@ use crate::key::ed::{EdPublicKey, NamedEdAlgorithm};
 use crate::key::{EcCurve, EdAlgorithm, PublicKey};
 use base64::engine::general_purpose;
 use base64::{DecodeError, Engine as _};
-use num_bigint_dig::BigUint;
+use crypto_bigint::BoxedUint;
 use picky_asn1::wrapper::IntegerAsn1;
 use picky_asn1_x509::SubjectPublicKeyInfo;
 use serde::{Deserialize, Serialize};
@@ -432,8 +432,8 @@ impl Jwk {
                     JwkEcPublicKeyCurve::P521 => EcCurve::NistP521,
                 };
 
-                let x = BigUint::from_bytes_be(&ec.x_signed_bytes_be()?);
-                let y = BigUint::from_bytes_be(&ec.y_signed_bytes_be()?);
+                let x = BoxedUint::from_be_slice_vartime(&ec.x_signed_bytes_be()?);
+                let y = BoxedUint::from_be_slice_vartime(&ec.y_signed_bytes_be()?);
 
                 PublicKey::from_ec_components(curve, &x, &y).map_err(|_| JwkError::InvalidEcPointCoordinates)
             }

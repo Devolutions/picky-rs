@@ -3,6 +3,8 @@
 use crate::hash::HashAlgorithm;
 use crate::key::ec::{EcComponent, EcCurve, NamedEcCurve};
 use crate::key::{KeyError, PrivateKey, PublicKey};
+use ed25519_dalek::ed25519::SignatureEncoding;
+use rsa::signature::Signer;
 
 use picky_asn1_x509::{AlgorithmIdentifier, oids};
 use serde::{Deserialize, Serialize};
@@ -134,7 +136,7 @@ impl SignatureAlgorithm {
     pub fn sign(self, msg: &[u8], private_key: &PrivateKey) -> Result<Vec<u8>, SignatureError> {
         match self {
             SignatureAlgorithm::RsaPkcs1v15(picky_hash_algo) => {
-                use rsa::signature::{SignatureEncoding as _, SignerMut as _};
+                use rsa::signature::SignatureEncoding as _;
                 use rsa::{RsaPrivateKey, pkcs1v15};
 
                 let rsa_private_key = RsaPrivateKey::try_from(private_key)?;
@@ -177,9 +179,17 @@ impl SignatureAlgorithm {
                                 EcCurve::NistP256.validate_component(EcComponent::Secret(ec_keypair.secret()))?;
 
                             let key_bytes =
-                                p256::elliptic_curve::generic_array::GenericArray::from_slice(secret_validated);
+                                p256::elliptic_curve::array::Array::try_from(secret_validated).map_err(|_| {
+                                    SignatureError::Ec {
+                                        context: format!(
+                                            "validated secret is not the right size(expected: {}, actual: {})",
+                                            EcCurve::NistP256.field_bytes_size(),
+                                            secret_validated.len(),
+                                        ),
+                                    }
+                                })?;
                             let key =
-                                p256::ecdsa::SigningKey::from_bytes(key_bytes).map_err(|e| SignatureError::Ec {
+                                p256::ecdsa::SigningKey::from_bytes(&key_bytes).map_err(|e| SignatureError::Ec {
                                     context: format!("Cannot decode p256 EC keypair: {}", e),
                                 })?;
                             let sig: p256::ecdsa::Signature = key.try_sign(msg).map_err(|e| SignatureError::Ec {
@@ -201,10 +211,18 @@ impl SignatureAlgorithm {
                                 EcCurve::NistP384.validate_component(EcComponent::Secret(ec_keypair.secret()))?;
 
                             let key_bytes =
-                                p384::elliptic_curve::generic_array::GenericArray::from_slice(secret_validated);
+                                p384::elliptic_curve::array::Array::try_from(secret_validated).map_err(|_| {
+                                    SignatureError::Ec {
+                                        context: format!(
+                                            "validated secret is not the right size(expected: {}, actual: {})",
+                                            EcCurve::NistP384.field_bytes_size(),
+                                            secret_validated.len(),
+                                        ),
+                                    }
+                                })?;
 
                             let key =
-                                p384::ecdsa::SigningKey::from_bytes(key_bytes).map_err(|e| SignatureError::Ec {
+                                p384::ecdsa::SigningKey::from_bytes(&key_bytes).map_err(|e| SignatureError::Ec {
                                     context: format!("Cannot decode p384 EC keypair: {}", e),
                                 })?;
                             let sig: p384::ecdsa::Signature = key.try_sign(msg).map_err(|e| SignatureError::Ec {
@@ -225,10 +243,18 @@ impl SignatureAlgorithm {
                                 EcCurve::NistP521.validate_component(EcComponent::Secret(ec_keypair.secret()))?;
 
                             let key_bytes =
-                                p521::elliptic_curve::generic_array::GenericArray::from_slice(secret_validated);
+                                p521::elliptic_curve::array::Array::try_from(secret_validated).map_err(|_| {
+                                    SignatureError::Ec {
+                                        context: format!(
+                                            "validated secret is not the right size(expected: {}, actual: {})",
+                                            EcCurve::NistP521.field_bytes_size(),
+                                            secret_validated.len(),
+                                        ),
+                                    }
+                                })?;
 
                             let key =
-                                p521::ecdsa::SigningKey::from_bytes(key_bytes).map_err(|e| SignatureError::Ec {
+                                p521::ecdsa::SigningKey::from_bytes(&key_bytes).map_err(|e| SignatureError::Ec {
                                     context: format!("Cannot decode p521 EC keypair: {}", e),
                                 })?;
                             let sig: p521::ecdsa::Signature = key.try_sign(msg).map_err(|e| SignatureError::Ec {

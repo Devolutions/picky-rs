@@ -5,8 +5,9 @@ use crate::ssh::encode::SshComplexTypeEncode;
 use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
 
 use aes::cipher::block_padding::NoPadding;
-use aes::cipher::{BlockDecryptMut, KeyIvInit, StreamCipher};
+use aes::cipher::{KeyIvInit, StreamCipher};
 use byteorder::{BigEndian, ReadBytesExt};
+use cbc::cipher::BlockModeDecrypt;
 use rand::Rng;
 use std::io::{Cursor, Read};
 use std::string;
@@ -63,6 +64,10 @@ pub enum SshPrivateKeyError {
     KeyError(#[from] KeyError),
     #[error(transparent)]
     PemError(#[from] PemError),
+    #[error("RSA prime is zero")]
+    RsaPrimeIsZero,
+    #[error("RSA second prime invert mod first prime failed")]
+    RsaSecondPrimeInvertModFirstPrimeFailed,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Default)]
@@ -223,9 +228,9 @@ impl SshPrivateKey {
             Some(_) => {
                 let mut salt: Vec<u8> = Vec::new();
                 let rounds = 16;
-                let mut rnd = rand::thread_rng();
+                let mut rnd = rand::rng();
                 for _ in 0..rounds {
-                    salt.push(rnd.r#gen::<u8>());
+                    salt.push(rnd.random::<u8>());
                 }
 
                 let kdf = Kdf {
@@ -377,7 +382,7 @@ pub(crate) fn decrypt(
             AES128_CBC => {
                 let cipher = Aes128CbcDec::new_from_slices(key, iv).unwrap();
                 let n = cipher
-                    .decrypt_padded_mut::<NoPadding>(&mut data)
+                    .decrypt_padded_inout::<NoPadding>(data.as_mut_slice().into())
                     .map_err(|e| SshPrivateKeyError::DecryptionError(e.to_string()))?
                     .len();
                 data.truncate(n);
@@ -386,7 +391,7 @@ pub(crate) fn decrypt(
             AES256_CBC => {
                 let cipher = Aes256CbcDec::new_from_slices(key, iv).unwrap();
                 let n = cipher
-                    .decrypt_padded_mut::<NoPadding>(&mut data)
+                    .decrypt_padded_inout::<NoPadding>(data.as_mut_slice().into())
                     .map_err(|e| SshPrivateKeyError::DecryptionError(e.to_string()))?
                     .len();
                 data.truncate(n);

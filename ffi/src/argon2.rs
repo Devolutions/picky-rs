@@ -76,10 +76,12 @@ pub mod ffi {
         pub fn hash_password(&self, password: &str, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             use argon2::PasswordHasher as _;
             use argon2::password_hash::SaltString;
-            use argon2::password_hash::rand_core::OsRng;
+            use rand::SeedableRng;
+            use rand::rngs::StdRng;
             use std::fmt::Write as _;
 
-            let salt = SaltString::generate(&mut OsRng);
+            let mut rng = StdRng::try_from_os_rng().map_err(|_| "failed to create a random number generator")?;
+            let salt = SaltString::from_rng(&mut rng);
 
             let password_hash = self.0.hash_password(password.as_bytes(), &salt)?.to_string();
 

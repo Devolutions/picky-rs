@@ -30,6 +30,8 @@ panic = "abort"
 # Optimize for speed the cryptographic libraries.
 [profile.ffi-production.package.num-bigint-dig]
 opt-level = 3
+[profile.ffi-production.package.crypto-bigint]
+opt-level = 3
 [profile.ffi-production.package.ed25519-dalek]
 opt-level = 3
 [profile.ffi-production.package.x25519-dalek]

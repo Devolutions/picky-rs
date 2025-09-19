@@ -9,7 +9,7 @@ use crate::ssh::decode::SshReadExt;
 use crate::ssh::encode::SshWriteExt;
 use crate::ssh::private_key::SshBasePrivateKey;
 use crate::ssh::public_key::SshBasePublicKey;
-use num_bigint_dig::BigUint;
+use crypto_bigint::BoxedUint;
 use rsa::traits::{PrivateKeyParts, PublicKeyParts};
 use rsa::{RsaPrivateKey, RsaPublicKey};
 
@@ -85,7 +85,8 @@ impl PuttyBasePrivateKey {
                 let qinv = rsa_key
                     .qinv()
                     .expect("BUG: should be precomuted above")
-                    .to_signed_bytes_be();
+                    .retrieve()
+                    .to_be_bytes_trimmed_vartime();
                 cursor.write_ssh_bytes(&qinv)?;
 
                 let ssh_public_key = SshBasePublicKey::Rsa(key.to_public_key()?);
@@ -100,7 +101,7 @@ impl PuttyBasePrivateKey {
             SshBasePrivateKey::Ec(key) => {
                 let ec_key = EcdsaKeypair::try_from(key)?;
 
-                let secret = BigUint::from_bytes_be(ec_key.secret());
+                let secret = BoxedUint::from_be_slice_vartime(ec_key.secret());
                 cursor.write_ssh_mpint(&secret)?;
 
                 let algorithm = match ec_key.curve() {
@@ -126,7 +127,7 @@ impl PuttyBasePrivateKey {
             SshBasePrivateKey::Ed(key) => {
                 let ed_key = EdKeypair::try_from(key)?;
 
-                cursor.write_ssh_mpint(&BigUint::from_bytes_be(ed_key.secret()))?;
+                cursor.write_ssh_mpint(&BoxedUint::from_be_slice_vartime(ed_key.secret()))?;
 
                 let algorithm = match ed_key.algorithm() {
                     NamedEdAlgorithm::Known(EdAlgorithm::Ed25519) => PpkKeyAlgorithmValue::Ed25519,
@@ -191,7 +192,7 @@ impl PuttyBasePrivateKey {
 
                 let private_key = PrivateKey::from_ec_encoded_components(
                     curve.into(),
-                    &secret.to_bytes_be(),
+                    &secret.to_be_bytes_trimmed_vartime(),
                     Some(public.encoded_point()),
                 );
 
@@ -207,7 +208,7 @@ impl PuttyBasePrivateKey {
 
                 let private_key = PrivateKey::from_ed_encoded_components(
                     NamedEdAlgorithm::Known(EdAlgorithm::Ed25519).into(),
-                    &secret.to_bytes_be(),
+                    &secret.to_be_bytes_trimmed_vartime(),
                     Some(public.data()),
                 );
 
