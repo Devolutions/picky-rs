@@ -14,12 +14,12 @@ use aes_kw::AesKw;
 use base64::engine::general_purpose;
 use base64::{DecodeError, Engine as _};
 use rand::RngCore;
-use rand_chacha::ChaCha20Rng;
-use rand_core::SeedableRng;
 use rsa::{Oaep, Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashMap;
+use rand::rngs::StdRng;
+use rand_core::SeedableRng;
 use thiserror::Error;
 use zeroize::Zeroizing;
 
@@ -688,7 +688,7 @@ fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
 
                 let cek = generate_cek(jwe.header.enc);
 
-                let encrypted_key = match rsa_public_key.encrypt(&mut ChaCha20Rng::from_os_rng(), padding, &cek) {
+                let encrypted_key = match rsa_public_key.encrypt(&mut StdRng::from_os_rng(), padding, &cek) {
                     Ok(encrypted_key) => encrypted_key,
                     Err(err) => {
                         return Err(err.into());
@@ -1063,7 +1063,7 @@ fn generate_ecdh_shared_secret(
                         JweError::Key { source }
                     })?;
 
-                    let secret = p256::ecdh::EphemeralSecret::random(&mut ChaCha20Rng::from_os_rng());
+                    let secret = p256::ecdh::EphemeralSecret::random(&mut StdRng::from_os_rng());
 
                     let shared_secret = Zeroizing::new(secret.diffie_hellman(&public_key).raw_secret_bytes().to_vec());
                     let epk = PublicKey::from_ec_encoded_components(
@@ -1081,7 +1081,7 @@ fn generate_ecdh_shared_secret(
                         JweError::Key { source }
                     })?;
 
-                    let secret = p384::ecdh::EphemeralSecret::random(&mut ChaCha20Rng::from_os_rng());
+                    let secret = p384::ecdh::EphemeralSecret::random(&mut StdRng::from_os_rng());
 
                     let shared_secret = Zeroizing::new(secret.diffie_hellman(&public_key).raw_secret_bytes().to_vec());
                     let epk = PublicKey::from_ec_encoded_components(
@@ -1099,7 +1099,7 @@ fn generate_ecdh_shared_secret(
                         JweError::Key { source }
                     })?;
 
-                    let secret = p521::ecdh::EphemeralSecret::random(&mut ChaCha20Rng::from_os_rng());
+                    let secret = p521::ecdh::EphemeralSecret::random(&mut StdRng::from_os_rng());
 
                     let shared_secret = Zeroizing::new(secret.diffie_hellman(&public_key).raw_secret_bytes().to_vec());
                     let epk = PublicKey::from_ec_encoded_components(
@@ -1129,7 +1129,7 @@ fn generate_ecdh_shared_secret(
 
                     let public_key = x25519_dalek::PublicKey::from(public_key_data);
 
-                    let secret = x25519_dalek::EphemeralSecret::random_from_rng(&mut ChaCha20Rng::from_os_rng());
+                    let secret = x25519_dalek::EphemeralSecret::random_from_rng(&mut StdRng::from_os_rng());
 
                     let epk = PublicKey::from_ed_encoded_components(
                         &EdAlgorithm::X25519.into(),
@@ -1333,7 +1333,7 @@ fn calculate_ecdh_shared_secret(
 /// Generate content encryption key (CEK) for given algorithm and wraps it with zeroize-on-drop container
 fn generate_cek(alg: JweEnc) -> Zeroizing<Vec<u8>> {
     let mut cek = Zeroizing::new(vec![0u8; alg.key_size()]);
-    let mut rng = ChaCha20Rng::from_os_rng();
+    let mut rng = StdRng::from_os_rng();
     rng.fill_bytes(&mut cek);
     cek
 }

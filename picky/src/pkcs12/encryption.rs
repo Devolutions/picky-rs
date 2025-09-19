@@ -8,9 +8,9 @@ use picky_asn1_x509::pkcs12::{
     Pbes2Params as Pbes2ParamsAsn1, Pbkdf2Params as Pbkdf2ParamsAsn1, Pbkdf2Prf as Pbkdf2PrfAsn1,
     Pbkdf2SaltSource as Pbkdf2SaltSourceAsn1, Pkcs12EncryptionAlgorithm as Pkcs12EncryptionAsn1,
 };
-use rand_chacha::ChaCha20Rng;
-use rand_core::SeedableRng;
 use std::str::FromStr as _;
+use rand::rngs::StdRng;
+use rand_core::SeedableRng;
 
 /// Same default KDF iterations as in OpenSSL
 const DEFAULT_KDF_ITERATIONS: usize = 2048;
@@ -29,7 +29,7 @@ impl Pkcs12CryptoContext {
     pub fn new_with_password(password: &str) -> Self {
         Self {
             password: password.to_string().into(),
-            rng: Box::new(ChaCha20Rng::from_os_rng()),
+            rng: Box::new(StdRng::from_os_rng()),
         }
     }
 
@@ -43,7 +43,7 @@ impl Pkcs12CryptoContext {
     pub fn new_without_password() -> Self {
         Self {
             password: String::new().into(),
-            rng: Box::new(ChaCha20Rng::from_os_rng()),
+            rng: Box::new(StdRng::from_os_rng()),
         }
     }
 

@@ -46,8 +46,6 @@ pub enum PuttyError {
     KeyError(#[from] crate::key::KeyError),
     #[error(transparent)]
     IoError(#[from] std::io::Error),
-    #[error("rand failed: {0}")]
-    RandError(String),
     #[error(transparent)]
     OutIsTooSmallError(#[from] inout::OutIsTooSmallError),
 }

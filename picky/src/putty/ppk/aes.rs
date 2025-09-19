@@ -5,22 +5,22 @@ use aes::cipher::KeyIvInit;
 use aes::cipher::block_padding::NoPadding;
 use cbc::cipher::{BlockModeDecrypt, BlockModeEncrypt};
 use inout::InOutBufReserved;
-use rand_core::TryRngCore;
+use rand_core::{RngCore};
 
 pub const KEY_SIZE: usize = 32;
 pub const BLOCK_SIZE: usize = 16;
 
 /// Adds padding to the message if it is not a multiple of the AES block size.
-pub fn make_padding<R: TryRngCore>(mut message: Vec<u8>, mut rng: R) -> Result<Vec<u8>, R::Error> {
+pub fn make_padding<R: RngCore>(mut message: Vec<u8>, mut rng: R) -> Vec<u8> {
     if message.len() % BLOCK_SIZE != 0 {
         let unpadded_size = message.len();
         let padding_size = BLOCK_SIZE - (unpadded_size % BLOCK_SIZE);
 
         message.resize(unpadded_size + padding_size, 0);
-        rng.try_fill_bytes(&mut message[unpadded_size..])?;
+        rng.fill_bytes(&mut message[unpadded_size..]);
     }
 
-    Ok(message)
+    message
 }
 
 /// Encrypts the message in-place using AES-256 in CBC mode.

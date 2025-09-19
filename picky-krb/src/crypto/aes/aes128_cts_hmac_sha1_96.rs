@@ -1,5 +1,5 @@
-use rand::TryRngCore;
-use rand::rngs::OsRng;
+use rand::{RngCore, SeedableRng};
+use rand::rngs::{StdRng};
 
 use crate::crypto::common::hmac_sha1;
 use crate::crypto::utils::usage_ki;
@@ -41,7 +41,7 @@ impl Cipher for Aes128CtsHmacSha196 {
 
     fn encrypt(&self, key: &[u8], key_usage: i32, payload: &[u8]) -> Result<Vec<u8>, KerberosCryptoError> {
         let mut confounder = [0; AES_BLOCK_SIZE];
-        OsRng.try_fill_bytes(&mut confounder)?;
+        StdRng::from_os_rng().fill_bytes(&mut confounder);
 
         encrypt_message(key, key_usage, payload, &AesSize::Aes128, confounder)
     }
@@ -53,7 +53,7 @@ impl Cipher for Aes128CtsHmacSha196 {
         payload: &[u8],
     ) -> KerberosCryptoResult<EncryptWithoutChecksum> {
         let mut confounder = [0; AES_BLOCK_SIZE];
-        OsRng.try_fill_bytes(&mut confounder)?;
+        StdRng::from_os_rng().fill_bytes(&mut confounder);
 
         encrypt_message_no_checksum(key, key_usage, payload, &AesSize::Aes128, confounder)
     }

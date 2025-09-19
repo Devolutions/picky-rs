@@ -1,5 +1,6 @@
 //! PPK encryption/decryption types and fucntions
 
+use rand_core::SeedableRng;
 use crate::putty::PuttyError;
 use crate::putty::key_value::{Argon2FlavourValue, PpkEncryptionValue, PpkVersionKey};
 use crate::putty::ppk::kdf::{self, KeyMaterialV2};
@@ -111,7 +112,7 @@ impl Ppk {
 
     /// Returns PPK key encrypted with the specified passphrase and config.
     pub fn encrypt(&self, passphrase: &str, config: PpkEncryptionConfig) -> Result<Self, PuttyError> {
-        self.encrypt_with_rng(passphrase, config, rand::rngs::OsRng)
+        self.encrypt_with_rng(passphrase, config, rand::rngs::StdRng::from_os_rng())
     }
 
     /// Returns PPK key encrypted with the specified passphrase, config and RNG.
@@ -119,7 +120,7 @@ impl Ppk {
         &self,
         passphrase: &str,
         config: PpkEncryptionConfig,
-        mut rng: impl rand::TryRngCore,
+        mut rng: impl rand::RngCore,
     ) -> Result<Ppk, PuttyError> {
         if self.encryption.is_some() {
             return Err(PuttyError::AlreadyEncrypted);
@@ -129,8 +130,7 @@ impl Ppk {
             PpkVersionKey::V2 => {
                 let key_material = kdf::derive_key_material_v2(passphrase)?;
 
-                let mut private_key = ppk_aes::make_padding(self.private_key.clone(), rng)
-                    .map_err(|error| PuttyError::RandError(format!("{error}")))?;
+                let mut private_key = ppk_aes::make_padding(self.private_key.clone(), rng);
                 let mac = self.calculate_mac_v2(passphrase, &private_key, PpkEncryptionValue::Aes256Cbc)?;
                 ppk_aes::encrypt(&mut private_key, key_material.key(), KeyMaterialV2::iv())?;
 
@@ -146,8 +146,7 @@ impl Ppk {
             }
             PpkVersionKey::V3 => {
                 let mut argon2_salt = vec![0u8; config.argon2_salt_size as usize];
-                rng.try_fill_bytes(&mut argon2_salt)
-                    .map_err(|error| PuttyError::RandError(format!("{error}")))?;
+                rng.fill_bytes(&mut argon2_salt);
                 let argon2_params = Argon2Params {
                     flavor: config.argon2_flavour,
                     memory: config.argon2_memory,
@@ -158,8 +157,7 @@ impl Ppk {
 
                 let key_material = kdf::derive_key_material_v3(&argon2_params, passphrase)?;
 
-                let mut private_key = ppk_aes::make_padding(self.private_key.clone(), rng)
-                    .map_err(|error| PuttyError::RandError(format!("{error}")))?;
+                let mut private_key = ppk_aes::make_padding(self.private_key.clone(), rng);
                 let mac =
                     self.calculate_mac_v3(key_material.hmac_key(), &private_key, PpkEncryptionValue::Aes256Cbc)?;
                 ppk_aes::encrypt(&mut private_key, key_material.key(), key_material.iv())?;
