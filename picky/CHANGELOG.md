@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[7.0.0-rc.18](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.17...picky-v7.0.0-rc.18)] - 2025-09-26
+
+### <!-- 7 -->Build
+
+- Bump tempfile from 3.20.0 to 3.22.0 (#407) ([b6cf548a37](https://github.com/Devolutions/picky-rs/commit/b6cf548a37447105d600b6a7e33cbc8a6da05508)) 
+
+- Bump the crypto group across 1 directory with 3 updates (#388) ([58d179a0c3](https://github.com/Devolutions/picky-rs/commit/58d179a0c39d701025a363c3f294912c2881a8f5)) 
+
+
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+
 ## [[7.0.0-rc.17](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.16...picky-v7.0.0-rc.17)] - 2025-08-18
 
 ### <!-- 7 -->Build
