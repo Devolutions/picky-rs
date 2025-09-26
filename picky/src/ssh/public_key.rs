@@ -128,7 +128,7 @@ mod tests {
 
     use base64::Engine;
     use base64::engine::general_purpose::STANDARD_NO_PAD;
-    use num_bigint_dig::BigUint;
+    use crypto_bigint::BoxedUint;
     use rstest::rstest;
 
     #[test]
@@ -141,7 +141,7 @@ mod tests {
         assert_eq!("test@picky.com".to_owned(), public_key.comment);
         assert_eq!(
             SshBasePublicKey::Rsa(PublicKey::from_rsa_components(
-                &BigUint::from_bytes_be(&[
+                &BoxedUint::from_be_slice_vartime(&[
                     219, 80, 34, 184, 116, 125, 103, 225, 211, 133, 6, 255, 236, 141, 243, 38, 107, 138, 185, 169, 238,
                     210, 103, 143, 99, 216, 99, 131, 24, 170, 252, 14, 231, 153, 49, 102, 11, 77, 201, 58, 214, 229,
                     12, 50, 85, 65, 79, 117, 242, 95, 169, 158, 233, 126, 22, 176, 26, 34, 143, 52, 22, 190, 12, 41,
@@ -167,7 +167,7 @@ mod tests {
                     126, 134, 146, 46, 237, 14, 142, 139, 105, 245, 80, 76, 190, 41, 122, 162, 52, 156, 108, 147, 75,
                     4, 191, 45, 24, 222, 62, 186, 178, 28, 176, 213, 47, 86, 48, 14, 159, 7, 55, 158, 139, 97, 43
                 ]),
-                &BigUint::from_bytes_be(&[1, 0, 1])
+                &BoxedUint::from_be_slice_vartime(&[1, 0, 1])
             )),
             public_key.inner_key
         );
@@ -183,7 +183,7 @@ mod tests {
         assert_eq!("test2@picky.com".to_owned(), public_key.comment);
         assert_eq!(
             SshBasePublicKey::Rsa(PublicKey::from_rsa_components(
-                &BigUint::from_bytes_be(&[
+                &BoxedUint::from_be_slice_vartime(&[
                     200, 246, 27, 118, 131, 106, 142, 62, 4, 134, 230, 27, 149, 98, 49, 84, 162, 236, 154, 195, 159,
                     127, 233, 11, 144, 169, 69, 70, 194, 9, 200, 78, 88, 81, 108, 207, 155, 146, 242, 80, 125, 203,
                     162, 169, 203, 254, 188, 63, 127, 243, 160, 223, 186, 9, 59, 246, 196, 159, 131, 246, 149, 43, 229,
@@ -197,7 +197,7 @@ mod tests {
                     83, 2, 130, 16, 254, 214, 18, 114, 57, 217, 204, 28, 144, 191, 230, 164, 212, 24, 224, 124, 232,
                     204, 108, 71, 132, 66, 94, 164, 190, 45, 154, 198, 164, 196, 156, 87, 32, 208, 129, 238, 235
                 ]),
-                &BigUint::from_bytes_be(&[1, 0, 1])
+                &BoxedUint::from_be_slice_vartime(&[1, 0, 1])
             )),
             public_key.inner_key
         );

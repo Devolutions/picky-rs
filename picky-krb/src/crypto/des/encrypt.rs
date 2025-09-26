@@ -1,10 +1,11 @@
-use aes::cipher::block_padding::NoPadding;
-use aes::cipher::{BlockEncryptMut, KeyIvInit};
-use des::TdesEde3;
-
 use crate::crypto::common::hmac_sha1;
 use crate::crypto::utils::{usage_ke, usage_ki};
 use crate::crypto::{EncryptWithoutChecksum, KerberosCryptoError, KerberosCryptoResult};
+use aes::cipher::{Array, KeyIvInit};
+use des::TdesEde3;
+use des::cipher::BlockModeEncrypt;
+use des::cipher::block_padding::NoPadding;
+use inout::InOutBufReserved;
 
 use super::{DES3_BLOCK_SIZE, DES3_KEY_SIZE, DES3_MAC_SIZE, derive_key};
 
@@ -90,9 +91,11 @@ pub fn encrypt_des(key: &[u8], payload: &[u8]) -> KerberosCryptoResult<Vec<u8>> 
     // RFC 3961: initial cipher state. All bits zero
     let iv = [0_u8; DES3_BLOCK_SIZE];
 
-    let ct = DesCbcCipher::new(key.into(), &iv.into());
+    let key = Array::try_from(key)?;
+    let ct = DesCbcCipher::new(&key, &iv.into());
 
-    ct.encrypt_padded_mut::<NoPadding>(&mut payload, payload_len)?;
+    let inout = InOutBufReserved::from_mut_slice(&mut payload, payload_len)?;
+    ct.encrypt_padded_inout::<NoPadding>(inout)?;
 
     payload.resize(payload_len, 0);
 

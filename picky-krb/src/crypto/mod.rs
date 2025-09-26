@@ -35,6 +35,12 @@ pub enum KerberosCryptoError {
     CipherPad(PadError),
     #[error("Invalid seed bit len: {0}")]
     SeedBitLen(String),
+    #[error(transparent)]
+    RandError(#[from] rand::rand_core::OsError),
+    #[error(transparent)]
+    TooSmallBuffer(#[from] inout::OutIsTooSmallError),
+    #[error(transparent)]
+    ArrayTryFromSliceError(#[from] std::array::TryFromSliceError),
 }
 
 impl From<UnpadError> for KerberosCryptoError {

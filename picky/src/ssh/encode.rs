@@ -15,9 +15,9 @@ use super::key_identifier;
 use aes::cipher::{KeyIvInit, StreamCipher};
 use base64::engine::general_purpose;
 use byteorder::{BigEndian, WriteBytesExt};
-use num_bigint_dig::{BigUint, ModInverse};
+use crypto_bigint::NonZero;
 use rsa::traits::{PrivateKeyParts as _, PublicKeyParts as _};
-use rsa::{RsaPrivateKey, RsaPublicKey};
+use rsa::{BoxedUint, RsaPrivateKey, RsaPublicKey};
 use std::io::{self, Write};
 
 pub trait SshWriteExt {
@@ -25,7 +25,7 @@ pub trait SshWriteExt {
 
     fn write_ssh_string(&mut self, data: &str) -> Result<(), Self::Error>;
     fn write_ssh_bytes(&mut self, data: &[u8]) -> Result<(), Self::Error>;
-    fn write_ssh_mpint(&mut self, data: &BigUint) -> Result<(), Self::Error>;
+    fn write_ssh_mpint(&mut self, data: &BoxedUint) -> Result<(), Self::Error>;
 }
 
 impl<T> SshWriteExt for T
@@ -44,8 +44,8 @@ where
         self.write_all(data)
     }
 
-    fn write_ssh_mpint(&mut self, data: &BigUint) -> Result<(), Self::Error> {
-        let data = data.to_bytes_be();
+    fn write_ssh_mpint(&mut self, data: &BoxedUint) -> Result<(), Self::Error> {
+        let data = data.to_be_bytes_trimmed_vartime();
         let size = data.len() as u32;
         // If the most significant bit would be set for
         // a positive number, the number MUST be preceded by a zero byte.
@@ -271,8 +271,13 @@ impl SshComplexTypeEncode for SshBasePrivateKey {
                 stream.write_ssh_mpint(rsa.e())?;
                 stream.write_ssh_mpint(rsa.d())?;
 
-                let iqmp = rsa.primes()[1].clone().mod_inverse(&rsa.primes()[0]).unwrap();
-                let iqmp = BigUint::from_bytes_be(&iqmp.to_bytes_be().1);
+                let prime = NonZero::new(rsa.primes()[0].clone())
+                    .into_option()
+                    .ok_or(SshPrivateKeyError::RsaPrimeIsZero)?;
+                let iqmp = rsa.primes()[1]
+                    .invert_mod(&prime)
+                    .into_option()
+                    .ok_or(SshPrivateKeyError::RsaSecondPrimeInvertModFirstPrimeFailed)?;
                 stream.write_ssh_mpint(&iqmp)?;
 
                 for prime in rsa.primes().iter() {
@@ -288,7 +293,7 @@ impl SshComplexTypeEncode for SshBasePrivateKey {
                 encode_ecdsa_public_key_body(&mut stream, &public_key)?;
 
                 // Ecnode encoded secret
-                let secret = BigUint::from_bytes_be(keypair.secret());
+                let secret = BoxedUint::from_be_slice_vartime(keypair.secret());
                 stream.write_ssh_mpint(&secret)?;
             }
             SshBasePrivateKey::Ed(key) => {
@@ -513,7 +518,7 @@ impl SshComplexTypeEncode for SshCertificate {
 #[cfg(test)]
 mod test {
     use super::SshWriteExt;
-    use num_bigint_dig::BigUint;
+    use rsa::BoxedUint;
 
     #[test]
     fn ssh_string_encode() {
@@ -551,7 +556,7 @@ mod test {
 
     #[test]
     fn mpint_encoding() {
-        let mpint = BigUint::from_bytes_be(&[0x09, 0xa3, 0x78, 0xf9, 0xb2, 0xe3, 0x32, 0xa7]);
+        let mpint = BoxedUint::from_be_slice_vartime(&[0x09, 0xa3, 0x78, 0xf9, 0xb2, 0xe3, 0x32, 0xa7]);
         let mut res = Vec::new();
         res.write_ssh_mpint(&mpint).unwrap();
 
@@ -560,7 +565,7 @@ mod test {
             vec![0x00, 0x00, 0x00, 0x08, 0x09, 0xa3, 0x78, 0xf9, 0xb2, 0xe3, 0x32, 0xa7],
         );
 
-        let mpint = BigUint::from_bytes_be(&[0x80]);
+        let mpint = BoxedUint::from_be_slice_vartime(&[0x80]);
         let mut res = Vec::new();
         res.write_ssh_mpint(&mpint).unwrap();
 

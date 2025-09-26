@@ -26,7 +26,7 @@ lazy_static = { version = "1.5", optional = true }
 base64 = "0.22"
 pretty_assertions = "1.4"
 serde_bytes = "0.11"
-num-bigint-dig = "0.8"
+num-bigint-dig = "0.8"# TODO: use `crypto-bigint` instead
 oid = { version = "0.2", default-features = false, features = ["serde_support"] }
 
 [features]

@@ -7,12 +7,15 @@ use crate::key::ec::{EcComponent, EcdsaKeypair, EcdsaPublicKey, NamedEcCurve};
 use crate::key::ed::{EdKeypair, EdPublicKey, NamedEdAlgorithm, X25519_FIELD_ELEMENT_SIZE};
 use crate::key::{EcCurve, EdAlgorithm, KeyError, PrivateKey, PrivateKeyKind, PublicKey};
 
-use aes_gcm::aead::generic_array::typenum::Unsigned;
-use aes_gcm::{AeadInPlace, Aes128Gcm, Aes256Gcm, KeyInit, KeySizeUser};
+use aes::cipher::Array;
+use aes::cipher::typenum::Unsigned;
+use aes_gcm::{AeadInOut, Aes128Gcm, Aes256Gcm, KeyInit, KeySizeUser};
+use aes_kw::AesKw;
 use base64::engine::general_purpose;
 use base64::{DecodeError, Engine as _};
-use digest::generic_array::GenericArray;
 use rand::RngCore;
+use rand::rngs::StdRng;
+use rand_core::SeedableRng;
 use rsa::{Oaep, Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -89,6 +92,9 @@ pub enum JweError {
 
     #[error("invalid encrypted key size: expected {expected}, got {got}")]
     InvalidEncryptedKeySize { expected: usize, got: usize },
+
+    #[error("invalid decryption key size: expected {expected}, got {got}")]
+    InvalidDecryptionKeySize { expected: usize, got: usize },
 }
 
 impl From<rsa::errors::Error> for JweError {
@@ -126,6 +132,10 @@ impl From<aes_kw::Error> for JweError {
         Self::AesKw { source: e }
     }
 }
+
+type KekAes128 = AesKw<aes::Aes128>;
+type KekAes192 = AesKw<aes::Aes192>;
+type KekAes256 = AesKw<aes::Aes256>;
 
 // === JWE algorithms === //
 
@@ -238,16 +248,28 @@ impl KeyWrappingAlg {
 
         match self {
             KeyWrappingAlg::Aes128 => {
-                let kek = aes_kw::KekAes128::new(GenericArray::from_slice(decryption_key));
-                kek.unwrap(encrypted_cek, &mut cek)?;
+                let kek =
+                    KekAes128::new_from_slice(decryption_key).map_err(|_| JweError::InvalidDecryptionKeySize {
+                        expected: self.key_size(),
+                        got: decryption_key.len(),
+                    })?;
+                kek.unwrap_key(encrypted_cek, &mut cek)?;
             }
             KeyWrappingAlg::Aes192 => {
-                let kek = aes_kw::KekAes192::new(GenericArray::from_slice(decryption_key));
-                kek.unwrap(encrypted_cek, &mut cek)?;
+                let kek =
+                    KekAes192::new_from_slice(decryption_key).map_err(|_| JweError::InvalidDecryptionKeySize {
+                        expected: self.key_size(),
+                        got: decryption_key.len(),
+                    })?;
+                kek.unwrap_key(encrypted_cek, &mut cek)?;
             }
             KeyWrappingAlg::Aes256 => {
-                let kek = aes_kw::KekAes256::new(GenericArray::from_slice(decryption_key));
-                kek.unwrap(encrypted_cek, &mut cek)?;
+                let kek =
+                    KekAes256::new_from_slice(decryption_key).map_err(|_| JweError::InvalidDecryptionKeySize {
+                        expected: self.key_size(),
+                        got: decryption_key.len(),
+                    })?;
+                kek.unwrap_key(encrypted_cek, &mut cek)?;
             }
         };
 
@@ -263,16 +285,25 @@ impl KeyWrappingAlg {
         let mut wrapped_key = vec![0u8; cek_alg.key_size() + aes_kw::IV_LEN];
         match self {
             KeyWrappingAlg::Aes128 => {
-                let kek = aes_kw::KekAes128::new(GenericArray::from_slice(encryption_key));
-                kek.wrap(cek, &mut wrapped_key)?;
+                let kek = KekAes128::new_from_slice(encryption_key).map_err(|_| JweError::InvalidEncryptedKeySize {
+                    expected: self.key_size(),
+                    got: encryption_key.len(),
+                })?;
+                kek.wrap_key(cek, &mut wrapped_key)?;
             }
             KeyWrappingAlg::Aes192 => {
-                let kek = aes_kw::KekAes192::new(GenericArray::from_slice(encryption_key));
-                kek.wrap(cek, &mut wrapped_key)?;
+                let kek = KekAes192::new_from_slice(encryption_key).map_err(|_| JweError::InvalidEncryptedKeySize {
+                    expected: self.key_size(),
+                    got: encryption_key.len(),
+                })?;
+                kek.wrap_key(cek, &mut wrapped_key)?;
             }
             KeyWrappingAlg::Aes256 => {
-                let kek = aes_kw::KekAes256::new(GenericArray::from_slice(encryption_key));
-                kek.wrap(cek, &mut wrapped_key)?;
+                let kek = KekAes256::new_from_slice(encryption_key).map_err(|_| JweError::InvalidEncryptedKeySize {
+                    expected: self.key_size(),
+                    got: encryption_key.len(),
+                })?;
+                kek.wrap_key(cek, &mut wrapped_key)?;
             }
         };
 
@@ -657,7 +688,7 @@ fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
 
                 let cek = generate_cek(jwe.header.enc);
 
-                let encrypted_key = match rsa_public_key.encrypt(&mut rand::rngs::OsRng, padding, &cek) {
+                let encrypted_key = match rsa_public_key.encrypt(&mut StdRng::from_os_rng(), padding, &cek) {
                     Ok(encrypted_key) => encrypted_key,
                     Err(err) => {
                         return Err(err.into());
@@ -695,13 +726,16 @@ fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
     let aad = protected_header_base64.as_bytes(); // The Additional Authenticated Data value used for AES-GCM.
     let authentication_tag = match jwe.header.enc {
         JweEnc::Aes128Gcm => {
-            Aes128Gcm::new(GenericArray::from_slice(&jwe_cek)).encrypt_in_place_detached(&nonce, aad, &mut buffer)?
+            let algo = Aes128Gcm::new_from_slice(&jwe_cek).map_err(|_| JweError::AesGcm)?;
+            algo.encrypt_inout_detached(&nonce, aad, buffer.as_mut_slice().into())?
         }
         JweEnc::Aes192Gcm => {
-            Aes192Gcm::new(GenericArray::from_slice(&jwe_cek)).encrypt_in_place_detached(&nonce, aad, &mut buffer)?
+            let algo = Aes192Gcm::new_from_slice(&jwe_cek).map_err(|_| JweError::AesGcm)?;
+            algo.encrypt_inout_detached(&nonce, aad, buffer.as_mut_slice().into())?
         }
         JweEnc::Aes256Gcm => {
-            Aes256Gcm::new(GenericArray::from_slice(&jwe_cek)).encrypt_in_place_detached(&nonce, aad, &mut buffer)?
+            let algo = Aes256Gcm::new_from_slice(&jwe_cek).map_err(|_| JweError::AesGcm)?;
+            algo.encrypt_inout_detached(&nonce, aad, buffer.as_mut_slice().into())?
         }
         unsupported => {
             return Err(JweError::UnsupportedAlgorithm {
@@ -865,27 +899,23 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
     }
 
     let mut buffer = ciphertext;
-    let nonce = GenericArray::from_slice(&initialization_vector);
+    let nonce = Array::try_from(&initialization_vector).expect("can't panic since the size is checked before");
     let aad = protected_header_base64.as_bytes(); // The Additional Authenticated Data value used for AES-GCM.
+    let authentication_tag =
+        Array::try_from(&authentication_tag).expect("can't panic since the size is checked before");
     match header.enc {
-        JweEnc::Aes128Gcm => Aes128Gcm::new(GenericArray::from_slice(&jwe_cek)).decrypt_in_place_detached(
-            nonce,
-            aad,
-            &mut buffer,
-            GenericArray::from_slice(&authentication_tag),
-        )?,
-        JweEnc::Aes192Gcm => Aes192Gcm::new(GenericArray::from_slice(&jwe_cek)).decrypt_in_place_detached(
-            nonce,
-            aad,
-            &mut buffer,
-            GenericArray::from_slice(&authentication_tag),
-        )?,
-        JweEnc::Aes256Gcm => Aes256Gcm::new(GenericArray::from_slice(&jwe_cek)).decrypt_in_place_detached(
-            nonce,
-            aad,
-            &mut buffer,
-            GenericArray::from_slice(&authentication_tag),
-        )?,
+        JweEnc::Aes128Gcm => {
+            let algo = Aes128Gcm::new_from_slice(&jwe_cek).map_err(|_| JweError::AesGcm)?;
+            algo.decrypt_inout_detached(&nonce, aad, buffer.as_mut_slice().into(), &authentication_tag)?;
+        }
+        JweEnc::Aes192Gcm => {
+            let algo = Aes192Gcm::new_from_slice(&jwe_cek).map_err(|_| JweError::AesGcm)?;
+            algo.decrypt_inout_detached(&nonce, aad, buffer.as_mut_slice().into(), &authentication_tag)?;
+        }
+        JweEnc::Aes256Gcm => {
+            let algo = Aes256Gcm::new_from_slice(&jwe_cek).map_err(|_| JweError::AesGcm)?;
+            algo.decrypt_inout_detached(&nonce, aad, buffer.as_mut_slice().into(), &authentication_tag)?;
+        }
         unsupported => {
             return Err(JweError::UnsupportedAlgorithm {
                 algorithm: format!("{:?}", unsupported),
@@ -1022,8 +1052,6 @@ fn generate_ecdh_shared_secret(
 
     let (shared_secret, epk) = match &receiver_public_key.as_inner().subject_public_key {
         RfcPublicKey::Ec(_) => {
-            use rand::rngs::OsRng;
-
             let ec = EcdsaPublicKey::try_from(receiver_public_key)?;
 
             match ec.curve() {
@@ -1035,7 +1063,7 @@ fn generate_ecdh_shared_secret(
                         JweError::Key { source }
                     })?;
 
-                    let secret = p256::ecdh::EphemeralSecret::random(&mut OsRng);
+                    let secret = p256::ecdh::EphemeralSecret::random(&mut StdRng::from_os_rng());
 
                     let shared_secret = Zeroizing::new(secret.diffie_hellman(&public_key).raw_secret_bytes().to_vec());
                     let epk = PublicKey::from_ec_encoded_components(
@@ -1053,7 +1081,7 @@ fn generate_ecdh_shared_secret(
                         JweError::Key { source }
                     })?;
 
-                    let secret = p384::ecdh::EphemeralSecret::random(&mut OsRng);
+                    let secret = p384::ecdh::EphemeralSecret::random(&mut StdRng::from_os_rng());
 
                     let shared_secret = Zeroizing::new(secret.diffie_hellman(&public_key).raw_secret_bytes().to_vec());
                     let epk = PublicKey::from_ec_encoded_components(
@@ -1071,7 +1099,7 @@ fn generate_ecdh_shared_secret(
                         JweError::Key { source }
                     })?;
 
-                    let secret = p521::ecdh::EphemeralSecret::random(&mut OsRng);
+                    let secret = p521::ecdh::EphemeralSecret::random(&mut StdRng::from_os_rng());
 
                     let shared_secret = Zeroizing::new(secret.diffie_hellman(&public_key).raw_secret_bytes().to_vec());
                     let epk = PublicKey::from_ec_encoded_components(
@@ -1092,8 +1120,6 @@ fn generate_ecdh_shared_secret(
 
             match ed.algorithm() {
                 NamedEdAlgorithm::Known(EdAlgorithm::X25519) => {
-                    use rand::rngs::OsRng;
-
                     let public_key_data: [u8; X25519_FIELD_ELEMENT_SIZE] = ed.data().try_into().map_err(|e| {
                         let source = KeyError::ED {
                             context: format!("Cannot parse x25519 encoded point from bytes: {e}"),
@@ -1103,7 +1129,7 @@ fn generate_ecdh_shared_secret(
 
                     let public_key = x25519_dalek::PublicKey::from(public_key_data);
 
-                    let secret = x25519_dalek::EphemeralSecret::random_from_rng(OsRng);
+                    let secret = x25519_dalek::EphemeralSecret::random_from_rng(&mut StdRng::from_os_rng());
 
                     let epk = PublicKey::from_ed_encoded_components(
                         &EdAlgorithm::X25519.into(),
@@ -1175,10 +1201,7 @@ fn calculate_ecdh_shared_secret(
                     let secret_bytes_validated =
                         EcCurve::NistP256.validate_component(EcComponent::Secret(private_key.secret()))?;
 
-                    let secret = p256::SecretKey::from_bytes(
-                        p256::elliptic_curve::generic_array::GenericArray::from_slice(secret_bytes_validated),
-                    )
-                    .map_err(|e| KeyError::EC {
+                    let secret = p256::SecretKey::from_slice(secret_bytes_validated).map_err(|e| KeyError::EC {
                         context: format!("Cannot parse p256 secret from bytes: {e}"),
                     })?;
 
@@ -1201,10 +1224,7 @@ fn calculate_ecdh_shared_secret(
                     let secret_bytes_validated =
                         EcCurve::NistP384.validate_component(EcComponent::Secret(private_key.secret()))?;
 
-                    let secret = p384::SecretKey::from_bytes(
-                        p384::elliptic_curve::generic_array::GenericArray::from_slice(secret_bytes_validated),
-                    )
-                    .map_err(|e| KeyError::EC {
+                    let secret = p384::SecretKey::from_slice(secret_bytes_validated).map_err(|e| KeyError::EC {
                         context: format!("Cannot parse p384 secret from bytes: {e}"),
                     })?;
 
@@ -1227,10 +1247,7 @@ fn calculate_ecdh_shared_secret(
                     let secret_bytes_validated =
                         EcCurve::NistP521.validate_component(EcComponent::Secret(private_key.secret()))?;
 
-                    let secret = p521::SecretKey::from_bytes(
-                        p521::elliptic_curve::generic_array::GenericArray::from_slice(secret_bytes_validated),
-                    )
-                    .map_err(|e| KeyError::EC {
+                    let secret = p521::SecretKey::from_slice(secret_bytes_validated).map_err(|e| KeyError::EC {
                         context: format!("Cannot parse p521 secret from bytes: {e}"),
                     })?;
 
@@ -1316,7 +1333,7 @@ fn calculate_ecdh_shared_secret(
 /// Generate content encryption key (CEK) for given algorithm and wraps it with zeroize-on-drop container
 fn generate_cek(alg: JweEnc) -> Zeroizing<Vec<u8>> {
     let mut cek = Zeroizing::new(vec![0u8; alg.key_size()]);
-    let mut rng = rand::rngs::OsRng;
+    let mut rng = StdRng::from_os_rng();
     rng.fill_bytes(&mut cek);
     cek
 }
@@ -1327,7 +1344,7 @@ enum RsaPaddingScheme {
 }
 
 impl rsa::traits::PaddingScheme for RsaPaddingScheme {
-    fn decrypt<Rng: rand_core::CryptoRngCore>(
+    fn decrypt<Rng: rand_core::TryCryptoRng + ?Sized>(
         self,
         rng: Option<&mut Rng>,
         priv_key: &RsaPrivateKey,
@@ -1341,7 +1358,7 @@ impl rsa::traits::PaddingScheme for RsaPaddingScheme {
         }
     }
 
-    fn encrypt<Rng: rand_core::CryptoRngCore>(
+    fn encrypt<Rng: rand_core::TryCryptoRng + ?Sized>(
         self,
         rng: &mut Rng,
         pub_key: &RsaPublicKey,
@@ -1472,8 +1489,9 @@ mod tests {
         // 6: Content Encryption
 
         let mut buffer = plaintext.to_vec();
-        let tag = Aes256Gcm::new(GenericArray::from_slice(&cek))
-            .encrypt_in_place_detached(GenericArray::from_slice(&iv), aad, &mut buffer)
+        let algo = Aes256Gcm::new_from_slice(&cek).unwrap();
+        let tag = algo
+            .encrypt_inout_detached(&Array::try_from(iv).unwrap(), aad, buffer.as_mut_slice().into())
             .unwrap();
         let ciphertext = buffer;
 

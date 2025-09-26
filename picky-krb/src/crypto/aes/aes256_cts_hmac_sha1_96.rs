@@ -1,5 +1,5 @@
-use rand::Rng;
-use rand::rngs::OsRng;
+use rand::prelude::StdRng;
+use rand::{RngCore, SeedableRng};
 
 use crate::crypto::common::hmac_sha1;
 use crate::crypto::utils::usage_ki;
@@ -36,13 +36,9 @@ impl Cipher for Aes256CtsHmacSha196 {
     }
 
     fn encrypt(&self, key: &[u8], key_usage: i32, payload: &[u8]) -> Result<Vec<u8>, KerberosCryptoError> {
-        encrypt_message(
-            key,
-            key_usage,
-            payload,
-            &AesSize::Aes256,
-            OsRng.r#gen::<[u8; AES_BLOCK_SIZE]>(),
-        )
+        let mut confounder = [0; AES_BLOCK_SIZE];
+        StdRng::from_os_rng().fill_bytes(&mut confounder);
+        encrypt_message(key, key_usage, payload, &AesSize::Aes256, confounder)
     }
 
     fn encrypt_no_checksum(
@@ -51,13 +47,9 @@ impl Cipher for Aes256CtsHmacSha196 {
         key_usage: i32,
         payload: &[u8],
     ) -> KerberosCryptoResult<EncryptWithoutChecksum> {
-        encrypt_message_no_checksum(
-            key,
-            key_usage,
-            payload,
-            &AesSize::Aes256,
-            OsRng.r#gen::<[u8; AES_BLOCK_SIZE]>(),
-        )
+        let mut confounder = [0; AES_BLOCK_SIZE];
+        StdRng::from_os_rng().fill_bytes(&mut confounder);
+        encrypt_message_no_checksum(key, key_usage, payload, &AesSize::Aes256, confounder)
     }
 
     fn decrypt(&self, key: &[u8], key_usage: i32, cipher_data: &[u8]) -> KerberosCryptoResult<Vec<u8>> {

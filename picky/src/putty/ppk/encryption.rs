@@ -5,6 +5,7 @@ use crate::putty::key_value::{Argon2FlavourValue, PpkEncryptionValue, PpkVersion
 use crate::putty::ppk::kdf::{self, KeyMaterialV2};
 use crate::putty::ppk::{Argon2Params, Ppk, aes as ppk_aes};
 use crate::ssh::decode::SshReadExt;
+use rand_core::SeedableRng;
 
 /// PPK encryption configuration builder.
 ///
@@ -111,7 +112,7 @@ impl Ppk {
 
     /// Returns PPK key encrypted with the specified passphrase and config.
     pub fn encrypt(&self, passphrase: &str, config: PpkEncryptionConfig) -> Result<Self, PuttyError> {
-        self.encrypt_with_rng(passphrase, config, rand::rngs::OsRng)
+        self.encrypt_with_rng(passphrase, config, rand::rngs::StdRng::from_os_rng())
     }
 
     /// Returns PPK key encrypted with the specified passphrase, config and RNG.

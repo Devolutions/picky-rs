@@ -1,5 +1,5 @@
-use rand::Rng;
-use rand::rngs::OsRng;
+use rand::rngs::StdRng;
+use rand::{RngCore, SeedableRng};
 
 use crate::crypto::common::hmac_sha1;
 use crate::crypto::utils::usage_ki;
@@ -43,7 +43,9 @@ impl Cipher for Des3CbcSha1Kd {
     }
 
     fn encrypt(&self, key: &[u8], key_usage: i32, payload: &[u8]) -> KerberosCryptoResult<Vec<u8>> {
-        encrypt_message(key, key_usage, payload, OsRng.r#gen::<[u8; DES3_BLOCK_SIZE]>())
+        let mut cofounder = [0; DES3_BLOCK_SIZE];
+        StdRng::from_os_rng().fill_bytes(&mut cofounder);
+        encrypt_message(key, key_usage, payload, cofounder)
     }
 
     fn encrypt_no_checksum(
@@ -52,7 +54,9 @@ impl Cipher for Des3CbcSha1Kd {
         key_usage: i32,
         payload: &[u8],
     ) -> KerberosCryptoResult<EncryptWithoutChecksum> {
-        encrypt_message_no_checksum(key, key_usage, payload, OsRng.r#gen::<[u8; DES3_BLOCK_SIZE]>())
+        let mut cofounder = [0; DES3_BLOCK_SIZE];
+        StdRng::from_os_rng().fill_bytes(&mut cofounder);
+        encrypt_message_no_checksum(key, key_usage, payload, cofounder)
     }
 
     fn decrypt(&self, key: &[u8], key_usage: i32, cipher_data: &[u8]) -> KerberosCryptoResult<Vec<u8>> {
