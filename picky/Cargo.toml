@@ -85,7 +85,6 @@ ring = "0.17"
 rstest = "0.26"
 expect-test = "1"
 tempfile = "3.22"
-rand_chacha = "0.3"
 picky-test-data = { path = "../picky-test-data", version = "0.1" }
 
 [features]
