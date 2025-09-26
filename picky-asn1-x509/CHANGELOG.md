@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### <!-- 1 -->Features
 
-- Improve support for SHA3 digests within EC and RSA certificates (#397) ([c898c1a65a](https://github.com/Devolutions/picky-rs/commit/c898c1a65a3a368047354d92cbfd3a6b3aa4f694)) 
+- Improve support for SHA3 digests within EC and RSA certificates (#397) ([c898c1a65a](https://github.com/Devolutions/picky-rs/commit/c898c1a65a3a368047354d92cbfd3a6b3aa4f694))
 
 ### Changed
 
