@@ -12,15 +12,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Improve support for SHA3 digests within EC and RSA certificates (#397) ([c898c1a65a](https://github.com/Devolutions/picky-rs/commit/c898c1a65a3a368047354d92cbfd3a6b3aa4f694)) 
 
-# Changelog
-
-All notable changes to this project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-## [Unreleased]
-
 ### Changed
 
 - Bump minimal rustc version to 1.85.
