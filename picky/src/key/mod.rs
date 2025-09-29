@@ -105,6 +105,7 @@ pub enum KeyKind {
     Rsa,
     Ec,
     Ed,
+    Mldsa,
 }
 
 // === private key === //
@@ -885,6 +886,7 @@ impl TryFrom<&'_ PublicKey> for RsaPublicKey {
             InnerPublicKey::Ed(_) => Err(KeyError::UnsupportedAlgorithm {
                 algorithm: "edwards curves",
             }),
+            InnerPublicKey::Mldsa(_) => Err(KeyError::UnsupportedAlgorithm { algorithm: "mldsa" }),
         }
     }
 }
@@ -1084,6 +1086,7 @@ impl PublicKey {
             picky_asn1_x509::PublicKey::Rsa(_) => KeyKind::Rsa,
             picky_asn1_x509::PublicKey::Ec(_) => KeyKind::Ec,
             picky_asn1_x509::PublicKey::Ed(_) => KeyKind::Ed,
+            picky_asn1_x509::PublicKey::Mldsa(_) => KeyKind::Mldsa,
         }
     }
 

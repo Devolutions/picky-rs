@@ -713,6 +713,11 @@ fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
 
                 (encrypted_key_base64, jwe_cek)
             }
+            RfcPublicKey::Mldsa(_) => {
+                return Err(JweError::UnsupportedAlgorithm {
+                    algorithm: "mldsa".to_string(),
+                });
+            }
         },
     };
 
@@ -1153,6 +1158,11 @@ fn generate_ecdh_shared_secret(
         RfcPublicKey::Rsa(_) => {
             return Err(JweError::UnsupportedAlgorithm {
                 algorithm: format!("RSA key can't be used with `{:?}` algorithm", alg),
+            });
+        }
+        RfcPublicKey::Mldsa(_) => {
+            return Err(JweError::UnsupportedAlgorithm {
+                algorithm: format!("MLDSA key can't be used with `{:?}` algorithm", alg),
             });
         }
     };

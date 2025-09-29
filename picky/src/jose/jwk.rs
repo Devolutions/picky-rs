@@ -406,6 +406,9 @@ impl Jwk {
 
                 Ok(Self::new(JwkKeyType::new_ed_key(algorithm, ed_key.data())))
             }
+            SerdePublicKey::Mldsa(_) => Err(JwkError::UnsupportedAlgorithm {
+                algorithm: "JWK unsupported with MLDSA keys",
+            }),
         }
     }
 

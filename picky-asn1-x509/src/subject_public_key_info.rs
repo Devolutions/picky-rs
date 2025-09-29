@@ -11,6 +11,7 @@ pub enum PublicKey {
     Ec(EncapsulatedEcPoint),
     /// Used For Ed25519, Ed448, X25519, and X448 keys
     Ed(EncapsulatedEcPoint),
+    Mldsa(EncapsulatedMldsaPublicKey),
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
@@ -24,6 +25,8 @@ pub type EncapsulatedRsaPublicKey = BitStringAsn1Container<RsaPublicKey>;
 pub type EcPoint = OctetStringAsn1;
 
 pub type EncapsulatedEcPoint = BitStringAsn1;
+
+pub type EncapsulatedMldsaPublicKey = BitStringAsn1;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct SubjectPublicKeyInfo {
@@ -74,6 +77,7 @@ impl ser::Serialize for SubjectPublicKeyInfo {
             PublicKey::Rsa(key) => seq.serialize_element(key)?,
             PublicKey::Ec(key) => seq.serialize_element(key)?,
             PublicKey::Ed(key) => seq.serialize_element(key)?,
+            PublicKey::Mldsa(key) => seq.serialize_element(key)?,
         }
 
         seq.end()
@@ -110,6 +114,9 @@ impl<'de> de::Deserialize<'de> for SubjectPublicKeyInfo {
                     }
                     oids::ED448 | oids::X448 => {
                         PublicKey::Ed(seq_next_element!(seq, SubjectPublicKeyInfo, "curve448 key"))
+                    }
+                    oids::ID_MLDSA_44 | oids::ID_MLDSA_65 | oids::ID_MLDSA_87 => {
+                        PublicKey::Mldsa(seq_next_element!(seq, SubjectPublicKeyInfo, "mldsa key"))
                     }
                     _ => {
                         return Err(serde_invalid_value!(

@@ -293,6 +293,9 @@ impl<'a> TryFrom<&'a PublicKey> for EcdsaPublicKey<'a> {
             InnerPublicKey::Ed(_) => Err(KeyError::EC {
                 context: "EC public key cannot be constructed from ED25519 public key".to_string(),
             }),
+            InnerPublicKey::Mldsa(_) => Err(KeyError::EC {
+                context: "EC public key cannot be constructed from MLDSA public key".to_string(),
+            }),
         }
     }
 }

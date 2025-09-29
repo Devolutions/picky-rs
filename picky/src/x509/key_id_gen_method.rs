@@ -53,6 +53,10 @@ impl KeyIdGenMethod {
                     let der = bitstring.0.payload_view();
                     Ok(hash_algo.digest(der)[..20].to_vec())
                 }
+                InnerPublicKey::Mldsa(bitstring) => {
+                    let der = bitstring.0.payload_view();
+                    Ok(hash_algo.digest(der)[..20].to_vec())
+                }
             },
             KeyIdGenMethod::SPKFullDER(hash_algo) => {
                 let der = public_key

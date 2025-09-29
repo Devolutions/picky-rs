@@ -184,6 +184,9 @@ impl<'a> TryFrom<&'a PublicKey> for EdPublicKey<'a> {
                     algorithm: NamedEdAlgorithm::from(oid),
                 })
             }
+            InnerPublicKey::Mldsa(_) => Err(KeyError::ED {
+                context: "Ed public key cannot be constructed from Mldsa public key".to_string(),
+            }),
         }
     }
 }
