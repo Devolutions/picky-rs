@@ -56,9 +56,9 @@ p256 = { version = "0.14.0-pre.11", features = ["ecdh"] }
 p384 = { version = "0.14.0-pre.11", features = ["ecdh"] }
 p521 = { version = "0.14.0-pre.11", features = ["ecdh"] }
 
-rsa = { version = "0.10.0-rc.8", features = ["std"] }
+rsa = { version = "0.10.0-rc.9", features = ["std"] }
 
-digest = "0.11.0-rc.1"
+digest = "0.11.0-rc.3"
 md5 = { package = "md-5", version = "0.11.0-rc.2", features = ["oid"] }
 sha1 = { version = "0.11.0-rc.2", features = ["oid"] }
 sha2 = { version = "0.11.0-rc.2", features = ["oid"] }
