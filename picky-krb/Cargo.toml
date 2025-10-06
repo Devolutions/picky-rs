@@ -27,7 +27,7 @@ sha1 = "0.11.0-rc.2"
 aes = "0.9.0-rc.1"
 des = "0.9.0-rc.1"
 cbc = "0.2.0-rc.1"
-inout = "0.2.0-rc.6"
+inout = "0.2.1"
 rand = "0.9"
 
 uuid = { version = "1.18", default-features = false, features = ["serde"] }
