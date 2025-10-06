@@ -32,4 +32,4 @@ rand = "0.9"
 
 uuid = { version = "1.18", default-features = false, features = ["serde"] }
 oid = "0.2"
-crypto-bigint = "0.7.0-rc.6"
+crypto-bigint = { version = "0.7.0-rc.6", features = ["alloc"] }
