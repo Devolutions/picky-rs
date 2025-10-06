@@ -1660,8 +1660,9 @@ dependencies = [
 
 [[package]]
 name = "rc2"
-version = "0.9.0-pre"
-source = "git+https://github.com/RustCrypto/block-ciphers?rev=cbc75f837701a1114bd50748cff6cdb65e8d3c1d#cbc75f837701a1114bd50748cff6cdb65e8d3c1d"
+version = "0.9.0-pre.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b03621ac292cc723def9e0fd0eb9573b1df8d6a9ee7ad637fe94dfc153705f3c"
 dependencies = [
  "cipher",
 ]
