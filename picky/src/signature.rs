@@ -3,7 +3,6 @@
 use crate::hash::HashAlgorithm;
 use crate::key::ec::{EcComponent, EcCurve, NamedEcCurve};
 use crate::key::{KeyError, PrivateKey, PublicKey};
-use ed25519_dalek::ed25519::SignatureEncoding;
 use rsa::signature::Signer;
 
 use picky_asn1_x509::{AlgorithmIdentifier, oids};
