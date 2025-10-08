@@ -18,7 +18,7 @@ picky-asn1-der = { version = "0.5", path = "../picky-asn1-der" }
 picky-asn1-x509 = { version = "0.15", path = "../picky-asn1-x509" }
 serde = { version = "1", features = ["derive"] }
 byteorder = "1.5"
-thiserror = "1"
+thiserror = "2"
 
 pbkdf2 = { version = "=0.13.0-rc.1", features = ["sha1"] }
 hmac = "=0.13.0-rc.2"
