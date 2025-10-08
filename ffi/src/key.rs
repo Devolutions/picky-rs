@@ -46,6 +46,7 @@ impl From<KeyKind> for picky::key::KeyKind {
             KeyKind::Rsa => picky::key::KeyKind::Rsa,
             KeyKind::Ec => picky::key::KeyKind::Ec,
             KeyKind::Ed => picky::key::KeyKind::Ed,
+            KeyKind::Mldsa => picky::key::KeyKind::Mldsa
         }
     }
 }
@@ -56,6 +57,7 @@ impl From<picky::key::KeyKind> for KeyKind {
             picky::key::KeyKind::Rsa => KeyKind::Rsa,
             picky::key::KeyKind::Ec => KeyKind::Ec,
             picky::key::KeyKind::Ed => KeyKind::Ed,
+            picky::key::KeyKind::Mldsa => KeyKind::Mldsa
         }
     }
 }
@@ -94,6 +96,8 @@ pub mod ffi {
         Ec,
         /// Edwards-curve
         Ed,
+        /// MLDSA (Module-Lattice-Based Digital Signature Algorithm)
+        Mldsa
     }
 
     #[diplomat::opaque]
