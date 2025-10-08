@@ -81,7 +81,7 @@ inout = "=0.2.0-rc.6"
 # TODO: Remove when stable versions will be released.
 aead = { version = "=0.6.0-rc.2", optional = true }
 blake2 = { version = "=0.11.0-rc.2", optional = true }
-block-padding = "=0.4.0-rc.4"
+block-padding = "=0.4.1"
 block-buffer = "=0.11.0-rc.5"
 blowfish = { version = "=0.10.0-rc.1", optional = true }
 cipher = { version = "=0.5.0-rc.1", optional = true }
