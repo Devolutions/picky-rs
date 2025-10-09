@@ -64,6 +64,10 @@ define_oid! {
     ID_RSASSA_PKCS1_V1_5_WITH_SHA3_256 => id_rsassa_pkcs1_v1_5_with_sha3_256 => "2.16.840.1.101.3.4.3.14",
     ID_RSASSA_PKCS1_V1_5_WITH_SHA3_384 => id_rsassa_pkcs1_v1_5_with_sha3_384 => "2.16.840.1.101.3.4.3.15",
     ID_RSASSA_PKCS1_V1_5_WITH_SHA3_512 => id_rsassa_pkcs1_v1_5_with_sha3_512 => "2.16.840.1.101.3.4.3.16",
+    ID_MLDSA_44 => id_mldsa_44 => "2.16.840.1.101.3.4.3.17",
+    ID_MLDSA_65 => id_mldsa_65 => "2.16.840.1.101.3.4.3.18",
+    ID_MLDSA_87 => id_mldsa_87 => "2.16.840.1.101.3.4.3.19",
+
 
     // Certicom Object Identifiers
     SECP384R1 => secp384r1 => "1.3.132.0.34",

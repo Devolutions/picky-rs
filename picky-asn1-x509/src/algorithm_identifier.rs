@@ -297,6 +297,27 @@ impl AlgorithmIdentifier {
             parameters: AlgorithmIdentifierParameters::None,
         }
     }
+
+    pub fn new_mldsa_44() -> Self {
+        Self {
+            algorithm: oids::id_mldsa_44().into(),
+            parameters: AlgorithmIdentifierParameters::None,
+        }
+    }
+
+    pub fn new_mldsa_65() -> Self {
+        Self {
+            algorithm: oids::id_mldsa_65().into(),
+            parameters: AlgorithmIdentifierParameters::None,
+        }
+    }
+
+    pub fn new_mldsa_87() -> Self {
+        Self {
+            algorithm: oids::id_mldsa_87().into(),
+            parameters: AlgorithmIdentifierParameters::None,
+        }
+    }
 }
 
 impl ser::Serialize for AlgorithmIdentifier {
@@ -379,7 +400,10 @@ impl<'de> de::Deserialize<'de> for AlgorithmIdentifier {
                     | oids::ED25519
                     | oids::ED448
                     | oids::X25519
-                    | oids::X448 => AlgorithmIdentifierParameters::None,
+                    | oids::X448
+                    | oids::ID_MLDSA_44
+                    | oids::ID_MLDSA_65
+                    | oids::ID_MLDSA_87 => AlgorithmIdentifierParameters::None,
                     oids::DSA_WITH_SHA1 => {
                         // A note from [RFC 3927](https://www.ietf.org/rfc/rfc3279.txt)
                         // When the id-dsa-with-sha1 algorithm identifier appears as the
@@ -1323,5 +1347,32 @@ mod tests {
         let expected = RawAlgorithmIdentifier::from_parts(oid, Some(params));
         pretty_assertions::assert_eq!(decoded, expected);
         check_serde!(decoded: RawAlgorithmIdentifier in encoded);
+    }
+
+    #[test]
+    fn mldsa_44() {
+        let expected = [
+            0x30, 0x0B, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x11,
+        ];
+        let mldsa = AlgorithmIdentifier::new_mldsa_44();
+        check_serde!(mldsa: AlgorithmIdentifier in expected);
+    }
+
+    #[test]
+    fn mldsa_65() {
+        let expected = [
+            0x30, 0x0B, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x12,
+        ];
+        let mldsa = AlgorithmIdentifier::new_mldsa_65();
+        check_serde!(mldsa: AlgorithmIdentifier in expected);
+    }
+
+    #[test]
+    fn mldsa_87() {
+        let expected = [
+            0x30, 0x0B, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x03, 0x13,
+        ];
+        let mldsa = AlgorithmIdentifier::new_mldsa_87();
+        check_serde!(mldsa: AlgorithmIdentifier in expected);
     }
 }
