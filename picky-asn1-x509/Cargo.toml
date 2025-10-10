@@ -1,6 +1,6 @@
 [package]
 name = "picky-asn1-x509"
-version = "0.15.0"
+version = "0.15.1"
 authors = [
     "Benoît CORTIER <bcortier@devolutions.net>",
     "Sergey Noskov <snoskov@avito.ru>",

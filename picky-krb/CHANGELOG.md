@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[0.11.3](https://github.com/Devolutions/picky-rs/compare/picky-krb-v0.11.2...picky-krb-v0.11.3)] - 2025-10-10
+
+### <!-- 4 -->Bug Fixes
+
+- Pin RustCrypto release candidate crates ([#417](https://github.com/Devolutions/picky-rs/issues/417)) ([8a79282bbc](https://github.com/Devolutions/picky-rs/commit/8a79282bbc0dae9df222f16d261b7dd1f03cd66f)) 
+
+### <!-- 7 -->Build
+
+- Bump thiserror from 1.0.69 to 2.0.17 ([#409](https://github.com/Devolutions/picky-rs/issues/409)) ([4edf52b407](https://github.com/Devolutions/picky-rs/commit/4edf52b407b04c787fbce2ccea8e1ea3dd25b627)) 
+
+
+
 ## [[0.11.2](https://github.com/Devolutions/picky-rs/compare/picky-krb-v0.11.1...picky-krb-v0.11.2)] - 2025-09-26
 
 ### <!-- 7 -->Build
