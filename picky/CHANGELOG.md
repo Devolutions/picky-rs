@@ -12,17 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Support parsing certs with MLDSA public keys ([#411](https://github.com/Devolutions/picky-rs/issues/411)) ([abc63dde88](https://github.com/Devolutions/picky-rs/commit/abc63dde88360e35ef225cfd1c279958f47c3abc)) 
 
-### <!-- 4 -->Bug Fixes
-
-- Pin RustCrypto release candidate crates ([#417](https://github.com/Devolutions/picky-rs/issues/417)) ([8a79282bbc](https://github.com/Devolutions/picky-rs/commit/8a79282bbc0dae9df222f16d261b7dd1f03cd66f)) 
-
 ### <!-- 7 -->Build
 
-- Bump the crypto group across 1 directory with 3 updates ([#415](https://github.com/Devolutions/picky-rs/issues/415)) ([5093106874](https://github.com/Devolutions/picky-rs/commit/5093106874c2a8d910c4c2344a64af6180dcc9e7)) 
-
-- Bump thiserror from 1.0.69 to 2.0.17 ([#409](https://github.com/Devolutions/picky-rs/issues/409)) ([4edf52b407](https://github.com/Devolutions/picky-rs/commit/4edf52b407b04c787fbce2ccea8e1ea3dd25b627)) 
-
-
+- Pin RustCrypto release candidate crates ([#417](https://github.com/Devolutions/picky-rs/issues/417)) ([8a79282bbc](https://github.com/Devolutions/picky-rs/commit/8a79282bbc0dae9df222f16d261b7dd1f03cd66f)) 
 
 ## [[7.0.0-rc.18](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.17...picky-v7.0.0-rc.18)] - 2025-09-26
 
