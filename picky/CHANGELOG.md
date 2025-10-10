@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[7.0.0-rc.19](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.18...picky-v7.0.0-rc.19)] - 2025-10-10
+
+### <!-- 1 -->Features
+
+- Support parsing certs with MLDSA public keys ([#411](https://github.com/Devolutions/picky-rs/issues/411)) ([abc63dde88](https://github.com/Devolutions/picky-rs/commit/abc63dde88360e35ef225cfd1c279958f47c3abc)) 
+
+### <!-- 7 -->Build
+
+- Pin RustCrypto release candidate crates ([#417](https://github.com/Devolutions/picky-rs/issues/417)) ([8a79282bbc](https://github.com/Devolutions/picky-rs/commit/8a79282bbc0dae9df222f16d261b7dd1f03cd66f)) 
+
 ## [[7.0.0-rc.18](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.17...picky-v7.0.0-rc.18)] - 2025-09-26
 
 ### <!-- 7 -->Build

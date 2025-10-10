@@ -1,6 +1,6 @@
 [package]
 name = "picky-krb"
-version = "0.11.2"
+version = "0.11.3"
 authors = ["Devolutions Inc."]
 edition = "2024"
 rust-version = "1.85"
