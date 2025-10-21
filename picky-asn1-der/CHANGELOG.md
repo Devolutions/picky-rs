@@ -20,8 +20,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Remove lazy_static ([#424](https://github.com/Devolutions/picky-rs/issues/424)) ([d96e761fba](https://github.com/Devolutions/picky-rs/commit/d96e761fbaf7e4061a9488240e3f6426a53cc6b1)) 
 
-
-
 ### Changed
 
 - Bump minimal rustc version to 1.85.
