@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[0.15.2](https://github.com/Devolutions/picky-rs/compare/picky-asn1-x509-v0.15.1...picky-asn1-x509-v0.15.2)] - 2025-10-21
+
+### <!-- 7 -->Build
+
+- Remove num-bigint-dig ([#425](https://github.com/Devolutions/picky-rs/issues/425)) ([9081890c3c](https://github.com/Devolutions/picky-rs/commit/9081890c3c4a4b26bb1827b983f40d1c2991550e)) 
+
 ## [[0.15.1](https://github.com/Devolutions/picky-rs/compare/picky-asn1-x509-v0.15.0...picky-asn1-x509-v0.15.1)] - 2025-10-10
 
 ### <!-- 1 -->Features

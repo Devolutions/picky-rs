@@ -14,6 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [[0.5.4](https://github.com/Devolutions/picky-rs/compare/picky-asn1-der-v0.5.3...picky-asn1-der-v0.5.4)] - 2025-10-21
+
+### <!-- 7 -->Build
+
+- Remove lazy_static ([#424](https://github.com/Devolutions/picky-rs/issues/424)) ([d96e761fba](https://github.com/Devolutions/picky-rs/commit/d96e761fbaf7e4061a9488240e3f6426a53cc6b1)) 
+
 ### Changed
 
 - Bump minimal rustc version to 1.85.
