@@ -1424,7 +1424,6 @@ name = "picky-asn1-der"
 version = "0.5.3"
 dependencies = [
  "base64",
- "lazy_static",
  "num-bigint-dig",
  "oid",
  "picky-asn1",

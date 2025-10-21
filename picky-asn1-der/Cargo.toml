@@ -20,7 +20,6 @@ include = ["src/**/*", "README.md", "CHANGELOG.md", "LICENSE-*"]
 picky-asn1 = { version = "0.10", path = "../picky-asn1" }
 serde = { version = "1", default-features = false, features = ["derive"] }
 serde_bytes = "0.11"
-lazy_static = { version = "1.5", optional = true }
 
 [dev-dependencies]
 base64 = "0.22"
@@ -30,4 +29,4 @@ num-bigint-dig = "0.8"# TODO: use `crypto-bigint` instead
 oid = { version = "0.2", default-features = false, features = ["serde_support"] }
 
 [features]
-debug_log = ["lazy_static"]
+debug_log = []
