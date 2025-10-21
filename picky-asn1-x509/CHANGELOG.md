@@ -10,9 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### <!-- 7 -->Build
 
-- Get rid of num-bigint-dig ([#425](https://github.com/Devolutions/picky-rs/issues/425)) ([9081890c3c](https://github.com/Devolutions/picky-rs/commit/9081890c3c4a4b26bb1827b983f40d1c2991550e)) 
-
-
+- Remove num-bigint-dig ([#425](https://github.com/Devolutions/picky-rs/issues/425)) ([9081890c3c](https://github.com/Devolutions/picky-rs/commit/9081890c3c4a4b26bb1827b983f40d1c2991550e)) 
 
 ## [[0.15.1](https://github.com/Devolutions/picky-rs/compare/picky-asn1-x509-v0.15.0...picky-asn1-x509-v0.15.1)] - 2025-10-10
 
