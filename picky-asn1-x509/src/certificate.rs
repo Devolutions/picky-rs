@@ -163,7 +163,7 @@ mod tests {
     use crate::{DirectoryName, Extension, KeyIdentifier, KeyUsage};
     use base64::Engine as _;
     use base64::engine::general_purpose;
-    use num_bigint_dig::BigInt;
+    use crypto_bigint::BoxedUint;
     use picky_asn1::bit_string::BitString;
     use picky_asn1::date::UTCTime;
 
@@ -218,7 +218,10 @@ mod tests {
 
         let subject_public_key_info = SubjectPublicKeyInfo::new_rsa_key(
             IntegerAsn1::from(encoded[165..422].to_vec()),
-            BigInt::from(65537).to_signed_bytes_be().into(),
+            BoxedUint::from(65537u32)
+                .to_be_bytes_trimmed_vartime()
+                .into_vec()
+                .into(),
         );
         check_serde!(subject_public_key_info: SubjectPublicKeyInfo in encoded[133..427]);
 
@@ -245,7 +248,10 @@ mod tests {
 
         let tbs_certificate = TbsCertificate {
             version: ExplicitContextTag0(Version::V3),
-            serial_number: BigInt::from(935548868).to_signed_bytes_be().into(),
+            serial_number: BoxedUint::from(935548868u32)
+                .to_be_bytes_trimmed_vartime()
+                .into_vec()
+                .into(),
             signature: signature_algorithm.clone(),
             issuer,
             validity,

@@ -370,36 +370,53 @@ impl<'de> de::Deserialize<'de> for RsaPrivateKey {
                     let coefficient = seq.next_element()?.ok_or_else(|| de::Error::invalid_length(8, &self))?;
                     (exponent_1, exponent_2, coefficient)
                 } else {
-                    use num_bigint_dig::{BigUint, ModInverse};
+                    use crypto_bigint::{BoxedUint, NonZero, Uint};
+                    use std::ops::Sub;
 
-                    // conversion to num_bigint_dig format BigUint
-                    let private_exponent = BigUint::from_bytes_be(private_exponent.as_unsigned_bytes_be());
-                    let prime_1 = BigUint::from_bytes_be(prime_1.as_unsigned_bytes_be());
-                    let prime_2 = BigUint::from_bytes_be(prime_2.as_unsigned_bytes_be());
+                    // conversion to crypto_bigint format BoxedUint
+                    let private_exponent = BoxedUint::from_be_slice_vartime(private_exponent.as_unsigned_bytes_be());
+                    let prime_1 = BoxedUint::from_be_slice_vartime(prime_1.as_unsigned_bytes_be());
+                    let prime_1 = NonZero::new(prime_1).into_option().ok_or_else(|| {
+                        de::Error::invalid_value(
+                            de::Unexpected::Other("[RSAPrivateKey] prime 1 is zero"),
+                            &"a non zero prime 1",
+                        )
+                    })?;
 
-                    let exponent_1 = &private_exponent % (&prime_1 - 1u8);
-                    let exponent_2 = &private_exponent % (&prime_2 - 1u8);
+                    let prime_2 = BoxedUint::from_be_slice_vartime(prime_2.as_unsigned_bytes_be());
 
-                    let coefficient = prime_2
-                        .mod_inverse(prime_1)
-                        .ok_or_else(|| {
+                    let one = Uint::<1>::from_u8(1);
+                    let prime_1_minus_one =
+                        NonZero::new(prime_1.as_ref().sub(&one)).into_option().ok_or_else(|| {
                             de::Error::invalid_value(
-                                de::Unexpected::Other("[RSAPrivateKey] no modular inverse for prime 1"),
-                                &"an invertible prime 1 value",
-                            )
-                        })?
-                        .to_biguint()
-                        .ok_or_else(|| {
-                            de::Error::invalid_value(
-                                de::Unexpected::Other("[RSAPrivateKey] BigUint conversion failed"),
-                                &"a valid prime 1 value",
+                                de::Unexpected::Other("[RSAPrivateKey] prime 1 minus one results in zero"),
+                                &"a prime 1 larger than 1",
                             )
                         })?;
+                    let prime_2_minus_one = NonZero::new((&prime_2).sub(&one)).into_option().ok_or_else(|| {
+                        de::Error::invalid_value(
+                            de::Unexpected::Other("[RSAPrivateKey] prime 2 minus one results in zero"),
+                            &"a prime 2 larger than 1",
+                        )
+                    })?;
+
+                    let exponent_1 = private_exponent.rem(&prime_1_minus_one);
+                    let exponent_2 = private_exponent.rem(&prime_2_minus_one);
+
+                    let coefficient = prime_2.invert_mod(&prime_1).into_option().ok_or_else(|| {
+                        de::Error::invalid_value(
+                            de::Unexpected::Other("[RSAPrivateKey] no modular inverse for prime 1"),
+                            &"an invertible prime 1 value",
+                        )
+                    })?;
 
                     // conversion to IntegerAsn1
-                    let exponent_1 = IntegerAsn1::from_bytes_be_unsigned(exponent_1.to_bytes_be());
-                    let exponent_2 = IntegerAsn1::from_bytes_be_unsigned(exponent_2.to_bytes_be());
-                    let coefficient = IntegerAsn1::from_bytes_be_unsigned(coefficient.to_bytes_be());
+                    let exponent_1 =
+                        IntegerAsn1::from_bytes_be_unsigned(exponent_1.to_be_bytes_trimmed_vartime().into_vec());
+                    let exponent_2 =
+                        IntegerAsn1::from_bytes_be_unsigned(exponent_2.to_be_bytes_trimmed_vartime().into_vec());
+                    let coefficient =
+                        IntegerAsn1::from_bytes_be_unsigned(coefficient.to_be_bytes_trimmed_vartime().into_vec());
 
                     (exponent_1, exponent_2, coefficient)
                 };

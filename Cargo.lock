@@ -1438,9 +1438,9 @@ name = "picky-asn1-x509"
 version = "0.15.1"
 dependencies = [
  "base64",
+ "crypto-bigint",
  "expect-test",
  "hex",
- "num-bigint-dig",
  "oid",
  "picky-asn1",
  "picky-asn1-der",
