@@ -143,7 +143,7 @@ mod tests {
     use super::*;
     use base64::Engine as _;
     use base64::engine::general_purpose;
-    use num_bigint_dig::BigInt;
+    use crypto_bigint::BoxedUint;
 
     #[test]
     fn rsa_subject_public_key_info() {
@@ -185,7 +185,10 @@ mod tests {
         ]);
         check_serde!(modulus: IntegerAsn1 in encoded[28..289]);
 
-        let public_exponent: IntegerAsn1 = BigInt::from(65537).to_signed_bytes_be().into();
+        let public_exponent: IntegerAsn1 = BoxedUint::from(65537u32)
+            .to_be_bytes_trimmed_vartime()
+            .into_vec()
+            .into();
         check_serde!(public_exponent: IntegerAsn1 in encoded[289..294]);
 
         // RSA public key
