@@ -8,12 +8,10 @@ macro_rules! debug_log {
 #[macro_use]
 pub mod internal {
     use std::collections::HashMap;
-    use std::sync::Mutex;
+    use std::sync::{LazyLock, Mutex};
     use std::thread::ThreadId;
 
-    lazy_static::lazy_static! {
-        pub static ref CTX: Mutex<HashMap<ThreadId, u8>> = Mutex::new(HashMap::new());
-    }
+    pub static CTX: LazyLock<Mutex<HashMap<ThreadId, u8>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
     pub struct Identer;
     impl Identer {
