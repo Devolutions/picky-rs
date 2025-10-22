@@ -17,7 +17,7 @@
 use super::ocsp_request::AlgorithmIdentifier;
 use base64::Engine as _;
 use base64::engine::general_purpose;
-use num_bigint_dig::BigInt;
+use crypto_bigint::BoxedUint;
 use oid::prelude::*;
 use picky_asn1::wrapper::*;
 use serde::{Deserialize, Serialize};
@@ -78,7 +78,10 @@ fn subject_public_key_info() {
     ]);
     check!(modulus: IntegerAsn1 in encoded[28..289]);
 
-    let public_exponent: IntegerAsn1 = BigInt::from(65537).to_signed_bytes_be().into();
+    let public_exponent: IntegerAsn1 = BoxedUint::from(65537u32)
+        .to_be_bytes_trimmed_vartime()
+        .into_vec()
+        .into();
     check!(public_exponent: IntegerAsn1 in encoded[289..294]);
 
     // RSA public key

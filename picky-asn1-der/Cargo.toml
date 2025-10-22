@@ -25,7 +25,7 @@ serde_bytes = "0.11"
 base64 = "0.22"
 pretty_assertions = "1.4"
 serde_bytes = "0.11"
-num-bigint-dig = "0.8"# TODO: use `crypto-bigint` instead
+crypto-bigint = { version = "0.7.0-rc.8", default-features = false, features = ["alloc"] }
 oid = { version = "0.2", default-features = false, features = ["serde_support"] }
 
 [features]

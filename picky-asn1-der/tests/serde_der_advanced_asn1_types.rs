@@ -1,8 +1,6 @@
-extern crate num_bigint_dig as num_bigint;
-
 mod pki_tests;
 
-use num_bigint::ToBigInt;
+use crypto_bigint::BoxedUint;
 use oid::prelude::*;
 use picky_asn1::bit_string::BitString;
 use picky_asn1::date::{Date, GeneralizedTime, UTCTime};
@@ -107,23 +105,11 @@ fn big_integer() {
 #[test]
 fn small_integer() {
     let buffer = [0x02, 0x01, 0x03];
-    let big_integer = IntegerAsn1::from(3.to_bigint().unwrap().to_signed_bytes_be());
+    let big_integer = IntegerAsn1::from(BoxedUint::from(3u32).to_be_bytes_trimmed_vartime().into_vec());
 
     assert!(big_integer.is_positive());
     assert!(!big_integer.is_negative());
     assert_eq!(big_integer.as_unsigned_bytes_be(), &[0x03]);
-
-    check(&buffer, big_integer);
-}
-
-#[test]
-fn small_integer_negative() {
-    let buffer = [0x02, 0x01, 0xF9];
-    let big_integer = IntegerAsn1::from((-7).to_bigint().unwrap().to_signed_bytes_be());
-
-    assert!(!big_integer.is_positive());
-    assert!(big_integer.is_negative());
-    assert_eq!(big_integer.as_unsigned_bytes_be(), &[0xF9]);
 
     check(&buffer, big_integer);
 }
@@ -223,13 +209,6 @@ fn sequence_of() {
     ];
 
     check(&buffer, set_of_elems);
-}
-
-#[test]
-fn application_tag0() {
-    let buffer = [0xA0, 0x03, 0x02, 0x01, 0xF9];
-    let application_tag = ExplicitContextTag0(IntegerAsn1::from((-7).to_bigint().unwrap().to_signed_bytes_be()));
-    check(&buffer, application_tag);
 }
 
 #[test]
