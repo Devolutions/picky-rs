@@ -59,7 +59,7 @@ use crate::pki_tests::rsa_public_key::{RSAPublicKey, SubjectPublicKeyInfoRsa};
 use crate::pki_tests::version::{Version, implicit_app0_version_is_default};
 use base64::Engine as _;
 use base64::engine::general_purpose;
-use num_bigint_dig::BigInt;
+use crypto_bigint::BoxedUint;
 use oid::prelude::*;
 use picky_asn1::bit_string::BitString;
 use picky_asn1::date::Date;
@@ -176,7 +176,10 @@ fn x509_v3_certificate() {
         },
         subject_public_key: RSAPublicKey {
             modulus: IntegerAsn1::from_bytes_be_signed(encoded[165..422].to_vec()),
-            public_exponent: BigInt::from(65537).to_signed_bytes_be().into(),
+            public_exponent: BoxedUint::from(65537u32)
+                .to_be_bytes_trimmed_vartime()
+                .into_vec()
+                .into(),
         }
         .into(),
     };
