@@ -47,7 +47,7 @@ reqwest = { version = "0.12", default-features = false, features = ["blocking"],
 
 rand = "0.9"
 rand_core = "0.9"
-crypto-bigint = "=0.7.0-rc.8"
+crypto-bigint = "=0.7.0-rc.9"
 
 ed25519-dalek = { version = "=3.0.0-pre.1", features = ["hazmat", "rand_core"] }
 x25519-dalek = { version = "=3.0.0-pre.1", features = ["static_secrets"] }
