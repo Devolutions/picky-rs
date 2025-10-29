@@ -21,7 +21,6 @@ jobs:
     steps:
       - name: Get dry run
         id: get-dry-run
-        shell: pwsh
         run: |
           $IsDryRun = '${{ github.event.inputs.dry-run }}' -Eq 'true' -Or '${{ github.event_name }}' -Eq 'schedule'
 
@@ -30,6 +29,7 @@ jobs:
           } else {
             echo "dry-run=false" >> $Env:GITHUB_OUTPUT
           }
+        shell: pwsh
 
   tests:
     name: Tests
@@ -43,42 +43,42 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-      
+
       - name: Setup wasm-pack
-        shell: bash
         run: |
-          curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh      
+          curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+        shell: bash
 
       - name: Tests
-        shell: pwsh
         run: |
           Set-Location ./ffi/wasm
           ./run_tests.ps1
+        shell: pwsh
 
   publish:
     name: Publish package
-    runs-on: ubuntu-latest
     environment: npm-publish
-    needs:
-      - preflight
-      - tests
-    if: needs.preflight.outputs.dry-run == 'false'
+    if: ${{ needs.preflight.outputs.dry-run == 'false' }}
+    needs: [preflight, tests]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup wasm-pack
-        shell: bash
         run: |
-          curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh      
+          curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+        shell: bash
 
       - name: Build & Publish
-        shell: pwsh
         run: |
           Set-Location ./ffi/wasm
-          npm config set "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}"
           ./publish.ps1
+        shell: pwsh
 
       - name: Update Artifactory Cache
         run: gh workflow run update-artifactory-cache.yml --repo Devolutions/scheduled-tasks --field package_name="picky"
@@ -95,6 +95,7 @@ jobs:
     env:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_ARCHITECTURE }}
       SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
     steps:
       - name: Send slack notification
         id: slack

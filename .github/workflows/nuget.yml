@@ -26,7 +26,6 @@ jobs:
 
       - name: Get dry run
         id: get-dry-run
-        shell: pwsh
         run: |
           $IsDryRun = '${{ github.event.inputs.dry-run }}' -Eq 'true' -Or '${{ github.event_name }}' -Eq 'schedule'
 
@@ -35,21 +34,22 @@ jobs:
           } else {
             echo "dry-run=false" >> $Env:GITHUB_OUTPUT
           }
+        shell: pwsh
 
       - name: Get version
         id: get-version
-        shell: pwsh
         run: |
           $CsprojXml = [Xml] (Get-Content .\ffi\dotnet\Devolutions.Picky\Devolutions.Picky.csproj)
           $ProjectVersion = $CsprojXml.Project.PropertyGroup.Version | Select-Object -First 1
           $PackageVersion = $ProjectVersion -Replace "^(\d+)\.(\d+)\.(\d+).(\d+)$", "`$1.`$2.`$3"
           echo "project-version=$ProjectVersion" >> $Env:GITHUB_OUTPUT
           echo "package-version=$PackageVersion" >> $Env:GITHUB_OUTPUT
+        shell: pwsh
 
   build-native:
     name: Native build
+    needs: [preflight]
     runs-on: ${{matrix.runner}}
-    needs: preflight
     strategy:
       fail-fast: false
       matrix:
@@ -95,13 +95,13 @@ jobs:
           android_api_level: "21"
 
       - name: Setup build environment
-        shell: pwsh
         run: |
           if ('${{ matrix.os }}' -Eq 'osx') {
             echo "MACOSX_DEPLOYMENT_TARGET=10.12" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
           } elseif ('${{ matrix.os }}' -Eq 'ios') {
             echo "IPHONEOS_DEPLOYMENT_TARGET=12.1" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
           }
+        shell: pwsh
 
       - name: Setup LLVM
         uses: Devolutions/actions-public/setup-llvm@v1
@@ -120,7 +120,6 @@ jobs:
           cargo_env_scripts: true
 
       - name: Build picky (${{matrix.os}}-${{matrix.arch}})
-        shell: pwsh
         run: |
           $DotNetOs = '${{matrix.os}}'
           $DotNetArch = '${{matrix.arch}}'
@@ -177,6 +176,7 @@ jobs:
           $OutputPath = Join-Path "dependencies" "runtimes" $DotNetRid "native"
           New-Item -ItemType Directory -Path $OutputPath | Out-Null
           Copy-Item $OutputLibrary $(Join-Path $OutputPath $RenamedLibraryName)
+        shell: pwsh
 
       - name: Upload native components
         uses: actions/upload-artifact@v4
@@ -186,8 +186,8 @@ jobs:
 
   build-universal:
     name: Universal build
-    runs-on: ubuntu-24.04
     needs: [preflight, build-native]
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -206,7 +206,6 @@ jobs:
           path: dependencies/runtimes
 
       - name: Lipo native components
-        shell: pwsh
         run: |
           Set-Location "dependencies/runtimes"
           # No RID for universal binaries, see: https://github.com/dotnet/runtime/issues/53156
@@ -216,9 +215,9 @@ jobs:
           $LipoCmd = $(@('lipo', '-create', '-output', (Join-Path -Path $OutputPath -ChildPath "libDevolutionsPicky.dylib")) + $Libraries) -Join ' '
           Write-Host $LipoCmd
           Invoke-Expression $LipoCmd
+        shell: pwsh
 
       - name: Framework
-        shell: pwsh
         if: ${{ matrix.os == 'ios' }}
         run: |
           $Version = '${{ needs.preflight.outputs.project-version }}'
@@ -261,6 +260,7 @@ jobs:
           # .NET XML document inserts two square brackets at the end of the DOCTYPE tag
           # It's perfectly valid XML, but we're dealing with plists here and dyld will not be able to read the file
           ((Get-Content -Path (Join-Path $FrameworkDir "Info.plist") -Raw) -Replace 'PropertyList-1.0.dtd"\[\]', 'PropertyList-1.0.dtd"') | Set-Content -Path (Join-Path $FrameworkDir "Info.plist")
+        shell: pwsh
 
       - name: Upload native components
         uses: actions/upload-artifact@v4
@@ -270,8 +270,8 @@ jobs:
 
   build-managed:
     name: Managed build
+    needs: [build-universal]
     runs-on: windows-2022
-    needs: build-universal
 
     steps:
       - name: Check out ${{ github.repository }}
@@ -281,9 +281,9 @@ jobs:
         run: dotnet workload install ios
 
       - name: Prepare dependencies
-        shell: pwsh
         run: |
           New-Item -ItemType Directory -Path "dependencies/runtimes" | Out-Null
+        shell: pwsh
 
       - name: Download native components
         uses: actions/download-artifact@v4
@@ -291,16 +291,16 @@ jobs:
           path: dependencies/runtimes
 
       - name: Rename dependencies
-        shell: pwsh
         run: |
           Set-Location "dependencies/runtimes"
           $(Get-Item ".\picky-*") | ForEach-Object { Rename-Item $_ $_.Name.Replace("picky-", "") }
           Get-ChildItem * -Recurse
+        shell: pwsh
 
       - name: Build picky (managed)
-        shell: pwsh
         run: |
           dotnet build .\ffi\dotnet\Devolutions.Picky\Devolutions.Picky.csproj -c Release
+        shell: pwsh
 
       - name: Upload managed components
         uses: actions/upload-artifact@v4
@@ -310,12 +310,10 @@ jobs:
 
   publish:
     name: Publish NuGet package
-    runs-on: ubuntu-latest
     environment: nuget-publish
-    if: needs.preflight.outputs.dry-run == 'false'
-    needs:
-      - preflight
-      - build-managed
+    if: ${{ needs.preflight.outputs.dry-run == 'false' }}
+    needs: [preflight, build-managed]
+    runs-on: ubuntu-latest
 
     steps:
       - name: Download NuGet package artifact
@@ -325,15 +323,14 @@ jobs:
           path: package
 
       - name: Publish to nuget.org
-        shell: pwsh
         run: |
           $Files = Get-ChildItem -Recurse package/*.nupkg
-    
+
           foreach ($File in $Files) {
             $PushCmd = @(
-              'dotnet', 
-              'nuget', 
-              'push', 
+              'dotnet',
+              'nuget',
+              'push',
               "$File",
               '--api-key',
               '${{ secrets.NUGET_API_KEY }}',
@@ -346,15 +343,13 @@ jobs:
             $PushCmd = $PushCmd -Join ' '
             Invoke-Expression $PushCmd
           }
+        shell: pwsh
 
   notify:
     name: Notify failure
-    runs-on: ubuntu-latest
     if: ${{ always() && contains(needs.*.result, 'failure') && github.event_name == 'schedule' }}
-    needs:
-      - preflight
-      - build-universal
-      - build-managed
+    needs: [preflight, build-universal, build-managed]
+    runs-on: ubuntu-latest
     env:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_ARCHITECTURE }}
       SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
