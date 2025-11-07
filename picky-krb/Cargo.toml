@@ -32,11 +32,11 @@ rand = "0.9"
 
 uuid = { version = "1.18", default-features = false, features = ["serde"] }
 oid = "0.2"
-crypto-bigint = { version = "=0.7.0-rc.8", features = ["alloc"] }
+crypto-bigint = { version = "=0.7.0-rc.10", features = ["alloc"] }
 
 # Pin transitive dependencies versions.
 # TODO: Remove when stable versions will be released.
-block-padding = "=0.4.0-rc.4"
+block-padding = "=0.4.1"
 cipher = "=0.5.0-rc.1"
 block-buffer = "=0.11.0-rc.5"
 crypto-common = "=0.2.0-rc.4"
