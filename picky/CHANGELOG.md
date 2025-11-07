@@ -16,8 +16,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   this rule doesn't work for an `rc` version. So we should pin the `rc`
   versions, to not allow _cargo_ update to a new `rc` automatically.
 
-
-
 ## [[7.0.0-rc.19](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.18...picky-v7.0.0-rc.19)] - 2025-10-10
 
 ### <!-- 1 -->Features
