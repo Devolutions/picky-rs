@@ -105,6 +105,10 @@ pkcs1 = "=0.8.0-rc.4"
 keccak = "=0.2.0-rc.0"
 primefield = "=0.14.0-pre.6"
 primeorder = "=0.14.0-pre.9"
+ff = { version = "=0.14.0-pre.0", default-features = false }
+group = "=0.14.0-pre.0"
+curve25519-dalek = "=5.0.0-pre.1"
+crypto-primes = "=0.7.0-pre.3"
 
 [dev-dependencies]
 pretty_assertions = "1.4"
