@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[7.0.0-rc.20](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.19...picky-v7.0.0-rc.20)] - 2025-11-07
+
+### <!-- 4 -->Bug Fixes
+
+- Pin leftover pre-release crypto crates ([#430](https://github.com/Devolutions/picky-rs/issues/430)) ([0fe43dae7b](https://github.com/Devolutions/picky-rs/commit/0fe43dae7b463a16d48b00b08ca6ce21a013af74)) 
+
+  The patch version upgrade is not allowed to bring breaking changes, but
+  this rule doesn't work for an `rc` version. So we should pin the `rc`
+  versions, to not allow _cargo_ update to a new `rc` automatically.
+
 ## [[7.0.0-rc.19](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.18...picky-v7.0.0-rc.19)] - 2025-10-10
 
 ### <!-- 1 -->Features
