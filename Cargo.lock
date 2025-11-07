@@ -1369,11 +1369,16 @@ name = "picky-ffi"
 version = "0.0.0"
 dependencies = [
  "argon2",
+ "blake2",
+ "block-buffer",
+ "crypto-common",
+ "digest",
  "diplomat",
  "diplomat-runtime",
  "embed-resource",
  "getrandom 0.3.4",
  "hex",
+ "password-hash",
  "picky",
  "picky-asn1",
  "picky-asn1-der",
