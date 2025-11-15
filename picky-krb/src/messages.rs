@@ -256,7 +256,7 @@ pub struct EncKdcRepPart {
     pub srealm: ExplicitContextTag9<Realm>,
     pub sname: ExplicitContextTag10<PrincipalName>,
     #[serde(default)]
-    pub caadr: Optional<Option<ExplicitContextTag11<HostAddresses>>>,
+    pub caddr: Optional<Option<ExplicitContextTag11<HostAddresses>>>,
     // this field is not specified in RFC but present in real tickets
     #[serde(default)]
     pub encrypted_pa_data: Optional<Option<ExplicitContextTag12<Asn1SequenceOf<PaData>>>>,
