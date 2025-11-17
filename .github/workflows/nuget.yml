@@ -108,7 +108,7 @@ jobs:
         if: matrix.os == 'linux'
         with:
           version: "18.1.8"
-  
+
       - name: Setup CBake
         uses: Devolutions/actions-public/setup-cbake@v1
         if: matrix.os == 'linux'
@@ -235,19 +235,19 @@ jobs:
 
           [xml] $InfoPlistXml = Get-Content (Join-Path "ffi" "dotnet" "Devolutions.Picky" "Info.plist")
           Select-Xml -xml $InfoPlistXml -XPath "/plist/dict/key[. = 'CFBundleIdentifier']/following-sibling::string[1]" |
-          %{ 	
+          %{
           $_.Node.InnerXml = "com.devolutions.picky"
           }
           Select-Xml -xml $InfoPlistXml -XPath "/plist/dict/key[. = 'CFBundleExecutable']/following-sibling::string[1]" |
-          %{ 	
+          %{
           $_.Node.InnerXml = $BundleName
           }
           Select-Xml -xml $InfoPlistXml -XPath "/plist/dict/key[. = 'CFBundleVersion']/following-sibling::string[1]" |
-          %{ 	
+          %{
           $_.Node.InnerXml = $Version
           }
           Select-Xml -xml $InfoPlistXml -XPath "/plist/dict/key[. = 'CFBundleShortVersionString']/following-sibling::string[1]" |
-          %{ 	
+          %{
           $_.Node.InnerXml = $ShortVersion
           }
 
@@ -314,6 +314,8 @@ jobs:
     if: ${{ needs.preflight.outputs.dry-run == 'false' }}
     needs: [preflight, build-managed]
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
 
     steps:
       - name: Download NuGet package artifact
@@ -321,6 +323,12 @@ jobs:
         with:
           name: picky-nupkg
           path: package
+
+      - name: NuGet login (OIDC)
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_BOT_USERNAME }}
 
       - name: Publish to nuget.org
         run: |
@@ -333,7 +341,7 @@ jobs:
               'push',
               "$File",
               '--api-key',
-              '${{ secrets.NUGET_API_KEY }}',
+              '${{ steps.nuget-login.outputs.NUGET_API_KEY }}',
               '--source',
               'https://api.nuget.org/v3/index.json',
               '--skip-duplicate'
