@@ -1385,7 +1385,7 @@ dependencies = [
 
 [[package]]
 name = "picky-krb"
-version = "0.11.3"
+version = "0.12.0"
 dependencies = [
  "aes",
  "block-buffer",
