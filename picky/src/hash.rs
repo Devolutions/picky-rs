@@ -39,13 +39,13 @@ impl TryFrom<HashAlgorithm> for ShaVariant {
 
     fn try_from(v: HashAlgorithm) -> Result<ShaVariant, UnsupportedHashAlgorithmError> {
         match v {
-            HashAlgorithm::MD5 => Ok(ShaVariant::MD5),
-            HashAlgorithm::SHA1 => Ok(ShaVariant::SHA1),
-            HashAlgorithm::SHA2_256 => Ok(ShaVariant::SHA2_256),
-            HashAlgorithm::SHA2_384 => Ok(ShaVariant::SHA2_384),
-            HashAlgorithm::SHA2_512 => Ok(ShaVariant::SHA2_512),
-            HashAlgorithm::SHA3_384 => Ok(ShaVariant::SHA3_384),
-            HashAlgorithm::SHA3_512 => Ok(ShaVariant::SHA3_512),
+            HashAlgorithm::MD5 => Ok("md5"),
+            HashAlgorithm::SHA1 => Ok("sha1"),
+            HashAlgorithm::SHA2_256 => Ok("sha256"),
+            HashAlgorithm::SHA2_384 => Ok("sha384"),
+            HashAlgorithm::SHA2_512 => Ok("sha512"),
+            HashAlgorithm::SHA3_384 => Ok("sha3-384"),
+            HashAlgorithm::SHA3_512 => Ok("sha3-512"),
             _ => Err(UnsupportedHashAlgorithmError {
                 algorithm: format!("{:?}", v),
             }),
@@ -58,13 +58,13 @@ impl TryFrom<ShaVariant> for HashAlgorithm {
 
     fn try_from(v: ShaVariant) -> Result<HashAlgorithm, UnsupportedHashAlgorithmError> {
         match v {
-            ShaVariant::MD5 => Ok(HashAlgorithm::MD5),
-            ShaVariant::SHA1 => Ok(HashAlgorithm::SHA1),
-            ShaVariant::SHA2_256 => Ok(HashAlgorithm::SHA2_256),
-            ShaVariant::SHA2_384 => Ok(HashAlgorithm::SHA2_384),
-            ShaVariant::SHA2_512 => Ok(HashAlgorithm::SHA2_512),
-            ShaVariant::SHA3_384 => Ok(HashAlgorithm::SHA3_384),
-            ShaVariant::SHA3_512 => Ok(HashAlgorithm::SHA3_512),
+            "md5" => Ok(HashAlgorithm::MD5),
+            "sha1" => Ok(HashAlgorithm::SHA1),
+            "sha256" => Ok(HashAlgorithm::SHA2_256),
+            "sha384" => Ok(HashAlgorithm::SHA2_384),
+            "sha512" => Ok(HashAlgorithm::SHA2_512),
+            "sha3-384" => Ok(HashAlgorithm::SHA3_384),
+            "sha3-512" => Ok(HashAlgorithm::SHA3_512),
             _ => Err(UnsupportedHashAlgorithmError {
                 algorithm: format!("{:?}", v),
             }),

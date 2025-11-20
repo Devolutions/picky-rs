@@ -10,8 +10,8 @@ use crate::key::{EcCurve, EdAlgorithm, PublicKey};
 use base64::engine::general_purpose;
 use base64::{DecodeError, Engine as _};
 use num_bigint_dig::BigUint;
-use picky_asn1::wrapper::IntegerAsn1;
-use picky_asn1_x509::SubjectPublicKeyInfo;
+use spki::SubjectPublicKeyInfo;
+use der::asn1::UintRef;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -321,16 +321,17 @@ impl Jwk {
     }
 
     pub fn from_public_key(public_key: &PublicKey) -> Result<Self, JwkError> {
-        use picky_asn1::wrapper::BitStringAsn1Container;
-        use picky_asn1_x509::PublicKey as SerdePublicKey;
+        use der::asn1::BitString;
+        use picky_asn1_x509::{PublicKey as ParsedPublicKey};
 
-        match &public_key.as_inner().subject_public_key {
-            SerdePublicKey::Rsa(BitStringAsn1Container(rsa)) => {
-                let modulus = rsa.modulus.as_signed_bytes_be();
-                let public_exponent = rsa.public_exponent.as_signed_bytes_be();
+        let spki = public_key.as_inner().map_err(|e| JwkError::UnsupportedAlgorithm { algorithm: "Failed to parse SPKI" })?;
+        match picky_asn1_x509::parse_subject_public_key_info(&spki).map_err(|e| JwkError::UnsupportedAlgorithm { algorithm: "Failed to parse public key" })? {
+            ParsedPublicKey::Rsa(rsa) => {
+                let modulus = rsa.modulus.as_bytes();
+                let public_exponent = rsa.public_exponent.as_bytes();
                 Ok(Self::new(JwkKeyType::new_rsa_key(modulus, public_exponent)))
             }
-            SerdePublicKey::Ec(_) => {
+            ParsedPublicKey::Ec(_) => {
                 let ec_key = EcdsaPublicKey::try_from(public_key)
                     .map_err(|e| JwkError::InvalidEcPublicKey { cause: e.to_string() })?;
 
@@ -394,7 +395,7 @@ impl Jwk {
                     }),
                 }
             }
-            SerdePublicKey::Ed(_) => {
+            ParsedPublicKey::Ed(_) => {
                 let ed_key = EdPublicKey::try_from(public_key)
                     .map_err(|e| JwkError::InvalidEdPublicKey { cause: e.to_string() })?;
 
@@ -424,10 +425,14 @@ impl Jwk {
     pub fn to_public_key(&self) -> Result<PublicKey, JwkError> {
         match &self.key {
             JwkKeyType::Rsa(rsa) => {
-                let modulus = IntegerAsn1::from_bytes_be_signed(rsa.modulus_signed_bytes_be()?);
-                let public_exponent = IntegerAsn1::from_bytes_be_signed(rsa.public_exponent_signed_bytes_be()?);
-                let spki = SubjectPublicKeyInfo::new_rsa_key(modulus, public_exponent);
-                Ok(spki.into())
+                let modulus_bytes = rsa.modulus_signed_bytes_be()?;
+                let public_exponent_bytes = rsa.public_exponent_signed_bytes_be()?;
+                
+                // Convert BigUint to bytes for PublicKey::from_rsa_components
+                let modulus_biguint = BigUint::from_bytes_be(&modulus_bytes);
+                let public_exponent_biguint = BigUint::from_bytes_be(&public_exponent_bytes);
+                
+                Ok(PublicKey::from_rsa_components(&modulus_biguint, &public_exponent_biguint))
             }
             JwkKeyType::Ec(ec) => {
                 let curve = match ec.crv {

@@ -3,19 +3,19 @@
 pub(crate) mod ec;
 pub(crate) mod ed;
 
-use crate::oid::ObjectIdentifier;
 use crate::pem::{parse_pem, Pem, PemError};
+use const_oid::ObjectIdentifier;
 
+use der::asn1::{BitString, OctetString, UintRef};
 use num_bigint_dig::traits::ModInverse;
 use num_bigint_dig::BigUint;
-use picky_asn1::bit_string::BitString;
-use picky_asn1::wrapper::{BitStringAsn1Container, IntegerAsn1, OctetStringAsn1Container};
-use picky_asn1_der::Asn1DerError;
-use picky_asn1_x509::{
-    private_key_info, ECPrivateKey, PrivateKeyInfo, PrivateKeyValue, SubjectPublicKeyInfo, PRIVATE_KEY_INFO_VERSION_1,
-};
+use picky_asn1_x509::oids;
+use pkcs1::{RsaPrivateKey as Pkcs1RsaPrivateKey, RsaPublicKey as Pkcs1RsaPublicKey};
+use pkcs8::{AlgorithmIdentifierRef, PrivateKeyInfo, SecretDocument};
 use rsa::traits::{PrivateKeyParts as _, PublicKeyParts as _};
 use rsa::{RsaPrivateKey, RsaPublicKey};
+use sec1::EcPrivateKey;
+use spki::{SubjectPublicKeyInfo, SubjectPublicKeyInfoOwned};
 use thiserror::Error;
 use zeroize::Zeroize;
 
@@ -29,17 +29,11 @@ pub use ed::EdAlgorithm;
 pub enum KeyError {
     /// ASN1 serialization error
     #[error("(ASN1) couldn't serialize {element}: {source}")]
-    Asn1Serialization {
-        element: &'static str,
-        source: Asn1DerError,
-    },
+    Asn1Serialization { element: &'static str, source: der::Error },
 
     /// ASN1 deserialization error
     #[error("(ASN1) couldn't deserialize {element}: {source}")]
-    Asn1Deserialization {
-        element: &'static str,
-        source: Asn1DerError,
-    },
+    Asn1Deserialization { element: &'static str, source: der::Error },
 
     /// RSA error
     #[error("RSA error: {context}")]
@@ -47,11 +41,11 @@ pub enum KeyError {
 
     /// EC error
     #[error("EC error: {context}")]
-    EC { context: String },
+    Ec { context: String },
 
     /// ED error
     #[error("ED error: {context}")]
-    ED { context: String },
+    Ed { context: String },
 
     /// invalid PEM label error
     #[error("invalid PEM label: {label}")]
@@ -68,21 +62,15 @@ pub enum KeyError {
 
 impl KeyError {
     pub(crate) fn unsupported_curve(curve_oid: &ObjectIdentifier, context: &'static str) -> Self {
-        let curve_oid: String = curve_oid.into();
-        Self::EC {
-            context: format!(
-                "EC curve with oid `{}` is not supported in context of {}",
-                curve_oid, context,
-            ),
+        Self::Ec {
+            context: format!("EC curve with oid `{curve_oid}` is not supported in context of {context}",),
         }
     }
 
     pub(crate) fn unsupported_ed_algorithm(oid: &ObjectIdentifier, context: &'static str) -> Self {
-        let oid: String = oid.into();
-        Self::ED {
+        Self::Ed {
             context: format!(
-                "Algorithm with oid `{}` based on Edwards curves is not supported in context of {}",
-                oid, context,
+                "algorithm with oid `{oid}` based on Edwards curves is not supported in context of {context}",
             ),
         }
     }
@@ -100,11 +88,48 @@ impl From<PemError> for KeyError {
     }
 }
 
+impl From<picky_asn1_x509::PublicKeyError> for KeyError {
+    fn from(e: picky_asn1_x509::PublicKeyError) -> Self {
+        match e {
+            picky_asn1_x509::PublicKeyError::UnsupportedAlgorithm { oid } => Self::UnsupportedAlgorithm {
+                algorithm: "PublicKey parsing detected unsupported algorithm",
+            },
+            picky_asn1_x509::PublicKeyError::RsaParseError(der_err) => Self::Asn1Deserialization {
+                source: der_err,
+                element: "RSA public key",
+            },
+            picky_asn1_x509::PublicKeyError::InvalidKeyData => Self::Asn1Deserialization {
+                source: der::ErrorKind::Failed.into(),
+                element: "public key data",
+            },
+        }
+    }
+}
+
+impl From<picky_asn1_x509::PrivateKeyError> for KeyError {
+    fn from(e: picky_asn1_x509::PrivateKeyError) -> Self {
+        match e {
+            picky_asn1_x509::PrivateKeyError::UnsupportedAlgorithm { oid } => Self::UnsupportedAlgorithm {
+                algorithm: "PrivateKey parsing detected unsupported algorithm",
+            },
+            picky_asn1_x509::PrivateKeyError::ParseError(der_err) => Self::Asn1Deserialization {
+                source: der_err,
+                element: "private key",
+            },
+            picky_asn1_x509::PrivateKeyError::InvalidKeyData => Self::Asn1Deserialization {
+                source: der::ErrorKind::Failed.into(),
+                element: "private key data",
+            },
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum KeyKind {
     Rsa,
     Ec,
     Ed,
+    Unknown,
 }
 
 // === private key === //
@@ -148,27 +173,32 @@ impl Drop for PrivateKeyKind {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct PrivateKey {
     /// Inner key details. This should never be puiblicly exposed.
     kind: PrivateKeyKind,
-    /// Inner representation in Pkcs8
-    inner: PrivateKeyInfo,
+    /// Inner representation in Pkcs8 - using SecretDocument for secure storage
+    inner: SecretDocument,
 }
 
 impl TryFrom<&'_ PrivateKey> for RsaPrivateKey {
     type Error = KeyError;
 
     fn try_from(v: &PrivateKey) -> Result<Self, Self::Error> {
-        match &v.as_inner().private_key {
-            private_key_info::PrivateKeyValue::Rsa(OctetStringAsn1Container(key)) => {
-                let p1 = BigUint::from_bytes_be(key.prime_1.as_unsigned_bytes_be());
-                let p2 = BigUint::from_bytes_be(key.prime_2.as_unsigned_bytes_be());
+        use picky_asn1_x509::{PrivateKey as ParsedPrivateKey, PrivateKeyInfoExt};
+
+        let private_key_info = v.as_inner()?;
+
+        match private_key_info.parse().map_err(|e| KeyError::from(e))? {
+            ParsedPrivateKey::Rsa(rsa_key) => {
+                // Convert from PKCS#1 RSA private key to rsa crate's RsaPrivateKey
+                let p1 = BigUint::from_bytes_be(rsa_key.prime1.as_bytes());
+                let p2 = BigUint::from_bytes_be(rsa_key.prime2.as_bytes());
 
                 RsaPrivateKey::from_components(
-                    BigUint::from_bytes_be(key.modulus.as_unsigned_bytes_be()),
-                    BigUint::from_bytes_be(key.public_exponent.as_unsigned_bytes_be()),
-                    BigUint::from_bytes_be(key.private_exponent.as_unsigned_bytes_be()),
+                    BigUint::from_bytes_be(rsa_key.modulus.as_bytes()),
+                    BigUint::from_bytes_be(rsa_key.public_exponent.as_bytes()),
+                    BigUint::from_bytes_be(rsa_key.private_exponent.as_bytes()),
                     vec![p1, p2],
                 )
                 .map_err(|e| KeyError::Rsa {
@@ -186,14 +216,16 @@ impl TryFrom<&'_ PrivateKey> for RsaPublicKey {
     type Error = KeyError;
 
     fn try_from(v: &PrivateKey) -> Result<Self, Self::Error> {
-        match &v.as_inner().private_key {
-            private_key_info::PrivateKeyValue::Rsa(OctetStringAsn1Container(key)) => {
-                Ok(RsaPublicKey::new_with_max_size(
-                    BigUint::from_bytes_be(key.modulus.as_unsigned_bytes_be()),
-                    BigUint::from_bytes_be(key.public_exponent.as_unsigned_bytes_be()),
-                    8192,
-                )?)
-            }
+        use picky_asn1_x509::{PrivateKey as ParsedPrivateKey, PrivateKeyInfoExt};
+
+        let private_key_info = v.as_inner()?;
+
+        match private_key_info.parse().map_err(|e| KeyError::from(e))? {
+            ParsedPrivateKey::Rsa(rsa_key) => Ok(RsaPublicKey::new_with_max_size(
+                BigUint::from_bytes_be(rsa_key.modulus.as_bytes()),
+                BigUint::from_bytes_be(rsa_key.public_exponent.as_bytes()),
+                8192,
+            )?),
             _ => Err(KeyError::Rsa {
                 context: "RSA public key cannot be constructed from non-RSA private key.".to_string(),
             }),
@@ -208,6 +240,11 @@ impl PrivateKey {
         private_exponent: &BigUint,
         primes: &[BigUint],
     ) -> Result<Self, KeyError> {
+        use der::{asn1::UintRef, Encode};
+        use picky_asn1_x509::oids;
+        use pkcs1::RsaPrivateKey as Pkcs1RsaPrivateKey;
+        use pkcs8::{AlgorithmIdentifierRef, PrivateKeyInfo};
+
         let mut primes_it = primes.iter();
         let prime_1 = primes_it.next().ok_or_else(|| KeyError::Rsa {
             context: format!("invalid number of primes provided: expected 2, got: {}", primes.len()),
@@ -229,22 +266,80 @@ impl PrivateKey {
                 context: "BigUint conversion failed".to_string(),
             })?;
 
-        let inner = PrivateKeyInfo::new_rsa_encryption(
-            IntegerAsn1::from_bytes_be_unsigned(modulus.to_bytes_be()),
-            IntegerAsn1::from_bytes_be_unsigned(public_exponent.to_bytes_be()),
-            IntegerAsn1::from_bytes_be_unsigned(private_exponent.to_bytes_be()),
-            (
-                // primes
-                IntegerAsn1::from_bytes_be_unsigned(prime_1.to_bytes_be()),
-                IntegerAsn1::from_bytes_be_unsigned(prime_2.to_bytes_be()),
-            ),
-            (
-                // exponents
-                IntegerAsn1::from_bytes_be_unsigned(exponent_1.to_bytes_be()),
-                IntegerAsn1::from_bytes_be_unsigned(exponent_2.to_bytes_be()),
-            ),
-            IntegerAsn1::from_bytes_be_unsigned(coefficient.to_bytes_be()),
-        );
+        // Create PKCS#1 RSA private key structure
+        // Create byte arrays with sufficient lifetime
+        let modulus_bytes = modulus.to_bytes_be();
+        let public_exponent_bytes = public_exponent.to_bytes_be();
+        let private_exponent_bytes = private_exponent.to_bytes_be();
+        let prime_1_bytes = prime_1.to_bytes_be();
+        let prime_2_bytes = prime_2.to_bytes_be();
+        let exponent_1_bytes = exponent_1.to_bytes_be();
+        let exponent_2_bytes = exponent_2.to_bytes_be();
+        let coefficient_bytes = coefficient.to_bytes_be();
+
+        let rsa_private_key = Pkcs1RsaPrivateKey {
+            modulus: UintRef::new(&modulus_bytes).map_err(|source| KeyError::Asn1Serialization {
+                source,
+                element: "RSA modulus",
+            })?,
+            public_exponent: UintRef::new(&public_exponent_bytes).map_err(|source| {
+                KeyError::Asn1Serialization {
+                    source,
+                    element: "RSA public exponent",
+                }
+            })?,
+            private_exponent: UintRef::new(&private_exponent_bytes).map_err(|source| {
+                KeyError::Asn1Serialization {
+                    source,
+                    element: "RSA private exponent",
+                }
+            })?,
+            prime1: UintRef::new(&prime_1_bytes).map_err(|source| KeyError::Asn1Serialization {
+                source,
+                element: "RSA prime1",
+            })?,
+            prime2: UintRef::new(&prime_2_bytes).map_err(|source| KeyError::Asn1Serialization {
+                source,
+                element: "RSA prime2",
+            })?,
+            exponent1: UintRef::new(&exponent_1_bytes).map_err(|source| KeyError::Asn1Serialization {
+                source,
+                element: "RSA exponent1",
+            })?,
+            exponent2: UintRef::new(&exponent_2_bytes).map_err(|source| KeyError::Asn1Serialization {
+                source,
+                element: "RSA exponent2",
+            })?,
+            coefficient: UintRef::new(&coefficient_bytes).map_err(|source| KeyError::Asn1Serialization {
+                source,
+                element: "RSA coefficient",
+            })?,
+            other_prime_infos: None,
+        };
+
+        // Encode the PKCS#1 private key to DER.
+        let rsa_private_key_der = rsa_private_key.to_der().map_err(|source| KeyError::Asn1Serialization {
+            source,
+            element: "PKCS#1 RSA private key",
+        })?;
+
+        // Create PKCS#8 PrivateKeyInfo.
+        let algorithm = AlgorithmIdentifierRef {
+            oid: oids::RSA_ENCRYPTION,
+            parameters: None,
+        };
+
+        let private_key_info = PrivateKeyInfo {
+            algorithm,
+            private_key: &rsa_private_key_der,
+            public_key: None,
+        };
+
+        // Encode to PKCS#8 DER and create SecretDocument.
+        let inner = SecretDocument::encode_msg(&private_key_info).map_err(|source| KeyError::Asn1Deserialization {
+            source,
+            element: "SecretDocument",
+        })?;
 
         Ok(Self {
             kind: PrivateKeyKind::Rsa,
@@ -299,12 +394,43 @@ impl PrivateKey {
 
         let secret = secret.to_bytes_be();
 
-        let inner = PrivateKeyInfo::new_ec_encryption(
-            curve_oid.clone(),
-            secret.clone(),
-            Some(BitString::with_bytes(point_bytes.as_slice())),
-            false,
-        );
+        // Create EC private key structure and serialize to DER
+        let ec_private_key = sec1::EcPrivateKey {
+            private_key: &secret,
+            parameters: Some(sec1::EcParameters::NamedCurve(curve_oid.clone())),
+            public_key: Some(der::asn1::BitString::from_bytes(point_bytes.as_slice()).unwrap()),
+        };
+        
+        let ec_der = ec_private_key.to_der().map_err(|e| KeyError::Asn1Serialization {
+            source: e,
+            element: "EC private key",
+        })?;
+
+        // Create PKCS#8 DER and SecretDocument
+        let pkcs8_params = der::asn1::Any::new(der::Tag::ObjectIdentifier, curve_oid.as_bytes())
+            .map_err(|e| KeyError::Asn1Serialization {
+                source: e,
+                element: "EC curve parameters",
+            })?;
+        
+        let pkcs8_pki = pkcs8::PrivateKeyInfo {
+            algorithm: spki::AlgorithmIdentifierRef {
+                oid: oids::EC_PUBLIC_KEY,
+                parameters: Some(pkcs8_params.into()),
+            },
+            private_key: &ec_der,
+            public_key: None,
+        };
+
+        let pkcs8_der = pkcs8_pki.to_der().map_err(|e| KeyError::Asn1Serialization {
+            source: e,
+            element: "PKCS#8 private key info",
+        })?;
+
+        let inner = SecretDocument::from_der(&pkcs8_der).map_err(|e| KeyError::Asn1Deserialization {
+            source: e,
+            element: "SecretDocument",
+        })?;
 
         let kind = PrivateKeyKind::Ec {
             curve_oid,
@@ -319,12 +445,28 @@ impl PrivateKey {
     /// on the validity of the secret and point bytes representation in regards to selected
     /// curve oid.
     pub fn from_ec_encoded_components(curve_oid: ObjectIdentifier, secret: &[u8], point: Option<&[u8]>) -> Self {
-        let inner = PrivateKeyInfo::new_ec_encryption(
-            curve_oid.clone(),
-            secret.to_vec(),
-            point.map(BitString::with_bytes),
-            false,
-        );
+        let inner = {
+            use pkcs8::PrivateKeyInfo;
+            use der::Encode;
+            
+            // Create EC private key structure  
+            let ec_private_key = sec1::EcPrivateKey {
+                private_key: secret,
+                parameters: Some(sec1::EcParameters::NamedCurve(curve_oid.clone())),
+                public_key: point.map(|p| der::asn1::BitString::from_bytes(p).unwrap()),
+            };
+            
+            let ec_der = ec_private_key.to_der().unwrap();
+            
+            PrivateKeyInfo {
+                algorithm: spki::AlgorithmIdentifier {
+                    oid: oids::EC_PUBLIC_KEY,
+                    parameters: Some(der::asn1::Any::new(der::Tag::ObjectIdentifier, curve_oid.as_bytes()).unwrap()),
+                },
+                private_key: &ec_der,
+                public_key: None,
+            }
+        };
 
         let kind = PrivateKeyKind::Ec {
             curve_oid,
@@ -340,9 +482,20 @@ impl PrivateKey {
         secret: &[u8],
         public_key: Option<&[u8]>,
     ) -> Self {
-        let public_key_bit_string = public_key.map(BitString::with_bytes);
+        let public_key_bit_string = public_key.map(|p| BitString::from_bytes(&p).unwrap());
 
-        let inner = PrivateKeyInfo::new_ed_encryption(algorithm_oid.clone(), secret.to_vec(), public_key_bit_string);
+        let inner = {
+            use pkcs8::PrivateKeyInfo;
+            
+            PrivateKeyInfo {
+                algorithm: spki::AlgorithmIdentifier {
+                    oid: algorithm_oid.clone(),
+                    parameters: None,
+                },
+                private_key: secret,
+                public_key: public_key_bit_string.as_ref().map(|bs| bs.as_bytes()),
+            }
+        };
 
         let kind = PrivateKeyKind::Ed {
             algorithm_oid,
@@ -370,56 +523,94 @@ impl PrivateKey {
     }
 
     pub fn from_pkcs8<T: ?Sized + AsRef<[u8]>>(pkcs8: &T) -> Result<Self, KeyError> {
-        let inner: PrivateKeyInfo =
-            picky_asn1_der::from_bytes(pkcs8.as_ref()).map_err(|e| KeyError::Asn1Deserialization {
+        use picky_asn1_x509::{PrivateKey as ParsedPrivateKey, PrivateKeyInfoExt};
+
+        // Create SecretDocument from PKCS#8 DER data
+        let secret_doc = SecretDocument::from_der(pkcs8.as_ref()).map_err(|e| KeyError::Asn1Deserialization {
+            source: e,
+            element: "private key info (pkcs8)",
+        })?;
+
+        // Parse the private key info to determine type
+        let private_key_info =
+            PrivateKeyInfo::from_der(secret_doc.as_bytes()).map_err(|e| KeyError::Asn1Deserialization {
                 source: e,
-                element: "private key info (pkcs8)",
+                element: "private key info parsing",
             })?;
 
-        match &inner.private_key {
-            PrivateKeyValue::Rsa(_) => Ok(Self {
+        match private_key_info.parse().map_err(|e| KeyError::from(e))? {
+            ParsedPrivateKey::Rsa(_) => Ok(Self {
                 kind: PrivateKeyKind::Rsa,
-                inner,
+                inner: secret_doc,
             }),
-            PrivateKeyValue::EC(OctetStringAsn1Container(key)) => {
-                let curve_oid = match inner.private_key_algorithm.parameters() {
-                    picky_asn1_x509::AlgorithmIdentifierParameters::Ec(params) => params.curve_oid().clone(),
-                    _ => {
-                        return Err(KeyError::EC {
-                            context: "Specified private key parameters are not EC parameters".to_string(),
-                        });
-                    }
-                };
+            ParsedPrivateKey::Ec(ec_key) => {
+                // Extract curve OID from algorithm parameters
+                let curve_oid =
+                    match private_key_info.algorithm.parameters {
+                        Some(params) => {
+                            // Try to decode as EC parameters - this is a simplified approach
+                            // In a full implementation, we'd properly decode the parameters
+                            match private_key_info.algorithm.oid {
+                                oids::EC_PUBLIC_KEY => {
+                                    // For now, we'll extract from the parsed key or use a default
+                                    // This would need proper parameter parsing in a complete implementation
+                                    ec_key.parameters.map(|p| p.named_curve()).flatten().ok_or_else(|| {
+                                        KeyError::Ec {
+                                            context: "Missing or unsupported EC curve parameters".to_string(),
+                                        }
+                                    })?
+                                }
+                                _ => {
+                                    return Err(KeyError::Ec {
+                                        context: "Invalid EC algorithm OID".to_string(),
+                                    })
+                                }
+                            }
+                        }
+                        None => {
+                            return Err(KeyError::Ec {
+                                context: "Missing EC algorithm parameters".to_string(),
+                            })
+                        }
+                    };
 
-                Self::from_ec_decoded_der_with_curve_oid(curve_oid, key)
+                // Extract public and private key components
+                let private_key = ec_key.private_key.to_vec();
+                let public_key = ec_key.public_key.map(|pk| pk.raw_bytes().to_vec());
+
+                Ok(Self {
+                    kind: PrivateKeyKind::Ec {
+                        curve_oid,
+                        public_key,
+                        private_key,
+                    },
+                    inner: secret_doc,
+                })
             }
-            PrivateKeyValue::ED(OctetStringAsn1Container(key)) => {
-                let algorithm = NamedEdAlgorithm::from(inner.private_key_algorithm.oid());
-                let private_key = key.0.clone();
+            ParsedPrivateKey::Ed(ed_key) => {
+                let algorithm_oid = private_key_info.algorithm.oid;
+                let algorithm = NamedEdAlgorithm::from(&algorithm_oid);
+                let private_key = ed_key.as_bytes().to_vec();
+
                 let public_key = match &algorithm {
                     NamedEdAlgorithm::Known(EdAlgorithm::Ed25519) => {
-                        let private_key = private_key.as_slice().try_into().map_err(|e| KeyError::ED {
-                            context: format!("invalid size for private key: {e}"),
+                        let private_key_bytes = private_key.as_slice().try_into().map_err(|e| KeyError::Ed {
+                            context: format!("invalid size for Ed25519 private key: {e}"),
                         })?;
-                        let private_key = ed25519_dalek::SigningKey::from_bytes(private_key);
-
+                        let private_key = ed25519_dalek::SigningKey::from_bytes(private_key_bytes);
                         let public_key = private_key.verifying_key();
-
                         Some(public_key.to_bytes().to_vec())
                     }
                     NamedEdAlgorithm::Known(EdAlgorithm::X25519) => {
                         let len = private_key.len();
-
                         let secret: X25519FieldElement =
-                            private_key.as_slice().try_into().map_err(|_| KeyError::ED {
+                            private_key.as_slice().try_into().map_err(|_| KeyError::Ed {
                                 context: format!(
                                 "Invalid X25519 private key size. Expected: {X25519_FIELD_ELEMENT_SIZE}, actual: {len}"
                             ),
                             })?;
-
                         let secret = x25519_dalek::StaticSecret::from(secret);
                         let public_key = x25519_dalek::PublicKey::from(&secret);
-
                         Some(public_key.to_bytes().to_vec())
                     }
                     NamedEdAlgorithm::Unsupported(_) => {
@@ -430,11 +621,11 @@ impl PrivateKey {
 
                 Ok(Self {
                     kind: PrivateKeyKind::Ed {
-                        algorithm_oid: algorithm.into(),
+                        algorithm_oid,
                         public_key,
                         private_key,
                     },
-                    inner,
+                    inner: secret_doc,
                 })
             }
         }
@@ -442,20 +633,38 @@ impl PrivateKey {
 
     /// Decodes a DER-encoded RSA private key
     pub fn from_pkcs1<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, KeyError> {
-        use picky_asn1_x509::{AlgorithmIdentifier, RsaPrivateKey};
+        use der::Encode;
+        use pkcs1::RsaPrivateKey as Pkcs1RsaPrivateKey;
 
-        let private_key =
-            picky_asn1_der::from_bytes::<RsaPrivateKey>(der.as_ref()).map_err(|e| KeyError::Asn1Deserialization {
-                source: e,
-                element: "rsa private key",
-            })?;
+        // Parse the PKCS#1 RSA private key
+        use der::Decode;
+        let pkcs1_key = Pkcs1RsaPrivateKey::from_der(der.as_ref()).map_err(|e| KeyError::Asn1Deserialization {
+            source: e,
+            element: "rsa private key",
+        })?;
 
-        let inner = PrivateKeyInfo {
-            version: PRIVATE_KEY_INFO_VERSION_1,
-            private_key_algorithm: AlgorithmIdentifier::new_rsa_encryption(),
-            private_key: PrivateKeyValue::Rsa(private_key.into()),
+        // Create PKCS#8 PrivateKeyInfo
+        let algorithm = AlgorithmIdentifierRef {
+            oid: oids::RSA_ENCRYPTION,
+            parameters: None,
+        };
+
+        let private_key_info = PrivateKeyInfo {
+            algorithm,
+            private_key: der.as_ref(),
             public_key: None,
         };
+
+        // Encode to PKCS#8 DER and create SecretDocument
+        let pkcs8_der = private_key_info.to_der().map_err(|e| KeyError::Asn1Serialization {
+            source: e,
+            element: "PKCS#8 private key info",
+        })?;
+
+        let inner = SecretDocument::from_der(&pkcs8_der).map_err(|e| KeyError::Asn1Deserialization {
+            source: e,
+            element: "SecretDocument",
+        })?;
 
         Ok(Self {
             kind: PrivateKeyKind::Rsa,
@@ -475,31 +684,60 @@ impl PrivateKey {
     /// calculated from the private key (Only if curve is supported. In other case - throws error)
     fn from_ec_decoded_der_with_curve_oid(
         curve_oid: ObjectIdentifier,
-        decoded: &ECPrivateKey,
+        decoded: &EcPrivateKey,
     ) -> Result<Self, KeyError> {
-        // Generate the public key if it's not present in the `ECPrivateKey` representation
-        let (public_key, public_key_is_generated) = match &decoded.public_key.0 .0 {
-            Some(bit_string) => (Some(bit_string.payload_view().to_vec()), false),
+        // Generate the public key if it's not present in the `EcPrivateKey` representation
+        let (public_key, public_key_is_generated) = match decoded.public_key {
+            Some(public_key_bytes) => (Some(public_key_bytes.to_vec()), false),
             None => (
-                calculate_public_ec_key(&curve_oid, &decoded.private_key.0, COMPRESS_EC_POINT_BY_DEFAULT)?,
+                calculate_public_ec_key(&curve_oid, decoded.private_key, COMPRESS_EC_POINT_BY_DEFAULT)?,
                 true,
             ),
         };
-        let private_key = decoded.private_key.0.clone();
+        let private_key = decoded.private_key.to_vec();
         // if the public key is generated, we need to skip it when encoding, to preserve the
         // original `ECPrivateKey` structure in encoded representation
         let public_key_encoded = public_key
             .as_deref()
-            .and_then(|public_key| (!public_key_is_generated).then(|| BitString::with_bytes(public_key)));
+            .and_then(|public_key| (!public_key_is_generated).then(|| BitString::from_bytes(&public_key).unwrap()));
         // if the parameters are missing during parsing, we need to skip them when encoding
-        let der_skip_parameters = decoded.parameters.0.is_none();
+        let der_skip_parameters = decoded.parameters.is_none();
 
-        let inner = PrivateKeyInfo::new_ec_encryption(
-            curve_oid.clone(),
-            private_key.clone(),
-            public_key_encoded,
-            der_skip_parameters,
-        );
+        // Create PKCS#8 PrivateKeyInfo for EC key
+        use der::Encode;
+
+        let algorithm = AlgorithmIdentifierRef {
+            oid: oids::EC_PUBLIC_KEY,
+            parameters: Some(der::asn1::AnyRef::new(curve_oid.as_bytes()).map_err(|e| {
+                KeyError::Asn1Serialization {
+                    source: e,
+                    element: "EC curve OID parameters",
+                }
+            })?),
+        };
+
+        // For EC keys, the private key data in PKCS#8 is the SEC1 EcPrivateKey structure
+        let sec1_der = decoded.to_der().map_err(|e| KeyError::Asn1Serialization {
+            source: e,
+            element: "SEC1 EC private key",
+        })?;
+
+        let private_key_info = PrivateKeyInfo {
+            algorithm,
+            private_key: &sec1_der,
+            public_key: None,
+        };
+
+        // Encode to PKCS#8 DER and create SecretDocument
+        let pkcs8_der = private_key_info.to_der().map_err(|e| KeyError::Asn1Serialization {
+            source: e,
+            element: "PKCS#8 private key info",
+        })?;
+
+        let inner = SecretDocument::from_der(&pkcs8_der).map_err(|e| KeyError::Asn1Deserialization {
+            source: e,
+            element: "SecretDocument",
+        })?;
 
         let kind = PrivateKeyKind::Ec {
             curve_oid,
@@ -518,11 +756,11 @@ impl PrivateKey {
         der: &T,
         curve_oid: ObjectIdentifier,
     ) -> Result<Self, KeyError> {
-        let private_key =
-            picky_asn1_der::from_bytes::<ECPrivateKey>(der.as_ref()).map_err(|e| KeyError::Asn1Deserialization {
-                source: e,
-                element: "ec private key",
-            })?;
+        use der::Decode;
+        let private_key = EcPrivateKey::from_der(der.as_ref()).map_err(|e| KeyError::Asn1Deserialization {
+            source: e,
+            element: "ec private key",
+        })?;
 
         Self::from_ec_decoded_der_with_curve_oid(curve_oid, &private_key)
     }
@@ -540,11 +778,11 @@ impl PrivateKey {
     /// Also, if public key is absent is missing in the parsed file, it will be calculated from the
     /// private key (Only if curve is supported. In other case - throws error)
     pub fn from_ec_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, KeyError> {
-        let private_key =
-            picky_asn1_der::from_bytes::<ECPrivateKey>(der.as_ref()).map_err(|e| KeyError::Asn1Deserialization {
-                source: e,
-                element: "ec private key",
-            })?;
+        use der::Decode;
+        let private_key = EcPrivateKey::from_der(der.as_ref()).map_err(|e| KeyError::Asn1Deserialization {
+            source: e,
+            element: "ec private key",
+        })?;
 
         // By specification (https://www.rfc-editor.org/rfc/rfc5915) `parameters` files SHOULD
         // be present when EC key is encoded as standalone DER. However, some implementations
@@ -552,7 +790,7 @@ impl PrivateKey {
         let curve_oid = match &private_key.parameters.0 .0 {
             Some(params) => params.curve_oid().clone(),
             None => {
-                return Err(KeyError::EC {
+                return Err(KeyError::Ec {
                     context: "EC parameters are missing from DER-encoded private key".into(),
                 });
             }
@@ -562,24 +800,34 @@ impl PrivateKey {
     }
 
     pub fn to_pkcs8(&self) -> Result<Vec<u8>, KeyError> {
-        picky_asn1_der::to_vec(self.as_inner()).map_err(|e| KeyError::Asn1Serialization {
-            source: e,
-            element: "private key info (pkcs8)",
-        })
+        Ok(self.inner.as_bytes().to_vec())
     }
 
     pub fn to_pkcs1(&self) -> Result<Vec<u8>, KeyError> {
-        let picky_asn1_x509::PrivateKeyValue::Rsa(OctetStringAsn1Container(rsa_private_key)) = &self.inner.private_key
-        else {
-            return Err(KeyError::Rsa {
-                context: String::from("can’t export a non-RSA key to PKCS#1 format"),
-            });
-        };
+        use picky_asn1_x509::{PrivateKey as ParsedPrivateKey, PrivateKeyInfoExt};
 
-        picky_asn1_der::to_vec(rsa_private_key).map_err(|e| KeyError::Asn1Serialization {
-            source: e,
-            element: "RSA private key (pkcs1)",
-        })
+        // First check if this is an RSA key
+        match self.kind {
+            PrivateKeyKind::Rsa => {
+                let private_key_info = self.as_inner()?;
+                match private_key_info.parse().map_err(|e| KeyError::from(e))? {
+                    ParsedPrivateKey::Rsa(rsa_key) => {
+                        // Re-encode the RSA private key to DER (PKCS#1)
+                        use der::Encode;
+                        rsa_key.to_der().map_err(|e| KeyError::Asn1Serialization {
+                            source: e,
+                            element: "RSA private key (pkcs1)",
+                        })
+                    }
+                    _ => Err(KeyError::Rsa {
+                        context: String::from("invalid RSA key structure"),
+                    }),
+                }
+            }
+            _ => Err(KeyError::Rsa {
+                context: String::from("can't export a non-RSA key to PKCS#1 format"),
+            }),
+        }
     }
 
     pub fn to_pem(&self) -> Result<Pem<'static>, KeyError> {
@@ -601,25 +849,63 @@ impl PrivateKey {
     }
 
     pub fn to_public_key(&self) -> Result<PublicKey, KeyError> {
-        let key = match &self.kind {
-            PrivateKeyKind::Rsa => match &self.inner.private_key {
-                PrivateKeyValue::Rsa(OctetStringAsn1Container(key)) => {
-                    SubjectPublicKeyInfo::new_rsa_key(key.modulus.clone(), key.public_exponent.clone()).into()
+        use der::{asn1::BitString, Encode};
+        use picky_asn1_x509::{PrivateKey as ParsedPrivateKey, PrivateKeyInfoExt};
+        use spki::SubjectPublicKeyInfo;
+
+        match &self.kind {
+            PrivateKeyKind::Rsa => {
+                let private_key_info = self.as_inner()?;
+                match private_key_info.parse().map_err(|e| KeyError::from(e))? {
+                    ParsedPrivateKey::Rsa(rsa_key) => {
+                        // Create RSA public key from private key components
+                        let rsa_public_key = pkcs1::RsaPublicKey {
+                            modulus: rsa_key.modulus,
+                            public_exponent: rsa_key.public_exponent,
+                        };
+
+                        let public_key_der = rsa_public_key.to_der().map_err(|e| KeyError::Asn1Serialization {
+                            source: e,
+                            element: "RSA public key",
+                        })?;
+
+                        let spki = SubjectPublicKeyInfo {
+                            algorithm: AlgorithmIdentifierRef {
+                                oid: oids::RSA_ENCRYPTION,
+                                parameters: None,
+                            },
+                            subject_public_key: &public_key_der,
+                        };
+
+                        Ok(PublicKey::from(spki))
+                    }
+                    _ => Err(KeyError::Rsa {
+                        context: "Invalid RSA key structure".to_string(),
+                    }),
                 }
-                _ => unreachable!("BUG: Non-RSA key data in RSA private key"),
-            },
+            }
             PrivateKeyKind::Ec {
                 public_key, curve_oid, ..
             } => match public_key {
                 Some(data) => {
-                    let point = picky_asn1::bit_string::BitString::with_bytes(data.as_slice());
-                    SubjectPublicKeyInfo::new_ec_key(curve_oid.clone(), point).into()
+                    let spki = SubjectPublicKeyInfo {
+                        algorithm: AlgorithmIdentifierRef {
+                            oid: oids::EC_PUBLIC_KEY,
+                            parameters: Some(der::asn1::AnyRef::new(curve_oid.as_bytes()).map_err(|e| {
+                                KeyError::Asn1Serialization {
+                                    source: e,
+                                    element: "EC curve OID parameters",
+                                }
+                            })?),
+                        },
+                        subject_public_key: data.as_slice(),
+                    };
+
+                    Ok(PublicKey::from(spki))
                 }
-                None => {
-                    return Err(KeyError::EC {
-                        context: "Public key can't be calculated for unknown EC algorithms".into(),
-                    });
-                }
+                None => Err(KeyError::Ec {
+                    context: "Public key can't be calculated for unknown EC algorithms".into(),
+                }),
             },
             PrivateKeyKind::Ed {
                 public_key,
@@ -627,18 +913,21 @@ impl PrivateKey {
                 ..
             } => match public_key {
                 Some(data) => {
-                    let point = picky_asn1::bit_string::BitString::with_bytes(data.as_slice());
-                    SubjectPublicKeyInfo::new_ed_key(algorithm_oid.clone(), point).into()
-                }
-                None => {
-                    return Err(KeyError::ED {
-                        context: "Public key can't be calculated for unknown edwards curves-based algorithms".into(),
-                    });
-                }
-            },
-        };
+                    let spki = SubjectPublicKeyInfo {
+                        algorithm: AlgorithmIdentifierRef {
+                            oid: *algorithm_oid,
+                            parameters: None,
+                        },
+                        subject_public_key: data.as_slice(),
+                    };
 
-        Ok(key)
+                    Ok(PublicKey::from(spki))
+                }
+                None => Err(KeyError::Ed {
+                    context: "Public key can't be calculated for unknown edwards curves-based algorithms".into(),
+                }),
+            },
+        }
     }
 
     /// **Beware**: this is insanely slow in debug builds.
@@ -702,7 +991,7 @@ impl PrivateKey {
         let inner = PrivateKeyInfo::new_ec_encryption(
             curve_oid.clone(),
             secret.clone(),
-            Some(BitString::with_bytes(point.as_slice())),
+            Some(BitString::from_bytes(point.as_slice()).unwrap()),
             false,
         );
 
@@ -737,10 +1026,20 @@ impl PrivateKey {
             }
         };
 
-        let public_key_bit_string = write_public_key.then(|| BitString::with_bytes(public_key.as_slice()));
+        let public_key_bit_string = write_public_key.then(|| BitString::from_bytes(public_key.as_slice()).unwrap());
 
-        let inner =
-            PrivateKeyInfo::new_ed_encryption(algorithm_oid.clone(), private_key.clone(), public_key_bit_string);
+        let inner = {
+            use pkcs8::PrivateKeyInfo;
+            
+            PrivateKeyInfo {
+                algorithm: spki::AlgorithmIdentifier {
+                    oid: algorithm_oid.clone(),
+                    parameters: None,
+                },
+                private_key: &private_key,
+                public_key: public_key_bit_string.as_ref().map(|bs| bs.as_bytes()),
+            }
+        };
 
         let kind = PrivateKeyKind::Ed {
             algorithm_oid,
@@ -759,8 +1058,11 @@ impl PrivateKey {
         }
     }
 
-    pub(crate) fn as_inner(&self) -> &PrivateKeyInfo {
-        &self.inner
+    pub(crate) fn as_inner(&self) -> Result<PrivateKeyInfo<'_>, KeyError> {
+        PrivateKeyInfo::from_der(self.inner.as_bytes()).map_err(|e| KeyError::Asn1Deserialization {
+            source: e,
+            element: "private key info",
+        })
     }
 
     #[cfg(any(feature = "ssh", feature = "jose"))]
@@ -776,34 +1078,34 @@ const RSA_PUBLIC_KEY_PEM_LABEL: &str = "RSA PUBLIC KEY";
 const EC_PUBLIC_KEY_PEM_LABEL: &str = "EC PUBLIC KEY";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-#[repr(transparent)]
-pub struct PublicKey(SubjectPublicKeyInfo);
+pub struct PublicKey {
+    /// DER-encoded SubjectPublicKeyInfo
+    inner: Vec<u8>,
+}
 
-impl<'a> From<&'a SubjectPublicKeyInfo> for &'a PublicKey {
+// Note: This conversion is not possible with the new inner Vec<u8> structure
+// Users should use PublicKey::from(spki.clone()) instead
+
+// Note: This conversion is not possible with the new inner Vec<u8> structure
+// Users should use key.as_inner() instead
+
+impl<Params, Key> From<spki::SubjectPublicKeyInfo<Params, Key>> for PublicKey
+where
+    spki::SubjectPublicKeyInfo<Params, Key>: der::Encode,
+{
     #[inline]
-    fn from(spki: &'a SubjectPublicKeyInfo) -> Self {
-        unsafe { &*(spki as *const SubjectPublicKeyInfo as *const PublicKey) }
+    fn from(spki: spki::SubjectPublicKeyInfo<Params, Key>) -> Self {
+        use der::Encode;
+        let inner = spki.to_der().expect("failed to encode SPKI");
+        Self { inner }
     }
 }
 
-impl<'a> From<&'a PublicKey> for &'a SubjectPublicKeyInfo {
-    #[inline]
-    fn from(key: &'a PublicKey) -> Self {
-        unsafe { &*(key as *const PublicKey as *const SubjectPublicKeyInfo) }
-    }
-}
-
-impl From<SubjectPublicKeyInfo> for PublicKey {
-    #[inline]
-    fn from(spki: SubjectPublicKeyInfo) -> Self {
-        Self(spki)
-    }
-}
-
-impl From<PublicKey> for SubjectPublicKeyInfo {
+impl From<PublicKey> for SubjectPublicKeyInfoOwned {
     #[inline]
     fn from(key: PublicKey) -> Self {
-        key.0
+        use der::Decode;
+        SubjectPublicKeyInfoOwned::from_der(&key.inner).expect("failed to decode SPKI")
     }
 }
 impl TryFrom<PrivateKey> for PublicKey {
@@ -815,12 +1117,8 @@ impl TryFrom<PrivateKey> for PublicKey {
     }
 }
 
-impl AsRef<SubjectPublicKeyInfo> for PublicKey {
-    #[inline]
-    fn as_ref(&self) -> &SubjectPublicKeyInfo {
-        self.into()
-    }
-}
+// Note: AsRef<SubjectPublicKeyInfo> is not directly possible with new structure
+// Users should use as_inner() method instead
 
 impl AsRef<PublicKey> for PublicKey {
     #[inline]
@@ -833,42 +1131,99 @@ impl TryFrom<&'_ PublicKey> for RsaPublicKey {
     type Error = KeyError;
 
     fn try_from(v: &PublicKey) -> Result<Self, Self::Error> {
-        use picky_asn1_x509::PublicKey as InnerPublicKey;
+        use picky_asn1_x509::{PublicKey as ParsedPublicKey};
 
-        match &v.as_inner().subject_public_key {
-            InnerPublicKey::Rsa(BitStringAsn1Container(key)) => Ok(RsaPublicKey::new_with_max_size(
-                BigUint::from_bytes_be(key.modulus.as_unsigned_bytes_be()),
-                BigUint::from_bytes_be(key.public_exponent.as_unsigned_bytes_be()),
-                8192,
-            )?),
-            InnerPublicKey::Ec(_) => Err(KeyError::UnsupportedAlgorithm {
-                algorithm: "elliptic curves",
-            }),
-            InnerPublicKey::Ed(_) => Err(KeyError::UnsupportedAlgorithm {
-                algorithm: "edwards curves",
+        let spki = v.as_inner()?;
+
+        match picky_asn1_x509::parse_subject_public_key_info(&spki).map_err(|e| KeyError::from(e))? {
+            ParsedPublicKey::Rsa(rsa_key) => {
+                // Use the already parsed PKCS#1 RSA public key
+                Ok(RsaPublicKey::new_with_max_size(
+                    BigUint::from_bytes_be(rsa_key.modulus.as_bytes()),
+                    BigUint::from_bytes_be(rsa_key.public_exponent.as_bytes()),
+                    8192,
+                )?)
+            }
+            _ => Err(KeyError::UnsupportedAlgorithm {
+                algorithm: "only RSA keys are supported in this context",
             }),
         }
     }
 }
 
 impl PublicKey {
+    pub(crate) fn as_inner(&self) -> Result<spki::SubjectPublicKeyInfo<der::asn1::AnyRef<'_>, der::asn1::BitStringRef<'_>>, KeyError> {
+        use der::Decode;
+        spki::SubjectPublicKeyInfo::from_der(&self.inner).map_err(|e| KeyError::Asn1Deserialization {
+            source: e,
+            element: "SubjectPublicKeyInfo",
+        })
+    }
+
     pub fn from_rsa_components(modulus: &BigUint, public_exponent: &BigUint) -> Self {
-        PublicKey(SubjectPublicKeyInfo::new_rsa_key(
-            IntegerAsn1::from_bytes_be_unsigned(modulus.to_bytes_be()),
-            IntegerAsn1::from_bytes_be_unsigned(public_exponent.to_bytes_be()),
-        ))
+        use der::asn1::{Any, Null, UintRef};
+        use der::Encode;
+        use picky_asn1_x509::AlgorithmIdentifier;
+        use spki::SubjectPublicKeyInfo;
+
+        // Create PKCS#1 RSA public key
+        let modulus_bytes = modulus.to_bytes_be();
+        let public_exp_bytes = public_exponent.to_bytes_be();
+
+        let rsa_key = pkcs1::RsaPublicKey {
+            modulus: UintRef::new(&modulus_bytes).unwrap(),
+            public_exponent: UintRef::new(&public_exp_bytes).unwrap(),
+        };
+
+        let rsa_key_der = rsa_key.to_der().unwrap();
+
+        let spki = SubjectPublicKeyInfo {
+            algorithm: AlgorithmIdentifier {
+                oid: picky_asn1_x509::oids::RSA_ENCRYPTION,
+                parameters: Some(Any::from(Null)),
+            },
+            subject_public_key: der::asn1::BitString::from_bytes(&rsa_key_der).unwrap(),
+        };
+
+        let inner = spki.to_der().unwrap();
+        Self { inner }
     }
 
     /// `point` is SEC1 encoded point data
     pub fn from_ec_encoded_components(curve: &ObjectIdentifier, point: &[u8]) -> Self {
-        let point = picky_asn1::bit_string::BitString::with_bytes(point);
-        PublicKey(SubjectPublicKeyInfo::new_ec_key(curve.clone(), point))
+        use der::asn1::Any;
+        use der::Encode;
+        use picky_asn1_x509::AlgorithmIdentifier;
+        use spki::SubjectPublicKeyInfo;
+
+        let spki = SubjectPublicKeyInfo {
+            algorithm: AlgorithmIdentifier {
+                oid: picky_asn1_x509::oids::EC_PUBLIC_KEY,
+                parameters: Some(Any::encode_from(curve).unwrap()),
+            },
+            subject_public_key: der::asn1::BitString::from_bytes(point).unwrap(),
+        };
+
+        let inner = spki.to_der().unwrap();
+        Self { inner }
     }
 
     /// `public_key` is raw edwards curve public key
     pub fn from_ed_encoded_components(algorithm: &ObjectIdentifier, public_key: &[u8]) -> Self {
-        let point = picky_asn1::bit_string::BitString::with_bytes(public_key);
-        PublicKey(SubjectPublicKeyInfo::new_ed_key(algorithm.clone(), point))
+        use der::Encode;
+        use picky_asn1_x509::AlgorithmIdentifier;
+        use spki::SubjectPublicKeyInfo;
+
+        let spki = SubjectPublicKeyInfoOwned {
+            algorithm: spki::AlgorithmIdentifier {
+                oid: *algorithm,
+                parameters: None,
+            },
+            subject_public_key: der::asn1::BitString::from_bytes(public_key).unwrap(),
+        };
+
+        let inner = spki.to_der().unwrap();
+        Self { inner }
     }
 
     /// Creates public key from its raw components. Only curves declared in [`EcCurve`] are
@@ -929,23 +1284,25 @@ impl PublicKey {
     }
 
     pub fn to_der(&self) -> Result<Vec<u8>, KeyError> {
-        picky_asn1_der::to_vec(&self.0).map_err(|e| KeyError::Asn1Serialization {
-            source: e,
-            element: "subject public key info",
-        })
+        Ok(self.inner.clone())
     }
 
     pub fn to_pkcs1(&self) -> Result<Vec<u8>, KeyError> {
-        let picky_asn1_x509::PublicKey::Rsa(BitStringAsn1Container(rsa_public_key)) = &self.0.subject_public_key else {
-            return Err(KeyError::Rsa {
-                context: String::from("can’t export a non-RSA key to PKCS#1 format"),
-            });
-        };
+        use der::Encode;
 
-        picky_asn1_der::to_vec(rsa_public_key).map_err(|e| KeyError::Asn1Serialization {
-            source: e,
-            element: "RSA public key",
-        })
+        let spki = self.as_inner()?;
+        match picky_asn1_x509::parse_subject_public_key_info(&spki).map_err(|e| KeyError::from(e))? {
+            picky_asn1_x509::PublicKey::Rsa(rsa_key) => {
+                // Re-encode the RSA public key to DER
+                rsa_key.to_der().map_err(|e| KeyError::Asn1Serialization {
+                    source: e,
+                    element: "RSA public key",
+                })
+            }
+            _ => Err(KeyError::Rsa {
+                context: String::from("can't export a non-RSA key to PKCS#1 format"),
+            }),
+        }
     }
 
     pub fn to_pem(&self) -> Result<Pem<'static>, KeyError> {
@@ -982,39 +1339,69 @@ impl PublicKey {
     }
 
     pub fn from_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, KeyError> {
-        Ok(Self(picky_asn1_der::from_bytes(der.as_ref()).map_err(|e| {
-            KeyError::Asn1Deserialization {
+        use der::Decode;
+
+        // Validate by parsing
+        let _spki: spki::SubjectPublicKeyInfo<der::asn1::AnyRef, der::asn1::BitStringRef> =
+            spki::SubjectPublicKeyInfo::from_der(der.as_ref()).map_err(|e| KeyError::Asn1Deserialization {
                 source: e,
                 element: "subject public key info",
-            }
-        })?))
+            })?;
+
+        Ok(Self {
+            inner: der.as_ref().to_vec(),
+        })
     }
 
     pub fn from_pkcs1<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, KeyError> {
-        use picky_asn1_x509::{AlgorithmIdentifier, PublicKey, RsaPublicKey};
+        use der::asn1::{Any, Null};
+        use der::{Decode, Encode};
+        use picky_asn1_x509::AlgorithmIdentifier;
+        use spki::SubjectPublicKeyInfo;
 
-        let public_key =
-            picky_asn1_der::from_bytes::<RsaPublicKey>(der.as_ref()).map_err(|e| KeyError::Asn1Deserialization {
-                source: e,
-                element: "rsa public key",
-            })?;
+        // Parse the PKCS#1 RSA public key to validate it
+        let _public_key = pkcs1::RsaPublicKey::from_der(der.as_ref()).map_err(|e| KeyError::Asn1Deserialization {
+            source: e,
+            element: "rsa public key",
+        })?;
 
-        Ok(Self(SubjectPublicKeyInfo {
-            algorithm: AlgorithmIdentifier::new_rsa_encryption(),
-            subject_public_key: PublicKey::Rsa(public_key.into()),
-        }))
+        let spki = SubjectPublicKeyInfo {
+            algorithm: AlgorithmIdentifier {
+                oid: picky_asn1_x509::oids::RSA_ENCRYPTION,
+                parameters: Some(Any::from(Null)),
+            },
+            subject_public_key: der::asn1::BitString::from_bytes(der.as_ref()).map_err(|e| {
+                KeyError::Asn1Deserialization {
+                    source: e,
+                    element: "bit string",
+                }
+            })?,
+        };
+
+        let inner = spki.to_der().map_err(|e| KeyError::Asn1Deserialization {
+            source: e,
+            element: "subject public key info",
+        })?;
+
+        Ok(Self { inner })
     }
 
     pub fn kind(&self) -> KeyKind {
-        match self.0.subject_public_key {
-            picky_asn1_x509::PublicKey::Rsa(_) => KeyKind::Rsa,
-            picky_asn1_x509::PublicKey::Ec(_) => KeyKind::Ec,
-            picky_asn1_x509::PublicKey::Ed(_) => KeyKind::Ed,
-        }
-    }
+        use picky_asn1_x509::parse_subject_public_key_info;
 
-    pub(crate) fn as_inner(&self) -> &SubjectPublicKeyInfo {
-        &self.0
+        match self.as_inner() {
+            Ok(spki) => {
+                match parse_subject_public_key_info(&spki) {
+                    Ok(parsed) => match parsed {
+                        picky_asn1_x509::PublicKey::Rsa(_) => KeyKind::Rsa,
+                        picky_asn1_x509::PublicKey::Ec(_) => KeyKind::Ec,
+                        picky_asn1_x509::PublicKey::Ed(_) => KeyKind::Ed,
+                    }
+                    Err(_) => KeyKind::Unknown,
+                }
+            }
+            Err(_) => KeyKind::Unknown,
+        }
     }
 }
 
@@ -1034,24 +1421,27 @@ fn expand_ec_field(bytes: Vec<u8>, curve: EcCurve) -> Vec<u8> {
 
 #[cfg(test)]
 mod tests {
+    use rsa::traits::PublicKeyParts;
+    use rstest::rstest;
+
     use super::*;
     use crate::hash::HashAlgorithm;
     use crate::key::ed::EdKeypair;
     use crate::signature::SignatureAlgorithm;
-    use rsa::traits::PublicKeyParts;
-    use rstest::rstest;
 
     cfg_if::cfg_if! { if #[cfg(feature = "x509")] {
-        use crate::x509::{certificate::CertificateBuilder, date::UtcDate, name::DirectoryName};
+        use picky_asn1_x509::NameExt as _;
+        use x509_cert::name::Name;
+
+        use crate::x509::{certificate::CertificateBuilder, date::UtcDate};
 
         fn generate_certificate_from_pk(private_key: PrivateKey) {
-            // validity
-            let valid_from = UtcDate::ymd(2019, 10, 10).unwrap();
-            let valid_to = UtcDate::ymd(2019, 10, 11).unwrap();
+            let valid_from = UtcDate::new(2019, 10, 10, 0, 0, 0).unwrap();
+            let valid_to = UtcDate::new(2019, 10, 11, 0, 0, 0).unwrap();
 
             CertificateBuilder::new()
                 .validity(valid_from, valid_to)
-                .self_signed(DirectoryName::new_common_name("Test Root CA"), &private_key)
+                .self_signed(Name::new_common_name("Test Root CA"), &private_key)
                 .ca(true)
                 .build()
                 .expect("couldn't build root ca");

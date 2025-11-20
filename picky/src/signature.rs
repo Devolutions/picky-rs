@@ -5,6 +5,7 @@ use crate::key::ec::{EcComponent, EcCurve, NamedEcCurve};
 use crate::key::{KeyError, PrivateKey, PublicKey};
 
 use picky_asn1_x509::{oids, AlgorithmIdentifier};
+use der::asn1::AnyRef;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -63,13 +64,13 @@ pub enum SignatureAlgorithm {
     Ed25519,
 }
 
-impl TryFrom<&'_ AlgorithmIdentifier> for SignatureAlgorithm {
+impl TryFrom<&'_ AlgorithmIdentifier<der::Any>> for SignatureAlgorithm {
     type Error = SignatureError;
 
-    fn try_from(v: &AlgorithmIdentifier) -> Result<Self, Self::Error> {
-        let oid_string: String = v.oid().into();
-        match oid_string.as_str() {
-            oids::MD5_WITH_RSA_ENCRYPTHION => Ok(Self::RsaPkcs1v15(HashAlgorithm::MD5)),
+    fn try_from(v: &AlgorithmIdentifier<der::Any>) -> Result<Self, Self::Error> {
+        let oid = v.oid;
+        match oid {
+            oids::MD5_WITH_RSA_ENCRYPTION => Ok(Self::RsaPkcs1v15(HashAlgorithm::MD5)),
             oids::SHA1_WITH_RSA_ENCRYPTION => Ok(Self::RsaPkcs1v15(HashAlgorithm::SHA1)),
             oids::SHA224_WITH_RSA_ENCRYPTION => Ok(Self::RsaPkcs1v15(HashAlgorithm::SHA2_224)),
             oids::SHA256_WITH_RSA_ENCRYPTION => Ok(Self::RsaPkcs1v15(HashAlgorithm::SHA2_256)),
@@ -80,54 +81,54 @@ impl TryFrom<&'_ AlgorithmIdentifier> for SignatureAlgorithm {
             oids::ECDSA_WITH_SHA256 => Ok(Self::Ecdsa(HashAlgorithm::SHA2_256)),
             oids::ECDSA_WITH_SHA384 => Ok(Self::Ecdsa(HashAlgorithm::SHA2_384)),
             oids::ED25519 => Ok(Self::Ed25519),
-            _ => Err(SignatureError::UnsupportedAlgorithm { algorithm: oid_string }),
+            _ => Err(SignatureError::UnsupportedAlgorithm { algorithm: oid.to_string() }),
         }
     }
 }
 
-impl TryFrom<SignatureAlgorithm> for AlgorithmIdentifier {
+impl TryFrom<SignatureAlgorithm> for AlgorithmIdentifier<AnyRef<'static>> {
     type Error = SignatureError;
 
     fn try_from(ty: SignatureAlgorithm) -> Result<Self, Self::Error> {
         match ty {
             SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::MD5) => {
-                Ok(AlgorithmIdentifier::new_md5_with_rsa_encryption())
+                Ok(picky_asn1_x509::algorithm_identifier::md5_with_rsa_encryption())
             }
             SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA1) => {
-                Ok(AlgorithmIdentifier::new_sha1_with_rsa_encryption())
+                Ok(picky_asn1_x509::algorithm_identifier::sha1_with_rsa_encryption())
             }
             SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_224) => {
-                Ok(AlgorithmIdentifier::new_sha224_with_rsa_encryption())
+                Ok(picky_asn1_x509::algorithm_identifier::sha224_with_rsa_encryption())
             }
             SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256) => {
-                Ok(AlgorithmIdentifier::new_sha256_with_rsa_encryption())
+                Ok(picky_asn1_x509::algorithm_identifier::sha256_with_rsa_encryption())
             }
             SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_384) => {
-                Ok(AlgorithmIdentifier::new_sha384_with_rsa_encryption())
+                Ok(picky_asn1_x509::algorithm_identifier::sha384_with_rsa_encryption())
             }
             SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_512) => {
-                Ok(AlgorithmIdentifier::new_sha512_with_rsa_encryption())
+                Ok(picky_asn1_x509::algorithm_identifier::sha512_with_rsa_encryption())
             }
             SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA3_384) => {
-                Ok(AlgorithmIdentifier::new_sha3_384_with_rsa_encryption())
+                Ok(picky_asn1_x509::algorithm_identifier::sha3_384_with_rsa_encryption())
             }
             SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA3_512) => {
-                Ok(AlgorithmIdentifier::new_sha3_512_with_rsa_encryption())
+                Ok(picky_asn1_x509::algorithm_identifier::sha3_512_with_rsa_encryption())
             }
-            SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_256) => Ok(AlgorithmIdentifier::new_ecdsa_with_sha256()),
-            SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_384) => Ok(AlgorithmIdentifier::new_ecdsa_with_sha384()),
-            SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_512) => Ok(AlgorithmIdentifier::new_ecdsa_with_sha512()),
+            SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_256) => Ok(picky_asn1_x509::algorithm_identifier::ecdsa_with_sha256()),
+            SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_384) => Ok(picky_asn1_x509::algorithm_identifier::ecdsa_with_sha384()),
+            SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_512) => Ok(picky_asn1_x509::algorithm_identifier::ecdsa_with_sha512()),
             SignatureAlgorithm::Ecdsa(hash) => {
                 let msg = format!("ECDSA doesn't support {:?} hashing algorithm", hash);
                 Err(SignatureError::Ec { context: msg })
             }
-            SignatureAlgorithm::Ed25519 => Ok(AlgorithmIdentifier::new_ed25519()),
+            SignatureAlgorithm::Ed25519 => Ok(picky_asn1_x509::algorithm_identifier::ed25519()),
         }
     }
 }
 
 impl SignatureAlgorithm {
-    pub fn from_algorithm_identifier(algorithm_identifier: &AlgorithmIdentifier) -> Result<Self, SignatureError> {
+    pub fn from_algorithm_identifier(algorithm_identifier: &AlgorithmIdentifier<der::Any>) -> Result<Self, SignatureError> {
         Self::try_from(algorithm_identifier)
     }
 

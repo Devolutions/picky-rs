@@ -1,8 +1,9 @@
 use crate::key::{KeyError, PrivateKey, PrivateKeyKind, PublicKey};
-use crate::oid::ObjectIdentifier;
+use const_oid::ObjectIdentifier;
 
-use picky_asn1::wrapper::BitStringAsn1;
-use picky_asn1_x509::{oids, EcParameters};
+use der::asn1::BitString;
+use picky_asn1_x509::oids;
+use sec1::EcParameters;
 use std::fmt::Display;
 use zeroize::Zeroize;
 
@@ -79,7 +80,7 @@ impl EcCurve {
         };
 
         if buffer.len() != self.field_bytes_size() {
-            return Err(KeyError::EC {
+            return Err(KeyError::Ec {
                 context: error_message.to_string(),
             });
         }
@@ -110,7 +111,7 @@ impl Display for NamedEcCurve {
         match self {
             Self::Known(curve) => curve.fmt(f),
             Self::Unsupported(oid) => {
-                let oid: String = oid.into();
+                let oid = oid.to_string();
                 write!(f, "Unsupported(OID: {oid})")
             }
         }
@@ -119,8 +120,7 @@ impl Display for NamedEcCurve {
 
 impl From<&'_ ObjectIdentifier> for NamedEcCurve {
     fn from(value: &ObjectIdentifier) -> Self {
-        let oid: String = value.into();
-        match oid.as_str() {
+        match *value {
             oids::SECP256R1 => NamedEcCurve::Known(EcCurve::NistP256),
             oids::SECP384R1 => NamedEcCurve::Known(EcCurve::NistP384),
             oids::SECP521R1 => NamedEcCurve::Known(EcCurve::NistP521),
@@ -133,9 +133,9 @@ impl From<NamedEcCurve> for ObjectIdentifier {
     fn from(value: NamedEcCurve) -> Self {
         match value {
             NamedEcCurve::Known(curve) => match curve {
-                EcCurve::NistP256 => oids::secp256r1(),
-                EcCurve::NistP384 => oids::secp384r1(),
-                EcCurve::NistP521 => oids::secp521r1(),
+                EcCurve::NistP256 => oids::SECP256R1,
+                EcCurve::NistP384 => oids::SECP384R1,
+                EcCurve::NistP521 => oids::SECP521R1,
             },
             NamedEcCurve::Unsupported(oid) => oid,
         }
@@ -157,7 +157,7 @@ impl<'a> TryFrom<&'a PrivateKey> for EcdsaKeypair {
                 private_key: private_key.clone(),
                 public_key: public_key.clone(),
             }),
-            _ => Err(KeyError::EC {
+            _ => Err(KeyError::Ec {
                 context: "EC keypair cannot be built from Non-EC private key".to_string(),
             }),
         }
@@ -180,7 +180,7 @@ pub(crate) fn calculate_public_ec_key(
             let private_key_validated = EcCurve::NistP256.validate_component(EcComponent::Secret(private_key))?;
 
             let secret_bytes = GenericArrayP256::from_slice(private_key_validated);
-            let secret_key = SecretKeyP256::from_bytes(secret_bytes).map_err(|_| KeyError::EC {
+            let secret_key = SecretKeyP256::from_bytes(secret_bytes).map_err(|_| KeyError::Ec {
                 context: "Failed to construct P256 SecretKey from private key bytes".to_string(),
             })?;
 
@@ -197,7 +197,7 @@ pub(crate) fn calculate_public_ec_key(
             let private_key_validated = EcCurve::NistP384.validate_component(EcComponent::Secret(private_key))?;
 
             let secret_bytes = GenericArrayP384::from_slice(private_key_validated);
-            let secret_key = SecretKeyP384::from_bytes(secret_bytes).map_err(|_| KeyError::EC {
+            let secret_key = SecretKeyP384::from_bytes(secret_bytes).map_err(|_| KeyError::Ec {
                 context: "Failed to construct P384 SecretKey from private key bytes".to_string(),
             })?;
 
@@ -214,7 +214,7 @@ pub(crate) fn calculate_public_ec_key(
             let private_key_validated = EcCurve::NistP521.validate_component(EcComponent::Secret(private_key))?;
 
             let secret_bytes = GenericArrayP521::from_slice(private_key_validated);
-            let secret_key = SecretKeyP521::from_bytes(secret_bytes).map_err(|_| KeyError::EC {
+            let secret_key = SecretKeyP521::from_bytes(secret_bytes).map_err(|_| KeyError::Ec {
                 context: "Failed to construct P521 SecretKey from private key bytes".to_string(),
             })?;
 
@@ -249,31 +249,47 @@ impl<'a> TryFrom<&'a PublicKey> for EcdsaPublicKey<'a> {
     fn try_from(v: &'a PublicKey) -> Result<Self, Self::Error> {
         use picky_asn1_x509::PublicKey as InnerPublicKey;
 
-        let curve_oid = match &v.as_inner().algorithm.parameters() {
-            picky_asn1_x509::AlgorithmIdentifierParameters::Ec(EcParameters::NamedCurve(curve_oid)) => {
-                curve_oid.0.clone()
+        let spki = v.as_inner().map_err(|e| KeyError::Ec {
+            context: format!("Failed to parse SPKI: {e}"),
+        })?;
+        
+        // Check if this is an EC key
+        if spki.algorithm.oid != picky_asn1_x509::oids::EC_PUBLIC_KEY {
+            return Err(KeyError::Ec {
+                context: "Not an EC public key".to_string(),
+            });
+        }
+        
+        // Extract curve OID from parameters
+        let curve_oid = match &spki.algorithm.parameters {
+            Some(params) => {
+                // Try to decode the parameters as an OID
+                use der::Decode;
+                const_oid::ObjectIdentifier::from_der(params.as_bytes()).map_err(|e| KeyError::Ec {
+                    context: format!("Failed to decode curve OID: {e}"),
+                })?
             }
-            _ => {
-                return Err(KeyError::EC {
-                    context: "EC public key cannot be constructed from non-EC public key".to_string(),
+            None => {
+                return Err(KeyError::Ec {
+                    context: "Missing EC curve parameters".to_string(),
                 })
             }
         };
 
-        match &v.as_inner().subject_public_key {
-            InnerPublicKey::Rsa(_) => Err(KeyError::EC {
-                context: "EC public key cannot be constructed from RSA public key".to_string(),
-            }),
-            InnerPublicKey::Ec(BitStringAsn1(bitstring)) => {
-                let data = bitstring.payload_view();
+        // Parse the public key using the picky_asn1_x509 parser
+        match picky_asn1_x509::parse_subject_public_key_info(&spki).map_err(|e| KeyError::Ec {
+            context: format!("Failed to parse EC public key: {e}"),
+        })? {
+            picky_asn1_x509::PublicKey::Ec(ec_point) => {
+                let data = ec_point.raw_bytes();
 
                 Ok(EcdsaPublicKey {
                     data,
                     curve: NamedEcCurve::from(&curve_oid),
                 })
             }
-            InnerPublicKey::Ed(_) => Err(KeyError::EC {
-                context: "EC public key cannot be constructed from ED25519 public key".to_string(),
+            _ => Err(KeyError::Ec {
+                context: "Public key is not an EC public key".to_string(),
             }),
         }
     }
@@ -288,7 +304,7 @@ impl<'a> TryFrom<&'a EcdsaKeypair> for EcdsaPublicKey<'a> {
                 data: key.as_slice(),
                 curve: v.curve.clone(),
             }),
-            None => Err(KeyError::EC {
+            None => Err(KeyError::Ec {
                 context: "EC public key cannot be constructed from EC private key without public key".to_string(),
             }),
         }
@@ -348,7 +364,7 @@ mod tests {
         let pk: &PublicKey = &PublicKey::from_pem_str(RSA_PUBLIC_KEY_PEM).unwrap();
         let epk: Result<EcdsaPublicKey, KeyError> = pk.try_into();
         assert!(epk.is_err());
-        assert!(matches!(epk, Err(KeyError::EC { context: _ })));
+        assert!(matches!(epk, Err(KeyError::Ec { context: _ })));
 
         // TODO: add check for attempted conversion from ED keys - which are not supported yet
     }

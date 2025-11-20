@@ -127,15 +127,12 @@
 //!# }
 //! ```
 
-#[cfg(feature = "pkcs7")]
-pub mod pkcs7;
-
 #[cfg(feature = "wincert")]
 pub mod wincert;
 
 pub mod certificate;
 pub mod csr;
-pub mod date;
+pub mod date; // TODO: remove this module.
 pub mod key_id_gen_method;
 pub mod name;
 
@@ -147,5 +144,3 @@ pub use picky_asn1_x509::{DirectoryString, Extension, Extensions};
 pub mod extension {
     pub use picky_asn1_x509::extension::*;
 }
-
-mod utils;

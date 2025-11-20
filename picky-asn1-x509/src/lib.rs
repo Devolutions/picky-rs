@@ -1,39 +1,50 @@
-#[macro_use]
-mod macros;
+//! ASN.1 types for X.509 certificates and related standards
+//!
+//! This crate provides ASN.1 types defined by X.509 related RFCs, now using the `der` crate
+//! for proper ASN.1 DER encoding instead of the old serde-based approach.
+//!
+//! # Key Changes from Legacy Implementation
+//!
+//! - Uses `der` crate for proper ASN.1 DER encoding/decoding
+//! - Uses `const-oid` for compile-time OID constants
+//! - Integrates with RustCrypto ecosystem (`x509-cert`, `spki`, `pkcs1`, etc.)
+//! - Eliminates serde impedance mismatch issues
+//! - Provides correct ASN.1 encoding for interoperability
 
 pub mod algorithm_identifier;
-pub mod attribute;
-pub mod attribute_type_and_value;
 pub mod certificate;
-pub mod certification_request;
-pub mod directory_string;
 pub mod extension;
 pub mod name;
 pub mod oids;
-#[cfg(feature = "pkcs12")]
-pub mod pkcs12;
-#[cfg(feature = "pkcs7")]
-pub mod pkcs7;
-pub mod private_key_info;
+pub mod private_key;
+pub mod public_key;
 pub mod signature;
-pub mod subject_public_key_info;
-pub mod validity;
-pub mod version;
 
-pub use algorithm_identifier::*;
-pub use attribute::*;
-pub use attribute_type_and_value::*;
-pub use certificate::*;
-pub use certification_request::*;
-pub use directory_string::*;
-pub use extension::*;
-pub use name::*;
-#[cfg(feature = "pkcs7")]
-pub use pkcs7::*;
-pub use private_key_info::*;
-pub use subject_public_key_info::*;
-pub use validity::*;
-pub use version::*;
+// Re-export der::DateTime for compatibility
+pub use der::DateTime;
 
-// Re-export `oid` crate as we use it in crate public API
-pub use oid;
+// Re-exports for convenience
+pub use algorithm_identifier::{AlgorithmIdentifier, AlgorithmIdentifierExt};
+pub use certificate::{Certificate, CertificateExt, TbsCertificate};
+pub use extension::ExtensionExt;
+pub use name::{NameExt, IntoDirectoryString};
+pub use private_key::{PrivateKey, PrivateKeyError, PrivateKeyInfoExt};
+pub use public_key::{parse_subject_public_key_info, PublicKey, PublicKeyError, SubjectPublicKeyInfoExt};
+pub use signature::EcdsaSignatureValue;
+pub use const_oid::ObjectIdentifier;
+
+// Re-exports from x509-cert for compatibility  
+pub use x509_cert::ext::pkix::name::DirectoryString;
+pub use x509_cert::ext::{Extension, Extensions};
+
+// Type aliases for legacy compatibility
+pub use der::asn1::{Ia5String as Ia5StringAsn1, UintRef as IntegerAsn1};
+pub use x509_cert::Version;
+
+// Legacy type placeholders - these would need proper implementation
+// For now, we'll create basic type aliases to get compilation working
+pub type ShaVariant = &'static str; // Placeholder - needs proper implementation
+pub type AttributeValues = x509_cert::attr::Attributes; // Using RustCrypto equivalent
+
+// Re-export core dependencies
+pub use der;

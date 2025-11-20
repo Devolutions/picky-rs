@@ -10,32 +10,26 @@ authors = [
     "Isode Ltd./Geobert Quach <geobert.quach@isode.com>",
     "Alexandr Yusuk <aleksandr.yusuk@apriorit.com>",
 ]
-description = "Provides ASN1 types defined by X.509 related RFCs"
-edition = "2021"
-rust-version = "1.70"
+description = "Provides ASN1 types defined by X.509 related RFCs - now using der crate"
+edition = "2024"
+rust-version = "1.85"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Devolutions/picky-rs"
 
 [dependencies]
-picky-asn1 = { version = "0.10", path = "../picky-asn1" }
-picky-asn1-der = { version = "0.5", path = "../picky-asn1-der" }
-serde = { version = "1", features = ["derive"] }
-oid = { version = "0.2", features = ["serde_support"] }
-base64 = "0.22"
-num-bigint-dig = { version = "0.8", optional = true }
-widestring = { version = "1.1", default-features = false, features = ["alloc"], optional = true }
-zeroize = { version = "1.8", optional = true }
+# Core ASN.1 DER implementation
+der = { version = "0.7", features = ["derive", "oid", "alloc"] }
+spki = { version = "0.7" }
+x509-cert = { version = "0.2" }
+pkcs1 = { version = "0.7" }
+pkcs8 = { version = "0.10" }
+sec1 = { version = "0.7" }
+thiserror = "1"
+
+# OID constants
+const-oid = { version = "0.9" }
 
 [dev-dependencies]
-num-bigint-dig = "0.8"
 pretty_assertions = "1.4"
 hex = "0.4"
 expect-test = "1"
-picky-test-data = { path = "../picky-test-data", version = "0.1" }
-
-[features]
-legacy = ["num-bigint-dig"]
-pkcs7 = ["widestring"]
-pkcs12 = []
-ctl = ["pkcs7"]
-zeroize = ["dep:zeroize", "picky-asn1/zeroize"]

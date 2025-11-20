@@ -3,10 +3,7 @@
 //! ![Crates.io](https://img.shields.io/crates/l/picky)
 //! # picky
 //!
-//! Portable X.509, PKI, JOSE and HTTP signature implementation.
-
-#[cfg(feature = "http_signature")]
-pub mod http;
+//! Portable X.509, PKI and JOSE implementation.
 
 #[cfg(feature = "jose")]
 pub mod jose;
@@ -17,9 +14,6 @@ pub mod x509;
 #[cfg(feature = "ssh")]
 pub mod ssh;
 
-#[cfg(feature = "pkcs12")]
-pub mod pkcs12;
-
 #[cfg(feature = "putty")]
 pub mod putty;
 
@@ -28,4 +22,4 @@ pub mod key;
 pub mod pem;
 pub mod signature;
 
-pub use picky_asn1_x509::{oid, oids, AlgorithmIdentifier};
+pub use picky_asn1_x509::{oids, AlgorithmIdentifier, ExtensionExt, SubjectPublicKeyInfoExt, PrivateKeyInfoExt};

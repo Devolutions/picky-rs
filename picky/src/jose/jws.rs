@@ -8,7 +8,7 @@ use crate::key::{EcCurve, PrivateKey, PublicKey};
 use crate::signature::{SignatureAlgorithm, SignatureError};
 use base64::engine::general_purpose;
 use base64::{DecodeError, Engine as _};
-use picky_asn1::wrapper::IntegerAsn1;
+use der::{asn1::UintRef, Encode};
 use picky_asn1_x509::signature::EcdsaSignatureValue;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -313,8 +313,9 @@ impl Jws {
             // EC sugnatures have special encoding rules (RFC 7518, section 3.4)
             JwsAlg::ES256 | JwsAlg::ES384 | JwsAlg::ES512 => {
                 // Parse signature as ASN.1 DER sequence
+                use der::Decode;
                 let signature: EcdsaSignatureValue =
-                    picky_asn1_der::from_bytes(&signature).map_err(|e| SignatureError::Ec {
+                    EcdsaSignatureValue::from_der(&signature).map_err(|e| SignatureError::Ec {
                         context: format!("Invalid EC DER signature encoding: {e}"),
                     })?;
 
@@ -327,8 +328,8 @@ impl Jws {
 
                 let signature_component_size = curve.field_bytes_size();
 
-                let r = signature.r.as_unsigned_bytes_be();
-                let s = signature.s.as_unsigned_bytes_be();
+                let r = signature.r.as_bytes();
+                let s = signature.s.as_bytes();
 
                 // We should add zero padding (leading zeros) for R & S components to match the
                 // size of the curve, as ASN.1 DER encoding removes leading zeros.
@@ -471,12 +472,11 @@ pub fn verify_signature(encoded_token: &str, public_key: &PublicKey, algorithm: 
 
             let (r, s) = signature.split_at(component_size);
 
-            let signature = EcdsaSignatureValue {
-                r: IntegerAsn1::from_bytes_be_unsigned(r.to_vec()),
-                s: IntegerAsn1::from_bytes_be_unsigned(s.to_vec()),
-            };
+            let signature = EcdsaSignatureValue::new(r, s).map_err(|e| SignatureError::Ec {
+                context: format!("Failed to create ECDSA signature: {e}"),
+            })?;
 
-            picky_asn1_der::to_vec(&signature).map_err(|e| SignatureError::Ec {
+            signature.to_der().map_err(|e| SignatureError::Ec {
                 context: format!("Failed to encode EC signature to DER format: {e}"),
             })?
         }

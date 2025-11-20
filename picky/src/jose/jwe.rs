@@ -623,7 +623,7 @@ enum EncoderMode<'a> {
 }
 
 fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
-    use picky_asn1_x509::PublicKey as RfcPublicKey;
+    use spki::SubjectPublicKeyInfoOwned as RfcPublicKey;
 
     let (encrypted_key_base64, jwe_cek) = match mode {
         EncoderMode::Direct(symmetric_key) => {
@@ -640,8 +640,10 @@ fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
 
             (String::new(), Zeroizing::new(symmetric_key.to_vec()))
         }
-        EncoderMode::Asymmetric(public_key) => match &public_key.as_inner().subject_public_key {
-            RfcPublicKey::Rsa(_) => {
+        EncoderMode::Asymmetric(public_key) => {
+            let spki = public_key.as_inner().map_err(|e| JweError::Key { source: e })?;
+            match picky_asn1_x509::parse_subject_public_key_info(&spki).map_err(|e| JweError::Key { source: e.into() })? {
+            picky_asn1_x509::PublicKey::Rsa(_) => {
                 let rsa_public_key = RsaPublicKey::try_from(public_key)?;
 
                 let padding = match jwe.header.alg {
@@ -666,7 +668,7 @@ fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
 
                 (general_purpose::URL_SAFE_NO_PAD.encode(encrypted_key), cek)
             }
-            RfcPublicKey::Ec(_) | RfcPublicKey::Ed(_) => {
+            picky_asn1_x509::PublicKey::Ec(_) | picky_asn1_x509::PublicKey::Ed(_) => {
                 let JweEcdhEncryptionContext {
                     jwe_cek,
                     encrypted_key,
@@ -682,7 +684,8 @@ fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
 
                 (encrypted_key_base64, jwe_cek)
             }
-        },
+            }
+        }
     };
 
     // Note that header could be modified by code above:
@@ -1018,10 +1021,11 @@ fn generate_ecdh_shared_secret(
     receiver_public_key: &PublicKey,
     cek_key_len: usize,
 ) -> Result<(Zeroizing<Vec<u8>>, PublicKey), JweError> {
-    use picky_asn1_x509::PublicKey as RfcPublicKey;
+    use spki::SubjectPublicKeyInfoOwned as RfcPublicKey;
 
-    let (shared_secret, epk) = match &receiver_public_key.as_inner().subject_public_key {
-        RfcPublicKey::Ec(_) => {
+    let spki = receiver_public_key.as_inner().map_err(|e| JweError::Key { source: e })?;
+    let (shared_secret, epk) = match picky_asn1_x509::parse_subject_public_key_info(&spki).map_err(|e| JweError::Key { source: e.into() })? {
+        picky_asn1_x509::PublicKey::Ec(_) => {
             use rand::rngs::OsRng;
 
             let ec = EcdsaPublicKey::try_from(receiver_public_key)?;
@@ -1029,7 +1033,7 @@ fn generate_ecdh_shared_secret(
             match ec.curve() {
                 NamedEcCurve::Known(EcCurve::NistP256) => {
                     let public_key = p256::PublicKey::from_sec1_bytes(ec.encoded_point()).map_err(|e| {
-                        let source = KeyError::EC {
+                        let source = KeyError::Ec {
                             context: format!("Cannot parse p256 encoded point from bytes: {e}"),
                         };
                         JweError::Key { source }
@@ -1047,7 +1051,7 @@ fn generate_ecdh_shared_secret(
                 }
                 NamedEcCurve::Known(EcCurve::NistP384) => {
                     let public_key = p384::PublicKey::from_sec1_bytes(ec.encoded_point()).map_err(|e| {
-                        let source = KeyError::EC {
+                        let source = KeyError::Ec {
                             context: format!("Cannot parse p384 encoded point from bytes: {e}"),
                         };
                         JweError::Key { source }
@@ -1065,7 +1069,7 @@ fn generate_ecdh_shared_secret(
                 }
                 NamedEcCurve::Known(EcCurve::NistP521) => {
                     let public_key = p521::PublicKey::from_sec1_bytes(ec.encoded_point()).map_err(|e| {
-                        let source = KeyError::EC {
+                        let source = KeyError::Ec {
                             context: format!("Cannot parse p521 encoded point from bytes: {e}"),
                         };
                         JweError::Key { source }
@@ -1087,7 +1091,7 @@ fn generate_ecdh_shared_secret(
                 }
             }
         }
-        RfcPublicKey::Ed(_) => {
+        picky_asn1_x509::PublicKey::Ed(_) => {
             let ed = EdPublicKey::try_from(receiver_public_key)?;
 
             match ed.algorithm() {
@@ -1095,7 +1099,7 @@ fn generate_ecdh_shared_secret(
                     use rand::rngs::OsRng;
 
                     let public_key_data: [u8; X25519_FIELD_ELEMENT_SIZE] = ed.data().try_into().map_err(|e| {
-                        let source = KeyError::ED {
+                        let source = KeyError::Ed {
                             context: format!("Cannot parse x25519 encoded point from bytes: {e}"),
                         };
                         JweError::Key { source }
@@ -1124,7 +1128,7 @@ fn generate_ecdh_shared_secret(
                 }
             }
         }
-        RfcPublicKey::Rsa(_) => {
+        picky_asn1_x509::PublicKey::Rsa(_) => {
             return Err(JweError::UnsupportedAlgorithm {
                 algorithm: format!("RSA key can't be used with `{:?}` algorithm", alg),
             });
@@ -1166,7 +1170,7 @@ fn calculate_ecdh_shared_secret(
             match private_key.curve() {
                 NamedEcCurve::Known(EcCurve::NistP256) => {
                     let public_key = p256::PublicKey::from_sec1_bytes(public_key.encoded_point()).map_err(|e| {
-                        let source = KeyError::EC {
+                        let source = KeyError::Ec {
                             context: format!("Cannot parse p256 encoded point from bytes: {e}"),
                         };
                         JweError::Key { source }
@@ -1178,7 +1182,7 @@ fn calculate_ecdh_shared_secret(
                     let secret = p256::SecretKey::from_bytes(
                         p256::elliptic_curve::generic_array::GenericArray::from_slice(secret_bytes_validated),
                     )
-                    .map_err(|e| KeyError::EC {
+                    .map_err(|e| KeyError::Ec {
                         context: format!("Cannot parse p256 secret from bytes: {e}"),
                     })?;
 
@@ -1192,7 +1196,7 @@ fn calculate_ecdh_shared_secret(
                 }
                 NamedEcCurve::Known(EcCurve::NistP384) => {
                     let public_key = p384::PublicKey::from_sec1_bytes(public_key.encoded_point()).map_err(|e| {
-                        let source = KeyError::EC {
+                        let source = KeyError::Ec {
                             context: format!("Cannot parse p384 encoded point from bytes: {e}"),
                         };
                         JweError::Key { source }
@@ -1204,7 +1208,7 @@ fn calculate_ecdh_shared_secret(
                     let secret = p384::SecretKey::from_bytes(
                         p384::elliptic_curve::generic_array::GenericArray::from_slice(secret_bytes_validated),
                     )
-                    .map_err(|e| KeyError::EC {
+                    .map_err(|e| KeyError::Ec {
                         context: format!("Cannot parse p384 secret from bytes: {e}"),
                     })?;
 
@@ -1218,7 +1222,7 @@ fn calculate_ecdh_shared_secret(
                 }
                 NamedEcCurve::Known(EcCurve::NistP521) => {
                     let public_key = p521::PublicKey::from_sec1_bytes(public_key.encoded_point()).map_err(|e| {
-                        let source = KeyError::EC {
+                        let source = KeyError::Ec {
                             context: format!("Cannot parse p521 encoded point from bytes: {e}"),
                         };
                         JweError::Key { source }
@@ -1230,7 +1234,7 @@ fn calculate_ecdh_shared_secret(
                     let secret = p521::SecretKey::from_bytes(
                         p521::elliptic_curve::generic_array::GenericArray::from_slice(secret_bytes_validated),
                     )
-                    .map_err(|e| KeyError::EC {
+                    .map_err(|e| KeyError::Ec {
                         context: format!("Cannot parse p521 secret from bytes: {e}"),
                     })?;
 
@@ -1270,7 +1274,7 @@ fn calculate_ecdh_shared_secret(
                 NamedEdAlgorithm::Known(EdAlgorithm::X25519) => {
                     let public_key_data: [u8; X25519_FIELD_ELEMENT_SIZE] =
                         public_key.data().try_into().map_err(|e| {
-                            let source = KeyError::ED {
+                            let source = KeyError::Ed {
                                 context: format!("Cannot parse x25519 encoded point from bytes: {e}"),
                             };
                             JweError::Key { source }
@@ -1280,7 +1284,7 @@ fn calculate_ecdh_shared_secret(
 
                     let private_key_data: [u8; X25519_FIELD_ELEMENT_SIZE] =
                         private_key.secret().try_into().map_err(|e| {
-                            let source = KeyError::ED {
+                            let source = KeyError::Ed {
                                 context: format!("Cannot parse x25519 secret from bytes: {e}"),
                             };
                             JweError::Key { source }

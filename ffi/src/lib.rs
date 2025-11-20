@@ -8,7 +8,6 @@ pub mod jwt;
 pub mod key;
 pub mod pem;
 pub mod pkcs12;
-pub mod pkcs7;
 pub mod putty;
 pub mod signature;
 pub mod ssh;

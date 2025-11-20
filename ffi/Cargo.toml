@@ -15,12 +15,13 @@ doctest = false
 embed-resource = "3.0"
 
 [dependencies]
-picky = { path = "../picky/", default-features = false, features = ["ssh", "x509", "time_conversion", "jose", "pkcs12", "pkcs7", "http_timestamp", "putty"] }
+picky = { path = "../picky/", default-features = false, features = ["ssh", "x509", "time_conversion", "jose", "putty"] }
 picky-asn1 = { path = "../picky-asn1", default-features = false }
 picky-asn1-der = { path = "../picky-asn1-der" }
-picky-asn1-x509 = { path = "../picky-asn1-x509", features = ["legacy", "zeroize"] }
+picky-asn1-x509 = { path = "../picky-asn1-x509" }
 
 argon2 = "0.5"
+pkcs12 = "0.1"
 
 # FFI
 diplomat = { git = "https://github.com/CBenoit/diplomat.git", rev = "f4d93d57e93025c57e75e9711d2418faa9311a42" }

@@ -1,7 +1,7 @@
 use crate::key::{KeyError, PrivateKey, PrivateKeyKind, PublicKey};
-use crate::oid::ObjectIdentifier;
+use const_oid::ObjectIdentifier;
 
-use picky_asn1::wrapper::BitStringAsn1;
+use der::asn1::BitString;
 use picky_asn1_x509::oids;
 use std::fmt::Display;
 use zeroize::Zeroize;
@@ -34,12 +34,12 @@ impl Display for NamedEdAlgorithm {
             NamedEdAlgorithm::Unsupported(oid) => {
                 // We don't support Ed448 and X448 algorithms, but we can still print their named
                 // representation of OID to make errrs more readable.
-                if oid == &oids::ed448() {
+                if *oid == oids::ED448 {
                     write!(f, "Ed448")
-                } else if oid == &oids::x448() {
+                } else if *oid == oids::X448 {
                     write!(f, "X448")
                 } else {
-                    let oid: String = oid.into();
+                    let oid = oid.to_string();
                     write!(f, "Unsupported(OID: {oid})")
                 }
             }
@@ -58,8 +58,7 @@ impl Display for EdAlgorithm {
 
 impl From<&'_ ObjectIdentifier> for NamedEdAlgorithm {
     fn from(value: &'_ ObjectIdentifier) -> Self {
-        let oid: String = value.into();
-        match oid.as_str() {
+        match *value {
             oids::ED25519 => NamedEdAlgorithm::Known(EdAlgorithm::Ed25519),
             oids::X25519 => NamedEdAlgorithm::Known(EdAlgorithm::X25519),
             _ => NamedEdAlgorithm::Unsupported(value.clone()),
@@ -70,8 +69,8 @@ impl From<&'_ ObjectIdentifier> for NamedEdAlgorithm {
 impl From<EdAlgorithm> for ObjectIdentifier {
     fn from(value: EdAlgorithm) -> Self {
         match value {
-            EdAlgorithm::Ed25519 => oids::ed25519(),
-            EdAlgorithm::X25519 => oids::x25519(),
+            EdAlgorithm::Ed25519 => oids::ED25519,
+            EdAlgorithm::X25519 => oids::X25519,
         }
     }
 }
@@ -122,7 +121,7 @@ impl<'a> TryFrom<&'a PrivateKey> for EdKeypair {
                 private_key: private_key.clone(),
                 public_key: public_key.clone(),
             }),
-            _ => Err(KeyError::ED {
+            _ => Err(KeyError::Ed {
                 context: "Ed keypair cannot be constructed from non-Ed private key".to_string(),
             }),
         }
@@ -154,7 +153,7 @@ impl<'a> TryFrom<&'a EdKeypair> for EdPublicKey<'a> {
                 data: key.as_slice(),
                 algorithm: v.algorithm.clone(),
             }),
-            None => Err(KeyError::ED {
+            None => Err(KeyError::Ed {
                 context: "Ed public key cannot be constructed from Ed private key without public key".to_string(),
             }),
         }
@@ -167,21 +166,22 @@ impl<'a> TryFrom<&'a PublicKey> for EdPublicKey<'a> {
     fn try_from(v: &'a PublicKey) -> Result<Self, Self::Error> {
         use picky_asn1_x509::PublicKey as InnerPublicKey;
 
-        let oid = v.as_inner().algorithm.oid();
+        let spki = v.as_inner()?;
+        let oid = spki.algorithm.oid;
 
-        match &v.as_inner().subject_public_key {
-            InnerPublicKey::Rsa(_) => Err(KeyError::ED {
+        match picky_asn1_x509::parse_subject_public_key_info(&spki)? {
+            InnerPublicKey::Rsa(_) => Err(KeyError::Ed {
                 context: "Ed public key cannot be constructed from RSA public key".to_string(),
             }),
-            InnerPublicKey::Ec(_) => Err(KeyError::ED {
+            InnerPublicKey::Ec(_) => Err(KeyError::Ed {
                 context: "Ed public key cannot be constructed from Ec public key".to_string(),
             }),
-            InnerPublicKey::Ed(BitStringAsn1(bitstring)) => {
-                let data = bitstring.payload_view();
+            InnerPublicKey::Ed(bitstring) => {
+                let data = bitstring.raw_bytes();
 
                 Ok(EdPublicKey {
                     data,
-                    algorithm: NamedEdAlgorithm::from(oid),
+                    algorithm: NamedEdAlgorithm::from(&oid),
                 })
             }
         }

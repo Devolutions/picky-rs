@@ -1,15 +1,16 @@
-use super::utils::{from_der, from_pem, from_pem_str, to_der, to_pem};
+use der::{Decode, Encode};
+use crate::pem::parse_pem;
 use crate::key::{KeyError, PrivateKey, PublicKey};
 use crate::pem::{Pem, PemError};
 use crate::signature::{SignatureAlgorithm, SignatureError};
 use crate::x509::certificate::CertError;
 use crate::x509::name::DirectoryName;
-use picky_asn1::bit_string::BitString;
-use picky_asn1_der::Asn1DerError;
-use picky_asn1_x509::{CertificationRequest, CertificationRequestInfo};
+use der::asn1::BitString;
+use der::Error as Asn1DerError;
+use x509_cert::request::{CertReq, CertReqInfo};
 use thiserror::Error;
 
-pub use picky_asn1_x509::Attribute;
+pub use x509_cert::attr::Attribute;
 
 const ELEMENT_NAME: &str = "certification request";
 
@@ -61,33 +62,47 @@ const CSR_PEM_LABEL: &str = "CERTIFICATE REQUEST";
 
 /// Certificate Signing Request
 #[derive(Clone, Debug, PartialEq)]
-pub struct Csr(pub(crate) CertificationRequest);
+pub struct Csr(pub(crate) CertReq);
 
-impl From<CertificationRequest> for Csr {
-    fn from(certification_request: CertificationRequest) -> Self {
+impl From<CertReq> for Csr {
+    fn from(certification_request: CertReq) -> Self {
         Self(certification_request)
     }
 }
 
 impl Csr {
     pub fn from_der<T: ?Sized + AsRef<[u8]>>(der: &T) -> Result<Self, CsrError> {
-        Ok(from_der(der, ELEMENT_NAME).map(Self)?)
+        let cert_req = CertReq::from_der(der.as_ref()).map_err(|e| CsrError::Asn1Deserialization {
+            element: ELEMENT_NAME,
+            source: e,
+        })?;
+        Ok(Self(cert_req))
     }
 
     pub fn from_pem_str(pem_str: &str) -> Result<Self, CsrError> {
-        Ok(from_pem_str(pem_str, &[CSR_PEM_LABEL], ELEMENT_NAME).map(Self)?)
+        let pem = parse_pem(pem_str).map_err(|e| CsrError::Pem { source: e })?;
+        Self::from_pem(&pem)
     }
 
     pub fn from_pem(pem: &Pem) -> Result<Self, CsrError> {
-        Ok(from_pem(pem, &[CSR_PEM_LABEL], ELEMENT_NAME).map(Self)?)
+        if pem.label() != CSR_PEM_LABEL {
+            return Err(CsrError::InvalidPemLabel {
+                label: pem.label().to_string(),
+            });
+        }
+        Self::from_der(pem.data())
     }
 
     pub fn to_der(&self) -> Result<Vec<u8>, CsrError> {
-        Ok(to_der(&self.0, ELEMENT_NAME)?)
+        self.0.to_der().map_err(|e| CsrError::Asn1Serialization {
+            element: ELEMENT_NAME,
+            source: e,
+        })
     }
 
     pub fn to_pem(&self) -> Result<Pem<'static>, CsrError> {
-        Ok(to_pem(&self.0, CSR_PEM_LABEL, ELEMENT_NAME)?)
+        let der = self.to_der()?;
+        Ok(Pem::new(CSR_PEM_LABEL, der))
     }
 
     pub fn generate(
@@ -99,7 +114,12 @@ impl Csr {
             .to_public_key()
             .map_err(|source| CsrError::PrivateKeyToPublicKey { source })?;
 
-        let cri = CertificationRequestInfo::new(subject.into(), public_key.into());
+        let cri = CertReqInfo {
+            version: x509_cert::request::Version::V1,
+            subject: subject.into(),
+            public_key: public_key.into(),
+            attributes: Default::default(),
+        };
         h_generate_from_cri(cri, private_key, signature_hash_type)
     }
 
@@ -113,42 +133,50 @@ impl Csr {
             .to_public_key()
             .map_err(|source| CsrError::PrivateKeyToPublicKey { source })?;
 
-        let mut cri = CertificationRequestInfo::new(subject.into(), public_key.into());
-        for attr in attributes {
-            cri.add_attribute(attr);
-        }
+        let attributes_set = x509_cert::attr::Attributes::try_from(attributes)
+            .map_err(|e| CsrError::Asn1Serialization {
+                element: "attributes",
+                source: e,
+            })?;
+            
+        let cri = CertReqInfo {
+            version: x509_cert::request::Version::V1,
+            subject: subject.into(),
+            public_key: public_key.into(),
+            attributes: attributes_set,
+        };
         h_generate_from_cri(cri, private_key, signature_hash_type)
     }
 
     pub fn subject_name(&self) -> DirectoryName {
-        self.0.certification_request_info.subject.clone().into()
+        self.0.info.subject.clone().into()
     }
 
-    pub fn public_key(&self) -> &PublicKey {
-        (&self.0.certification_request_info.subject_public_key_info).into()
+    pub fn public_key(&self) -> PublicKey {
+        self.0.info.public_key.clone().into()
     }
 
     pub fn into_subject_infos(self) -> (DirectoryName, PublicKey) {
         (
-            self.0.certification_request_info.subject.into(),
-            self.0.certification_request_info.subject_public_key_info.into(),
+            self.0.info.subject.into(),
+            self.0.info.public_key.into(),
         )
     }
 
     pub fn verify(&self) -> Result<(), CsrError> {
-        let hash_type = SignatureAlgorithm::from_algorithm_identifier(&self.0.signature_algorithm)
+        let hash_type = SignatureAlgorithm::from_algorithm_identifier(&self.0.algorithm)
             .map_err(|e| CsrError::Signature { source: e })?;
 
-        let public_key = &self.0.certification_request_info.subject_public_key_info;
+        let public_key = &self.0.info.public_key;
 
         let msg =
-            picky_asn1_der::to_vec(&self.0.certification_request_info).map_err(|e| CsrError::Asn1Serialization {
+            self.0.info.to_der().map_err(|e| CsrError::Asn1Serialization {
                 source: e,
                 element: "certification request info",
             })?;
 
         hash_type
-            .verify(&public_key.clone().into(), &msg, self.0.signature.0.payload_view())
+            .verify(&public_key.clone().into(), &msg, self.0.signature.raw_bytes())
             .map_err(|e| CsrError::Signature { source: e })?;
 
         Ok(())
@@ -156,27 +184,35 @@ impl Csr {
 }
 
 fn h_generate_from_cri(
-    cri: CertificationRequestInfo,
+    cri: CertReqInfo,
     private_key: &PrivateKey,
     signature_hash_type: SignatureAlgorithm,
 ) -> Result<Csr, CsrError> {
-    let cri_der = picky_asn1_der::to_vec(&cri).map_err(|e| CsrError::Asn1Serialization {
+    let cri_der = cri.to_der().map_err(|e| CsrError::Asn1Serialization {
         source: e,
         element: "certification request cri",
     })?;
-    let signature = BitString::with_bytes(
-        signature_hash_type
-            .sign(&cri_der, private_key)
-            .map_err(|e| CsrError::Signature { source: e })?,
-    );
-
-    let signature_algorithm = signature_hash_type
-        .try_into()
+    let signature_bytes = signature_hash_type
+        .sign(&cri_der, private_key)
         .map_err(|e| CsrError::Signature { source: e })?;
+    let signature = BitString::from_bytes(&signature_bytes)
+        .map_err(|e| CsrError::Asn1Serialization {
+            element: "signature",
+            source: e,
+        })?;
 
-    Ok(Csr(CertificationRequest {
-        certification_request_info: cri,
-        signature_algorithm,
+    let signature_algorithm = {
+        let algo_ref = picky_asn1_x509::AlgorithmIdentifier::try_from(signature_hash_type)
+            .map_err(|e| CsrError::Signature { source: e })?;
+        spki::AlgorithmIdentifier {
+            oid: algo_ref.oid,
+            parameters: algo_ref.parameters.map(|p| der::Any::from_der(&p.to_der().unwrap()).unwrap()),
+        }
+    };
+
+    Ok(Csr(CertReq {
+        info: cri,
+        algorithm: signature_algorithm,
         signature: signature.into(),
     }))
 }

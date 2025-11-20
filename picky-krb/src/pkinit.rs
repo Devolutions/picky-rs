@@ -6,6 +6,7 @@ use picky_asn1::wrapper::{
 };
 use picky_asn1_x509::AlgorithmIdentifier;
 use serde::{de, ser, Deserialize, Serialize};
+use der;
 
 use crate::data_types::{Checksum, KerberosTime, PrincipalName, Realm};
 
@@ -149,7 +150,7 @@ pub struct AuthPack {
     #[serde(default)]
     pub client_public_value: Optional<Option<ExplicitContextTag1<DhReqInfo>>>,
     #[serde(default)]
-    pub supported_cms_types: Optional<Option<ExplicitContextTag2<Asn1SequenceOf<AlgorithmIdentifier>>>>,
+    pub supported_cms_types: Optional<Option<ExplicitContextTag2<Asn1SequenceOf<AlgorithmIdentifier<Option<der::asn1::Any>>>>>>,
     #[serde(default)]
     pub client_dh_nonce: Optional<Option<ExplicitContextTag3<DhNonce>>>,
 }

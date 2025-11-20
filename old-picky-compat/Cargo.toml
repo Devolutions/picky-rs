@@ -1,0 +1,29 @@
+[package]
+name = "old-picky-compat"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+
+# Empty workspace to prevent inheriting from parent
+[workspace]
+description = "Compatibility test crate to validate picky-asn1-x509 migration"
+publish = false
+
+[dependencies]
+# Published version from crates.io for comparison
+picky-asn1-x509-old = { version = "0.14.6", package = "picky-asn1-x509" }
+
+# Local version being migrated
+picky-asn1-x509 = { path = "../picky-asn1-x509" }
+
+# Test data for real certificate compatibility testing
+picky-test-data = { path = "../picky-test-data" }
+
+# Old picky-asn1-der for cross-compatibility testing
+picky-asn1-der = "0.4"
+
+# Test utilities
+hex = "0.4"
+base64 = "0.22"
+pretty_assertions = "1.4"
+expect-test = "1"
