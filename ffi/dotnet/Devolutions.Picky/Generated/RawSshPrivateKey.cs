@@ -70,6 +70,9 @@ public partial struct SshPrivateKey
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshPrivateKey_from_key", ExactSpelling = true)]
     public static unsafe extern IntPtr FromKey(PrivateKey* key);
 
+    [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "SshPrivateKey_inner_key", ExactSpelling = true)]
+    public static unsafe extern PrivateKey* InnerKey(SshPrivateKey* self);
+
     /// <summary>
     /// Exports the SSH Private Key into a PEM object
     /// </summary>

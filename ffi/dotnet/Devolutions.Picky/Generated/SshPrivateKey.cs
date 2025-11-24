@@ -229,6 +229,26 @@ public partial class SshPrivateKey: IDisposable
         }
     }
 
+    /// <returns>
+    /// A <c>PrivateKey</c> allocated on Rust side.
+    /// </returns>
+    public PrivateKey? InnerKey()
+    {
+        unsafe
+        {
+            if (_inner == null)
+            {
+                throw new ObjectDisposedException("SshPrivateKey");
+            }
+            Raw.PrivateKey* retVal = Raw.SshPrivateKey.InnerKey(_inner);
+            if (retVal == null)
+            {
+                return null;
+            }
+            return new PrivateKey(retVal);
+        }
+    }
+
     /// <summary>
     /// Exports the SSH Private Key into a PEM object
     /// </summary>
