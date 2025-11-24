@@ -210,6 +210,10 @@ pub mod ffi {
             Ok(Box::new(SshPrivateKey(key)))
         }
 
+        pub fn inner_key(&self) -> Option<Box<PrivateKey>> {
+            self.0.inner_key().cloned().map(PrivateKey).map(Box::new)
+        }
+
         /// Exports the SSH Private Key into a PEM object
         pub fn to_pem(&self) -> Result<Box<Pem>, Box<PickyError>> {
             let pem = self.0.to_pem()?;

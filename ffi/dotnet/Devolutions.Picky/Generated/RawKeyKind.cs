@@ -28,4 +28,8 @@ public enum KeyKind
     /// Edwards-curve
     /// </summary>
     Ed = 2,
+    /// <summary>
+    /// MLDSA (Module-Lattice-Based Digital Signature Algorithm)
+    /// </summary>
+    Mldsa = 3,
 }
