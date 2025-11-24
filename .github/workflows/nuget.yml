@@ -8,6 +8,11 @@ on:
         required: true
         type: boolean
         default: true
+      version:
+        description: 'Package version (defaults to auto-generated date-based version)'
+        required: false
+        type: string
+        default: 'latest'
   schedule:
     - cron: '21 3 * * 1' # 3:21 AM UTC every Monday
 
@@ -36,11 +41,26 @@ jobs:
           }
         shell: pwsh
 
+      - name: Package information
+        id: package-info
+        run: |
+          $Version = '${{ github.event.inputs.version }}'
+          if ($Version -eq '' -or $Version -eq 'latest') {
+            $Version = (Get-Date -Format "yyyy.MM.dd") + ".0"
+          }
+
+          if ($Version -notmatch '^\d+\.\d+\.\d+\.\d+$') {
+            throw "Invalid version format. Expected X.Y.Z.W, got: $Version"
+          }
+
+          echo "Computed package version: $Version"
+          echo "package-version=$Version" >> $Env:GITHUB_OUTPUT
+        shell: pwsh
+
       - name: Get version
         id: get-version
         run: |
-          $CsprojXml = [Xml] (Get-Content .\ffi\dotnet\Devolutions.Picky\Devolutions.Picky.csproj)
-          $ProjectVersion = $CsprojXml.Project.PropertyGroup.Version | Select-Object -First 1
+          $ProjectVersion = '${{ steps.package-info.outputs.package-version }}'
           $PackageVersion = $ProjectVersion -Replace "^(\d+)\.(\d+)\.(\d+).(\d+)$", "`$1.`$2.`$3"
           echo "project-version=$ProjectVersion" >> $Env:GITHUB_OUTPUT
           echo "package-version=$PackageVersion" >> $Env:GITHUB_OUTPUT
@@ -270,7 +290,7 @@ jobs:
 
   build-managed:
     name: Managed build
-    needs: [build-universal]
+    needs: [preflight, build-universal]
     runs-on: windows-2022
 
     steps:
@@ -295,6 +315,18 @@ jobs:
           Set-Location "dependencies/runtimes"
           $(Get-Item ".\picky-*") | ForEach-Object { Rename-Item $_ $_.Name.Replace("picky-", "") }
           Get-ChildItem * -Recurse
+        shell: pwsh
+
+      - name: Set package version
+        run: |
+          $Version = '${{ needs.preflight.outputs.project-version }}'
+          $CsprojPath = '.\ffi\dotnet\Devolutions.Picky\Devolutions.Picky.csproj'
+
+          $Content = Get-Content $CsprojPath -Raw
+          $Content = $Content -replace '<Version>[\d\.]+</Version>', "<Version>$Version</Version>"
+          Set-Content -Path $CsprojPath -Value $Content
+
+          echo "Package version set to: $Version"
         shell: pwsh
 
       - name: Build picky (managed)
