@@ -1,7 +1,7 @@
 <Project>
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.0;net8.0-ios</TargetFrameworks>
-     <SupportedOSPlatformVersion Condition="'$(TargetFramework)' == 'net8.0-ios'">12.1</SupportedOSPlatformVersion>
+    <TargetFrameworks>netstandard2.0;net9.0-ios</TargetFrameworks>
+     <SupportedOSPlatformVersion Condition="'$(TargetFramework)' == 'net9.0-ios'">12.1</SupportedOSPlatformVersion>
   </PropertyGroup>
 
   <ItemGroup>
