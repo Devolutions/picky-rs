@@ -8,7 +8,7 @@ use picky_asn1_x509::pkcs12::{
     Pbes2Params as Pbes2ParamsAsn1, Pbkdf2Params as Pbkdf2ParamsAsn1, Pbkdf2Prf as Pbkdf2PrfAsn1,
     Pbkdf2SaltSource as Pbkdf2SaltSourceAsn1, Pkcs12EncryptionAlgorithm as Pkcs12EncryptionAsn1,
 };
-use rand::rngs::StdRng;
+use rand::rngs::{StdRng, SysRng};
 use rand_core::SeedableRng;
 use std::str::FromStr as _;
 
@@ -26,11 +26,11 @@ pub struct Pkcs12CryptoContext {
 
 impl Pkcs12CryptoContext {
     /// Creates new context with given password and default
-    pub fn new_with_password(password: &str) -> Self {
-        Self {
+    pub fn new_with_password(password: &str) -> Result<Self, Pkcs12Error> {
+        Ok(Self {
             password: password.to_string().into(),
-            rng: Box::new(StdRng::from_os_rng()),
-        }
+            rng: Box::new(StdRng::try_from_rng(&mut SysRng)?),
+        })
     }
 
     /// Sets RNG for this context
@@ -40,11 +40,11 @@ impl Pkcs12CryptoContext {
     }
 
     /// Creates new context with empty password and default RNG
-    pub fn new_without_password() -> Self {
-        Self {
+    pub fn new_without_password() -> Result<Self, Pkcs12Error> {
+        Ok(Self {
             password: String::new().into(),
-            rng: Box::new(StdRng::from_os_rng()),
-        }
+            rng: Box::new(StdRng::try_from_rng(&mut SysRng)?),
+        })
     }
 
     /// Returns password in PBES1 password representation - UCS2 encoded string with null terminator

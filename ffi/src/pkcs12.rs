@@ -8,6 +8,7 @@ pub mod ffi {
     use crate::x509::ffi::Cert;
     use diplomat_runtime::DiplomatWriteable;
     use picky::pkcs12;
+    use picky::pkcs12::Pkcs12Error;
     use picky_asn1::restricted_string::BmpString;
     use std::str::FromStr;
     use std::sync::{Arc, Mutex};
@@ -114,16 +115,16 @@ pub mod ffi {
     pub struct Pkcs12CryptoContext(pub(crate) Arc<Mutex<pkcs12::Pkcs12CryptoContext>>);
 
     impl Pkcs12CryptoContext {
-        pub fn with_password(password: &str) -> Box<Pkcs12CryptoContext> {
-            Box::new(Self(Arc::new(Mutex::new(
-                pkcs12::Pkcs12CryptoContext::new_with_password(password),
-            ))))
+        pub fn with_password(password: &str) -> Result<Box<Pkcs12CryptoContext>, Pkcs12Error> {
+            Ok(Box::new(Self(Arc::new(Mutex::new(
+                pkcs12::Pkcs12CryptoContext::new_with_password(password)?,
+            )))))
         }
 
-        pub fn no_password() -> Box<Pkcs12CryptoContext> {
-            Box::new(Self(Arc::new(Mutex::new(
-                pkcs12::Pkcs12CryptoContext::new_without_password(),
-            ))))
+        pub fn no_password() -> Result<Box<Pkcs12CryptoContext>, Pkcs12Error> {
+            Ok(Box::new(Self(Arc::new(Mutex::new(
+                pkcs12::Pkcs12CryptoContext::new_without_password()?,
+            )))))
         }
     }
 

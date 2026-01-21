@@ -48,4 +48,6 @@ pub enum PuttyError {
     IoError(#[from] std::io::Error),
     #[error(transparent)]
     OutIsTooSmallError(#[from] inout::OutIsTooSmallError),
+    #[error(transparent)]
+    RandError(#[from] rand::rngs::SysError),
 }

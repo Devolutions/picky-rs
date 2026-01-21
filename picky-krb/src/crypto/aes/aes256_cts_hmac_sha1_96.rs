@@ -1,12 +1,12 @@
-use rand::prelude::StdRng;
-use rand::{RngCore, SeedableRng};
-
 use crate::crypto::common::hmac_sha1;
 use crate::crypto::utils::usage_ki;
 use crate::crypto::{
     ChecksumSuite, Cipher, CipherSuite, DecryptWithoutChecksum, EncryptWithoutChecksum, KerberosCryptoError,
     KerberosCryptoResult,
 };
+use rand::prelude::StdRng;
+use rand::rngs::SysRng;
+use rand::{RngCore, SeedableRng};
 
 use super::decrypt::{decrypt_message, decrypt_message_no_checksum};
 use super::encrypt::{encrypt_message, encrypt_message_no_checksum};
@@ -37,7 +37,7 @@ impl Cipher for Aes256CtsHmacSha196 {
 
     fn encrypt(&self, key: &[u8], key_usage: i32, payload: &[u8]) -> Result<Vec<u8>, KerberosCryptoError> {
         let mut confounder = [0; AES_BLOCK_SIZE];
-        StdRng::from_os_rng().fill_bytes(&mut confounder);
+        StdRng::try_from_rng(&mut SysRng)?.fill_bytes(&mut confounder);
         encrypt_message(key, key_usage, payload, &AesSize::Aes256, confounder)
     }
 
@@ -48,7 +48,7 @@ impl Cipher for Aes256CtsHmacSha196 {
         payload: &[u8],
     ) -> KerberosCryptoResult<EncryptWithoutChecksum> {
         let mut confounder = [0; AES_BLOCK_SIZE];
-        StdRng::from_os_rng().fill_bytes(&mut confounder);
+        StdRng::try_from_rng(&mut SysRng)?.fill_bytes(&mut confounder);
         encrypt_message_no_checksum(key, key_usage, payload, &AesSize::Aes256, confounder)
     }
 
