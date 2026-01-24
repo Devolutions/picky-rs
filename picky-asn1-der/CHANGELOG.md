@@ -20,8 +20,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Bump the patch group across 1 directory with 14 updates ([#448](https://github.com/Devolutions/picky-rs/issues/448)) ([0bf42c1c4b](https://github.com/Devolutions/picky-rs/commit/0bf42c1c4bd727eaf5b4b0a877e8698986e0bd37)) 
 
-
-
 ## [[0.5.4](https://github.com/Devolutions/picky-rs/compare/picky-asn1-der-v0.5.3...picky-asn1-der-v0.5.4)] - 2025-10-21
 
 ### <!-- 7 -->Build
