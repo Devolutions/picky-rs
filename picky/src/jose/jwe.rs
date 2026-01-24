@@ -14,7 +14,7 @@ use aes_kw::AesKw;
 use base64::engine::general_purpose;
 use base64::{DecodeError, Engine as _};
 use rand::RngCore;
-use rand::rngs::StdRng;
+use rand::rngs::{StdRng, SysRng};
 use rand_core::SeedableRng;
 use rsa::{Oaep, Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
 use serde::{Deserialize, Serialize};
@@ -95,6 +95,9 @@ pub enum JweError {
 
     #[error("invalid decryption key size: expected {expected}, got {got}")]
     InvalidDecryptionKeySize { expected: usize, got: usize },
+
+    #[error(transparent)]
+    RandError(#[from] rand::rngs::SysError),
 }
 
 impl From<rsa::errors::Error> for JweError {
@@ -677,8 +680,8 @@ fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
 
                 let padding = match jwe.header.alg {
                     JweAlg::RsaPkcs1v15 => RsaPaddingScheme::Pkcs1v15Encrypt,
-                    JweAlg::RsaOaep => RsaPaddingScheme::Oaep(Oaep::new::<sha1::Sha1>()),
-                    JweAlg::RsaOaep256 => RsaPaddingScheme::Oaep(Oaep::new::<sha2::Sha256>()),
+                    JweAlg::RsaOaep => RsaPaddingScheme::Oaep(Oaep::<sha1::Sha1>::new()),
+                    JweAlg::RsaOaep256 => RsaPaddingScheme::Oaep256(Oaep::<sha2::Sha256>::new()),
                     unsupported => {
                         return Err(JweError::UnsupportedAlgorithm {
                             algorithm: format!("{:?}", unsupported),
@@ -686,9 +689,10 @@ fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
                     }
                 };
 
-                let cek = generate_cek(jwe.header.enc);
+                let cek = generate_cek(jwe.header.enc)?;
 
-                let encrypted_key = match rsa_public_key.encrypt(&mut StdRng::from_os_rng(), padding, &cek) {
+                let encrypted_key = match rsa_public_key.encrypt(&mut StdRng::try_from_rng(&mut SysRng)?, padding, &cek)
+                {
                     Ok(encrypted_key) => encrypted_key,
                     Err(err) => {
                         return Err(err.into());
@@ -804,7 +808,7 @@ fn prepare_ecdh_encryption_key(jwe: &Jwe, public_key: &PublicKey) -> Result<JweE
                 wrapping_alg.key_size(),
             )?;
 
-            let cek = generate_cek(header.enc);
+            let cek = generate_cek(header.enc)?;
             let wrapped_key = wrapping_alg.encrypt_key(header.enc, &cek, &shared_secret)?;
 
             (wrapped_key, cek, epk)
@@ -856,8 +860,8 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
 
                 let padding = match header.alg {
                     JweAlg::RsaPkcs1v15 => RsaPaddingScheme::Pkcs1v15Encrypt,
-                    JweAlg::RsaOaep => RsaPaddingScheme::Oaep(Oaep::new::<sha1::Sha1>()),
-                    JweAlg::RsaOaep256 => RsaPaddingScheme::Oaep(Oaep::new::<sha2::Sha256>()),
+                    JweAlg::RsaOaep => RsaPaddingScheme::Oaep(Oaep::<sha1::Sha1>::new()),
+                    JweAlg::RsaOaep256 => RsaPaddingScheme::Oaep256(Oaep::<sha2::Sha256>::new()),
                     unsupported => {
                         return Err(JweError::UnsupportedAlgorithm {
                             algorithm: format!("{:?}", unsupported),
@@ -1068,7 +1072,11 @@ fn generate_ecdh_shared_secret(
                         JweError::Key { source }
                     })?;
 
-                    let secret = p256::ecdh::EphemeralSecret::random(&mut StdRng::from_os_rng());
+                    let secret =
+                        match p256::ecdh::EphemeralSecret::try_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?) {
+                            Ok(secret) => secret,
+                            Err(e) => match e {},
+                        };
 
                     let shared_secret = Zeroizing::new(secret.diffie_hellman(&public_key).raw_secret_bytes().to_vec());
                     let epk = PublicKey::from_ec_encoded_components(
@@ -1086,7 +1094,11 @@ fn generate_ecdh_shared_secret(
                         JweError::Key { source }
                     })?;
 
-                    let secret = p384::ecdh::EphemeralSecret::random(&mut StdRng::from_os_rng());
+                    let secret =
+                        match p384::ecdh::EphemeralSecret::try_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?) {
+                            Ok(secret) => secret,
+                            Err(e) => match e {},
+                        };
 
                     let shared_secret = Zeroizing::new(secret.diffie_hellman(&public_key).raw_secret_bytes().to_vec());
                     let epk = PublicKey::from_ec_encoded_components(
@@ -1104,7 +1116,11 @@ fn generate_ecdh_shared_secret(
                         JweError::Key { source }
                     })?;
 
-                    let secret = p521::ecdh::EphemeralSecret::random(&mut StdRng::from_os_rng());
+                    let secret =
+                        match p521::ecdh::EphemeralSecret::try_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?) {
+                            Ok(secret) => secret,
+                            Err(e) => match e {},
+                        };
 
                     let shared_secret = Zeroizing::new(secret.diffie_hellman(&public_key).raw_secret_bytes().to_vec());
                     let epk = PublicKey::from_ec_encoded_components(
@@ -1134,7 +1150,8 @@ fn generate_ecdh_shared_secret(
 
                     let public_key = x25519_dalek::PublicKey::from(public_key_data);
 
-                    let secret = x25519_dalek::EphemeralSecret::random_from_rng(&mut StdRng::from_os_rng());
+                    let secret =
+                        x25519_dalek::EphemeralSecret::random_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
 
                     let epk = PublicKey::from_ed_encoded_components(
                         &EdAlgorithm::X25519.into(),
@@ -1341,16 +1358,17 @@ fn calculate_ecdh_shared_secret(
 }
 
 /// Generate content encryption key (CEK) for given algorithm and wraps it with zeroize-on-drop container
-fn generate_cek(alg: JweEnc) -> Zeroizing<Vec<u8>> {
+fn generate_cek(alg: JweEnc) -> Result<Zeroizing<Vec<u8>>, JweError> {
     let mut cek = Zeroizing::new(vec![0u8; alg.key_size()]);
-    let mut rng = StdRng::from_os_rng();
+    let mut rng = StdRng::try_from_rng(&mut SysRng)?;
     rng.fill_bytes(&mut cek);
-    cek
+    Ok(cek)
 }
 
 enum RsaPaddingScheme {
     Pkcs1v15Encrypt,
-    Oaep(Oaep),
+    Oaep(Oaep<sha1::Sha1>),
+    Oaep256(Oaep<sha2::Sha256>),
 }
 
 impl rsa::traits::PaddingScheme for RsaPaddingScheme {
@@ -1365,6 +1383,7 @@ impl rsa::traits::PaddingScheme for RsaPaddingScheme {
                 rsa::traits::PaddingScheme::decrypt(Pkcs1v15Encrypt, rng, priv_key, ciphertext)
             }
             RsaPaddingScheme::Oaep(oaep) => rsa::traits::PaddingScheme::decrypt(oaep, rng, priv_key, ciphertext),
+            RsaPaddingScheme::Oaep256(oaep) => rsa::traits::PaddingScheme::decrypt(oaep, rng, priv_key, ciphertext),
         }
     }
 
@@ -1379,6 +1398,7 @@ impl rsa::traits::PaddingScheme for RsaPaddingScheme {
                 rsa::traits::PaddingScheme::encrypt(Pkcs1v15Encrypt, rng, pub_key, msg)
             }
             RsaPaddingScheme::Oaep(oaep) => rsa::traits::PaddingScheme::encrypt(oaep, rng, pub_key, msg),
+            RsaPaddingScheme::Oaep256(oaep) => rsa::traits::PaddingScheme::encrypt(oaep, rng, pub_key, msg),
         }
     }
 }

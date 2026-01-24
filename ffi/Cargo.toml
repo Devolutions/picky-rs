@@ -20,8 +20,8 @@ picky-asn1 = { path = "../picky-asn1", default-features = false }
 picky-asn1-der = { path = "../picky-asn1-der" }
 picky-asn1-x509 = { path = "../picky-asn1-x509", features = ["legacy", "zeroize"] }
 
-argon2 = "=0.6.0-rc.1"
-rand = "0.9"
+argon2 = { version = "=0.6.0-rc.5", features = ["rand_core"] }
+rand = "0.10.0-rc.6"
 
 # FFI
 diplomat = { git = "https://github.com/CBenoit/diplomat.git", rev = "f4d93d57e93025c57e75e9711d2418faa9311a42" }
@@ -37,8 +37,8 @@ getrandom = { version = "0.3", features = ["wasm_js"] }
 
 # Pin transitive dependencies versions.
 # TODO: Remove when stable versions will be released.
-blake2 = "=0.11.0-rc.2"
-digest = "=0.11.0-rc.3"
-crypto-common = "=0.2.0-rc.4"
-block-buffer = "=0.11.0-rc.5"
-password-hash = "=0.6.0-rc.1"
+blake2 = "=0.11.0-rc.3"
+digest = "=0.11.0-rc.5"
+crypto-common = "=0.2.0-rc.8"
+block-buffer = "0.11"
+password-hash = "=0.6.0-rc.8"

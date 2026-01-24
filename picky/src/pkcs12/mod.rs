@@ -359,6 +359,8 @@ pub enum Pkcs12Error {
     Key(#[from] crate::key::KeyError),
     #[error(transparent)]
     Certificate(#[from] crate::x509::certificate::CertError),
+    #[error(transparent)]
+    RandError(#[from] rand::rngs::SysError),
     #[error("Not supported or invalid PFX version: {0}")]
     InvalidVersion(u8),
     #[error("Invalid PFX AuthenticatedSafe content type: {0}")]
@@ -420,35 +422,35 @@ mod tests {
     #[test]
     fn pfx_certmgr_aes256() {
         let encoded = picky_test_data::CERTMGR_AES256;
-        let crypto_context = Pkcs12CryptoContext::new_with_password("test");
+        let crypto_context = Pkcs12CryptoContext::new_with_password("test").unwrap();
         let _decoded = Pfx::from_der(encoded, &crypto_context, &Pkcs12ParsingParams::default()).unwrap();
     }
 
     #[test]
     fn pfx_certmgr_3des() {
         let encoded = picky_test_data::CERTMGR_3DES;
-        let crypto_context = Pkcs12CryptoContext::new_with_password("test");
+        let crypto_context = Pkcs12CryptoContext::new_with_password("test").unwrap();
         let _decoded = Pfx::from_der(encoded, &crypto_context, &Pkcs12ParsingParams::default()).unwrap();
     }
 
     #[test]
     fn pfx_certmgr_rc2() {
         let encoded = picky_test_data::LEAF_PASSWORD_IS_ABC;
-        let crypto_context = Pkcs12CryptoContext::new_with_password("abc");
+        let crypto_context = Pkcs12CryptoContext::new_with_password("abc").unwrap();
         let _decoded = Pfx::from_der(encoded, &crypto_context, &Pkcs12ParsingParams::default()).unwrap();
     }
 
     #[test]
     fn pfx_certmgr_rc2_empty_pass() {
         let encoded = picky_test_data::LEAF_EMPTY_PASSWORD;
-        let crypto_context = Pkcs12CryptoContext::new_without_password();
+        let crypto_context = Pkcs12CryptoContext::new_without_password().unwrap();
         let _decoded = Pfx::from_der(encoded, &crypto_context, &Pkcs12ParsingParams::default()).unwrap();
     }
 
     #[test]
     fn pfx_openssl_aes_empty_pass() {
         let encoded = picky_test_data::OPENSSL_NOCRYPT;
-        let crypto_context = Pkcs12CryptoContext::new_without_password();
+        let crypto_context = Pkcs12CryptoContext::new_without_password().unwrap();
         let _decoded = Pfx::from_der(encoded, &crypto_context, &Pkcs12ParsingParams::default()).unwrap();
     }
 
@@ -490,9 +492,13 @@ mod tests {
 
     fn make_crypto_context(password: Option<&str>) -> Pkcs12CryptoContext {
         if let Some(password) = password {
-            Pkcs12CryptoContext::new_with_password(password).with_rng(stable_rand())
+            Pkcs12CryptoContext::new_with_password(password)
+                .unwrap()
+                .with_rng(stable_rand())
         } else {
-            Pkcs12CryptoContext::new_without_password().with_rng(stable_rand())
+            Pkcs12CryptoContext::new_without_password()
+                .unwrap()
+                .with_rng(stable_rand())
         }
     }
 

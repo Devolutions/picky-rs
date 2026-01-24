@@ -12,7 +12,7 @@ use picky_asn1_der::Asn1DerError;
 use picky_asn1_x509::{
     ECPrivateKey, PRIVATE_KEY_INFO_VERSION_1, PrivateKeyInfo, PrivateKeyValue, SubjectPublicKeyInfo, private_key_info,
 };
-use rand::rngs::StdRng;
+use rand::rngs::{StdRng, SysRng};
 use rand_core::SeedableRng;
 use rsa::traits::{PrivateKeyParts as _, PublicKeyParts as _};
 use rsa::{RsaPrivateKey, RsaPublicKey};
@@ -64,6 +64,9 @@ pub enum KeyError {
     /// invalid PEM provided
     #[error("invalid PEM provided: {source}")]
     Pem { source: PemError },
+
+    #[error(transparent)]
+    RandError(#[from] rand::rngs::SysError),
 }
 
 impl KeyError {
@@ -688,7 +691,7 @@ impl PrivateKey {
 
     /// **Beware**: this is insanely slow in debug builds.
     pub fn generate_rsa(bits: usize) -> Result<Self, KeyError> {
-        let key = RsaPrivateKey::new(&mut StdRng::from_os_rng(), bits)?;
+        let key = RsaPrivateKey::new(&mut StdRng::try_from_rng(&mut SysRng)?, bits)?;
 
         let modulus = key.n();
         let public_exponent = key.e();
@@ -705,7 +708,10 @@ impl PrivateKey {
             EcCurve::NistP256 => {
                 use p256::elliptic_curve::sec1::ToEncodedPoint;
 
-                let key = p256::SecretKey::random(&mut StdRng::from_os_rng());
+                let key = match p256::SecretKey::try_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?) {
+                    Ok(key) => key,
+                    Err(e) => match e {},
+                };
                 let secret = key.to_bytes().to_vec();
                 let point = key
                     .public_key()
@@ -717,7 +723,10 @@ impl PrivateKey {
             EcCurve::NistP384 => {
                 use p384::elliptic_curve::sec1::ToEncodedPoint;
 
-                let key = p384::SecretKey::random(&mut StdRng::from_os_rng());
+                let key = match p384::SecretKey::try_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?) {
+                    Ok(key) => key,
+                    Err(e) => match e {},
+                };
                 let secret = key.to_bytes().to_vec();
                 let point = key
                     .public_key()
@@ -729,7 +738,10 @@ impl PrivateKey {
             EcCurve::NistP521 => {
                 use p521::elliptic_curve::sec1::ToEncodedPoint;
 
-                let key = p521::SecretKey::random(&mut StdRng::from_os_rng());
+                let key = match p521::SecretKey::try_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?) {
+                    Ok(key) => key,
+                    Err(e) => match e {},
+                };
                 let secret = key.to_bytes().to_vec();
                 let point = key
                     .public_key()
@@ -765,12 +777,12 @@ impl PrivateKey {
 
         let (private_key, public_key) = match algorithm {
             EdAlgorithm::Ed25519 => {
-                let private = ed25519_dalek::SigningKey::generate(&mut StdRng::from_os_rng());
+                let private = ed25519_dalek::SigningKey::generate(&mut StdRng::try_from_rng(&mut SysRng)?);
                 let public = private.verifying_key();
                 (private.to_bytes().to_vec(), public.to_bytes().to_vec())
             }
             EdAlgorithm::X25519 => {
-                let private = x25519_dalek::StaticSecret::random_from_rng(&mut StdRng::from_os_rng());
+                let private = x25519_dalek::StaticSecret::random_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
                 let public = x25519_dalek::PublicKey::from(&private);
                 (private.to_bytes().to_vec(), public.to_bytes().to_vec())
             }

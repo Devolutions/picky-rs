@@ -7,7 +7,6 @@ pub mod diffie_hellman;
 pub(crate) mod nfold;
 pub(crate) mod utils;
 
-use ::aes::cipher::block_padding::UnpadError;
 use ::aes::cipher::inout::PadError;
 use thiserror::Error;
 
@@ -30,23 +29,17 @@ pub enum KerberosCryptoError {
     #[error("Cipher error: {0}")]
     CipherError(String),
     #[error("Padding error: {0:?}")]
-    CipherUnpad(UnpadError),
+    CipherUnpad(#[from] block_padding::Error),
     #[error("Padding error: {0:?}")]
     CipherPad(PadError),
     #[error("Invalid seed bit len: {0}")]
     SeedBitLen(String),
     #[error(transparent)]
-    RandError(#[from] rand::rand_core::OsError),
+    RandError(#[from] rand::rngs::SysError),
     #[error(transparent)]
     TooSmallBuffer(#[from] inout::OutIsTooSmallError),
     #[error(transparent)]
     ArrayTryFromSliceError(#[from] std::array::TryFromSliceError),
-}
-
-impl From<UnpadError> for KerberosCryptoError {
-    fn from(err: UnpadError) -> Self {
-        Self::CipherUnpad(err)
-    }
 }
 
 impl From<PadError> for KerberosCryptoError {
