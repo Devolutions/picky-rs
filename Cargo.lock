@@ -211,9 +211,9 @@ dependencies = [
 
 [[package]]
 name = "cbc"
-version = "0.2.0-rc.1"
+version = "0.2.0-rc.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5dbf9e5b071e9de872e32b73f485e8f644ff47c7011d95476733e7482ee3e5c3"
+checksum = "3c34a745c272d1f6124df3006881364190a8f033ff3857ce196a17aa4a753096"
 dependencies = [
  "cipher",
 ]
@@ -409,9 +409,9 @@ dependencies = [
 
 [[package]]
 name = "des"
-version = "0.9.0-rc.1"
+version = "0.9.0-rc.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f51594a70805988feb1c85495ddec0c2052e4fbe59d9c0bb7f94bfc164f4f90"
+checksum = "512ca722eff02fa73c43e5136f440c46f861d41f9dd7761c1f2817a5ca5d9ad7"
 dependencies = [
  "cipher",
 ]
@@ -1643,9 +1643,9 @@ checksum = "f66ee92bc15280519ef199a274fe0cafff4245d31bc39aaa31c011ad56cb1f05"
 
 [[package]]
 name = "rc2"
-version = "0.9.0-pre.0"
+version = "0.9.0-rc.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b03621ac292cc723def9e0fd0eb9573b1df8d6a9ee7ad637fe94dfc153705f3c"
+checksum = "cbf6c2adcb906a945d98f7188581dba744f29eba2055d140633e49e86923ac6c"
 dependencies = [
  "cipher",
 ]
