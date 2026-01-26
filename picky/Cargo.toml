@@ -39,7 +39,7 @@ zeroize = "1.8"
 
 # FIXME: either use ureq, or even better: do not require this kind of dependency at all to let user decide which lib to use.
 # (currently users should *really* not forget to use `spawn_blocking` when calling associated functions from async context)
-reqwest = { version = "0.12", default-features = false, features = ["blocking"], optional = true }
+reqwest = { version = "0.13", default-features = false, features = ["blocking"], optional = true }
 
 # /!\ ===== cryptography dependencies ===== /!\
 # These should be updated as soon as possible.
