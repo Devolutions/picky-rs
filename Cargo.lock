@@ -1340,7 +1340,6 @@ dependencies = [
  "p521",
  "password-hash",
  "pbkdf2",
- "pem-rfc7468",
  "picky-asn1",
  "picky-asn1-der",
  "picky-asn1-x509",
