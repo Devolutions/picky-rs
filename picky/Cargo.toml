@@ -46,8 +46,8 @@ reqwest = { version = "0.13", default-features = false, features = ["blocking"],
 # /!\ ===================================== /!\
 
 rand = "=0.10.0-rc.6"
-rand_core = { version = "=0.10.0-rc-3" }
-crypto-bigint = "=0.7.0-rc.18"
+rand_core = { version = "=0.10.0" }
+crypto-bigint = "=0.7.0-rc.21"
 
 ed25519-dalek = { version = "=3.0.0-pre.4", features = ["hazmat", "rand_core"] }
 x25519-dalek = { version = "=3.0.0-pre.4", features = ["static_secrets"] }
@@ -60,7 +60,7 @@ rsa = { version = "=0.10.0-rc.12", features = ["std"] }
 
 digest = "=0.11.0-rc.5"
 md5 = { package = "md-5", version = "=0.11.0-rc.2", features = ["oid"] }
-sha1 = { version = "=0.11.0-rc.2", features = ["oid"] }
+sha1 = { version = "=0.11.0-rc.3", features = ["oid"] }
 sha2 = { version = "=0.11.0-rc.3", features = ["oid"] }
 sha3 = { version = "=0.11.0-rc.3", features = ["oid"] }
 
@@ -69,11 +69,11 @@ aes = { version = "=0.9.0-rc.2", optional = true }
 aes-kw = { version = "=0.3.0-rc.1", optional = true }
 argon2 = { version = "=0.6.0-rc.5", optional = true }
 ctr = { version = "=0.10.0-rc.2", optional = true }
-cbc = { version = "=0.2.0-rc.1", optional = true, features = ["alloc"] }
+cbc = { version = "=0.2.0-rc.2", optional = true, features = ["alloc"] }
 bcrypt-pbkdf = { version = "=0.11.0-rc.1", optional = true }
-des = { version = "=0.9.0-rc.1", optional = true }
-rc2 = { version = "=0.9.0-pre.0", optional = true }
-pbkdf2 = { version = "=0.13.0-rc.1", optional = true }
+des = { version = "=0.9.0-rc.2", optional = true }
+rc2 = { version = "=0.9.0-rc.0", optional = true }
+pbkdf2 = { version = "=0.13.0-rc.8", optional = true }
 hmac = { version = "=0.13.0-rc.3", optional = true }
 inout = "0.2.2"
 
@@ -83,36 +83,36 @@ aead = { version = "=0.6.0-rc.5", optional = true }
 blake2 = { version = "=0.11.0-rc.3", optional = true }
 block-padding = "0.4"
 block-buffer = "0.11"
-blowfish = { version = "=0.10.0-rc.1", optional = true }
+blowfish = { version = "=0.10.0-rc.2", optional = true }
 cipher = { version = "=0.5.0-rc.3", optional = true }
-crypto-common = "=0.2.0-rc.8"
+crypto-common = "=0.2.0-rc.12"
 ghash = { version = "=0.6.0-rc.3", optional = true }
 polyval = { version = "=0.7.0-rc.3", optional = true }
-universal-hash = { version = "=0.6.0-rc.4", optional = true }
-password-hash = { version = "=0.6.0-rc.8", optional = true }
+universal-hash = { version = "=0.6.0-rc.6", optional = true }
+password-hash = { version = "=0.6.0-rc.10", optional = true }
 ed25519 = "=3.0.0-rc.2"
-signature = "=3.0.0-rc.6"
+signature = "=3.0.0-rc.7"
 ecdsa = "=0.17.0-rc.11"
 der = "=0.8.0-rc.10"
-elliptic-curve = "=0.14.0-rc.19"
+elliptic-curve = "=0.14.0-rc.22"
 hkdf = "=0.13.0-rc.3"
-pkcs8 = "=0.11.0-rc.8"
+pkcs8 = "=0.11.0-rc.10"
 spki = "=0.8.0-rc.4"
-sec1 = "=0.8.0-rc.11"
+sec1 = "=0.8.0-rc.12"
 rfc6979 = "=0.5.0-rc.3"
 pkcs1 = "=0.8.0-rc.4"
-keccak = "=0.2.0-rc.0"
-primefield = "=0.14.0-rc.3"
-primeorder = "=0.14.0-rc.3"
+keccak = "=0.2.0-rc.1"
+primefield = "=0.14.0-rc.5"
+primeorder = "=0.14.0-rc.4"
 ff = { version = "=0.14.0-pre.0", default-features = false }
 group = "=0.14.0-pre.0"
 curve25519-dalek = "=5.0.0-pre.4"
-crypto-primes = "=0.7.0-pre.6"
+crypto-primes = "=0.7.0-pre.7"
 
 [dev-dependencies]
 pretty_assertions = "1.4"
 cfg-if = "1.0"
-rand_chacha = "=0.10.0-rc.6"
+rand_chacha = "=0.10.0"
 ring = "0.17"
 rstest = "0.26"
 expect-test = "1"
