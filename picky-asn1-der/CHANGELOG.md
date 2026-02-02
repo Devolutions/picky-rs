@@ -6,13 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [[0.5.3](https://github.com/Devolutions/picky-rs/compare/picky-asn1-der-v0.5.2...picky-asn1-der-v0.5.3)] - 2025-09-26
+## [[0.5.5](https://github.com/Devolutions/picky-rs/compare/picky-asn1-der-v0.5.4...picky-asn1-der-v0.5.5)] - 2026-02-02
 
 ### <!-- 7 -->Build
 
-- Bump the crypto group across 1 directory with 3 updates (#388) ([58d179a0c3](https://github.com/Devolutions/picky-rs/commit/58d179a0c39d701025a363c3f294912c2881a8f5)) 
+- Update crypto dependencies ([#448](https://github.com/Devolutions/picky-rs/issues/448)) ([0bf42c1c4b](https://github.com/Devolutions/picky-rs/commit/0bf42c1c4bd727eaf5b4b0a877e8698986e0bd37)) 
 
-## [Unreleased]
 
 ## [[0.5.4](https://github.com/Devolutions/picky-rs/compare/picky-asn1-der-v0.5.3...picky-asn1-der-v0.5.4)] - 2025-10-21
 
@@ -24,6 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Bump minimal rustc version to 1.85.
 
+## [[0.5.3](https://github.com/Devolutions/picky-rs/compare/picky-asn1-der-v0.5.2...picky-asn1-der-v0.5.3)] - 2025-09-26
+
+### <!-- 7 -->Build
+
+- Bump the crypto group across 1 directory with 3 updates (#388) ([58d179a0c3](https://github.com/Devolutions/picky-rs/commit/58d179a0c39d701025a363c3f294912c2881a8f5)) 
+
 ## [[0.5.2](https://github.com/Devolutions/picky-rs/compare/picky-asn1-der-v0.5.1...picky-asn1-der-v0.5.2)] - 2025-01-16
 
 ### <!-- 4 -->Bug Fixes
@@ -33,7 +38,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Use symlinks instead of copying files to avoid a “dirty” state during
   cargo publish and preserve VCS info. With #337 merged, CI handles
   publishing consistently, so developer environments no longer matter.
-
 
 ## [0.5.1] 2024-11-26
 

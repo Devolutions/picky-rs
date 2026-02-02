@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[7.0.0-rc.21](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.20...picky-v7.0.0-rc.21)] - 2026-02-02
+
+### <!-- 7 -->Build
+
+- Update crypto dependencies ([#448](https://github.com/Devolutions/picky-rs/issues/448)) ([0bf42c1c4b](https://github.com/Devolutions/picky-rs/commit/0bf42c1c4bd727eaf5b4b0a877e8698986e0bd37)) 
+
+- Remove transitive pem-rfc7468 crate ([#449](https://github.com/Devolutions/picky-rs/issues/449)) ([cc4caf455d](https://github.com/Devolutions/picky-rs/commit/cc4caf455defd38ef37fc15434b173275937d534)) 
+
+- Bump reqwest from 0.12.24 to 0.13.1 ([#453](https://github.com/Devolutions/picky-rs/issues/453)) ([9cbaab9395](https://github.com/Devolutions/picky-rs/commit/9cbaab93955f2fef8f96a589b22e2582d4a8cbf0)) 
+
 ## [[7.0.0-rc.20](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.19...picky-v7.0.0-rc.20)] - 2025-11-07
 
 ### <!-- 4 -->Bug Fixes
