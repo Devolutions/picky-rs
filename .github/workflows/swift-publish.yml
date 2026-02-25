@@ -1,0 +1,119 @@
+name: Publish Swift package
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Dry run'
+        required: true
+        type: boolean
+        default: true
+
+jobs:
+  preflight:
+    name: Preflight
+    runs-on: ubuntu-latest
+    outputs:
+      dry-run: ${{ steps.get-dry-run.outputs.dry-run }}
+      version: ${{ steps.get-version.outputs.version }}
+
+    steps:
+      - name: Checkout ${{ github.repository }}
+        uses: actions/checkout@v4
+
+      - name: Get dry run
+        id: get-dry-run
+        run: |
+          $IsDryRun = '${{ github.event.inputs.dry-run }}' -Eq 'true'
+
+          if ($IsDryRun) {
+            echo "dry-run=true" >> $Env:GITHUB_OUTPUT
+          } else {
+            echo "dry-run=false" >> $Env:GITHUB_OUTPUT
+          }
+        shell: pwsh
+
+      - name: Get version
+        id: get-version
+        run: |
+          VERSION=$(grep -E "^version\s*=" Cargo.toml | head -1 | awk -F'"' '{print $2}')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+  build-swift:
+    name: Build Swift package
+    environment: build-swift
+    needs: [preflight]
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout ${{ github.repository }}
+        uses: actions/checkout@v4
+
+      - name: Setup Rust targets
+        run: |
+          rustup target add aarch64-apple-ios
+          rustup target add x86_64-apple-darwin
+          rustup target add aarch64-apple-ios-sim
+          rustup target add aarch64-apple-darwin
+
+      - name: Setup code signing
+        run: |
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          CERTIFICATE_PATH=$RUNNER_TEMP/certificate.p12
+          echo -n "$CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
+          security import $CERTIFICATE_PATH -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.APPLE_APP_DEV_ID_APP_CERTIFICATE }}
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_APP_DEV_ID_APP_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.APPLE_APP_DEV_ID_APP_CERTIFICATE_PASSWORD }}
+
+      - name: Generate package
+        run: sh ffi/swift/build.sh
+
+      - name: Sign XCFramework
+        run: |
+          codesign --timestamp --sign "$SIGNING_IDENTITY" package/libpicky.xcframework
+          codesign --verify --verbose package/libpicky.xcframework
+        env:
+          SIGNING_IDENTITY: "Developer ID Application: Devolutions inc."
+
+      - name: Package Swift Package
+        run: |
+          VERSION=${{ needs.preflight.outputs.version }}
+          mv package Picky-$VERSION
+          zip -r Picky-$VERSION.zip Picky-$VERSION
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: swift-zip
+          path: ./Picky-${{ needs.preflight.outputs.version }}.zip
+
+  publish:
+    name: Publish Swift package
+    environment: cloudsmith-publish
+    if: ${{ needs.preflight.outputs.dry-run == 'false' }}
+    needs: [preflight, build-swift]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download Swift package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: swift-zip
+          path: .
+
+      - name: Install Cloudsmith CLI
+        run: pip install --upgrade cloudsmith-cli
+
+      - name: Push package to Cloudsmith
+        run: cloudsmith push swift devolutions/swift-public Picky-${{ needs.preflight.outputs.version }}.zip --name Picky --version ${{ needs.preflight.outputs.version }} --scope devolutions
+        env:
+          CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
