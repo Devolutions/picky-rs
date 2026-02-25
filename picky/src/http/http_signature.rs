@@ -247,7 +247,7 @@ impl HttpSignature {
 
             match &self.algorithm {
                 Some(HttpSigAlgorithm::Custom(algorithm_name)) => {
-                    acc.push(format!("{}=\"{}\"", HTTP_SIGNATURE_ALGORITHM, algorithm_name));
+                    acc.push(format!("{HTTP_SIGNATURE_ALGORITHM}=\"{algorithm_name}\""));
                 }
                 Some(HttpSigAlgorithm::Known(algorithm)) => {
                     acc.push(format!(
@@ -261,11 +261,11 @@ impl HttpSignature {
         }
 
         if let Some(created) = self.created {
-            acc.push(format!("{}={}", HTTP_SIGNATURE_CREATED, created));
+            acc.push(format!("{HTTP_SIGNATURE_CREATED}={created}"));
         }
 
         if let Some(expires) = self.expires {
-            acc.push(format!("{}={}", HTTP_SIGNATURE_EXPIRES, expires));
+            acc.push(format!("{HTTP_SIGNATURE_EXPIRES}={expires}"));
         }
 
         if self.legacy {
@@ -422,7 +422,7 @@ impl Debug for SigningStringGenMethod<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "SigningStringGenMethod::")?;
         match self {
-            SigningStringGenMethod::PreGenerated(signing_string) => write!(f, "PreGenerated({})", signing_string),
+            SigningStringGenMethod::PreGenerated(signing_string) => write!(f, "PreGenerated({signing_string})"),
             SigningStringGenMethod::FromHttpRequest(_) => write!(f, "FromHttpRequest(...)"),
         }
     }

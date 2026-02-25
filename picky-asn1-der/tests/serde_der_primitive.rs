@@ -75,7 +75,7 @@ impl PrimitiveErr {
         let err = from_bytes::<T>(&self.der__)
             .err()
             .unwrap_or_else(|| panic!("Illegal successful deserialization @{}", self.line));
-        assert_eq!(format!("{:?}", err), self.error, "Invalid error @{}", self.line);
+        assert_eq!(format!("{err:?}"), self.error, "Invalid error @{}", self.line);
     }
 }
 

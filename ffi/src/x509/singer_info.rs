@@ -89,7 +89,7 @@ pub mod ffi {
     impl IssuerAndSerialNumber {
         pub fn get_issuer(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             let name_string = format!("{}", self.0.issuer);
-            write!(writable, "{}", name_string)?;
+            write!(writable, "{name_string}")?;
             Ok(())
         }
     }

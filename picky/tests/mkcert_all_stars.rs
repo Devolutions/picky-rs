@@ -35,7 +35,7 @@ fn all_stars_parsing() {
         let pem = match parse_pem(&contents[cursor..]) {
             Ok(pem) => pem,
             Err(e) => {
-                eprintln!("Couldn't parse pem at cursor = {}: {}", cursor, e);
+                eprintln!("Couldn't parse pem at cursor = {cursor}: {e}");
                 print_context(contents, cursor);
                 panic!("couldn't parse pem");
             }
@@ -53,12 +53,9 @@ fn all_stars_parsing() {
                     || formatted_str.contains("V1 certificates unsupported")
                 {
                     // these won't be supported
-                    eprintln!(
-                        "Couldn't parse certificate (cursor = {}) [won't support]: {}",
-                        cursor, formatted_str
-                    );
+                    eprintln!("Couldn't parse certificate (cursor = {cursor}) [won't support]: {formatted_str}");
                 } else {
-                    eprintln!("Couldn't parse certificate (cursor = {}): {}", cursor, formatted_str);
+                    eprintln!("Couldn't parse certificate (cursor = {cursor}): {formatted_str}");
                     print_context(contents, cursor);
                     panic!("couldn't parse certificate")
                 }
@@ -69,10 +66,7 @@ fn all_stars_parsing() {
         last_cursor = cursor + 1;
     }
 
-    println!(
-        "successfully decoded {}/{} certificates",
-        number_decoded, total_certificates
-    );
+    println!("successfully decoded {number_decoded}/{total_certificates} certificates");
 
     // we currently support 132 certificates out of the 136.
     assert!(number_decoded >= 134);

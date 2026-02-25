@@ -173,7 +173,7 @@ impl<T: ser::Serialize> ser::Serialize for KrbMessage<T> {
 
         let mut buff = Vec::new();
         self.encode(&mut buff)
-            .map_err(|e| S::Error::custom(format!("cannot serialize KrbMessage inner value: {:?}", e)))?;
+            .map_err(|e| S::Error::custom(format!("cannot serialize KrbMessage inner value: {e:?}")))?;
 
         Container { buff: Asn1RawDer(buff) }.serialize(serializer)
     }
@@ -226,7 +226,7 @@ impl<T: ser::Serialize + Debug + PartialEq> ser::Serialize for ApplicationTag0<T
             let mut s = picky_asn1_der::Serializer::new_to_byte_buf(&mut buff);
             self.0
                 .serialize(&mut s)
-                .map_err(|e| S::Error::custom(format!("cannot serialize GssApiMessage inner value: {:?}", e)))?;
+                .map_err(|e| S::Error::custom(format!("cannot serialize GssApiMessage inner value: {e:?}")))?;
         }
 
         buff[0] = Tag::application_constructed(0).inner();

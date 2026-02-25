@@ -125,40 +125,40 @@ impl fmt::Display for NamePrettyFormatter<'_> {
 
                 match &attr.value {
                     AttributeTypeAndValueParameters::CommonName(name) => {
-                        write!(f, "CN={}", name)?;
+                        write!(f, "CN={name}")?;
                     }
                     AttributeTypeAndValueParameters::Surname(name) => {
-                        write!(f, "SURNAME={}", name)?;
+                        write!(f, "SURNAME={name}")?;
                     }
                     AttributeTypeAndValueParameters::SerialNumber(name) => {
-                        write!(f, "SN={}", name)?;
+                        write!(f, "SN={name}")?;
                     }
                     AttributeTypeAndValueParameters::CountryName(name) => {
-                        write!(f, "C={}", name)?;
+                        write!(f, "C={name}")?;
                     }
                     AttributeTypeAndValueParameters::LocalityName(name) => {
-                        write!(f, "L={}", name)?;
+                        write!(f, "L={name}")?;
                     }
                     AttributeTypeAndValueParameters::StateOrProvinceName(name) => {
-                        write!(f, "ST={}", name)?;
+                        write!(f, "ST={name}")?;
                     }
                     AttributeTypeAndValueParameters::StreetName(name) => {
-                        write!(f, "STREET NAME={}", name)?;
+                        write!(f, "STREET NAME={name}")?;
                     }
                     AttributeTypeAndValueParameters::OrganizationName(name) => {
-                        write!(f, "O={}", name)?;
+                        write!(f, "O={name}")?;
                     }
                     AttributeTypeAndValueParameters::OrganizationalUnitName(name) => {
-                        write!(f, "OU={}", name)?;
+                        write!(f, "OU={name}")?;
                     }
                     AttributeTypeAndValueParameters::EmailAddress(name) => {
                         write!(f, "EMAIL={}", String::from_utf8_lossy(name.as_bytes()))?;
                     }
                     AttributeTypeAndValueParameters::GivenName(name) => {
-                        write!(f, "GIVENNAME={}", name)?;
+                        write!(f, "GIVENNAME={name}")?;
                     }
                     AttributeTypeAndValueParameters::Phone(name) => {
-                        write!(f, "PHONE={}", name)?;
+                        write!(f, "PHONE={name}")?;
                     }
                     AttributeTypeAndValueParameters::Custom(der) => {
                         write!(f, "{}={:?}", Into::<String>::into(&attr.ty.0), der)?;

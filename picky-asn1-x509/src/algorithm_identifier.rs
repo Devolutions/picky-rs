@@ -152,7 +152,7 @@ impl AlgorithmIdentifier {
             ShaVariant::SHA3_512 => oids::id_rsassa_pkcs1_v1_5_with_sha3_512(),
             _ => {
                 return Err(UnsupportedAlgorithmError {
-                    algorithm: format!("{:?}", variant),
+                    algorithm: format!("{variant:?}"),
                 });
             }
         };

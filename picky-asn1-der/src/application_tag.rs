@@ -33,7 +33,7 @@ impl<'de, V: de::Deserialize<'de> + Debug + PartialEq, const T: u8> de::Deserial
             type Value = E;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str(&format!("A valid DER-encoded ApplicationTag{:02x}", T))
+                formatter.write_str(&format!("A valid DER-encoded ApplicationTag{T:02x}"))
             }
 
             fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
@@ -47,7 +47,7 @@ impl<'de, V: de::Deserialize<'de> + Debug + PartialEq, const T: u8> de::Deserial
 
                 let tag_peeker: TagPeeker = seq
                     .next_element()
-                    .map_err(|e| A::Error::custom(format!("Cannot deserialize application tag: {:?}", e)))?
+                    .map_err(|e| A::Error::custom(format!("Cannot deserialize application tag: {e:?}")))?
                     .ok_or_else(|| A::Error::missing_field("ApplicationTag"))?;
                 let tag = tag_peeker.next_tag;
 
@@ -68,7 +68,7 @@ impl<'de, V: de::Deserialize<'de> + Debug + PartialEq, const T: u8> de::Deserial
 
                 let rest: ApplicationTagInner<E> = seq
                     .next_element()
-                    .map_err(|e| A::Error::custom(format!("Cannot deserialize application tag inner value: {:?}", e)))?
+                    .map_err(|e| A::Error::custom(format!("Cannot deserialize application tag inner value: {e:?}")))?
                     .ok_or_else(|| A::Error::missing_field("ApplicationInnerValue"))?;
 
                 Ok(rest.value)
@@ -95,13 +95,13 @@ impl<V: ser::Serialize + Debug + PartialEq + Clone, const T: u8> ser::Serialize 
             let mut s = crate::Serializer::new_to_byte_buf(&mut buff);
             self.0
                 .serialize(&mut s)
-                .map_err(|e| S::Error::custom(format!("Cannot serialize Application tag inner value: {:?}", e)))?;
+                .map_err(|e| S::Error::custom(format!("Cannot serialize Application tag inner value: {e:?}")))?;
         }
 
         let mut res = vec![Tag::application_constructed(T).inner()];
 
         Length::serialize(buff.len(), &mut res)
-            .map_err(|e| S::Error::custom(format!("Cannot serialize Length: {:?}", e)))?;
+            .map_err(|e| S::Error::custom(format!("Cannot serialize Length: {e:?}")))?;
         res.extend_from_slice(&buff);
 
         Asn1RawDer(res).serialize(serializer)

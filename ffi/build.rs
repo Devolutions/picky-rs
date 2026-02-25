@@ -17,9 +17,9 @@ mod win {
 
     fn generate_version_rc() -> String {
         let output_name = "DevolutionsPicky";
-        let filename = format!("{}.dll", output_name);
+        let filename = format!("{output_name}.dll");
         let company_name = "Devolutions Inc.";
-        let legal_copyright = format!("Copyright 2019-2024 {}", company_name);
+        let legal_copyright = format!("Copyright 2019-2026 {company_name}");
 
         let version_number = env::var("CARGO_PKG_VERSION").unwrap() + ".0";
         let version_commas = version_number.replace('.', ",");
@@ -67,16 +67,6 @@ BEGIN
     END
 END
 "#,
-            vs_file_version = vs_file_version,
-            vs_product_version = vs_product_version,
-            company_name = company_name,
-            file_description = file_description,
-            file_version = file_version,
-            internal_name = internal_name,
-            legal_copyright = legal_copyright,
-            original_filename = original_filename,
-            product_name = product_name,
-            product_version = product_version
         );
 
         version_rc
@@ -84,7 +74,7 @@ END
 
     pub fn main_stub() {
         let out_dir = env::var("OUT_DIR").unwrap();
-        let version_rc_file = format!("{}/version.rc", out_dir);
+        let version_rc_file = format!("{out_dir}/version.rc");
         let version_rc_data = generate_version_rc();
         let mut file = File::create(&version_rc_file).expect("cannot create version.rc file");
         file.write_all(version_rc_data.as_bytes()).unwrap();

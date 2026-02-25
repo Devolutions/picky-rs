@@ -409,7 +409,7 @@ impl Pkcs12Error {
 
 fn format_oid(oid: &ObjectIdentifier) -> String {
     let oid_str: String = oid.clone().into();
-    format!("OID({})", oid_str)
+    format!("OID({oid_str})")
 }
 
 #[cfg(test)]

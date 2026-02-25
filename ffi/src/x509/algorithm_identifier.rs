@@ -18,7 +18,7 @@ pub mod ffi {
 
         pub fn get_oid(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             let string: String = self.0.oid().into();
-            write!(writable, "{}", string)?;
+            write!(writable, "{string}")?;
             Ok(())
         }
 

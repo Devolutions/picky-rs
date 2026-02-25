@@ -47,7 +47,7 @@ impl TryFrom<HashAlgorithm> for ShaVariant {
             HashAlgorithm::SHA3_384 => Ok(ShaVariant::SHA3_384),
             HashAlgorithm::SHA3_512 => Ok(ShaVariant::SHA3_512),
             _ => Err(UnsupportedHashAlgorithmError {
-                algorithm: format!("{:?}", v),
+                algorithm: format!("{v:?}"),
             }),
         }
     }
@@ -66,7 +66,7 @@ impl TryFrom<ShaVariant> for HashAlgorithm {
             ShaVariant::SHA3_384 => Ok(HashAlgorithm::SHA3_384),
             ShaVariant::SHA3_512 => Ok(HashAlgorithm::SHA3_512),
             _ => Err(UnsupportedHashAlgorithmError {
-                algorithm: format!("{:?}", v),
+                algorithm: format!("{v:?}"),
             }),
         }
     }

@@ -59,14 +59,14 @@ fn fuzz_artifacts() {
     let mut success = true;
 
     for test in read_vector() {
-        println!("==> Test: {:?}", test);
+        println!("==> Test: {test:?}");
 
         let now = Instant::now();
 
         fuzz_target(&test);
 
         let duration = Instant::now().duration_since(now);
-        println!("Duration: {:?}", duration);
+        println!("Duration: {duration:?}");
         if duration.as_secs() > 1 {
             println!("/!!!!\\ WAY TOO SLOW");
             success = false;

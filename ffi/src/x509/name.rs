@@ -124,7 +124,7 @@ pub mod ffi {
             match &self.0 {
                 picky_asn1_x509::name::GeneralName::RegisteredId(registered_id) => {
                     let oid: String = registered_id.0.clone().into();
-                    write!(writable, "{}", oid)?;
+                    write!(writable, "{oid}")?;
                     Ok(())
                 }
                 _ => Err("not a registered ID".into()),
@@ -154,7 +154,7 @@ pub mod ffi {
     impl OtherName {
         pub fn get_type_id(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             let oid: String = self.0.type_id.0.clone().into();
-            write!(writable, "{}", oid)?;
+            write!(writable, "{oid}")?;
             Ok(())
         }
 

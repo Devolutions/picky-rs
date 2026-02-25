@@ -27,7 +27,7 @@ pub mod ffi {
 
         pub fn get_as_string(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             let string: String = self.0.clone().into();
-            write!(writable, "{}", string)?;
+            write!(writable, "{string}")?;
             Ok(())
         }
 

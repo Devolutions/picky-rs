@@ -30,7 +30,7 @@ pub(crate) enum NamedEdAlgorithm {
 impl Display for NamedEdAlgorithm {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            NamedEdAlgorithm::Known(alg) => write!(f, "{}", alg),
+            NamedEdAlgorithm::Known(alg) => write!(f, "{alg}"),
             NamedEdAlgorithm::Unsupported(oid) => {
                 // We don't support Ed448 and X448 algorithms, but we can still print their named
                 // representation of OID to make errrs more readable.

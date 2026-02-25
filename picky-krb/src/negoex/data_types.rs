@@ -175,10 +175,7 @@ impl NegoexDataType for MessageHeader {
         if signature != NEGOEXTS_MESSAGE_SIGNATURE {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!(
-                    "invalid message signature: {:x?}. expected: {:x?}",
-                    signature, NEGOEXTS_MESSAGE_SIGNATURE
-                ),
+                format!("invalid message signature: {signature:x?}. expected: {NEGOEXTS_MESSAGE_SIGNATURE:x?}"),
             ));
         }
 
@@ -355,10 +352,7 @@ impl NegoexDataType for Checksum {
         if checksum_scheme != CHECKSUM_SCHEME_RFC3961 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!(
-                    "invalid checksum scheme: {}. Expected: {}",
-                    checksum_scheme, CHECKSUM_SCHEME_RFC3961
-                ),
+                format!("invalid checksum scheme: {checksum_scheme}. Expected: {CHECKSUM_SCHEME_RFC3961}"),
             ));
         }
 

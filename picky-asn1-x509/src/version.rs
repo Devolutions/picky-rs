@@ -119,7 +119,7 @@ mod tests {
                 "invalid value: invalid version number, expected a valid integer \
                  representing a supported version number (0, 1 or 2)"
             ),
-            Err(err) => panic!("invalid error: {}", err),
+            Err(err) => panic!("invalid error: {err}"),
             Ok(_) => panic!("parsing should have failed but did not"),
         }
     }

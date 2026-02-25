@@ -23,8 +23,7 @@ pub type DiffieHellmanResult<T> = Result<T, DiffieHellmanError>;
 fn k_truncate(k: usize, mut data: Vec<u8>) -> DiffieHellmanResult<Vec<u8>> {
     if k % 8 != 0 {
         return Err(DiffieHellmanError::BitLen(format!(
-            "Seed bit len must be a multiple of 8. Got: {}",
-            k
+            "Seed bit len must be a multiple of 8. Got: {k}"
         )));
     }
 

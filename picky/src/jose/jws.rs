@@ -158,7 +158,7 @@ impl TryFrom<SignatureAlgorithm> for JwsAlg {
             SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_512) => Ok(Self::ES512),
             SignatureAlgorithm::Ed25519 => Ok(Self::EdDSA),
             unsupported => Err(SignatureError::UnsupportedAlgorithm {
-                algorithm: format!("{:?}", unsupported),
+                algorithm: format!("{unsupported:?}"),
             }),
         }
     }
@@ -179,7 +179,7 @@ impl TryFrom<JwsAlg> for SignatureAlgorithm {
             #[allow(deprecated)]
             JwsAlg::ED25519 => Ok(SignatureAlgorithm::Ed25519),
             unsupported => Err(SignatureError::UnsupportedAlgorithm {
-                algorithm: format!("{:?}", unsupported),
+                algorithm: format!("{unsupported:?}"),
             }),
         }
     }
@@ -483,7 +483,7 @@ pub fn verify_signature(encoded_token: &str, public_key: &PublicKey, algorithm: 
         _ => signature,
     };
 
-    signature_algo.verify(public_key, encoded_token[..last_dot_idx].as_bytes(), &signature)?;
+    signature_algo.verify(public_key, &encoded_token.as_bytes()[..last_dot_idx], &signature)?;
 
     Ok(())
 }

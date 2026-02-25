@@ -252,19 +252,19 @@ impl Serialize for RecipientInfo {
         let buf = match self {
             RecipientInfo::Kek(kek_recipient_info) => {
                 let mut buf = picky_asn1_der::to_vec(&kek_recipient_info.version)
-                    .map_err(|err| S::Error::custom(format!("Cannot serialize version: {:?}", err)))?;
+                    .map_err(|err| S::Error::custom(format!("Cannot serialize version: {err:?}")))?;
                 buf.extend_from_slice(
                     &picky_asn1_der::to_vec(&kek_recipient_info.kek_id)
-                        .map_err(|err| S::Error::custom(format!("Cannot serialize kek_id: {:?}", err)))?,
+                        .map_err(|err| S::Error::custom(format!("Cannot serialize kek_id: {err:?}")))?,
                 );
                 buf.extend_from_slice(
                     &picky_asn1_der::to_vec(&kek_recipient_info.key_encryption_algorithm).map_err(|err| {
-                        S::Error::custom(format!("Cannot serialize key_encryption_algorithm: {:?}", err))
+                        S::Error::custom(format!("Cannot serialize key_encryption_algorithm: {err:?}"))
                     })?,
                 );
                 buf.extend_from_slice(
                     &picky_asn1_der::to_vec(&kek_recipient_info.encrypted_key)
-                        .map_err(|err| S::Error::custom(format!("Cannot serialize encrypted_key: {:?}", err)))?,
+                        .map_err(|err| S::Error::custom(format!("Cannot serialize encrypted_key: {err:?}")))?,
                 );
                 buf
             }
