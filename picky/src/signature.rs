@@ -119,7 +119,7 @@ impl TryFrom<SignatureAlgorithm> for AlgorithmIdentifier {
             SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_384) => Ok(AlgorithmIdentifier::new_ecdsa_with_sha384()),
             SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_512) => Ok(AlgorithmIdentifier::new_ecdsa_with_sha512()),
             SignatureAlgorithm::Ecdsa(hash) => {
-                let msg = format!("ECDSA doesn't support {:?} hashing algorithm", hash);
+                let msg = format!("ECDSA doesn't support {hash:?} hashing algorithm");
                 Err(SignatureError::Ec { context: msg })
             }
             SignatureAlgorithm::Ed25519 => Ok(AlgorithmIdentifier::new_ed25519()),
@@ -189,18 +189,17 @@ impl SignatureAlgorithm {
                                 })?;
                             let key =
                                 p256::ecdsa::SigningKey::from_bytes(&key_bytes).map_err(|e| SignatureError::Ec {
-                                    context: format!("Cannot decode p256 EC keypair: {}", e),
+                                    context: format!("Cannot decode p256 EC keypair: {e}"),
                                 })?;
                             let sig: p256::ecdsa::Signature = key.try_sign(msg).map_err(|e| SignatureError::Ec {
-                                context: format!("Cannot produce p256 signature: {}", e),
+                                context: format!("Cannot produce p256 signature: {e}"),
                             })?;
 
                             Ok(sig.to_der().as_bytes().to_vec())
                         }
                         _ => Err(SignatureError::UnsupportedAlgorithm {
                             algorithm: format!(
-                                "ECDSA P-256 curve with {:?} hash algorithm is not supported",
-                                picky_hash_algo
+                                "ECDSA P-256 curve with {picky_hash_algo:?} hash algorithm is not supported"
                             ),
                         }),
                     },
@@ -222,17 +221,16 @@ impl SignatureAlgorithm {
 
                             let key =
                                 p384::ecdsa::SigningKey::from_bytes(&key_bytes).map_err(|e| SignatureError::Ec {
-                                    context: format!("Cannot decode p384 EC keypair: {}", e),
+                                    context: format!("Cannot decode p384 EC keypair: {e}"),
                                 })?;
                             let sig: p384::ecdsa::Signature = key.try_sign(msg).map_err(|e| SignatureError::Ec {
-                                context: format!("Cannot produce p384 signature: {}", e),
+                                context: format!("Cannot produce p384 signature: {e}"),
                             })?;
                             Ok(sig.to_der().as_bytes().to_vec())
                         }
                         _ => Err(SignatureError::UnsupportedAlgorithm {
                             algorithm: format!(
-                                "ECDSA P-384 curve with {:?} hash algorithm is not supported",
-                                picky_hash_algo
+                                "ECDSA P-384 curve with {picky_hash_algo:?} hash algorithm is not supported"
                             ),
                         }),
                     },
@@ -254,17 +252,16 @@ impl SignatureAlgorithm {
 
                             let key =
                                 p521::ecdsa::SigningKey::from_bytes(&key_bytes).map_err(|e| SignatureError::Ec {
-                                    context: format!("Cannot decode p521 EC keypair: {}", e),
+                                    context: format!("Cannot decode p521 EC keypair: {e}"),
                                 })?;
                             let sig: p521::ecdsa::Signature = key.try_sign(msg).map_err(|e| SignatureError::Ec {
-                                context: format!("Cannot produce p521 signature: {}", e),
+                                context: format!("Cannot produce p521 signature: {e}"),
                             })?;
                             Ok(sig.to_der().as_bytes().to_vec())
                         }
                         _ => Err(SignatureError::UnsupportedAlgorithm {
                             algorithm: format!(
-                                "ECDSA P-521 curve with {:?} hash algorithm is not supported",
-                                picky_hash_algo
+                                "ECDSA P-521 curve with {picky_hash_algo:?} hash algorithm is not supported"
                             ),
                         }),
                     },
@@ -285,7 +282,7 @@ impl SignatureAlgorithm {
                         })?;
                         let verifying_key = ed25519_dalek::VerifyingKey::from_bytes(public_key).map_err(
                             |e: ed25519_dalek::ed25519::Error| SignatureError::Ed {
-                                context: format!("Cannot decode ed25519 public key: {}", e),
+                                context: format!("Cannot decode ed25519 public key: {e}"),
                             },
                         )?;
 
@@ -364,7 +361,7 @@ impl SignatureAlgorithm {
                             EcCurve::NistP256 => {}
                             curve => {
                                 return Err(SignatureError::UnsupportedAlgorithm {
-                                    algorithm: format!("SHA256 hash algorithm can't be used with `{}` curve", curve),
+                                    algorithm: format!("SHA256 hash algorithm can't be used with `{curve}` curve"),
                                 });
                             }
                         };
@@ -372,19 +369,19 @@ impl SignatureAlgorithm {
                         let encoded_point =
                             p256::EncodedPoint::from_bytes(ec_pub_key.encoded_point()).map_err(|e| {
                                 SignatureError::Ec {
-                                    context: format!("Cannot parse p256 public key from der bytes: {}", e),
+                                    context: format!("Cannot parse p256 public key from der bytes: {e}"),
                                 }
                             })?;
 
                         let vkey = p256::ecdsa::VerifyingKey::from_encoded_point(&encoded_point).map_err(|e| {
                             SignatureError::Ec {
-                                context: format!("Cannot parse p256 encoded point: {}", e),
+                                context: format!("Cannot parse p256 encoded point: {e}"),
                             }
                         })?;
 
                         let signature =
                             p256::ecdsa::Signature::from_der(signature).map_err(|e| SignatureError::Ec {
-                                context: format!("Cannot parse p256 signature: {}", e),
+                                context: format!("Cannot parse p256 signature: {e}"),
                             })?;
                         vkey.verify(msg, &signature).map_err(|_| SignatureError::BadSignature)?
                     }
@@ -395,7 +392,7 @@ impl SignatureAlgorithm {
                             EcCurve::NistP384 => {}
                             curve => {
                                 return Err(SignatureError::UnsupportedAlgorithm {
-                                    algorithm: format!("SHA384 hash algorithm can't be used with `{}` curve", curve),
+                                    algorithm: format!("SHA384 hash algorithm can't be used with `{curve}` curve"),
                                 });
                             }
                         };
@@ -403,19 +400,19 @@ impl SignatureAlgorithm {
                         let encoded_point =
                             p384::EncodedPoint::from_bytes(ec_pub_key.encoded_point()).map_err(|e| {
                                 SignatureError::Ec {
-                                    context: format!("Cannot parse p384 public key from der bytes: {}", e),
+                                    context: format!("Cannot parse p384 public key from der bytes: {e}"),
                                 }
                             })?;
 
                         let vkey = p384::ecdsa::VerifyingKey::from_encoded_point(&encoded_point).map_err(|e| {
                             SignatureError::Ec {
-                                context: format!("Cannot parse p384 encoded point: {}", e),
+                                context: format!("Cannot parse p384 encoded point: {e}"),
                             }
                         })?;
 
                         let signature =
                             p384::ecdsa::Signature::from_der(signature).map_err(|e| SignatureError::Ec {
-                                context: format!("Cannot parse p384 signature: {}", e),
+                                context: format!("Cannot parse p384 signature: {e}"),
                             })?;
                         vkey.verify(msg, &signature).map_err(|_| SignatureError::BadSignature)?
                     }
@@ -426,7 +423,7 @@ impl SignatureAlgorithm {
                             EcCurve::NistP521 => {}
                             curve => {
                                 return Err(SignatureError::UnsupportedAlgorithm {
-                                    algorithm: format!("SHA512 hash algorithm can't be used with `{}` curve", curve),
+                                    algorithm: format!("SHA512 hash algorithm can't be used with `{curve}` curve"),
                                 });
                             }
                         };
@@ -434,25 +431,25 @@ impl SignatureAlgorithm {
                         let encoded_point =
                             p521::EncodedPoint::from_bytes(ec_pub_key.encoded_point()).map_err(|e| {
                                 SignatureError::Ec {
-                                    context: format!("Cannot parse p521 public key from der bytes: {}", e),
+                                    context: format!("Cannot parse p521 public key from der bytes: {e}"),
                                 }
                             })?;
 
                         let vkey = p521::ecdsa::VerifyingKey::from_encoded_point(&encoded_point).map_err(|e| {
                             SignatureError::Ec {
-                                context: format!("Cannot parse p521 encoded point: {}", e),
+                                context: format!("Cannot parse p521 encoded point: {e}"),
                             }
                         })?;
 
                         let signature =
                             p521::ecdsa::Signature::from_der(signature).map_err(|e| SignatureError::Ec {
-                                context: format!("Cannot parse p521 signature: {}", e),
+                                context: format!("Cannot parse p521 signature: {e}"),
                             })?;
                         vkey.verify(msg, &signature).map_err(|_| SignatureError::BadSignature)?
                     }
                     _ => {
                         return Err(SignatureError::UnsupportedAlgorithm {
-                            algorithm: format!("ECDSA with {:?} hash algorithm is not supported", picky_hash_algo),
+                            algorithm: format!("ECDSA with {picky_hash_algo:?} hash algorithm is not supported"),
                         });
                     }
                 }
@@ -470,7 +467,7 @@ impl SignatureAlgorithm {
                         })?;
                         let verifying_key = ed25519_dalek::VerifyingKey::from_bytes(public_key).map_err(
                             |e: ed25519_dalek::ed25519::Error| SignatureError::Ed {
-                                context: format!("Cannot decode ed25519 public key: {}", e),
+                                context: format!("Cannot decode ed25519 public key: {e}"),
                             },
                         )?;
 

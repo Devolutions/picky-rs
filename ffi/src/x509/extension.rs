@@ -15,7 +15,7 @@ pub mod ffi {
     impl Extension {
         pub fn get_extn_id(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             let oid: String = self.0.extn_id().0.clone().into();
-            write!(writable, "{}", oid)?;
+            write!(writable, "{oid}")?;
             Ok(())
         }
 
@@ -161,7 +161,7 @@ pub mod ffi {
     impl OidIterator {
         pub fn next(&mut self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             let oid = self.0.pop().ok_or("no more OIDs")?;
-            write!(writable, "{}", oid)?;
+            write!(writable, "{oid}")?;
             Ok(())
         }
     }

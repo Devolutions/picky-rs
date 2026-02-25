@@ -1,5 +1,4 @@
 //! Wrappers around public and private keys raw data providing an easy to use API
-
 pub(crate) mod ec;
 pub(crate) mod ed;
 
@@ -73,10 +72,7 @@ impl KeyError {
     pub(crate) fn unsupported_curve(curve_oid: &ObjectIdentifier, context: &'static str) -> Self {
         let curve_oid: String = curve_oid.into();
         Self::EC {
-            context: format!(
-                "EC curve with oid `{}` is not supported in context of {}",
-                curve_oid, context,
-            ),
+            context: format!("EC curve with oid `{curve_oid}` is not supported in context of {context}"),
         }
     }
 
@@ -84,8 +80,7 @@ impl KeyError {
         let oid: String = oid.into();
         Self::ED {
             context: format!(
-                "Algorithm with oid `{}` based on Edwards curves is not supported in context of {}",
-                oid, context,
+                "Algorithm with oid `{oid}` based on Edwards curves is not supported in context of {context}",
             ),
         }
     }

@@ -735,8 +735,7 @@ impl SshCertificateBuilder {
                         HashAlgorithm::SHA2_512 => SshSignatureFormat::RsaSha512,
                         _ => {
                             return Err(SshCertificateGenerationError::IncorrectSignatureAlgorithm(format!(
-                                "Invalid signature format hash algorithm. Only sha1, sha2-256 and ssh2-521 are in use in OpenSSH for RSA keys, but got {:?} hash",
-                                hash_algo
+                                "Invalid signature format hash algorithm. Only sha1, sha2-256 and ssh2-521 are in use in OpenSSH for RSA keys, but got {hash_algo:?} hash"
                             )));
                         }
                     },
@@ -763,8 +762,7 @@ impl SshCertificateBuilder {
                         HashAlgorithm::SHA2_512 => SshSignatureFormat::EcdsaSha2Nistp521,
                         _ => {
                             return Err(SshCertificateGenerationError::IncorrectSignatureAlgorithm(format!(
-                                "Invalid signature format hash algorithm. Only sha2-256, sha2-384 and ssh2-521 are in use in OpenSSH for ECDSA keys, but got {:?} hash",
-                                hash_algo
+                                "Invalid signature format hash algorithm. Only sha2-256, sha2-384 and ssh2-521 are in use in OpenSSH for ECDSA keys, but got {hash_algo:?} hash"
                             )));
                         }
                     },

@@ -84,7 +84,7 @@ impl fmt::Display for Pem<'_> {
         let bytes = encoded.as_bytes();
         for chunk in bytes.chunks(64) {
             let chunk = std::str::from_utf8(chunk).map_err(|_| fmt::Error)?;
-            writeln!(f, "{}", chunk)?;
+            writeln!(f, "{chunk}")?;
         }
 
         write!(f, "{} {}-----", PEM_FOOTER_START, self.label)?;

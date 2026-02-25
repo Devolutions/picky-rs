@@ -55,7 +55,7 @@ pub mod ffi {
         pub fn next(&mut self, writable: &mut diplomat_runtime::DiplomatWriteable) -> Result<(), Box<PickyError>> {
             let next = self.0.next();
             if let Some(next) = next {
-                let _ = write!(writable, "{}", next);
+                let _ = write!(writable, "{next}");
                 writable.flush();
                 return Ok(());
             }

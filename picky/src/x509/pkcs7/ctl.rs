@@ -70,11 +70,11 @@ pub mod http_fetch {
 
             let mut buffer = Vec::new();
             cab.copy_to(&mut buffer).map_err(|err| CtlError::ExtractingError {
-                description: format!("Failed to copy Response body to Vec: {}", err),
+                description: format!("Failed to copy Response body to Vec: {err}"),
             })?;
 
             let mut cabinet = cab::Cabinet::new(Cursor::new(&mut buffer)).map_err(|err| CtlError::ExtractingError {
-                description: format!("Failed to parse Cabinet file: {}", err),
+                description: format!("Failed to parse Cabinet file: {err}"),
             })?;
 
             let mut authroot = cabinet

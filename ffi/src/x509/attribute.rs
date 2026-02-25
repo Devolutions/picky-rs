@@ -16,7 +16,7 @@ pub mod ffi {
     impl Attribute {
         pub fn get_type(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             let oid: String = self.0.ty.0.clone().into();
-            write!(writable, "{}", oid)?;
+            write!(writable, "{oid}")?;
             Ok(())
         }
 
@@ -294,7 +294,7 @@ pub mod ffi {
     impl AttributeTypeAndValue {
         pub fn get_type_id(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             let oid: String = self.0.ty.0.clone().into();
-            write!(writable, "{}", oid)?;
+            write!(writable, "{oid}")?;
             Ok(())
         }
 
@@ -496,7 +496,7 @@ pub mod ffi {
     impl UnsignedAttribute {
         pub fn get_type(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             let oid: String = self.0.ty.0.clone().into();
-            write!(writable, "{}", oid)?;
+            write!(writable, "{oid}")?;
             Ok(())
         }
 
@@ -569,7 +569,7 @@ pub mod ffi {
     impl MsCounterSign {
         pub fn get_oid(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             let oid_string: String = self.0.oid.0.clone().into();
-            write!(writable, "{}", oid_string)?;
+            write!(writable, "{oid_string}")?;
             Ok(())
         }
 
@@ -619,7 +619,7 @@ pub mod ffi {
     impl EncapsulatedContentInfo {
         pub fn content_type(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             let oid: String = self.0.content_type.0.clone().into();
-            write!(writable, "{}", oid)?;
+            write!(writable, "{oid}")?;
             Ok(())
         }
     }
@@ -719,7 +719,7 @@ pub mod ffi {
 
         pub fn get_issuer(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             let name_string = format!("{}", self.0.issuer);
-            write!(writable, "{}", name_string)?;
+            write!(writable, "{name_string}")?;
             Ok(())
         }
 

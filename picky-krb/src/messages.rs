@@ -356,7 +356,7 @@ impl<'de> de::Deserialize<'de> for ApMessage {
             {
                 let tag_peeker: TagPeeker = seq
                     .next_element()
-                    .map_err(|e| A::Error::custom(format!("Cannot deserialize application tag: {:?}", e)))?
+                    .map_err(|e| A::Error::custom(format!("Cannot deserialize application tag: {e:?}")))?
                     .ok_or_else(|| A::Error::missing_field("ApplicationTag"))?;
 
                 match tag_peeker.next_tag.class_and_number() {
@@ -414,9 +414,9 @@ impl KrbPrivMessage {
 
         Ok(Self {
             ap_message: picky_asn1_der::from_reader(&mut data)
-                .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, format!("{:?}", err)))?,
+                .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, format!("{err:?}")))?,
             krb_priv: picky_asn1_der::from_reader(&mut data)
-                .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, format!("{:?}", err)))?,
+                .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, format!("{err:?}")))?,
         })
     }
 }
@@ -430,9 +430,9 @@ impl ser::Serialize for KrbPrivMessage {
         let mut message = vec![0, 0, 0, 0, 0, 0];
 
         let ap_len = picky_asn1_der::to_writer(&self.ap_message, &mut message)
-            .map_err(|err| S::Error::custom(format!("Cannot serialize ap_req: {:?}", err)))?;
+            .map_err(|err| S::Error::custom(format!("Cannot serialize ap_req: {err:?}")))?;
         let _krb_priv_len = picky_asn1_der::to_writer(&self.krb_priv, &mut message)
-            .map_err(|err| S::Error::custom(format!("Cannot serialize krb_priv: {:?}", err)))?;
+            .map_err(|err| S::Error::custom(format!("Cannot serialize krb_priv: {err:?}")))?;
 
         let message_len = message.len();
         debug_assert_eq!(message_len, 6 + ap_len + _krb_priv_len);

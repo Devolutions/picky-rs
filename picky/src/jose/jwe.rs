@@ -684,7 +684,7 @@ fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
                     JweAlg::RsaOaep256 => RsaPaddingScheme::Oaep256(Oaep::<sha2::Sha256>::new()),
                     unsupported => {
                         return Err(JweError::UnsupportedAlgorithm {
-                            algorithm: format!("{:?}", unsupported),
+                            algorithm: format!("{unsupported:?}"),
                         });
                     }
                 };
@@ -748,7 +748,7 @@ fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
         }
         unsupported => {
             return Err(JweError::UnsupportedAlgorithm {
-                algorithm: format!("{:?}", unsupported),
+                algorithm: format!("{unsupported:?}"),
             });
         }
     };
@@ -864,7 +864,7 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
                     JweAlg::RsaOaep256 => RsaPaddingScheme::Oaep256(Oaep::<sha2::Sha256>::new()),
                     unsupported => {
                         return Err(JweError::UnsupportedAlgorithm {
-                            algorithm: format!("{:?}", unsupported),
+                            algorithm: format!("{unsupported:?}"),
                         });
                     }
                 };
@@ -927,7 +927,7 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
         }
         unsupported => {
             return Err(JweError::UnsupportedAlgorithm {
-                algorithm: format!("{:?}", unsupported),
+                algorithm: format!("{unsupported:?}"),
             });
         }
     };
@@ -1174,12 +1174,12 @@ fn generate_ecdh_shared_secret(
         }
         RfcPublicKey::Rsa(_) => {
             return Err(JweError::UnsupportedAlgorithm {
-                algorithm: format!("RSA key can't be used with `{:?}` algorithm", alg),
+                algorithm: format!("RSA key can't be used with `{alg:?}` algorithm"),
             });
         }
         RfcPublicKey::Mldsa(_) => {
             return Err(JweError::UnsupportedAlgorithm {
-                algorithm: format!("MLDSA key can't be used with `{:?}` algorithm", alg),
+                algorithm: format!("MLDSA key can't be used with `{alg:?}` algorithm"),
             });
         }
     };
@@ -1348,7 +1348,7 @@ fn calculate_ecdh_shared_secret(
         }
         PrivateKeyKind::Rsa => {
             return Err(JweError::UnsupportedAlgorithm {
-                algorithm: format!("RSA key can't be used with `{:?}` algorithm", alg),
+                algorithm: format!("RSA key can't be used with `{alg:?}` algorithm"),
             });
         }
     };

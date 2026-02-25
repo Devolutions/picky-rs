@@ -113,7 +113,7 @@ pub enum Asn1DerError {
 
 impl Display for Asn1DerError {
     fn fmt(&self, t: &mut Formatter) -> fmt::Result {
-        write!(t, "{:?}", self)
+        write!(t, "{self:?}")
     }
 }
 
