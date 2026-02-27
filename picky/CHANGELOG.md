@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[7.0.0-rc.22](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.21...picky-v7.0.0-rc.22)] - 2026-02-27
+
+### <!-- 4 -->Bug Fixes
+
+- Bump `sha1` to v0.11.0-rc.3 ([#463](https://github.com/Devolutions/picky-rs/issues/463)) ([e40aee72bd](https://github.com/Devolutions/picky-rs/commit/e40aee72bd248bda84e6fe9e84a648784a6374ed)) 
+
 ## [[7.0.0-rc.21](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.20...picky-v7.0.0-rc.21)] - 2026-02-02
 
 ### <!-- 7 -->Build
