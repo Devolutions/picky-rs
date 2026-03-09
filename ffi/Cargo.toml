@@ -39,6 +39,6 @@ getrandom = { version = "0.3", features = ["wasm_js"] }
 # TODO: Remove when stable versions will be released.
 blake2 = "=0.11.0-rc.3"
 digest = "=0.11.0-rc.5"
-crypto-common = "=0.2.0-rc.8"
+crypto-common = "=0.2.0-rc.12"
 block-buffer = "0.11"
-password-hash = "=0.6.0-rc.8"
+password-hash = "=0.6.0-rc.12"
