@@ -27,7 +27,7 @@ jobs:
 
     steps:
       - name: Checkout ${{ github.repository }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Get dry run
         id: get-dry-run
@@ -107,7 +107,7 @@ jobs:
 
     steps:
       - name: Checkout ${{ github.repository }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Configure Android NDK
         uses: Devolutions/actions-public/cargo-android-ndk@v1
@@ -200,7 +200,7 @@ jobs:
         shell: pwsh
 
       - name: Upload native components
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: picky-${{matrix.os}}-${{matrix.arch}}
           path: dependencies/runtimes/${{matrix.os}}-${{matrix.arch}}
@@ -216,13 +216,13 @@ jobs:
 
     steps:
       - name: Checkout ${{ github.repository }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup CCTools
         uses: Devolutions/actions-public/setup-cctools@v1
 
       - name: Download native components
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: dependencies/runtimes
 
@@ -284,7 +284,7 @@ jobs:
         shell: pwsh
 
       - name: Upload native components
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: picky-${{ matrix.os }}-universal
           path: dependencies/runtimes/${{ matrix.os }}-universal
@@ -296,7 +296,7 @@ jobs:
 
     steps:
       - name: Check out ${{ github.repository }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install ios workload
         run: dotnet workload install ios
@@ -307,7 +307,7 @@ jobs:
         shell: pwsh
 
       - name: Download native components
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: dependencies/runtimes
 
@@ -336,7 +336,7 @@ jobs:
         shell: pwsh
 
       - name: Upload managed components
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: picky-nupkg
           path: ffi/dotnet/Devolutions.Picky/bin/Release/*.nupkg
@@ -352,7 +352,7 @@ jobs:
 
     steps:
       - name: Download NuGet package artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: picky-nupkg
           path: package
