@@ -366,12 +366,11 @@ impl SignatureAlgorithm {
                             }
                         };
 
-                        let encoded_point =
-                            p256::Sec1Point::from_bytes(ec_pub_key.encoded_point()).map_err(|e| {
-                                SignatureError::Ec {
-                                    context: format!("Cannot parse p256 public key from der bytes: {e}"),
-                                }
-                            })?;
+                        let encoded_point = p256::Sec1Point::from_bytes(ec_pub_key.encoded_point()).map_err(|e| {
+                            SignatureError::Ec {
+                                context: format!("Cannot parse p256 public key from der bytes: {e}"),
+                            }
+                        })?;
 
                         let vkey = p256::ecdsa::VerifyingKey::from_sec1_point(&encoded_point).map_err(|e| {
                             SignatureError::Ec {
@@ -397,12 +396,11 @@ impl SignatureAlgorithm {
                             }
                         };
 
-                        let encoded_point =
-                            p384::Sec1Point::from_bytes(ec_pub_key.encoded_point()).map_err(|e| {
-                                SignatureError::Ec {
-                                    context: format!("Cannot parse p384 public key from der bytes: {e}"),
-                                }
-                            })?;
+                        let encoded_point = p384::Sec1Point::from_bytes(ec_pub_key.encoded_point()).map_err(|e| {
+                            SignatureError::Ec {
+                                context: format!("Cannot parse p384 public key from der bytes: {e}"),
+                            }
+                        })?;
 
                         let vkey = p384::ecdsa::VerifyingKey::from_sec1_point(&encoded_point).map_err(|e| {
                             SignatureError::Ec {
@@ -428,12 +426,11 @@ impl SignatureAlgorithm {
                             }
                         };
 
-                        let encoded_point =
-                            p521::Sec1Point::from_bytes(ec_pub_key.encoded_point()).map_err(|e| {
-                                SignatureError::Ec {
-                                    context: format!("Cannot parse p521 public key from der bytes: {e}"),
-                                }
-                            })?;
+                        let encoded_point = p521::Sec1Point::from_bytes(ec_pub_key.encoded_point()).map_err(|e| {
+                            SignatureError::Ec {
+                                context: format!("Cannot parse p521 public key from der bytes: {e}"),
+                            }
+                        })?;
 
                         let vkey = p521::ecdsa::VerifyingKey::from_sec1_point(&encoded_point).map_err(|e| {
                             SignatureError::Ec {

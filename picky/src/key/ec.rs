@@ -177,13 +177,14 @@ pub(crate) fn calculate_public_ec_key(
 
             let private_key_validated = EcCurve::NistP256.validate_component(EcComponent::Secret(private_key))?;
 
-            let secret_bytes = p256::elliptic_curve::array::Array::try_from(private_key_validated).map_err(|_| KeyError::EC {
-                context: format!(
-                    "validated private key is the not right length(expected: {}, actual: {})",
-                    EcCurve::NistP256.field_bytes_size(),
-                    private_key_validated.len()
-                ),
-            })?;
+            let secret_bytes =
+                p256::elliptic_curve::array::Array::try_from(private_key_validated).map_err(|_| KeyError::EC {
+                    context: format!(
+                        "validated private key is the not right length(expected: {}, actual: {})",
+                        EcCurve::NistP256.field_bytes_size(),
+                        private_key_validated.len()
+                    ),
+                })?;
             let secret_key = p256::SecretKey::from_bytes(&secret_bytes).map_err(|_| KeyError::EC {
                 context: "Failed to construct P256 SecretKey from private key bytes".to_string(),
             })?;
@@ -198,13 +199,14 @@ pub(crate) fn calculate_public_ec_key(
 
             let private_key_validated = EcCurve::NistP384.validate_component(EcComponent::Secret(private_key))?;
 
-            let secret_bytes = p384::elliptic_curve::array::Array::try_from(private_key_validated).map_err(|_| KeyError::EC {
-                context: format!(
-                    "validated private key is the not right length(expected: {}, actual: {})",
-                    EcCurve::NistP384.field_bytes_size(),
-                    private_key_validated.len()
-                ),
-            })?;
+            let secret_bytes =
+                p384::elliptic_curve::array::Array::try_from(private_key_validated).map_err(|_| KeyError::EC {
+                    context: format!(
+                        "validated private key is the not right length(expected: {}, actual: {})",
+                        EcCurve::NistP384.field_bytes_size(),
+                        private_key_validated.len()
+                    ),
+                })?;
             let secret_key = p384::SecretKey::from_bytes(&secret_bytes).map_err(|_| KeyError::EC {
                 context: "Failed to construct P384 SecretKey from private key bytes".to_string(),
             })?;
@@ -219,13 +221,14 @@ pub(crate) fn calculate_public_ec_key(
 
             let private_key_validated = EcCurve::NistP521.validate_component(EcComponent::Secret(private_key))?;
 
-            let secret_bytes = p521::elliptic_curve::array::Array::try_from(private_key_validated).map_err(|_| KeyError::EC {
-                context: format!(
-                    "validated private key is the not right length(expected: {}, actual: {})",
-                    EcCurve::NistP521.field_bytes_size(),
-                    private_key_validated.len()
-                ),
-            })?;
+            let secret_bytes =
+                p521::elliptic_curve::array::Array::try_from(private_key_validated).map_err(|_| KeyError::EC {
+                    context: format!(
+                        "validated private key is the not right length(expected: {}, actual: {})",
+                        EcCurve::NistP521.field_bytes_size(),
+                        private_key_validated.len()
+                    ),
+                })?;
             let secret_key = p521::SecretKey::from_bytes(&secret_bytes).map_err(|_| KeyError::EC {
                 context: "Failed to construct P521 SecretKey from private key bytes".to_string(),
             })?;
