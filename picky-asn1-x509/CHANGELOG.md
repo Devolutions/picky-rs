@@ -12,8 +12,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Upgrade RustCrypto dependencies ([#476](https://github.com/Devolutions/picky-rs/issues/476)) ([8ce838e347](https://github.com/Devolutions/picky-rs/commit/8ce838e3470ac605c912f61dc67c1c6d388b140d)) 
 
-
-
 ## [[0.15.3](https://github.com/Devolutions/picky-rs/compare/picky-asn1-x509-v0.15.2...picky-asn1-x509-v0.15.3)] - 2026-02-02
 
 ### <!-- 7 -->Build
