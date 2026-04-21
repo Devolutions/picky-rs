@@ -1,6 +1,6 @@
 use crypto_bigint::modular::{BoxedMontyForm, BoxedMontyParams};
 use crypto_bigint::{BoxedUint, Odd, RandomBits, Resize};
-use rand::TryRng;
+use rand_core::TryRng;
 use sha1::{Digest, Sha1};
 use thiserror::Error;
 

@@ -1493,6 +1493,7 @@ dependencies = [
  "picky-asn1-der",
  "picky-asn1-x509",
  "rand",
+ "rand_core 0.10.1",
  "serde_json",
  "time",
 ]
@@ -1519,6 +1520,7 @@ dependencies = [
  "picky-asn1-der",
  "picky-asn1-x509",
  "rand",
+ "rand_core 0.10.1",
  "serde",
  "sha1",
  "thiserror",

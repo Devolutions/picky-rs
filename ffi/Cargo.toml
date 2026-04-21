@@ -22,6 +22,7 @@ picky-asn1-x509 = { path = "../picky-asn1-x509", features = ["legacy", "zeroize"
 
 argon2 = { version = "=0.6.0-rc.8", features = ["rand_core"] }
 rand = "0.10"
+rand_core = "0.10"
 
 # FFI
 diplomat = { git = "https://github.com/CBenoit/diplomat.git", rev = "f4d93d57e93025c57e75e9711d2418faa9311a42" }

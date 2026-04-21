@@ -29,6 +29,7 @@ des = "0.9"
 cbc = "0.2"
 inout = "0.2"
 rand = "0.10"
+rand_core = "0.10"
 
 uuid = { version = "1.18", default-features = false, features = ["serde"] }
 oid = "0.2"
