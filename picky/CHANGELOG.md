@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[7.0.0-rc.23](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.22...picky-v7.0.0-rc.23)] - 2026-04-21
+
+### <!-- 7 -->Build
+
+- Upgrade RustCrypto dependencies ([#476](https://github.com/Devolutions/picky-rs/issues/476)) ([8ce838e347](https://github.com/Devolutions/picky-rs/commit/8ce838e3470ac605c912f61dc67c1c6d388b140d)) 
+
+
+
 ## [[7.0.0-rc.22](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.21...picky-v7.0.0-rc.22)] - 2026-02-27
 
 ### <!-- 4 -->Bug Fixes
