@@ -1,6 +1,6 @@
 use crypto_bigint::modular::{BoxedMontyForm, BoxedMontyParams};
 use crypto_bigint::{BoxedUint, Odd, RandomBits, Resize};
-use rand::TryRngCore;
+use rand_core::TryRng;
 use sha1::{Digest, Sha1};
 use thiserror::Error;
 
@@ -124,7 +124,7 @@ pub fn generate_key(
 
 /// [Key and Parameter Requirements](https://www.rfc-editor.org/rfc/rfc2631#section-2.2)
 /// X9.42 requires that the private key x be in the interval [2, (q - 2)]
-pub fn generate_private_key<R: TryRngCore>(q: &[u8], rng: &mut R) -> Result<Vec<u8>, R::Error> {
+pub fn generate_private_key<R: TryRng>(q: &[u8], rng: &mut R) -> Result<Vec<u8>, R::Error> {
     let q = BoxedUint::from_be_slice_vartime(q);
     let low_bound = BoxedUint::from_be_slice_vartime(&[2]);
     let high_bound = q - 1_u32;

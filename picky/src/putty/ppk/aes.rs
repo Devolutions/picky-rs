@@ -5,13 +5,13 @@ use aes::cipher::KeyIvInit;
 use aes::cipher::block_padding::NoPadding;
 use cbc::cipher::{BlockModeDecrypt, BlockModeEncrypt};
 use inout::InOutBufReserved;
-use rand_core::RngCore;
+use rand_core::Rng;
 
 pub const KEY_SIZE: usize = 32;
 pub const BLOCK_SIZE: usize = 16;
 
 /// Adds padding to the message if it is not a multiple of the AES block size.
-pub fn make_padding<R: RngCore>(mut message: Vec<u8>, mut rng: R) -> Vec<u8> {
+pub fn make_padding<R: Rng>(mut message: Vec<u8>, mut rng: R) -> Vec<u8> {
     if message.len() % BLOCK_SIZE != 0 {
         let unpadded_size = message.len();
         let padding_size = BLOCK_SIZE - (unpadded_size % BLOCK_SIZE);

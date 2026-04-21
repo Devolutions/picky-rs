@@ -455,7 +455,7 @@ mod tests {
     }
 
     fn stable_rand() -> impl rand_core::CryptoRng {
-        use rand::SeedableRng;
+        use rand_core::SeedableRng as _;
         rand_chacha::ChaChaRng::seed_from_u64(42)
     }
 

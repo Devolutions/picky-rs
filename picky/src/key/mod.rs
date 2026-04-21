@@ -5,6 +5,7 @@ pub(crate) mod ed;
 use crate::oid::ObjectIdentifier;
 use crate::pem::{Pem, PemError, parse_pem};
 use crypto_bigint::{BoxedUint, NonZero};
+use crypto_common::Generate as _;
 use picky_asn1::bit_string::BitString;
 use picky_asn1::wrapper::{BitStringAsn1Container, IntegerAsn1, OctetStringAsn1Container};
 use picky_asn1_der::Asn1DerError;
@@ -12,7 +13,7 @@ use picky_asn1_x509::{
     ECPrivateKey, PRIVATE_KEY_INFO_VERSION_1, PrivateKeyInfo, PrivateKeyValue, SubjectPublicKeyInfo, private_key_info,
 };
 use rand::rngs::{StdRng, SysRng};
-use rand_core::SeedableRng;
+use rand_core::SeedableRng as _;
 use rsa::traits::{PrivateKeyParts as _, PublicKeyParts as _};
 use rsa::{RsaPrivateKey, RsaPublicKey};
 use thiserror::Error;
@@ -267,15 +268,6 @@ impl PrivateKey {
         point_x: &BoxedUint,
         point_y: &BoxedUint,
     ) -> Result<Self, KeyError> {
-        use p256::EncodedPoint as EncodedPointP256;
-        use p256::elliptic_curve::array::Array as GenericArrayP256;
-
-        use p384::EncodedPoint as EncodedPointP384;
-        use p384::elliptic_curve::array::Array as GenericArrayP384;
-
-        use p521::EncodedPoint as EncodedPointP521;
-        use p521::elliptic_curve::array::Array as GenericArrayP521;
-
         let curve_oid: ObjectIdentifier = NamedEcCurve::Known(curve).into();
         let px_bytes = point_x.to_be_bytes_trimmed_vartime().into_vec();
         let py_bytes = point_y.to_be_bytes_trimmed_vartime().into_vec();
@@ -285,57 +277,57 @@ impl PrivateKey {
 
         let point_bytes = match curve {
             EcCurve::NistP256 => {
-                let x = GenericArrayP256::try_from(px_validated).map_err(|_| KeyError::EC {
+                let x = p256::elliptic_curve::array::Array::try_from(px_validated).map_err(|_| KeyError::EC {
                     context: format!(
                         "validated PX slice is not right length(expected: {}, actual: {})",
                         curve.field_bytes_size(),
                         px_validated.len(),
                     ),
                 })?;
-                let y = GenericArrayP256::try_from(py_validated).map_err(|_| KeyError::EC {
+                let y = p256::elliptic_curve::array::Array::try_from(py_validated).map_err(|_| KeyError::EC {
                     context: format!(
                         "validated PY slice is not right length(expected: {}, actual: {})",
                         curve.field_bytes_size(),
                         py_validated.len(),
                     ),
                 })?;
-                let point = EncodedPointP256::from_affine_coordinates(&x, &y, COMPRESS_EC_POINT_BY_DEFAULT);
+                let point = p256::Sec1Point::from_affine_coordinates(&x, &y, COMPRESS_EC_POINT_BY_DEFAULT);
                 point.as_bytes().to_vec()
             }
             EcCurve::NistP384 => {
-                let x = GenericArrayP384::try_from(px_validated).map_err(|_| KeyError::EC {
+                let x = p384::elliptic_curve::array::Array::try_from(px_validated).map_err(|_| KeyError::EC {
                     context: format!(
                         "validated PX slice is not right length(expected: {}, actual: {})",
                         curve.field_bytes_size(),
                         px_validated.len(),
                     ),
                 })?;
-                let y = GenericArrayP384::try_from(py_validated).map_err(|_| KeyError::EC {
+                let y = p384::elliptic_curve::array::Array::try_from(py_validated).map_err(|_| KeyError::EC {
                     context: format!(
                         "validated PY slice is not right length(expected: {}, actual: {})",
                         curve.field_bytes_size(),
                         py_validated.len(),
                     ),
                 })?;
-                let point = EncodedPointP384::from_affine_coordinates(&x, &y, COMPRESS_EC_POINT_BY_DEFAULT);
+                let point = p384::Sec1Point::from_affine_coordinates(&x, &y, COMPRESS_EC_POINT_BY_DEFAULT);
                 point.as_bytes().to_vec()
             }
             EcCurve::NistP521 => {
-                let x = GenericArrayP521::try_from(px_validated).map_err(|_| KeyError::EC {
+                let x = p521::elliptic_curve::array::Array::try_from(px_validated).map_err(|_| KeyError::EC {
                     context: format!(
                         "validated PX slice is not right length(expected: {}, actual: {})",
                         curve.field_bytes_size(),
                         px_validated.len(),
                     ),
                 })?;
-                let y = GenericArrayP521::try_from(py_validated).map_err(|_| KeyError::EC {
+                let y = p521::elliptic_curve::array::Array::try_from(py_validated).map_err(|_| KeyError::EC {
                     context: format!(
                         "validated PY slice is not right length(expected: {}, actual: {})",
                         curve.field_bytes_size(),
                         py_validated.len(),
                     ),
                 })?;
-                let point = EncodedPointP521::from_affine_coordinates(&x, &y, COMPRESS_EC_POINT_BY_DEFAULT);
+                let point = p521::Sec1Point::from_affine_coordinates(&x, &y, COMPRESS_EC_POINT_BY_DEFAULT);
                 point.to_bytes().into_vec()
             }
         };
@@ -701,46 +693,37 @@ impl PrivateKey {
 
         let (secret, point) = match curve {
             EcCurve::NistP256 => {
-                use p256::elliptic_curve::sec1::ToEncodedPoint;
+                use p256::elliptic_curve::sec1::ToSec1Point;
 
-                let key = match p256::SecretKey::try_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?) {
-                    Ok(key) => key,
-                    Err(e) => match e {},
-                };
+                let key = p256::SecretKey::generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
                 let secret = key.to_bytes().to_vec();
                 let point = key
                     .public_key()
-                    .to_encoded_point(COMPRESS_EC_POINT_BY_DEFAULT)
+                    .to_sec1_point(COMPRESS_EC_POINT_BY_DEFAULT)
                     .as_bytes()
                     .to_vec();
                 (secret, point)
             }
             EcCurve::NistP384 => {
-                use p384::elliptic_curve::sec1::ToEncodedPoint;
+                use p384::elliptic_curve::sec1::ToSec1Point;
 
-                let key = match p384::SecretKey::try_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?) {
-                    Ok(key) => key,
-                    Err(e) => match e {},
-                };
+                let key = p384::SecretKey::generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
                 let secret = key.to_bytes().to_vec();
                 let point = key
                     .public_key()
-                    .to_encoded_point(COMPRESS_EC_POINT_BY_DEFAULT)
+                    .to_sec1_point(COMPRESS_EC_POINT_BY_DEFAULT)
                     .as_bytes()
                     .to_vec();
                 (secret, point)
             }
             EcCurve::NistP521 => {
-                use p521::elliptic_curve::sec1::ToEncodedPoint;
+                use p521::elliptic_curve::sec1::ToSec1Point;
 
-                let key = match p521::SecretKey::try_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?) {
-                    Ok(key) => key,
-                    Err(e) => match e {},
-                };
+                let key = p521::SecretKey::generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
                 let secret = key.to_bytes().to_vec();
                 let point = key
                     .public_key()
-                    .to_encoded_point(COMPRESS_EC_POINT_BY_DEFAULT)
+                    .to_sec1_point(COMPRESS_EC_POINT_BY_DEFAULT)
                     .as_bytes()
                     .to_vec();
                 (secret, point)
@@ -931,17 +914,15 @@ impl PublicKey {
 
         match curve {
             EcCurve::NistP256 => {
-                use p256::elliptic_curve::array::Array as GenericArrayP256;
-
-                let p = p256::EncodedPoint::from_affine_coordinates(
-                    &GenericArrayP256::try_from(px_validated).map_err(|_| KeyError::EC {
+                let p = p256::Sec1Point::from_affine_coordinates(
+                    &p256::elliptic_curve::array::Array::try_from(px_validated).map_err(|_| KeyError::EC {
                         context: format!(
                             "validated PX slice is not right length(expected: {}, actual: {})",
                             curve.field_bytes_size(),
                             px_validated.len(),
                         ),
                     })?,
-                    &GenericArrayP256::try_from(py_validated).map_err(|_| KeyError::EC {
+                    &p256::elliptic_curve::array::Array::try_from(py_validated).map_err(|_| KeyError::EC {
                         context: format!(
                             "validated PY slice is not right length(expected: {}, actual: {})",
                             curve.field_bytes_size(),
@@ -957,17 +938,15 @@ impl PublicKey {
                 ))
             }
             EcCurve::NistP384 => {
-                use p256::elliptic_curve::array::Array as GenericArrayP384;
-
-                let p = p384::EncodedPoint::from_affine_coordinates(
-                    &GenericArrayP384::try_from(px_validated).map_err(|_| KeyError::EC {
+                let p = p384::Sec1Point::from_affine_coordinates(
+                    &p384::elliptic_curve::array::Array::try_from(px_validated).map_err(|_| KeyError::EC {
                         context: format!(
                             "validated PX slice is not right length(expected: {}, actual: {})",
                             curve.field_bytes_size(),
                             px_validated.len(),
                         ),
                     })?,
-                    &GenericArrayP384::try_from(py_validated).map_err(|_| KeyError::EC {
+                    &p384::elliptic_curve::array::Array::try_from(py_validated).map_err(|_| KeyError::EC {
                         context: format!(
                             "validated PY slice is not right length(expected: {}, actual: {})",
                             curve.field_bytes_size(),
@@ -983,17 +962,15 @@ impl PublicKey {
                 ))
             }
             EcCurve::NistP521 => {
-                use p521::elliptic_curve::array::Array as GenericArrayP521;
-
-                let p = p521::EncodedPoint::from_affine_coordinates(
-                    &GenericArrayP521::try_from(px_validated).map_err(|_| KeyError::EC {
+                let p = p521::Sec1Point::from_affine_coordinates(
+                    &p521::elliptic_curve::array::Array::try_from(px_validated).map_err(|_| KeyError::EC {
                         context: format!(
                             "validated PX slice is not right length(expected: {}, actual: {})",
                             curve.field_bytes_size(),
                             px_validated.len(),
                         ),
                     })?,
-                    &GenericArrayP521::try_from(py_validated).map_err(|_| KeyError::EC {
+                    &p521::elliptic_curve::array::Array::try_from(py_validated).map_err(|_| KeyError::EC {
                         context: format!(
                             "validated PY slice is not right length(expected: {}, actual: {})",
                             curve.field_bytes_size(),

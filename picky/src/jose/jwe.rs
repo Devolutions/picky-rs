@@ -13,9 +13,9 @@ use aes_gcm::{AeadInOut, Aes128Gcm, Aes256Gcm, KeyInit, KeySizeUser};
 use aes_kw::AesKw;
 use base64::engine::general_purpose;
 use base64::{DecodeError, Engine as _};
-use rand::RngCore;
+use crypto_common::Generate as _;
 use rand::rngs::{StdRng, SysRng};
-use rand_core::SeedableRng;
+use rand_core::{Rng as _, SeedableRng as _};
 use rsa::{Oaep, Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -1073,10 +1073,7 @@ fn generate_ecdh_shared_secret(
                     })?;
 
                     let secret =
-                        match p256::ecdh::EphemeralSecret::try_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?) {
-                            Ok(secret) => secret,
-                            Err(e) => match e {},
-                        };
+                        p256::ecdh::EphemeralSecret::generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
 
                     let shared_secret = Zeroizing::new(secret.diffie_hellman(&public_key).raw_secret_bytes().to_vec());
                     let epk = PublicKey::from_ec_encoded_components(
@@ -1095,10 +1092,7 @@ fn generate_ecdh_shared_secret(
                     })?;
 
                     let secret =
-                        match p384::ecdh::EphemeralSecret::try_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?) {
-                            Ok(secret) => secret,
-                            Err(e) => match e {},
-                        };
+                        p384::ecdh::EphemeralSecret::generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
 
                     let shared_secret = Zeroizing::new(secret.diffie_hellman(&public_key).raw_secret_bytes().to_vec());
                     let epk = PublicKey::from_ec_encoded_components(
@@ -1117,10 +1111,7 @@ fn generate_ecdh_shared_secret(
                     })?;
 
                     let secret =
-                        match p521::ecdh::EphemeralSecret::try_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?) {
-                            Ok(secret) => secret,
-                            Err(e) => match e {},
-                        };
+                        p521::ecdh::EphemeralSecret::generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
 
                     let shared_secret = Zeroizing::new(secret.diffie_hellman(&public_key).raw_secret_bytes().to_vec());
                     let epk = PublicKey::from_ec_encoded_components(

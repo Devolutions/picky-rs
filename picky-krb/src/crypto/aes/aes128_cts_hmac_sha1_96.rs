@@ -1,5 +1,5 @@
 use rand::rngs::{StdRng, SysRng};
-use rand::{RngCore, SeedableRng};
+use rand_core::{Rng as _, SeedableRng as _};
 
 use crate::crypto::common::hmac_sha1;
 use crate::crypto::utils::usage_ki;

@@ -366,14 +366,13 @@ impl SignatureAlgorithm {
                             }
                         };
 
-                        let encoded_point =
-                            p256::EncodedPoint::from_bytes(ec_pub_key.encoded_point()).map_err(|e| {
-                                SignatureError::Ec {
-                                    context: format!("Cannot parse p256 public key from der bytes: {e}"),
-                                }
-                            })?;
+                        let encoded_point = p256::Sec1Point::from_bytes(ec_pub_key.encoded_point()).map_err(|e| {
+                            SignatureError::Ec {
+                                context: format!("Cannot parse p256 public key from der bytes: {e}"),
+                            }
+                        })?;
 
-                        let vkey = p256::ecdsa::VerifyingKey::from_encoded_point(&encoded_point).map_err(|e| {
+                        let vkey = p256::ecdsa::VerifyingKey::from_sec1_point(&encoded_point).map_err(|e| {
                             SignatureError::Ec {
                                 context: format!("Cannot parse p256 encoded point: {e}"),
                             }
@@ -397,14 +396,13 @@ impl SignatureAlgorithm {
                             }
                         };
 
-                        let encoded_point =
-                            p384::EncodedPoint::from_bytes(ec_pub_key.encoded_point()).map_err(|e| {
-                                SignatureError::Ec {
-                                    context: format!("Cannot parse p384 public key from der bytes: {e}"),
-                                }
-                            })?;
+                        let encoded_point = p384::Sec1Point::from_bytes(ec_pub_key.encoded_point()).map_err(|e| {
+                            SignatureError::Ec {
+                                context: format!("Cannot parse p384 public key from der bytes: {e}"),
+                            }
+                        })?;
 
-                        let vkey = p384::ecdsa::VerifyingKey::from_encoded_point(&encoded_point).map_err(|e| {
+                        let vkey = p384::ecdsa::VerifyingKey::from_sec1_point(&encoded_point).map_err(|e| {
                             SignatureError::Ec {
                                 context: format!("Cannot parse p384 encoded point: {e}"),
                             }
@@ -428,14 +426,13 @@ impl SignatureAlgorithm {
                             }
                         };
 
-                        let encoded_point =
-                            p521::EncodedPoint::from_bytes(ec_pub_key.encoded_point()).map_err(|e| {
-                                SignatureError::Ec {
-                                    context: format!("Cannot parse p521 public key from der bytes: {e}"),
-                                }
-                            })?;
+                        let encoded_point = p521::Sec1Point::from_bytes(ec_pub_key.encoded_point()).map_err(|e| {
+                            SignatureError::Ec {
+                                context: format!("Cannot parse p521 public key from der bytes: {e}"),
+                            }
+                        })?;
 
-                        let vkey = p521::ecdsa::VerifyingKey::from_encoded_point(&encoded_point).map_err(|e| {
+                        let vkey = p521::ecdsa::VerifyingKey::from_sec1_point(&encoded_point).map_err(|e| {
                             SignatureError::Ec {
                                 context: format!("Cannot parse p521 encoded point: {e}"),
                             }
@@ -601,19 +598,19 @@ csaQwO9jFvbQFIpCvcMRjaunLfhIWiYDdg==
 
         let (privk, pubk) = match hash {
             HashAlgorithm::SHA2_256 => {
-                use p256::EncodedPoint;
+                use p256::Sec1Point;
                 let k = p256::SecretKey::from_sec1_pem(key_pem).unwrap();
                 (
                     k.to_bytes().as_slice().to_vec(),
-                    Into::<EncodedPoint>::into(k.public_key()).as_bytes().to_vec(),
+                    Into::<Sec1Point>::into(k.public_key()).as_bytes().to_vec(),
                 )
             }
             HashAlgorithm::SHA2_384 => {
-                use p384::EncodedPoint;
+                use p384::Sec1Point;
                 let k = p384::SecretKey::from_sec1_pem(key_pem).unwrap();
                 (
                     k.to_bytes().as_slice().to_vec(),
-                    Into::<EncodedPoint>::into(k.public_key()).as_bytes().to_vec(),
+                    Into::<Sec1Point>::into(k.public_key()).as_bytes().to_vec(),
                 )
             }
             _ => panic!("no this condition"),

@@ -9,7 +9,7 @@ use picky_asn1_x509::pkcs12::{
     Pbkdf2SaltSource as Pbkdf2SaltSourceAsn1, Pkcs12EncryptionAlgorithm as Pkcs12EncryptionAsn1,
 };
 use rand::rngs::{StdRng, SysRng};
-use rand_core::SeedableRng;
+use rand_core::SeedableRng as _;
 use std::str::FromStr as _;
 
 /// Same default KDF iterations as in OpenSSL
@@ -21,7 +21,7 @@ const AES_BLOCK_SIZE: usize = 16;
 /// string and RNG.
 pub struct Pkcs12CryptoContext {
     password: zeroize::Zeroizing<String>,
-    rng: Box<dyn rand::RngCore>,
+    rng: Box<dyn rand_core::Rng>,
 }
 
 impl Pkcs12CryptoContext {
