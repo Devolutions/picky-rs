@@ -5,6 +5,7 @@ pub(crate) mod ed;
 use crate::oid::ObjectIdentifier;
 use crate::pem::{Pem, PemError, parse_pem};
 use crypto_bigint::{BoxedUint, NonZero};
+use crypto_common::Generate as _;
 use picky_asn1::bit_string::BitString;
 use picky_asn1::wrapper::{BitStringAsn1Container, IntegerAsn1, OctetStringAsn1Container};
 use picky_asn1_der::Asn1DerError;
@@ -703,10 +704,7 @@ impl PrivateKey {
             EcCurve::NistP256 => {
                 use p256::elliptic_curve::sec1::ToSec1Point;
 
-                let key = match p256::SecretKey::try_generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?) {
-                    Ok(key) => key,
-                    Err(e) => match e {},
-                };
+                let key = p256::SecretKey::generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
                 let secret = key.to_bytes().to_vec();
                 let point = key
                     .public_key()
@@ -718,10 +716,7 @@ impl PrivateKey {
             EcCurve::NistP384 => {
                 use p384::elliptic_curve::sec1::ToSec1Point;
 
-                let key = match p384::SecretKey::try_generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?) {
-                    Ok(key) => key,
-                    Err(e) => match e {},
-                };
+                let key = p384::SecretKey::generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
                 let secret = key.to_bytes().to_vec();
                 let point = key
                     .public_key()
@@ -733,10 +728,7 @@ impl PrivateKey {
             EcCurve::NistP521 => {
                 use p521::elliptic_curve::sec1::ToSec1Point;
 
-                let key = match p521::SecretKey::try_generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?) {
-                    Ok(key) => key,
-                    Err(e) => match e {},
-                };
+                let key = p521::SecretKey::generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
                 let secret = key.to_bytes().to_vec();
                 let point = key
                     .public_key()
