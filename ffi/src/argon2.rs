@@ -77,7 +77,7 @@ pub mod ffi {
             use argon2::PasswordHasher as _;
             use argon2::password_hash::phc::Salt;
             use rand::rngs::{StdRng, SysRng};
-            use rand_core::SeedableRng;
+            use rand_core::SeedableRng as _;
             use std::fmt::Write as _;
 
             let mut rng =

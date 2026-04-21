@@ -39,7 +39,3 @@ getrandom = { version = "0.3", features = ["wasm_js"] }
 # Pin transitive dependencies versions.
 # TODO: Remove when stable versions will be released.
 blake2 = "=0.11.0-rc.6"
-digest = "0.11"
-crypto-common = "0.2"
-block-buffer = "0.11"
-password-hash = "0.6"

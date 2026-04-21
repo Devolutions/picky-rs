@@ -153,15 +153,6 @@ dependencies = [
 
 [[package]]
 name = "block-buffer"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96eb4cdd6cf1b31d671e9efe75c5d1ec614776856cefbe109ca373554a6d514f"
-dependencies = [
- "hybrid-array",
-]
-
-[[package]]
-name = "block-buffer"
 version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cdd35008169921d80bc60d3d0ab416eecb028c4cd653352907921d95084790be"
@@ -271,7 +262,7 @@ version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e34d8227fe1ba289043aeb13792056ff80fd6de1a9f49137a5f499de8e8c78ea"
 dependencies = [
- "block-buffer 0.12.0",
+ "block-buffer",
  "crypto-common",
  "inout",
 ]
@@ -453,7 +444,7 @@ version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4850db49bf08e663084f7fb5c87d202ef91a3907271aff24a94eb97ff039153c"
 dependencies = [
- "block-buffer 0.12.0",
+ "block-buffer",
  "const-oid",
  "crypto-common",
  "ctutils",
@@ -1356,21 +1347,15 @@ dependencies = [
  "base64",
  "bcrypt-pbkdf",
  "blake2",
- "block-buffer 0.11.0",
- "block-padding",
- "blowfish",
  "byteorder",
  "cab",
  "cbc",
  "cfg-if",
  "chrono",
- "cipher",
  "crypto-bigint",
  "crypto-common",
- "crypto-primes",
  "ctr",
  "curve25519-dalek",
- "der",
  "des",
  "digest",
  "ecdsa",
@@ -1379,20 +1364,16 @@ dependencies = [
  "elliptic-curve",
  "expect-test",
  "ff",
- "ghash",
  "group",
  "hex",
- "hkdf",
  "hmac",
  "http",
  "inout",
- "keccak",
  "lexical-sort",
  "md-5",
  "p256",
  "p384",
  "p521",
- "password-hash",
  "pbkdf2",
  "picky-asn1",
  "picky-asn1-der",
@@ -1400,7 +1381,6 @@ dependencies = [
  "picky-test-data",
  "pkcs1",
  "pkcs8",
- "polyval",
  "pretty_assertions",
  "primefield",
  "primeorder",
@@ -1413,18 +1393,15 @@ dependencies = [
  "ring",
  "rsa",
  "rstest",
- "sec1",
  "serde",
  "serde_json",
  "sha1",
  "sha2",
  "sha3",
  "signature",
- "spki",
  "tempfile",
  "thiserror",
  "time",
- "universal-hash",
  "x25519-dalek",
  "zeroize",
 ]
@@ -1479,15 +1456,11 @@ version = "0.0.0"
 dependencies = [
  "argon2",
  "blake2",
- "block-buffer 0.11.0",
- "crypto-common",
- "digest",
  "diplomat",
  "diplomat-runtime",
  "embed-resource",
  "getrandom 0.3.4",
  "hex",
- "password-hash",
  "picky",
  "picky-asn1",
  "picky-asn1-der",
@@ -1503,15 +1476,12 @@ name = "picky-krb"
 version = "0.12.2"
 dependencies = [
  "aes",
- "block-buffer 0.11.0",
  "block-padding",
  "byteorder",
  "cbc",
  "cipher",
  "crypto-bigint",
- "crypto-common",
  "des",
- "digest",
  "hmac",
  "inout",
  "oid",

@@ -15,7 +15,7 @@ use base64::engine::general_purpose;
 use base64::{DecodeError, Engine as _};
 use crypto_common::Generate as _;
 use rand::rngs::{StdRng, SysRng};
-use rand_core::{Rng as _, SeedableRng};
+use rand_core::{Rng as _, SeedableRng as _};
 use rsa::{Oaep, Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;

@@ -25,6 +25,8 @@ hmac = "0.13"
 sha1 = "0.11"
 
 aes = "0.9"
+block-padding = "0.4"
+cipher = "0.5"
 des = "0.9"
 cbc = "0.2"
 inout = "0.2"
@@ -34,11 +36,3 @@ rand_core = "0.10"
 uuid = { version = "1.18", default-features = false, features = ["serde"] }
 oid = "0.2"
 crypto-bigint = { version = "0.7", features = ["alloc"] }
-
-# Pin transitive dependencies versions.
-# TODO: Remove when stable versions will be released.
-block-padding = "0.4"
-cipher = "0.5"
-block-buffer = "0.11"
-crypto-common = "0.2"
-digest = "0.11"

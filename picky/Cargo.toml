@@ -81,33 +81,19 @@ inout = "0.2.2"
 # TODO: Remove when stable versions will be released.
 aead = { version = "=0.6.0-rc.10", optional = true }
 blake2 = { version = "=0.11.0-rc.6", optional = true }
-block-padding = "0.4"
-block-buffer = "0.11"
-blowfish = { version = "0.10", optional = true }
-cipher = { version = "0.5", optional = true }
 crypto-common = "0.2"
-ghash = { version = "0.6", optional = true }
-polyval = { version = "0.7", optional = true }
-universal-hash = { version = "0.6", optional = true }
-password-hash = { version = "0.6", optional = true }
 ed25519 = "=3.0.0-rc.4"
 signature = "=3.0.0-rc.10"
 ecdsa = "=0.17.0-rc.17"
-der = "0.8"
 elliptic-curve = "=0.14.0-rc.31"
-hkdf = "0.13"
 pkcs8 = "=0.11.0-rc.11"
-spki = "0.8"
-sec1 = "0.8"
 rfc6979 = "=0.5.0-rc.5"
 pkcs1 = "=0.8.0-rc.4"
-keccak = "0.2"
 primefield = "=0.14.0-rc.9"
 primeorder = "=0.14.0-rc.9"
 ff = { version = "=0.14.0-pre.0", default-features = false }
 group = "=0.14.0-pre.0"
 curve25519-dalek = "=5.0.0-pre.6"
-crypto-primes = "0.7"
 
 [dev-dependencies]
 pretty_assertions = "1.4"
@@ -126,13 +112,10 @@ default = ["x509", "jose", "http_signature", "http_trait_impl", "pkcs12"]
 x509 = []
 jose = ["dep:serde_json", "dep:aes-gcm", "dep:cbc", "dep:aes-kw",
 # Transitive dependencies
-    "dep:aead", "dep:aes", "dep:cipher", "dep:ctr", "dep:ghash", "dep:polyval", "dep:universal-hash"
+    "dep:aead", "dep:aes", "dep:ctr"
 ]
 http_signature = []
-pkcs12 = ["picky-asn1-x509/pkcs12", "dep:des", "dep:rc2", "dep:cbc", "dep:pbkdf2", "dep:hmac", "dep:aes", "x509",
-# Transitive dependencies
-    "dep:cipher"
-]
+pkcs12 = ["picky-asn1-x509/pkcs12", "dep:des", "dep:rc2", "dep:cbc", "dep:pbkdf2", "dep:hmac", "dep:aes", "x509"]
 
 # secondary features
 pkcs7 = ["x509", "picky-asn1-x509/pkcs7"]
@@ -142,14 +125,14 @@ ctl_http_fetch = ["dep:reqwest", "dep:cab", "ctl"]
 wincert = ["x509", "dep:byteorder"]
 ssh = ["dep:byteorder", "dep:aes", "dep:ctr", "dep:cbc", "dep:bcrypt-pbkdf", "dep:lexical-sort",
 # Transitive dependencies
-    "dep:cipher", "dep:blowfish", "dep:pbkdf2", "dep:hmac"
+    "dep:pbkdf2", "dep:hmac"
 ]
 http_trait_impl = ["dep:http"]
 chrono_conversion = ["dep:chrono", "picky-asn1/chrono_conversion"]
 time_conversion = ["dep:time", "picky-asn1/time_conversion"]
 putty = ["dep:argon2", "dep:hmac", "ssh",
 # Transitive dependencies
-    "dep:blake2", "dep:password-hash"
+    "dep:blake2"
 ]
 
 [package.metadata.docs.rs]

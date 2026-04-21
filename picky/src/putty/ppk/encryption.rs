@@ -6,7 +6,7 @@ use crate::putty::ppk::kdf::{self, KeyMaterialV2};
 use crate::putty::ppk::{Argon2Params, Ppk, aes as ppk_aes};
 use crate::ssh::decode::SshReadExt;
 use rand::rngs::{StdRng, SysRng};
-use rand_core::SeedableRng;
+use rand_core::SeedableRng as _;
 
 /// PPK encryption configuration builder.
 ///
