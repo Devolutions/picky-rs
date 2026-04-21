@@ -1,5 +1,5 @@
 use cbc::cipher::Array;
-use hmac::digest::crypto_common::KeySizeUser;
+use cipher::KeySizeUser;
 use hmac::{Hmac, KeyInit, Mac};
 use sha1::Sha1;
 

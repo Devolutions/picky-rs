@@ -8,7 +8,7 @@ use aes::cipher::block_padding::NoPadding;
 use aes::cipher::{KeyIvInit, StreamCipher};
 use byteorder::{BigEndian, ReadBytesExt};
 use cbc::cipher::BlockModeDecrypt;
-use rand::Rng;
+use rand::RngExt;
 use std::io::{Cursor, Read};
 use std::string;
 use thiserror::Error;

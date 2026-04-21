@@ -13,7 +13,7 @@ use aes_gcm::{AeadInOut, Aes128Gcm, Aes256Gcm, KeyInit, KeySizeUser};
 use aes_kw::AesKw;
 use base64::engine::general_purpose;
 use base64::{DecodeError, Engine as _};
-use rand::RngCore;
+use rand::Rng as _;
 use rand::rngs::{StdRng, SysRng};
 use rand_core::SeedableRng;
 use rsa::{Oaep, Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
@@ -1073,7 +1073,7 @@ fn generate_ecdh_shared_secret(
                     })?;
 
                     let secret =
-                        match p256::ecdh::EphemeralSecret::try_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?) {
+                        match p256::ecdh::EphemeralSecret::try_generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?) {
                             Ok(secret) => secret,
                             Err(e) => match e {},
                         };
@@ -1095,7 +1095,7 @@ fn generate_ecdh_shared_secret(
                     })?;
 
                     let secret =
-                        match p384::ecdh::EphemeralSecret::try_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?) {
+                        match p384::ecdh::EphemeralSecret::try_generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?) {
                             Ok(secret) => secret,
                             Err(e) => match e {},
                         };
@@ -1117,7 +1117,7 @@ fn generate_ecdh_shared_secret(
                     })?;
 
                     let secret =
-                        match p521::ecdh::EphemeralSecret::try_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?) {
+                        match p521::ecdh::EphemeralSecret::try_generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?) {
                             Ok(secret) => secret,
                             Err(e) => match e {},
                         };

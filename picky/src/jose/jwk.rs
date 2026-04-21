@@ -332,7 +332,7 @@ impl Jwk {
 
                 match ec_key.curve() {
                     NamedEcCurve::Known(EcCurve::NistP256) => {
-                        let point = p256::EncodedPoint::from_bytes(ec_key.encoded_point()).map_err(|_| {
+                        let point = p256::Sec1Point::from_bytes(ec_key.encoded_point()).map_err(|_| {
                             JwkError::InvalidEcPublicKey {
                                 cause: "invalid P-256 EC point encoding".to_string(),
                             }
@@ -350,7 +350,7 @@ impl Jwk {
                         }
                     }
                     NamedEcCurve::Known(EcCurve::NistP384) => {
-                        let point = p384::EncodedPoint::from_bytes(ec_key.encoded_point()).map_err(|_| {
+                        let point = p384::Sec1Point::from_bytes(ec_key.encoded_point()).map_err(|_| {
                             JwkError::InvalidEcPublicKey {
                                 cause: "invalid P-384 EC point encoding".to_string(),
                             }
@@ -368,7 +368,7 @@ impl Jwk {
                         }
                     }
                     NamedEcCurve::Known(EcCurve::NistP521) => {
-                        let point = p521::EncodedPoint::from_bytes(ec_key.encoded_point()).map_err(|_| {
+                        let point = p521::Sec1Point::from_bytes(ec_key.encoded_point()).map_err(|_| {
                             JwkError::InvalidEcPublicKey {
                                 cause: "invalid P-521 EC point encoding".to_string(),
                             }

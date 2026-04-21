@@ -21,7 +21,7 @@ const AES_BLOCK_SIZE: usize = 16;
 /// string and RNG.
 pub struct Pkcs12CryptoContext {
     password: zeroize::Zeroizing<String>,
-    rng: Box<dyn rand::RngCore>,
+    rng: Box<dyn rand::Rng>,
 }
 
 impl Pkcs12CryptoContext {

@@ -10,7 +10,7 @@ use crate::ssh::private_key::{SshBasePrivateKey, SshPrivateKey, SshPrivateKeyErr
 use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
 
 use byteorder::{BigEndian, WriteBytesExt};
-use rand::Rng;
+use rand::RngExt;
 use rsa::RsaPublicKey;
 use rsa::traits::PublicKeyParts as _;
 use serde::Deserialize;

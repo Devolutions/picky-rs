@@ -175,7 +175,7 @@ pub(crate) fn calculate_public_ec_key(
         NamedEcCurve::Known(EcCurve::NistP256) => {
             use p256::SecretKey as SecretKeyP256;
             use p256::elliptic_curve::array::Array as GenericArrayP256;
-            use p256::elliptic_curve::sec1::ToEncodedPoint as _;
+            use p256::elliptic_curve::sec1::ToSec1Point as _;
 
             let private_key_validated = EcCurve::NistP256.validate_component(EcComponent::Secret(private_key))?;
 
@@ -191,14 +191,14 @@ pub(crate) fn calculate_public_ec_key(
             })?;
 
             // Calculate public key from secret key
-            let public_key = secret_key.public_key().as_affine().to_encoded_point(compress);
+            let public_key = secret_key.public_key().as_affine().to_sec1_point(compress);
 
             Ok(Some(public_key.to_bytes().to_vec()))
         }
         NamedEcCurve::Known(EcCurve::NistP384) => {
             use p384::SecretKey as SecretKeyP384;
             use p384::elliptic_curve::array::Array as GenericArrayP384;
-            use p384::elliptic_curve::sec1::ToEncodedPoint as _;
+            use p384::elliptic_curve::sec1::ToSec1Point as _;
 
             let private_key_validated = EcCurve::NistP384.validate_component(EcComponent::Secret(private_key))?;
 
@@ -214,14 +214,14 @@ pub(crate) fn calculate_public_ec_key(
             })?;
 
             // Calculate public key from secret key
-            let public_key = secret_key.public_key().as_affine().to_encoded_point(compress);
+            let public_key = secret_key.public_key().as_affine().to_sec1_point(compress);
 
             Ok(Some(public_key.to_bytes().to_vec()))
         }
         NamedEcCurve::Known(EcCurve::NistP521) => {
             use p521::SecretKey as SecretKeyP521;
             use p521::elliptic_curve::array::Array as GenericArrayP521;
-            use p521::elliptic_curve::sec1::ToEncodedPoint as _;
+            use p521::elliptic_curve::sec1::ToSec1Point as _;
 
             let private_key_validated = EcCurve::NistP521.validate_component(EcComponent::Secret(private_key))?;
 
@@ -237,7 +237,7 @@ pub(crate) fn calculate_public_ec_key(
             })?;
 
             // Calculate public key from secret key
-            let public_key = secret_key.public_key().as_affine().to_encoded_point(compress);
+            let public_key = secret_key.public_key().as_affine().to_sec1_point(compress);
 
             Ok(Some(public_key.to_bytes().to_vec()))
         }

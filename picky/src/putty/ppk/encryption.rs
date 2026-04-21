@@ -121,7 +121,7 @@ impl Ppk {
         &self,
         passphrase: &str,
         config: PpkEncryptionConfig,
-        mut rng: impl rand::RngCore,
+        mut rng: impl rand::Rng,
     ) -> Result<Ppk, PuttyError> {
         if self.encryption.is_some() {
             return Err(PuttyError::AlreadyEncrypted);

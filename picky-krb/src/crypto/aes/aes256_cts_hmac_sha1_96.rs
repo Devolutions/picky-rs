@@ -6,7 +6,7 @@ use crate::crypto::{
 };
 use rand::prelude::StdRng;
 use rand::rngs::SysRng;
-use rand::{RngCore, SeedableRng};
+use rand::{Rng, SeedableRng};
 
 use super::decrypt::{decrypt_message, decrypt_message_no_checksum};
 use super::encrypt::{encrypt_message, encrypt_message_no_checksum};
