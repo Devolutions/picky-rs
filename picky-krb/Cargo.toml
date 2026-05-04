@@ -20,7 +20,7 @@ serde = { version = "1", features = ["derive"] }
 byteorder = "1.5"
 thiserror = "2"
 
-pbkdf2 = { version = "=0.13.0-rc.10" }
+pbkdf2 = { version = "=0.13.0" }
 hmac = "0.13"
 sha1 = "0.11"
 
