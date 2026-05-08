@@ -81,7 +81,6 @@ inout = "0.2.2"
 # TODO: Remove when stable versions will be released.
 aead = { version = "=0.6.0-rc.10", optional = true }
 blake2 = { version = "=0.11.0-rc.6", optional = true }
-crypto-common = "0.2"
 ed25519 = "=3.0.0-rc.4"
 ecdsa = "=0.17.0-rc.17"
 elliptic-curve = "=0.14.0-rc.31"
