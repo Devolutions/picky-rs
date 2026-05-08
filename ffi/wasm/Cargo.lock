@@ -848,9 +848,9 @@ dependencies = [
 
 [[package]]
 name = "pbkdf2"
-version = "0.13.0-rc.10"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f24f3eb2f4471b1730d59e4b730b747939960a8c7eb0c33c5a9076f2d3dddea"
+checksum = "112d82ceb8c5bf524d9af484d4e4970c9fd5a0cc15ba14ad93dccd28873b0629"
 dependencies = [
  "digest",
  "hmac",
@@ -903,7 +903,6 @@ dependencies = [
  "byteorder",
  "cbc",
  "crypto-bigint",
- "crypto-common",
  "ctr",
  "curve25519-dalek",
  "digest",
@@ -926,12 +925,10 @@ dependencies = [
  "picky-asn1-der",
  "picky-asn1-x509",
  "pkcs1",
- "pkcs8",
  "primefield",
  "primeorder",
  "rand",
  "rand_core 0.10.1",
- "rfc6979",
  "rsa",
  "rustcrypto-ff",
  "rustcrypto-ff_derive",
@@ -941,7 +938,6 @@ dependencies = [
  "sha1",
  "sha2",
  "sha3",
- "signature",
  "thiserror",
  "x25519-dalek",
  "zeroize",
