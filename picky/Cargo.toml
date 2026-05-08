@@ -56,7 +56,7 @@ p256 = { version = "=0.14.0-rc.9", features = ["ecdh"] }
 p384 = { version = "=0.14.0-rc.9", features = ["ecdh"] }
 p521 = { version = "=0.14.0-rc.9", features = ["ecdh"] }
 
-rsa = { version = "=0.10.0-rc.17", features = ["std"] }
+rsa = { version = "=0.10.0-rc.18", features = ["std"] }
 
 digest = "0.11"
 md5 = { package = "md-5", version = "0.11", features = ["oid"] }
@@ -73,21 +73,18 @@ cbc = { version = "0.2", optional = true, features = ["alloc"] }
 bcrypt-pbkdf = { version = "=0.11.0-rc.6", optional = true }
 des = { version = "0.9", optional = true }
 rc2 = { version = "0.9", optional = true }
-pbkdf2 = { version = "=0.13.0-rc.10", optional = true }
+pbkdf2 = { version = "0.13.0", optional = true }
 hmac = { version = "0.13", optional = true }
+crypto-common = "0.2"
 inout = "0.2.2"
 
 # Pin transitive dependencies versions.
 # TODO: Remove when stable versions will be released.
 aead = { version = "=0.6.0-rc.10", optional = true }
 blake2 = { version = "=0.11.0-rc.6", optional = true }
-crypto-common = "0.2"
 ed25519 = "=3.0.0-rc.4"
-signature = "=3.0.0-rc.10"
 ecdsa = "=0.17.0-rc.17"
 elliptic-curve = "=0.14.0-rc.31"
-pkcs8 = "=0.11.0-rc.11"
-rfc6979 = "=0.5.0-rc.5"
 pkcs1 = "=0.8.0-rc.4"
 primefield = "=0.14.0-rc.9"
 primeorder = "=0.14.0-rc.9"
