@@ -62,7 +62,7 @@ digest = "0.11"
 md5 = { package = "md-5", version = "0.11", features = ["oid"] }
 sha1 = { version = "0.11", features = ["oid"] }
 sha2 = { version = "0.11", features = ["oid"] }
-sha3 = { version = "0.11", features = ["oid"] }
+sha3 = { version = "0.12", features = ["oid"] }
 
 aes-gcm = { version = "=0.11.0-rc.3", optional = true }
 aes = { version = "0.9", optional = true }
@@ -70,7 +70,7 @@ aes-kw = { version = "0.3", optional = true }
 argon2 = { version = "=0.6.0-rc.8", optional = true }
 ctr = { version = "0.10", optional = true }
 cbc = { version = "0.2", optional = true, features = ["alloc"] }
-bcrypt-pbkdf = { version = "=0.11.0-rc.6", optional = true }
+bcrypt-pbkdf = { version = "=0.11.0", optional = true }
 des = { version = "0.9", optional = true }
 rc2 = { version = "0.9", optional = true }
 pbkdf2 = { version = "0.13.0", optional = true }
