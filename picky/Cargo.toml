@@ -62,7 +62,7 @@ digest = "0.11"
 md5 = { package = "md-5", version = "0.11", features = ["oid"] }
 sha1 = { version = "0.11", features = ["oid"] }
 sha2 = { version = "0.11", features = ["oid"] }
-sha3 = { version = "0.11", features = ["oid"] }
+sha3 = { version = "0.12", features = ["oid"] }
 
 aes-gcm = { version = "=0.11.0-rc.4", optional = true }
 aes = { version = "0.9", optional = true }
