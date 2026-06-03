@@ -49,7 +49,7 @@ rand = "0.10"
 rand_core = "0.10"
 crypto-bigint = "0.7"
 
-ed25519-dalek = { version = "=3.0.0-pre.6", features = ["hazmat", "rand_core"] }
+ed25519-dalek = { version = "=3.0.0-pre.7", features = ["hazmat", "rand_core"] }
 x25519-dalek = { version = "=3.0.0-pre.6", features = ["static_secrets"] }
 
 p256 = { version = "=0.14.0-rc.9", features = ["ecdh"] }
@@ -83,7 +83,7 @@ inout = "0.2.2"
 aead = { version = "=0.6.0-rc.10", optional = true }
 blake2 = { version = "=0.11.0-rc.6", optional = true }
 ed25519 = "=3.0.0"
-ecdsa = "=0.17.0-rc.17"
+ecdsa = "=0.17.0-rc.18"
 elliptic-curve = "=0.14.0-rc.32"
 pkcs1 = "=0.8.0-rc.4"
 primefield = "=0.14.0-rc.9"

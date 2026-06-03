@@ -33,6 +33,6 @@ inout = "0.2"
 rand = "0.10"
 rand_core = "0.10"
 
-uuid = { version = "1.18", default-features = false, features = ["serde"] }
+uuid = { version = "1.23", default-features = false, features = ["serde"] }
 oid = "0.2"
 crypto-bigint = { version = "0.7", features = ["alloc"] }
