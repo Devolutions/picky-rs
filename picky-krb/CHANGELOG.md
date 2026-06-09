@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[0.12.4](https://github.com/Devolutions/picky-rs/compare/picky-krb-v0.12.3...picky-krb-v0.12.4)] - 2026-06-09
+
+### <!-- 7 -->Build
+
+- Bump the patch group across 2 directories with 8 updates ([#486](https://github.com/Devolutions/picky-rs/issues/486)) ([cea4919f7b](https://github.com/Devolutions/picky-rs/commit/cea4919f7b4ae5bddceb38ae07ad03b8b5882143)) 
+
+
+
 ## [[0.12.3](https://github.com/Devolutions/picky-rs/compare/picky-krb-v0.12.2...picky-krb-v0.12.3)] - 2026-04-21
 
 ### <!-- 7 -->Build
