@@ -111,7 +111,7 @@ default = ["x509", "jose", "http_signature", "http_trait_impl", "pkcs12"]
 x509 = []
 jose = ["dep:serde_json", "dep:aes-gcm", "dep:cbc", "dep:aes-kw",
 # Transitive dependencies
-    "dep:aead", "dep:aes", "dep:ctr"
+   "dep:aes", "dep:ctr"
 ]
 http_signature = []
 pkcs12 = ["picky-asn1-x509/pkcs12", "dep:des", "dep:rc2", "dep:cbc", "dep:pbkdf2", "dep:hmac", "dep:aes", "x509"]
