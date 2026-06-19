@@ -74,7 +74,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ win, osx, linux, ios, android ]
+        os: [ win, osx, linux, ios, iossimulator, android ]
         arch: [ x86, x64, arm, arm64 ]
         include:
           - os: win
@@ -84,6 +84,8 @@ jobs:
           - os: linux
             runner: ubuntu-22.04
           - os: ios
+            runner: macos-14
+          - os: iossimulator
             runner: macos-14
           - os: android
             runner: ubuntu-22.04
@@ -96,6 +98,8 @@ jobs:
             os: linux
           - arch: arm
             os: ios
+          - arch: arm
+            os: iossimulator
           - arch: x86
             os: win
           - arch: x86
@@ -104,6 +108,12 @@ jobs:
             os: linux
           - arch: x86
             os: ios
+          - arch: x86
+            os: iossimulator
+          - arch: x64
+            os: ios
+          - arch: x64
+            os: iossimulator
 
     steps:
       - name: Checkout ${{ github.repository }}
@@ -119,7 +129,7 @@ jobs:
         run: |
           if ('${{ matrix.os }}' -Eq 'osx') {
             echo "MACOSX_DEPLOYMENT_TARGET=10.12" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
-          } elseif ('${{ matrix.os }}' -Eq 'ios') {
+          } elseif ('${{ matrix.os }}' -Eq 'ios' -Or '${{ matrix.os }}' -Eq 'iossimulator') {
             echo "IPHONEOS_DEPLOYMENT_TARGET=12.1" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
           }
         shell: pwsh
@@ -148,11 +158,11 @@ jobs:
           $RustArch = @{'x64'='x86_64';'arm64'='aarch64';
             'x86'='i686';'arm'='armv7'}[$DotNetArch]
           $RustPlatform = @{'win'='pc-windows-msvc';
-            'osx'='apple-darwin';'ios'='apple-ios';
+            'osx'='apple-darwin';'ios'='apple-ios';'iossimulator'='apple-ios-sim';
             'linux'='unknown-linux-gnu';'android'='linux-android'}[$DotNetOs]
-          $LibPrefix = @{'win'='';'osx'='lib';'ios'='lib';
+          $LibPrefix = @{'win'='';'osx'='lib';'ios'='lib';'iossimulator'='lib';
             'linux'='lib';'android'='lib'}[$DotNetOs]
-          $LibSuffix = @{'win'='.dll';'osx'='.dylib';'ios'='.dylib';
+          $LibSuffix = @{'win'='.dll';'osx'='.dylib';'ios'='.dylib';'iossimulator'='.dylib';
             'linux'='.so';'android'='.so'}[$DotNetOs]
           $RustTarget = "$RustArch-$RustPlatform"
 
@@ -196,7 +206,51 @@ jobs:
           $OutputLibrary = Join-Path "target" $RustTarget 'ffi-production' $OutputLibraryName
           $OutputPath = Join-Path "dependencies" "runtimes" $DotNetRid "native"
           New-Item -ItemType Directory -Path $OutputPath | Out-Null
-          Copy-Item $OutputLibrary $(Join-Path $OutputPath $RenamedLibraryName)
+          $RenamedLibrary = Join-Path $OutputPath $RenamedLibraryName
+          Copy-Item $OutputLibrary $RenamedLibrary
+
+          if ($DotNetOs -eq 'ios' -or $DotNetOs -eq 'iossimulator') {
+            $Version = '${{ needs.preflight.outputs.project-version }}'
+            $ShortVersion = '${{ needs.preflight.outputs.package-version }}'
+            $BundleName = "libDevolutionsPicky"
+            $FrameworkDir = Join-Path $OutputPath "$BundleName.framework"
+            New-Item -Path $FrameworkDir -ItemType "directory" -Force
+            $FrameworkExecutable = Join-Path $FrameworkDir $BundleName
+            Copy-Item -Path $RenamedLibrary -Destination $FrameworkExecutable -Force
+            Remove-Item -Path $RenamedLibrary -Force
+
+            $RPathCmd = $(@('install_name_tool', '-id', "@rpath/$BundleName.framework/$BundleName", "$FrameworkExecutable")) -Join ' '
+            Write-Host $RPathCmd
+            Invoke-Expression $RPathCmd
+
+            [xml] $InfoPlistXml = Get-Content (Join-Path "ffi" "dotnet" "Devolutions.Picky" "Info.plist")
+            Select-Xml -xml $InfoPlistXml -XPath "/plist/dict/key[. = 'CFBundleIdentifier']/following-sibling::string[1]" |
+            %{
+            $_.Node.InnerXml = "com.devolutions.picky"
+            }
+            Select-Xml -xml $InfoPlistXml -XPath "/plist/dict/key[. = 'CFBundleExecutable']/following-sibling::string[1]" |
+            %{
+            $_.Node.InnerXml = $BundleName
+            }
+            Select-Xml -xml $InfoPlistXml -XPath "/plist/dict/key[. = 'CFBundleVersion']/following-sibling::string[1]" |
+            %{
+            $_.Node.InnerXml = $Version
+            }
+            Select-Xml -xml $InfoPlistXml -XPath "/plist/dict/key[. = 'CFBundleShortVersionString']/following-sibling::string[1]" |
+            %{
+            $_.Node.InnerXml = $ShortVersion
+            }
+
+            # Write the plist *without* a BOM
+            $Encoding = New-Object System.Text.UTF8Encoding($false)
+            $Writer = New-Object System.IO.StreamWriter((Join-Path $FrameworkDir "Info.plist"), $false, $Encoding)
+            $InfoPlistXml.Save($Writer)
+            $Writer.Close()
+
+            # .NET XML document inserts two square brackets at the end of the DOCTYPE tag
+            # It's perfectly valid XML, but we're dealing with plists here and dyld will not be able to read the file
+            ((Get-Content -Path (Join-Path $FrameworkDir "Info.plist") -Raw) -Replace 'PropertyList-1.0.dtd"\[\]', 'PropertyList-1.0.dtd"') | Set-Content -Path (Join-Path $FrameworkDir "Info.plist")
+          }
         shell: pwsh
 
       - name: Upload native components
@@ -209,11 +263,6 @@ jobs:
     name: Universal build
     needs: [preflight, build-native]
     runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ osx, ios ]
-
     steps:
       - name: Checkout ${{ github.repository }}
         uses: actions/checkout@v6
@@ -230,68 +279,23 @@ jobs:
         run: |
           Set-Location "dependencies/runtimes"
           # No RID for universal binaries, see: https://github.com/dotnet/runtime/issues/53156
-          $OutputPath = Join-Path "${{ matrix.os }}-universal" "native"
+          $OutputPath = Join-Path "osx-universal" "native"
           New-Item -ItemType Directory -Path $OutputPath | Out-Null
-          $Libraries = Get-ChildItem -Recurse -Path "picky-${{ matrix.os }}-*" -Filter "*.dylib" | Foreach-Object { $_.FullName } | Select -Unique
+          $Libraries = Get-ChildItem -Recurse -Path "picky-osx-*" -Filter "*.dylib" | Foreach-Object { $_.FullName } | Select -Unique
           $LipoCmd = $(@('lipo', '-create', '-output', (Join-Path -Path $OutputPath -ChildPath "libDevolutionsPicky.dylib")) + $Libraries) -Join ' '
           Write-Host $LipoCmd
           Invoke-Expression $LipoCmd
         shell: pwsh
 
-      - name: Framework
-        if: ${{ matrix.os == 'ios' }}
-        run: |
-          $Version = '${{ needs.preflight.outputs.project-version }}'
-          $ShortVersion = '${{ needs.preflight.outputs.package-version }}'
-          $BundleName = "libDevolutionsPicky"
-          $RuntimesDir = Join-Path "dependencies" "runtimes" "ios-universal" "native"
-          $FrameworkDir = Join-Path "$RuntimesDir" "$BundleName.framework"
-          New-Item -Path $FrameworkDir -ItemType "directory" -Force
-          $FrameworkExecutable = Join-Path $FrameworkDir $BundleName
-          Copy-Item -Path (Join-Path "$RuntimesDir" "$BundleName.dylib") -Destination $FrameworkExecutable -Force
-
-          $RPathCmd = $(@('install_name_tool', '-id', "@rpath/$BundleName.framework/$BundleName", "$FrameworkExecutable")) -Join ' '
-          Write-Host $RPathCmd
-          Invoke-Expression $RPathCmd
-
-          [xml] $InfoPlistXml = Get-Content (Join-Path "ffi" "dotnet" "Devolutions.Picky" "Info.plist")
-          Select-Xml -xml $InfoPlistXml -XPath "/plist/dict/key[. = 'CFBundleIdentifier']/following-sibling::string[1]" |
-          %{
-          $_.Node.InnerXml = "com.devolutions.picky"
-          }
-          Select-Xml -xml $InfoPlistXml -XPath "/plist/dict/key[. = 'CFBundleExecutable']/following-sibling::string[1]" |
-          %{
-          $_.Node.InnerXml = $BundleName
-          }
-          Select-Xml -xml $InfoPlistXml -XPath "/plist/dict/key[. = 'CFBundleVersion']/following-sibling::string[1]" |
-          %{
-          $_.Node.InnerXml = $Version
-          }
-          Select-Xml -xml $InfoPlistXml -XPath "/plist/dict/key[. = 'CFBundleShortVersionString']/following-sibling::string[1]" |
-          %{
-          $_.Node.InnerXml = $ShortVersion
-          }
-
-          # Write the plist *without* a BOM
-          $Encoding = New-Object System.Text.UTF8Encoding($false)
-          $Writer = New-Object System.IO.StreamWriter((Join-Path $FrameworkDir "Info.plist"), $false, $Encoding)
-          $InfoPlistXml.Save($Writer)
-          $Writer.Close()
-
-          # .NET XML document inserts two square brackets at the end of the DOCTYPE tag
-          # It's perfectly valid XML, but we're dealing with plists here and dyld will not be able to read the file
-          ((Get-Content -Path (Join-Path $FrameworkDir "Info.plist") -Raw) -Replace 'PropertyList-1.0.dtd"\[\]', 'PropertyList-1.0.dtd"') | Set-Content -Path (Join-Path $FrameworkDir "Info.plist")
-        shell: pwsh
-
       - name: Upload native components
         uses: actions/upload-artifact@v7
         with:
-          name: picky-${{ matrix.os }}-universal
-          path: dependencies/runtimes/${{ matrix.os }}-universal
+          name: picky-osx-universal
+          path: dependencies/runtimes/osx-universal
 
   build-managed:
     name: Managed build
-    needs: [preflight, build-universal]
+    needs: [preflight, build-native, build-universal]
     runs-on: windows-2022
 
     steps:
