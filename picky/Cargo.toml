@@ -84,9 +84,9 @@ aead = { version = "0.6", optional = true }
 blake2 = { version = "=0.11.0-rc.6", optional = true }
 ed25519 = "=3.0.0"
 ecdsa = "=0.17.0-rc.18"
-elliptic-curve = "=0.14.0-rc.33"
+elliptic-curve = "0.14"
 pkcs1 = "=0.8.0-rc.4"
-primefield = "=0.14.0-rc.12"
+primefield = "0.14"
 primeorder = "=0.14.0-rc.10"
 ff = { version = "0.14", default-features = false }
 group = "0.14"
