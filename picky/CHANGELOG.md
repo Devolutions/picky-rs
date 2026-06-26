@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[7.0.0-rc.25](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.24...picky-v7.0.0-rc.25)] - 2026-06-26
+
+### <!-- 7 -->Build
+
+- Align RustCrypto ECC dependency versions and remove unnecessary transitive pins ([#506](https://github.com/Devolutions/picky-rs/issues/506)) ([a4346f2853](https://github.com/Devolutions/picky-rs/commit/a4346f2853e726eb05b1fb5de2fa9351c8c44e2e)) 
+
+
+
 ## [[7.0.0-rc.24](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.23...picky-v7.0.0-rc.24)] - 2026-06-19
 
 ### <!-- 7 -->Build
