@@ -523,7 +523,6 @@ version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "29fcf32e6c73d1079f83ab4d782de2d81620346a5f38c6237a86a22f8368980a"
 dependencies = [
- "pkcs8",
  "signature",
 ]
 
@@ -1302,7 +1301,6 @@ dependencies = [
 name = "picky"
 version = "7.0.0-rc.24"
 dependencies = [
- "aead",
  "aes",
  "aes-gcm",
  "aes-kw",
@@ -1317,17 +1315,12 @@ dependencies = [
  "chrono",
  "crypto-bigint",
  "crypto-common",
- "ctr",
  "curve25519-dalek",
  "des",
  "digest",
  "ecdsa",
- "ed25519",
  "ed25519-dalek",
- "elliptic-curve",
  "expect-test",
- "ff",
- "group",
  "hex",
  "hmac",
  "http",
@@ -1337,14 +1330,12 @@ dependencies = [
  "p256",
  "p384",
  "p521",
- "pbkdf2",
  "picky-asn1",
  "picky-asn1-der",
  "picky-asn1-x509",
  "picky-test-data",
  "pkcs1",
  "pretty_assertions",
- "primefield",
  "primeorder",
  "rand",
  "rand_chacha",
