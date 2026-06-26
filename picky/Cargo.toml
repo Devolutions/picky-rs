@@ -49,12 +49,12 @@ rand = "0.10"
 rand_core = "0.10"
 crypto-bigint = "0.7"
 
-ed25519-dalek = { version = "=3.0.0-rc.0", features = ["hazmat", "rand_core"] }
-x25519-dalek = { version = "=3.0.0-rc.0", features = ["static_secrets"] }
+ed25519-dalek = { version = "=3.0.0-rc.1", features = ["hazmat", "rand_core"] }
+x25519-dalek = { version = "=3.0.0-rc.1", features = ["static_secrets"] }
 
-p256 = { version = "=0.14.0-rc.10", features = ["ecdh"] }
-p384 = { version = "=0.14.0-rc.10", features = ["ecdh"] }
-p521 = { version = "=0.14.0-rc.10", features = ["ecdh"] }
+p256 = { version = "=0.14.0-rc.14", features = ["ecdh"] }
+p384 = { version = "=0.14.0-rc.14", features = ["ecdh"] }
+p521 = { version = "=0.14.0-rc.14", features = ["ecdh"] }
 
 rsa = { version = "=0.10.0-rc.18", features = ["std"] }
 
@@ -70,30 +70,24 @@ aes-kw = { version = "0.3", optional = true }
 argon2 = { version = "=0.6.0-rc.8", optional = true }
 ctr = { version = "0.10", optional = true }
 cbc = { version = "0.2", optional = true, features = ["alloc"] }
-bcrypt-pbkdf = { version = "=0.11.0", optional = true }
+bcrypt-pbkdf = { version = "0.11", optional = true }
 des = { version = "0.9", optional = true }
 rc2 = { version = "0.9", optional = true }
-pbkdf2 = { version = "0.13.0", optional = true }
+pbkdf2 = { version = "0.13", optional = true }
 hmac = { version = "0.13", optional = true }
 crypto-common = "0.2"
 inout = "0.2.2"
 
 # Pin transitive dependencies versions.
 # TODO: Remove when stable versions will be released.
-aead = { version = "0.6", optional = true }
 blake2 = { version = "=0.11.0-rc.6", optional = true }
-ed25519 = "=3.0.0"
-ecdsa = "=0.17.0-rc.18"
-elliptic-curve = "=0.14.0-rc.33"
+ecdsa = "=0.17.0-rc.22"
 pkcs1 = "=0.8.0-rc.4"
-primefield = "=0.14.0-rc.12"
-primeorder = "=0.14.0-rc.10"
-ff = { version = "0.14", default-features = false }
-group = "0.14"
+primeorder = "=0.14.0-rc.14"
 rustcrypto-ff = "=0.14.0-rc.1"
 rustcrypto-ff_derive = "=0.14.0-rc.0"
 rustcrypto-group = "=0.14.0-rc.1"
-curve25519-dalek = "=5.0.0-rc.0"
+curve25519-dalek = "=5.0.0-rc.1"
 
 [dev-dependencies]
 pretty_assertions = "1.4"
@@ -110,12 +104,9 @@ default = ["x509", "jose", "http_signature", "http_trait_impl", "pkcs12"]
 
 # main features
 x509 = []
-jose = ["dep:serde_json", "dep:aes-gcm", "dep:cbc", "dep:aes-kw",
-# Transitive dependencies
-    "dep:aead", "dep:aes", "dep:ctr"
-]
+jose = ["dep:serde_json", "dep:aes-gcm", "dep:ctr", "dep:cbc", "dep:aes-kw", "dep:aes"]
 http_signature = []
-pkcs12 = ["picky-asn1-x509/pkcs12", "dep:des", "dep:rc2", "dep:cbc", "dep:pbkdf2", "dep:hmac", "dep:aes", "x509"]
+pkcs12 = ["picky-asn1-x509/pkcs12", "dep:des", "dep:rc2", "dep:cbc", "dep:hmac", "dep:aes", "x509", "dep:pbkdf2"]
 
 # secondary features
 pkcs7 = ["x509", "picky-asn1-x509/pkcs7"]
@@ -123,15 +114,12 @@ http_timestamp = ["dep:reqwest"]
 ctl = ["picky-asn1-x509/ctl", "pkcs7", "chrono_conversion"]
 ctl_http_fetch = ["dep:reqwest", "dep:cab", "ctl"]
 wincert = ["x509", "dep:byteorder"]
-ssh = ["dep:byteorder", "dep:aes", "dep:ctr", "dep:cbc", "dep:bcrypt-pbkdf", "dep:lexical-sort",
-# Transitive dependencies
-    "dep:pbkdf2", "dep:hmac"
-]
+ssh = ["dep:byteorder", "dep:aes", "dep:ctr", "dep:cbc", "dep:bcrypt-pbkdf", "dep:lexical-sort", "dep:hmac", "dep:pbkdf2"]
 http_trait_impl = ["dep:http"]
 chrono_conversion = ["dep:chrono", "picky-asn1/chrono_conversion"]
 time_conversion = ["dep:time", "picky-asn1/time_conversion"]
 putty = ["dep:argon2", "dep:hmac", "ssh",
-# Transitive dependencies
+    # Transitive dependencies
     "dep:blake2"
 ]
 
