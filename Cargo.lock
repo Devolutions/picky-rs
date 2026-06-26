@@ -1315,6 +1315,7 @@ dependencies = [
  "chrono",
  "crypto-bigint",
  "crypto-common",
+ "ctr",
  "curve25519-dalek",
  "des",
  "digest",
