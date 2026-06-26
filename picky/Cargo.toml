@@ -72,6 +72,7 @@ cbc = { version = "0.2", optional = true, features = ["alloc"] }
 bcrypt-pbkdf = { version = "0.11", optional = true }
 des = { version = "0.9", optional = true }
 rc2 = { version = "0.9", optional = true }
+pbkdf2 = { version = "0.13", optional = true }
 hmac = { version = "0.13", optional = true }
 crypto-common = "0.2"
 inout = "0.2.2"
@@ -104,7 +105,7 @@ default = ["x509", "jose", "http_signature", "http_trait_impl", "pkcs12"]
 x509 = []
 jose = ["dep:serde_json", "dep:aes-gcm", "dep:cbc", "dep:aes-kw", "dep:aes"]
 http_signature = []
-pkcs12 = ["picky-asn1-x509/pkcs12", "dep:des", "dep:rc2", "dep:cbc", "dep:hmac", "dep:aes", "x509"]
+pkcs12 = ["picky-asn1-x509/pkcs12", "dep:des", "dep:rc2", "dep:cbc", "dep:hmac", "dep:aes", "x509", "dep:pbkdf2"]
 
 # secondary features
 pkcs7 = ["x509", "picky-asn1-x509/pkcs7"]
@@ -112,7 +113,7 @@ http_timestamp = ["dep:reqwest"]
 ctl = ["picky-asn1-x509/ctl", "pkcs7", "chrono_conversion"]
 ctl_http_fetch = ["dep:reqwest", "dep:cab", "ctl"]
 wincert = ["x509", "dep:byteorder"]
-ssh = ["dep:byteorder", "dep:aes", "dep:cbc", "dep:bcrypt-pbkdf", "dep:lexical-sort", "dep:hmac"]
+ssh = ["dep:byteorder", "dep:aes", "dep:cbc", "dep:bcrypt-pbkdf", "dep:lexical-sort", "dep:hmac", "dep:pbkdf2"]
 http_trait_impl = ["dep:http"]
 chrono_conversion = ["dep:chrono", "picky-asn1/chrono_conversion"]
 time_conversion = ["dep:time", "picky-asn1/time_conversion"]

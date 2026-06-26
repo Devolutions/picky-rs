@@ -1330,6 +1330,7 @@ dependencies = [
  "p256",
  "p384",
  "p521",
+ "pbkdf2",
  "picky-asn1",
  "picky-asn1-der",
  "picky-asn1-x509",

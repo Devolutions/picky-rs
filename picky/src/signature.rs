@@ -3,9 +3,9 @@
 use crate::hash::HashAlgorithm;
 use crate::key::ec::{EcComponent, EcCurve, NamedEcCurve};
 use crate::key::{KeyError, PrivateKey, PublicKey};
-use rsa::signature::Signer;
 
 use picky_asn1_x509::{AlgorithmIdentifier, oids};
+use rsa::signature::{SignatureEncoding as _, Signer};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
