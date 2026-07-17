@@ -28,8 +28,6 @@ codegen-units = 1
 panic = "abort"
 
 # Optimize for speed the cryptographic libraries.
-[profile.ffi-production.package.num-bigint]
-opt-level = 3
 [profile.ffi-production.package.crypto-bigint]
 opt-level = 3
 [profile.ffi-production.package.ed25519-dalek]
