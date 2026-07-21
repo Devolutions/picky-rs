@@ -24,10 +24,10 @@ public partial struct Pkcs12CryptoContext
 #endif
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pkcs12CryptoContext_with_password", ExactSpelling = true)]
-    public static unsafe extern Pkcs12CryptoContext* WithPassword(byte* password, nuint passwordSz);
+    public static unsafe extern IntPtr WithPassword(byte* password, nuint passwordSz);
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pkcs12CryptoContext_no_password", ExactSpelling = true)]
-    public static unsafe extern Pkcs12CryptoContext* NoPassword();
+    public static unsafe extern IntPtr NoPassword();
 
     [DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pkcs12CryptoContext_destroy", ExactSpelling = true)]
     public static unsafe extern void Destroy(Pkcs12CryptoContext* self);
