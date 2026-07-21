@@ -13,8 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Move RustCrypto crates to stable releases and drop obsolete pins ([#512](https://github.com/Devolutions/picky-rs/issues/512)) ([74090c9d1a](https://github.com/Devolutions/picky-rs/commit/74090c9d1ae301c8d46ed04f593acbfb3f5108e8)) 
 
   Several release-candidate crypto dependencies now have stable releases
-  and
-  are moved off their `=x.y.z-rc.n` pins.
+  and are moved off their `=x.y.z-rc.n` pins.
 
 
 
