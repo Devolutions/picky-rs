@@ -32,6 +32,7 @@ public partial class Pkcs12CryptoContext: IDisposable
         _inner = handle;
     }
 
+    /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>Pkcs12CryptoContext</c> allocated on Rust side.
     /// </returns>
@@ -43,12 +44,20 @@ public partial class Pkcs12CryptoContext: IDisposable
             nuint passwordBufLength = (nuint)passwordBuf.Length;
             fixed (byte* passwordBufPtr = passwordBuf)
             {
-                Raw.Pkcs12CryptoContext* retVal = Raw.Pkcs12CryptoContext.WithPassword(passwordBufPtr, passwordBufLength);
+                IntPtr resultPtr = Raw.Pkcs12CryptoContext.WithPassword(passwordBufPtr, passwordBufLength);
+                Raw.Pkcs12FfiResultBoxPkcs12CryptoContextBoxPickyError result = Marshal.PtrToStructure<Raw.Pkcs12FfiResultBoxPkcs12CryptoContextBoxPickyError>(resultPtr);
+                Raw.Pkcs12FfiResultBoxPkcs12CryptoContextBoxPickyError.Destroy(resultPtr);
+                if (!result.isOk)
+                {
+                    throw new PickyException(new PickyError(result.Err));
+                }
+                Raw.Pkcs12CryptoContext* retVal = result.Ok;
                 return new Pkcs12CryptoContext(retVal);
             }
         }
     }
 
+    /// <exception cref="PickyException"></exception>
     /// <returns>
     /// A <c>Pkcs12CryptoContext</c> allocated on Rust side.
     /// </returns>
@@ -56,7 +65,14 @@ public partial class Pkcs12CryptoContext: IDisposable
     {
         unsafe
         {
-            Raw.Pkcs12CryptoContext* retVal = Raw.Pkcs12CryptoContext.NoPassword();
+            IntPtr resultPtr = Raw.Pkcs12CryptoContext.NoPassword();
+            Raw.Pkcs12FfiResultBoxPkcs12CryptoContextBoxPickyError result = Marshal.PtrToStructure<Raw.Pkcs12FfiResultBoxPkcs12CryptoContextBoxPickyError>(resultPtr);
+            Raw.Pkcs12FfiResultBoxPkcs12CryptoContextBoxPickyError.Destroy(resultPtr);
+            if (!result.isOk)
+            {
+                throw new PickyException(new PickyError(result.Err));
+            }
+            Raw.Pkcs12CryptoContext* retVal = result.Ok;
             return new Pkcs12CryptoContext(retVal);
         }
     }
