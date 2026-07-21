@@ -123,10 +123,55 @@ jobs:
       - name: cargo check ${{ matrix.crate }}
         run: cargo +${{ matrix.msvc }} check -p ${{ matrix.crate }}
 
+  dotnet-tests:
+    name: .NET binding tests
+    needs: [formatting]
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      # Release matches what ships (the ffi-production/NuGet build) and avoids debug-only
+      # std precondition checks at the FFI boundary.
+      - name: Build native library
+        run: cargo build --locked --release -p picky-ffi
+        shell: pwsh
+
+      # Devolutions.Picky multi-targets net9.0-ios, so the iOS workload is required
+      # just to build it (same as the nuget.yml build-managed job).
+      - name: Install iOS workload
+        run: dotnet workload install ios
+        shell: pwsh
+
+      # GeneratePackageOnBuild is on by default; disable it so the build does not try to
+      # pack native libraries for every RID (only the win-x64 one is available here).
+      # The committed bindings are built as-is (not regenerated) so a stale binding fails CI.
+      - name: Build .NET bindings and tests
+        run: dotnet build ./ffi/dotnet/Devolutions.Picky.Tests/Devolutions.Picky.Tests.csproj -c Release -p:GeneratePackageOnBuild=false
+        shell: pwsh
+
+      # The project intentionally does not copy the native lib to output
+      # (CopyToOutputDirectory=Never), so place it next to the test host.
+      - name: Place native library next to the test host
+        run: |
+          $testDll = Get-ChildItem -Recurse -Path ./ffi/dotnet/Devolutions.Picky.Tests/bin/Release -Filter Devolutions.Picky.Tests.dll | Select-Object -First 1
+          Copy-Item ./target/release/picky.dll (Join-Path $testDll.DirectoryName DevolutionsPicky.dll) -Force
+        shell: pwsh
+
+      # The tests read fixtures via paths relative to the test host CWD that resolve to
+      # <repo-parent>/test_assets; provision them from picky-test-data.
+      - name: Provision test assets
+        run: Copy-Item picky-test-data/test_assets ../test_assets -Recurse -Force
+        shell: pwsh
+
+      - name: Run .NET tests
+        run: dotnet test ./ffi/dotnet/Devolutions.Picky.Tests/Devolutions.Picky.Tests.csproj -c Release --no-build
+        shell: pwsh
+
   success:
     name: Success
     if: ${{ always() }}
-    needs: [formatting, lints, lints-wasm, tests, msrv]
+    needs: [formatting, lints, lints-wasm, tests, msrv, dotnet-tests]
     runs-on: ubuntu-latest
 
     steps:

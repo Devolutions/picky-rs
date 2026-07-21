@@ -90,7 +90,7 @@ Z/fDKMxHxeXla54kfV+HiGkH
         Assert.Equal("44AFB080D6A327BA893039862EF8406B", cert2.SerialNumber);
 
         X509ExtensionCollection extensions = cert2.Extensions;
-        X509Extension? skiExt = extensions["subjectKeyIdentifier"];
+        X509Extension? skiExt = extensions["2.5.29.14"]; // SKI OID (friendly-name lookup is runtime-dependent)
         Assert.NotNull(skiExt);
         byte[] skiExtRawData = skiExt!.RawData; // includes the ASN.1 DER tag and length of the actual value
         Assert.Equal("0414C4A7B1A47B2C71FADBE14B9075FFC41560858910", Convert.ToHexString(skiExtRawData));
