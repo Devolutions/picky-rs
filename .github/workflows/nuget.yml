@@ -302,7 +302,7 @@ jobs:
       - name: Check out ${{ github.repository }}
         uses: actions/checkout@v6
 
-      - name: Install ios workload
+      - name: Install iOS workload
         run: dotnet workload install ios
 
       - name: Prepare dependencies

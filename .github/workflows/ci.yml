@@ -147,13 +147,17 @@ jobs:
         run: cargo build --locked --release -p picky-ffi
         shell: pwsh
 
+      # Devolutions.Picky multi-targets net9.0-ios, so the iOS workload is required
+      # just to build it.
+      - name: Install iOS workload
+        run: dotnet workload install ios
+        shell: pwsh
+
       # GeneratePackageOnBuild is on by default; disable it so the build does not try to
       # pack native libraries for every RID (only the win-x64 one is available here).
       # The committed bindings are built as-is (not regenerated) so a stale binding fails CI.
-      # We pass in -p:TargetFrameworks=netstandard2.0 to override the target framework and avoid net9.0-ios,
-      # which is not required for the tests in CI.
       - name: Build .NET bindings and tests
-        run: dotnet build ./ffi/dotnet/Devolutions.Picky.Tests/Devolutions.Picky.Tests.csproj -c Release -p:GeneratePackageOnBuild=false -p:TargetFrameworks=netstandard2.0
+        run: dotnet build ./ffi/dotnet/Devolutions.Picky.Tests/Devolutions.Picky.Tests.csproj -c Release -p:GeneratePackageOnBuild=false
         shell: pwsh
 
       # The project intentionally does not copy the native lib to output
