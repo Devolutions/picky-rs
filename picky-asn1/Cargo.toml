@@ -17,7 +17,7 @@ readme = "README.md"
 
 [dependencies]
 serde = { version = "1", default-features = false, features = ["derive"] }
-oid = { version = "0.2", default-features = false, features = ["serde_support"] }
+oid = { version = "0.3", default-features = false, features = ["serde"] }
 serde_bytes = "0.11"
 chrono = { version = "0.4", default-features = false, optional = true }
 time = { version = "0.3", optional = true }
