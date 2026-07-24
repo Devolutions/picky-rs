@@ -25,8 +25,8 @@ rand = "0.10"
 rand_core = "0.10"
 
 # FFI
-diplomat = { git = "https://github.com/CBenoit/diplomat.git", rev = "f4d93d57e93025c57e75e9711d2418faa9311a42" }
-diplomat-runtime = { git = "https://github.com/CBenoit/diplomat.git", rev = "f4d93d57e93025c57e75e9711d2418faa9311a42" }
+diplomat = { git = "https://github.com/irvingoujAtDevolution/diplomat.git", rev = "68bccfd8d61e146673ccdb2b24bd9f89dc25431c" }
+diplomat-runtime = { git = "https://github.com/irvingoujAtDevolution/diplomat.git", rev = "68bccfd8d61e146673ccdb2b24bd9f89dc25431c" }
 
 time = "0.3"
 hex = "0.4"

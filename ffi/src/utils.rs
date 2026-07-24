@@ -2,7 +2,7 @@ use self::ffi::VecU8;
 
 #[diplomat::bridge]
 pub mod ffi {
-    use diplomat_runtime::DiplomatWriteable;
+    use diplomat_runtime::DiplomatWrite;
 
     use crate::error::ffi::PickyError;
     use std::fmt::Write;
@@ -33,13 +33,13 @@ pub mod ffi {
     pub struct BufferTooSmallError;
 
     impl BufferTooSmallError {
-        pub fn to_display(&self, writeable: &mut DiplomatWriteable) {
+        pub fn to_display(&self, writeable: &mut DiplomatWrite) {
             let _ = write!(writeable, "Buffer too small");
             writeable.flush();
         }
     }
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct VecU8Iterator(pub Vec<VecU8>);
 
     impl VecU8Iterator {
@@ -48,11 +48,11 @@ pub mod ffi {
         }
     }
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct StringIterator(pub Box<dyn Iterator<Item = String>>);
 
     impl StringIterator {
-        pub fn next(&mut self, writable: &mut diplomat_runtime::DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn next(&mut self, writable: &mut diplomat_runtime::DiplomatWrite) -> Result<(), Box<PickyError>> {
             let next = self.0.next();
             if let Some(next) = next {
                 let _ = write!(writable, "{next}");
@@ -64,7 +64,7 @@ pub mod ffi {
         }
     }
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct StringNestedIterator(pub Vec<StringIterator>);
 
     impl StringNestedIterator {

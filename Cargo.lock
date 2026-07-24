@@ -475,11 +475,10 @@ dependencies = [
 
 [[package]]
 name = "diplomat"
-version = "0.5.2"
-source = "git+https://github.com/CBenoit/diplomat.git?rev=f4d93d57e93025c57e75e9711d2418faa9311a42#f4d93d57e93025c57e75e9711d2418faa9311a42"
+version = "0.15.0"
+source = "git+https://github.com/irvingoujAtDevolution/diplomat.git?rev=68bccfd8d61e146673ccdb2b24bd9f89dc25431c#68bccfd8d61e146673ccdb2b24bd9f89dc25431c"
 dependencies = [
  "diplomat_core",
- "lazy_static",
  "proc-macro2",
  "quote",
  "syn 2.0.117",
@@ -487,20 +486,19 @@ dependencies = [
 
 [[package]]
 name = "diplomat-runtime"
-version = "0.5.2"
-source = "git+https://github.com/CBenoit/diplomat.git?rev=f4d93d57e93025c57e75e9711d2418faa9311a42#f4d93d57e93025c57e75e9711d2418faa9311a42"
+version = "0.15.1"
+source = "git+https://github.com/irvingoujAtDevolution/diplomat.git?rev=68bccfd8d61e146673ccdb2b24bd9f89dc25431c#68bccfd8d61e146673ccdb2b24bd9f89dc25431c"
 
 [[package]]
 name = "diplomat_core"
-version = "0.5.2"
-source = "git+https://github.com/CBenoit/diplomat.git?rev=f4d93d57e93025c57e75e9711d2418faa9311a42#f4d93d57e93025c57e75e9711d2418faa9311a42"
+version = "0.15.0"
+source = "git+https://github.com/irvingoujAtDevolution/diplomat.git?rev=68bccfd8d61e146673ccdb2b24bd9f89dc25431c#68bccfd8d61e146673ccdb2b24bd9f89dc25431c"
 dependencies = [
- "lazy_static",
  "proc-macro2",
  "quote",
  "serde",
  "smallvec",
- "strck_ident",
+ "strck",
  "syn 2.0.117",
 ]
 
@@ -1138,12 +1136,6 @@ dependencies = [
  "cfg-if",
  "cpufeatures 0.3.0",
 ]
-
-[[package]]
-name = "lazy_static"
-version = "1.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "leb128fmt"
@@ -2119,17 +2111,10 @@ checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
 
 [[package]]
 name = "strck"
-version = "0.1.2"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be91090ded9d8f979d9fe921777342d37e769e0b6b7296843a7a38247240e917"
-
-[[package]]
-name = "strck_ident"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1c3802b169b3858a44667f221c9a0b3136e6019936ea926fc97fbad8af77202"
+checksum = "42316e70da376f3d113a68d138a60d8a9883c604fe97942721ec2068dab13a9f"
 dependencies = [
- "strck",
  "unicode-ident",
 ]
 

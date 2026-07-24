@@ -6,9 +6,8 @@ pub mod ffi {
     use crate::error::ffi::PickyError;
     use crate::key::ffi::PrivateKey;
     use crate::x509::ffi::Cert;
-    use diplomat_runtime::DiplomatWriteable;
+    use diplomat_runtime::DiplomatWrite;
     use picky::pkcs12;
-    use picky::pkcs12::Pkcs12Error;
     use picky_asn1::restricted_string::BmpString;
     use std::str::FromStr;
     use std::sync::{Arc, Mutex};
@@ -81,7 +80,7 @@ pub mod ffi {
         }
     }
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct Pkcs12ParsingParams(pub(crate) pkcs12::Pkcs12ParsingParams);
 
     impl Pkcs12ParsingParams {
@@ -115,13 +114,13 @@ pub mod ffi {
     pub struct Pkcs12CryptoContext(pub(crate) Arc<Mutex<pkcs12::Pkcs12CryptoContext>>);
 
     impl Pkcs12CryptoContext {
-        pub fn with_password(password: &str) -> Result<Box<Pkcs12CryptoContext>, Pkcs12Error> {
+        pub fn with_password(password: &str) -> Result<Box<Pkcs12CryptoContext>, Box<PickyError>> {
             Ok(Box::new(Self(Arc::new(Mutex::new(
                 pkcs12::Pkcs12CryptoContext::new_with_password(password)?,
             )))))
         }
 
-        pub fn no_password() -> Result<Box<Pkcs12CryptoContext>, Pkcs12Error> {
+        pub fn no_password() -> Result<Box<Pkcs12CryptoContext>, Box<PickyError>> {
             Ok(Box::new(Self(Arc::new(Mutex::new(
                 pkcs12::Pkcs12CryptoContext::new_without_password()?,
             )))))
@@ -160,7 +159,7 @@ pub mod ffi {
             }
         }
 
-        pub fn get_friendly_name(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn get_friendly_name(&self, writeable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             use std::fmt::Write as _;
 
             if let pkcs12::Pkcs12AttributeKind::FriendlyName(name) = self.0.kind() {
@@ -174,7 +173,7 @@ pub mod ffi {
         }
     }
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct Pkcs12AttributeIterator(pub(crate) Box<dyn Iterator<Item = pkcs12::Pkcs12Attribute>>);
 
     impl Pkcs12AttributeIterator {
@@ -191,7 +190,7 @@ pub mod ffi {
     }
 
     /// PFX safe bag, the polymorphic container for all the data in a PKCS12 archive.
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct SafeBag(pub(crate) pkcs12::SafeBag);
 
     impl SafeBag {
@@ -294,7 +293,7 @@ pub mod ffi {
         }
     }
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct SafeBagIterator(pub(crate) Box<dyn Iterator<Item = pkcs12::SafeBag>>);
 
     impl SafeBagIterator {
@@ -304,7 +303,7 @@ pub mod ffi {
     }
 
     /// PFX (PKCS12 archive) builder.
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct PfxBuilder {
         safe_bags_acc: Vec<pkcs12::SafeBag>,
         safe_contents: Vec<pkcs12::SafeContents>,

@@ -1,9 +1,9 @@
 #[diplomat::bridge]
 pub mod ffi {
     use crate::error::ffi::PickyError;
-    use diplomat_runtime::DiplomatWriteable;
+    use diplomat_runtime::DiplomatWrite;
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct Argon2Params {
         m_cost: u32,
         t_cost: u32,
@@ -43,7 +43,6 @@ pub mod ffi {
         }
     }
 
-    #[derive(Clone, Copy)]
     pub enum Argon2Algorithm {
         Argon2d,
         Argon2i,
@@ -73,7 +72,7 @@ pub mod ffi {
             Ok(Box::new(Self(argon2)))
         }
 
-        pub fn hash_password(&self, password: &str, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn hash_password(&self, password: &str, writeable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             use argon2::PasswordHasher as _;
             use argon2::password_hash::phc::Salt;
             use rand::rngs::{StdRng, SysRng};

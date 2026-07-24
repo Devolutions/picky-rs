@@ -3,7 +3,7 @@
 #[diplomat::bridge]
 pub mod ffi {
     use crate::error::ffi::PickyError;
-    use diplomat_runtime::DiplomatWriteable;
+    use diplomat_runtime::DiplomatWrite;
     use std::fmt::Write;
 
     #[diplomat::opaque]
@@ -16,7 +16,7 @@ pub mod ffi {
                 .is_a(picky::oid::ObjectIdentifier::try_from(other).map_err(|_| "invalid OID")?))
         }
 
-        pub fn get_oid(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn get_oid(&self, writable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             let string: String = self.0.oid().into();
             write!(writable, "{string}")?;
             Ok(())
@@ -39,7 +39,7 @@ pub mod ffi {
         RsassaPss,
     }
 
-    impl AlgorithmIdentifierParameters<'_> {
+    impl<'a> AlgorithmIdentifierParameters<'a> {
         pub fn get_type(&self) -> AlgorithmIdentifierParametersType {
             match self.0 {
                 picky_asn1_x509::AlgorithmIdentifierParameters::None => AlgorithmIdentifierParametersType::None,
@@ -126,7 +126,7 @@ pub mod ffi {
     #[diplomat::opaque]
     pub struct AesAuthEncParams(pub picky_asn1_x509::AesAuthEncParams);
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct AlgorithmIdentifierIterator(pub Vec<picky::AlgorithmIdentifier>);
 
     impl AlgorithmIdentifierIterator {

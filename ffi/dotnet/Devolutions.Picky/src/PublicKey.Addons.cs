@@ -39,19 +39,19 @@ public partial class PublicKey
     {
         unsafe
         {
-            if (_inner == null)
+            if (_inner.IsNull)
             {
                 throw new ObjectDisposedException("PublicKey");
             }
 
-            nuint count = PublicKey_pkcs1_encoded_len(_inner);
+            nuint count = PublicKey_pkcs1_encoded_len(_inner.Ptr);
 
             byte[] pkcs1 = new byte[count];
             Raw.PickyError* error;
 
             fixed (byte* pkcs1Ptr = pkcs1)
             {
-                error = PublicKey_to_pkcs1(_inner, pkcs1Ptr, count);
+                error = PublicKey_to_pkcs1(_inner.Ptr, pkcs1Ptr, count);
             }
 
             if (error != null)

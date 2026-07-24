@@ -15,7 +15,7 @@ pub mod ffi {
     use crate::x509::ffi::{Cert, CertIterator};
     use crate::x509::name::ffi::DirectoryNameIterator;
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct AuthenticodeSignature(pub picky::x509::pkcs7::authenticode::AuthenticodeSignature);
 
     #[diplomat::enum_convert(picky_asn1_x509::ShaVariant)]
@@ -42,7 +42,7 @@ pub mod ffi {
             file_hash: &VecU8,
             hash_algorithm: ShaVariant,
             private_key: &PrivateKey,
-            program_name: Option<Box<RsString>>,
+            program_name: Option<&RsString>,
         ) -> Result<Box<AuthenticodeSignature>, Box<PickyError>> {
             let inner = picky::x509::pkcs7::authenticode::AuthenticodeSignature::new(
                 &pkcs7.0,
@@ -97,7 +97,7 @@ pub mod ffi {
             Ok(Box::new(Cert(cert.clone())))
         }
 
-        pub fn authenticode_verifier(&self) -> Box<AuthenticodeValidator<'_>> {
+        pub fn authenticode_verifier<'a>(&'a self) -> Box<AuthenticodeValidator<'a>> {
             let verifier = self.0.authenticode_verifier();
             Box::new(AuthenticodeValidator::new(verifier))
         }
@@ -127,7 +127,7 @@ pub mod ffi {
         }
     }
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct AuthenticodeValidator<'a> {
         pub inner: picky::x509::pkcs7::authenticode::AuthenticodeValidator<'a>,
         //'exclude_cert_authorities' method down there a few lines takes a reference to a Vec<DirectoryName>,
@@ -197,7 +197,7 @@ pub mod ffi {
         }
     }
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct AuthenticodeTimestamper(pub picky::x509::pkcs7::timestamp::http_timestamp::AuthenticodeTimestamper);
 
     impl AuthenticodeTimestamper {

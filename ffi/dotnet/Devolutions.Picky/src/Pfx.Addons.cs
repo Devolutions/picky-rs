@@ -39,19 +39,19 @@ public partial class Pfx
     {
         unsafe
         {
-            if (_inner == null)
+            if (_inner.IsNull)
             {
                 throw new ObjectDisposedException("Pfx");
             }
 
-            nuint count = Pfx_der_encoded_len(_inner);
+            nuint count = Pfx_der_encoded_len(_inner.Ptr);
 
             byte[] der = new byte[count];
             Raw.PickyError* error;
 
             fixed (byte* derPtr = der)
             {
-                error = Pfx_to_der(_inner, derPtr, count);
+                error = Pfx_to_der(_inner.Ptr, derPtr, count);
             }
 
             if (error != null)

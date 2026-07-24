@@ -30,7 +30,7 @@ pub mod ffi {
         }
     }
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct UTCTimeIterator(pub Vec<UTCTime>);
 
     impl UTCTimeIterator {

@@ -6,14 +6,14 @@ pub mod ffi {
     use crate::error::ffi::PickyError;
     use crate::utils::ffi::VecU8;
     use crate::x509::name::ffi::{GeneralName, GeneralNameIterator};
-    use diplomat_runtime::DiplomatWriteable;
+    use diplomat_runtime::DiplomatWrite;
     use std::fmt::Write;
 
     #[diplomat::opaque]
     pub struct Extension(pub picky_asn1_x509::extension::Extension);
 
     impl Extension {
-        pub fn get_extn_id(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn get_extn_id(&self, writable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             let oid: String = self.0.extn_id().0.clone().into();
             write!(writable, "{oid}")?;
             Ok(())
@@ -29,7 +29,7 @@ pub mod ffi {
         }
     }
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct ExtensionIterator(pub Vec<Extension>);
 
     impl ExtensionIterator {
@@ -155,11 +155,11 @@ pub mod ffi {
         }
     }
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct OidIterator(pub Vec<String>);
 
     impl OidIterator {
-        pub fn next(&mut self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn next(&mut self, writable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             let oid = self.0.pop().ok_or("no more OIDs")?;
             write!(writable, "{oid}")?;
             Ok(())

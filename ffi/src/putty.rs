@@ -70,7 +70,7 @@ pub mod ffi {
     use crate::key::ffi::{EcCurve, PrivateKey, PublicKey};
     use crate::ssh::ffi::{SshPrivateKey, SshPublicKey};
     use crate::utils::ffi::VecU8;
-    use diplomat_runtime::DiplomatWriteable;
+    use diplomat_runtime::DiplomatWrite;
     use std::fmt::Write;
 
     /// PuTTY Private Key (PPK) version.
@@ -137,7 +137,7 @@ pub mod ffi {
         }
 
         /// Encode PPK key file to a string.
-        pub fn to_repr(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn to_repr(&self, writeable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             writeable.write_str(&self.0.to_string()?)?;
             writeable.flush();
             Ok(())
@@ -198,7 +198,7 @@ pub mod ffi {
         }
 
         /// Get the PPK key file comment.
-        pub fn get_comment(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn get_comment(&self, writeable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             writeable.write_str(self.0.comment())?;
             writeable.flush();
             Ok(())
@@ -272,7 +272,7 @@ pub mod ffi {
         }
 
         /// Get the comment of the public key.
-        pub fn get_comment(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn get_comment(&self, writeable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             writeable.write_str(self.0.comment())?;
             writeable.flush();
             Ok(())
@@ -285,7 +285,7 @@ pub mod ffi {
         }
 
         /// Converts the public key to a string (PuTTY format).
-        pub fn to_repr(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn to_repr(&self, writeable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             writeable.write_str(&self.0.to_string())?;
             writeable.flush();
             Ok(())
@@ -347,7 +347,7 @@ pub mod ffi {
     /// PPK encryption configuration builder.
     ///
     /// Could be constructed via `PuttyPpkEncryptionConfig::builder()`.
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct PuttyPpkEncryptionConfigBuilder(picky::putty::PpkEncryptionConfigBuilder);
 
     impl PuttyPpkEncryptionConfigBuilder {

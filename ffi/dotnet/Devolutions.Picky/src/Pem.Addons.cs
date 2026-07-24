@@ -22,13 +22,13 @@ public partial class Pem
     {
         unsafe
         {
-            if (_inner == null)
+            if (_inner.IsNull)
             {
                 throw new ObjectDisposedException("Pem");
             }
 
             nuint dataLen;
-            IntPtr dataPtr = PeekData(_inner, out dataLen);
+            IntPtr dataPtr = PeekData(_inner.Ptr, out dataLen);
 
             byte[] retVal = new byte[dataLen];
             Marshal.Copy(dataPtr, retVal, 0, (int)dataLen);

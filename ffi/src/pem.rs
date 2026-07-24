@@ -1,7 +1,7 @@
 #[diplomat::bridge]
 pub mod ffi {
     use crate::error::ffi::PickyError;
-    use diplomat_runtime::DiplomatWriteable;
+    use diplomat_runtime::DiplomatWrite;
     use std::fmt::Write as _;
     use std::io::Write as _;
 
@@ -48,14 +48,14 @@ pub mod ffi {
         }
 
         /// Returns the label of this PEM object.
-        pub fn get_label(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn get_label(&self, writeable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             write!(writeable, "{}", self.0.label())?;
             writeable.flush();
             Ok(())
         }
 
         /// Returns the string representation of this PEM object.
-        pub fn to_repr(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn to_repr(&self, writeable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             write!(writeable, "{}", self.0)?;
             writeable.flush();
             Ok(())

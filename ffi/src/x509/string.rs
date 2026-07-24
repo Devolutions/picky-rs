@@ -2,7 +2,7 @@
 pub mod ffi {
     use crate::error::ffi::PickyError;
     use crate::utils::ffi::VecU8;
-    use diplomat_runtime::DiplomatWriteable;
+    use diplomat_runtime::DiplomatWrite;
     use std::fmt::Write;
 
     #[diplomat::opaque]
@@ -25,7 +25,7 @@ pub mod ffi {
             }
         }
 
-        pub fn get_as_string(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn get_as_string(&self, writable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             let string: String = self.0.clone().into();
             write!(writable, "{string}")?;
             Ok(())

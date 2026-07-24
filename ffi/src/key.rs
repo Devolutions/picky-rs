@@ -68,7 +68,6 @@ pub mod ffi {
     use crate::pem::ffi::Pem;
 
     /// Known elliptic curve name used for ECDSA arithmetic operations
-    #[derive(Clone, Copy)]
     pub enum EcCurve {
         /// NIST P-256
         NistP256,
@@ -79,7 +78,6 @@ pub mod ffi {
     }
 
     /// Known Edwards curve-based algorithm name
-    #[derive(Clone, Copy)]
     pub enum EdAlgorithm {
         /// Ed25519 signing algorithm
         Ed25519,
@@ -88,7 +86,6 @@ pub mod ffi {
     }
 
     /// Known key kinds
-    #[derive(Clone, Copy)]
     pub enum KeyKind {
         /// RSA (Rivest–Shamir–Adleman)
         Rsa,
