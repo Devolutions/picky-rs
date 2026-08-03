@@ -213,6 +213,7 @@ define_oid! {
     KRB5 => krb5 => "1.2.840.113554.1.2.2",
     MS_KRB5 => ms_krb5 => "1.2.840.48018.1.2.2",
     KRB5_USER_TO_USER => krb5_user_to_user => "1.2.840.113554.1.2.2.3",
+    IAKERB5 => iakerb5 => "1.3.6.1.5.2.5",
     NTLM_SSP => ntlm_ssp => "1.3.6.1.4.1.311.2.2.10",
     NEGOEX => negoex => "1.3.6.1.4.1.311.2.2.30",
     SPNEGO => spnego => "1.3.6.1.5.5.2",
