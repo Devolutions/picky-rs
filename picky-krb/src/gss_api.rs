@@ -7,7 +7,7 @@ use picky_asn1::wrapper::{
     Asn1SequenceOf, BitStringAsn1, ExplicitContextTag0, ExplicitContextTag1, ExplicitContextTag2, ExplicitContextTag3,
     ObjectIdentifierAsn1, OctetStringAsn1, Optional,
 };
-use picky_asn1_der::{Asn1DerError, Asn1RawDer};
+use picky_asn1_der::{Asn1DerError, Asn1RawDer, Length};
 use picky_asn1_x509::oids::iakerb5;
 use serde::de::{self, DeserializeOwned};
 use serde::{Deserialize, Serialize, Serializer, ser};
@@ -124,11 +124,16 @@ impl<T: Serialize> KrbMessage<T> {
 impl<T: DeserializeOwned> KrbMessage<T> {
     /// Deserializes `ApplicationTag0<KrbMessage<T>>`.
     pub fn decode_application_krb_message(
-        mut data: &[u8],
+        data: &[u8],
     ) -> Result<ApplicationTag0<KrbMessage<T>>, GssApiMessageError> {
         if data.is_empty() || Tag::from(data[0]) != Tag::application_constructed(0) {
             return Err(GssApiMessageError::Asn1Error(Asn1DerError::InvalidData));
         }
+
+        let total_len = der_tlv_total_len(data)?;
+        let mut data = data
+            .get(..total_len)
+            .ok_or(GssApiMessageError::Asn1Error(Asn1DerError::TruncatedData))?;
 
         // We cannot implement the deserialization using the `Deserialize` trait
         // because the krb5 token id is not an ASN1 field, but plain two-byte value.
@@ -152,6 +157,10 @@ impl<T: DeserializeOwned> KrbMessage<T> {
         let max_len = data.len();
         let mut reader = &mut data;
         let krb_msg: T = T::deserialize(&mut picky_asn1_der::Deserializer::new_from_reader(&mut reader, max_len))?;
+
+        if !data.is_empty() {
+            return Err(GssApiMessageError::Asn1Error(Asn1DerError::InvalidData));
+        }
 
         Ok(ApplicationTag0(KrbMessage {
             krb5_oid,
@@ -184,12 +193,12 @@ impl<T: ser::Serialize> ser::Serialize for KrbMessage<T> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct IAKrbProxyMessage<T> {
+pub struct IAKerbProxyMessage<T> {
     pub header: IAKerbHeader,
     pub krb_msg: T,
 }
 
-impl<T: Serialize> IAKrbProxyMessage<T> {
+impl<T: Serialize> IAKerbProxyMessage<T> {
     pub fn encode(&self, mut data: impl Write) -> Result<(), GssApiMessageError> {
         let mut oid = Vec::new();
 
@@ -207,21 +216,26 @@ impl<T: Serialize> IAKrbProxyMessage<T> {
     }
 }
 
-impl<T: DeserializeOwned> IAKrbProxyMessage<T> {
-    /// Deserializes `ApplicationTag0<IAKrbProxyMessage<T>>`.
-    pub fn decode_application_iakrb_proxy_message(
-        mut data: &[u8],
-    ) -> Result<ApplicationTag0<IAKrbProxyMessage<T>>, GssApiMessageError> {
+impl<T: DeserializeOwned> IAKerbProxyMessage<T> {
+    /// Deserializes `ApplicationTag0<IAKerbProxyMessage<T>>`.
+    pub fn decode_application_iakerb_proxy_message(
+        data: &[u8],
+    ) -> Result<ApplicationTag0<IAKerbProxyMessage<T>>, GssApiMessageError> {
         if data.is_empty() || Tag::from(data[0]) != Tag::application_constructed(0) {
             return Err(GssApiMessageError::Asn1Error(Asn1DerError::InvalidData));
         }
+
+        let total_len = der_tlv_total_len(data)?;
+        let mut data = data
+            .get(..total_len)
+            .ok_or(GssApiMessageError::Asn1Error(Asn1DerError::TruncatedData))?;
 
         // We cannot implement the deserialization using the `Deserialize` trait
         // because the iakerb token id is not an ASN1 field, but plain two-byte value.
         // We cannot read this id using our ASN1 deserializer.
 
         // This is a workaround we use to read the `ApplicationTag0` tag and length bytes.
-        // At the same time it will also read the first field of the `IAKrbProxyMessage`.
+        // At the same time it will also read the first field of the `IAKerbProxyMessage`.
         #[derive(Deserialize)]
         struct Container {
             iakerb_oid: ObjectIdentifierAsn1,
@@ -248,23 +262,32 @@ impl<T: DeserializeOwned> IAKrbProxyMessage<T> {
 
         let max_len = data.len();
         let mut reader = &mut data;
-        let mut der = picky_asn1_der::Deserializer::new_from_reader(&mut reader, max_len);
 
-        let header = IAKerbHeader::deserialize(&mut der)?;
-        let krb_msg: T = T::deserialize(&mut der)?;
+        let (header, krb_msg) = {
+            let mut der = picky_asn1_der::Deserializer::new_from_reader(&mut reader, max_len);
 
-        Ok(ApplicationTag0(IAKrbProxyMessage { header, krb_msg }))
+            let header = IAKerbHeader::deserialize(&mut der)?;
+            let krb_msg: T = T::deserialize(&mut der)?;
+
+            (header, krb_msg)
+        };
+
+        if !data.is_empty() {
+            return Err(GssApiMessageError::Asn1Error(Asn1DerError::InvalidData));
+        }
+
+        Ok(ApplicationTag0(IAKerbProxyMessage { header, krb_msg }))
     }
 }
 
-impl<T: Serialize> Serialize for IAKrbProxyMessage<T> {
+impl<T: Serialize> Serialize for IAKerbProxyMessage<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         use serde::ser::Error;
 
-        // We encode `IAKrbProxyMessage` fields using `IAKrbProxyMessage::encode` method.
+        // We encode `IAKerbProxyMessage` fields using `IAKerbProxyMessage::encode` method.
         // We use the `Container` type to prepend the sequence tag and length to the encoded fields.
         #[derive(Serialize)]
         struct Container {
@@ -273,7 +296,7 @@ impl<T: Serialize> Serialize for IAKrbProxyMessage<T> {
 
         let mut buff = Vec::new();
         self.encode(&mut buff)
-            .map_err(|e| S::Error::custom(format!("cannot serialize IAKrbProxyMessage inner value: {e:?}")))?;
+            .map_err(|e| S::Error::custom(format!("cannot serialize IAKerbProxyMessage inner value: {e:?}")))?;
 
         Container { buff: Asn1RawDer(buff) }.serialize(serializer)
     }
@@ -549,6 +572,22 @@ impl WrapToken {
     }
 }
 
+/// Reads the DER TLV header and returns the total length (header + content) of the TLV.
+fn der_tlv_total_len(data: &[u8]) -> Result<usize, GssApiMessageError> {
+    if data.len() < 2 {
+        return Err(GssApiMessageError::Asn1Error(Asn1DerError::TruncatedData));
+    }
+
+    let content_len = Length::deserialized(&data[1..]).map_err(GssApiMessageError::Asn1Error)?;
+    let header_len = 1 + Length::encoded_len(content_len);
+
+    let total_len = header_len
+        .checked_add(content_len)
+        .ok_or(GssApiMessageError::Asn1Error(Asn1DerError::UnsupportedValue))?;
+
+    Ok(total_len)
+}
+
 #[cfg(test)]
 mod tests {
     use picky_asn1::bit_string::BitString;
@@ -565,7 +604,7 @@ mod tests {
     use crate::data_types::{
         EncryptedData, KerberosStringAsn1, KerberosTime, PaData, PrincipalName, Ticket, TicketInner,
     };
-    use crate::gss_api::{ApplicationTag0, IAKrbProxyMessage, MicToken, WrapToken};
+    use crate::gss_api::{ApplicationTag0, IAKerbProxyMessage, MicToken, WrapToken};
     use crate::messages::{AsReq, IAKerbHeader, KdcReq, KdcReqBody, TgtRep};
 
     use super::KrbMessage;
@@ -777,7 +816,7 @@ mod tests {
             16, 2, 1, 23, 2, 1, 25, 2, 1, 26,
         ];
 
-        let expected = ApplicationTag0(IAKrbProxyMessage {
+        let expected = ApplicationTag0(IAKerbProxyMessage {
             header: IAKerbHeader {
                 target_realm: ExplicitContextTag1::from("EXAMPLE.COM".to_string()),
                 cookie: Optional::from(Some(ExplicitContextTag2::from(OctetStringAsn1::from(vec![
@@ -840,10 +879,93 @@ mod tests {
         });
 
         let iakerb_proxy_message =
-            IAKrbProxyMessage::<AsReq>::decode_application_iakrb_proxy_message(expected_raw.as_slice()).unwrap();
+            IAKerbProxyMessage::<AsReq>::decode_application_iakerb_proxy_message(expected_raw.as_slice()).unwrap();
         let iakerb_proxy_message_raw = picky_asn1_der::to_vec(&expected).unwrap();
 
         assert_eq!(iakerb_proxy_message, expected);
         assert_eq!(iakerb_proxy_message_raw, expected_raw);
+    }
+
+    #[test]
+    fn iakerb_header_deserialize_skips_unknown_extension_fields() {
+        let iakerb_proxy_message_raw = vec![
+            96, 129, 236, 6, 6, 43, 6, 1, 5, 2, 5, 5, 1, 48, 40, 161, 13, 12, 11, 69, 88, 65, 77, 80, 76, 69, 46, 67,
+            79, 77, 162, 12, 4, 10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 164, 9, 12, 7, 117, 110, 107, 110, 111, 119, 110,
+            106, 129, 181, 48, 129, 178, 161, 3, 2, 1, 5, 162, 3, 2, 1, 10, 163, 26, 48, 24, 48, 10, 161, 4, 2, 2, 0,
+            150, 162, 2, 4, 0, 48, 10, 161, 4, 2, 2, 0, 149, 162, 2, 4, 0, 164, 129, 137, 48, 129, 134, 160, 7, 3, 5,
+            0, 0, 0, 0, 16, 161, 19, 48, 17, 160, 3, 2, 1, 1, 161, 10, 48, 8, 27, 6, 109, 121, 117, 115, 101, 114, 162,
+            13, 27, 11, 69, 88, 65, 77, 80, 76, 69, 46, 67, 79, 77, 163, 32, 48, 30, 160, 3, 2, 1, 2, 161, 23, 48, 21,
+            27, 6, 107, 114, 98, 116, 103, 116, 27, 11, 69, 88, 65, 77, 80, 76, 69, 46, 67, 79, 77, 165, 17, 24, 15,
+            50, 48, 50, 49, 49, 50, 50, 57, 49, 48, 51, 54, 48, 54, 90, 167, 6, 2, 4, 29, 32, 235, 11, 168, 26, 48, 24,
+            2, 1, 18, 2, 1, 17, 2, 1, 20, 2, 1, 19, 2, 1, 16, 2, 1, 23, 2, 1, 25, 2, 1, 26,
+        ];
+
+        let expected = ApplicationTag0(IAKerbProxyMessage {
+            header: IAKerbHeader {
+                target_realm: ExplicitContextTag1::from("EXAMPLE.COM".to_string()),
+                cookie: Optional::from(Some(ExplicitContextTag2::from(OctetStringAsn1::from(vec![
+                    1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+                ])))),
+                flags: Optional::from(None),
+            },
+            krb_msg: AsReq::from(KdcReq {
+                pvno: ExplicitContextTag1::from(IntegerAsn1(vec![5])),
+                msg_type: ExplicitContextTag2::from(IntegerAsn1(vec![10])),
+                padata: Optional::from(Some(ExplicitContextTag3::from(Asn1SequenceOf::from(vec![
+                    PaData {
+                        padata_type: ExplicitContextTag1::from(IntegerAsn1(vec![0, 150])),
+                        padata_data: ExplicitContextTag2::from(OctetStringAsn1(Vec::new())),
+                    },
+                    PaData {
+                        padata_type: ExplicitContextTag1::from(IntegerAsn1(vec![0, 149])),
+                        padata_data: ExplicitContextTag2::from(OctetStringAsn1(Vec::new())),
+                    },
+                ])))),
+                req_body: ExplicitContextTag4::from(KdcReqBody {
+                    kdc_options: ExplicitContextTag0::from(BitStringAsn1::from(BitString::with_bytes(vec![
+                        0, 0, 0, 16,
+                    ]))),
+                    cname: Optional::from(Some(ExplicitContextTag1::from(PrincipalName {
+                        name_type: ExplicitContextTag0::from(IntegerAsn1(vec![1])),
+                        name_string: ExplicitContextTag1::from(Asn1SequenceOf::from(vec![GeneralStringAsn1::from(
+                            Ia5String::from_string("myuser".to_owned()).unwrap(),
+                        )])),
+                    }))),
+                    realm: ExplicitContextTag2::from(GeneralStringAsn1::from(
+                        Ia5String::from_string("EXAMPLE.COM".to_owned()).unwrap(),
+                    )),
+                    sname: Optional::from(Some(ExplicitContextTag3::from(PrincipalName {
+                        name_type: ExplicitContextTag0::from(IntegerAsn1(vec![2])),
+                        name_string: ExplicitContextTag1::from(Asn1SequenceOf::from(vec![
+                            KerberosStringAsn1::from(Ia5String::from_string("krbtgt".to_owned()).unwrap()),
+                            KerberosStringAsn1::from(Ia5String::from_string("EXAMPLE.COM".to_owned()).unwrap()),
+                        ])),
+                    }))),
+                    from: Optional::from(None),
+                    till: ExplicitContextTag5::from(KerberosTime::from(Date::new(2021, 12, 29, 10, 36, 6).unwrap())),
+                    rtime: Optional::from(None),
+                    nonce: ExplicitContextTag7::from(IntegerAsn1(vec![29, 32, 235, 11])),
+                    etype: ExplicitContextTag8::from(Asn1SequenceOf::from(vec![
+                        IntegerAsn1(vec![18]),
+                        IntegerAsn1(vec![17]),
+                        IntegerAsn1(vec![20]),
+                        IntegerAsn1(vec![19]),
+                        IntegerAsn1(vec![16]),
+                        IntegerAsn1(vec![23]),
+                        IntegerAsn1(vec![25]),
+                        IntegerAsn1(vec![26]),
+                    ])),
+                    addresses: Optional::from(None),
+                    enc_authorization_data: Optional::from(None),
+                    additional_tickets: Optional::from(None),
+                }),
+            }),
+        });
+
+        let iakerb_proxy_message =
+            IAKerbProxyMessage::<AsReq>::decode_application_iakerb_proxy_message(iakerb_proxy_message_raw.as_slice())
+                .unwrap();
+
+        assert_eq!(iakerb_proxy_message, expected);
     }
 }
