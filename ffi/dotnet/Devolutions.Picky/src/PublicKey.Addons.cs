@@ -7,13 +7,6 @@ namespace Devolutions.Picky;
 
 public partial class PublicKey
 {
-    // FIXME: maybe this should be part of the Diplomat namespace in DiplomatRuntime.cs
-#if __IOS__
-    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
-#else
-    private const string NativeLib = "DevolutionsPicky";
-#endif
-
     /// Returns the required space in bytes to write the DER representation of the PKCS1 archive.
     ///
     /// When an error occurs, 0 is returned.
@@ -21,7 +14,7 @@ public partial class PublicKey
     /// # Safety
     ///
     /// - `public_key` must be a pointer to a valid memory location containing a `PublicKey` object.
-	[DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PublicKey_pkcs1_encoded_len", ExactSpelling = true)]
+	[DllImport(DiplomatNativeLib.Name, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PublicKey_pkcs1_encoded_len", ExactSpelling = true)]
     internal static unsafe extern nuint PublicKey_pkcs1_encoded_len(Raw.PublicKey* public_key);
 
     /// Serializes an RSA public key into a PKCS1 archive (DER representation).
@@ -32,26 +25,32 @@ public partial class PublicKey
     ///
     /// - `public_key` must be a pointer to a valid memory location containing a `PublicKey` object.
     /// - `dst` must be valid for writes of `count` bytes.
-	[DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PublicKey_to_pkcs1", ExactSpelling = true)]
+	[DllImport(DiplomatNativeLib.Name, CallingConvention = CallingConvention.Cdecl, EntryPoint = "PublicKey_to_pkcs1", ExactSpelling = true)]
     internal static unsafe extern Raw.PickyError* PublicKey_to_pkcs1(Raw.PublicKey* public_key, byte* dst, nuint count);
 
     public byte[] ToPkcs1()
     {
         unsafe
         {
-            if (_inner == null)
-            {
-                throw new ObjectDisposedException("PublicKey");
-            }
-
-            nuint count = PublicKey_pkcs1_encoded_len(_inner);
-
-            byte[] pkcs1 = new byte[count];
+            BorrowLease<Raw.PublicKey>? selfLease = null;
             Raw.PickyError* error;
-
-            fixed (byte* pkcs1Ptr = pkcs1)
+            byte[] pkcs1;
+            try
             {
-                error = PublicKey_to_pkcs1(_inner, pkcs1Ptr, count);
+                selfLease = _diplomatHandle.Lease(BorrowKind.Shared);
+
+                nuint count = PublicKey_pkcs1_encoded_len(selfLease.Ptr);
+
+                pkcs1 = new byte[count];
+
+                fixed (byte* pkcs1Ptr = pkcs1)
+                {
+                    error = PublicKey_to_pkcs1(selfLease.Ptr, pkcs1Ptr, count);
+                }
+            }
+            finally
+            {
+                selfLease?.Release();
             }
 
             if (error != null)

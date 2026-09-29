@@ -6,7 +6,7 @@ pub mod ffi {
     use crate::error::ffi::PickyError;
     use crate::key::ffi::PrivateKey;
     use crate::x509::ffi::Cert;
-    use diplomat_runtime::DiplomatWriteable;
+    use diplomat_runtime::DiplomatWrite;
     use picky::pkcs12;
     use picky_asn1::restricted_string::BmpString;
     use std::str::FromStr;
@@ -80,7 +80,7 @@ pub mod ffi {
         }
     }
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct Pkcs12ParsingParams(pub(crate) pkcs12::Pkcs12ParsingParams);
 
     impl Pkcs12ParsingParams {
@@ -166,7 +166,7 @@ pub mod ffi {
         }
 
         #[diplomat::attr(auto, getter = "friendly_name")]
-        pub fn get_friendly_name(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn get_friendly_name(&self, writeable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             use std::fmt::Write as _;
 
             if let pkcs12::Pkcs12AttributeKind::FriendlyName(name) = self.0.kind() {
@@ -180,7 +180,7 @@ pub mod ffi {
         }
     }
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct Pkcs12AttributeIterator(pub(crate) Box<dyn Iterator<Item = pkcs12::Pkcs12Attribute>>);
 
     impl Pkcs12AttributeIterator {
@@ -198,7 +198,7 @@ pub mod ffi {
 
     /// PFX safe bag, the polymorphic container for all the data in a PKCS12 archive.
     // Can hold a private key: free it promptly, don't wait on the GC.
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     #[diplomat::attr(dotnet, manually_disposable)]
     pub struct SafeBag(pub(crate) pkcs12::SafeBag);
 
@@ -306,7 +306,7 @@ pub mod ffi {
     }
 
     // Owns the remaining safe bags, which can hold private keys.
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     #[diplomat::attr(dotnet, manually_disposable)]
     pub struct SafeBagIterator(pub(crate) Box<dyn Iterator<Item = pkcs12::SafeBag>>);
 
@@ -318,7 +318,7 @@ pub mod ffi {
 
     /// PFX (PKCS12 archive) builder.
     // Holds private-key safe bags and the password: free them promptly, don't wait on the GC.
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     #[diplomat::attr(dotnet, manually_disposable)]
     pub struct PfxBuilder {
         safe_bags_acc: Vec<pkcs12::SafeBag>,
