@@ -89,7 +89,7 @@ AAXJx0RWF7EDQVJtlTfSrUCm+SSFoD0AAAAOdGVzdEBwaWNreS5jb20BAgMEBQ==
         ulong validBefore = 2000;
 
         var builder = SshCert.Builder();
-        builder.CertKeyType = SshCertKeyType.RsaSha2_256V01;
+        builder.CertKeyType = SshCertKeyType.RsaSha2256v01;
         builder.Key = privateKey.ToPublicKey();
         builder.CertType = SshCertType.Host;
         builder.ValidAfter = validAfter;
@@ -98,7 +98,7 @@ AAXJx0RWF7EDQVJtlTfSrUCm+SSFoD0AAAAOdGVzdEBwaWNreS5jb20BAgMEBQ==
         builder.Comment = "hello!";
         var cert = builder.Build();
 
-        Assert.Equal(SshCertKeyType.RsaSha2_256V01, cert.SshKeyType);
+        Assert.Equal(SshCertKeyType.RsaSha2256v01, cert.SshKeyType);
         Assert.Equal(SshCertType.Host, cert.CertType);
         Assert.Equal((ulong)1000, cert.ValidAfter);
         Assert.Equal((ulong)2000, cert.ValidBefore);

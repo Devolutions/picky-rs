@@ -6,11 +6,11 @@ pub mod ffi {
         AttributeTypeAndValue, AttributeTypeAndValueIterator, AttributeTypeAndValueNestedIterator,
     };
     use crate::x509::string::ffi::DirectoryString;
-    use diplomat_runtime::DiplomatWriteable;
+    use diplomat_runtime::DiplomatWrite;
     use std::fmt::Write;
     use std::str::FromStr;
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     #[diplomat::attr(dotnet, manually_disposable)]
     pub struct GeneralNameIterator(pub Vec<GeneralName>);
 
@@ -59,7 +59,7 @@ pub mod ffi {
             }
         }
 
-        pub fn to_rfc822_name(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn to_rfc822_name(&self, writable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             match &self.0 {
                 picky_asn1_x509::name::GeneralName::Rfc822Name(rfc822_name) => {
                     write!(writable, "{}", rfc822_name.0)?;
@@ -69,7 +69,7 @@ pub mod ffi {
             }
         }
 
-        pub fn to_dns_name(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn to_dns_name(&self, writable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             match &self.0 {
                 picky_asn1_x509::name::GeneralName::DnsName(dns_name) => {
                     write!(writable, "{}", dns_name.0)?;
@@ -104,7 +104,7 @@ pub mod ffi {
             }
         }
 
-        pub fn to_uri(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn to_uri(&self, writable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             match &self.0 {
                 picky_asn1_x509::name::GeneralName::Uri(uri) => {
                     write!(writable, "{}", uri.0)?;
@@ -123,7 +123,7 @@ pub mod ffi {
             }
         }
 
-        pub fn to_registered_id(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn to_registered_id(&self, writable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             match &self.0 {
                 picky_asn1_x509::name::GeneralName::RegisteredId(registered_id) => {
                     let oid: String = registered_id.0.clone().into();
@@ -160,7 +160,7 @@ pub mod ffi {
 
     impl OtherName {
         #[diplomat::attr(auto, getter = "type_id")]
-        pub fn get_type_id(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn get_type_id(&self, writable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             let oid: String = self.0.type_id.0.clone().into();
             write!(writable, "{oid}")?;
             Ok(())
@@ -187,7 +187,7 @@ pub mod ffi {
         Phone,
     }
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     #[diplomat::attr(dotnet, manually_disposable)]
     pub struct DirectoryName(pub picky::x509::name::DirectoryName);
 

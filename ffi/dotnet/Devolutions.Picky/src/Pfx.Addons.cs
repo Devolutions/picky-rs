@@ -7,13 +7,6 @@ namespace Devolutions.Picky;
 
 public partial class Pfx
 {
-    // FIXME: maybe this should be part of the Diplomat namespace in DiplomatRuntime.cs
-#if __IOS__
-    private const string NativeLib = "libDevolutionsPicky.framework/libDevolutionsPicky";
-#else
-    private const string NativeLib = "DevolutionsPicky";
-#endif
-
     /// Returns the required space in bytes to write the DER representation of this PKCS12 archive.
     ///
     /// When an error occurs, 0 is returned.
@@ -21,7 +14,7 @@ public partial class Pfx
     /// # Safety
     ///
     /// - `pfx` must be a pointer to a valid memory location containing a `Pfx` object.
-	[DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pfx_der_encoded_len", ExactSpelling = true)]
+	[DllImport(DiplomatNativeLib.Name, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pfx_der_encoded_len", ExactSpelling = true)]
     internal static unsafe extern nuint Pfx_der_encoded_len(Raw.Pfx* pfx);
 
     /// Serializes the PKCS12 archive into DER representation.
@@ -32,26 +25,32 @@ public partial class Pfx
     ///
     /// - `pfx` must be a pointer to a valid memory location containing a `Pfx` object.
     /// - `dst` must be valid for writes of `count` bytes.
-	[DllImport(NativeLib, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pfx_to_der", ExactSpelling = true)]
+	[DllImport(DiplomatNativeLib.Name, CallingConvention = CallingConvention.Cdecl, EntryPoint = "Pfx_to_der", ExactSpelling = true)]
     internal static unsafe extern Raw.PickyError* Pfx_to_der(Raw.Pfx* pfx, byte* dst, nuint count);
 
     public byte[] ToDer()
     {
         unsafe
         {
-            if (_inner == null)
-            {
-                throw new ObjectDisposedException("Pfx");
-            }
-
-            nuint count = Pfx_der_encoded_len(_inner);
-
-            byte[] der = new byte[count];
+            BorrowLease<Raw.Pfx>? selfLease = null;
             Raw.PickyError* error;
-
-            fixed (byte* derPtr = der)
+            byte[] der;
+            try
             {
-                error = Pfx_to_der(_inner, derPtr, count);
+                selfLease = _diplomatHandle.Lease(BorrowKind.Shared);
+
+                nuint count = Pfx_der_encoded_len(selfLease.Ptr);
+
+                der = new byte[count];
+
+                fixed (byte* derPtr = der)
+                {
+                    error = Pfx_to_der(selfLease.Ptr, derPtr, count);
+                }
+            }
+            finally
+            {
+                selfLease?.Release();
             }
 
             if (error != null)
