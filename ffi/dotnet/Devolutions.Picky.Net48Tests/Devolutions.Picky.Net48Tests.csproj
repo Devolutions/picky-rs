@@ -51,4 +51,11 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="..\..\..\picky-test-data\test_assets\pkcs12\certmgr_aes256.pfx;..\..\..\picky-test-data\test_assets\pkcs12\asset_leaf.crt">
+      <Link>%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
