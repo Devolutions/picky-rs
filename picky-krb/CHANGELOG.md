@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[0.12.5](https://github.com/Devolutions/picky-rs/compare/picky-krb-v0.12.4...picky-krb-v0.12.5)] - 2026-09-29
+
+### <!-- 1 -->Features
+
+- Add IAKerb proxy message encoding/decoding ([#531](https://github.com/Devolutions/picky-rs/issues/531)) ([6f980446a3](https://github.com/Devolutions/picky-rs/commit/6f980446a350835f238c69c3189f831e75457279)) 
+
+  This PR implements encoding and decoding of the `IAKERB_PROXY` message
+  (`IAKrbProxyMessage`) according to the [IAKERB
+  specification](https://datatracker.ietf.org/doc/html/draft-ietf-kitten-iakerb-03).
+  The implementation is also covered with unit-tests.
+  
+  ## What is IAKERB
+  IAKERB extends Kerberos to support scenarios where the client cannot
+  directly access the KDC. Instead, KDC messages are encapsulated in
+  GSS-API tokens and exchanged through an IAKERB proxy. The server
+  forwards these messages to the LocalKDC, allowing the client to obtain
+  the required Kerberos tickets without direct network access to the KDC.
+  
+  Microsoft recently introduced IAKERB support in Windows Insider builds
+  as part of its effort to reduce NTLM dependency:
+  https://techcommunity.microsoft.com/blog/windows-itpro-blog/reducing-ntlm-dependency-iakerb-and-localkdc-in-windows-insider-preview/4524615.
+
+
+
 ## [[0.12.4](https://github.com/Devolutions/picky-rs/compare/picky-krb-v0.12.3...picky-krb-v0.12.4)] - 2026-06-19
 
 ### <!-- 7 -->Build
