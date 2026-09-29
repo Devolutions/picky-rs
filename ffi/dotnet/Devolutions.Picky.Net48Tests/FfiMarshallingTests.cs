@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 
 using Xunit;
 
@@ -216,4 +217,82 @@ Z/fDKMxHxeXla54kfV+HiGkH
         Assert.False(string.IsNullOrEmpty(ex.Inner.ToDisplay()));
         Assert.True(Enum.IsDefined(typeof(PickyErrorKind), ex.Inner.Kind));
     }
+
+    // The tests below follow what the Devolutions Gateway PowerShell module does on
+    // Windows PowerShell 5.1, the one shipping consumer that loads these bindings on
+    // .NET Framework (powershell/DevolutionsGateway/Private/CertificateHelper.ps1).
+
+    // Iterator returning Option<Box<T>> until null, plus nullable opaque getters:
+    // Get-PemCertificate walking a password-protected PFX exported by certmgr.
+    [Fact]
+    public void Iterator_PfxSafeBags()
+    {
+        byte[] pfxBytes = File.ReadAllBytes(Asset("certmgr_aes256.pfx"));
+        using Pkcs12CryptoContext cryptoContext = Pkcs12CryptoContext.WithPassword("test");
+        using Pkcs12ParsingParams parsingParams = Pkcs12ParsingParams.New();
+        using Pfx pfx = Pfx.FromDer(pfxBytes, cryptoContext, parsingParams);
+
+        int certCount = 0;
+        int keyCount = 0;
+
+        using SafeBagIterator safeBags = pfx.SafeBags();
+        SafeBag? safeBag;
+        while ((safeBag = safeBags.Next()) is not null)
+        {
+            using (safeBag)
+            {
+                switch (safeBag.Kind)
+                {
+                    case SafeBagKind.Certificate:
+                        {
+                            using Cert? cert = safeBag.Certificate;
+                            Assert.NotNull(cert);
+                            using Pem pem = cert!.ToPem();
+                            Assert.Contains("BEGIN CERTIFICATE", pem.ToRepr());
+                            certCount++;
+                            break;
+                        }
+                    case SafeBagKind.PrivateKey:
+                        {
+                            using PrivateKey? key = safeBag.PrivateKey;
+                            Assert.NotNull(key);
+                            using Pem pem = key!.ToPem();
+                            Assert.Contains("PRIVATE KEY", pem.ToRepr());
+                            keyCount++;
+                            break;
+                        }
+                }
+            }
+        }
+
+        Assert.NotEqual(0, certCount);
+        Assert.Equal(1, keyCount);
+    }
+
+    // Byte-slice inputs: Get-PemCertificate with a DER certificate and a PKCS#8 key file.
+    [Fact]
+    public void SliceInput_DerCertAndPkcs8Key()
+    {
+        using Cert cert = Cert.FromDer(File.ReadAllBytes(Asset("asset_leaf.crt")));
+        using Pem certPem = cert.ToPem();
+        Assert.Contains("BEGIN CERTIFICATE", certPem.ToRepr());
+
+        using Pem keyPem = Pem.Parse(RsaPrivateKeyPem);
+        using PrivateKey key = PrivateKey.FromPkcs8(keyPem.ToData());
+        Assert.Equal(KeyKind.Rsa, key.Kind);
+    }
+
+    // usize parameter (nuint): New-RsaKeyPair with the module's default key size.
+    [Fact]
+    public void UsizeParam_GenerateRsa()
+    {
+        using PrivateKey key = PrivateKey.GenerateRsa(2048);
+        Assert.Equal(KeyKind.Rsa, key.Kind);
+
+        using PublicKey pub = key.ToPublicKey();
+        using Pem pem = pub.ToPem();
+        Assert.Contains("PUBLIC KEY", pem.ToRepr());
+    }
+
+    private static string Asset(string name) => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, name);
 }
