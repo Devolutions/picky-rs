@@ -181,6 +181,16 @@ jobs:
         run: dotnet test ./ffi/dotnet/Devolutions.Picky.Tests/Devolutions.Picky.Tests.csproj -c Release --no-build
         shell: pwsh
 
+      # The netstandard2.0 assembly also loads on .NET Framework, so run the
+      # marshalling tests on the net48 CLR too. That project copies the native
+      # library from dependencies/runtimes/win-x64/native at build time.
+      - name: Run .NET Framework marshalling tests
+        run: |
+          New-Item -ItemType Directory -Force ./dependencies/runtimes/win-x64/native | Out-Null
+          Copy-Item ./target/${{ matrix.profile }}/picky.dll ./dependencies/runtimes/win-x64/native/DevolutionsPicky.dll -Force
+          dotnet test ./ffi/dotnet/Devolutions.Picky.Net48Tests/Devolutions.Picky.Net48Tests.csproj -c Release
+        shell: pwsh
+
   success:
     name: Success
     if: ${{ always() }}
