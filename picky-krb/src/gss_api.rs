@@ -123,9 +123,7 @@ impl<T: Serialize> KrbMessage<T> {
 
 impl<T: DeserializeOwned> KrbMessage<T> {
     /// Deserializes `ApplicationTag0<KrbMessage<T>>`.
-    pub fn decode_application_krb_message(
-        data: &[u8],
-    ) -> Result<ApplicationTag0<KrbMessage<T>>, GssApiMessageError> {
+    pub fn decode_application_krb_message(data: &[u8]) -> Result<ApplicationTag0<KrbMessage<T>>, GssApiMessageError> {
         if data.is_empty() || Tag::from(data[0]) != Tag::application_constructed(0) {
             return Err(GssApiMessageError::Asn1Error(Asn1DerError::InvalidData));
         }
