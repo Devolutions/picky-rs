@@ -59,7 +59,7 @@ pub mod ffi {
     use crate::pem::ffi::Pem;
     use crate::signature::ffi::SignatureAlgorithm;
     use crate::utils::ffi::VecU8;
-    use diplomat_runtime::DiplomatWriteable;
+    use diplomat_runtime::DiplomatWrite;
     use picky::ssh;
     use std::borrow::ToOwned;
     use std::fmt::Write as _;
@@ -82,7 +82,7 @@ pub mod ffi {
         /// It is generally represented as:
         /// "(algorithm) (der for the key) (comment)"
         /// where (comment) is usually an email address.
-        pub fn to_repr(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn to_repr(&self, writeable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             let repr = self.0.to_string()?;
             writeable.write_str(&repr)?;
             writeable.flush();
@@ -90,7 +90,7 @@ pub mod ffi {
         }
 
         #[diplomat::attr(auto, getter = "comment")]
-        pub fn get_comment(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn get_comment(&self, writeable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             writeable.write_str(&self.0.comment)?;
             writeable.flush();
             Ok(())
@@ -224,7 +224,7 @@ pub mod ffi {
         }
 
         /// Returns the SSH Private Key string representation.
-        pub fn to_repr(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn to_repr(&self, writeable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             let repr = self.0.to_string()?;
             writeable.write_str(&repr)?;
             writeable.flush();
@@ -232,14 +232,14 @@ pub mod ffi {
         }
 
         #[diplomat::attr(auto, getter = "cipher_name")]
-        pub fn get_cipher_name(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn get_cipher_name(&self, writeable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             writeable.write_str(&self.0.cipher_name)?;
             writeable.flush();
             Ok(())
         }
 
         #[diplomat::attr(auto, getter = "comment")]
-        pub fn get_comment(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn get_comment(&self, writeable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             writeable.write_str(&self.0.comment)?;
             writeable.flush();
             Ok(())
@@ -363,7 +363,7 @@ pub mod ffi {
         }
 
         /// Returns the SSH Certificate string representation.
-        pub fn to_repr(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn to_repr(&self, writeable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             let repr = self.0.to_string()?;
             writeable.write_str(&repr)?;
             writeable.flush();
@@ -401,14 +401,14 @@ pub mod ffi {
         }
 
         #[diplomat::attr(auto, getter = "key_id")]
-        pub fn get_key_id(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn get_key_id(&self, writeable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             writeable.write_str(&self.0.key_id)?;
             writeable.flush();
             Ok(())
         }
 
         #[diplomat::attr(auto, getter = "comment")]
-        pub fn get_comment(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn get_comment(&self, writeable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             writeable.write_str(&self.0.comment)?;
             writeable.flush();
             Ok(())

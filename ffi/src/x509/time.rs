@@ -37,7 +37,7 @@ pub mod ffi {
         }
     }
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     #[diplomat::attr(dotnet, manually_disposable)]
     pub struct UTCTimeIterator(pub Vec<UTCTime>);
 

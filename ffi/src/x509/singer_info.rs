@@ -3,7 +3,7 @@ pub mod ffi {
     use crate::error::ffi::PickyError;
     use crate::x509::algorithm_identifier::ffi::AlgorithmIdentifier;
     use crate::x509::attribute::ffi::{Attribute, AttributeIterator, UnsignedAttribute, UnsignedAttributeIterator};
-    use diplomat_runtime::DiplomatWriteable;
+    use diplomat_runtime::DiplomatWrite;
     use std::fmt::Write;
 
     #[diplomat::opaque]
@@ -100,14 +100,14 @@ pub mod ffi {
 
     impl IssuerAndSerialNumber {
         #[diplomat::attr(auto, getter = "issuer")]
-        pub fn get_issuer(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn get_issuer(&self, writable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             let name_string = format!("{}", self.0.issuer);
             write!(writable, "{name_string}")?;
             Ok(())
         }
     }
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     #[diplomat::attr(dotnet, manually_disposable)]
     pub struct SignerInfoIterator(pub Vec<SignerInfo>);
 

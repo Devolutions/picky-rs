@@ -18,7 +18,7 @@ pub mod ffi {
     // Not `manually_disposable`: `authenticode_verifier` returns a validator that
     // borrows from `self`, and Diplomat rejects retained borrows from a manually
     // disposable type.
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct AuthenticodeSignature(pub picky::x509::pkcs7::authenticode::AuthenticodeSignature);
 
     #[diplomat::enum_convert(picky_asn1_x509::ShaVariant)]
@@ -100,7 +100,7 @@ pub mod ffi {
             Ok(Box::new(Cert(cert.clone())))
         }
 
-        pub fn authenticode_verifier(&self) -> Box<AuthenticodeValidator<'_>> {
+        pub fn authenticode_verifier<'a>(&'a self) -> Box<AuthenticodeValidator<'a>> {
             let verifier = self.0.authenticode_verifier();
             Box::new(AuthenticodeValidator::new(verifier))
         }
@@ -130,7 +130,7 @@ pub mod ffi {
         }
     }
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     #[diplomat::attr(dotnet, manually_disposable)]
     pub struct AuthenticodeValidator<'a> {
         pub inner: picky::x509::pkcs7::authenticode::AuthenticodeValidator<'a>,
@@ -201,7 +201,7 @@ pub mod ffi {
         }
     }
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     #[diplomat::attr(dotnet, manually_disposable)]
     pub struct AuthenticodeTimestamper(pub picky::x509::pkcs7::timestamp::http_timestamp::AuthenticodeTimestamper);
 
