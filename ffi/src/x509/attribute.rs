@@ -14,12 +14,14 @@ pub mod ffi {
     pub struct Attribute(pub picky_asn1_x509::Attribute);
 
     impl Attribute {
+        #[diplomat::attr(auto, getter = "type")]
         pub fn get_type(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             let oid: String = self.0.ty.0.clone().into();
             write!(writable, "{oid}")?;
             Ok(())
         }
 
+        #[diplomat::attr(auto, getter = "values")]
         pub fn get_values(&self) -> Box<AttributeValues> {
             Box::new(AttributeValues(self.0.value.clone()))
         }
@@ -48,6 +50,7 @@ pub mod ffi {
     }
 
     impl AttributeValues {
+        #[diplomat::attr(auto, getter = "type")]
         pub fn get_type(&self) -> AttributeValueType {
             match &self.0 {
                 picky_asn1_x509::AttributeValues::Extensions(_) => AttributeValueType::Extensions,
@@ -142,6 +145,7 @@ pub mod ffi {
     pub struct SpcSpOpusInfo(picky_asn1_x509::pkcs7::content_info::SpcSpOpusInfo);
 
     impl SpcSpOpusInfo {
+        #[diplomat::attr(auto, getter = "program_name")]
         pub fn get_program_name(&self) -> Option<Box<SpcString>> {
             self.0
                 .program_name
@@ -149,6 +153,7 @@ pub mod ffi {
                 .map(|program_name| Box::new(SpcString(program_name.0.clone())))
         }
 
+        #[diplomat::attr(auto, getter = "more_info")]
         pub fn get_more_info(&self) -> Option<Box<SpcLink>> {
             self.0
                 .more_info
@@ -166,6 +171,7 @@ pub mod ffi {
     }
 
     impl SpcString {
+        #[diplomat::attr(auto, getter = "type")]
         pub fn get_type(&self) -> SpcStringType {
             match &self.0 {
                 picky_asn1_x509::pkcs7::content_info::SpcString::Unicode(_) => SpcStringType::Unicode,
@@ -173,6 +179,7 @@ pub mod ffi {
             }
         }
 
+        #[diplomat::attr(auto, getter = "as_string")]
         pub fn get_as_string(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             match &self.0 {
                 picky_asn1_x509::pkcs7::content_info::SpcString::Unicode(unicode) => {
@@ -185,6 +192,7 @@ pub mod ffi {
             Ok(())
         }
 
+        #[diplomat::attr(auto, getter = "as_bytes")]
         pub fn get_as_bytes(&self) -> Box<VecU8> {
             match &self.0 {
                 picky_asn1_x509::pkcs7::content_info::SpcString::Unicode(unicode) => {
@@ -207,6 +215,7 @@ pub mod ffi {
     }
 
     impl SpcLink {
+        #[diplomat::attr(auto, getter = "type")]
         pub fn get_type(&self) -> SpcLinkType {
             match &self.0 {
                 picky_asn1_x509::pkcs7::content_info::SpcLink::Url(_) => SpcLinkType::Url,
@@ -215,6 +224,7 @@ pub mod ffi {
             }
         }
 
+        #[diplomat::attr(auto, getter = "url")]
         pub fn get_url(&self) -> Option<Box<VecU8>> {
             match &self.0 {
                 picky_asn1_x509::pkcs7::content_info::SpcLink::Url(url) => {
@@ -225,6 +235,7 @@ pub mod ffi {
             }
         }
 
+        #[diplomat::attr(auto, getter = "moniker")]
         pub fn get_moniker(&self) -> Option<Box<SpcSerializedObject>> {
             match &self.0 {
                 picky_asn1_x509::pkcs7::content_info::SpcLink::Moniker(moniker) => {
@@ -234,6 +245,7 @@ pub mod ffi {
             }
         }
 
+        #[diplomat::attr(auto, getter = "file")]
         pub fn get_file(&self) -> Option<Box<SpcString>> {
             match &self.0 {
                 picky_asn1_x509::pkcs7::content_info::SpcLink::File(file) => {
@@ -249,10 +261,12 @@ pub mod ffi {
     pub struct SpcSerializedObject(picky_asn1_x509::pkcs7::content_info::SpcSerializedObject);
 
     impl SpcSerializedObject {
+        #[diplomat::attr(auto, getter = "class_id")]
         pub fn get_class_id(&self) -> Box<VecU8> {
             VecU8::from_bytes(&self.0.class_id.0.0).boxed()
         }
 
+        #[diplomat::attr(auto, getter = "object_id")]
         pub fn get_object_id(&self) -> Box<VecU8> {
             VecU8::from_bytes(&self.0.serialized_data.0).boxed()
         }
@@ -292,12 +306,14 @@ pub mod ffi {
     pub struct AttributeTypeAndValue(pub picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValue);
 
     impl AttributeTypeAndValue {
+        #[diplomat::attr(auto, getter = "type_id")]
         pub fn get_type_id(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             let oid: String = self.0.ty.0.clone().into();
             write!(writable, "{oid}")?;
             Ok(())
         }
 
+        #[diplomat::attr(auto, getter = "value")]
         pub fn get_value(&self) -> Box<AttributeTypeAndValueParameters> {
             Box::new(AttributeTypeAndValueParameters(self.0.value.clone()))
         }
@@ -325,6 +341,7 @@ pub mod ffi {
     }
 
     impl AttributeTypeAndValueParameters {
+        #[diplomat::attr(auto, getter = "type")]
         pub fn get_type(&self) -> AttributeTypeAndValueParametersType {
             match &self.0 {
                 picky_asn1_x509::attribute_type_and_value::AttributeTypeAndValueParameters::CommonName(_) => {
@@ -494,12 +511,14 @@ pub mod ffi {
     pub struct UnsignedAttribute(pub picky_asn1_x509::signer_info::UnsignedAttribute);
 
     impl UnsignedAttribute {
+        #[diplomat::attr(auto, getter = "type")]
         pub fn get_type(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             let oid: String = self.0.ty.0.clone().into();
             write!(writable, "{oid}")?;
             Ok(())
         }
 
+        #[diplomat::attr(auto, getter = "values")]
         pub fn get_values(&self) -> Box<UnsignedAttributeValue> {
             Box::new(UnsignedAttributeValue(self.0.value.clone()))
         }
@@ -523,6 +542,7 @@ pub mod ffi {
     }
 
     impl UnsignedAttributeValue {
+        #[diplomat::attr(auto, getter = "type")]
         pub fn get_type(&self) -> UnsignedAttributeValueType {
             match &self.0 {
                 picky_asn1_x509::signer_info::UnsignedAttributeValue::MsCounterSign(_) => {
@@ -567,12 +587,14 @@ pub mod ffi {
     pub struct MsCounterSign(picky_asn1_x509::Pkcs7Certificate);
 
     impl MsCounterSign {
+        #[diplomat::attr(auto, getter = "oid")]
         pub fn get_oid(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             let oid_string: String = self.0.oid.0.clone().into();
             write!(writable, "{oid_string}")?;
             Ok(())
         }
 
+        #[diplomat::attr(auto, getter = "signed_data")]
         pub fn get_signed_data(&self) -> Box<SignedData> {
             Box::new(SignedData(self.0.signed_data.0.clone()))
         }
@@ -582,19 +604,23 @@ pub mod ffi {
     pub struct SignedData(pub picky_asn1_x509::pkcs7::signed_data::SignedData);
 
     impl SignedData {
+        #[diplomat::attr(auto, getter = "version")]
         pub fn get_version(&self) -> CmsVersion {
             self.0.version.into()
         }
 
+        #[diplomat::attr(auto, getter = "digest_algorithms")]
         pub fn get_digest_algorithms(&self) -> Box<AlgorithmIdentifierIterator> {
             let vec: Vec<_> = self.0.digest_algorithms.0.iter().cloned().collect();
             Box::new(AlgorithmIdentifierIterator(vec))
         }
 
+        #[diplomat::attr(auto, getter = "content_info")]
         pub fn get_content_info(&self) -> Box<EncapsulatedContentInfo> {
             Box::new(EncapsulatedContentInfo(self.0.content_info.clone()))
         }
 
+        #[diplomat::attr(auto, getter = "crls")]
         pub fn get_crls(&self) -> Option<Box<RevocationInfoChoiceIterator>> {
             self.0
                 .crls
@@ -602,10 +628,12 @@ pub mod ffi {
                 .map(|crls| Box::new(RevocationInfoChoiceIterator(crls.clone())))
         }
 
+        #[diplomat::attr(auto, getter = "certificates")]
         pub fn get_certificates(&self) -> Box<CertificateChoicesIterator> {
             Box::new(CertificateChoicesIterator(self.0.certificates.0.clone()))
         }
 
+        #[diplomat::attr(auto, getter = "signers_infos")]
         pub fn get_signers_infos(&self) -> Box<SignerInfoIterator> {
             let signer_infos = &self.0.signers_infos;
             let vec_signer_infos: Vec<_> = signer_infos.0.iter().cloned().map(SignerInfo).collect();
@@ -637,6 +665,7 @@ pub mod ffi {
     pub struct CertificateChoices(pub picky_asn1_x509::signed_data::CertificateChoices);
 
     impl CertificateChoices {
+        #[diplomat::attr(auto, getter = "certificate")]
         pub fn get_certificate(&self) -> Option<Box<VecU8>> {
             match &self.0 {
                 picky_asn1_x509::signed_data::CertificateChoices::Certificate(der) => {
@@ -646,6 +675,7 @@ pub mod ffi {
             }
         }
 
+        #[diplomat::attr(auto, getter = "other")]
         pub fn get_other(&self) -> Option<Box<VecU8>> {
             match &self.0 {
                 picky_asn1_x509::signed_data::CertificateChoices::Other(der) => Some(VecU8::from_bytes(&der.0).boxed()),
@@ -674,6 +704,7 @@ pub mod ffi {
     pub struct RevocationInfoChoice(pub picky_asn1_x509::crls::RevocationInfoChoice);
 
     impl RevocationInfoChoice {
+        #[diplomat::attr(auto, getter = "crl")]
         pub fn get_crl(&self) -> Option<Box<CertificateList>> {
             match &self.0 {
                 picky_asn1_x509::crls::RevocationInfoChoice::Crl(crl) => Some(Box::new(CertificateList(crl.clone()))),
@@ -686,14 +717,17 @@ pub mod ffi {
     pub struct CertificateList(pub picky_asn1_x509::crls::CertificateList);
 
     impl CertificateList {
+        #[diplomat::attr(auto, getter = "tbs_cert_list")]
         pub fn get_tbs_cert_list(&self) -> Box<TbsCertList> {
             Box::new(TbsCertList(self.0.tbs_cert_list.clone()))
         }
 
+        #[diplomat::attr(auto, getter = "signature_algorithm")]
         pub fn get_signature_algorithm(&self) -> Box<AlgorithmIdentifier> {
             Box::new(AlgorithmIdentifier(self.0.signature_algorithm.clone()))
         }
 
+        #[diplomat::attr(auto, getter = "signature_value")]
         pub fn get_signature_value(&self) -> Box<VecU8> {
             VecU8::from_bytes(self.0.signature_value.clone().payload_view()).boxed()
         }
@@ -702,6 +736,7 @@ pub mod ffi {
     pub struct TbsCertList(pub picky_asn1_x509::crls::TbsCertList);
 
     impl TbsCertList {
+        #[diplomat::attr(auto, getter = "version")]
         pub fn get_version(&self) -> Version {
             match self.0.version.map(|v| match v {
                 picky_asn1_x509::Version::V1 => Version::V1,
@@ -713,24 +748,29 @@ pub mod ffi {
             }
         }
 
+        #[diplomat::attr(auto, getter = "signature_algorithm")]
         pub fn get_signature_algorithm(&self) -> Box<AlgorithmIdentifier> {
             Box::new(AlgorithmIdentifier(self.0.signature.clone()))
         }
 
+        #[diplomat::attr(auto, getter = "issuer")]
         pub fn get_issuer(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             let name_string = format!("{}", self.0.issuer);
             write!(writable, "{name_string}")?;
             Ok(())
         }
 
+        #[diplomat::attr(auto, getter = "this_upate")]
         pub fn get_this_upate(&self) -> Box<Time> {
             Box::new(Time(self.0.this_update.clone()))
         }
 
+        #[diplomat::attr(auto, getter = "next_update")]
         pub fn get_next_update(&self) -> Option<Box<Time>> {
             self.0.next_update.clone().map(Time).map(Box::new)
         }
 
+        #[diplomat::attr(auto, getter = "revoked_certificates")]
         pub fn get_revoked_certificates(&self) -> Option<Box<RevokedCertificateIterator>> {
             self.0.revoked_certificates.as_ref().map(|revoked_certificates| {
                 let mut vec = vec![];
@@ -741,6 +781,7 @@ pub mod ffi {
             })
         }
 
+        #[diplomat::attr(auto, getter = "extenstions")]
         pub fn get_extenstions(&self) -> Option<Box<ExtensionIterator>> {
             self.0.crl_extension.as_ref().map(|extensions| {
                 Box::new(ExtensionIterator(
@@ -766,15 +807,18 @@ pub mod ffi {
     pub struct RevokedCertificate(picky_asn1_x509::crls::RevokedCertificate);
 
     impl RevokedCertificate {
+        #[diplomat::attr(auto, getter = "user_certificate")]
         pub fn get_user_certificate(&self) -> Box<VecU8> {
             let vec = self.0.user_certificate.0.0.clone();
             VecU8::from_bytes(&vec).boxed()
         }
 
+        #[diplomat::attr(auto, getter = "revocation_date")]
         pub fn get_revocation_date(&self) -> Box<Time> {
             Box::new(Time(self.0.revocation_data.clone()))
         }
 
+        #[diplomat::attr(auto, getter = "extensions")]
         pub fn get_extensions(&self) -> Option<Box<ExtensionIterator>> {
             self.0.crl_entry_extensions.as_ref().map(|extensions| {
                 Box::new(ExtensionIterator(

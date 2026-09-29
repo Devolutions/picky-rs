@@ -170,12 +170,14 @@ pub mod ffi {
         }
 
         /// Get the public key from the PPK key file.
+        #[diplomat::attr(auto, getter = "public_key")]
         pub fn get_public_key(&self) -> Result<Box<PublicKey>, Box<PickyError>> {
             let key = self.0.public_key()?;
             Ok(Box::new(PublicKey(key)))
         }
 
         /// Get the private key from the PPK key file.
+        #[diplomat::attr(auto, getter = "private_key")]
         pub fn get_private_key(&self) -> Result<Box<PrivateKey>, Box<PickyError>> {
             let key = self.0.private_key()?;
             Ok(Box::new(PrivateKey(key)))
@@ -188,16 +190,19 @@ pub mod ffi {
         }
 
         /// Get the PPK key file version.
+        #[diplomat::attr(auto, getter = "version")]
         pub fn get_version(&self) -> PuttyPpkVersion {
             self.0.version().into()
         }
 
         /// Get the PPK key file algorithm.
+        #[diplomat::attr(auto, getter = "algorithm")]
         pub fn get_algorithm(&self) -> PuttyPpkKeyAlgorithm {
             self.0.algorithm().into()
         }
 
         /// Get the PPK key file comment.
+        #[diplomat::attr(auto, getter = "comment")]
         pub fn get_comment(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             writeable.write_str(self.0.comment())?;
             writeable.flush();
@@ -272,6 +277,7 @@ pub mod ffi {
         }
 
         /// Get the comment of the public key.
+        #[diplomat::attr(auto, getter = "comment")]
         pub fn get_comment(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             writeable.write_str(self.0.comment())?;
             writeable.flush();
@@ -303,22 +309,27 @@ pub mod ffi {
     pub struct PuttyArgon2Params(picky::putty::Argon2Params);
 
     impl PuttyArgon2Params {
+        #[diplomat::attr(auto, getter = "flavor")]
         pub fn get_flavor(&self) -> PuttyArgon2Flavour {
             self.0.flavor.into()
         }
 
+        #[diplomat::attr(auto, getter = "memory")]
         pub fn get_memory(&self) -> u32 {
             self.0.memory
         }
 
+        #[diplomat::attr(auto, getter = "passes")]
         pub fn get_passes(&self) -> u32 {
             self.0.passes
         }
 
+        #[diplomat::attr(auto, getter = "parallelism")]
         pub fn get_parallelism(&self) -> u32 {
             self.0.parallelism
         }
 
+        #[diplomat::attr(auto, getter = "salt")]
         pub fn get_salt(&self) -> Box<VecU8> {
             Box::new(VecU8(self.0.salt.to_vec()))
         }
@@ -355,18 +366,22 @@ pub mod ffi {
             self.0.clone().argon2_flavour(argon2_flavour.into());
         }
 
+        #[diplomat::attr(auto, setter = "argon2_memory")]
         pub fn set_argon2_memory(&mut self, argon2_memory: u32) {
             self.0.clone().argon2_memory(argon2_memory);
         }
 
+        #[diplomat::attr(auto, setter = "argon2_passes")]
         pub fn set_argon2_passes(&mut self, argon2_passes: u32) {
             self.0.clone().argon2_passes(argon2_passes);
         }
 
+        #[diplomat::attr(auto, setter = "argon2_parallelism")]
         pub fn set_argon2_parallelism(&mut self, argon2_parallelism: u32) {
             self.0.clone().argon2_parallelism(argon2_parallelism);
         }
 
+        #[diplomat::attr(auto, setter = "argon2_salt_size")]
         pub fn set_argon2_salt_size(&mut self, argon2_salt_size: u32) {
             self.0.clone().argon2_salt_size(argon2_salt_size);
         }
