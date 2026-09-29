@@ -111,6 +111,10 @@ pub mod gss_api {
 
     //= [Authenticator Checksum](https://datatracker.ietf.org/doc/html/rfc4121#section-4.1.1) =//
     pub const AUTHENTICATOR_CHECKSUM_TYPE: [u8; 3] = [0x00, 0x80, 0x03];
+
+    /// [The IAKERB GSS-API](https://datatracker.ietf.org/doc/html/draft-ietf-kitten-iakerb-03#section-3)
+    /// IAKERB_PROXY           05 01
+    pub const IAKERB_PROXY_TOKEN_ID: [u8; 2] = [0x05, 0x01];
 }
 
 //= [Kerberos Change Password and Set Password Protocols](https://datatracker.ietf.org/doc/html/rfc3244) =//
@@ -226,4 +230,10 @@ pub mod error_codes {
     pub const KDC_ERR_REVOCATION_STATUS_UNAVAILABLE: u32 = 74;
     pub const KDC_ERR_CLIENT_NAME_MISMATCH: u32 = 75;
     pub const KDC_ERR_KDC_NAME_MISMATCH: u32 = 76;
+
+    //= [IAKERB Error Codes](https://datatracker.ietf.org/doc/html/draft-ietf-kitten-iakerb-03#section-3) =//
+    /// The IAKERB proxy could not find a KDC.
+    pub const KRB_AP_ERR_IAKERB_KDC_NOT_FOUND: u32 = 85;
+    /// The KDC did not respond to the IAKERB proxy.
+    pub const KRB_AP_ERR_IAKERB_KDC_NO_RESPONSE: u32 = 86;
 }

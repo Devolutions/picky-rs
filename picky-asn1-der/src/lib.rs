@@ -79,6 +79,7 @@ mod raw_der;
 mod ser;
 
 pub use crate::de::{Deserializer, from_bytes, from_reader, from_reader_with_max_len};
+pub use crate::misc::Length;
 pub use crate::raw_der::Asn1RawDer;
 pub use crate::ser::{Serializer, to_byte_buf, to_bytes, to_vec, to_writer};
 

@@ -1,18 +1,6 @@
 use std::fmt;
 use std::io::{self, Read};
 
-use picky_asn1::tag::{TagClass, TagPeeker};
-use picky_asn1::wrapper::{
-    Asn1SequenceOf, ExplicitContextTag0, ExplicitContextTag1, ExplicitContextTag2, ExplicitContextTag3,
-    ExplicitContextTag4, ExplicitContextTag5, ExplicitContextTag6, ExplicitContextTag7, ExplicitContextTag8,
-    ExplicitContextTag9, ExplicitContextTag10, ExplicitContextTag11, ExplicitContextTag12, IntegerAsn1,
-    OctetStringAsn1, Optional,
-};
-use picky_asn1_der::application_tag::ApplicationTag;
-use picky_asn1_der::{Asn1DerError, Asn1RawDer};
-use serde::ser::Error;
-use serde::{Deserialize, Serialize, de, ser};
-
 use crate::constants::krb_priv::KRB_PRIV_VERSION;
 use crate::constants::types::{
     AP_REP_MSG_TYPE, AP_REQ_MSG_TYPE, AS_REP_MSG_TYPE, AS_REQ_MSG_TYPE, ENC_AS_REP_PART_TYPE, ENC_TGS_REP_PART_TYPE,
@@ -22,6 +10,18 @@ use crate::data_types::{
     ApOptions, EncryptedData, EncryptionKey, HostAddresses, KerberosFlags, KerberosStringAsn1, KerberosTime, LastReq,
     Microseconds, PaData, PrincipalName, Realm, Ticket,
 };
+use picky_asn1::tag::{TagClass, TagPeeker};
+use picky_asn1::wrapper::{
+    Asn1SequenceOf, BitStringAsn1, ExplicitContextTag0, ExplicitContextTag1, ExplicitContextTag2, ExplicitContextTag3,
+    ExplicitContextTag4, ExplicitContextTag5, ExplicitContextTag6, ExplicitContextTag7, ExplicitContextTag8,
+    ExplicitContextTag9, ExplicitContextTag10, ExplicitContextTag11, ExplicitContextTag12, IntegerAsn1,
+    OctetStringAsn1, Optional,
+};
+use picky_asn1_der::application_tag::ApplicationTag;
+use picky_asn1_der::{Asn1DerError, Asn1RawDer};
+use serde::de::Error as _;
+use serde::ser::Error as _;
+use serde::{Deserialize, Serialize, de, ser};
 
 /// [2.2.2 KDC_PROXY_MESSAGE](https://docs.microsoft.com/en-us/openspecs/windows_protocols/ms-kkdcp/5778aff5-b182-4b97-a970-29c7f911eef2)
 ///
@@ -445,6 +445,68 @@ impl ser::Serialize for KrbPrivMessage {
     }
 }
 
+/// Opaque data, if sent by the server, MUST be copied by the client verbatim into the next IAKERB_PROXY message.
+///
+/// [draft-ietf-kitten-iakerb-03 3](https://datatracker.ietf.org/doc/html/draft-ietf-kitten-iakerb-03#section-3)
+pub type IAKerbCookie = Option<ExplicitContextTag2<OctetStringAsn1>>;
+
+/// [draft-ietf-kitten-iakerb-03 3](https://datatracker.ietf.org/doc/html/draft-ietf-kitten-iakerb-03#section-3)
+///
+/// ```not_rust
+/// IAKERB-HEADER ::= SEQUENCE {
+///       -- Note that the tag numbers start at 1, not 0, which would
+///       -- be more conventional for Kerberos.
+///       target-realm      [1] UTF8String,
+///          -- The name of the target realm.
+///       cookie            [2] OCTET STRING OPTIONAL,
+///          -- Opaque data, if sent by the server,
+///          -- MUST be copied by the client verbatim into
+///          -- the next IAKERB_PROXY message.
+///       ...
+/// }
+/// ```
+#[derive(Serialize, Debug, Clone, PartialEq, Eq)]
+pub struct IAKerbHeader {
+    pub target_realm: ExplicitContextTag1<String>,
+    pub cookie: Optional<IAKerbCookie>,
+    // This field is not specified in the RFC but present in real messages.
+    pub flags: Optional<Option<ExplicitContextTag3<BitStringAsn1>>>,
+}
+
+// IAKERB-HEADER is extensible, so we need a custom deserialization implementation
+// to consume the entire header while parsing only the known fields.
+// The derived implementation would leave the unknown fields of the header unconsumed,
+// which would cause the subsequent deserialization to fail.
+impl<'de> de::Deserialize<'de> for IAKerbHeader {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct IAKerbHeaderHelper {
+            target_realm: ExplicitContextTag1<String>,
+            #[serde(default)]
+            cookie: Optional<IAKerbCookie>,
+            #[serde(default)]
+            flags: Optional<Option<ExplicitContextTag3<BitStringAsn1>>>,
+        }
+
+        let Asn1RawDer(raw) = Asn1RawDer::deserialize(deserializer)?;
+        let IAKerbHeaderHelper {
+            target_realm,
+            cookie,
+            flags,
+        } = picky_asn1_der::from_bytes(&raw)
+            .map_err(|err| D::Error::custom(format!("Cannot deserialize IAKerbHeader: {err:?}")))?;
+
+        Ok(IAKerbHeader {
+            target_realm,
+            cookie,
+            flags,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::constants::error_codes::{KDC_ERR_C_PRINCIPAL_UNKNOWN, KRB_AP_ERR_INAPP_CKSUM};
@@ -453,8 +515,8 @@ mod tests {
         Ticket, TicketInner,
     };
     use crate::messages::{
-        ApMessage, ApRep, ApRepInner, ApReq, ApReqInner, AsRep, AsReq, KdcProxyMessage, KdcRep, KdcReq, KdcReqBody,
-        KrbError, KrbErrorInner, KrbPriv, KrbPrivInner, KrbPrivMessage, TgsReq,
+        ApMessage, ApRep, ApRepInner, ApReq, ApReqInner, AsRep, AsReq, IAKerbHeader, KdcProxyMessage, KdcRep, KdcReq,
+        KdcReqBody, KrbError, KrbErrorInner, KrbPriv, KrbPrivInner, KrbPrivMessage, TgsReq,
     };
 
     use picky_asn1::bit_string::BitString;
@@ -1177,5 +1239,27 @@ mod tests {
 
         assert_eq!(expected, tgs_req);
         assert_eq!(expected_raw, tgs_req_raw);
+    }
+
+    #[test]
+    fn iakerb_header() {
+        let expected_raw = vec![
+            48, 29, 161, 13, 12, 11, 69, 88, 65, 77, 80, 76, 69, 46, 67, 79, 77, 162, 12, 4, 10, 1, 2, 3, 4, 5, 6, 7,
+            8, 9, 10,
+        ];
+
+        let expected = IAKerbHeader {
+            target_realm: ExplicitContextTag1::from("EXAMPLE.COM".to_string()),
+            cookie: Optional::from(Some(ExplicitContextTag2::from(OctetStringAsn1::from(vec![
+                1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+            ])))),
+            flags: Optional::from(None),
+        };
+
+        let iakerb: IAKerbHeader = picky_asn1_der::from_bytes(&expected_raw).unwrap();
+        let iakerb_raw = picky_asn1_der::to_vec(&expected).unwrap();
+
+        assert_eq!(expected, iakerb);
+        assert_eq!(expected_raw, iakerb_raw);
     }
 }
