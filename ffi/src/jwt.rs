@@ -102,6 +102,7 @@ pub mod ffi {
     ///
     /// This is a JWS (JSON Web Signature) structure with JWT claims contained in a JSON payload.
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct JwtSig(pub(crate) jwt::CheckedJwtSig<serde_json::Value>);
 
     impl JwtSig {
@@ -111,6 +112,7 @@ pub mod ffi {
 
         /// Returns the content type.
         // TODO: support for optional string in return position
+        #[diplomat::attr(auto, getter = "content_type")]
         pub fn get_content_type(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             write!(writeable, "{}", self.0.header.cty.as_deref().unwrap_or(""))?;
             writeable.flush();
@@ -119,6 +121,7 @@ pub mod ffi {
 
         /// Returns the key ID.
         // TODO: support for optional string in return position
+        #[diplomat::attr(auto, getter = "kid")]
         pub fn get_kid(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             write!(writeable, "{}", self.0.header.kid.as_deref().unwrap_or(""))?;
             writeable.flush();
@@ -126,6 +129,7 @@ pub mod ffi {
         }
 
         /// Returns the header as a JSON encoded payload.
+        #[diplomat::attr(auto, getter = "header")]
         pub fn get_header(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             let header = serde_json::to_string(&self.0.header)?;
             write!(writeable, "{header}")?;
@@ -134,6 +138,7 @@ pub mod ffi {
         }
 
         /// Returns the claims as a JSON encoded payload.
+        #[diplomat::attr(auto, getter = "claims")]
         pub fn get_claims(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             let claims = serde_json::to_string(&self.0.state.claims)?;
             write!(writeable, "{claims}")?;
@@ -170,6 +175,7 @@ pub mod ffi {
     }
 
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct JwtSigBuilder(pub(crate) super::SigBuilderInner);
 
     impl JwtSigBuilder {
@@ -183,14 +189,17 @@ pub mod ffi {
             }))
         }
 
+        #[diplomat::attr(auto, setter = "algorithm")]
         pub fn set_algorithm(&mut self, alg: JwsAlg) {
             self.0.alg = alg;
         }
 
+        #[diplomat::attr(auto, setter = "content_type")]
         pub fn set_content_type(&mut self, cty: &str) {
             self.0.cty = Some(cty.to_owned());
         }
 
+        #[diplomat::attr(auto, setter = "kid")]
         pub fn set_kid(&mut self, kid: &str) {
             self.0.kid = Some(kid.to_owned());
         }
@@ -247,6 +256,7 @@ pub mod ffi {
         /// Sets the given JSON payload.
         ///
         /// Claims should be a valid JSON payload.
+        #[diplomat::attr(auto, setter = "claims")]
         pub fn set_claims(&mut self, claims: &str) -> Result<(), Box<PickyError>> {
             let claims = serde_json::from_str(claims)?;
             self.0.claims = claims;
@@ -264,6 +274,7 @@ pub mod ffi {
     }
 
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct JwtValidator(jwt::JwtValidator);
 
     impl JwtValidator {

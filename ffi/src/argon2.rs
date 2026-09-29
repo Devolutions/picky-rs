@@ -4,6 +4,7 @@ pub mod ffi {
     use diplomat_runtime::DiplomatWriteable;
 
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct Argon2Params {
         m_cost: u32,
         t_cost: u32,
@@ -23,21 +24,25 @@ pub mod ffi {
         }
 
         /// Sets the memory size in 1 KiB blocks. Between 1 and (2^32)-1.
+        #[diplomat::attr(auto, setter = "m_cost")]
         pub fn set_m_cost(&mut self, value: u32) {
             self.m_cost = value;
         }
 
         /// Sets the number of iterations. Between 1 and (2^32)-1.
+        #[diplomat::attr(auto, setter = "t_cost")]
         pub fn set_t_cost(&mut self, value: u32) {
             self.t_cost = value;
         }
 
         /// Sets the degree of parallelism. Between 1 and 255.
+        #[diplomat::attr(auto, setter = "p_cost")]
         pub fn set_p_cost(&mut self, value: u32) {
             self.p_cost = value;
         }
 
         /// Sets the size of the KDF output in bytes. Default 32.
+        #[diplomat::attr(auto, setter = "output_len")]
         pub fn set_output_len(&mut self, value: usize) {
             self.output_len = Some(value);
         }
@@ -51,6 +56,7 @@ pub mod ffi {
     }
 
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct Argon2(pub argon2::Argon2<'static>);
 
     impl Argon2 {

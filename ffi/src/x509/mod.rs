@@ -63,6 +63,7 @@ pub mod ffi {
     }
 
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct Cert(pub certificate::Cert);
 
     impl Cert {
@@ -84,26 +85,32 @@ pub mod ffi {
             Ok(Box::new(Pem(pem)))
         }
 
+        #[diplomat::attr(auto, getter = "ty")]
         pub fn get_ty(&self) -> CertType {
             self.0.ty().into()
         }
 
+        #[diplomat::attr(auto, getter = "public_key")]
         pub fn get_public_key(&self) -> Box<PublicKey> {
             Box::new(PublicKey(self.0.public_key().clone()))
         }
 
+        #[diplomat::attr(auto, getter = "cert_type")]
         pub fn get_cert_type(&self) -> CertType {
             self.0.ty().into()
         }
 
+        #[diplomat::attr(auto, getter = "valid_not_before")]
         pub fn get_valid_not_before(&self) -> Box<UtcDate> {
             Box::new(UtcDate(self.0.valid_not_before()))
         }
 
+        #[diplomat::attr(auto, getter = "valid_not_after")]
         pub fn get_valid_not_after(&self) -> Box<UtcDate> {
             Box::new(UtcDate(self.0.valid_not_after()))
         }
 
+        #[diplomat::attr(auto, getter = "subject_key_id_hex")]
         pub fn get_subject_key_id_hex(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             let ski = self.0.subject_key_identifier()?;
             let ski = hex::encode(ski);
@@ -112,12 +119,14 @@ pub mod ffi {
             Ok(())
         }
 
+        #[diplomat::attr(auto, getter = "subject_name")]
         pub fn get_subject_name(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             write!(writeable, "{}", self.0.subject_name())?;
             writeable.flush();
             Ok(())
         }
 
+        #[diplomat::attr(auto, getter = "issuer_name")]
         pub fn get_issuer_name(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             write!(writeable, "{}", self.0.issuer_name())?;
             writeable.flush();
@@ -126,6 +135,7 @@ pub mod ffi {
     }
 
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct CertificateBuilder(RefCell<super::CertificateBuilderInner>);
 
     impl CertificateBuilder {
@@ -142,34 +152,42 @@ pub mod ffi {
             })))
         }
 
+        #[diplomat::attr(auto, setter = "valid_from")]
         pub fn set_valid_from(&self, valid_from: &UtcDate) {
             self.0.borrow_mut().valid_from = Some(valid_from.0.clone());
         }
 
+        #[diplomat::attr(auto, setter = "valid_to")]
         pub fn set_valid_to(&self, valid_to: &UtcDate) {
             self.0.borrow_mut().valid_to = Some(valid_to.0.clone());
         }
 
+        #[diplomat::attr(auto, setter = "issuer_common_name")]
         pub fn set_issuer_common_name(&self, name: &str) {
             self.0.borrow_mut().issuer_common_name = Some(name.to_owned());
         }
 
+        #[diplomat::attr(auto, setter = "subject_dns_name")]
         pub fn set_subject_dns_name(&self, name: &str) {
             self.0.borrow_mut().subject_dns_name = Some(name.to_owned());
         }
 
+        #[diplomat::attr(auto, setter = "issuer_key")]
         pub fn set_issuer_key(&self, key: &PrivateKey) {
             self.0.borrow_mut().issuer_key = Some(key.0.clone());
         }
 
+        #[diplomat::attr(auto, setter = "self_signed")]
         pub fn set_self_signed(&self, is_self_signed: bool) {
             self.0.borrow_mut().self_signed = is_self_signed;
         }
 
+        #[diplomat::attr(auto, setter = "ku_digital_signature")]
         pub fn set_ku_digital_signature(&self, enable: bool) {
             self.0.borrow_mut().enable_ku_digital_signature = enable;
         }
 
+        #[diplomat::attr(auto, setter = "kp_server_auth")]
         pub fn set_kp_server_auth(&self, enable: bool) {
             self.0.borrow_mut().enable_kp_server_auth = enable;
         }
@@ -226,6 +244,7 @@ pub mod ffi {
     }
 
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct CertIterator(pub Vec<certificate::Cert>);
 
     impl CertIterator {

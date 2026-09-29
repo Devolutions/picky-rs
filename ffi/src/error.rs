@@ -230,6 +230,7 @@ pub mod ffi {
 
     /// Stringified Picky error along with an error kind.
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct PickyError(pub(super) super::PickyErrorInner);
 
     impl PickyError {
@@ -245,6 +246,7 @@ pub mod ffi {
         }
 
         /// Returns the error kind.
+        #[diplomat::attr(auto, getter = "kind")]
         pub fn get_kind(&self) -> PickyErrorKind {
             self.0.kind
         }

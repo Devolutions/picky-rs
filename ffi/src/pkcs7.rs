@@ -8,6 +8,7 @@ pub mod ffi {
     use crate::x509::ffi::CertIterator;
 
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct Pkcs7(pub pkcs7::Pkcs7);
 
     impl Pkcs7 {

@@ -6,6 +6,8 @@ pub mod ffi {
     use diplomat_runtime::DiplomatWriteable;
     use std::fmt::Write;
 
+    // Not `manually_disposable`: `get_parameters` returns a view that borrows from
+    // `self`, and Diplomat rejects retained borrows from a manually disposable type.
     #[diplomat::opaque]
     pub struct AlgorithmIdentifier(pub picky::AlgorithmIdentifier);
 
@@ -16,12 +18,14 @@ pub mod ffi {
                 .is_a(picky::oid::ObjectIdentifier::try_from(other).map_err(|_| "invalid OID")?))
         }
 
+        #[diplomat::attr(auto, getter = "oid")]
         pub fn get_oid(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             let string: String = self.0.oid().into();
             write!(writable, "{string}")?;
             Ok(())
         }
 
+        #[diplomat::attr(auto, getter = "parameters")]
         pub fn get_parameters<'a>(&'a self) -> Box<AlgorithmIdentifierParameters<'a>> {
             Box::new(AlgorithmIdentifierParameters(self.0.parameters()))
         }
@@ -29,6 +33,7 @@ pub mod ffi {
 
     /// TODO/FIXME: Is having a reference here safe? We perhaps need to clone the parameters.
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct AlgorithmIdentifierParameters<'a>(pub &'a picky_asn1_x509::AlgorithmIdentifierParameters);
 
     pub enum AlgorithmIdentifierParametersType {
@@ -40,6 +45,7 @@ pub mod ffi {
     }
 
     impl AlgorithmIdentifierParameters<'_> {
+        #[diplomat::attr(auto, getter = "type")]
         pub fn get_type(&self) -> AlgorithmIdentifierParametersType {
             match self.0 {
                 picky_asn1_x509::AlgorithmIdentifierParameters::None => AlgorithmIdentifierParametersType::None,
@@ -81,12 +87,15 @@ pub mod ffi {
     }
 
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct AesParameters(pub picky_asn1_x509::AesParameters);
 
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct EcParameters(pub picky_asn1_x509::EcParameters);
 
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct RsassaPssParameters(pub picky_asn1_x509::RsassaPssParams);
 
     pub enum AesParametersType {
@@ -96,6 +105,7 @@ pub mod ffi {
     }
 
     impl AesParameters {
+        #[diplomat::attr(auto, getter = "type")]
         pub fn get_type(&self) -> AesParametersType {
             match self.0 {
                 picky_asn1_x509::AesParameters::Null => AesParametersType::Null,
@@ -124,9 +134,11 @@ pub mod ffi {
     }
 
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct AesAuthEncParams(pub picky_asn1_x509::AesAuthEncParams);
 
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct AlgorithmIdentifierIterator(pub Vec<picky::AlgorithmIdentifier>);
 
     impl AlgorithmIdentifierIterator {

@@ -14,6 +14,7 @@ pub mod ffi {
 
     /// Encryption mode to use for the PFX file
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct Pkcs12Encryption(super::InnerPkcs12Encryption);
 
     /// Hashing algorithm used for MAC or KDF in PFX file
@@ -59,6 +60,7 @@ pub mod ffi {
     }
 
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct Pkcs12MacAlgorithmHmac(pub(crate) pkcs12::Pkcs12MacAlgorithmHmac);
 
     impl Pkcs12MacAlgorithmHmac {
@@ -81,6 +83,7 @@ pub mod ffi {
     }
 
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct Pkcs12ParsingParams(pub(crate) pkcs12::Pkcs12ParsingParams);
 
     impl Pkcs12ParsingParams {
@@ -90,11 +93,13 @@ pub mod ffi {
 
         /// Continue parsing even if conversion to high level picky data structure fails (e.g. due to
         /// unsupported private key or certificate kind)
+        #[diplomat::attr(auto, setter = "skip_soft_parsing_errors")]
         pub fn set_skip_soft_parsing_errors(&mut self, value: bool) {
             self.0.skip_soft_parsing_errors = value;
         }
 
         /// Continue parsing even if decryption fails and keep data in encrypted form
+        #[diplomat::attr(auto, setter = "skip_decryption_errors")]
         pub fn set_skip_decryption_errors(&mut self, value: bool) {
             self.0.skip_decryption_errors = value;
         }
@@ -104,6 +109,7 @@ pub mod ffi {
         /// This is useful for parsing available unencrypted data from
         /// password-protected PFX files. Also could be useful if PFX integrity has been intentionally
         /// violated for testing purposes.
+        #[diplomat::attr(auto, setter = "skip_mac_validation")]
         pub fn set_skip_mac_validation(&mut self, value: bool) {
             self.0.skip_mac_validation = value;
         }
@@ -111,6 +117,7 @@ pub mod ffi {
 
     /// Crypto context to use when building a PFX.
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct Pkcs12CryptoContext(pub(crate) Arc<Mutex<pkcs12::Pkcs12CryptoContext>>);
 
     impl Pkcs12CryptoContext {
@@ -135,6 +142,7 @@ pub mod ffi {
 
     /// Attributes which can be used to store additional information about safe (e.g. friendly name, key ID).
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct Pkcs12Attribute(pub(crate) pkcs12::Pkcs12Attribute);
 
     impl Pkcs12Attribute {
@@ -151,6 +159,7 @@ pub mod ffi {
             Box::new(Self(pkcs12::Pkcs12Attribute::new_local_key_id(value.to_vec())))
         }
 
+        #[diplomat::attr(auto, getter = "kind")]
         pub fn get_kind(&self) -> Pkcs12AttributeKind {
             match self.0.kind() {
                 pkcs12::Pkcs12AttributeKind::FriendlyName(..) => Pkcs12AttributeKind::FriendlyName,
@@ -159,6 +168,7 @@ pub mod ffi {
             }
         }
 
+        #[diplomat::attr(auto, getter = "friendly_name")]
         pub fn get_friendly_name(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             use std::fmt::Write as _;
 
@@ -174,6 +184,7 @@ pub mod ffi {
     }
 
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct Pkcs12AttributeIterator(pub(crate) Box<dyn Iterator<Item = pkcs12::Pkcs12Attribute>>);
 
     impl Pkcs12AttributeIterator {
@@ -191,6 +202,7 @@ pub mod ffi {
 
     /// PFX safe bag, the polymorphic container for all the data in a PKCS12 archive.
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct SafeBag(pub(crate) pkcs12::SafeBag);
 
     impl SafeBag {
@@ -226,6 +238,7 @@ pub mod ffi {
             self.0.add_attribute(attribute.0.clone());
         }
 
+        #[diplomat::attr(auto, getter = "kind")]
         pub fn get_kind(&self) -> SafeBagKind {
             match self.0.kind() {
                 pkcs12::SafeBagKind::PrivateKey(..) => SafeBagKind::PrivateKey,
@@ -239,6 +252,7 @@ pub mod ffi {
             }
         }
 
+        #[diplomat::attr(auto, getter = "private_key")]
         pub fn get_private_key(&self) -> Option<Box<PrivateKey>> {
             if let pkcs12::SafeBagKind::PrivateKey(key) | pkcs12::SafeBagKind::EncryptedPrivateKey { key, .. } =
                 self.0.kind()
@@ -249,6 +263,7 @@ pub mod ffi {
             }
         }
 
+        #[diplomat::attr(auto, getter = "certificate")]
         pub fn get_certificate(&self) -> Option<Box<Cert>> {
             if let pkcs12::SafeBagKind::Certificate(cert) = self.0.kind() {
                 Some(Box::new(Cert(cert.clone())))
@@ -294,6 +309,7 @@ pub mod ffi {
     }
 
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct SafeBagIterator(pub(crate) Box<dyn Iterator<Item = pkcs12::SafeBag>>);
 
     impl SafeBagIterator {
@@ -304,6 +320,7 @@ pub mod ffi {
 
     /// PFX (PKCS12 archive) builder.
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct PfxBuilder {
         safe_bags_acc: Vec<pkcs12::SafeBag>,
         safe_contents: Vec<pkcs12::SafeContents>,
@@ -354,6 +371,7 @@ pub mod ffi {
             Ok(())
         }
 
+        #[diplomat::attr(auto, setter = "hmac_algorithm")]
         pub fn set_hmac_algorithm(&mut self, mac_algorithm: &Pkcs12MacAlgorithmHmac) {
             self.hmac_algorithm = Some(mac_algorithm.0.clone());
         }
@@ -385,6 +403,7 @@ pub mod ffi {
 
     /// A PKCS12 archive.
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct Pfx(pub(crate) pkcs12::Pfx);
 
     impl Pfx {

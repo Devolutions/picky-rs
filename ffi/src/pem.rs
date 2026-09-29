@@ -7,6 +7,7 @@ pub mod ffi {
 
     ///  PEM object.
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct Pem(pub picky::pem::Pem<'static>);
 
     impl Pem {
@@ -43,11 +44,13 @@ pub mod ffi {
         // }
 
         /// Returns the length of the data contained by this PEM object.
+        #[diplomat::attr(auto, getter = "data_length")]
         pub fn get_data_length(&self) -> u64 {
             self.0.data().len() as u64
         }
 
         /// Returns the label of this PEM object.
+        #[diplomat::attr(auto, getter = "label")]
         pub fn get_label(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             write!(writeable, "{}", self.0.label())?;
             writeable.flush();
