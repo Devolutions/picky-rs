@@ -5,6 +5,7 @@ pub mod ffi {
     use crate::key::ffi::PublicKey;
 
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct SignatureAlgorithm(pub picky::signature::SignatureAlgorithm);
 
     impl SignatureAlgorithm {
