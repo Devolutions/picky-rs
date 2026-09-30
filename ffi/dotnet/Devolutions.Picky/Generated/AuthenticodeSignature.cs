@@ -7,7 +7,7 @@ namespace Devolutions.Picky;
 
 #nullable enable
 
-public partial class AuthenticodeSignature
+public partial class AuthenticodeSignature: IDisposable
 {
     private unsafe RustHandle<Raw.AuthenticodeSignature>? _inner;
 
@@ -283,10 +283,6 @@ public partial class AuthenticodeSignature
     /// <returns>
     /// A <c>AuthenticodeValidator</c> allocated on Rust side.
     /// </returns>
-    /// <remarks>
-    /// Lifetime: the returned native-backed value may borrow from the receiver or one or more inputs.
-    /// Source handles stay reachable while the returned value exists.
-    /// </remarks>
     public AuthenticodeValidator AuthenticodeVerifier()
     {
         unsafe
@@ -296,7 +292,7 @@ public partial class AuthenticodeSignature
             {
                 selfLease = _diplomatHandle.Lease(BorrowKind.Shared);
                 Raw.AuthenticodeValidator* result = Raw.AuthenticodeSignature.AuthenticodeVerifier(selfLease!.Ptr);
-                return new AuthenticodeValidator(result, LifetimeEdge.Move(ref selfLease));
+                return new AuthenticodeValidator(result);
             }
             finally
             {
@@ -381,5 +377,19 @@ public partial class AuthenticodeSignature
             inner.ReleaseWrapper();
             _inner = null;
         }
+    }
+    /// <summary>
+    /// Releases this wrapper's native resource immediately.
+    /// </summary>
+    /// <remarks>
+    /// Retained-borrow returns sourced from a manually_disposable opaque are
+    /// rejected during generation, so Dispose is not a parent-invalidation API.
+    /// Callers must not race Dispose with calls from another thread. Later calls
+    /// throw <see cref="ObjectDisposedException"/>.
+    /// </remarks>
+    public void Dispose()
+    {
+        Cleanup();
+        GC.SuppressFinalize(this);
     }
 }

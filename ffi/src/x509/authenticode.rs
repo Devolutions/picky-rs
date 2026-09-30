@@ -15,10 +15,8 @@ pub mod ffi {
     use crate::x509::ffi::{Cert, CertIterator};
     use crate::x509::name::ffi::DirectoryNameIterator;
 
-    // Not `manually_disposable`: `authenticode_verifier` returns a validator that
-    // borrows from `self`, and Diplomat rejects retained borrows from a manually
-    // disposable type.
     #[diplomat::opaque_mut]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct AuthenticodeSignature(pub picky::x509::pkcs7::authenticode::AuthenticodeSignature);
 
     #[diplomat::enum_convert(picky_asn1_x509::ShaVariant)]
@@ -100,9 +98,11 @@ pub mod ffi {
             Ok(Box::new(Cert(cert.clone())))
         }
 
-        pub fn authenticode_verifier<'a>(&'a self) -> Box<AuthenticodeValidator<'a>> {
-            let verifier = self.0.authenticode_verifier();
-            Box::new(AuthenticodeValidator::new(verifier))
+        pub fn authenticode_verifier(&self) -> Box<AuthenticodeValidator> {
+            Box::new(AuthenticodeValidator {
+                signature: self.0.clone(),
+                steps: Vec::new(),
+            })
         }
 
         pub fn file_hash(&self) -> Option<Box<VecU8>> {
@@ -130,74 +130,83 @@ pub mod ffi {
         }
     }
 
+    // Holds a copy of the signature plus the requested settings, and only builds picky's borrowing
+    // validator inside `verify`. Nothing is borrowed across calls, so the signature and the dates
+    // passed in can be disposed at any time.
     #[diplomat::opaque_mut]
     #[diplomat::attr(dotnet, manually_disposable)]
-    pub struct AuthenticodeValidator<'a> {
-        pub inner: picky::x509::pkcs7::authenticode::AuthenticodeValidator<'a>,
-        //'exclude_cert_authorities' method down there a few lines takes a reference to a Vec<DirectoryName>,
-        // which I have to store in the struct so it have the same lifetime as the inner struct
-        pub excluded_cert_authorities: Option<Vec<picky::x509::name::DirectoryName>>,
+    pub struct AuthenticodeValidator {
+        signature: picky::x509::pkcs7::authenticode::AuthenticodeSignature,
+        steps: Vec<super::ValidatorStep>,
     }
 
-    impl<'a> AuthenticodeValidator<'a> {
-        pub fn exact_date(&'a self, exact: &'a UtcDate) {
-            self.inner.exact_date(&exact.0);
+    impl AuthenticodeValidator {
+        pub fn exact_date(&mut self, exact: &UtcDate) {
+            self.steps.push(super::ValidatorStep::ExactDate(exact.0.clone()));
         }
 
-        pub fn interval_date(&'a self, lower: &'a UtcDate, upper: &'a UtcDate) {
-            self.inner.interval_date(&lower.0, &upper.0);
+        pub fn interval_date(&mut self, lower: &UtcDate, upper: &UtcDate) {
+            self.steps.push(super::ValidatorStep::IntervalDate {
+                lower: lower.0.clone(),
+                upper: upper.0.clone(),
+            });
         }
 
-        pub fn require_not_before_check(&'a self) {
-            self.inner.require_not_before_check();
+        pub fn require_not_before_check(&mut self) {
+            self.steps.push(super::ValidatorStep::RequireNotBeforeCheck);
         }
 
-        pub fn require_not_after_check(&'a self) {
-            self.inner.require_not_after_check();
+        pub fn require_not_after_check(&mut self) {
+            self.steps.push(super::ValidatorStep::RequireNotAfterCheck);
         }
 
-        pub fn ignore_not_before_check(&'a self) {
-            self.inner.ignore_not_before_check();
+        pub fn ignore_not_before_check(&mut self) {
+            self.steps.push(super::ValidatorStep::IgnoreNotBeforeCheck);
         }
 
-        pub fn ignore_not_after_check(&'a self) {
-            self.inner.ignore_not_after_check();
+        pub fn ignore_not_after_check(&mut self) {
+            self.steps.push(super::ValidatorStep::IgnoreNotAfterCheck);
         }
 
-        pub fn require_signing_certificate_check(&'a self) {
-            self.inner.require_signing_certificate_check();
+        pub fn require_signing_certificate_check(&mut self) {
+            self.steps.push(super::ValidatorStep::RequireSigningCertificateCheck);
         }
 
-        pub fn ignore_signing_certificate_check(&'a self) {
-            self.inner.ignore_signing_certificate_check();
+        pub fn ignore_signing_certificate_check(&mut self) {
+            self.steps.push(super::ValidatorStep::IgnoreSigningCertificateCheck);
         }
 
-        pub fn require_basic_authenticode_validation(&'a self, expected_file_hash: &'a VecU8) {
-            self.inner
-                .require_basic_authenticode_validation(expected_file_hash.0.clone());
+        pub fn require_basic_authenticode_validation(&mut self, expected_file_hash: &VecU8) {
+            self.steps
+                .push(super::ValidatorStep::RequireBasicAuthenticodeValidation(
+                    expected_file_hash.0.clone(),
+                ));
         }
 
-        pub fn ignore_basic_authenticode_validation(&'a self) {
-            self.inner.ignore_basic_authenticode_validation();
+        pub fn ignore_basic_authenticode_validation(&mut self) {
+            self.steps.push(super::ValidatorStep::IgnoreBasicAuthenticodeValidation);
         }
 
-        pub fn require_chain_check(&'a self) {
-            self.inner.require_chain_check();
+        pub fn require_chain_check(&mut self) {
+            self.steps.push(super::ValidatorStep::RequireChainCheck);
         }
 
-        pub fn ignore_chain_check(&'a self) {
-            self.inner.ignore_chain_check();
+        pub fn ignore_chain_check(&mut self) {
+            self.steps.push(super::ValidatorStep::IgnoreChainCheck);
         }
 
-        pub fn exclude_cert_authorities(&'a mut self, cert_auths: &'a DirectoryNameIterator) {
-            let vec: Vec<picky::x509::name::DirectoryName> = cert_auths.0.iter().map(|dn| dn.0.clone()).collect();
-            self.excluded_cert_authorities = Some(vec);
-            self.inner
-                .exclude_cert_authorities(self.excluded_cert_authorities.as_ref().unwrap());
+        pub fn exclude_cert_authorities(&mut self, cert_auths: &DirectoryNameIterator) {
+            let cert_auths = cert_auths.0.iter().map(|dn| dn.0.clone()).collect();
+            self.steps
+                .push(super::ValidatorStep::ExcludeCertAuthorities(cert_auths));
         }
 
         pub fn verify(&self) -> Result<(), Box<PickyError>> {
-            Ok(self.inner.verify()?)
+            let validator = self.signature.authenticode_verifier();
+            for step in &self.steps {
+                step.apply(&validator);
+            }
+            Ok(validator.verify()?)
         }
     }
 
@@ -228,11 +237,44 @@ pub mod ffi {
     }
 }
 
-impl<'a> ffi::AuthenticodeValidator<'a> {
-    pub fn new(inner: picky::x509::pkcs7::authenticode::AuthenticodeValidator<'a>) -> Self {
-        Self {
-            inner,
-            excluded_cert_authorities: None,
-        }
+/// A setting recorded on `ffi::AuthenticodeValidator`, replayed in call order onto picky's validator.
+enum ValidatorStep {
+    ExactDate(picky::x509::date::UtcDate),
+    IntervalDate {
+        lower: picky::x509::date::UtcDate,
+        upper: picky::x509::date::UtcDate,
+    },
+    RequireNotBeforeCheck,
+    IgnoreNotBeforeCheck,
+    RequireNotAfterCheck,
+    IgnoreNotAfterCheck,
+    RequireSigningCertificateCheck,
+    IgnoreSigningCertificateCheck,
+    RequireBasicAuthenticodeValidation(Vec<u8>),
+    IgnoreBasicAuthenticodeValidation,
+    RequireChainCheck,
+    IgnoreChainCheck,
+    ExcludeCertAuthorities(Vec<picky::x509::name::DirectoryName>),
+}
+
+impl ValidatorStep {
+    fn apply<'a>(&'a self, validator: &picky::x509::pkcs7::authenticode::AuthenticodeValidator<'a>) {
+        match self {
+            Self::ExactDate(exact) => validator.exact_date(exact),
+            Self::IntervalDate { lower, upper } => validator.interval_date(lower, upper),
+            Self::RequireNotBeforeCheck => validator.require_not_before_check(),
+            Self::IgnoreNotBeforeCheck => validator.ignore_not_before_check(),
+            Self::RequireNotAfterCheck => validator.require_not_after_check(),
+            Self::IgnoreNotAfterCheck => validator.ignore_not_after_check(),
+            Self::RequireSigningCertificateCheck => validator.require_signing_certificate_check(),
+            Self::IgnoreSigningCertificateCheck => validator.ignore_signing_certificate_check(),
+            Self::RequireBasicAuthenticodeValidation(hash) => {
+                validator.require_basic_authenticode_validation(hash.clone())
+            }
+            Self::IgnoreBasicAuthenticodeValidation => validator.ignore_basic_authenticode_validation(),
+            Self::RequireChainCheck => validator.require_chain_check(),
+            Self::IgnoreChainCheck => validator.ignore_chain_check(),
+            Self::ExcludeCertAuthorities(cert_auths) => validator.exclude_cert_authorities(cert_auths),
+        };
     }
 }
