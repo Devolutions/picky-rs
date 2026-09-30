@@ -7,7 +7,7 @@ namespace Devolutions.Picky;
 
 #nullable enable
 
-public partial class Extension
+public partial class Extension: IDisposable
 {
     private unsafe RustHandle<Raw.Extension>? _inner;
 
@@ -70,10 +70,6 @@ public partial class Extension
     /// <returns>
     /// A <c>ExtensionView</c> allocated on Rust side.
     /// </returns>
-    /// <remarks>
-    /// Lifetime: the returned native-backed value may borrow from the receiver or one or more inputs.
-    /// Source handles stay reachable while the returned value exists.
-    /// </remarks>
     public ExtensionView Value
     {
         get
@@ -85,7 +81,7 @@ public partial class Extension
                 {
                     selfLease = _diplomatHandle.Lease(BorrowKind.Shared);
                     Raw.ExtensionView* result = Raw.Extension.GetValue(selfLease!.Ptr);
-                    return new ExtensionView(result, LifetimeEdge.Move(ref selfLease));
+                    return new ExtensionView(result);
                 }
                 finally
                 {
@@ -152,5 +148,19 @@ public partial class Extension
             inner.ReleaseWrapper();
             _inner = null;
         }
+    }
+    /// <summary>
+    /// Releases this wrapper's native resource immediately.
+    /// </summary>
+    /// <remarks>
+    /// Retained-borrow returns sourced from a manually_disposable opaque are
+    /// rejected during generation, so Dispose is not a parent-invalidation API.
+    /// Callers must not race Dispose with calls from another thread. Later calls
+    /// throw <see cref="ObjectDisposedException"/>.
+    /// </remarks>
+    public void Dispose()
+    {
+        Cleanup();
+        GC.SuppressFinalize(this);
     }
 }
