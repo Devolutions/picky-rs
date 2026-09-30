@@ -96,3 +96,13 @@ pub unsafe extern "C" fn Pem_peek_data(pem: Option<&ffi::Pem>, len: *mut usize) 
         core::ptr::null()
     }
 }
+
+// A PEM can carry a private key, so wipe the decoded bytes before they're freed.
+impl Drop for ffi::Pem {
+    fn drop(&mut self) {
+        let pem = core::mem::replace(&mut self.0, picky::pem::Pem::new(String::new(), Vec::new()));
+        if let std::borrow::Cow::Owned(mut data) = pem.into_data() {
+            zeroize::Zeroize::zeroize(&mut data);
+        }
+    }
+}
