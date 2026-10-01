@@ -10,23 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### <!-- 1 -->Features
 
-- Add IAKerb proxy message encoding/decoding ([#531](https://github.com/Devolutions/picky-rs/issues/531)) ([6f980446a3](https://github.com/Devolutions/picky-rs/commit/6f980446a350835f238c69c3189f831e75457279)) 
-
-  This PR implements encoding and decoding of the `IAKERB_PROXY` message
-  (`IAKrbProxyMessage`) according to the [IAKERB
-  specification](https://datatracker.ietf.org/doc/html/draft-ietf-kitten-iakerb-03).
-  The implementation is also covered with unit-tests.
-  
-  ## What is IAKERB
-  IAKERB extends Kerberos to support scenarios where the client cannot
-  directly access the KDC. Instead, KDC messages are encapsulated in
-  GSS-API tokens and exchanged through an IAKERB proxy. The server
-  forwards these messages to the LocalKDC, allowing the client to obtain
-  the required Kerberos tickets without direct network access to the KDC.
-  
-  Microsoft recently introduced IAKERB support in Windows Insider builds
-  as part of its effort to reduce NTLM dependency:
-  https://techcommunity.microsoft.com/blog/windows-itpro-blog/reducing-ntlm-dependency-iakerb-and-localkdc-in-windows-insider-preview/4524615.
+- Add `IAKerbProxyMessage`, with `encode` and `decode_application_iakerb_proxy_message`, to encode and decode IAKerb proxy tokens ([#531](https://github.com/Devolutions/picky-rs/issues/531)) ([6f980446a3](https://github.com/Devolutions/picky-rs/commit/6f980446a350835f238c69c3189f831e75457279)) 
+- Add `IAKerbHeader` and the `IAKerbCookie` alias describing the IAKerb proxy token header ([#531](https://github.com/Devolutions/picky-rs/issues/531)) ([6f980446a3](https://github.com/Devolutions/picky-rs/commit/6f980446a350835f238c69c3189f831e75457279)) 
+- Add the `IAKERB_PROXY_TOKEN_ID` constant and the `KRB_AP_ERR_IAKERB_KDC_NOT_FOUND` and `KRB_AP_ERR_IAKERB_KDC_NO_RESPONSE` error codes ([#531](https://github.com/Devolutions/picky-rs/issues/531)) ([6f980446a3](https://github.com/Devolutions/picky-rs/commit/6f980446a350835f238c69c3189f831e75457279)) 
+- [**breaking**] Add the `GssApiMessageError::InvalidMechanismOid` variant, which breaks exhaustive matches on `GssApiMessageError` ([#531](https://github.com/Devolutions/picky-rs/issues/531)) ([6f980446a3](https://github.com/Devolutions/picky-rs/commit/6f980446a350835f238c69c3189f831e75457279)) 
+- Make `KrbMessage::decode_application_krb_message` reject trailing bytes instead of ignoring them ([#531](https://github.com/Devolutions/picky-rs/issues/531)) ([6f980446a3](https://github.com/Devolutions/picky-rs/commit/6f980446a350835f238c69c3189f831e75457279)) 
 
 
 
