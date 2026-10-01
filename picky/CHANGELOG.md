@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[7.0.0-rc.27](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.26...picky-v7.0.0-rc.27)] - 2026-09-29
+
+### <!-- 7 -->Build
+
+- Bump base64 from 0.22.1 to 0.23.0 ([#520](https://github.com/Devolutions/picky-rs/issues/520)) ([0e921e41d0](https://github.com/Devolutions/picky-rs/commit/0e921e41d0d08523748254c4a9a234c4cc28424f)) 
+
+  `base64::DecodeError` is part of the public API through error types such as
+  `PemError::Base64Decoding` and `SshPublicKeyError::Base64DecodeError`, so consumers
+  that match on these errors must also depend on `base64` 0.23.
+
+
+
 ## [[7.0.0-rc.26](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.25...picky-v7.0.0-rc.26)] - 2026-07-21
 
 ### <!-- 7 -->Build

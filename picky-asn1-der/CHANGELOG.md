@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[0.5.7](https://github.com/Devolutions/picky-rs/compare/picky-asn1-der-v0.5.6...picky-asn1-der-v0.5.7)] - 2026-09-29
+
+### <!-- 1 -->Features
+
+- Re-export the ASN.1 DER `Length` helper as `picky_asn1_der::Length` ([#531](https://github.com/Devolutions/picky-rs/issues/531)) ([6f980446a3](https://github.com/Devolutions/picky-rs/commit/6f980446a350835f238c69c3189f831e75457279)) 
+
+### <!-- 7 -->Build
+
+- Bump base64 from 0.22.1 to 0.23.0 ([#520](https://github.com/Devolutions/picky-rs/issues/520)) ([0e921e41d0](https://github.com/Devolutions/picky-rs/commit/0e921e41d0d08523748254c4a9a234c4cc28424f)) 
+
+
+
 ## [[0.5.6](https://github.com/Devolutions/picky-rs/compare/picky-asn1-der-v0.5.5...picky-asn1-der-v0.5.6)] - 2026-04-21
 
 ### <!-- 7 -->Build

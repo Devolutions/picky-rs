@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[0.12.5](https://github.com/Devolutions/picky-rs/compare/picky-krb-v0.12.4...picky-krb-v0.12.5)] - 2026-09-29
+
+### <!-- 1 -->Features
+
+- Add `IAKerbProxyMessage`, with `encode` and `decode_application_iakerb_proxy_message`, to encode and decode IAKerb proxy tokens ([#531](https://github.com/Devolutions/picky-rs/issues/531)) ([6f980446a3](https://github.com/Devolutions/picky-rs/commit/6f980446a350835f238c69c3189f831e75457279)) 
+- Add `IAKerbHeader` and the `IAKerbCookie` alias describing the IAKerb proxy token header ([#531](https://github.com/Devolutions/picky-rs/issues/531)) ([6f980446a3](https://github.com/Devolutions/picky-rs/commit/6f980446a350835f238c69c3189f831e75457279)) 
+- Add the `IAKERB_PROXY_TOKEN_ID` constant and the `KRB_AP_ERR_IAKERB_KDC_NOT_FOUND` and `KRB_AP_ERR_IAKERB_KDC_NO_RESPONSE` error codes ([#531](https://github.com/Devolutions/picky-rs/issues/531)) ([6f980446a3](https://github.com/Devolutions/picky-rs/commit/6f980446a350835f238c69c3189f831e75457279)) 
+- [**breaking**] Add the `GssApiMessageError::InvalidMechanismOid` variant, which breaks exhaustive matches on `GssApiMessageError` ([#531](https://github.com/Devolutions/picky-rs/issues/531)) ([6f980446a3](https://github.com/Devolutions/picky-rs/commit/6f980446a350835f238c69c3189f831e75457279)) 
+- Make `KrbMessage::decode_application_krb_message` reject trailing bytes instead of ignoring them ([#531](https://github.com/Devolutions/picky-rs/issues/531)) ([6f980446a3](https://github.com/Devolutions/picky-rs/commit/6f980446a350835f238c69c3189f831e75457279)) 
+
+
+
 ## [[0.12.4](https://github.com/Devolutions/picky-rs/compare/picky-krb-v0.12.3...picky-krb-v0.12.4)] - 2026-06-19
 
 ### <!-- 7 -->Build
