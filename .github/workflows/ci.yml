@@ -119,7 +119,7 @@ jobs:
     needs: [formatting]
     runs-on: ubuntu-latest
     env:
-      WOLFSSL_PREFIX: ${{ runner.temp }}/wolfssl-install
+      WOLFSSL_PREFIX: /tmp/wolfssl-install
 
     steps:
       - uses: actions/checkout@v6
