@@ -1,5 +1,4 @@
-use crate::crypto::CryptoPolicyError;
-use crate::hash::HashAlgorithm;
+use crate::hash::{HashAlgorithm, HashError};
 use crate::key::{KeyError, PublicKey};
 use picky_asn1::wrapper::BitStringAsn1Container;
 use picky_asn1_der::Asn1DerError;
@@ -18,9 +17,9 @@ pub enum KeyIdGenError {
     #[error("invalid key: {source}")]
     InvalidKey { source: KeyError },
 
-    /// hash algorithm disabled by the active cryptographic policy
+    /// hashing failed
     #[error(transparent)]
-    HashAlgorithmDisabled(#[from] CryptoPolicyError),
+    Hash(#[from] HashError),
 }
 
 /// Describes which method to use to generate key identifiers.

@@ -37,6 +37,7 @@ cab = { version = "0.6", optional = true }
 lexical-sort = { version = "0.3", optional = true }
 zeroize = "1.8"
 aws-lc-rs = { version = "1.18.1", default-features = false, features = ["fips"], optional = true }
+wolfssl-wolfcrypt = { version = "=2.2.0", default-features = false, features = ["alloc"], optional = true }
 
 # FIXME: either use ureq, or even better: do not require this kind of dependency at all to let user decide which lib to use.
 # (currently users should *really* not forget to use `spawn_blocking` when calling associated functions from async context)
@@ -104,7 +105,7 @@ picky-test-data = { path = "../picky-test-data", version = "0.1" }
 default = ["rustcrypto", "x509", "jose", "jwe-crypto", "http_signature", "http_trait_impl", "pkcs12"]
 
 # Crypto backends. FIPS consumers must disable default features and select
-# `fips-aws-lc` explicitly.
+# a concrete FIPS provider explicitly.
 rustcrypto = [
     "dep:rand",
     "dep:rand_core",
@@ -133,6 +134,7 @@ rustcrypto = [
 ]
 fips = []
 fips-aws-lc = ["fips", "dep:aws-lc-rs"]
+fips-wolfcrypt = ["fips", "dep:wolfssl-wolfcrypt"]
 full = [
     "x509",
     "jose",
@@ -174,5 +176,7 @@ putty = ["dep:argon2", "dep:hmac", "ssh",
 ]
 
 [package.metadata.docs.rs]
-# Enable all features when building documentation for docs.rs
-all-features = true
+# FIPS providers are mutually exclusive and require provider-specific native
+# build inputs, so docs.rs builds the complete RustCrypto surface instead.
+all-features = false
+features = ["full"]

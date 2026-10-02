@@ -876,6 +876,7 @@ impl PrivateKey {
     }
 
     #[cfg(any(feature = "ssh", feature = "jose"))]
+    #[cfg_attr(feature = "fips", allow(dead_code))]
     pub(crate) fn as_kind(&self) -> &PrivateKeyKind {
         &self.kind
     }

@@ -14,6 +14,7 @@ use crate::signature::SignatureAlgorithm;
 pub enum CryptoProvider {
     RustCrypto,
     AwsLcFips,
+    WolfCryptFips,
 }
 
 /// Returns the cryptographic provider selected for this build.
@@ -23,7 +24,12 @@ pub const fn provider() -> CryptoProvider {
         CryptoProvider::AwsLcFips
     }
 
-    #[cfg(not(feature = "fips-aws-lc"))]
+    #[cfg(feature = "fips-wolfcrypt")]
+    {
+        CryptoProvider::WolfCryptFips
+    }
+
+    #[cfg(feature = "rustcrypto")]
     {
         CryptoProvider::RustCrypto
     }
@@ -94,7 +100,7 @@ pub(crate) fn require_signature(
 }
 
 #[cfg(feature = "fips-aws-lc")]
-pub(crate) mod fips {
+mod aws_lc_fips {
     use super::{CryptoPolicyError, require_signature};
     use crate::hash::HashAlgorithm;
     use crate::key::ec::{EcCurve, EcdsaKeypair, EcdsaPublicKey, NamedEcCurve};
@@ -225,6 +231,250 @@ pub(crate) mod fips {
     }
 }
 
+#[cfg(feature = "fips-wolfcrypt")]
+pub(crate) mod wolfcrypt_fips {
+    use std::sync::OnceLock;
+
+    use super::{CryptoPolicyError, require_signature};
+    use crate::hash::HashAlgorithm;
+    use crate::key::ec::{EcCurve, EcdsaKeypair, EcdsaPublicKey, NamedEcCurve};
+    use crate::key::{PrivateKey, PublicKey};
+    use crate::signature::{SignatureAlgorithm, SignatureError};
+    use wolfssl_wolfcrypt::ecc::ECC;
+    use wolfssl_wolfcrypt::random::RNG;
+    use wolfssl_wolfcrypt::rsa::RSA;
+
+    static INITIALIZATION: OnceLock<Result<(), i32>> = OnceLock::new();
+
+    pub(crate) fn ensure_initialized() -> Result<(), i32> {
+        *INITIALIZATION.get_or_init(wolfssl_wolfcrypt::wolfcrypt_init)
+    }
+
+    fn policy_error(error: CryptoPolicyError) -> SignatureError {
+        SignatureError::AlgorithmDisabledByPolicy {
+            algorithm: error.algorithm,
+        }
+    }
+
+    fn rsa_error(context: &str, error: i32) -> SignatureError {
+        SignatureError::Rsa {
+            context: format!("wolfCrypt {context} failed with error code {error}"),
+        }
+    }
+
+    fn ec_error(context: &str, error: i32) -> SignatureError {
+        SignatureError::Ec {
+            context: format!("wolfCrypt {context} failed with error code {error}"),
+        }
+    }
+
+    fn rsa_digest_info(hash: HashAlgorithm, msg: &[u8]) -> Result<Vec<u8>, SignatureError> {
+        let prefix: &[u8] = match hash {
+            HashAlgorithm::SHA2_256 => &[
+                0x30, 0x31, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01, 0x05, 0x00,
+                0x04, 0x20,
+            ],
+            HashAlgorithm::SHA2_384 => &[
+                0x30, 0x41, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x02, 0x05, 0x00,
+                0x04, 0x30,
+            ],
+            HashAlgorithm::SHA2_512 => &[
+                0x30, 0x51, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03, 0x05, 0x00,
+                0x04, 0x40,
+            ],
+            _ => unreachable!("policy checked before constructing RSA DigestInfo"),
+        };
+        let digest = hash.digest(msg).map_err(|error| SignatureError::Rsa {
+            context: format!("wolfCrypt hashing failed while constructing RSA DigestInfo: {error}"),
+        })?;
+        let mut digest_info = Vec::with_capacity(prefix.len() + digest.len());
+        digest_info.extend_from_slice(prefix);
+        digest_info.extend_from_slice(&digest);
+        Ok(digest_info)
+    }
+
+    fn curve_id(curve: EcCurve) -> i32 {
+        match curve {
+            EcCurve::NistP256 => ECC::SECP256R1,
+            EcCurve::NistP384 => ECC::SECP384R1,
+            EcCurve::NistP521 => unreachable!("P-521 is rejected by the active policy"),
+        }
+    }
+
+    fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
+        if left.len() != right.len() {
+            return false;
+        }
+        left.iter()
+            .zip(right)
+            .fold(0u8, |difference, (left, right)| difference | (left ^ right))
+            == 0
+    }
+
+    pub(crate) fn sign(
+        algorithm: SignatureAlgorithm,
+        msg: &[u8],
+        private_key: &PrivateKey,
+    ) -> Result<Vec<u8>, SignatureError> {
+        match algorithm {
+            SignatureAlgorithm::RsaPkcs1v15(hash) => {
+                require_signature(algorithm, None).map_err(policy_error)?;
+                ensure_initialized().map_err(|error| rsa_error("initialization", error))?;
+                let mut key = RSA::new_from_der(&private_key.to_pkcs1()?)
+                    .map_err(|error| rsa_error("RSA private-key import", error))?;
+                let modulus_len = key
+                    .get_encrypt_size()
+                    .map_err(|error| rsa_error("RSA modulus-size query", error))?;
+                if modulus_len < 256 {
+                    return Err(SignatureError::AlgorithmDisabledByPolicy {
+                        algorithm: format!("RSA key smaller than 2048 bits ({} bits)", modulus_len * 8),
+                    });
+                }
+                let digest_info = rsa_digest_info(hash, msg)?;
+                let rng = RNG::new().map_err(|error| rsa_error("RNG initialization", error))?;
+                let mut signature = vec![0; modulus_len];
+                let signature_len = key
+                    .ssl_sign(&digest_info, &mut signature, &rng)
+                    .map_err(|error| rsa_error("RSA PKCS#1 v1.5 signing", error))?;
+                signature.truncate(signature_len);
+                Ok(signature)
+            }
+            SignatureAlgorithm::Ecdsa(hash) => {
+                let key = EcdsaKeypair::try_from(private_key)?;
+                let curve = match key.curve() {
+                    NamedEcCurve::Known(curve) => *curve,
+                    NamedEcCurve::Unsupported(_) => {
+                        return Err(SignatureError::AlgorithmDisabledByPolicy {
+                            algorithm: "unsupported EC curve".to_string(),
+                        });
+                    }
+                };
+                require_signature(algorithm, Some(curve)).map_err(policy_error)?;
+                ensure_initialized().map_err(|error| ec_error("initialization", error))?;
+                let public_key = key.public_key().ok_or_else(|| SignatureError::Ec {
+                    context: "EC public key is required for FIPS signing".to_string(),
+                })?;
+                let mut key = ECC::import_private_key_ex(key.secret(), public_key, curve_id(curve), None, None)
+                    .map_err(|error| ec_error("EC private-key import", error))?;
+                let digest = hash.digest(msg).map_err(|error| SignatureError::Ec {
+                    context: format!("wolfCrypt hashing failed while signing: {error}"),
+                })?;
+                let rng = RNG::new().map_err(|error| ec_error("RNG initialization", error))?;
+                let mut signature = vec![0; 160];
+                let signature_len = key
+                    .sign_hash(&digest, &mut signature, &rng)
+                    .map_err(|error| ec_error("ECDSA signing", error))?;
+                signature.truncate(signature_len);
+                Ok(signature)
+            }
+            SignatureAlgorithm::Ed25519 => Err(SignatureError::AlgorithmDisabledByPolicy {
+                algorithm: "Ed25519".to_string(),
+            }),
+        }
+    }
+
+    pub(crate) fn verify(
+        algorithm: SignatureAlgorithm,
+        public_key: &PublicKey,
+        msg: &[u8],
+        signature: &[u8],
+    ) -> Result<(), SignatureError> {
+        match algorithm {
+            SignatureAlgorithm::RsaPkcs1v15(hash) => {
+                require_signature(algorithm, None).map_err(policy_error)?;
+                ensure_initialized().map_err(|error| rsa_error("initialization", error))?;
+                let mut key = RSA::new_public_from_der(&public_key.to_pkcs1()?)
+                    .map_err(|error| rsa_error("RSA public-key import", error))?;
+                let modulus_len = key
+                    .get_encrypt_size()
+                    .map_err(|error| rsa_error("RSA modulus-size query", error))?;
+                if modulus_len < 256 {
+                    return Err(SignatureError::AlgorithmDisabledByPolicy {
+                        algorithm: format!("RSA key smaller than 2048 bits ({} bits)", modulus_len * 8),
+                    });
+                }
+                if signature.len() != modulus_len {
+                    return Err(SignatureError::BadSignature);
+                }
+                let expected = rsa_digest_info(hash, msg)?;
+                let mut recovered = vec![0; modulus_len];
+                let recovered_len = key
+                    .ssl_verify(signature, &mut recovered)
+                    .map_err(|_| SignatureError::BadSignature)?;
+                recovered.truncate(recovered_len);
+                if constant_time_eq(&recovered, &expected) {
+                    Ok(())
+                } else {
+                    Err(SignatureError::BadSignature)
+                }
+            }
+            SignatureAlgorithm::Ecdsa(hash) => {
+                let public_key = EcdsaPublicKey::try_from(public_key)?;
+                let curve = match public_key.curve() {
+                    NamedEcCurve::Known(curve) => *curve,
+                    NamedEcCurve::Unsupported(_) => {
+                        return Err(SignatureError::AlgorithmDisabledByPolicy {
+                            algorithm: "unsupported EC curve".to_string(),
+                        });
+                    }
+                };
+                require_signature(algorithm, Some(curve)).map_err(policy_error)?;
+                ensure_initialized().map_err(|error| ec_error("initialization", error))?;
+                let mut key = ECC::import_x963_ex(public_key.encoded_point(), curve_id(curve), None, None)
+                    .map_err(|error| ec_error("EC public-key import", error))?;
+                let digest = hash.digest(msg).map_err(|error| SignatureError::Ec {
+                    context: format!("wolfCrypt hashing failed while verifying: {error}"),
+                })?;
+                match key.verify_hash(signature, &digest) {
+                    Ok(true) => Ok(()),
+                    Ok(false) => Err(SignatureError::BadSignature),
+                    Err(error) => Err(ec_error("ECDSA verification", error)),
+                }
+            }
+            SignatureAlgorithm::Ed25519 => Err(SignatureError::AlgorithmDisabledByPolicy {
+                algorithm: "Ed25519".to_string(),
+            }),
+        }
+    }
+}
+
+#[cfg(feature = "fips")]
+pub(crate) mod fips {
+    use crate::key::{PrivateKey, PublicKey};
+    use crate::signature::{SignatureAlgorithm, SignatureError};
+
+    pub(crate) fn sign(
+        algorithm: SignatureAlgorithm,
+        msg: &[u8],
+        private_key: &PrivateKey,
+    ) -> Result<Vec<u8>, SignatureError> {
+        #[cfg(feature = "fips-aws-lc")]
+        {
+            super::aws_lc_fips::sign(algorithm, msg, private_key)
+        }
+        #[cfg(feature = "fips-wolfcrypt")]
+        {
+            super::wolfcrypt_fips::sign(algorithm, msg, private_key)
+        }
+    }
+
+    pub(crate) fn verify(
+        algorithm: SignatureAlgorithm,
+        public_key: &PublicKey,
+        msg: &[u8],
+        signature: &[u8],
+    ) -> Result<(), SignatureError> {
+        #[cfg(feature = "fips-aws-lc")]
+        {
+            super::aws_lc_fips::verify(algorithm, public_key, msg, signature)
+        }
+        #[cfg(feature = "fips-wolfcrypt")]
+        {
+            super::wolfcrypt_fips::verify(algorithm, public_key, msg, signature)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -234,40 +484,66 @@ mod tests {
         if cfg!(feature = "fips-aws-lc") {
             assert_eq!(provider(), CryptoProvider::AwsLcFips);
             assert!(fips_mode());
+        } else if cfg!(feature = "fips-wolfcrypt") {
+            assert_eq!(provider(), CryptoProvider::WolfCryptFips);
+            assert!(fips_mode());
         } else {
             assert_eq!(provider(), CryptoProvider::RustCrypto);
         }
     }
 
-    #[cfg(feature = "fips-aws-lc")]
+    #[cfg(feature = "fips")]
     #[test]
-    fn approved_rsa_signature_uses_fips_provider() {
+    fn approved_rsa_signatures_use_fips_provider() {
         use crate::key::PrivateKey;
+        use crate::signature::SignatureError;
 
         let key = PrivateKey::from_pem_str(picky_test_data::RSA_2048_PK_1).unwrap();
         let public_key = key.to_public_key().unwrap();
-        let algorithm = SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256);
         let message = b"picky FIPS provider test";
 
-        let signature = algorithm.sign(message, &key).unwrap();
-        algorithm.verify(&public_key, message, &signature).unwrap();
+        for hash in [
+            HashAlgorithm::SHA2_256,
+            HashAlgorithm::SHA2_384,
+            HashAlgorithm::SHA2_512,
+        ] {
+            let algorithm = SignatureAlgorithm::RsaPkcs1v15(hash);
+            let signature = algorithm.sign(message, &key).unwrap();
+
+            algorithm.verify(&public_key, message, &signature).unwrap();
+            assert!(matches!(
+                algorithm.verify(&public_key, b"tampered", &signature),
+                Err(SignatureError::BadSignature)
+            ));
+        }
     }
 
-    #[cfg(feature = "fips-aws-lc")]
+    #[cfg(feature = "fips")]
     #[test]
-    fn approved_ecdsa_signature_uses_fips_provider() {
+    fn approved_ecdsa_signatures_use_fips_provider() {
         use crate::key::PrivateKey;
+        use crate::signature::SignatureError;
 
-        let key = PrivateKey::from_pem_str(picky_test_data::EC_NIST256_PK_1).unwrap();
-        let public_key = key.to_public_key().unwrap();
-        let algorithm = SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_256);
         let message = b"picky FIPS provider test";
 
-        let signature = algorithm.sign(message, &key).unwrap();
-        algorithm.verify(&public_key, message, &signature).unwrap();
+        for (pem, hash) in [
+            (picky_test_data::EC_NIST256_PK_1, HashAlgorithm::SHA2_256),
+            (picky_test_data::EC_NIST384_PK_1, HashAlgorithm::SHA2_384),
+        ] {
+            let key = PrivateKey::from_pem_str(pem).unwrap();
+            let public_key = key.to_public_key().unwrap();
+            let algorithm = SignatureAlgorithm::Ecdsa(hash);
+            let signature = algorithm.sign(message, &key).unwrap();
+
+            algorithm.verify(&public_key, message, &signature).unwrap();
+            assert!(matches!(
+                algorithm.verify(&public_key, b"tampered", &signature),
+                Err(SignatureError::BadSignature)
+            ));
+        }
     }
 
-    #[cfg(feature = "fips-aws-lc")]
+    #[cfg(feature = "fips")]
     #[test]
     fn rejects_legacy_signature_algorithms() {
         use crate::key::PrivateKey;
@@ -289,7 +565,7 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "fips-aws-lc")]
+    #[cfg(feature = "fips")]
     #[test]
     fn rejects_ed25519_signature_algorithm() {
         use crate::key::{KeyError, PrivateKey, PublicKey};
@@ -322,7 +598,7 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "fips-aws-lc")]
+    #[cfg(feature = "fips")]
     #[test]
     fn rejects_unapproved_p521_curve() {
         use crate::key::PrivateKey;

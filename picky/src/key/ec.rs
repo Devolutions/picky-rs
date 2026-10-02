@@ -22,7 +22,7 @@ impl EcdsaKeypair {
         &self.private_key
     }
 
-    #[cfg(feature = "fips-aws-lc")]
+    #[cfg(feature = "fips")]
     pub fn public_key(&self) -> Option<&[u8]> {
         self.public_key.as_deref()
     }

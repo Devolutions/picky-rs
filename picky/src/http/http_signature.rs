@@ -1135,7 +1135,13 @@ mod tests {
             .generate_signing_string_using_http_request(&parts)
             .verify()
             .expect_err("verify");
+        #[cfg(feature = "rustcrypto")]
         assert_eq!(err.to_string(), "signature error: invalid signature");
+        #[cfg(feature = "fips")]
+        assert_eq!(
+            err.to_string(),
+            "signature error: algorithm disabled by the active cryptographic policy: RsaPkcs1v15(SHA1)"
+        );
     }
 
     #[test]

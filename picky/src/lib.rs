@@ -8,8 +8,11 @@
 #[cfg(all(feature = "fips", feature = "rustcrypto"))]
 compile_error!("`fips` and `rustcrypto` are mutually exclusive; use `default-features = false` for FIPS builds");
 
-#[cfg(all(feature = "fips", not(feature = "fips-aws-lc")))]
-compile_error!("`fips` requires a validated provider feature such as `fips-aws-lc`");
+#[cfg(all(feature = "fips-aws-lc", feature = "fips-wolfcrypt"))]
+compile_error!("`fips-aws-lc` and `fips-wolfcrypt` are mutually exclusive");
+
+#[cfg(all(feature = "fips", not(any(feature = "fips-aws-lc", feature = "fips-wolfcrypt"))))]
+compile_error!("`fips` requires exactly one provider feature: `fips-aws-lc` or `fips-wolfcrypt`");
 
 #[cfg(all(feature = "fips", any(feature = "pkcs12", feature = "ssh", feature = "putty")))]
 compile_error!("PKCS#12, SSH, and PuTTY crypto are not available in FIPS builds");

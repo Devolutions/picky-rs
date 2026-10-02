@@ -2,8 +2,7 @@ pub use picky_asn1_x509::ShaVariant;
 pub use picky_asn1_x509::attribute::Attribute;
 pub use picky_asn1_x509::pkcs7::content_info;
 
-use crate::crypto::CryptoPolicyError;
-use crate::hash::{HashAlgorithm, UnsupportedHashAlgorithmError};
+use crate::hash::{HashAlgorithm, HashError, UnsupportedHashAlgorithmError};
 use crate::key::PrivateKey;
 use crate::pem::Pem;
 use crate::signature::{SignatureAlgorithm, SignatureError};
@@ -97,7 +96,7 @@ pub enum AuthenticodeError {
     #[error(transparent)]
     UnsupportedHashAlgorithmError(UnsupportedHashAlgorithmError),
     #[error(transparent)]
-    HashAlgorithmDisabled(#[from] CryptoPolicyError),
+    Hash(#[from] HashError),
     #[error(transparent)]
     UnsupportedAlgorithmError(UnsupportedAlgorithmError),
     #[cfg(feature = "ctl")]

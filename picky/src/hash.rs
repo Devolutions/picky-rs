@@ -6,6 +6,22 @@ use picky_asn1_x509::ShaVariant;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt;
+use thiserror::Error as ThisError;
+
+use crate::crypto::CryptoPolicyError;
+
+#[derive(Debug, ThisError, PartialEq, Eq)]
+pub enum HashError {
+    #[error(transparent)]
+    Policy(#[from] CryptoPolicyError),
+
+    #[error("{provider} {operation} failed with error code {code}")]
+    Provider {
+        provider: &'static str,
+        operation: &'static str,
+        code: i32,
+    },
+}
 
 /// unsupported algorithm
 #[derive(Debug)]
@@ -75,7 +91,7 @@ impl TryFrom<ShaVariant> for HashAlgorithm {
 
 impl HashAlgorithm {
     /// Hashes `msg` when this algorithm is allowed by the active cryptographic policy.
-    pub fn digest(self, msg: &[u8]) -> Result<Vec<u8>, crate::crypto::CryptoPolicyError> {
+    pub fn digest(self, msg: &[u8]) -> Result<Vec<u8>, HashError> {
         #[cfg(feature = "fips-aws-lc")]
         {
             crate::crypto::require_hash(self)?;
@@ -88,7 +104,48 @@ impl HashAlgorithm {
             Ok(aws_lc_rs::digest::digest(algorithm, msg).as_ref().to_vec())
         }
 
-        #[cfg(not(feature = "fips-aws-lc"))]
+        #[cfg(feature = "fips-wolfcrypt")]
+        {
+            use wolfssl_wolfcrypt::sha::{SHA256, SHA384, SHA512};
+
+            crate::crypto::require_hash(self)?;
+            crate::crypto::wolfcrypt_fips::ensure_initialized().map_err(|code| HashError::Provider {
+                provider: "wolfCrypt",
+                operation: "initialization",
+                code,
+            })?;
+
+            macro_rules! digest {
+                ($hasher:ty, $size:expr, $operation:literal) => {{
+                    let mut hasher = <$hasher>::new().map_err(|code| HashError::Provider {
+                        provider: "wolfCrypt",
+                        operation: concat!($operation, " initialization"),
+                        code,
+                    })?;
+                    hasher.update(msg).map_err(|code| HashError::Provider {
+                        provider: "wolfCrypt",
+                        operation: concat!($operation, " update"),
+                        code,
+                    })?;
+                    let mut output = vec![0; $size];
+                    hasher.finalize(&mut output).map_err(|code| HashError::Provider {
+                        provider: "wolfCrypt",
+                        operation: concat!($operation, " finalize"),
+                        code,
+                    })?;
+                    output
+                }};
+            }
+
+            Ok(match self {
+                Self::SHA2_256 => digest!(SHA256, 32, "SHA-256"),
+                Self::SHA2_384 => digest!(SHA384, 48, "SHA-384"),
+                Self::SHA2_512 => digest!(SHA512, 64, "SHA-512"),
+                _ => unreachable!("policy checked above"),
+            })
+        }
+
+        #[cfg(feature = "rustcrypto")]
         Ok(match self {
             Self::MD5 => md5::Md5::digest(msg).as_slice().to_vec(),
             Self::SHA1 => sha1::Sha1::digest(msg).as_slice().to_vec(),
@@ -103,7 +160,7 @@ impl HashAlgorithm {
 
     /// Returns the digest size when this algorithm is allowed by the active cryptographic policy.
     pub fn output_size(self) -> Result<usize, crate::crypto::CryptoPolicyError> {
-        #[cfg(feature = "fips-aws-lc")]
+        #[cfg(feature = "fips")]
         {
             crate::crypto::require_hash(self)?;
         }
@@ -151,7 +208,7 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "fips-aws-lc")]
+    #[cfg(feature = "fips")]
     #[test]
     fn fips_rejects_unapproved_hashing_without_panicking() {
         for algorithm in [
@@ -162,7 +219,10 @@ mod tests {
             HashAlgorithm::SHA3_512,
         ] {
             let digest_error = algorithm.digest(b"attacker-controlled input").unwrap_err();
-            assert_eq!(digest_error.algorithm, format!("{algorithm:?}"));
+            assert!(matches!(
+                digest_error,
+                HashError::Policy(ref policy_error) if policy_error.algorithm == format!("{algorithm:?}")
+            ));
             assert_eq!(
                 digest_error.to_string(),
                 format!("algorithm disabled by the active cryptographic policy: {algorithm:?}")

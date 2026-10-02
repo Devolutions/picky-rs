@@ -142,7 +142,7 @@ impl SignatureAlgorithm {
     }
 
     pub fn sign(self, msg: &[u8], private_key: &PrivateKey) -> Result<Vec<u8>, SignatureError> {
-        #[cfg(feature = "fips-aws-lc")]
+        #[cfg(feature = "fips")]
         {
             crate::crypto::fips::sign(self, msg, private_key)
         }
@@ -324,7 +324,7 @@ impl SignatureAlgorithm {
     }
 
     pub fn verify(self, public_key: &PublicKey, msg: &[u8], signature: &[u8]) -> Result<(), SignatureError> {
-        #[cfg(feature = "fips-aws-lc")]
+        #[cfg(feature = "fips")]
         {
             crate::crypto::fips::verify(self, public_key, msg, signature)
         }
@@ -510,7 +510,7 @@ impl SignatureAlgorithm {
             }
         }
 
-        #[cfg(not(feature = "fips-aws-lc"))]
+        #[cfg(not(feature = "fips"))]
         Ok(())
     }
 

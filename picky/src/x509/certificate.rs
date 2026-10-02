@@ -1030,6 +1030,19 @@ fn generate_serial_number() -> Result<IntegerAsn1, CertError> {
             })?;
         bytes
     };
+    #[cfg(feature = "fips-wolfcrypt")]
+    let bytes = {
+        let mut bytes = [0u8; 4];
+        crate::crypto::wolfcrypt_fips::ensure_initialized().map_err(|_| CertError::Random {
+            context: "wolfCrypt initialization failed while generating a certificate serial number",
+        })?;
+        wolfssl_wolfcrypt::random::RNG::new()
+            .and_then(|rng| rng.generate_block(&mut bytes))
+            .map_err(|_| CertError::Random {
+                context: "wolfCrypt failed to generate a certificate serial number",
+            })?;
+        bytes
+    };
     #[cfg(feature = "rustcrypto")]
     let bytes = rand::random::<[u8; 4]>();
     // serial number MUST be a positive integer
@@ -1101,7 +1114,7 @@ mod tests {
         PrivateKey::from_pkcs8(pem.data()).unwrap()
     }
 
-    #[cfg(feature = "fips-aws-lc")]
+    #[cfg(feature = "fips")]
     #[test]
     fn certificate_builder_rejects_legacy_key_id_hashes_without_panicking() {
         let root_key = parse_key(picky_test_data::RSA_2048_PK_1);
@@ -1122,7 +1135,7 @@ mod tests {
                     if matches!(
                         source.as_ref(),
                         CertError::KeyIdGen {
-                            source: KeyIdGenError::HashAlgorithmDisabled(policy_error)
+                            source: KeyIdGenError::Hash(crate::hash::HashError::Policy(policy_error))
                         } if policy_error.algorithm == format!("{hash:?}")
                     )
             ));

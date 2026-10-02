@@ -609,7 +609,7 @@ mod tests {
         assert_eq!(decoded.state.claims, get_strongly_typed_claims());
     }
 
-    #[cfg(feature = "fips-aws-lc")]
+    #[cfg(feature = "fips")]
     #[test]
     fn jwe_direct_aes_256_gcm_is_rejected_by_fips_provider() {
         let claims = get_strongly_typed_claims();
