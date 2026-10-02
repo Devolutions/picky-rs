@@ -50,6 +50,10 @@ pub enum CertError {
     #[error("signature error: {source}")]
     Signature { source: SignatureError },
 
+    /// secure random number generation error
+    #[error("secure random number generation failed: {context}")]
+    Random { context: &'static str },
+
     /// key id generation error
     #[error("key id generation error: {source}")]
     KeyIdGen { source: KeyIdGenError },
@@ -883,7 +887,7 @@ impl<'a> CertificateBuilder<'a> {
         let serial_number = if let Some(unsigned_integer_bytes) = inner.serial_number.take() {
             IntegerAsn1::from_bytes_be_unsigned(unsigned_integer_bytes)
         } else {
-            generate_serial_number()
+            generate_serial_number()?
         };
 
         let inherit_extensions_from_csr_attributes = inner.inherit_extensions_from_csr_attributes;
@@ -1014,14 +1018,22 @@ impl<'a> CertificateBuilder<'a> {
     }
 }
 
-fn generate_serial_number() -> IntegerAsn1 {
-    let x = rand::random::<u32>();
-    let b1 = ((x >> 24) & 0xff) as u8;
-    let b2 = ((x >> 16) & 0xff) as u8;
-    let b3 = ((x >> 8) & 0xff) as u8;
-    let b4 = (x & 0xff) as u8;
+fn generate_serial_number() -> Result<IntegerAsn1, CertError> {
+    #[cfg(feature = "fips-aws-lc")]
+    let bytes = {
+        use aws_lc_rs::rand::SecureRandom as _;
+        let mut bytes = [0u8; 4];
+        aws_lc_rs::rand::SystemRandom::new()
+            .fill(&mut bytes)
+            .map_err(|_| CertError::Random {
+                context: "AWS-LC failed to generate a certificate serial number",
+            })?;
+        bytes
+    };
+    #[cfg(feature = "rustcrypto")]
+    let bytes = rand::random::<[u8; 4]>();
     // serial number MUST be a positive integer
-    IntegerAsn1::from_bytes_be_unsigned(vec![b1, b2, b3, b4])
+    Ok(IntegerAsn1::from_bytes_be_unsigned(bytes.to_vec()))
 }
 
 #[cfg(test)]

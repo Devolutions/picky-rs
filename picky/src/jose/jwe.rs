@@ -5,26 +5,38 @@
 #![cfg_attr(feature = "fips", allow(dead_code))]
 
 use crate::jose::jwk::{Jwk, JwkError};
-use crate::key::ec::{EcComponent, EcdsaKeypair, EcdsaPublicKey, NamedEcCurve};
-use crate::key::ed::{EdKeypair, EdPublicKey, NamedEdAlgorithm, X25519_FIELD_ELEMENT_SIZE};
-use crate::key::{EcCurve, EdAlgorithm, KeyError, PrivateKey, PrivateKeyKind, PublicKey};
+use crate::key::{PrivateKey, PublicKey};
 
+#[cfg(feature = "jwe-crypto")]
+use crate::key::ec::{EcComponent, EcdsaKeypair, EcdsaPublicKey, NamedEcCurve};
+#[cfg(feature = "jwe-crypto")]
+use crate::key::ed::{EdKeypair, EdPublicKey, NamedEdAlgorithm, X25519_FIELD_ELEMENT_SIZE};
+#[cfg(feature = "jwe-crypto")]
+use crate::key::{EcCurve, EdAlgorithm, KeyError, PrivateKeyKind};
+#[cfg(feature = "jwe-crypto")]
 use aes::cipher::Array;
-use aes::cipher::typenum::Unsigned;
-use aes_gcm::{AeadInOut, Aes128Gcm, Aes256Gcm, KeyInit, KeySizeUser};
+#[cfg(feature = "jwe-crypto")]
+use aes_gcm::{AeadInOut, Aes128Gcm, Aes256Gcm, KeyInit};
+#[cfg(feature = "jwe-crypto")]
 use aes_kw::AesKw;
 use base64::engine::general_purpose;
 use base64::{DecodeError, Engine as _};
+#[cfg(feature = "jwe-crypto")]
 use crypto_common::Generate as _;
+#[cfg(feature = "jwe-crypto")]
 use rand::rngs::{StdRng, SysRng};
+#[cfg(feature = "jwe-crypto")]
 use rand_core::{Rng as _, SeedableRng as _};
+#[cfg(feature = "jwe-crypto")]
 use rsa::{Oaep, Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use thiserror::Error;
+#[cfg(feature = "jwe-crypto")]
 use zeroize::Zeroizing;
 
+#[cfg(feature = "jwe-crypto")]
 type Aes192Gcm = aes_gcm::AesGcm<aes_gcm::aes::Aes192, aes_gcm::aes::cipher::consts::U12>;
 
 // === error type === //
@@ -47,6 +59,7 @@ pub enum JweError {
     #[error("AES-GCM error (opaque)")]
     AesGcm,
 
+    #[cfg(feature = "jwe-crypto")]
     /// AES-KW error
     #[error("AES-KW error")]
     AesKw { source: aes_kw::Error },
@@ -98,16 +111,19 @@ pub enum JweError {
     #[error("invalid decryption key size: expected {expected}, got {got}")]
     InvalidDecryptionKeySize { expected: usize, got: usize },
 
+    #[cfg(feature = "jwe-crypto")]
     #[error(transparent)]
     RandError(#[from] rand::rngs::SysError),
 }
 
+#[cfg(feature = "jwe-crypto")]
 impl From<rsa::errors::Error> for JweError {
     fn from(e: rsa::errors::Error) -> Self {
         Self::Rsa { context: e.to_string() }
     }
 }
 
+#[cfg(feature = "jwe-crypto")]
 impl From<aes_gcm::Error> for JweError {
     fn from(_: aes_gcm::Error) -> Self {
         Self::AesGcm
@@ -132,14 +148,18 @@ impl From<DecodeError> for JweError {
     }
 }
 
+#[cfg(feature = "jwe-crypto")]
 impl From<aes_kw::Error> for JweError {
     fn from(e: aes_kw::Error) -> Self {
         Self::AesKw { source: e }
     }
 }
 
+#[cfg(feature = "jwe-crypto")]
 type KekAes128 = AesKw<aes::Aes128>;
+#[cfg(feature = "jwe-crypto")]
 type KekAes192 = AesKw<aes::Aes192>;
+#[cfg(feature = "jwe-crypto")]
 type KekAes256 = AesKw<aes::Aes256>;
 
 // === JWE algorithms === //
@@ -215,12 +235,14 @@ pub enum JweAlg {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[cfg(feature = "jwe-crypto")]
 enum KeyWrappingAlg {
     Aes128,
     Aes192,
     Aes256,
 }
 
+#[cfg(feature = "jwe-crypto")]
 impl KeyWrappingAlg {
     fn key_size(self) -> usize {
         match self {
@@ -326,6 +348,7 @@ impl JweAlg {
             .to_string()
     }
 
+    #[cfg(feature = "jwe-crypto")]
     fn key_wrapping_alg(&self) -> Option<KeyWrappingAlg> {
         let alg = match self {
             JweAlg::AesKeyWrap128 => KeyWrappingAlg::Aes128,
@@ -395,9 +418,9 @@ impl JweEnc {
 
     pub fn key_size(self) -> usize {
         match self {
-            Self::Aes128CbcHmacSha256 | Self::Aes128Gcm => <Aes128Gcm as KeySizeUser>::KeySize::to_usize(),
-            Self::Aes192CbcHmacSha384 | Self::Aes192Gcm => <Aes192Gcm as KeySizeUser>::KeySize::to_usize(),
-            Self::Aes256CbcHmacSha512 | Self::Aes256Gcm => <Aes256Gcm as KeySizeUser>::KeySize::to_usize(),
+            Self::Aes128CbcHmacSha256 | Self::Aes128Gcm => 16,
+            Self::Aes192CbcHmacSha384 | Self::Aes192Gcm => 24,
+            Self::Aes256CbcHmacSha512 | Self::Aes256Gcm => 32,
         }
     }
 
@@ -560,7 +583,7 @@ impl Jwe {
 
     /// Encodes with CEK encrypted and included in the token using asymmetric cryptography.
     pub fn encode(self, asymmetric_key: &PublicKey) -> Result<String, JweError> {
-        #[cfg(feature = "fips")]
+        #[cfg(not(feature = "jwe-crypto"))]
         {
             let _ = asymmetric_key;
             Err(JweError::UnsupportedAlgorithm {
@@ -568,13 +591,13 @@ impl Jwe {
             })
         }
 
-        #[cfg(not(feature = "fips"))]
+        #[cfg(feature = "jwe-crypto")]
         encode_impl(self, EncoderMode::Asymmetric(asymmetric_key))
     }
 
     /// Encodes with provided CEK (a symmetric key). This will ignore `alg` value and override it with "dir".
     pub fn encode_direct(self, cek: &[u8]) -> Result<String, JweError> {
-        #[cfg(feature = "fips")]
+        #[cfg(not(feature = "jwe-crypto"))]
         {
             let _ = cek;
             Err(JweError::UnsupportedAlgorithm {
@@ -582,13 +605,13 @@ impl Jwe {
             })
         }
 
-        #[cfg(not(feature = "fips"))]
+        #[cfg(feature = "jwe-crypto")]
         encode_impl(self, EncoderMode::Direct(cek))
     }
 
     /// Decodes with CEK encrypted and included in the token using asymmetric cryptography.
     pub fn decode(compact_repr: &str, key: &PrivateKey) -> Result<Jwe, JweError> {
-        #[cfg(feature = "fips")]
+        #[cfg(not(feature = "jwe-crypto"))]
         {
             let _ = (compact_repr, key);
             Err(JweError::UnsupportedAlgorithm {
@@ -596,13 +619,13 @@ impl Jwe {
             })
         }
 
-        #[cfg(not(feature = "fips"))]
+        #[cfg(feature = "jwe-crypto")]
         RawJwe::decode(compact_repr).and_then(|jwe| jwe.decrypt(key))
     }
 
     /// Decodes with provided CEK (a symmetric key).
     pub fn decode_direct(compact_repr: &str, cek: &[u8]) -> Result<Jwe, JweError> {
-        #[cfg(feature = "fips")]
+        #[cfg(not(feature = "jwe-crypto"))]
         {
             let _ = (compact_repr, cek);
             Err(JweError::UnsupportedAlgorithm {
@@ -610,7 +633,7 @@ impl Jwe {
             })
         }
 
-        #[cfg(not(feature = "fips"))]
+        #[cfg(feature = "jwe-crypto")]
         RawJwe::decode(compact_repr).and_then(|jwe| jwe.decrypt_direct(cek))
     }
 }
@@ -640,7 +663,7 @@ impl<'repr> RawJwe<'repr> {
 
     /// Decrypts the ciphertext using asymmetric cryptography and returns a verified `Jwe` structure.
     pub fn decrypt(self, key: &PrivateKey) -> Result<Jwe, JweError> {
-        #[cfg(feature = "fips")]
+        #[cfg(not(feature = "jwe-crypto"))]
         {
             let _ = key;
             Err(JweError::UnsupportedAlgorithm {
@@ -648,13 +671,13 @@ impl<'repr> RawJwe<'repr> {
             })
         }
 
-        #[cfg(not(feature = "fips"))]
+        #[cfg(feature = "jwe-crypto")]
         decrypt_impl(self, DecoderMode::Normal(key))
     }
 
     /// Decrypts the ciphertext using the provided CEK (a symmetric key).
     pub fn decrypt_direct(self, cek: &[u8]) -> Result<Jwe, JweError> {
-        #[cfg(feature = "fips")]
+        #[cfg(not(feature = "jwe-crypto"))]
         {
             let _ = cek;
             Err(JweError::UnsupportedAlgorithm {
@@ -662,7 +685,7 @@ impl<'repr> RawJwe<'repr> {
             })
         }
 
-        #[cfg(not(feature = "fips"))]
+        #[cfg(feature = "jwe-crypto")]
         decrypt_impl(self, DecoderMode::Direct(cek))
     }
 }
@@ -707,11 +730,13 @@ fn decode_impl(compact_repr: Cow<'_, str>) -> Result<RawJwe<'_>, JweError> {
 // encoder
 
 #[derive(Debug, Clone)]
+#[cfg(feature = "jwe-crypto")]
 enum EncoderMode<'a> {
     Asymmetric(&'a PublicKey),
     Direct(&'a [u8]),
 }
 
+#[cfg(feature = "jwe-crypto")]
 fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
     use picky_asn1_x509::PublicKey as RfcPublicKey;
 
@@ -823,12 +848,14 @@ fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
     .join("."))
 }
 
+#[cfg(feature = "jwe-crypto")]
 struct JweEcdhEncryptionContext {
     jwe_cek: Zeroizing<Vec<u8>>,
     encrypted_key: Vec<u8>,
     epk: PublicKey,
 }
 
+#[cfg(feature = "jwe-crypto")]
 fn prepare_ecdh_encryption_key(jwe: &Jwe, public_key: &PublicKey) -> Result<JweEcdhEncryptionContext, JweError> {
     let header = &jwe.header;
 
@@ -886,11 +913,13 @@ fn prepare_ecdh_encryption_key(jwe: &Jwe, public_key: &PublicKey) -> Result<JweE
 // decoder
 
 #[derive(Clone)]
+#[cfg(feature = "jwe-crypto")]
 enum DecoderMode<'a> {
     Normal(&'a PrivateKey),
     Direct(&'a [u8]),
 }
 
+#[cfg(feature = "jwe-crypto")]
 fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError> {
     let RawJwe {
         compact_repr,
@@ -994,6 +1023,7 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
     })
 }
 
+#[cfg(feature = "jwe-crypto")]
 fn prepare_ecdh_decryption_key(
     header: &JweHeader,
     encrypted_key: &[u8],
@@ -1043,6 +1073,7 @@ fn prepare_ecdh_decryption_key(
 }
 
 /// Expands the shared secret into a key of the desired size using the ECDH Concat KDF
+#[cfg(feature = "jwe-crypto")]
 fn ecdh_concat_kdf(
     alg: &str,
     shared_key_len: usize,
@@ -1106,6 +1137,7 @@ fn ecdh_concat_kdf(
 }
 
 /// Returns ECDH ephemeral public key and shared secret required to build encrypted JWE
+#[cfg(feature = "jwe-crypto")]
 fn generate_ecdh_shared_secret(
     apu: Option<&str>,
     apv: Option<&str>,
@@ -1236,6 +1268,7 @@ fn generate_ecdh_shared_secret(
 }
 
 /// Calculates ECDH shared secret using given keys and jwe header fields
+#[cfg(feature = "jwe-crypto")]
 fn calculate_ecdh_shared_secret(
     apu: Option<&str>,
     apv: Option<&str>,
@@ -1405,6 +1438,7 @@ fn calculate_ecdh_shared_secret(
 }
 
 /// Generate content encryption key (CEK) for given algorithm and wraps it with zeroize-on-drop container
+#[cfg(feature = "jwe-crypto")]
 fn generate_cek(alg: JweEnc) -> Result<Zeroizing<Vec<u8>>, JweError> {
     let mut cek = Zeroizing::new(vec![0u8; alg.key_size()]);
     let mut rng = StdRng::try_from_rng(&mut SysRng)?;
@@ -1412,12 +1446,14 @@ fn generate_cek(alg: JweEnc) -> Result<Zeroizing<Vec<u8>>, JweError> {
     Ok(cek)
 }
 
+#[cfg(feature = "jwe-crypto")]
 enum RsaPaddingScheme {
     Pkcs1v15Encrypt,
     Oaep(Oaep<sha1::Sha1>),
     Oaep256(Oaep<sha2::Sha256>),
 }
 
+#[cfg(feature = "jwe-crypto")]
 impl rsa::traits::PaddingScheme for RsaPaddingScheme {
     fn decrypt<Rng: rand_core::TryCryptoRng + ?Sized>(
         self,
@@ -1450,7 +1486,7 @@ impl rsa::traits::PaddingScheme for RsaPaddingScheme {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "jwe-crypto"))]
 mod tests {
     use super::*;
     use crate::key::PrivateKey;

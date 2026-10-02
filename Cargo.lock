@@ -1381,7 +1381,7 @@ dependencies = [
 
 [[package]]
 name = "picky"
-version = "7.0.0-rc.27"
+version = "7.0.0-rc.25"
 dependencies = [
  "aes",
  "aes-gcm",

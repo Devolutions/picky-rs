@@ -1,5 +1,6 @@
 //! Hash algorithms supported by picky
 
+#[cfg(feature = "rustcrypto")]
 use digest::Digest;
 use picky_asn1_x509::ShaVariant;
 use serde::{Deserialize, Serialize};
@@ -106,14 +107,14 @@ impl HashAlgorithm {
         }
 
         match self {
-            Self::MD5 => md5::Md5::output_size(),
-            Self::SHA1 => sha1::Sha1::output_size(),
-            Self::SHA2_224 => sha2::Sha224::output_size(),
-            Self::SHA2_256 => sha2::Sha256::output_size(),
-            Self::SHA2_384 => sha2::Sha384::output_size(),
-            Self::SHA2_512 => sha2::Sha512::output_size(),
-            Self::SHA3_384 => sha3::Sha3_384::output_size(),
-            Self::SHA3_512 => sha3::Sha3_512::output_size(),
+            Self::MD5 => 16,
+            Self::SHA1 => 20,
+            Self::SHA2_224 => 28,
+            Self::SHA2_256 => 32,
+            Self::SHA2_384 => 48,
+            Self::SHA2_512 => 64,
+            Self::SHA3_384 => 48,
+            Self::SHA3_512 => 64,
         }
     }
 }

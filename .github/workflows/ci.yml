@@ -99,11 +99,20 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Reject RustCrypto implementations in the FIPS graph
+        run: |
+          if cargo tree --locked -p picky --edges normal,build --no-default-features \
+            --features fips-aws-lc,x509,jose,time_conversion \
+            | grep -E 'aws-lc-sys v|rsa v|p256 v|p384 v|p521 v|ed25519|x25519|md-5|sha1 v|sha2 v|sha3 v|aes|chacha|poly1305|argon|scrypt|pbkdf|hmac|crypto-bigint|ring v'; then
+            echo "A non-FIPS cryptography implementation is present in the FIPS dependency graph"
+            exit 1
+          fi
+
       - name: Check FIPS feature profile
-        run: cargo check --locked -p picky --no-default-features --features fips-aws-lc,x509,jose,http_signature,http_trait_impl
+        run: cargo check --locked -p picky --no-default-features --features fips-aws-lc,x509,jose,time_conversion,http_signature,http_trait_impl
 
       - name: Test FIPS policy and approved signatures
-        run: cargo test --locked -p picky --no-default-features --features fips-aws-lc,x509,jose,http_signature,http_trait_impl crypto::tests
+        run: cargo test --locked -p picky --no-default-features --features fips-aws-lc,x509,jose,time_conversion,http_signature,http_trait_impl crypto::tests
 
   msrv:
     # Minimum supported Rust version check for published crates.

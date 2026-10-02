@@ -9,7 +9,6 @@ use crate::key::ed::{EdPublicKey, NamedEdAlgorithm};
 use crate::key::{EcCurve, EdAlgorithm, PublicKey};
 use base64::engine::general_purpose;
 use base64::{DecodeError, Engine as _};
-use crypto_bigint::BoxedUint;
 use picky_asn1::wrapper::IntegerAsn1;
 use picky_asn1_x509::SubjectPublicKeyInfo;
 use serde::{Deserialize, Serialize};
@@ -329,66 +328,27 @@ impl Jwk {
             SerdePublicKey::Ec(_) => {
                 let ec_key = EcdsaPublicKey::try_from(public_key)
                     .map_err(|e| JwkError::InvalidEcPublicKey { cause: e.to_string() })?;
-
-                match ec_key.curve() {
-                    NamedEcCurve::Known(EcCurve::NistP256) => {
-                        let point = p256::Sec1Point::from_bytes(ec_key.encoded_point()).map_err(|_| {
-                            JwkError::InvalidEcPublicKey {
-                                cause: "invalid P-256 EC point encoding".to_string(),
-                            }
-                        })?;
-
-                        match (point.x(), point.y()) {
-                            (Some(x), Some(y)) => Ok(Self::new(JwkKeyType::new_ec_key(
-                                JwkEcPublicKeyCurve::P256,
-                                x.as_slice(),
-                                y.as_slice(),
-                            ))),
-                            _ => Err(JwkError::InvalidEcPublicKey {
-                                cause: "Invalid P-256 curve EC public point coordinates".to_string(),
-                            }),
-                        }
+                let (curve, coordinate_size) = match ec_key.curve() {
+                    NamedEcCurve::Known(EcCurve::NistP256) => (JwkEcPublicKeyCurve::P256, 32),
+                    NamedEcCurve::Known(EcCurve::NistP384) => (JwkEcPublicKeyCurve::P384, 48),
+                    NamedEcCurve::Known(EcCurve::NistP521) => (JwkEcPublicKeyCurve::P521, 66),
+                    NamedEcCurve::Unsupported(_) => {
+                        return Err(JwkError::UnsupportedAlgorithm {
+                            algorithm: "Unsupported EC curve",
+                        });
                     }
-                    NamedEcCurve::Known(EcCurve::NistP384) => {
-                        let point = p384::Sec1Point::from_bytes(ec_key.encoded_point()).map_err(|_| {
-                            JwkError::InvalidEcPublicKey {
-                                cause: "invalid P-384 EC point encoding".to_string(),
-                            }
-                        })?;
-
-                        match (point.x(), point.y()) {
-                            (Some(x), Some(y)) => Ok(Self::new(JwkKeyType::new_ec_key(
-                                JwkEcPublicKeyCurve::P384,
-                                x.as_slice(),
-                                y.as_slice(),
-                            ))),
-                            _ => Err(JwkError::InvalidEcPublicKey {
-                                cause: "Invalid P-384 curve EC public point coordinates".to_string(),
-                            }),
-                        }
-                    }
-                    NamedEcCurve::Known(EcCurve::NistP521) => {
-                        let point = p521::Sec1Point::from_bytes(ec_key.encoded_point()).map_err(|_| {
-                            JwkError::InvalidEcPublicKey {
-                                cause: "invalid P-521 EC point encoding".to_string(),
-                            }
-                        })?;
-
-                        match (point.x(), point.y()) {
-                            (Some(x), Some(y)) => Ok(Self::new(JwkKeyType::new_ec_key(
-                                JwkEcPublicKeyCurve::P521,
-                                x.as_slice(),
-                                y.as_slice(),
-                            ))),
-                            _ => Err(JwkError::InvalidEcPublicKey {
-                                cause: "Invalid P-521 curve EC public point coordinates".to_string(),
-                            }),
-                        }
-                    }
-                    NamedEcCurve::Unsupported(_) => Err(JwkError::UnsupportedAlgorithm {
-                        algorithm: "Unsupported EC curve",
-                    }),
+                };
+                let point = ec_key.encoded_point();
+                if point.len() != 1 + coordinate_size * 2 || point.first() != Some(&0x04) {
+                    return Err(JwkError::InvalidEcPublicKey {
+                        cause: "only uncompressed SEC1 EC points are supported".to_string(),
+                    });
                 }
+                Ok(Self::new(JwkKeyType::new_ec_key(
+                    curve,
+                    &point[1..1 + coordinate_size],
+                    &point[1 + coordinate_size..],
+                )))
             }
             SerdePublicKey::Ed(_) => {
                 let ed_key = EdPublicKey::try_from(public_key)
@@ -435,10 +395,20 @@ impl Jwk {
                     JwkEcPublicKeyCurve::P521 => EcCurve::NistP521,
                 };
 
-                let x = BoxedUint::from_be_slice_vartime(&ec.x_signed_bytes_be()?);
-                let y = BoxedUint::from_be_slice_vartime(&ec.y_signed_bytes_be()?);
-
-                PublicKey::from_ec_components(curve, &x, &y).map_err(|_| JwkError::InvalidEcPointCoordinates)
+                let coordinate_size = curve.field_bytes_size();
+                let x = general_purpose::URL_SAFE_NO_PAD.decode(&ec.x)?;
+                let y = general_purpose::URL_SAFE_NO_PAD.decode(&ec.y)?;
+                if x.len() != coordinate_size || y.len() != coordinate_size {
+                    return Err(JwkError::InvalidEcPointCoordinates);
+                }
+                let mut point = Vec::with_capacity(1 + coordinate_size * 2);
+                point.push(0x04);
+                point.extend_from_slice(&x);
+                point.extend_from_slice(&y);
+                Ok(PublicKey::from_ec_encoded_components(
+                    &NamedEcCurve::Known(curve).into(),
+                    &point,
+                ))
             }
             JwkKeyType::Ed(ed) => {
                 let algorithm = match ed.crv {

@@ -1,6 +1,6 @@
 [package]
 name = "picky"
-version = "7.0.0-rc.27"
+version = "7.0.0-rc.25"
 authors = [
     "Benoît CORTIER <bcortier@devolutions.net>",
     "Jonathan Trepanier <jtrepanier@devolutions.net>",
@@ -23,7 +23,7 @@ include = ["src/**/*", "README.md", "CHANGELOG.md", "LICENSE-*"]
 [dependencies]
 picky-asn1 = { version = "0.10", path = "../picky-asn1", features = ["zeroize"] }
 picky-asn1-der = { version = "0.5", path = "../picky-asn1-der" }
-picky-asn1-x509 = { version = "0.15", path = "../picky-asn1-x509", features = ["legacy", "zeroize"] }
+picky-asn1-x509 = { version = "0.15", path = "../picky-asn1-x509", features = ["zeroize"] }
 serde = { version = "1", features = ["derive"] }
 base64 = "0.23"
 thiserror = "2"
@@ -46,24 +46,24 @@ reqwest = { version = "0.13", default-features = false, features = ["blocking"],
 # These should be updated as soon as possible.
 # /!\ ===================================== /!\
 
-rand = "0.10"
-rand_core = "0.10"
-crypto-bigint = "0.7"
+rand = { version = "0.10", optional = true }
+rand_core = { version = "0.10", optional = true }
+crypto-bigint = { version = "0.7", optional = true }
 
-ed25519-dalek = { version = "3", features = ["hazmat", "rand_core"] }
-x25519-dalek = { version = "3", features = ["static_secrets"] }
+ed25519-dalek = { version = "3", features = ["hazmat", "rand_core"], optional = true }
+x25519-dalek = { version = "3", features = ["static_secrets"], optional = true }
 
-p256 = { version = "0.14", features = ["ecdh"] }
-p384 = { version = "0.14", features = ["ecdh"] }
-p521 = { version = "0.14", features = ["ecdh"] }
+p256 = { version = "0.14", features = ["ecdh"], optional = true }
+p384 = { version = "0.14", features = ["ecdh"], optional = true }
+p521 = { version = "0.14", features = ["ecdh"], optional = true }
 
-rsa = { version = "=0.10.0-rc.18", features = ["std"] }
+rsa = { version = "=0.10.0-rc.18", features = ["std"], optional = true }
 
-digest = "0.11"
-md5 = { package = "md-5", version = "0.11", features = ["oid"] }
-sha1 = { version = "0.11", features = ["oid"] }
-sha2 = { version = "0.11", features = ["oid"] }
-sha3 = { version = "0.12", features = ["oid"] }
+digest = { version = "0.11", optional = true }
+md5 = { package = "md-5", version = "0.11", features = ["oid"], optional = true }
+sha1 = { version = "0.11", features = ["oid"], optional = true }
+sha2 = { version = "0.11", features = ["oid"], optional = true }
+sha3 = { version = "0.12", features = ["oid"], optional = true }
 
 aes-gcm = { version = "0.11", optional = true }
 aes = { version = "0.9", optional = true }
@@ -76,13 +76,13 @@ des = { version = "0.9", optional = true }
 rc2 = { version = "0.9", optional = true }
 pbkdf2 = { version = "0.13", optional = true }
 hmac = { version = "0.13", optional = true }
-crypto-common = "0.2"
-inout = "0.2.2"
+crypto-common = { version = "0.2", optional = true }
+inout = { version = "0.2.2", optional = true }
 
 # Pin transitive dependencies versions.
 # TODO: Remove when stable versions will be released.
 blake2 = { version = "=0.11.0-rc.6", optional = true }
-pkcs1 = "=0.8.0-rc.4"
+pkcs1 = { version = "=0.8.0-rc.4", optional = true }
 
 [dev-dependencies]
 pretty_assertions = "1.4"
@@ -95,16 +95,36 @@ tempfile = "3.22"
 picky-test-data = { path = "../picky-test-data", version = "0.1" }
 
 [features]
-default = ["rustcrypto", "x509", "jose", "http_signature", "http_trait_impl", "pkcs12"]
+default = ["rustcrypto", "x509", "jose", "jwe-crypto", "http_signature", "http_trait_impl", "pkcs12"]
 
 # Crypto backends. FIPS consumers must disable default features and select
 # `fips-aws-lc` explicitly.
-rustcrypto = []
+rustcrypto = [
+    "dep:rand",
+    "dep:rand_core",
+    "dep:crypto-bigint",
+    "dep:ed25519-dalek",
+    "dep:x25519-dalek",
+    "dep:p256",
+    "dep:p384",
+    "dep:p521",
+    "dep:rsa",
+    "dep:digest",
+    "dep:md5",
+    "dep:sha1",
+    "dep:sha2",
+    "dep:sha3",
+    "dep:crypto-common",
+    "dep:inout",
+    "dep:pkcs1",
+    "picky-asn1-x509/legacy",
+]
 fips = []
 fips-aws-lc = ["fips", "dep:aws-lc-rs"]
 full = [
     "x509",
     "jose",
+    "jwe-crypto",
     "http_signature",
     "pkcs12",
     "pkcs7",
@@ -121,9 +141,10 @@ full = [
 
 # main features
 x509 = []
-jose = ["dep:serde_json", "dep:aes-gcm", "dep:ctr", "dep:cbc", "dep:aes-kw", "dep:aes"]
+jose = ["dep:serde_json"]
+jwe-crypto = ["jose", "rustcrypto", "dep:aes-gcm", "dep:ctr", "dep:cbc", "dep:aes-kw", "dep:aes"]
 http_signature = []
-pkcs12 = ["picky-asn1-x509/pkcs12", "dep:des", "dep:rc2", "dep:cbc", "dep:hmac", "dep:aes", "x509", "dep:pbkdf2"]
+pkcs12 = ["rustcrypto", "picky-asn1-x509/pkcs12", "dep:des", "dep:rc2", "dep:cbc", "dep:hmac", "dep:aes", "x509", "dep:pbkdf2"]
 
 # secondary features
 pkcs7 = ["x509", "picky-asn1-x509/pkcs7"]
@@ -131,7 +152,7 @@ http_timestamp = ["dep:reqwest"]
 ctl = ["picky-asn1-x509/ctl", "pkcs7", "chrono_conversion"]
 ctl_http_fetch = ["dep:reqwest", "dep:cab", "ctl"]
 wincert = ["x509", "dep:byteorder"]
-ssh = ["dep:byteorder", "dep:aes", "dep:ctr", "dep:cbc", "dep:bcrypt-pbkdf", "dep:lexical-sort", "dep:hmac", "dep:pbkdf2"]
+ssh = ["rustcrypto", "dep:byteorder", "dep:aes", "dep:ctr", "dep:cbc", "dep:bcrypt-pbkdf", "dep:lexical-sort", "dep:hmac", "dep:pbkdf2"]
 http_trait_impl = ["dep:http"]
 chrono_conversion = ["dep:chrono", "picky-asn1/chrono_conversion"]
 time_conversion = ["dep:time", "picky-asn1/time_conversion"]

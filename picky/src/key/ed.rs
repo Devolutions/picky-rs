@@ -1,13 +1,17 @@
-use crate::key::{KeyError, PrivateKey, PrivateKeyKind, PublicKey};
+use crate::key::{KeyError, PublicKey};
+#[cfg(feature = "rustcrypto")]
+use crate::key::{PrivateKey, PrivateKeyKind};
 use crate::oid::ObjectIdentifier;
 
 use picky_asn1::wrapper::BitStringAsn1;
 use picky_asn1_x509::oids;
 use std::fmt::Display;
+#[cfg(feature = "rustcrypto")]
 use zeroize::Zeroize;
 
+#[cfg(feature = "jwe-crypto")]
 pub(crate) const X25519_FIELD_ELEMENT_SIZE: usize = 32;
-#[cfg(not(feature = "fips"))]
+#[cfg(feature = "rustcrypto")]
 pub(crate) type X25519FieldElement = [u8; X25519_FIELD_ELEMENT_SIZE];
 
 /// Name of supported Curve25519 and Curve448 based algorithms.
@@ -86,6 +90,7 @@ impl From<NamedEdAlgorithm> for ObjectIdentifier {
     }
 }
 
+#[cfg(feature = "rustcrypto")]
 #[derive(Debug)]
 pub(crate) struct EdKeypair {
     algorithm: NamedEdAlgorithm,
@@ -93,6 +98,7 @@ pub(crate) struct EdKeypair {
     public_key: Option<Vec<u8>>,
 }
 
+#[cfg(feature = "rustcrypto")]
 impl EdKeypair {
     pub fn algorithm(&self) -> &NamedEdAlgorithm {
         &self.algorithm
@@ -103,12 +109,14 @@ impl EdKeypair {
     }
 }
 
+#[cfg(feature = "rustcrypto")]
 impl Drop for EdKeypair {
     fn drop(&mut self) {
         self.private_key.zeroize();
     }
 }
 
+#[cfg(feature = "rustcrypto")]
 impl<'a> TryFrom<&'a PrivateKey> for EdKeypair {
     type Error = KeyError;
 
@@ -146,6 +154,7 @@ impl EdPublicKey<'_> {
     }
 }
 
+#[cfg(feature = "rustcrypto")]
 impl<'a> TryFrom<&'a EdKeypair> for EdPublicKey<'a> {
     type Error = KeyError;
 

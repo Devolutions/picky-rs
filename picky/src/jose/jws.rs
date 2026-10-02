@@ -48,6 +48,7 @@ pub enum JwsError {
     },
 }
 
+#[cfg(feature = "rustcrypto")]
 impl From<rsa::errors::Error> for JwsError {
     fn from(e: rsa::errors::Error) -> Self {
         Self::Rsa { context: e.to_string() }

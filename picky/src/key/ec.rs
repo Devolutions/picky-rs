@@ -34,6 +34,7 @@ impl Drop for EcdsaKeypair {
     }
 }
 
+#[cfg(feature = "rustcrypto")]
 pub(crate) enum EcComponent<'a> {
     PointX(&'a [u8]),
     PointY(&'a [u8]),
@@ -56,26 +57,15 @@ impl EcCurve {
     /// R and S signature values)
     pub(crate) fn field_bytes_size(self) -> usize {
         match self {
-            EcCurve::NistP256 => {
-                use p256::elliptic_curve::FieldBytesSize;
-                use p256::elliptic_curve::array::typenum::Unsigned;
-                <FieldBytesSize<p256::NistP256> as Unsigned>::USIZE
-            }
-            EcCurve::NistP384 => {
-                use p384::elliptic_curve::FieldBytesSize;
-                use p384::elliptic_curve::array::typenum::Unsigned;
-                <FieldBytesSize<p384::NistP384> as Unsigned>::USIZE
-            }
-            EcCurve::NistP521 => {
-                use p521::elliptic_curve::FieldBytesSize;
-                use p521::elliptic_curve::array::typenum::Unsigned;
-                <FieldBytesSize<p521::NistP521> as Unsigned>::USIZE
-            }
+            EcCurve::NistP256 => 32,
+            EcCurve::NistP384 => 48,
+            EcCurve::NistP521 => 66,
         }
     }
 
     /// We need to validate input data sizes to prevent panics in the underlying `generic_array`
     /// library code.
+    #[cfg(feature = "rustcrypto")]
     pub(crate) fn validate_component<'a>(&self, component: EcComponent<'a>) -> Result<&'a [u8], KeyError> {
         let (buffer, error_message) = match component {
             EcComponent::PointX(buf) => (buf, "Invalid `point.x` component size"),
@@ -169,7 +159,7 @@ impl<'a> TryFrom<&'a PrivateKey> for EcdsaKeypair {
     }
 }
 
-#[cfg(not(feature = "fips"))]
+#[cfg(feature = "rustcrypto")]
 pub(crate) fn calculate_public_ec_key(
     curve_oid: &ObjectIdentifier,
     private_key: &[u8],

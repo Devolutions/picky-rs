@@ -7,9 +7,9 @@ use picky_asn1_x509::{AlgorithmIdentifier, oids};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-#[cfg(not(feature = "fips-aws-lc"))]
+#[cfg(feature = "rustcrypto")]
 use crate::key::ec::{EcComponent, EcCurve, NamedEcCurve};
-#[cfg(not(feature = "fips-aws-lc"))]
+#[cfg(feature = "rustcrypto")]
 use rsa::signature::{SignatureEncoding as _, Signer};
 
 #[derive(Debug, Error)]
@@ -44,12 +44,14 @@ pub enum SignatureError {
     AlgorithmDisabledByPolicy { algorithm: String },
 }
 
+#[cfg(feature = "rustcrypto")]
 impl From<rsa::errors::Error> for SignatureError {
     fn from(e: rsa::errors::Error) -> Self {
         SignatureError::Rsa { context: e.to_string() }
     }
 }
 
+#[cfg(feature = "rustcrypto")]
 impl From<rsa::signature::Error> for SignatureError {
     fn from(e: rsa::signature::Error) -> Self {
         SignatureError::Rsa { context: e.to_string() }
@@ -145,7 +147,7 @@ impl SignatureAlgorithm {
             crate::crypto::fips::sign(self, msg, private_key)
         }
 
-        #[cfg(not(feature = "fips-aws-lc"))]
+        #[cfg(feature = "rustcrypto")]
         match self {
             SignatureAlgorithm::RsaPkcs1v15(picky_hash_algo) => {
                 use rsa::signature::SignatureEncoding as _;
@@ -327,7 +329,7 @@ impl SignatureAlgorithm {
             crate::crypto::fips::verify(self, public_key, msg, signature)
         }
 
-        #[cfg(not(feature = "fips-aws-lc"))]
+        #[cfg(feature = "rustcrypto")]
         match self {
             SignatureAlgorithm::RsaPkcs1v15(picky_hash_algo) => {
                 use rsa::signature::Verifier as _;
@@ -521,7 +523,7 @@ impl SignatureAlgorithm {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "rustcrypto"))]
 mod ec_tests {
     use super::*;
     use rstest::*;

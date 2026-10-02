@@ -4,30 +4,38 @@ pub(crate) mod ed;
 
 use crate::oid::ObjectIdentifier;
 use crate::pem::{Pem, PemError, parse_pem};
-use crypto_bigint::{BoxedUint, NonZero};
 use picky_asn1::bit_string::BitString;
-use picky_asn1::wrapper::{BitStringAsn1Container, IntegerAsn1, OctetStringAsn1Container};
+use picky_asn1::wrapper::{BitStringAsn1Container, OctetStringAsn1Container};
 use picky_asn1_der::Asn1DerError;
 use picky_asn1_x509::{
-    ECPrivateKey, PRIVATE_KEY_INFO_VERSION_1, PrivateKeyInfo, PrivateKeyValue, SubjectPublicKeyInfo, private_key_info,
+    ECPrivateKey, PRIVATE_KEY_INFO_VERSION_1, PrivateKeyInfo, PrivateKeyValue, SubjectPublicKeyInfo,
 };
-use rsa::{RsaPrivateKey, RsaPublicKey};
 use thiserror::Error;
 use zeroize::Zeroize;
 
-#[cfg(not(feature = "fips"))]
+#[cfg(feature = "rustcrypto")]
+use crypto_bigint::{BoxedUint, NonZero};
+#[cfg(feature = "rustcrypto")]
 use crypto_common::Generate as _;
-#[cfg(not(feature = "fips"))]
+#[cfg(feature = "rustcrypto")]
+use picky_asn1::wrapper::IntegerAsn1;
+#[cfg(feature = "rustcrypto")]
+use picky_asn1_x509::private_key_info;
+#[cfg(feature = "rustcrypto")]
 use rand::rngs::{StdRng, SysRng};
-#[cfg(not(feature = "fips"))]
+#[cfg(feature = "rustcrypto")]
 use rand_core::SeedableRng as _;
-#[cfg(not(feature = "fips"))]
+#[cfg(feature = "rustcrypto")]
 use rsa::traits::{PrivateKeyParts as _, PublicKeyParts as _};
+#[cfg(feature = "rustcrypto")]
+use rsa::{RsaPrivateKey, RsaPublicKey};
 
-#[cfg(not(feature = "fips"))]
+#[cfg(feature = "rustcrypto")]
+use ec::EcComponent;
+use ec::NamedEcCurve;
+#[cfg(feature = "rustcrypto")]
 use ec::calculate_public_ec_key;
-use ec::{EcComponent, NamedEcCurve};
-#[cfg(not(feature = "fips"))]
+#[cfg(feature = "rustcrypto")]
 use ed::{NamedEdAlgorithm, X25519_FIELD_ELEMENT_SIZE, X25519FieldElement};
 
 pub use ec::EcCurve;
@@ -77,11 +85,13 @@ pub enum KeyError {
     #[error("invalid PEM provided: {source}")]
     Pem { source: PemError },
 
+    #[cfg(feature = "rustcrypto")]
     #[error(transparent)]
     RandError(#[from] rand::rngs::SysError),
 }
 
 impl KeyError {
+    #[cfg(feature = "rustcrypto")]
     pub(crate) fn unsupported_curve(curve_oid: &ObjectIdentifier, context: &'static str) -> Self {
         let curve_oid: String = curve_oid.into();
         Self::EC {
@@ -89,6 +99,7 @@ impl KeyError {
         }
     }
 
+    #[cfg(feature = "rustcrypto")]
     pub(crate) fn unsupported_ed_algorithm(oid: &ObjectIdentifier, context: &'static str) -> Self {
         let oid: String = oid.into();
         Self::ED {
@@ -99,6 +110,7 @@ impl KeyError {
     }
 }
 
+#[cfg(feature = "rustcrypto")]
 impl From<rsa::errors::Error> for KeyError {
     fn from(e: rsa::errors::Error) -> Self {
         Self::Rsa { context: e.to_string() }
@@ -129,6 +141,7 @@ const EC_PRIVATE_KEY_LABEL: &str = "EC PRIVATE KEY";
 // Namely, `ring` library has bug in it, which causes it to fail when validating
 // encoded public key, comparing it with generated one (It assumes uncompressed point).
 // [https://github.com/briansmith/ring/blob/155231fb017acaaa94a044f124bb34a777d115ef/src/ec/suite_b.rs#L221-L225]
+#[cfg(feature = "rustcrypto")]
 const COMPRESS_EC_POINT_BY_DEFAULT: bool = false;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -168,6 +181,7 @@ pub struct PrivateKey {
     inner: PrivateKeyInfo,
 }
 
+#[cfg(feature = "rustcrypto")]
 impl TryFrom<&'_ PrivateKey> for RsaPrivateKey {
     type Error = KeyError;
 
@@ -194,6 +208,7 @@ impl TryFrom<&'_ PrivateKey> for RsaPrivateKey {
     }
 }
 
+#[cfg(feature = "rustcrypto")]
 impl TryFrom<&'_ PrivateKey> for RsaPublicKey {
     type Error = KeyError;
 
@@ -214,6 +229,7 @@ impl TryFrom<&'_ PrivateKey> for RsaPublicKey {
 }
 
 impl PrivateKey {
+    #[cfg(feature = "rustcrypto")]
     pub fn from_rsa_components(
         modulus: &BoxedUint,
         public_exponent: &BoxedUint,
@@ -274,6 +290,7 @@ impl PrivateKey {
 
     /// Builds new EC key from given components. Note that only curves, declared in [`EcCurve`]
     /// are supported for key generation.
+    #[cfg(feature = "rustcrypto")]
     pub fn from_ec_components(
         curve: EcCurve,
         secret: &BoxedUint,
@@ -449,7 +466,7 @@ impl PrivateKey {
                     })
                 }
 
-                #[cfg(not(feature = "fips"))]
+                #[cfg(feature = "rustcrypto")]
                 {
                     let algorithm = NamedEdAlgorithm::from(inner.private_key_algorithm.oid());
                     let private_key = key.0.clone();
@@ -546,7 +563,7 @@ impl PrivateKey {
                     });
                 }
 
-                #[cfg(not(feature = "fips"))]
+                #[cfg(feature = "rustcrypto")]
                 {
                     (
                         calculate_public_ec_key(&curve_oid, &decoded.private_key.0, COMPRESS_EC_POINT_BY_DEFAULT)?,
@@ -720,7 +737,7 @@ impl PrivateKey {
             })
         }
 
-        #[cfg(not(feature = "fips"))]
+        #[cfg(feature = "rustcrypto")]
         {
             let key = RsaPrivateKey::new(&mut StdRng::try_from_rng(&mut SysRng)?, bits)?;
 
@@ -741,7 +758,7 @@ impl PrivateKey {
             })
         }
 
-        #[cfg(not(feature = "fips"))]
+        #[cfg(feature = "rustcrypto")]
         {
             let curve_oid: ObjectIdentifier = NamedEcCurve::Known(curve).into();
 
@@ -814,7 +831,7 @@ impl PrivateKey {
             })
         }
 
-        #[cfg(not(feature = "fips"))]
+        #[cfg(feature = "rustcrypto")]
         {
             let algorithm_oid: ObjectIdentifier = NamedEdAlgorithm::Known(algorithm).into();
 
@@ -859,6 +876,7 @@ impl PrivateKey {
     }
 
     #[cfg(any(feature = "ssh", feature = "jose"))]
+    #[cfg(feature = "jwe-crypto")]
     pub(crate) fn as_kind(&self) -> &PrivateKeyKind {
         &self.kind
     }
@@ -924,6 +942,7 @@ impl AsRef<PublicKey> for PublicKey {
     }
 }
 
+#[cfg(feature = "rustcrypto")]
 impl TryFrom<&'_ PublicKey> for RsaPublicKey {
     type Error = KeyError;
 
@@ -948,6 +967,7 @@ impl TryFrom<&'_ PublicKey> for RsaPublicKey {
 }
 
 impl PublicKey {
+    #[cfg(feature = "rustcrypto")]
     pub fn from_rsa_components(modulus: &BoxedUint, public_exponent: &BoxedUint) -> Self {
         PublicKey(SubjectPublicKeyInfo::new_rsa_key(
             IntegerAsn1::from_bytes_be_unsigned(modulus.to_be_bytes_trimmed_vartime().into_vec()),
@@ -971,6 +991,7 @@ impl PublicKey {
     /// supported. For correct encoding of the point, we need to know which curve-specific
     /// arithmetic crate to use. If you want to use a curve that is not declared in [`EcCurve`],
     /// and encoded representation of the point is available - use [`Self::from_ec_encoded_components`]
+    #[cfg(feature = "rustcrypto")]
     pub fn from_ec_components(curve: EcCurve, x: &BoxedUint, y: &BoxedUint) -> Result<Self, KeyError> {
         let px_bytes = x.to_be_bytes_trimmed_vartime();
         let py_bytes = y.to_be_bytes_trimmed_vartime();
@@ -1145,7 +1166,7 @@ impl PublicKey {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "rustcrypto"))]
 mod tests {
     use super::*;
     use crate::hash::HashAlgorithm;

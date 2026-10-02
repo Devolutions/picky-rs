@@ -36,6 +36,11 @@ and P-384/SHA-384. It rejects legacy signature algorithms, key generation, JWE
 encryption/decryption, PKCS#12, SSH, and PuTTY operations rather than falling
 back to the RustCrypto backend.
 
+The `jose` feature contains JOSE/JWT/JWE parsing and signature support without
+enabling RustCrypto encryption crates. Non-FIPS builds that need JWE
+encryption/decryption select `jwe-crypto`; it is included by the default and
+`full` feature profiles.
+
 `fips-aws-lc` selects a cryptographic module, but deployment compliance also
 depends on using a platform, build configuration, and module version covered by
 the applicable validation certificate.
