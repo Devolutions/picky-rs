@@ -876,7 +876,6 @@ impl PrivateKey {
     }
 
     #[cfg(any(feature = "ssh", feature = "jose"))]
-    #[cfg(feature = "jwe-crypto")]
     pub(crate) fn as_kind(&self) -> &PrivateKeyKind {
         &self.kind
     }
