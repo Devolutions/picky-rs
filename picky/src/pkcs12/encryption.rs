@@ -1,14 +1,22 @@
-use crate::pkcs12::{Pbkdf1Usage, Pkcs12Error, Pkcs12HashAlgorithm, pbkdf1};
+#[cfg(feature = "fips")]
+use crate::pkcs12::require_fips_hash;
+#[cfg(feature = "rustcrypto")]
+use crate::pkcs12::{Pbkdf1Usage, pbkdf1};
+use crate::pkcs12::{Pkcs12Error, Pkcs12HashAlgorithm};
 use picky_asn1::restricted_string::BmpString;
 use picky_asn1::wrapper::OctetStringAsn1;
 pub use picky_asn1_x509::pkcs12::Pbes1AlgorithmKind as Pbes1Cipher;
+#[cfg(feature = "rustcrypto")]
+use picky_asn1_x509::pkcs12::Pbes1Params as Pbes1ParamsAsn1;
 use picky_asn1_x509::pkcs12::{
-    Pbes1Params as Pbes1ParamsAsn1, Pbes2AesCbcEncryption as Pbes2AesCbcEncryptionAsn1,
-    Pbes2EncryptionScheme as Pbes2EncryptionSchemeAsn1, Pbes2KeyDerivationFunc as Pbes2KeyDerivationFuncAsn1,
-    Pbes2Params as Pbes2ParamsAsn1, Pbkdf2Params as Pbkdf2ParamsAsn1, Pbkdf2Prf as Pbkdf2PrfAsn1,
-    Pbkdf2SaltSource as Pbkdf2SaltSourceAsn1, Pkcs12EncryptionAlgorithm as Pkcs12EncryptionAsn1,
+    Pbes2AesCbcEncryption as Pbes2AesCbcEncryptionAsn1, Pbes2EncryptionScheme as Pbes2EncryptionSchemeAsn1,
+    Pbes2KeyDerivationFunc as Pbes2KeyDerivationFuncAsn1, Pbes2Params as Pbes2ParamsAsn1,
+    Pbkdf2Params as Pbkdf2ParamsAsn1, Pbkdf2Prf as Pbkdf2PrfAsn1, Pbkdf2SaltSource as Pbkdf2SaltSourceAsn1,
+    Pkcs12EncryptionAlgorithm as Pkcs12EncryptionAsn1,
 };
+#[cfg(feature = "rustcrypto")]
 use rand::rngs::{StdRng, SysRng};
+#[cfg(feature = "rustcrypto")]
 use rand_core::SeedableRng as _;
 use std::str::FromStr as _;
 
@@ -21,7 +29,10 @@ const AES_BLOCK_SIZE: usize = 16;
 /// string and RNG.
 pub struct Pkcs12CryptoContext {
     password: zeroize::Zeroizing<String>,
+    #[cfg(feature = "rustcrypto")]
     rng: Box<dyn rand_core::Rng>,
+    #[cfg(feature = "fips-wolfcrypt")]
+    rng: wolfssl_wolfcrypt::random::RNG,
 }
 
 impl Pkcs12CryptoContext {
@@ -29,11 +40,18 @@ impl Pkcs12CryptoContext {
     pub fn new_with_password(password: &str) -> Result<Self, Pkcs12Error> {
         Ok(Self {
             password: password.to_string().into(),
+            #[cfg(feature = "rustcrypto")]
             rng: Box::new(StdRng::try_from_rng(&mut SysRng)?),
+            #[cfg(feature = "fips-wolfcrypt")]
+            rng: wolfssl_wolfcrypt::random::RNG::new().map_err(|code| Pkcs12Error::CryptoProvider {
+                operation: "RNG initialization",
+                code,
+            })?,
         })
     }
 
     /// Sets RNG for this context
+    #[cfg(feature = "rustcrypto")]
     pub fn with_rng(mut self, rng: impl rand::CryptoRng + 'static) -> Self {
         self.rng = Box::new(rng);
         self
@@ -43,7 +61,13 @@ impl Pkcs12CryptoContext {
     pub fn new_without_password() -> Result<Self, Pkcs12Error> {
         Ok(Self {
             password: String::new().into(),
+            #[cfg(feature = "rustcrypto")]
             rng: Box::new(StdRng::try_from_rng(&mut SysRng)?),
+            #[cfg(feature = "fips-wolfcrypt")]
+            rng: wolfssl_wolfcrypt::random::RNG::new().map_err(|code| Pkcs12Error::CryptoProvider {
+                operation: "RNG initialization",
+                code,
+            })?,
         })
     }
 
@@ -60,10 +84,18 @@ impl Pkcs12CryptoContext {
         self.password.as_bytes()
     }
 
-    pub(crate) fn generate_bytes(&mut self, len: usize) -> Vec<u8> {
+    pub(crate) fn generate_bytes(&mut self, len: usize) -> Result<Vec<u8>, Pkcs12Error> {
         let mut data = vec![0u8; len];
+        #[cfg(feature = "rustcrypto")]
         self.rng.fill_bytes(&mut data);
-        data
+        #[cfg(feature = "fips-wolfcrypt")]
+        self.rng
+            .generate_block(&mut data)
+            .map_err(|code| Pkcs12Error::CryptoProvider {
+                operation: "random-byte generation",
+                code,
+            })?;
+        Ok(data)
     }
 }
 
@@ -121,25 +153,52 @@ impl Pkcs12Encryption {
     }
 
     /// Create new legacy PBES1 encryption (Not recommended for new files)
+    #[cfg(feature = "rustcrypto")]
     pub fn new_pbes1(encryption: Pbes1Encryption, context: &mut Pkcs12CryptoContext) -> Self {
-        let salt = context.generate_bytes(DEFAULT_SALT_SIZE);
-        let inner = Pkcs12EncryptionAsn1::Pbes1 {
-            kind: encryption.cipher,
-            params: Pbes1ParamsAsn1 {
-                salt: OctetStringAsn1(salt),
-                iterations: encryption.kdf_iterations.unwrap_or(DEFAULT_KDF_ITERATIONS as u32),
-            },
-        };
+        Self::try_new_pbes1(encryption, context).expect("RustCrypto random-byte generation cannot fail")
+    }
 
-        Self {
-            kind: Pkcs12EncryptionKind::Pbes1(encryption),
-            inner,
+    /// Fallible creation of legacy PBES1 encryption (Not recommended for new files)
+    pub fn try_new_pbes1(encryption: Pbes1Encryption, context: &mut Pkcs12CryptoContext) -> Result<Self, Pkcs12Error> {
+        #[cfg(feature = "fips")]
+        {
+            let _ = (encryption, context);
+            Err(Pkcs12Error::NotSupportedAlgorithm {
+                algorithm: "PBES1".into(),
+                context: "PKCS#12 encryption under the FIPS policy".to_string(),
+            })
+        }
+
+        #[cfg(feature = "rustcrypto")]
+        {
+            let salt = context.generate_bytes(DEFAULT_SALT_SIZE)?;
+            let inner = Pkcs12EncryptionAsn1::Pbes1 {
+                kind: encryption.cipher,
+                params: Pbes1ParamsAsn1 {
+                    salt: OctetStringAsn1(salt),
+                    iterations: encryption.kdf_iterations.unwrap_or(DEFAULT_KDF_ITERATIONS as u32),
+                },
+            };
+
+            Ok(Self {
+                kind: Pkcs12EncryptionKind::Pbes1(encryption),
+                inner,
+            })
         }
     }
 
     /// Create new PBES2 encryption (It is advised to use PBES2 for new files)
+    #[cfg(feature = "rustcrypto")]
     pub fn new_pbes2(encryption: Pbes2Encryption, context: &mut Pkcs12CryptoContext) -> Self {
-        let iv = context.generate_bytes(AES_BLOCK_SIZE);
+        Self::try_new_pbes2(encryption, context).expect("RustCrypto random-byte generation cannot fail")
+    }
+
+    /// Fallible creation of PBES2 encryption (It is advised to use PBES2 for new files)
+    pub fn try_new_pbes2(encryption: Pbes2Encryption, context: &mut Pkcs12CryptoContext) -> Result<Self, Pkcs12Error> {
+        #[cfg(feature = "fips")]
+        require_fips_hash(encryption.hmac_kdf, "PBES2 PBKDF2")?;
+
+        let iv = context.generate_bytes(AES_BLOCK_SIZE)?;
         let encryption_scheme = Pbes2EncryptionSchemeAsn1::AesCbc {
             kind: encryption.cipher.into(),
             iv: OctetStringAsn1(iv),
@@ -152,7 +211,7 @@ impl Pkcs12Encryption {
         };
 
         let kdf_params = Pbkdf2ParamsAsn1 {
-            salt: Pbkdf2SaltSourceAsn1::Specified(OctetStringAsn1(context.generate_bytes(DEFAULT_SALT_SIZE))),
+            salt: Pbkdf2SaltSourceAsn1::Specified(OctetStringAsn1(context.generate_bytes(DEFAULT_SALT_SIZE)?)),
             iteration_count: encryption.kdf_iterations.unwrap_or(DEFAULT_KDF_ITERATIONS as u32),
             // key length is not set by most implementations
             key_length: None,
@@ -166,10 +225,10 @@ impl Pkcs12Encryption {
 
         let inner = Pkcs12EncryptionAsn1::Pbes2(pbes2_params);
 
-        Self {
+        Ok(Self {
             kind: Pkcs12EncryptionKind::Pbes2(encryption),
             inner,
-        }
+        })
     }
 
     /// Parsed encryption representation
@@ -183,6 +242,7 @@ impl Pkcs12Encryption {
 
     pub(crate) fn decrypt(&self, data: &[u8], context: &Pkcs12CryptoContext) -> Result<Vec<u8>, Pkcs12Error> {
         match self.inner() {
+            #[cfg(feature = "rustcrypto")]
             Pkcs12EncryptionAsn1::Pbes1 { kind, params } => {
                 let password = context.password_bytes_pbes1()?;
                 decrypt_pbes1(
@@ -193,6 +253,11 @@ impl Pkcs12Encryption {
                     data,
                 )
             }
+            #[cfg(feature = "fips")]
+            Pkcs12EncryptionAsn1::Pbes1 { .. } => Err(Pkcs12Error::NotSupportedAlgorithm {
+                algorithm: "PBES1".into(),
+                context: "PKCS#12 decryption under the FIPS policy".to_string(),
+            }),
             Pkcs12EncryptionAsn1::Pbes2(params) => {
                 let password = context.password_bytes_pbes2();
                 decrypt_pbes2(params, password, data)
@@ -209,6 +274,7 @@ impl Pkcs12Encryption {
 
     pub(crate) fn encrypt(&self, data: &[u8], context: &Pkcs12CryptoContext) -> Result<Vec<u8>, Pkcs12Error> {
         match self.inner() {
+            #[cfg(feature = "rustcrypto")]
             Pkcs12EncryptionAsn1::Pbes1 { kind, params } => {
                 let password = context.password_bytes_pbes1()?;
                 encrypt_pbes1(
@@ -219,6 +285,11 @@ impl Pkcs12Encryption {
                     data,
                 )
             }
+            #[cfg(feature = "fips")]
+            Pkcs12EncryptionAsn1::Pbes1 { .. } => Err(Pkcs12Error::NotSupportedAlgorithm {
+                algorithm: "PBES1".into(),
+                context: "PKCS#12 encryption under the FIPS policy".to_string(),
+            }),
             Pkcs12EncryptionAsn1::Pbes2(params) => {
                 let password = context.password_bytes_pbes2();
                 encrypt_pbes2(params, password, data)
@@ -408,120 +479,240 @@ fn prepare_pbes2_cipher_inputs(
         }
     };
 
-    let calculate_kdf = match prf {
-        Pkcs12HashAlgorithm::Sha1 => pbkdf2::pbkdf2_hmac::<sha1::Sha1>,
-        Pkcs12HashAlgorithm::Sha224 => pbkdf2::pbkdf2_hmac::<sha2::Sha224>,
-        Pkcs12HashAlgorithm::Sha256 => pbkdf2::pbkdf2_hmac::<sha2::Sha256>,
-        Pkcs12HashAlgorithm::Sha384 => pbkdf2::pbkdf2_hmac::<sha2::Sha384>,
-        Pkcs12HashAlgorithm::Sha512 => pbkdf2::pbkdf2_hmac::<sha2::Sha512>,
-    };
-
     let mut key = vec![0u8; cipher.key_size()];
-    calculate_kdf(password, salt.as_slice(), kdf_iterations, key.as_mut_slice());
+    #[cfg(feature = "rustcrypto")]
+    {
+        let calculate_kdf = match prf {
+            Pkcs12HashAlgorithm::Sha1 => pbkdf2::pbkdf2_hmac::<sha1::Sha1>,
+            Pkcs12HashAlgorithm::Sha224 => pbkdf2::pbkdf2_hmac::<sha2::Sha224>,
+            Pkcs12HashAlgorithm::Sha256 => pbkdf2::pbkdf2_hmac::<sha2::Sha256>,
+            Pkcs12HashAlgorithm::Sha384 => pbkdf2::pbkdf2_hmac::<sha2::Sha384>,
+            Pkcs12HashAlgorithm::Sha512 => pbkdf2::pbkdf2_hmac::<sha2::Sha512>,
+        };
+        calculate_kdf(password, salt.as_slice(), kdf_iterations, key.as_mut_slice());
+    }
+    #[cfg(feature = "fips-wolfcrypt")]
+    {
+        use wolfssl_wolfcrypt::hmac::HMAC;
+
+        require_fips_hash(prf, &format!("PBES2 {cipher_context} PBKDF2"))?;
+        let hash_type = match prf {
+            Pkcs12HashAlgorithm::Sha256 => HMAC::TYPE_SHA256,
+            Pkcs12HashAlgorithm::Sha384 => HMAC::TYPE_SHA384,
+            Pkcs12HashAlgorithm::Sha512 => HMAC::TYPE_SHA512,
+            _ => unreachable!("hash policy checked above"),
+        };
+        wolfssl_wolfcrypt::kdf::pbkdf2(
+            password,
+            salt.as_slice(),
+            i32::try_from(kdf_iterations).map_err(|_| Pkcs12Error::Pbes2 {
+                context: "PBKDF2 iteration count exceeds wolfCrypt limits".to_string(),
+            })?,
+            hash_type,
+            key.as_mut_slice(),
+        )
+        .map_err(|code| Pkcs12Error::CryptoProvider {
+            operation: "PBES2 PBKDF2",
+            code,
+        })?;
+    }
 
     Ok(Pbes2CipherInputs { key, iv, cipher })
 }
 
 fn decrypt_pbes2(params: &Pbes2ParamsAsn1, password: &[u8], data: &[u8]) -> Result<Vec<u8>, Pkcs12Error> {
-    let Pbes2CipherInputs { key, iv, cipher } = prepare_pbes2_cipher_inputs(params, password, "decryption")?;
+    let Pbes2CipherInputs {
+        key,
+        iv,
+        cipher: _cipher,
+    } = prepare_pbes2_cipher_inputs(params, password, "decryption")?;
 
-    use aes::cipher::BlockModeDecrypt;
-    use cbc::Decryptor;
-    use cbc::cipher::KeyIvInit;
-    use cbc::cipher::block_padding::Pkcs7;
+    #[cfg(feature = "rustcrypto")]
+    {
+        use aes::cipher::BlockModeDecrypt;
+        use cbc::Decryptor;
+        use cbc::cipher::KeyIvInit;
+        use cbc::cipher::block_padding::Pkcs7;
 
-    let decrypted = match cipher {
-        Pbes2Cipher::Aes128Cbc => {
-            use aes::Aes128;
-            type Aes128Cbc = Decryptor<Aes128>;
+        let decrypted = match _cipher {
+            Pbes2Cipher::Aes128Cbc => {
+                use aes::Aes128;
+                type Aes128Cbc = Decryptor<Aes128>;
 
-            let aes = Aes128Cbc::new_from_slices(key.as_slice(), iv.as_slice()).map_err(|_| Pkcs12Error::Pbes2 {
-                context: "AES128 decryptor initialization failed".to_string(),
-            })?;
+                let aes =
+                    Aes128Cbc::new_from_slices(key.as_slice(), iv.as_slice()).map_err(|_| Pkcs12Error::Pbes2 {
+                        context: "AES128 decryptor initialization failed".to_string(),
+                    })?;
 
-            aes.decrypt_padded_vec::<Pkcs7>(data).map_err(|_| Pkcs12Error::Pbes2 {
-                context: "AES128 decryption with padding failed".to_string(),
-            })?
+                aes.decrypt_padded_vec::<Pkcs7>(data).map_err(|_| Pkcs12Error::Pbes2 {
+                    context: "AES128 decryption with padding failed".to_string(),
+                })?
+            }
+            Pbes2Cipher::Aes192Cbc => {
+                use aes::Aes192;
+                type Aes192Cbc = Decryptor<Aes192>;
+
+                let aes =
+                    Aes192Cbc::new_from_slices(key.as_slice(), iv.as_slice()).map_err(|_| Pkcs12Error::Pbes2 {
+                        context: "AES192 decryptor initialization failed".to_string(),
+                    })?;
+
+                aes.decrypt_padded_vec::<Pkcs7>(data).map_err(|_| Pkcs12Error::Pbes2 {
+                    context: "AES192 decryption with padding failed".to_string(),
+                })?
+            }
+            Pbes2Cipher::Aes256Cbc => {
+                use aes::Aes256;
+                type Aes256Cbc = Decryptor<Aes256>;
+
+                let aes =
+                    Aes256Cbc::new_from_slices(key.as_slice(), iv.as_slice()).map_err(|_| Pkcs12Error::Pbes2 {
+                        context: "AES256 decryptor initialization failed".to_string(),
+                    })?;
+
+                aes.decrypt_padded_vec::<Pkcs7>(data).map_err(|_| Pkcs12Error::Pbes2 {
+                    context: "AES256 decryption with padding failed".to_string(),
+                })?
+            }
+        };
+
+        Ok(decrypted)
+    }
+
+    #[cfg(feature = "fips-wolfcrypt")]
+    {
+        if data.is_empty() || data.len() % AES_BLOCK_SIZE != 0 {
+            return Err(Pkcs12Error::Pbes2 {
+                context: "AES-CBC ciphertext length is not a positive block multiple".to_string(),
+            });
         }
-        Pbes2Cipher::Aes192Cbc => {
-            use aes::Aes192;
-            type Aes192Cbc = Decryptor<Aes192>;
-
-            let aes = Aes192Cbc::new_from_slices(key.as_slice(), iv.as_slice()).map_err(|_| Pkcs12Error::Pbes2 {
-                context: "AES192 decryptor initialization failed".to_string(),
+        let mut aes = wolfssl_wolfcrypt::aes::CBC::new().map_err(|code| Pkcs12Error::CryptoProvider {
+            operation: "AES-CBC initialization",
+            code,
+        })?;
+        aes.init_decrypt(&key, &iv)
+            .map_err(|code| Pkcs12Error::CryptoProvider {
+                operation: "AES-CBC decryption key setup",
+                code,
             })?;
-
-            aes.decrypt_padded_vec::<Pkcs7>(data).map_err(|_| Pkcs12Error::Pbes2 {
-                context: "AES192 decryption with padding failed".to_string(),
-            })?
-        }
-        Pbes2Cipher::Aes256Cbc => {
-            use aes::Aes256;
-            type Aes256Cbc = Decryptor<Aes256>;
-
-            let aes = Aes256Cbc::new_from_slices(key.as_slice(), iv.as_slice()).map_err(|_| Pkcs12Error::Pbes2 {
-                context: "AES256 decryptor initialization failed".to_string(),
+        let mut decrypted = vec![0u8; data.len()];
+        aes.decrypt(data, &mut decrypted)
+            .map_err(|code| Pkcs12Error::CryptoProvider {
+                operation: "AES-CBC decryption",
+                code,
             })?;
-
-            aes.decrypt_padded_vec::<Pkcs7>(data).map_err(|_| Pkcs12Error::Pbes2 {
-                context: "AES256 decryption with padding failed".to_string(),
-            })?
-        }
-    };
-
-    Ok(decrypted)
+        remove_pkcs7_padding(decrypted)
+    }
 }
 
 fn encrypt_pbes2(params: &Pbes2ParamsAsn1, password: &[u8], data: &[u8]) -> Result<Vec<u8>, Pkcs12Error> {
-    let Pbes2CipherInputs { key, iv, cipher } = prepare_pbes2_cipher_inputs(params, password, "encryption")?;
+    let Pbes2CipherInputs {
+        key,
+        iv,
+        cipher: _cipher,
+    } = prepare_pbes2_cipher_inputs(params, password, "encryption")?;
 
-    use aes::cipher::BlockModeEncrypt;
-    use cbc::Encryptor;
-    use cbc::cipher::KeyIvInit;
-    use cbc::cipher::block_padding::Pkcs7;
+    #[cfg(feature = "rustcrypto")]
+    {
+        use aes::cipher::BlockModeEncrypt;
+        use cbc::Encryptor;
+        use cbc::cipher::KeyIvInit;
+        use cbc::cipher::block_padding::Pkcs7;
 
-    let encrypted = match cipher {
-        Pbes2Cipher::Aes128Cbc => {
-            use aes::Aes128;
-            type Aes128Cbc = Encryptor<Aes128>;
+        let encrypted = match _cipher {
+            Pbes2Cipher::Aes128Cbc => {
+                use aes::Aes128;
+                type Aes128Cbc = Encryptor<Aes128>;
 
-            let aes = Aes128Cbc::new_from_slices(key.as_slice(), iv.as_slice()).map_err(|_| Pkcs12Error::Pbes2 {
-                context: "AES128 encryptor initialization failed".to_string(),
+                let aes =
+                    Aes128Cbc::new_from_slices(key.as_slice(), iv.as_slice()).map_err(|_| Pkcs12Error::Pbes2 {
+                        context: "AES128 encryptor initialization failed".to_string(),
+                    })?;
+
+                aes.encrypt_padded_vec::<Pkcs7>(data)
+            }
+            Pbes2Cipher::Aes192Cbc => {
+                use aes::Aes192;
+                type Aes192Cbc = Encryptor<Aes192>;
+
+                let aes =
+                    Aes192Cbc::new_from_slices(key.as_slice(), iv.as_slice()).map_err(|_| Pkcs12Error::Pbes2 {
+                        context: "AES192 encryptor initialization failed".to_string(),
+                    })?;
+
+                aes.encrypt_padded_vec::<Pkcs7>(data)
+            }
+            Pbes2Cipher::Aes256Cbc => {
+                use aes::Aes256;
+                type Aes256Cbc = Encryptor<Aes256>;
+
+                let aes =
+                    Aes256Cbc::new_from_slices(key.as_slice(), iv.as_slice()).map_err(|_| Pkcs12Error::Pbes2 {
+                        context: "AES256 encryptor initialization failed".to_string(),
+                    })?;
+
+                aes.encrypt_padded_vec::<Pkcs7>(data)
+            }
+        };
+
+        Ok(encrypted)
+    }
+
+    #[cfg(feature = "fips-wolfcrypt")]
+    {
+        let padding_len = AES_BLOCK_SIZE - (data.len() % AES_BLOCK_SIZE);
+        let mut padded = zeroize::Zeroizing::new(Vec::with_capacity(data.len() + padding_len));
+        padded.extend_from_slice(data);
+        padded.resize(data.len() + padding_len, padding_len as u8);
+
+        let mut aes = wolfssl_wolfcrypt::aes::CBC::new().map_err(|code| Pkcs12Error::CryptoProvider {
+            operation: "AES-CBC initialization",
+            code,
+        })?;
+        aes.init_encrypt(&key, &iv)
+            .map_err(|code| Pkcs12Error::CryptoProvider {
+                operation: "AES-CBC encryption key setup",
+                code,
             })?;
-
-            aes.encrypt_padded_vec::<Pkcs7>(data)
-        }
-        Pbes2Cipher::Aes192Cbc => {
-            use aes::Aes192;
-            type Aes192Cbc = Encryptor<Aes192>;
-
-            let aes = Aes192Cbc::new_from_slices(key.as_slice(), iv.as_slice()).map_err(|_| Pkcs12Error::Pbes2 {
-                context: "AES192 encryptor initialization failed".to_string(),
+        let mut encrypted = vec![0u8; padded.len()];
+        aes.encrypt(&padded, &mut encrypted)
+            .map_err(|code| Pkcs12Error::CryptoProvider {
+                operation: "AES-CBC encryption",
+                code,
             })?;
-
-            aes.encrypt_padded_vec::<Pkcs7>(data)
-        }
-        Pbes2Cipher::Aes256Cbc => {
-            use aes::Aes256;
-            type Aes256Cbc = Encryptor<Aes256>;
-
-            let aes = Aes256Cbc::new_from_slices(key.as_slice(), iv.as_slice()).map_err(|_| Pkcs12Error::Pbes2 {
-                context: "AES256 encryptor initialization failed".to_string(),
-            })?;
-
-            aes.encrypt_padded_vec::<Pkcs7>(data)
-        }
-    };
-
-    Ok(encrypted)
+        Ok(encrypted)
+    }
 }
 
+#[cfg(feature = "fips-wolfcrypt")]
+fn remove_pkcs7_padding(mut data: Vec<u8>) -> Result<Vec<u8>, Pkcs12Error> {
+    let padding_len = usize::from(*data.last().ok_or_else(|| Pkcs12Error::Pbes2 {
+        context: "AES-CBC plaintext is empty".to_string(),
+    })?);
+    if padding_len == 0 || padding_len > AES_BLOCK_SIZE || padding_len > data.len() {
+        return Err(Pkcs12Error::Pbes2 {
+            context: "AES-CBC plaintext has invalid PKCS#7 padding".to_string(),
+        });
+    }
+    let invalid = data[data.len() - padding_len..]
+        .iter()
+        .fold(0u8, |difference, byte| difference | (byte ^ padding_len as u8));
+    if invalid != 0 {
+        return Err(Pkcs12Error::Pbes2 {
+            context: "AES-CBC plaintext has invalid PKCS#7 padding".to_string(),
+        });
+    }
+    data.truncate(data.len() - padding_len);
+    Ok(data)
+}
+
+#[cfg(feature = "rustcrypto")]
 fn generate_pbes1_key_and_iv(
     cipher: Pbes1Cipher,
     password: &[u8],
     salt: &[u8],
     kdf_iterations: usize,
-) -> (Vec<u8>, Vec<u8>) {
+) -> Result<(Vec<u8>, Vec<u8>), Pkcs12Error> {
     let (key_size, iv_size) = match cipher {
         Pbes1Cipher::ShaAnd40BitRc2Cbc => (5, 8),
         Pbes1Cipher::ShaAnd3Key3DesCbc => (24, 8),
@@ -534,7 +725,7 @@ fn generate_pbes1_key_and_iv(
         kdf_iterations,
         Pbkdf1Usage::Key,
         key_size,
-    );
+    )?;
     let iv = pbkdf1(
         Pkcs12HashAlgorithm::Sha1,
         password,
@@ -542,11 +733,12 @@ fn generate_pbes1_key_and_iv(
         kdf_iterations,
         Pbkdf1Usage::Iv,
         iv_size,
-    );
+    )?;
 
-    (key, iv)
+    Ok((key, iv))
 }
 
+#[cfg(feature = "rustcrypto")]
 fn encrypt_pbes1(
     scheme: Pbes1Cipher,
     password: &[u8],
@@ -558,7 +750,7 @@ fn encrypt_pbes1(
     use cbc::cipher::block_padding::Pkcs7;
     use cbc::cipher::{BlockModeEncrypt, KeyIvInit};
 
-    let (dk, iv) = generate_pbes1_key_and_iv(scheme, password, salt, kdf_iterations);
+    let (dk, iv) = generate_pbes1_key_and_iv(scheme, password, salt, kdf_iterations)?;
 
     match scheme {
         Pbes1Cipher::ShaAnd40BitRc2Cbc => {
@@ -582,6 +774,7 @@ fn encrypt_pbes1(
     }
 }
 
+#[cfg(feature = "rustcrypto")]
 fn decrypt_pbes1(
     scheme: Pbes1Cipher,
     password: &[u8],
@@ -593,7 +786,7 @@ fn decrypt_pbes1(
     use cbc::cipher::block_padding::Pkcs7;
     use cbc::cipher::{BlockModeDecrypt, KeyIvInit};
 
-    let (dk, iv) = generate_pbes1_key_and_iv(scheme, password, salt, kdf_iterations);
+    let (dk, iv) = generate_pbes1_key_and_iv(scheme, password, salt, kdf_iterations)?;
 
     match scheme {
         Pbes1Cipher::ShaAnd40BitRc2Cbc => {
@@ -621,7 +814,7 @@ fn decrypt_pbes1(
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "rustcrypto"))]
 mod tests {
     use super::*;
     use rstest::rstest;

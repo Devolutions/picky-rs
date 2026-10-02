@@ -130,6 +130,15 @@ rustcrypto = [
     "dep:rustcrypto-ff_derive",
     "dep:rustcrypto-group",
     "dep:curve25519-dalek",
+    "dep:aes-gcm",
+    "dep:ctr",
+    "dep:cbc",
+    "dep:aes-kw",
+    "dep:aes",
+    "dep:des",
+    "dep:rc2",
+    "dep:pbkdf2",
+    "dep:hmac",
     "picky-asn1-x509/legacy",
 ]
 fips = []
@@ -156,9 +165,9 @@ full = [
 # main features
 x509 = []
 jose = ["dep:serde_json"]
-jwe-crypto = ["jose", "rustcrypto", "dep:aes-gcm", "dep:ctr", "dep:cbc", "dep:aes-kw", "dep:aes"]
+jwe-crypto = ["jose"]
 http_signature = []
-pkcs12 = ["rustcrypto", "picky-asn1-x509/pkcs12", "dep:des", "dep:rc2", "dep:cbc", "dep:hmac", "dep:aes", "x509", "dep:pbkdf2"]
+pkcs12 = ["picky-asn1-x509/pkcs12", "x509"]
 
 # secondary features
 pkcs7 = ["x509", "picky-asn1-x509/pkcs7"]

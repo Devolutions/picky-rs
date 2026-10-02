@@ -595,7 +595,7 @@ mod tests {
         assert_eq!(jwt.state.claims["iat"].as_i64().expect("iat"), 1516239022);
     }
 
-    #[cfg(feature = "rustcrypto")]
+    #[cfg(feature = "jwe-crypto")]
     #[test]
     fn jwe_direct_aes_256_gcm() {
         let claims = get_strongly_typed_claims();
@@ -609,7 +609,7 @@ mod tests {
         assert_eq!(decoded.state.claims, get_strongly_typed_claims());
     }
 
-    #[cfg(feature = "fips")]
+    #[cfg(all(feature = "fips", not(feature = "jwe-crypto")))]
     #[test]
     fn jwe_direct_aes_256_gcm_is_rejected_by_fips_provider() {
         let claims = get_strongly_typed_claims();

@@ -8,26 +8,28 @@ use crate::jose::jwk::{Jwk, JwkError};
 use crate::key::{PrivateKey, PublicKey};
 
 #[cfg(feature = "jwe-crypto")]
+use crate::key::PrivateKeyKind;
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 use crate::key::ec::{EcComponent, EcdsaKeypair, EcdsaPublicKey, NamedEcCurve};
-#[cfg(feature = "jwe-crypto")]
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 use crate::key::ed::{EdKeypair, EdPublicKey, NamedEdAlgorithm, X25519_FIELD_ELEMENT_SIZE};
-#[cfg(feature = "jwe-crypto")]
-use crate::key::{EcCurve, EdAlgorithm, KeyError, PrivateKeyKind};
-#[cfg(feature = "jwe-crypto")]
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
+use crate::key::{EcCurve, EdAlgorithm, KeyError};
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 use aes::cipher::Array;
-#[cfg(feature = "jwe-crypto")]
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 use aes_gcm::{AeadInOut, Aes128Gcm, Aes256Gcm, KeyInit};
-#[cfg(feature = "jwe-crypto")]
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 use aes_kw::AesKw;
 use base64::engine::general_purpose;
 use base64::{DecodeError, Engine as _};
-#[cfg(feature = "jwe-crypto")]
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 use crypto_common::Generate as _;
-#[cfg(feature = "jwe-crypto")]
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 use rand::rngs::{StdRng, SysRng};
-#[cfg(feature = "jwe-crypto")]
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 use rand_core::{Rng as _, SeedableRng as _};
-#[cfg(feature = "jwe-crypto")]
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 use rsa::{Oaep, Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -36,7 +38,7 @@ use thiserror::Error;
 #[cfg(feature = "jwe-crypto")]
 use zeroize::Zeroizing;
 
-#[cfg(feature = "jwe-crypto")]
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 type Aes192Gcm = aes_gcm::AesGcm<aes_gcm::aes::Aes192, aes_gcm::aes::cipher::consts::U12>;
 
 // === error type === //
@@ -59,7 +61,11 @@ pub enum JweError {
     #[error("AES-GCM error (opaque)")]
     AesGcm,
 
-    #[cfg(feature = "jwe-crypto")]
+    /// Selected cryptographic provider failed.
+    #[error("cryptographic provider failed during {operation}: error code {code}")]
+    CryptoProvider { operation: &'static str, code: i32 },
+
+    #[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
     /// AES-KW error
     #[error("AES-KW error")]
     AesKw { source: aes_kw::Error },
@@ -111,19 +117,19 @@ pub enum JweError {
     #[error("invalid decryption key size: expected {expected}, got {got}")]
     InvalidDecryptionKeySize { expected: usize, got: usize },
 
-    #[cfg(feature = "jwe-crypto")]
+    #[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
     #[error(transparent)]
     RandError(#[from] rand::rngs::SysError),
 }
 
-#[cfg(feature = "jwe-crypto")]
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 impl From<rsa::errors::Error> for JweError {
     fn from(e: rsa::errors::Error) -> Self {
         Self::Rsa { context: e.to_string() }
     }
 }
 
-#[cfg(feature = "jwe-crypto")]
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 impl From<aes_gcm::Error> for JweError {
     fn from(_: aes_gcm::Error) -> Self {
         Self::AesGcm
@@ -148,18 +154,18 @@ impl From<DecodeError> for JweError {
     }
 }
 
-#[cfg(feature = "jwe-crypto")]
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 impl From<aes_kw::Error> for JweError {
     fn from(e: aes_kw::Error) -> Self {
         Self::AesKw { source: e }
     }
 }
 
-#[cfg(feature = "jwe-crypto")]
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 type KekAes128 = AesKw<aes::Aes128>;
-#[cfg(feature = "jwe-crypto")]
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 type KekAes192 = AesKw<aes::Aes192>;
-#[cfg(feature = "jwe-crypto")]
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 type KekAes256 = AesKw<aes::Aes256>;
 
 // === JWE algorithms === //
@@ -235,14 +241,14 @@ pub enum JweAlg {
 }
 
 #[derive(Debug, Clone, Copy)]
-#[cfg(feature = "jwe-crypto")]
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 enum KeyWrappingAlg {
     Aes128,
     Aes192,
     Aes256,
 }
 
-#[cfg(feature = "jwe-crypto")]
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 impl KeyWrappingAlg {
     fn key_size(self) -> usize {
         match self {
@@ -348,7 +354,7 @@ impl JweAlg {
             .to_string()
     }
 
-    #[cfg(feature = "jwe-crypto")]
+    #[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
     fn key_wrapping_alg(&self) -> Option<KeyWrappingAlg> {
         let alg = match self {
             JweAlg::AesKeyWrap128 => KeyWrappingAlg::Aes128,
@@ -736,7 +742,7 @@ enum EncoderMode<'a> {
     Direct(&'a [u8]),
 }
 
-#[cfg(feature = "jwe-crypto")]
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
     use picky_asn1_x509::PublicKey as RfcPublicKey;
 
@@ -848,14 +854,150 @@ fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
     .join("."))
 }
 
-#[cfg(feature = "jwe-crypto")]
+#[cfg(all(feature = "jwe-crypto", feature = "fips-wolfcrypt"))]
+fn significant_bits(bytes: &[u8]) -> usize {
+    let Some(first_nonzero) = bytes.iter().position(|byte| *byte != 0) else {
+        return 0;
+    };
+    let significant = &bytes[first_nonzero..];
+    (significant.len() - 1) * 8 + (u8::BITS - significant[0].leading_zeros()) as usize
+}
+
+#[cfg(all(feature = "jwe-crypto", feature = "fips-wolfcrypt"))]
+fn rsa_modulus_bits(public_key: &PublicKey) -> Option<usize> {
+    use picky_asn1::wrapper::BitStringAsn1Container;
+    use picky_asn1_x509::PublicKey as RfcPublicKey;
+
+    let RfcPublicKey::Rsa(BitStringAsn1Container(rsa_public_key)) = &public_key.as_inner().subject_public_key else {
+        return None;
+    };
+    Some(significant_bits(&rsa_public_key.modulus.0))
+}
+
+#[cfg(all(feature = "jwe-crypto", feature = "fips-wolfcrypt"))]
+fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
+    use wolfssl_wolfcrypt::aes::GCM;
+    use wolfssl_wolfcrypt::random::RNG;
+    use wolfssl_wolfcrypt::rsa::RSA;
+
+    crate::crypto::wolfcrypt_fips::ensure_initialized().map_err(|code| JweError::CryptoProvider {
+        operation: "wolfCrypt initialization",
+        code,
+    })?;
+
+    let (encrypted_key_base64, jwe_cek) = match mode {
+        EncoderMode::Direct(symmetric_key) => {
+            if symmetric_key.len() != jwe.header.enc.key_size() {
+                return Err(JweError::InvalidSize {
+                    ty: "symmetric key",
+                    expected: jwe.header.enc.key_size(),
+                    got: symmetric_key.len(),
+                });
+            }
+            jwe.header.alg = JweAlg::Direct;
+            (String::new(), Zeroizing::new(symmetric_key.to_vec()))
+        }
+        EncoderMode::Asymmetric(public_key) => {
+            if !matches!(jwe.header.alg, JweAlg::RsaOaep256) {
+                return Err(JweError::UnsupportedAlgorithm {
+                    algorithm: format!("{:?} is not enabled by the wolfCrypt FIPS policy", jwe.header.alg),
+                });
+            }
+            let Some(modulus_bits) = rsa_modulus_bits(public_key) else {
+                return Err(JweError::KeyAlgorithmsMismatch {
+                    context: "RSA-OAEP-256 requires an RSA public key".to_string(),
+                });
+            };
+            if modulus_bits < 2048 {
+                return Err(JweError::UnsupportedAlgorithm {
+                    algorithm: format!("RSA key smaller than 2048 bits ({modulus_bits} bits)"),
+                });
+            }
+
+            let mut key =
+                RSA::new_public_from_der(&public_key.to_pkcs1()?).map_err(|code| JweError::CryptoProvider {
+                    operation: "wolfCrypt RSA public-key import",
+                    code,
+                })?;
+            let modulus_len = key.get_encrypt_size().map_err(|code| JweError::CryptoProvider {
+                operation: "wolfCrypt RSA modulus-size query",
+                code,
+            })?;
+            let mut cek = Zeroizing::new(vec![0u8; jwe.header.enc.key_size()]);
+            let rng = RNG::new().map_err(|code| JweError::CryptoProvider {
+                operation: "wolfCrypt RNG initialization",
+                code,
+            })?;
+            rng.generate_block(&mut cek).map_err(|code| JweError::CryptoProvider {
+                operation: "wolfCrypt CEK generation",
+                code,
+            })?;
+
+            let mut encrypted_key = vec![0u8; modulus_len];
+            let encrypted_key_len = key
+                .public_encrypt_oaep(&cek, &mut encrypted_key, RSA::HASH_TYPE_SHA256, RSA::MGF1SHA256, &rng)
+                .map_err(|code| JweError::CryptoProvider {
+                    operation: "wolfCrypt RSA-OAEP-256 encryption",
+                    code,
+                })?;
+            encrypted_key.truncate(encrypted_key_len);
+            (general_purpose::URL_SAFE_NO_PAD.encode(encrypted_key), cek)
+        }
+    };
+
+    let protected_header_base64 = general_purpose::URL_SAFE_NO_PAD.encode(serde_json::to_vec(&jwe.header)?);
+    let aad = protected_header_base64.as_bytes();
+    let mut nonce = vec![0u8; jwe.header.enc.nonce_size()];
+    let rng = RNG::new().map_err(|code| JweError::CryptoProvider {
+        operation: "wolfCrypt RNG initialization",
+        code,
+    })?;
+    rng.generate_block(&mut nonce)
+        .map_err(|code| JweError::CryptoProvider {
+            operation: "wolfCrypt JWE nonce generation",
+            code,
+        })?;
+
+    let mut ciphertext = vec![0u8; jwe.payload.len()];
+    let mut authentication_tag = vec![0u8; jwe.header.enc.tag_size()];
+    match jwe.header.enc {
+        JweEnc::Aes128Gcm | JweEnc::Aes192Gcm | JweEnc::Aes256Gcm => {
+            let mut aes = GCM::new().map_err(|code| JweError::CryptoProvider {
+                operation: "wolfCrypt AES-GCM initialization",
+                code,
+            })?;
+            aes.init(&jwe_cek).map_err(|code| JweError::CryptoProvider {
+                operation: "wolfCrypt AES-GCM key setup",
+                code,
+            })?;
+            aes.encrypt(&jwe.payload, &mut ciphertext, &nonce, aad, &mut authentication_tag)
+                .map_err(|_| JweError::AesGcm)?;
+        }
+        unsupported => {
+            return Err(JweError::UnsupportedAlgorithm {
+                algorithm: format!("{unsupported:?}"),
+            });
+        }
+    }
+
+    Ok([
+        protected_header_base64,
+        encrypted_key_base64,
+        general_purpose::URL_SAFE_NO_PAD.encode(nonce),
+        general_purpose::URL_SAFE_NO_PAD.encode(ciphertext),
+        general_purpose::URL_SAFE_NO_PAD.encode(authentication_tag),
+    ]
+    .join("."))
+}
+
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 struct JweEcdhEncryptionContext {
     jwe_cek: Zeroizing<Vec<u8>>,
     encrypted_key: Vec<u8>,
     epk: PublicKey,
 }
 
-#[cfg(feature = "jwe-crypto")]
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 fn prepare_ecdh_encryption_key(jwe: &Jwe, public_key: &PublicKey) -> Result<JweEcdhEncryptionContext, JweError> {
     let header = &jwe.header;
 
@@ -919,7 +1061,7 @@ enum DecoderMode<'a> {
     Direct(&'a [u8]),
 }
 
-#[cfg(feature = "jwe-crypto")]
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError> {
     let RawJwe {
         compact_repr,
@@ -1023,7 +1165,156 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
     })
 }
 
-#[cfg(feature = "jwe-crypto")]
+#[cfg(all(feature = "jwe-crypto", feature = "fips-wolfcrypt"))]
+fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError> {
+    use wolfssl_wolfcrypt::aes::GCM;
+    use wolfssl_wolfcrypt::random::RNG;
+    use wolfssl_wolfcrypt::rsa::RSA;
+
+    crate::crypto::wolfcrypt_fips::ensure_initialized().map_err(|code| JweError::CryptoProvider {
+        operation: "wolfCrypt initialization",
+        code,
+    })?;
+
+    let RawJwe {
+        compact_repr,
+        header,
+        encrypted_key,
+        initialization_vector,
+        ciphertext,
+        authentication_tag,
+    } = raw;
+    let protected_header_base64 = compact_repr
+        .split('.')
+        .next()
+        .ok_or_else(|| JweError::InvalidEncoding {
+            input: compact_repr.clone().into_owned(),
+        })?;
+
+    let jwe_cek = match mode {
+        DecoderMode::Direct(symmetric_key) => {
+            if header.alg != JweAlg::Direct {
+                return Err(JweError::KeyAlgorithmsMismatch {
+                    context: format!("direct decryption cannot be used with {:?}", header.alg),
+                });
+            }
+            if !encrypted_key.is_empty() {
+                return Err(JweError::InvalidEncryptedKeySize {
+                    expected: 0,
+                    got: encrypted_key.len(),
+                });
+            }
+            Zeroizing::new(symmetric_key.to_vec())
+        }
+        DecoderMode::Normal(private_key) => {
+            if header.alg != JweAlg::RsaOaep256 {
+                return Err(JweError::UnsupportedAlgorithm {
+                    algorithm: format!("{:?} is not enabled by the wolfCrypt FIPS policy", header.alg),
+                });
+            }
+            if !matches!(private_key.as_kind(), PrivateKeyKind::Rsa) {
+                return Err(JweError::KeyAlgorithmsMismatch {
+                    context: "RSA-OAEP-256 requires an RSA private key".to_string(),
+                });
+            }
+            let public_key = private_key.to_public_key()?;
+            let modulus_bits = rsa_modulus_bits(&public_key).ok_or_else(|| JweError::KeyAlgorithmsMismatch {
+                context: "RSA-OAEP-256 requires an RSA private key".to_string(),
+            })?;
+            if modulus_bits < 2048 {
+                return Err(JweError::UnsupportedAlgorithm {
+                    algorithm: format!("RSA key smaller than 2048 bits ({modulus_bits} bits)"),
+                });
+            }
+
+            let mut key = RSA::new_from_der(&private_key.to_pkcs1()?).map_err(|code| JweError::CryptoProvider {
+                operation: "wolfCrypt RSA private-key import",
+                code,
+            })?;
+            key.set_rng(RNG::new().map_err(|code| JweError::CryptoProvider {
+                operation: "wolfCrypt RSA blinding RNG initialization",
+                code,
+            })?)
+            .map_err(|code| JweError::CryptoProvider {
+                operation: "wolfCrypt RSA blinding RNG setup",
+                code,
+            })?;
+            let modulus_len = key.get_encrypt_size().map_err(|code| JweError::CryptoProvider {
+                operation: "wolfCrypt RSA modulus-size query",
+                code,
+            })?;
+            if encrypted_key.len() != modulus_len {
+                return Err(JweError::InvalidEncryptedKeySize {
+                    expected: modulus_len,
+                    got: encrypted_key.len(),
+                });
+            }
+
+            let mut cek = Zeroizing::new(vec![0u8; modulus_len]);
+            let cek_len = key
+                .private_decrypt_oaep(&encrypted_key, &mut cek, RSA::HASH_TYPE_SHA256, RSA::MGF1SHA256)
+                .map_err(|code| JweError::CryptoProvider {
+                    operation: "wolfCrypt RSA-OAEP-256 decryption",
+                    code,
+                })?;
+            cek.truncate(cek_len);
+            cek
+        }
+    };
+
+    if jwe_cek.len() != header.enc.key_size() {
+        return Err(JweError::InvalidSize {
+            ty: "symmetric key",
+            expected: header.enc.key_size(),
+            got: jwe_cek.len(),
+        });
+    }
+    if initialization_vector.len() != header.enc.nonce_size() {
+        return Err(JweError::InvalidSize {
+            ty: "initialization vector (nonce)",
+            expected: header.enc.nonce_size(),
+            got: initialization_vector.len(),
+        });
+    }
+    if authentication_tag.len() != header.enc.tag_size() {
+        return Err(JweError::InvalidSize {
+            ty: "authentication tag",
+            expected: header.enc.tag_size(),
+            got: authentication_tag.len(),
+        });
+    }
+
+    let mut payload = vec![0u8; ciphertext.len()];
+    match header.enc {
+        JweEnc::Aes128Gcm | JweEnc::Aes192Gcm | JweEnc::Aes256Gcm => {
+            let mut aes = GCM::new().map_err(|code| JweError::CryptoProvider {
+                operation: "wolfCrypt AES-GCM initialization",
+                code,
+            })?;
+            aes.init(&jwe_cek).map_err(|code| JweError::CryptoProvider {
+                operation: "wolfCrypt AES-GCM key setup",
+                code,
+            })?;
+            aes.decrypt(
+                &ciphertext,
+                &mut payload,
+                &initialization_vector,
+                protected_header_base64.as_bytes(),
+                &authentication_tag,
+            )
+            .map_err(|_| JweError::AesGcm)?;
+        }
+        unsupported => {
+            return Err(JweError::UnsupportedAlgorithm {
+                algorithm: format!("{unsupported:?}"),
+            });
+        }
+    }
+
+    Ok(Jwe { header, payload })
+}
+
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 fn prepare_ecdh_decryption_key(
     header: &JweHeader,
     encrypted_key: &[u8],
@@ -1073,7 +1364,7 @@ fn prepare_ecdh_decryption_key(
 }
 
 /// Expands the shared secret into a key of the desired size using the ECDH Concat KDF
-#[cfg(feature = "jwe-crypto")]
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 fn ecdh_concat_kdf(
     alg: &str,
     shared_key_len: usize,
@@ -1137,7 +1428,7 @@ fn ecdh_concat_kdf(
 }
 
 /// Returns ECDH ephemeral public key and shared secret required to build encrypted JWE
-#[cfg(feature = "jwe-crypto")]
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 fn generate_ecdh_shared_secret(
     apu: Option<&str>,
     apv: Option<&str>,
@@ -1268,7 +1559,7 @@ fn generate_ecdh_shared_secret(
 }
 
 /// Calculates ECDH shared secret using given keys and jwe header fields
-#[cfg(feature = "jwe-crypto")]
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 fn calculate_ecdh_shared_secret(
     apu: Option<&str>,
     apv: Option<&str>,
@@ -1438,7 +1729,7 @@ fn calculate_ecdh_shared_secret(
 }
 
 /// Generate content encryption key (CEK) for given algorithm and wraps it with zeroize-on-drop container
-#[cfg(feature = "jwe-crypto")]
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 fn generate_cek(alg: JweEnc) -> Result<Zeroizing<Vec<u8>>, JweError> {
     let mut cek = Zeroizing::new(vec![0u8; alg.key_size()]);
     let mut rng = StdRng::try_from_rng(&mut SysRng)?;
@@ -1446,14 +1737,14 @@ fn generate_cek(alg: JweEnc) -> Result<Zeroizing<Vec<u8>>, JweError> {
     Ok(cek)
 }
 
-#[cfg(feature = "jwe-crypto")]
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 enum RsaPaddingScheme {
     Pkcs1v15Encrypt,
     Oaep(Oaep<sha1::Sha1>),
     Oaep256(Oaep<sha2::Sha256>),
 }
 
-#[cfg(feature = "jwe-crypto")]
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 impl rsa::traits::PaddingScheme for RsaPaddingScheme {
     fn decrypt<Rng: rand_core::TryCryptoRng + ?Sized>(
         self,
@@ -1486,7 +1777,7 @@ impl rsa::traits::PaddingScheme for RsaPaddingScheme {
     }
 }
 
-#[cfg(all(test, feature = "jwe-crypto"))]
+#[cfg(all(test, feature = "jwe-crypto", feature = "rustcrypto"))]
 mod tests {
     use super::*;
     use crate::key::PrivateKey;
@@ -1690,5 +1981,78 @@ mod tests {
         let private = PrivateKey::from_pem_str(key_pem).unwrap();
         let decoded = Jwe::decode(token, &private).expect("JWE decode failed");
         assert_eq!(String::from_utf8(decoded.payload).unwrap(), "Hello world!");
+    }
+}
+
+#[cfg(all(test, feature = "jwe-crypto", feature = "fips-wolfcrypt"))]
+mod wolfcrypt_tests {
+    use super::*;
+    use crate::key::PrivateKey;
+
+    fn rsa_key() -> PrivateKey {
+        PrivateKey::from_pem_str(picky_test_data::RSA_2048_PK_1).unwrap()
+    }
+
+    #[test]
+    fn rsa_oaep_256_aes_gcm_roundtrip_uses_wolfcrypt() {
+        let private_key = rsa_key();
+        let public_key = private_key.to_public_key().unwrap();
+        let payload = b"wolfCrypt JWE RSA-OAEP-256".to_vec();
+
+        for enc in [JweEnc::Aes128Gcm, JweEnc::Aes192Gcm, JweEnc::Aes256Gcm] {
+            let encoded = Jwe::new(JweAlg::RsaOaep256, enc, payload.clone())
+                .encode(&public_key)
+                .unwrap();
+            let decoded = Jwe::decode(&encoded, &private_key).unwrap();
+            assert_eq!(decoded.payload, payload);
+            assert_eq!(decoded.header.alg, JweAlg::RsaOaep256);
+            assert_eq!(decoded.header.enc, enc);
+        }
+    }
+
+    #[test]
+    fn direct_aes_gcm_roundtrip_and_authentication_failure_use_wolfcrypt() {
+        let key = [0x5au8; 32];
+        let payload = b"wolfCrypt direct JWE".to_vec();
+        let encoded = Jwe::new(JweAlg::Direct, JweEnc::Aes256Gcm, payload.clone())
+            .encode_direct(&key)
+            .unwrap();
+
+        let decoded = Jwe::decode_direct(&encoded, &key).unwrap();
+        assert_eq!(decoded.payload, payload);
+
+        let mut parts = encoded.split('.').map(str::to_owned).collect::<Vec<_>>();
+        let mut authentication_tag = general_purpose::URL_SAFE_NO_PAD.decode(&parts[4]).unwrap();
+        authentication_tag[0] ^= 1;
+        parts[4] = general_purpose::URL_SAFE_NO_PAD.encode(authentication_tag);
+        let corrupted = parts.join(".");
+        assert!(matches!(Jwe::decode_direct(&corrupted, &key), Err(JweError::AesGcm)));
+
+        let mut parts = encoded.split('.').map(str::to_owned).collect::<Vec<_>>();
+        parts[1] = general_purpose::URL_SAFE_NO_PAD.encode([1]);
+        let unexpected_encrypted_key = parts.join(".");
+        assert!(matches!(
+            Jwe::decode_direct(&unexpected_encrypted_key, &key),
+            Err(JweError::InvalidEncryptedKeySize { expected: 0, got: 1 })
+        ));
+    }
+
+    #[test]
+    fn rsa_modulus_size_uses_significant_bits() {
+        let mut modulus = vec![0u8; 257];
+        modulus[1] = 1;
+
+        assert_eq!(significant_bits(&modulus), 2041);
+    }
+
+    #[test]
+    fn non_fips_jwe_key_management_is_rejected() {
+        let public_key = rsa_key().to_public_key().unwrap();
+        for alg in [JweAlg::RsaPkcs1v15, JweAlg::RsaOaep] {
+            assert!(matches!(
+                Jwe::new(alg, JweEnc::Aes256Gcm, vec![1, 2, 3]).encode(&public_key),
+                Err(JweError::UnsupportedAlgorithm { .. })
+            ));
+        }
     }
 }

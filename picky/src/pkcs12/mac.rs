@@ -1,4 +1,5 @@
 use crate::pkcs12::{Pbkdf1Usage, Pkcs12CryptoContext, Pkcs12Error, Pkcs12HashAlgorithm, pbkdf1};
+#[cfg(feature = "rustcrypto")]
 use hmac::KeyInit;
 use picky_asn1::wrapper::OctetStringAsn1;
 use picky_asn1_x509::pkcs12::{MacData as MacDataAsn1, Pkcs12DigestInfo as Pkcs12DigestInfoAsn1};
@@ -91,7 +92,9 @@ impl Pkcs12MacData {
     ) -> Result<Self, Pkcs12Error> {
         let hash_algorithm = algorithm.hash_algorithm;
         let kdf_iterations = algorithm.iterations.unwrap_or(DEFAULT_MAC_KDF_ITERATIONS);
-        let salt = context.generate_bytes(DEFAULT_SALT_SIZE);
+        #[cfg(feature = "fips")]
+        crate::pkcs12::require_fips_hash(hash_algorithm, "PKCS#12 MAC")?;
+        let salt = context.generate_bytes(DEFAULT_SALT_SIZE)?;
 
         // PKCS12 MAC uses BMPString as password representation
         let password = context.password_bytes_pbes1()?;
@@ -127,7 +130,7 @@ impl Pkcs12MacData {
 
         let digest = Self::calculate_digest(hash_algorithm, kdf_iterations, password.as_slice(), salt, data)?;
 
-        if digest == self.inner.mac.digest.0.as_slice() {
+        if Self::constant_time_eq(&digest, self.inner.mac.digest.0.as_slice()) {
             Ok(())
         } else {
             Err(Pkcs12MacError::MacValidation.into())
@@ -141,6 +144,8 @@ impl Pkcs12MacData {
         salt: &[u8],
         data: &[u8],
     ) -> Result<Vec<u8>, Pkcs12Error> {
+        #[cfg(feature = "fips")]
+        crate::pkcs12::require_fips_hash(hash_algorithm, "PKCS#12 MAC")?;
         let key = pbkdf1(
             hash_algorithm,
             password,
@@ -148,41 +153,80 @@ impl Pkcs12MacData {
             kdf_iterations as usize,
             Pbkdf1Usage::Mac,
             hash_algorithm.digest_size(),
-        );
+        )?;
 
-        use hmac::Mac;
+        #[cfg(feature = "rustcrypto")]
+        {
+            use hmac::Mac;
 
-        let map_hmac_err = |_| Pkcs12MacError::InvalidHmacInputSize;
+            let map_hmac_err = |_| Pkcs12MacError::InvalidHmacInputSize;
 
-        let mac = match hash_algorithm {
-            Pkcs12HashAlgorithm::Sha1 => {
-                let mut hmac = hmac::Hmac::<sha1::Sha1>::new_from_slice(&key).map_err(map_hmac_err)?;
-                hmac.update(data);
-                hmac.finalize().into_bytes().to_vec()
-            }
-            Pkcs12HashAlgorithm::Sha224 => {
-                let mut hmac = hmac::Hmac::<sha2::Sha224>::new_from_slice(&key).map_err(map_hmac_err)?;
-                hmac.update(data);
-                hmac.finalize().into_bytes().to_vec()
-            }
-            Pkcs12HashAlgorithm::Sha256 => {
-                let mut hmac = hmac::Hmac::<sha2::Sha256>::new_from_slice(&key).map_err(map_hmac_err)?;
-                hmac.update(data);
-                hmac.finalize().into_bytes().to_vec()
-            }
-            Pkcs12HashAlgorithm::Sha384 => {
-                let mut hmac = hmac::Hmac::<sha2::Sha384>::new_from_slice(&key).map_err(map_hmac_err)?;
-                hmac.update(data);
-                hmac.finalize().into_bytes().to_vec()
-            }
-            Pkcs12HashAlgorithm::Sha512 => {
-                let mut hmac = hmac::Hmac::<sha2::Sha512>::new_from_slice(&key).map_err(map_hmac_err)?;
-                hmac.update(data);
-                hmac.finalize().into_bytes().to_vec()
-            }
-        };
+            let mac = match hash_algorithm {
+                Pkcs12HashAlgorithm::Sha1 => {
+                    let mut hmac = hmac::Hmac::<sha1::Sha1>::new_from_slice(&key).map_err(map_hmac_err)?;
+                    hmac.update(data);
+                    hmac.finalize().into_bytes().to_vec()
+                }
+                Pkcs12HashAlgorithm::Sha224 => {
+                    let mut hmac = hmac::Hmac::<sha2::Sha224>::new_from_slice(&key).map_err(map_hmac_err)?;
+                    hmac.update(data);
+                    hmac.finalize().into_bytes().to_vec()
+                }
+                Pkcs12HashAlgorithm::Sha256 => {
+                    let mut hmac = hmac::Hmac::<sha2::Sha256>::new_from_slice(&key).map_err(map_hmac_err)?;
+                    hmac.update(data);
+                    hmac.finalize().into_bytes().to_vec()
+                }
+                Pkcs12HashAlgorithm::Sha384 => {
+                    let mut hmac = hmac::Hmac::<sha2::Sha384>::new_from_slice(&key).map_err(map_hmac_err)?;
+                    hmac.update(data);
+                    hmac.finalize().into_bytes().to_vec()
+                }
+                Pkcs12HashAlgorithm::Sha512 => {
+                    let mut hmac = hmac::Hmac::<sha2::Sha512>::new_from_slice(&key).map_err(map_hmac_err)?;
+                    hmac.update(data);
+                    hmac.finalize().into_bytes().to_vec()
+                }
+            };
 
-        Ok(mac)
+            Ok(mac)
+        }
+
+        #[cfg(feature = "fips-wolfcrypt")]
+        {
+            use wolfssl_wolfcrypt::hmac::HMAC;
+
+            let hash_type = match hash_algorithm {
+                Pkcs12HashAlgorithm::Sha256 => HMAC::TYPE_SHA256,
+                Pkcs12HashAlgorithm::Sha384 => HMAC::TYPE_SHA384,
+                Pkcs12HashAlgorithm::Sha512 => HMAC::TYPE_SHA512,
+                _ => unreachable!("hash policy checked above"),
+            };
+            let mut hmac = HMAC::new(hash_type, &key).map_err(|code| Pkcs12Error::CryptoProvider {
+                operation: "HMAC initialization",
+                code,
+            })?;
+            hmac.update(data).map_err(|code| Pkcs12Error::CryptoProvider {
+                operation: "HMAC update",
+                code,
+            })?;
+            let mut mac = vec![0u8; hash_algorithm.digest_size()];
+            hmac.finalize(&mut mac).map_err(|code| Pkcs12Error::CryptoProvider {
+                operation: "HMAC finalization",
+                code,
+            })?;
+            Ok(mac)
+        }
+    }
+
+    fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
+        if left.len() != right.len() {
+            return false;
+        }
+        left.iter()
+            .zip(right)
+            .fold(0u8, |difference, (left, right)| difference | (left ^ right))
+            == 0
     }
 
     pub fn inner(&self) -> &MacDataAsn1 {

@@ -35,7 +35,7 @@ picky = { version = "7", default-features = false, features = ["fips-aws-lc", "x
 wolfCrypt:
 
 ```toml
-picky = { version = "7", default-features = false, features = ["fips-wolfcrypt", "x509", "jose"] }
+picky = { version = "7", default-features = false, features = ["fips-wolfcrypt", "x509", "jose", "jwe-crypto", "pkcs12"] }
 ```
 
 `fips-wolfcrypt` uses the official `wolfssl-wolfcrypt` wrapper and links a
@@ -44,7 +44,7 @@ prefix containing `include/wolfssl` and `lib/libwolfssl`:
 
 ```sh
 WOLFSSL_PREFIX=/opt/wolfssl-fips cargo build \
-  --no-default-features --features fips-wolfcrypt,x509,jose
+  --no-default-features --features fips-wolfcrypt,x509,jose,jwe-crypto,pkcs12
 ```
 
 The wolfSSL installation is not supplied by Picky. A FIPS deployment requires
@@ -64,14 +64,24 @@ AWS-LC profiles retain Picky's Rust 1.85 MSRV.
 
 Both profiles currently support SHA-256/384/512, RSA PKCS#1 v1.5 signatures
 with SHA-2 and keys of at least 2048 bits, and ECDSA P-256/SHA-256 and
-P-384/SHA-384. They reject legacy signature algorithms, key generation, JWE
-encryption/decryption, PKCS#12, SSH, and PuTTY operations rather than falling
-back to the RustCrypto backend.
+P-384/SHA-384. They reject legacy signature algorithms, key generation, SSH,
+and PuTTY operations rather than falling back to the RustCrypto backend.
+
+The wolfCrypt profile additionally supports a constrained JWE encryption and
+decryption policy: direct keys or RSA-OAEP-256 key management with
+AES-128/192/256-GCM content encryption. It rejects RSA1_5, SHA-1 RSA-OAEP,
+ECDH-ES, AES key wrap, and AES-CBC-HMAC JWE algorithms. RSA keys must be at
+least 2048 bits.
+
+The wolfCrypt profile also supports modern PKCS#12 archives using PBES2 with
+PBKDF2-HMAC-SHA-256/384/512, AES-128/192/256-CBC, and PKCS#12 MACs with
+SHA-256/384/512. It rejects PBES1, RC2, 3DES, SHA-1, and SHA-224. The AWS-LC
+profile does not currently support JWE encryption/decryption or PKCS#12.
 
 The `jose` feature contains JOSE/JWT/JWE parsing and signature support without
-enabling RustCrypto encryption crates. Non-FIPS builds that need JWE
-encryption/decryption select `jwe-crypto`; it is included by the default and
-`full` feature profiles.
+enabling encryption crates. Select `jwe-crypto` for JWE encryption/decryption;
+it is included by the default and `full` feature profiles. Select `pkcs12` for
+PKCS#12 parsing and creation.
 
 Selecting either provider feature enforces Picky's algorithm policy and backend
 routing. A feature flag alone is not a compliance claim: deployment compliance

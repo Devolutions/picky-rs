@@ -14,8 +14,14 @@ compile_error!("`fips-aws-lc` and `fips-wolfcrypt` are mutually exclusive");
 #[cfg(all(feature = "fips", not(any(feature = "fips-aws-lc", feature = "fips-wolfcrypt"))))]
 compile_error!("`fips` requires exactly one provider feature: `fips-aws-lc` or `fips-wolfcrypt`");
 
-#[cfg(all(feature = "fips", any(feature = "pkcs12", feature = "ssh", feature = "putty")))]
-compile_error!("PKCS#12, SSH, and PuTTY crypto are not available in FIPS builds");
+#[cfg(all(feature = "fips", any(feature = "ssh", feature = "putty")))]
+compile_error!("SSH and PuTTY crypto are not available in FIPS builds");
+
+#[cfg(all(feature = "fips-aws-lc", feature = "jwe-crypto"))]
+compile_error!("JWE crypto is not yet available with `fips-aws-lc`; use `fips-wolfcrypt`");
+
+#[cfg(all(feature = "fips-aws-lc", feature = "pkcs12"))]
+compile_error!("PKCS#12 crypto is not yet available with `fips-aws-lc`; use `fips-wolfcrypt`");
 
 #[cfg(not(any(feature = "rustcrypto", feature = "fips")))]
 compile_error!("a crypto backend is required; enable `rustcrypto` or a FIPS provider");
