@@ -138,12 +138,14 @@ impl<'a> TryFrom<&'a PrivateKey> for EdKeypair {
     }
 }
 
+#[cfg_attr(feature = "fips", allow(dead_code))]
 #[derive(Debug)]
 pub(crate) struct EdPublicKey<'a> {
     data: &'a [u8],
     algorithm: NamedEdAlgorithm,
 }
 
+#[cfg_attr(feature = "fips", allow(dead_code))]
 impl EdPublicKey<'_> {
     pub fn algorithm(&self) -> &NamedEdAlgorithm {
         &self.algorithm

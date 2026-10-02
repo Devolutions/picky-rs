@@ -29,6 +29,15 @@ pub fn pbkdf1(
     usage: Pbkdf1Usage,
     output_size: usize,
 ) -> Result<Vec<u8>, Pkcs12Error> {
+    #[cfg(feature = "fips")]
+    {
+        let _ = (hash, password, salt, kdf_iterations, usage, output_size);
+        Err(Pkcs12Error::NotSupportedAlgorithm {
+            algorithm: "PKCS#12 Appendix B KDF".into(),
+            context: "not an approved KDF in the AWS-LC FIPS provider".to_string(),
+        })
+    }
+
     #[cfg(feature = "rustcrypto")]
     {
         let u = hash.pbkdf1_u_bits() / 8;

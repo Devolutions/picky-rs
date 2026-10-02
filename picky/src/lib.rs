@@ -11,14 +11,8 @@ compile_error!("`fips` and `rustcrypto` are mutually exclusive; use `default-fea
 #[cfg(all(feature = "fips", not(feature = "fips-aws-lc")))]
 compile_error!("`fips` requires the `fips-aws-lc` provider feature");
 
-#[cfg(all(feature = "fips", any(feature = "ssh", feature = "putty")))]
-compile_error!("SSH and PuTTY crypto are not available in FIPS builds");
-
-#[cfg(all(feature = "fips-aws-lc", feature = "jwe-crypto"))]
-compile_error!("JWE crypto is not yet available with `fips-aws-lc`");
-
-#[cfg(all(feature = "fips-aws-lc", feature = "pkcs12"))]
-compile_error!("PKCS#12 crypto is not yet available with `fips-aws-lc`");
+#[cfg(all(feature = "fips", feature = "putty"))]
+compile_error!("PuTTY crypto is not available in FIPS builds");
 
 #[cfg(not(any(feature = "rustcrypto", feature = "fips")))]
 compile_error!("a crypto backend is required; enable `rustcrypto` or a FIPS provider");

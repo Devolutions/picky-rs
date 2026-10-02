@@ -1,4 +1,6 @@
-use crate::pkcs12::{Pbkdf1Usage, Pkcs12CryptoContext, Pkcs12Error, Pkcs12HashAlgorithm, pbkdf1};
+#[cfg(feature = "rustcrypto")]
+use crate::pkcs12::{Pbkdf1Usage, pbkdf1};
+use crate::pkcs12::{Pkcs12CryptoContext, Pkcs12Error, Pkcs12HashAlgorithm};
 #[cfg(feature = "rustcrypto")]
 use hmac::KeyInit;
 use picky_asn1::wrapper::OctetStringAsn1;
@@ -145,18 +147,24 @@ impl Pkcs12MacData {
         data: &[u8],
     ) -> Result<Vec<u8>, Pkcs12Error> {
         #[cfg(feature = "fips")]
-        crate::pkcs12::require_fips_hash(hash_algorithm, "PKCS#12 MAC")?;
-        let key = pbkdf1(
-            hash_algorithm,
-            password,
-            salt,
-            kdf_iterations as usize,
-            Pbkdf1Usage::Mac,
-            hash_algorithm.digest_size(),
-        )?;
-
+        {
+            let _ = (hash_algorithm, kdf_iterations, password, salt, data);
+            Err(Pkcs12Error::NotSupportedAlgorithm {
+                algorithm: "PKCS#12 Appendix B MAC KDF".into(),
+                context: "not an approved KDF in the AWS-LC FIPS provider".to_string(),
+            })
+        }
         #[cfg(feature = "rustcrypto")]
         {
+            let key = pbkdf1(
+                hash_algorithm,
+                password,
+                salt,
+                kdf_iterations as usize,
+                Pbkdf1Usage::Mac,
+                hash_algorithm.digest_size(),
+            )?;
+
             use hmac::Mac;
 
             let map_hmac_err = |_| Pkcs12MacError::InvalidHmacInputSize;

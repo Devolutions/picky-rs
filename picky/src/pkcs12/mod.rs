@@ -56,6 +56,7 @@
 mod attribute;
 mod encryption;
 mod mac;
+#[cfg(feature = "rustcrypto")]
 mod pbkdf1;
 mod safe_bag;
 mod safe_contents;
@@ -73,6 +74,7 @@ use picky_asn1_x509::pkcs12::{
 use std::fmt::Display;
 use thiserror::Error;
 
+#[cfg(feature = "rustcrypto")]
 pub(crate) use pbkdf1::{Pbkdf1Usage, pbkdf1};
 
 #[cfg(feature = "fips")]
@@ -299,6 +301,7 @@ impl Pkcs12HashAlgorithm {
         }
     }
 
+    #[cfg(feature = "rustcrypto")]
     pub(crate) fn digest_size(self) -> usize {
         match self {
             Self::Sha1 => 20,

@@ -33,13 +33,21 @@ picky = { version = "7", default-features = false, features = ["fips-aws-lc", "x
 ```
 
 The AWS-LC profile supports SHA-256/384/512, RSA PKCS#1 v1.5 signatures
-with SHA-2 and keys of at least 2048 bits, and ECDSA P-256/SHA-256 and
-P-384/SHA-384. They reject legacy signature algorithms, key generation, SSH,
-and PuTTY operations rather than falling back to the RustCrypto backend.
+with SHA-2 and keys of at least 2048 bits, ECDSA P-256/SHA-256 and
+P-384/SHA-384, JWE `dir` and RSA-OAEP-256 key management with AES-128-GCM or
+AES-256-GCM content encryption, and PKCS#12 PBES2 using PBKDF2-HMAC-SHA-2 and
+AES-CBC. PBES1 and the PKCS#12 Appendix B MAC KDF remain unavailable because
+they are outside the approved AWS-LC policy. Consequently, FIPS builds can
+create MAC-less PBES2 archives and can parse archives with MAC validation
+explicitly skipped, but cannot create or validate the conventional PKCS#12 MAC.
+PBKDF2 inputs must use at least 1000 iterations, a 16-byte salt, and 14 bytes of
+password material to satisfy the AWS-LC FIPS service indicator.
 
-JWE encryption/decryption and PKCS#12 cryptographic operations are not
-currently available in the AWS-LC FIPS profile and are rejected at compile
-time when those features are selected.
+The `ssh` feature supports parsing, encoding, and SHA-256 fingerprinting of RSA,
+P-256, and P-384 public keys in FIPS builds. Encrypted OpenSSH private keys and
+PuTTY PPK files remain unavailable because their formats require bcrypt-PBKDF,
+Argon2, or SHA-1. MD5/SHA-1 fingerprints, Ed25519, and P-521 are rejected by
+the FIPS policy.
 
 The `jose` feature contains JOSE/JWT/JWE parsing and signature support without
 enabling encryption crates. Select `jwe-crypto` for JWE encryption/decryption;

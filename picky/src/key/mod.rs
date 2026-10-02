@@ -5,7 +5,7 @@ pub(crate) mod ed;
 use crate::oid::ObjectIdentifier;
 use crate::pem::{Pem, PemError, parse_pem};
 use picky_asn1::bit_string::BitString;
-use picky_asn1::wrapper::{BitStringAsn1Container, OctetStringAsn1Container};
+use picky_asn1::wrapper::{BitStringAsn1Container, IntegerAsn1, OctetStringAsn1Container};
 use picky_asn1_der::Asn1DerError;
 use picky_asn1_x509::{
     ECPrivateKey, PRIVATE_KEY_INFO_VERSION_1, PrivateKeyInfo, PrivateKeyValue, SubjectPublicKeyInfo,
@@ -17,8 +17,6 @@ use zeroize::Zeroize;
 use crypto_bigint::{BoxedUint, NonZero};
 #[cfg(feature = "rustcrypto")]
 use crypto_common::Generate as _;
-#[cfg(feature = "rustcrypto")]
-use picky_asn1::wrapper::IntegerAsn1;
 #[cfg(feature = "rustcrypto")]
 use picky_asn1_x509::private_key_info;
 #[cfg(feature = "rustcrypto")]
@@ -967,12 +965,19 @@ impl TryFrom<&'_ PublicKey> for RsaPublicKey {
 }
 
 impl PublicKey {
+    pub(crate) fn from_rsa_encoded_components(modulus: &[u8], public_exponent: &[u8]) -> Self {
+        PublicKey(SubjectPublicKeyInfo::new_rsa_key(
+            IntegerAsn1::from_bytes_be_unsigned(modulus.to_vec()),
+            IntegerAsn1::from_bytes_be_unsigned(public_exponent.to_vec()),
+        ))
+    }
+
     #[cfg(feature = "rustcrypto")]
     pub fn from_rsa_components(modulus: &BoxedUint, public_exponent: &BoxedUint) -> Self {
-        PublicKey(SubjectPublicKeyInfo::new_rsa_key(
-            IntegerAsn1::from_bytes_be_unsigned(modulus.to_be_bytes_trimmed_vartime().into_vec()),
-            IntegerAsn1::from_bytes_be_unsigned(public_exponent.to_be_bytes_trimmed_vartime().into_vec()),
-        ))
+        Self::from_rsa_encoded_components(
+            &modulus.to_be_bytes_trimmed_vartime(),
+            &public_exponent.to_be_bytes_trimmed_vartime(),
+        )
     }
 
     /// `point` is SEC1 encoded point data

@@ -138,6 +138,7 @@ rustcrypto = [
     "dep:rc2",
     "dep:pbkdf2",
     "dep:hmac",
+    "dep:bcrypt-pbkdf",
     "picky-asn1-x509/legacy",
 ]
 fips = []
@@ -173,7 +174,7 @@ http_timestamp = ["dep:reqwest"]
 ctl = ["picky-asn1-x509/ctl", "pkcs7", "chrono_conversion"]
 ctl_http_fetch = ["dep:reqwest", "dep:cab", "ctl"]
 wincert = ["x509", "dep:byteorder"]
-ssh = ["rustcrypto", "dep:byteorder", "dep:aes", "dep:ctr", "dep:cbc", "dep:bcrypt-pbkdf", "dep:lexical-sort", "dep:hmac", "dep:pbkdf2"]
+ssh = ["dep:byteorder", "dep:lexical-sort"]
 http_trait_impl = ["dep:http"]
 chrono_conversion = ["dep:chrono", "picky-asn1/chrono_conversion"]
 time_conversion = ["dep:time", "picky-asn1/time_conversion"]

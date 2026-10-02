@@ -55,6 +55,7 @@ pub enum EcCurve {
 impl EcCurve {
     /// Get size of field compoennet in bytes (e.g. X and Y point values, Secret key,
     /// R and S signature values)
+    #[cfg_attr(feature = "fips", allow(dead_code))]
     pub(crate) fn field_bytes_size(self) -> usize {
         match self {
             EcCurve::NistP256 => 32,

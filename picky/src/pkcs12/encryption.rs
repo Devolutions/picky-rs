@@ -22,7 +22,10 @@ use std::str::FromStr as _;
 
 /// Same default KDF iterations as in OpenSSL
 const DEFAULT_KDF_ITERATIONS: usize = 2048;
+#[cfg(feature = "rustcrypto")]
 const DEFAULT_SALT_SIZE: usize = 8;
+#[cfg(feature = "fips-aws-lc")]
+const DEFAULT_SALT_SIZE: usize = 16;
 const AES_BLOCK_SIZE: usize = 16;
 
 /// Crypto operations context for PFX file parsing/building. Contains password inside as a secure
@@ -76,6 +79,10 @@ impl Pkcs12CryptoContext {
         let mut data = vec![0u8; len];
         #[cfg(feature = "rustcrypto")]
         self.rng.fill_bytes(&mut data);
+        #[cfg(feature = "fips-aws-lc")]
+        aws_lc_rs::rand::fill(&mut data).map_err(|_| Pkcs12Error::Pbes2 {
+            context: "AWS-LC random-byte generation failed".to_string(),
+        })?;
         Ok(data)
     }
 }
@@ -472,6 +479,40 @@ fn prepare_pbes2_cipher_inputs(
         };
         calculate_kdf(password, salt.as_slice(), kdf_iterations, key.as_mut_slice());
     }
+    #[cfg(feature = "fips-aws-lc")]
+    {
+        use std::num::NonZeroU32;
+
+        require_fips_hash(prf, "PBES2 PBKDF2")?;
+        if salt.len() < 16 {
+            return Err(Pkcs12Error::Pbes2 {
+                context: format!("FIPS PBKDF2 requires at least 16 bytes of salt, got {}", salt.len()),
+            });
+        }
+        if kdf_iterations < 1000 {
+            return Err(Pkcs12Error::Pbes2 {
+                context: format!("FIPS PBKDF2 requires at least 1000 iterations, got {kdf_iterations}"),
+            });
+        }
+        if password.len() < 14 {
+            return Err(Pkcs12Error::Pbes2 {
+                context: format!(
+                    "FIPS PBKDF2 requires at least 14 bytes of password material, got {}",
+                    password.len()
+                ),
+            });
+        }
+        let iterations = NonZeroU32::new(kdf_iterations).ok_or_else(|| Pkcs12Error::Pbes2 {
+            context: "PBKDF2 iteration count must be non-zero".to_string(),
+        })?;
+        let algorithm = match prf {
+            Pkcs12HashAlgorithm::Sha256 => aws_lc_rs::pbkdf2::PBKDF2_HMAC_SHA256,
+            Pkcs12HashAlgorithm::Sha384 => aws_lc_rs::pbkdf2::PBKDF2_HMAC_SHA384,
+            Pkcs12HashAlgorithm::Sha512 => aws_lc_rs::pbkdf2::PBKDF2_HMAC_SHA512,
+            Pkcs12HashAlgorithm::Sha1 | Pkcs12HashAlgorithm::Sha224 => unreachable!(),
+        };
+        aws_lc_rs::pbkdf2::derive(algorithm, iterations, salt.as_slice(), password, key.as_mut_slice());
+    }
     Ok(Pbes2CipherInputs { key, iv, cipher })
 }
 
@@ -533,6 +574,36 @@ fn decrypt_pbes2(params: &Pbes2ParamsAsn1, password: &[u8], data: &[u8]) -> Resu
 
         Ok(decrypted)
     }
+    #[cfg(feature = "fips-aws-lc")]
+    {
+        use aws_lc_rs::cipher::{DecryptionContext, PaddedBlockDecryptingKey, UnboundCipherKey};
+        use aws_lc_rs::iv::{FixedLength, IV_LEN_128_BIT};
+
+        let algorithm = match _cipher {
+            Pbes2Cipher::Aes128Cbc => &aws_lc_rs::cipher::AES_128,
+            Pbes2Cipher::Aes192Cbc => &aws_lc_rs::cipher::AES_192,
+            Pbes2Cipher::Aes256Cbc => &aws_lc_rs::cipher::AES_256,
+        };
+        let iv: [u8; 16] = iv.as_slice().try_into().map_err(|_| Pkcs12Error::Pbes2 {
+            context: format!("AES-CBC IV must be 16 bytes, got {}", iv.len()),
+        })?;
+        let key = UnboundCipherKey::new(algorithm, &key).map_err(|_| Pkcs12Error::Pbes2 {
+            context: "AWS-LC rejected the AES-CBC key".to_string(),
+        })?;
+        let decryptor = PaddedBlockDecryptingKey::cbc_pkcs7(key).map_err(|_| Pkcs12Error::Pbes2 {
+            context: "AWS-LC AES-CBC decryptor initialization failed".to_string(),
+        })?;
+        let mut decrypted = data.to_vec();
+        let plaintext = decryptor
+            .decrypt(
+                &mut decrypted,
+                DecryptionContext::Iv128(FixedLength::<IV_LEN_128_BIT>::from(iv)),
+            )
+            .map_err(|_| Pkcs12Error::Pbes2 {
+                context: "AWS-LC AES-CBC decryption or padding validation failed".to_string(),
+            })?;
+        Ok(plaintext.to_vec())
+    }
 }
 
 fn encrypt_pbes2(params: &Pbes2ParamsAsn1, password: &[u8], data: &[u8]) -> Result<Vec<u8>, Pkcs12Error> {
@@ -585,6 +656,36 @@ fn encrypt_pbes2(params: &Pbes2ParamsAsn1, password: &[u8], data: &[u8]) -> Resu
             }
         };
 
+        Ok(encrypted)
+    }
+    #[cfg(feature = "fips-aws-lc")]
+    {
+        use aws_lc_rs::cipher::{EncryptionContext, PaddedBlockEncryptingKey, UnboundCipherKey};
+        use aws_lc_rs::iv::{FixedLength, IV_LEN_128_BIT};
+
+        let algorithm = match _cipher {
+            Pbes2Cipher::Aes128Cbc => &aws_lc_rs::cipher::AES_128,
+            Pbes2Cipher::Aes192Cbc => &aws_lc_rs::cipher::AES_192,
+            Pbes2Cipher::Aes256Cbc => &aws_lc_rs::cipher::AES_256,
+        };
+        let iv: [u8; 16] = iv.as_slice().try_into().map_err(|_| Pkcs12Error::Pbes2 {
+            context: format!("AES-CBC IV must be 16 bytes, got {}", iv.len()),
+        })?;
+        let key = UnboundCipherKey::new(algorithm, &key).map_err(|_| Pkcs12Error::Pbes2 {
+            context: "AWS-LC rejected the AES-CBC key".to_string(),
+        })?;
+        let encryptor = PaddedBlockEncryptingKey::cbc_pkcs7(key).map_err(|_| Pkcs12Error::Pbes2 {
+            context: "AWS-LC AES-CBC encryptor initialization failed".to_string(),
+        })?;
+        let mut encrypted = data.to_vec();
+        encryptor
+            .less_safe_encrypt(
+                &mut encrypted,
+                EncryptionContext::Iv128(FixedLength::<IV_LEN_128_BIT>::from(iv)),
+            )
+            .map_err(|_| Pkcs12Error::Pbes2 {
+                context: "AWS-LC AES-CBC encryption failed".to_string(),
+            })?;
         Ok(encrypted)
     }
 }
@@ -746,5 +847,60 @@ mod tests {
         let encrypted = encrypt_pbes2(&params, password, &data).unwrap();
         let decrypted = decrypt_pbes2(&params, password, &encrypted).unwrap();
         assert_eq!(decrypted, data);
+    }
+}
+
+#[cfg(all(test, feature = "fips-aws-lc"))]
+mod fips_tests {
+    use super::*;
+
+    fn pbes2_params(cipher: Pbes2AesCbcEncryptionAsn1) -> Pbes2ParamsAsn1 {
+        Pbes2ParamsAsn1 {
+            key_derivation_func: Pbes2KeyDerivationFuncAsn1::Pbkdf2(Pbkdf2ParamsAsn1 {
+                salt: Pbkdf2SaltSourceAsn1::Specified(OctetStringAsn1((0..16).collect())),
+                iteration_count: 2000,
+                key_length: None,
+                prf: Some(Pbkdf2PrfAsn1::HmacWithSha256),
+            }),
+            encryption_scheme: Pbes2EncryptionSchemeAsn1::AesCbc {
+                kind: cipher,
+                iv: OctetStringAsn1((0..16).collect()),
+            },
+        }
+    }
+
+    #[test]
+    fn pbes2_aes_256_cbc_roundtrip() {
+        let params = pbes2_params(Pbes2AesCbcEncryptionAsn1::Aes256);
+        let password = b"fourteen-bytes!";
+        let data = (0..123).collect::<Vec<u8>>();
+
+        let encrypted = encrypt_pbes2(&params, password, &data).unwrap();
+        let decrypted = decrypt_pbes2(&params, password, &encrypted).unwrap();
+
+        assert_ne!(encrypted, data);
+        assert_eq!(decrypted, data);
+    }
+
+    #[test]
+    fn rejects_pbkdf2_salt_shorter_than_sixteen_bytes() {
+        let mut params = pbes2_params(Pbes2AesCbcEncryptionAsn1::Aes256);
+        let Pbes2KeyDerivationFuncAsn1::Pbkdf2(kdf) = &mut params.key_derivation_func else {
+            unreachable!()
+        };
+        kdf.salt = Pbkdf2SaltSourceAsn1::Specified(OctetStringAsn1(vec![0u8; 8]));
+
+        let error = encrypt_pbes2(&params, b"fourteen-bytes!", b"payload").unwrap_err();
+
+        assert!(error.to_string().contains("at least 16 bytes of salt"));
+    }
+
+    #[test]
+    fn rejects_pbkdf2_password_shorter_than_fourteen_bytes() {
+        let params = pbes2_params(Pbes2AesCbcEncryptionAsn1::Aes256);
+
+        let error = encrypt_pbes2(&params, b"short", b"payload").unwrap_err();
+
+        assert!(error.to_string().contains("at least 14 bytes of password material"));
     }
 }
