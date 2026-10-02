@@ -114,50 +114,6 @@ jobs:
       - name: Test FIPS policy and approved operations
         run: cargo test --locked -p picky --no-default-features --features fips-aws-lc,x509,jose,time_conversion,http_signature,http_trait_impl --lib
 
-  wolfcrypt:
-    name: wolfCrypt provider integration
-    needs: [formatting]
-    runs-on: ubuntu-latest
-    env:
-      WOLFSSL_PREFIX: /tmp/wolfssl-install
-
-    steps:
-      - uses: actions/checkout@v6
-
-      # This ordinary wolfSSL build checks the Rust integration only. It is not
-      # the commercially licensed validated module and makes no FIPS claim.
-      - name: Build wolfSSL integration library
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes libclang-dev
-          libclang_path="$(dirname "$(find /usr/lib/llvm-* -name libclang.so -print -quit)")"
-          test -n "$libclang_path"
-          echo "LIBCLANG_PATH=$libclang_path" >> "$GITHUB_ENV"
-          git clone --depth 1 --branch v5.9.4-stable \
-            https://github.com/wolfSSL/wolfssl.git "$RUNNER_TEMP/wolfssl"
-          cmake -S "$RUNNER_TEMP/wolfssl" -B "$RUNNER_TEMP/wolfssl-build" \
-            -DWOLFSSL_EXAMPLES=no \
-            -DWOLFSSL_CRYPT_TESTS=no \
-            -DBUILD_SHARED_LIBS=OFF \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX="$WOLFSSL_PREFIX"
-          cmake --build "$RUNNER_TEMP/wolfssl-build" --target install --parallel 2
-
-      - name: Reject other crypto implementations in the wolfCrypt graph
-        run: |
-          if cargo tree --locked -p picky --edges normal,build --no-default-features \
-            --features fips-wolfcrypt,x509,jose,jwe-crypto,pkcs12,time_conversion \
-            | grep -E 'aws-lc|rsa v|p256 v|p384 v|p521 v|ed25519|x25519|md-5|sha1 v|sha2 v|sha3 v|aes|chacha|poly1305|argon|scrypt|pbkdf|hmac|crypto-bigint|ring v'; then
-            echo "An implementation outside wolfCrypt is present in the provider graph"
-            exit 1
-          fi
-
-      - name: Check wolfCrypt provider profile
-        run: cargo check --locked -p picky --no-default-features --features fips-wolfcrypt,x509,jose,jwe-crypto,pkcs12,time_conversion,http_signature,http_trait_impl
-
-      - name: Test wolfCrypt policy and approved operations
-        run: cargo test --locked -p picky --no-default-features --features fips-wolfcrypt,x509,jose,jwe-crypto,pkcs12,time_conversion,http_signature,http_trait_impl --lib
-
   msrv:
     # Minimum supported Rust version check for published crates.
     # If this break, bump crate version minor number.
@@ -249,7 +205,7 @@ jobs:
   success:
     name: Success
     if: ${{ always() }}
-    needs: [formatting, lints, lints-wasm, tests, fips, wolfcrypt, msrv, dotnet-tests]
+    needs: [formatting, lints, lints-wasm, tests, fips, msrv, dotnet-tests]
     runs-on: ubuntu-latest
 
     steps:

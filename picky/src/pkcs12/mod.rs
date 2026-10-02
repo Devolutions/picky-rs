@@ -371,8 +371,6 @@ pub enum Pkcs12Error {
     Pbes1 { context: String },
     #[error("Failed to perform PBES2 crypto operation: {context}")]
     Pbes2 { context: String },
-    #[error("wolfCrypt failed during {operation}: error code {code}")]
-    CryptoProvider { operation: &'static str, code: i32 },
     #[error(transparent)]
     CharSet(#[from] CharSetError),
     #[error(transparent)]
@@ -635,103 +633,5 @@ mod tests {
         let der_data = pfx.to_der().unwrap();
 
         validate_pfx(&der_data, password);
-    }
-}
-
-#[cfg(all(test, feature = "fips-wolfcrypt"))]
-mod wolfcrypt_tests {
-    use super::*;
-    use crate::key::PrivateKey;
-    use crate::x509::Cert;
-
-    #[test]
-    fn modern_pfx_roundtrip_uses_wolfcrypt_for_all_approved_sha2_and_aes_sizes() {
-        let key = PrivateKey::from_pem_str(picky_test_data::RSA_2048_PK_3).unwrap();
-        let cert = Cert::from_der(picky_test_data::ASSERT_LEAF).unwrap();
-
-        for hash in [
-            Pkcs12HashAlgorithm::Sha256,
-            Pkcs12HashAlgorithm::Sha384,
-            Pkcs12HashAlgorithm::Sha512,
-        ] {
-            for cipher in [Pbes2Cipher::Aes128Cbc, Pbes2Cipher::Aes192Cbc, Pbes2Cipher::Aes256Cbc] {
-                let mut context = Pkcs12CryptoContext::new_with_password("wolfCrypt-password").unwrap();
-                let key_encryption =
-                    Pkcs12Encryption::try_new_pbes2(Pbes2Encryption::new(cipher, hash), &mut context).unwrap();
-                let key_bag = SafeBag::new_encrypted_key(key.clone(), Vec::new(), key_encryption, &context).unwrap();
-
-                let cert_encryption =
-                    Pkcs12Encryption::try_new_pbes2(Pbes2Encryption::new(cipher, hash), &mut context).unwrap();
-                let cert_contents = SafeContents::new_encrypted(
-                    vec![SafeBag::new_certificate(cert.clone(), Vec::new()).unwrap()],
-                    cert_encryption,
-                    &context,
-                )
-                .unwrap();
-                let key_contents = SafeContents::new(vec![key_bag]);
-                let pfx = Pfx::new_with_hmac(
-                    vec![cert_contents, key_contents],
-                    Pkcs12MacAlgorithmHmac::new(hash).with_iterations(2048),
-                    &mut context,
-                )
-                .unwrap();
-
-                let der = pfx.to_der().unwrap();
-                let parsed = Pfx::from_der(&der, &context, &Pkcs12ParsingParams::default()).unwrap();
-                assert_eq!(parsed.safe_contents().len(), 2);
-                assert!(matches!(
-                    parsed.safe_contents()[0].kind(),
-                    SafeContentsKind::EncryptedSafeBags { .. }
-                ));
-                assert!(matches!(
-                    parsed.safe_contents()[1].kind(),
-                    SafeContentsKind::SafeBags(_)
-                ));
-            }
-        }
-    }
-
-    #[test]
-    fn legacy_and_nonapproved_pkcs12_algorithms_are_rejected() {
-        let mut context = Pkcs12CryptoContext::new_with_password("password").unwrap();
-
-        assert!(matches!(
-            Pkcs12Encryption::try_new_pbes1(Pbes1Encryption::new(Pbes1Cipher::ShaAnd3Key3DesCbc), &mut context,),
-            Err(Pkcs12Error::NotSupportedAlgorithm { .. })
-        ));
-        assert!(matches!(
-            Pkcs12Encryption::try_new_pbes2(
-                Pbes2Encryption::new(Pbes2Cipher::Aes256Cbc, Pkcs12HashAlgorithm::Sha1),
-                &mut context,
-            ),
-            Err(Pkcs12Error::NotSupportedAlgorithm { .. })
-        ));
-        assert!(matches!(
-            Pfx::new_with_hmac(
-                Vec::new(),
-                Pkcs12MacAlgorithmHmac::new(Pkcs12HashAlgorithm::Sha224),
-                &mut context,
-            ),
-            Err(Pkcs12Error::NotSupportedAlgorithm { .. })
-        ));
-    }
-
-    #[test]
-    fn pfx_mac_tampering_is_rejected() {
-        let mut context = Pkcs12CryptoContext::new_with_password("password").unwrap();
-        let pfx = Pfx::new_with_hmac(
-            vec![SafeContents::new(Vec::new())],
-            Pkcs12MacAlgorithmHmac::new(Pkcs12HashAlgorithm::Sha256),
-            &mut context,
-        )
-        .unwrap();
-        let mut raw: RawPfxAsn1 = picky_asn1_der::from_bytes(&pfx.to_der().unwrap()).unwrap();
-        let RawAuthenticatedSafeContentInfoAsn1::Data(auth_safe) = &mut raw.auth_safe else {
-            panic!("expected authenticated safe data");
-        };
-        auth_safe.0[0] ^= 1;
-        let der = picky_asn1_der::to_vec(&raw).unwrap();
-
-        assert!(Pfx::from_der(&der, &context, &Pkcs12ParsingParams::default()).is_err());
     }
 }

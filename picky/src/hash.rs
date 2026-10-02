@@ -104,47 +104,6 @@ impl HashAlgorithm {
             Ok(aws_lc_rs::digest::digest(algorithm, msg).as_ref().to_vec())
         }
 
-        #[cfg(feature = "fips-wolfcrypt")]
-        {
-            use wolfssl_wolfcrypt::sha::{SHA256, SHA384, SHA512};
-
-            crate::crypto::require_hash(self)?;
-            crate::crypto::wolfcrypt_fips::ensure_initialized().map_err(|code| HashError::Provider {
-                provider: "wolfCrypt",
-                operation: "initialization",
-                code,
-            })?;
-
-            macro_rules! digest {
-                ($hasher:ty, $size:expr, $operation:literal) => {{
-                    let mut hasher = <$hasher>::new().map_err(|code| HashError::Provider {
-                        provider: "wolfCrypt",
-                        operation: concat!($operation, " initialization"),
-                        code,
-                    })?;
-                    hasher.update(msg).map_err(|code| HashError::Provider {
-                        provider: "wolfCrypt",
-                        operation: concat!($operation, " update"),
-                        code,
-                    })?;
-                    let mut output = vec![0; $size];
-                    hasher.finalize(&mut output).map_err(|code| HashError::Provider {
-                        provider: "wolfCrypt",
-                        operation: concat!($operation, " finalize"),
-                        code,
-                    })?;
-                    output
-                }};
-            }
-
-            Ok(match self {
-                Self::SHA2_256 => digest!(SHA256, 32, "SHA-256"),
-                Self::SHA2_384 => digest!(SHA384, 48, "SHA-384"),
-                Self::SHA2_512 => digest!(SHA512, 64, "SHA-512"),
-                _ => unreachable!("policy checked above"),
-            })
-        }
-
         #[cfg(feature = "rustcrypto")]
         Ok(match self {
             Self::MD5 => md5::Md5::digest(msg).as_slice().to_vec(),

@@ -191,32 +191,6 @@ impl Pkcs12MacData {
 
             Ok(mac)
         }
-
-        #[cfg(feature = "fips-wolfcrypt")]
-        {
-            use wolfssl_wolfcrypt::hmac::HMAC;
-
-            let hash_type = match hash_algorithm {
-                Pkcs12HashAlgorithm::Sha256 => HMAC::TYPE_SHA256,
-                Pkcs12HashAlgorithm::Sha384 => HMAC::TYPE_SHA384,
-                Pkcs12HashAlgorithm::Sha512 => HMAC::TYPE_SHA512,
-                _ => unreachable!("hash policy checked above"),
-            };
-            let mut hmac = HMAC::new(hash_type, &key).map_err(|code| Pkcs12Error::CryptoProvider {
-                operation: "HMAC initialization",
-                code,
-            })?;
-            hmac.update(data).map_err(|code| Pkcs12Error::CryptoProvider {
-                operation: "HMAC update",
-                code,
-            })?;
-            let mut mac = vec![0u8; hash_algorithm.digest_size()];
-            hmac.finalize(&mut mac).map_err(|code| Pkcs12Error::CryptoProvider {
-                operation: "HMAC finalization",
-                code,
-            })?;
-            Ok(mac)
-        }
     }
 
     fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {

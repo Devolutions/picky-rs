@@ -29,36 +29,6 @@ pub fn pbkdf1(
     usage: Pbkdf1Usage,
     output_size: usize,
 ) -> Result<Vec<u8>, Pkcs12Error> {
-    #[cfg(feature = "fips-wolfcrypt")]
-    {
-        use wolfssl_wolfcrypt::hmac::HMAC;
-
-        crate::pkcs12::require_fips_hash(hash, "PKCS#12 PBKDF")?;
-        let hash_type = match hash {
-            Pkcs12HashAlgorithm::Sha256 => HMAC::TYPE_SHA256,
-            Pkcs12HashAlgorithm::Sha384 => HMAC::TYPE_SHA384,
-            Pkcs12HashAlgorithm::Sha512 => HMAC::TYPE_SHA512,
-            _ => unreachable!("hash policy checked above"),
-        };
-        let mut output = vec![0u8; output_size];
-        wolfssl_wolfcrypt::kdf::pkcs12_pbkdf(
-            password,
-            salt,
-            i32::try_from(kdf_iterations).map_err(|_| Pkcs12Error::CryptoProvider {
-                operation: "PKCS#12 PBKDF iteration conversion",
-                code: -1,
-            })?,
-            hash_type,
-            usage.to_id_byte().into(),
-            &mut output,
-        )
-        .map_err(|code| Pkcs12Error::CryptoProvider {
-            operation: "PKCS#12 PBKDF",
-            code,
-        })?;
-        Ok(output)
-    }
-
     #[cfg(feature = "rustcrypto")]
     {
         let u = hash.pbkdf1_u_bits() / 8;

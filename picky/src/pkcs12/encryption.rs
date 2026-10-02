@@ -31,8 +31,6 @@ pub struct Pkcs12CryptoContext {
     password: zeroize::Zeroizing<String>,
     #[cfg(feature = "rustcrypto")]
     rng: Box<dyn rand_core::Rng>,
-    #[cfg(feature = "fips-wolfcrypt")]
-    rng: wolfssl_wolfcrypt::random::RNG,
 }
 
 impl Pkcs12CryptoContext {
@@ -42,11 +40,6 @@ impl Pkcs12CryptoContext {
             password: password.to_string().into(),
             #[cfg(feature = "rustcrypto")]
             rng: Box::new(StdRng::try_from_rng(&mut SysRng)?),
-            #[cfg(feature = "fips-wolfcrypt")]
-            rng: wolfssl_wolfcrypt::random::RNG::new().map_err(|code| Pkcs12Error::CryptoProvider {
-                operation: "RNG initialization",
-                code,
-            })?,
         })
     }
 
@@ -63,11 +56,6 @@ impl Pkcs12CryptoContext {
             password: String::new().into(),
             #[cfg(feature = "rustcrypto")]
             rng: Box::new(StdRng::try_from_rng(&mut SysRng)?),
-            #[cfg(feature = "fips-wolfcrypt")]
-            rng: wolfssl_wolfcrypt::random::RNG::new().map_err(|code| Pkcs12Error::CryptoProvider {
-                operation: "RNG initialization",
-                code,
-            })?,
         })
     }
 
@@ -88,13 +76,6 @@ impl Pkcs12CryptoContext {
         let mut data = vec![0u8; len];
         #[cfg(feature = "rustcrypto")]
         self.rng.fill_bytes(&mut data);
-        #[cfg(feature = "fips-wolfcrypt")]
-        self.rng
-            .generate_block(&mut data)
-            .map_err(|code| Pkcs12Error::CryptoProvider {
-                operation: "random-byte generation",
-                code,
-            })?;
         Ok(data)
     }
 }
@@ -491,32 +472,6 @@ fn prepare_pbes2_cipher_inputs(
         };
         calculate_kdf(password, salt.as_slice(), kdf_iterations, key.as_mut_slice());
     }
-    #[cfg(feature = "fips-wolfcrypt")]
-    {
-        use wolfssl_wolfcrypt::hmac::HMAC;
-
-        require_fips_hash(prf, &format!("PBES2 {cipher_context} PBKDF2"))?;
-        let hash_type = match prf {
-            Pkcs12HashAlgorithm::Sha256 => HMAC::TYPE_SHA256,
-            Pkcs12HashAlgorithm::Sha384 => HMAC::TYPE_SHA384,
-            Pkcs12HashAlgorithm::Sha512 => HMAC::TYPE_SHA512,
-            _ => unreachable!("hash policy checked above"),
-        };
-        wolfssl_wolfcrypt::kdf::pbkdf2(
-            password,
-            salt.as_slice(),
-            i32::try_from(kdf_iterations).map_err(|_| Pkcs12Error::Pbes2 {
-                context: "PBKDF2 iteration count exceeds wolfCrypt limits".to_string(),
-            })?,
-            hash_type,
-            key.as_mut_slice(),
-        )
-        .map_err(|code| Pkcs12Error::CryptoProvider {
-            operation: "PBES2 PBKDF2",
-            code,
-        })?;
-    }
-
     Ok(Pbes2CipherInputs { key, iv, cipher })
 }
 
@@ -578,31 +533,6 @@ fn decrypt_pbes2(params: &Pbes2ParamsAsn1, password: &[u8], data: &[u8]) -> Resu
 
         Ok(decrypted)
     }
-
-    #[cfg(feature = "fips-wolfcrypt")]
-    {
-        if data.is_empty() || data.len() % AES_BLOCK_SIZE != 0 {
-            return Err(Pkcs12Error::Pbes2 {
-                context: "AES-CBC ciphertext length is not a positive block multiple".to_string(),
-            });
-        }
-        let mut aes = wolfssl_wolfcrypt::aes::CBC::new().map_err(|code| Pkcs12Error::CryptoProvider {
-            operation: "AES-CBC initialization",
-            code,
-        })?;
-        aes.init_decrypt(&key, &iv)
-            .map_err(|code| Pkcs12Error::CryptoProvider {
-                operation: "AES-CBC decryption key setup",
-                code,
-            })?;
-        let mut decrypted = vec![0u8; data.len()];
-        aes.decrypt(data, &mut decrypted)
-            .map_err(|code| Pkcs12Error::CryptoProvider {
-                operation: "AES-CBC decryption",
-                code,
-            })?;
-        remove_pkcs7_padding(decrypted)
-    }
 }
 
 fn encrypt_pbes2(params: &Pbes2ParamsAsn1, password: &[u8], data: &[u8]) -> Result<Vec<u8>, Pkcs12Error> {
@@ -657,53 +587,6 @@ fn encrypt_pbes2(params: &Pbes2ParamsAsn1, password: &[u8], data: &[u8]) -> Resu
 
         Ok(encrypted)
     }
-
-    #[cfg(feature = "fips-wolfcrypt")]
-    {
-        let padding_len = AES_BLOCK_SIZE - (data.len() % AES_BLOCK_SIZE);
-        let mut padded = zeroize::Zeroizing::new(Vec::with_capacity(data.len() + padding_len));
-        padded.extend_from_slice(data);
-        padded.resize(data.len() + padding_len, padding_len as u8);
-
-        let mut aes = wolfssl_wolfcrypt::aes::CBC::new().map_err(|code| Pkcs12Error::CryptoProvider {
-            operation: "AES-CBC initialization",
-            code,
-        })?;
-        aes.init_encrypt(&key, &iv)
-            .map_err(|code| Pkcs12Error::CryptoProvider {
-                operation: "AES-CBC encryption key setup",
-                code,
-            })?;
-        let mut encrypted = vec![0u8; padded.len()];
-        aes.encrypt(&padded, &mut encrypted)
-            .map_err(|code| Pkcs12Error::CryptoProvider {
-                operation: "AES-CBC encryption",
-                code,
-            })?;
-        Ok(encrypted)
-    }
-}
-
-#[cfg(feature = "fips-wolfcrypt")]
-fn remove_pkcs7_padding(mut data: Vec<u8>) -> Result<Vec<u8>, Pkcs12Error> {
-    let padding_len = usize::from(*data.last().ok_or_else(|| Pkcs12Error::Pbes2 {
-        context: "AES-CBC plaintext is empty".to_string(),
-    })?);
-    if padding_len == 0 || padding_len > AES_BLOCK_SIZE || padding_len > data.len() {
-        return Err(Pkcs12Error::Pbes2 {
-            context: "AES-CBC plaintext has invalid PKCS#7 padding".to_string(),
-        });
-    }
-    let invalid = data[data.len() - padding_len..]
-        .iter()
-        .fold(0u8, |difference, byte| difference | (byte ^ padding_len as u8));
-    if invalid != 0 {
-        return Err(Pkcs12Error::Pbes2 {
-            context: "AES-CBC plaintext has invalid PKCS#7 padding".to_string(),
-        });
-    }
-    data.truncate(data.len() - padding_len);
-    Ok(data)
 }
 
 #[cfg(feature = "rustcrypto")]
