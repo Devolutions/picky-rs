@@ -3,7 +3,7 @@
 #[diplomat::bridge]
 pub mod ffi {
     use crate::error::ffi::PickyError;
-    use diplomat_runtime::DiplomatWriteable;
+    use diplomat_runtime::DiplomatWrite;
     use std::fmt::Write;
 
     // Not `manually_disposable`: `get_parameters` returns a view that borrows from
@@ -19,7 +19,7 @@ pub mod ffi {
         }
 
         #[diplomat::attr(auto, getter = "oid")]
-        pub fn get_oid(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn get_oid(&self, writable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             let string: String = self.0.oid().into();
             write!(writable, "{string}")?;
             Ok(())
@@ -44,7 +44,7 @@ pub mod ffi {
         RsassaPss,
     }
 
-    impl AlgorithmIdentifierParameters<'_> {
+    impl<'a> AlgorithmIdentifierParameters<'a> {
         #[diplomat::attr(auto, getter = "type")]
         pub fn get_type(&self) -> AlgorithmIdentifierParametersType {
             match self.0 {
@@ -137,7 +137,7 @@ pub mod ffi {
     #[diplomat::attr(dotnet, manually_disposable)]
     pub struct AesAuthEncParams(pub picky_asn1_x509::AesAuthEncParams);
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     #[diplomat::attr(dotnet, manually_disposable)]
     pub struct AlgorithmIdentifierIterator(pub Vec<picky::AlgorithmIdentifier>);
 

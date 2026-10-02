@@ -47,7 +47,7 @@ pub mod ffi {
     use std::cell::RefCell;
     use std::fmt::Write;
 
-    use diplomat_runtime::DiplomatWriteable;
+    use diplomat_runtime::DiplomatWrite;
     use picky::x509::certificate;
 
     use crate::date::ffi::UtcDate;
@@ -111,7 +111,7 @@ pub mod ffi {
         }
 
         #[diplomat::attr(auto, getter = "subject_key_id_hex")]
-        pub fn get_subject_key_id_hex(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn get_subject_key_id_hex(&self, writeable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             let ski = self.0.subject_key_identifier()?;
             let ski = hex::encode(ski);
             writeable.write_str(&ski)?;
@@ -120,14 +120,14 @@ pub mod ffi {
         }
 
         #[diplomat::attr(auto, getter = "subject_name")]
-        pub fn get_subject_name(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn get_subject_name(&self, writeable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             write!(writeable, "{}", self.0.subject_name())?;
             writeable.flush();
             Ok(())
         }
 
         #[diplomat::attr(auto, getter = "issuer_name")]
-        pub fn get_issuer_name(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn get_issuer_name(&self, writeable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             write!(writeable, "{}", self.0.issuer_name())?;
             writeable.flush();
             Ok(())
@@ -243,7 +243,7 @@ pub mod ffi {
         }
     }
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     #[diplomat::attr(dotnet, manually_disposable)]
     pub struct CertIterator(pub Vec<certificate::Cert>);
 

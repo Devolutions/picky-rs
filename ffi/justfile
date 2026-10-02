@@ -13,20 +13,22 @@ default: bindings
 
 ## Diplomat installation ##
 
-# For now, we need to use a custom diplomat revision
-# supporting dotnet framework 4.7.
-# Indeed, in older frameworks a few important types
-# are not blittables, causing Result types to not be
-# correctly send at the FFI boundary.
-diplomat_repo := "https://github.com/CBenoit/diplomat.git"
-diplomat_rev  := "f4d93d57e93025c57e75e9711d2418faa9311a42"
+# A tag on the Devolutions fork rather than a branch or a bare rev: a tag is an
+# immutable ref, so its commit survives the fork's branches being rebased.
+# The crates.io 0.16.1 release predates the .NET lifetime rework these bindings
+# are generated with; switch back to a crates.io version once upstream publishes
+# one that has it.
+diplomat_repo := "https://github.com/Devolutions/diplomat"
+diplomat_tag  := "0.16.1-devo.2"
 
+# diplomat-tool uses `if let` guards (stable since Rust 1.95), which this repo's
+# pinned toolchain is too old for.
 diplomat-install:
-    cargo install --git {{diplomat_repo}} --rev {{diplomat_rev}} diplomat-tool -f
+    cargo +stable install --git {{diplomat_repo}} --tag {{diplomat_tag}} diplomat-tool -f
 
 diplomat-sanity:
     @echo ">> Check Diplomat revision"
-    grep "{{diplomat_repo}}" ./Cargo.toml | grep "{{diplomat_rev}}" | wc -l | xargs -I '{}' test {} -eq 2
+    grep "{{diplomat_repo}}" ./Cargo.toml | grep "{{diplomat_tag}}" | wc -l | xargs -I '{}' test {} -eq 2
     @echo ">> Cargo.toml is in sync with justfile"
 
 ## Native library ##
@@ -100,7 +102,7 @@ bindings: dotnet-bindings
 
 dotnet-bindings:
     -rm {{dotnet_generated_path}}*.cs
-    diplomat-tool dotnet {{dotnet_generated_path}} -l {{dotnet_diplomat_config}}
+    diplomat-tool dotnet {{dotnet_generated_path}} -e src/lib.rs -c {{dotnet_diplomat_config}}
     @echo ">> .NET wrapper generated at {{dotnet_generated_path}}"
 
 # FIXME: js bindings not yet ready
