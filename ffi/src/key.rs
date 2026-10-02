@@ -101,6 +101,7 @@ pub mod ffi {
     }
 
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct PrivateKey(pub picky::key::PrivateKey);
 
     impl PrivateKey {
@@ -165,12 +166,14 @@ pub mod ffi {
         }
 
         /// Retrieves the key kind for this private key.
+        #[diplomat::attr(auto, getter = "kind")]
         pub fn get_kind(&self) -> KeyKind {
             self.0.kind().into()
         }
     }
 
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct PublicKey(pub picky::key::PublicKey);
 
     impl PublicKey {
@@ -207,6 +210,7 @@ pub mod ffi {
         }
 
         /// Retrieves the key kind for this public key.
+        #[diplomat::attr(auto, getter = "kind")]
         pub fn get_kind(&self) -> KeyKind {
             self.0.kind().into()
         }
