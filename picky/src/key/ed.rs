@@ -9,7 +9,7 @@ use std::fmt::Display;
 #[cfg(feature = "rustcrypto")]
 use zeroize::Zeroize;
 
-#[cfg(feature = "jwe-crypto")]
+#[cfg(feature = "rustcrypto")]
 pub(crate) const X25519_FIELD_ELEMENT_SIZE: usize = 32;
 #[cfg(feature = "rustcrypto")]
 pub(crate) type X25519FieldElement = [u8; X25519_FIELD_ELEMENT_SIZE];
