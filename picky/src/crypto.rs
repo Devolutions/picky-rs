@@ -34,7 +34,7 @@ pub const fn fips_mode() -> bool {
     cfg!(feature = "fips")
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq, Eq)]
 #[error("algorithm disabled by the active cryptographic policy: {algorithm}")]
 pub struct CryptoPolicyError {
     pub algorithm: String,
@@ -269,15 +269,78 @@ mod tests {
 
     #[cfg(feature = "fips-aws-lc")]
     #[test]
-    fn rejects_legacy_signature_algorithm() {
+    fn rejects_legacy_signature_algorithms() {
         use crate::key::PrivateKey;
         use crate::signature::SignatureError;
 
         let key = PrivateKey::from_pem_str(picky_test_data::RSA_2048_PK_1).unwrap();
-        let error = SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA1)
+        for hash in [HashAlgorithm::SHA1, HashAlgorithm::MD5] {
+            let error = SignatureAlgorithm::RsaPkcs1v15(hash).sign(b"legacy", &key).unwrap_err();
+
+            assert!(matches!(
+                error,
+                SignatureError::AlgorithmDisabledByPolicy { ref algorithm }
+                    if algorithm == &format!("RsaPkcs1v15({hash:?})")
+            ));
+            assert_eq!(
+                error.to_string(),
+                format!("algorithm disabled by the active cryptographic policy: RsaPkcs1v15({hash:?})")
+            );
+        }
+    }
+
+    #[cfg(feature = "fips-aws-lc")]
+    #[test]
+    fn rejects_ed25519_signature_algorithm() {
+        use crate::key::{KeyError, PrivateKey, PublicKey};
+        use crate::signature::SignatureError;
+
+        let key_error = PrivateKey::from_pem_str(picky_test_data::ED25519_PEM_PK_1).unwrap_err();
+
+        assert!(matches!(
+            key_error,
+            KeyError::AlgorithmDisabledByPolicy { ref algorithm }
+                if algorithm == "Ed25519/X25519 private keys"
+        ));
+        assert_eq!(
+            key_error.to_string(),
+            "algorithm disabled by the active cryptographic policy: Ed25519/X25519 private keys"
+        );
+
+        let public_key = PublicKey::from_pem_str(picky_test_data::ED25519_PEM_PK_1_PUB).unwrap();
+        let signature_error = SignatureAlgorithm::Ed25519
+            .verify(&public_key, b"legacy", &[0_u8; 64])
+            .unwrap_err();
+
+        assert!(matches!(
+            signature_error,
+            SignatureError::AlgorithmDisabledByPolicy { ref algorithm } if algorithm == "Ed25519"
+        ));
+        assert_eq!(
+            signature_error.to_string(),
+            "algorithm disabled by the active cryptographic policy: Ed25519"
+        );
+    }
+
+    #[cfg(feature = "fips-aws-lc")]
+    #[test]
+    fn rejects_unapproved_p521_curve() {
+        use crate::key::PrivateKey;
+        use crate::signature::SignatureError;
+
+        let key = PrivateKey::from_pem_str(picky_test_data::EC_NIST521_PK_1).unwrap();
+        let error = SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_512)
             .sign(b"legacy", &key)
             .unwrap_err();
 
-        assert!(matches!(error, SignatureError::AlgorithmDisabledByPolicy { .. }));
+        assert!(matches!(
+            error,
+            SignatureError::AlgorithmDisabledByPolicy { ref algorithm }
+                if algorithm == "Ecdsa(SHA2_512) with NIST-P521"
+        ));
+        assert_eq!(
+            error.to_string(),
+            "algorithm disabled by the active cryptographic policy: Ecdsa(SHA2_512) with NIST-P521"
+        );
     }
 }

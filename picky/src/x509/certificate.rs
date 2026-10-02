@@ -1101,6 +1101,42 @@ mod tests {
         PrivateKey::from_pkcs8(pem.data()).unwrap()
     }
 
+    #[cfg(feature = "fips-aws-lc")]
+    #[test]
+    fn certificate_builder_rejects_legacy_key_id_hashes_without_panicking() {
+        let root_key = parse_key(picky_test_data::RSA_2048_PK_1);
+
+        for hash in [HashAlgorithm::SHA1, HashAlgorithm::MD5] {
+            let error = CertificateBuilder::new()
+                .validity(UtcDate::ymd(2065, 6, 15).unwrap(), UtcDate::ymd(2070, 6, 15).unwrap())
+                .self_signed(DirectoryName::new_common_name("FIPS root"), &root_key)
+                .ca(true)
+                .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256))
+                .key_id_gen_method(KeyIdGenMethod::SPKFullDER(hash))
+                .build()
+                .unwrap_err();
+
+            assert!(matches!(
+                error,
+                CertError::CertGeneration { ref source }
+                    if matches!(
+                        source.as_ref(),
+                        CertError::KeyIdGen {
+                            source: KeyIdGenError::HashAlgorithmDisabled(policy_error)
+                        } if policy_error.algorithm == format!("{hash:?}")
+                    )
+            ));
+            assert_eq!(
+                error.to_string(),
+                format!(
+                    "couldn't generate certificate: key id generation error: \
+                     algorithm disabled by the active cryptographic policy: {hash:?}"
+                )
+            );
+        }
+    }
+
+    #[cfg(feature = "rustcrypto")]
     #[test]
     fn valid_ca_chain() {
         let root_key = parse_key(picky_test_data::RSA_2048_PK_1);
@@ -1259,6 +1295,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "rustcrypto")]
     #[test]
     fn ec_signing() {
         let root_key = parse_key(picky_test_data::EC_NIST256_PK_1);
@@ -1311,6 +1348,7 @@ mod tests {
             .expect("couldn't verify chain");
     }
 
+    #[cfg(feature = "rustcrypto")]
     #[test]
     fn ed25519_signing() {
         let root_key = parse_key(picky_test_data::ED25519_PEM_PK_1);
@@ -1363,6 +1401,7 @@ mod tests {
             .expect("couldn't verify chain");
     }
 
+    #[cfg(feature = "rustcrypto")]
     #[test]
     fn malicious_ca_chain() {
         let root_key = parse_key(picky_test_data::RSA_2048_PK_1);
@@ -1435,6 +1474,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "rustcrypto")]
     #[test]
     fn invalid_basic_constraints_chain() {
         let root_key = parse_key(picky_test_data::RSA_2048_PK_1);
@@ -1565,6 +1605,7 @@ mod tests {
         assert_eq!(cert.serial_number().as_unsigned_bytes_be(), unsigned_integer_bytes);
     }
 
+    #[cfg(feature = "rustcrypto")]
     #[test]
     fn validity_encoding() {
         use picky_asn1_x509::validity::Time;

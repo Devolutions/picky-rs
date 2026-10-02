@@ -523,7 +523,7 @@ mod tests {
     #[rstest]
     #[case(JwsAlg::ES256, picky_test_data::EC_NIST256_PK_1)]
     #[case(JwsAlg::ES384, picky_test_data::EC_NIST384_PK_1)]
-    #[case(JwsAlg::ES512, picky_test_data::EC_NIST521_PK_1)]
+    #[cfg_attr(feature = "rustcrypto", case(JwsAlg::ES512, picky_test_data::EC_NIST521_PK_1))]
     fn ecdsa_sign_verify(#[case] alg: JwsAlg, #[case] key_pem: &str) {
         let key = PrivateKey::from_pem_str(key_pem).unwrap();
 
@@ -549,7 +549,10 @@ mod tests {
     #[rstest]
     #[case(picky_test_data::EC_NIST256_PK_1, picky_test_data::JOSE_JWT_SIG_ES256)]
     #[case(picky_test_data::EC_NIST384_PK_1, picky_test_data::JOSE_JWT_SIG_ES384)]
-    #[case(picky_test_data::EC_NIST521_PK_1, picky_test_data::JOSE_JWT_SIG_ES512)]
+    #[cfg_attr(
+        feature = "rustcrypto",
+        case(picky_test_data::EC_NIST521_PK_1, picky_test_data::JOSE_JWT_SIG_ES512)
+    )]
     fn ecdsa_parse_and_verify(#[case] key_pem: &str, #[case] signature: &str) {
         let key = PrivateKey::from_pem_str(key_pem).unwrap();
 
@@ -558,10 +561,13 @@ mod tests {
         jws.clone().verify(&key.to_public_key().unwrap()).unwrap();
     }
 
+    #[cfg(feature = "rustcrypto")]
     const JWT_ED25519_BODY: &str = r#"{"username":"kataras"}"#;
+    #[cfg(feature = "rustcrypto")]
     const JWT_ED25519_GO_BODY: &str = r#"{"foo":"bar"}"#;
 
     /// Validate that invalid header with alg set to "ED25519" could be parsed by picky
+    #[cfg(feature = "rustcrypto")]
     #[rstest]
     #[allow(deprecated)]
     #[case(

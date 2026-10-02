@@ -203,9 +203,12 @@ impl<'a> TryFrom<&'a PublicKey> for EdPublicKey<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::key::{PrivateKey, PublicKey};
+    #[cfg(feature = "rustcrypto")]
+    use crate::key::PrivateKey;
+    use crate::key::PublicKey;
     use rstest::rstest;
 
+    #[cfg(feature = "rustcrypto")]
     #[rstest]
     #[case(picky_test_data::ED25519_PEM_PK_1)]
     #[case(picky_test_data::X25519_PEM_PK_1)]
@@ -230,6 +233,7 @@ mod tests {
         assert_eq!(encoded.as_str(), key_pem);
     }
 
+    #[cfg(feature = "rustcrypto")]
     #[rstest]
     #[case(picky_test_data::ED25519_PEM_PK_1, picky_test_data::ED25519_PEM_PK_1_PUB)]
     #[case(picky_test_data::X25519_PEM_PK_1, picky_test_data::X25519_PEM_PK_1_PUB)]
@@ -240,6 +244,7 @@ mod tests {
         assert_eq!(public, public_expected);
     }
 
+    #[cfg(feature = "rustcrypto")]
     #[rstest]
     #[case(picky_test_data::ED448_PEM_PK_1)]
     #[case(picky_test_data::X448_PEM_PK_1)]

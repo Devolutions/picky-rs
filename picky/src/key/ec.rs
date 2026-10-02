@@ -326,12 +326,13 @@ mod tests {
     #[rstest]
     #[case(picky_test_data::EC_NIST256_DER_PK_1)]
     #[case(picky_test_data::EC_NIST384_DER_PK_1)]
-    #[case(picky_test_data::EC_NIST521_DER_PK_1)]
+    #[cfg_attr(feature = "rustcrypto", case(picky_test_data::EC_NIST521_DER_PK_1))]
     #[case(picky_test_data::EC_NIST256_PK_1)] // PKCS8
     fn private_key_from_ec_pem(#[case] key_pem: &str) {
         PrivateKey::from_pem_str(key_pem).unwrap();
     }
 
+    #[cfg(feature = "rustcrypto")]
     #[rstest]
     #[case(picky_test_data::EC_NIST256_NOPUBLIC_DER_PK_1)]
     #[case(picky_test_data::EC_NIST384_NOPUBLIC_DER_PK_1)]
@@ -346,10 +347,10 @@ mod tests {
     // Known curves
     #[case(picky_test_data::EC_NIST256_PK_1_PUB)]
     #[case(picky_test_data::EC_NIST384_PK_1_PUB)]
-    #[case(picky_test_data::EC_NIST521_PK_1_PUB)]
+    #[cfg_attr(feature = "rustcrypto", case(picky_test_data::EC_NIST521_PK_1_PUB))]
     // Unsupported curve, should still work as long as pem contains the public key
     // (in that case no arithmetic operations are performed on the key)
-    #[case(picky_test_data::EC_PUBLIC_KEY_SECP256K1_PEM)]
+    #[cfg_attr(feature = "rustcrypto", case(picky_test_data::EC_PUBLIC_KEY_SECP256K1_PEM))]
     fn ecdsa_public_valid_key_conversions(#[case] key_pem: &str) {
         let pk: &PublicKey = &PublicKey::from_pem_str(key_pem).unwrap();
         let epk: Result<EcdsaPublicKey, KeyError> = pk.try_into();
