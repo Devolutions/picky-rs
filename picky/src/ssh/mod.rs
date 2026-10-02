@@ -1,25 +1,44 @@
+#[cfg(not(feature = "fips"))]
 pub mod certificate;
+#[cfg(not(feature = "fips"))]
 pub mod decode;
+#[cfg(not(feature = "fips"))]
 pub mod encode;
+#[cfg(not(feature = "fips"))]
 pub mod private_key;
+#[cfg(not(feature = "fips"))]
+pub mod public_key;
+#[cfg(feature = "fips")]
+#[path = "public_key_fips.rs"]
 pub mod public_key;
 
+#[cfg(not(feature = "fips"))]
 use crate::key::ec::NamedEcCurve;
+#[cfg(not(feature = "fips"))]
 use crate::key::ed::NamedEdAlgorithm;
+#[cfg(not(feature = "fips"))]
 use crate::key::{EcCurve, EdAlgorithm, KeyError};
 
+#[cfg(not(feature = "fips"))]
 use byteorder::ReadBytesExt;
+#[cfg(not(feature = "fips"))]
 use std::io::{self, Read};
 
+#[cfg(not(feature = "fips"))]
 pub use certificate::{SshCertKeyType, SshCertType, SshCertificate, SshCertificateBuilder};
+#[cfg(not(feature = "fips"))]
 pub use private_key::SshPrivateKey;
-pub use public_key::SshPublicKey;
+pub use public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
 
+#[cfg(not(feature = "fips"))]
 pub(crate) type Base64Writer<'a, T, E> = base64::write::EncoderWriter<'a, T, E>;
+#[cfg(not(feature = "fips"))]
 pub(crate) type Base64Reader<'a, T, E> = base64::read::DecoderReader<'a, T, E>;
 
+#[cfg(not(feature = "fips"))]
 const SSH_COMBO_ED25519_KEY_LENGTH: usize = ed25519_dalek::SECRET_KEY_LENGTH + ed25519_dalek::PUBLIC_KEY_LENGTH;
 
+#[cfg(not(feature = "fips"))]
 mod key_type {
     pub const RSA: &str = "ssh-rsa";
     pub const ECDSA_SHA2_NIST_P256: &str = "ecdsa-sha2-nistp256";
@@ -30,17 +49,20 @@ mod key_type {
     pub const SK_ED25519: &str = "sk-ssh-ed25519@openssh.com";
 }
 
+#[cfg(not(feature = "fips"))]
 mod key_identifier {
     pub const ECDSA_SHA2_NIST_P256: &str = "nistp256";
     pub const ECDSA_SHA2_NIST_P384: &str = "nistp384";
     pub const ECDSA_SHA2_NIST_P521: &str = "nistp521";
 }
 
+#[cfg(not(feature = "fips"))]
 trait EcCurveSshExt {
     fn to_ecdsa_ssh_key_type(&self) -> Result<&'static str, KeyError>;
     fn to_ecdsa_ssh_key_identifier(&self) -> Result<&'static str, KeyError>;
 }
 
+#[cfg(not(feature = "fips"))]
 impl EcCurveSshExt for NamedEcCurve {
     fn to_ecdsa_ssh_key_type(&self) -> Result<&'static str, KeyError> {
         match self {
@@ -61,10 +83,12 @@ impl EcCurveSshExt for NamedEcCurve {
     }
 }
 
+#[cfg(not(feature = "fips"))]
 trait EdAlgorithmSshExt {
     fn to_ed_ssh_key_type(&self) -> Result<&'static str, KeyError>;
 }
 
+#[cfg(not(feature = "fips"))]
 impl EdAlgorithmSshExt for NamedEdAlgorithm {
     fn to_ed_ssh_key_type(&self) -> Result<&'static str, KeyError> {
         match self {
@@ -79,6 +103,7 @@ impl EdAlgorithmSshExt for NamedEdAlgorithm {
     }
 }
 
+#[cfg(not(feature = "fips"))]
 fn read_until_whitespace(stream: &mut dyn Read, buffer: &mut Vec<u8>) -> io::Result<()> {
     loop {
         match stream.read_u8() {
@@ -99,6 +124,7 @@ fn read_until_whitespace(stream: &mut dyn Read, buffer: &mut Vec<u8>) -> io::Res
     Ok(())
 }
 
+#[cfg(not(feature = "fips"))]
 fn read_until_linebreak(stream: &mut dyn Read, buffer: &mut Vec<u8>) -> io::Result<()> {
     loop {
         match stream.read_u8() {

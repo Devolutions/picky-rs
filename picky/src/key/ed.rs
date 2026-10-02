@@ -1,12 +1,17 @@
-use crate::key::{KeyError, PrivateKey, PrivateKeyKind, PublicKey};
+use crate::key::{KeyError, PublicKey};
+#[cfg(feature = "rustcrypto")]
+use crate::key::{PrivateKey, PrivateKeyKind};
 use crate::oid::ObjectIdentifier;
 
 use picky_asn1::wrapper::BitStringAsn1;
 use picky_asn1_x509::oids;
 use std::fmt::Display;
+#[cfg(feature = "rustcrypto")]
 use zeroize::Zeroize;
 
+#[cfg(feature = "rustcrypto")]
 pub(crate) const X25519_FIELD_ELEMENT_SIZE: usize = 32;
+#[cfg(feature = "rustcrypto")]
 pub(crate) type X25519FieldElement = [u8; X25519_FIELD_ELEMENT_SIZE];
 
 /// Name of supported Curve25519 and Curve448 based algorithms.
@@ -85,6 +90,7 @@ impl From<NamedEdAlgorithm> for ObjectIdentifier {
     }
 }
 
+#[cfg(feature = "rustcrypto")]
 #[derive(Debug)]
 pub(crate) struct EdKeypair {
     algorithm: NamedEdAlgorithm,
@@ -92,6 +98,7 @@ pub(crate) struct EdKeypair {
     public_key: Option<Vec<u8>>,
 }
 
+#[cfg(feature = "rustcrypto")]
 impl EdKeypair {
     pub fn algorithm(&self) -> &NamedEdAlgorithm {
         &self.algorithm
@@ -102,12 +109,14 @@ impl EdKeypair {
     }
 }
 
+#[cfg(feature = "rustcrypto")]
 impl Drop for EdKeypair {
     fn drop(&mut self) {
         self.private_key.zeroize();
     }
 }
 
+#[cfg(feature = "rustcrypto")]
 impl<'a> TryFrom<&'a PrivateKey> for EdKeypair {
     type Error = KeyError;
 
@@ -129,12 +138,14 @@ impl<'a> TryFrom<&'a PrivateKey> for EdKeypair {
     }
 }
 
+#[cfg_attr(feature = "fips", allow(dead_code))]
 #[derive(Debug)]
 pub(crate) struct EdPublicKey<'a> {
     data: &'a [u8],
     algorithm: NamedEdAlgorithm,
 }
 
+#[cfg_attr(feature = "fips", allow(dead_code))]
 impl EdPublicKey<'_> {
     pub fn algorithm(&self) -> &NamedEdAlgorithm {
         &self.algorithm
@@ -145,6 +156,7 @@ impl EdPublicKey<'_> {
     }
 }
 
+#[cfg(feature = "rustcrypto")]
 impl<'a> TryFrom<&'a EdKeypair> for EdPublicKey<'a> {
     type Error = KeyError;
 
@@ -193,9 +205,12 @@ impl<'a> TryFrom<&'a PublicKey> for EdPublicKey<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::key::{PrivateKey, PublicKey};
+    #[cfg(feature = "rustcrypto")]
+    use crate::key::PrivateKey;
+    use crate::key::PublicKey;
     use rstest::rstest;
 
+    #[cfg(feature = "rustcrypto")]
     #[rstest]
     #[case(picky_test_data::ED25519_PEM_PK_1)]
     #[case(picky_test_data::X25519_PEM_PK_1)]
@@ -220,6 +235,7 @@ mod tests {
         assert_eq!(encoded.as_str(), key_pem);
     }
 
+    #[cfg(feature = "rustcrypto")]
     #[rstest]
     #[case(picky_test_data::ED25519_PEM_PK_1, picky_test_data::ED25519_PEM_PK_1_PUB)]
     #[case(picky_test_data::X25519_PEM_PK_1, picky_test_data::X25519_PEM_PK_1_PUB)]
@@ -230,6 +246,7 @@ mod tests {
         assert_eq!(public, public_expected);
     }
 
+    #[cfg(feature = "rustcrypto")]
     #[rstest]
     #[case(picky_test_data::ED448_PEM_PK_1)]
     #[case(picky_test_data::X448_PEM_PK_1)]

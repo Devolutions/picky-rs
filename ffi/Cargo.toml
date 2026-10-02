@@ -15,7 +15,7 @@ doctest = false
 embed-resource = "3.0"
 
 [dependencies]
-picky = { path = "../picky/", default-features = false, features = ["ssh", "x509", "time_conversion", "jose", "pkcs12", "pkcs7", "http_timestamp", "putty"] }
+picky = { path = "../picky/", default-features = false, features = ["rustcrypto", "ssh", "x509", "time_conversion", "jose", "pkcs12", "pkcs7", "http_timestamp", "putty"] }
 picky-asn1 = { path = "../picky-asn1", default-features = false }
 picky-asn1-der = { path = "../picky-asn1-der" }
 picky-asn1-x509 = { path = "../picky-asn1-x509", features = ["legacy", "zeroize"] }

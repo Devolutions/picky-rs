@@ -56,6 +56,7 @@
 mod attribute;
 mod encryption;
 mod mac;
+#[cfg(feature = "rustcrypto")]
 mod pbkdf1;
 mod safe_bag;
 mod safe_contents;
@@ -73,7 +74,28 @@ use picky_asn1_x509::pkcs12::{
 use std::fmt::Display;
 use thiserror::Error;
 
+#[cfg(feature = "rustcrypto")]
 pub(crate) use pbkdf1::{Pbkdf1Usage, pbkdf1};
+
+#[cfg(feature = "fips")]
+pub(crate) fn require_fips_hash(algorithm: Pkcs12HashAlgorithm, context: &str) -> Result<(), Pkcs12Error> {
+    if matches!(
+        algorithm,
+        Pkcs12HashAlgorithm::Sha256 | Pkcs12HashAlgorithm::Sha384 | Pkcs12HashAlgorithm::Sha512
+    ) {
+        Ok(())
+    } else {
+        Err(Pkcs12Error::NotSupportedAlgorithm {
+            algorithm: match algorithm {
+                Pkcs12HashAlgorithm::Sha1 => "SHA-1",
+                Pkcs12HashAlgorithm::Sha224 => "SHA-224",
+                _ => unreachable!(),
+            }
+            .into(),
+            context: context.to_string(),
+        })
+    }
+}
 
 pub use attribute::{CustomPkcs12Attribute, Pkcs12Attribute, Pkcs12AttributeKind};
 pub use encryption::{
@@ -257,6 +279,7 @@ pub enum Pkcs12HashAlgorithm {
 }
 
 impl Pkcs12HashAlgorithm {
+    #[cfg(feature = "rustcrypto")]
     pub(crate) fn pbkdf1_u_bits(self) -> usize {
         match self {
             Self::Sha1 => 160,
@@ -267,6 +290,7 @@ impl Pkcs12HashAlgorithm {
         }
     }
 
+    #[cfg(feature = "rustcrypto")]
     pub(crate) fn pbkdf1_v_bits(self) -> usize {
         match self {
             Self::Sha1 => 512,
@@ -277,6 +301,7 @@ impl Pkcs12HashAlgorithm {
         }
     }
 
+    #[cfg(feature = "rustcrypto")]
     pub(crate) fn digest_size(self) -> usize {
         match self {
             Self::Sha1 => 20,
@@ -359,6 +384,7 @@ pub enum Pkcs12Error {
     Key(#[from] crate::key::KeyError),
     #[error(transparent)]
     Certificate(#[from] crate::x509::certificate::CertError),
+    #[cfg(feature = "rustcrypto")]
     #[error(transparent)]
     RandError(#[from] rand::rngs::SysError),
     #[error("Not supported or invalid PFX version: {0}")]
@@ -412,7 +438,7 @@ fn format_oid(oid: &ObjectIdentifier) -> String {
     format!("OID({oid_str})")
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "rustcrypto"))]
 mod tests {
     use super::*;
     use crate::key::PrivateKey;

@@ -5,6 +5,20 @@
 //!
 //! Portable X.509, PKI, JOSE and HTTP signature implementation.
 
+#[cfg(all(feature = "fips", feature = "rustcrypto"))]
+compile_error!("`fips` and `rustcrypto` are mutually exclusive; use `default-features = false` for FIPS builds");
+
+#[cfg(all(feature = "fips", not(feature = "fips-aws-lc")))]
+compile_error!("`fips` requires the `fips-aws-lc` provider feature");
+
+#[cfg(all(feature = "fips", feature = "putty"))]
+compile_error!("PuTTY crypto is not available in FIPS builds");
+
+#[cfg(not(any(feature = "rustcrypto", feature = "fips")))]
+compile_error!("a crypto backend is required; enable `rustcrypto` or a FIPS provider");
+
+pub mod crypto;
+
 #[cfg(feature = "http_signature")]
 pub mod http;
 

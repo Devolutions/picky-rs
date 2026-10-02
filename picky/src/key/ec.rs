@@ -21,6 +21,11 @@ impl EcdsaKeypair {
     pub fn secret(&self) -> &[u8] {
         &self.private_key
     }
+
+    #[cfg(feature = "fips")]
+    pub fn public_key(&self) -> Option<&[u8]> {
+        self.public_key.as_deref()
+    }
 }
 
 impl Drop for EcdsaKeypair {
@@ -29,6 +34,7 @@ impl Drop for EcdsaKeypair {
     }
 }
 
+#[cfg(feature = "rustcrypto")]
 pub(crate) enum EcComponent<'a> {
     PointX(&'a [u8]),
     PointY(&'a [u8]),
@@ -49,28 +55,18 @@ pub enum EcCurve {
 impl EcCurve {
     /// Get size of field compoennet in bytes (e.g. X and Y point values, Secret key,
     /// R and S signature values)
+    #[cfg_attr(feature = "fips", allow(dead_code))]
     pub(crate) fn field_bytes_size(self) -> usize {
         match self {
-            EcCurve::NistP256 => {
-                use p256::elliptic_curve::FieldBytesSize;
-                use p256::elliptic_curve::array::typenum::Unsigned;
-                <FieldBytesSize<p256::NistP256> as Unsigned>::USIZE
-            }
-            EcCurve::NistP384 => {
-                use p384::elliptic_curve::FieldBytesSize;
-                use p384::elliptic_curve::array::typenum::Unsigned;
-                <FieldBytesSize<p384::NistP384> as Unsigned>::USIZE
-            }
-            EcCurve::NistP521 => {
-                use p521::elliptic_curve::FieldBytesSize;
-                use p521::elliptic_curve::array::typenum::Unsigned;
-                <FieldBytesSize<p521::NistP521> as Unsigned>::USIZE
-            }
+            EcCurve::NistP256 => 32,
+            EcCurve::NistP384 => 48,
+            EcCurve::NistP521 => 66,
         }
     }
 
     /// We need to validate input data sizes to prevent panics in the underlying `generic_array`
     /// library code.
+    #[cfg(feature = "rustcrypto")]
     pub(crate) fn validate_component<'a>(&self, component: EcComponent<'a>) -> Result<&'a [u8], KeyError> {
         let (buffer, error_message) = match component {
             EcComponent::PointX(buf) => (buf, "Invalid `point.x` component size"),
@@ -164,6 +160,7 @@ impl<'a> TryFrom<&'a PrivateKey> for EcdsaKeypair {
     }
 }
 
+#[cfg(feature = "rustcrypto")]
 pub(crate) fn calculate_public_ec_key(
     curve_oid: &ObjectIdentifier,
     private_key: &[u8],
@@ -330,12 +327,13 @@ mod tests {
     #[rstest]
     #[case(picky_test_data::EC_NIST256_DER_PK_1)]
     #[case(picky_test_data::EC_NIST384_DER_PK_1)]
-    #[case(picky_test_data::EC_NIST521_DER_PK_1)]
+    #[cfg_attr(feature = "rustcrypto", case(picky_test_data::EC_NIST521_DER_PK_1))]
     #[case(picky_test_data::EC_NIST256_PK_1)] // PKCS8
     fn private_key_from_ec_pem(#[case] key_pem: &str) {
         PrivateKey::from_pem_str(key_pem).unwrap();
     }
 
+    #[cfg(feature = "rustcrypto")]
     #[rstest]
     #[case(picky_test_data::EC_NIST256_NOPUBLIC_DER_PK_1)]
     #[case(picky_test_data::EC_NIST384_NOPUBLIC_DER_PK_1)]
@@ -350,10 +348,10 @@ mod tests {
     // Known curves
     #[case(picky_test_data::EC_NIST256_PK_1_PUB)]
     #[case(picky_test_data::EC_NIST384_PK_1_PUB)]
-    #[case(picky_test_data::EC_NIST521_PK_1_PUB)]
+    #[cfg_attr(feature = "rustcrypto", case(picky_test_data::EC_NIST521_PK_1_PUB))]
     // Unsupported curve, should still work as long as pem contains the public key
     // (in that case no arithmetic operations are performed on the key)
-    #[case(picky_test_data::EC_PUBLIC_KEY_SECP256K1_PEM)]
+    #[cfg_attr(feature = "rustcrypto", case(picky_test_data::EC_PUBLIC_KEY_SECP256K1_PEM))]
     fn ecdsa_public_valid_key_conversions(#[case] key_pem: &str) {
         let pk: &PublicKey = &PublicKey::from_pem_str(key_pem).unwrap();
         let epk: Result<EcdsaPublicKey, KeyError> = pk.try_into();

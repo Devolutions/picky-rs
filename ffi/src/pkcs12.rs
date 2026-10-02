@@ -208,7 +208,7 @@ pub mod ffi {
         ) -> Result<Box<SafeBag>, Box<PickyError>> {
             let mut crypto_context = crypto_context.0.lock().unwrap();
 
-            let encryption = encryption.0.to_picky_encryption(&mut crypto_context);
+            let encryption = encryption.0.to_picky_encryption(&mut crypto_context)?;
 
             let safe_bag = pkcs12::SafeBag::new_encrypted_key(key.0.clone(), Vec::new(), encryption, &crypto_context)?;
 
@@ -341,7 +341,7 @@ pub mod ffi {
 
             let safe_bags = std::mem::take(&mut self.safe_bags_acc);
 
-            let encryption = encryption.0.to_picky_encryption(&mut crypto_context);
+            let encryption = encryption.0.to_picky_encryption(&mut crypto_context)?;
 
             if let pkcs12::Pkcs12EncryptionKind::Pbes1(_) = encryption.kind() {
                 self.detected_old_encryption = true
@@ -538,15 +538,15 @@ impl InnerPkcs12Encryption {
     fn to_picky_encryption(
         &self,
         crypto_context: &mut picky::pkcs12::Pkcs12CryptoContext,
-    ) -> picky::pkcs12::Pkcs12Encryption {
+    ) -> Result<picky::pkcs12::Pkcs12Encryption, picky::pkcs12::Pkcs12Error> {
         match self {
             Self::Pbes1 { cipher } => {
                 let pbes1_encryption = picky::pkcs12::Pbes1Encryption::new(*cipher);
-                picky::pkcs12::Pkcs12Encryption::new_pbes1(pbes1_encryption, crypto_context)
+                picky::pkcs12::Pkcs12Encryption::try_new_pbes1(pbes1_encryption, crypto_context)
             }
             Self::Pbes2 { cipher, hmac_kdf } => {
                 let pbes2_encryption = picky::pkcs12::Pbes2Encryption::new(*cipher, *hmac_kdf);
-                picky::pkcs12::Pkcs12Encryption::new_pbes2(pbes2_encryption, crypto_context)
+                picky::pkcs12::Pkcs12Encryption::try_new_pbes2(pbes2_encryption, crypto_context)
             }
         }
     }

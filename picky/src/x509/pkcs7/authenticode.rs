@@ -2,7 +2,7 @@ pub use picky_asn1_x509::ShaVariant;
 pub use picky_asn1_x509::attribute::Attribute;
 pub use picky_asn1_x509::pkcs7::content_info;
 
-use crate::hash::{HashAlgorithm, UnsupportedHashAlgorithmError};
+use crate::hash::{HashAlgorithm, HashError, UnsupportedHashAlgorithmError};
 use crate::key::PrivateKey;
 use crate::pem::Pem;
 use crate::signature::{SignatureAlgorithm, SignatureError};
@@ -96,6 +96,8 @@ pub enum AuthenticodeError {
     #[error(transparent)]
     UnsupportedHashAlgorithmError(UnsupportedHashAlgorithmError),
     #[error(transparent)]
+    Hash(#[from] HashError),
+    #[error(transparent)]
     UnsupportedAlgorithmError(UnsupportedAlgorithmError),
     #[cfg(feature = "ctl")]
     #[error(transparent)]
@@ -145,7 +147,7 @@ impl AuthenticodeSignature {
 
         let message_digest_value = HashAlgorithm::try_from(hash_algo)
             .map_err(AuthenticodeError::UnsupportedHashAlgorithmError)?
-            .digest(raw_spc_indirect_data_content.as_ref());
+            .digest(raw_spc_indirect_data_content.as_ref())?;
 
         let authenticated_attributes = vec![
             Attribute {
@@ -666,7 +668,7 @@ impl<'a> AuthenticodeValidator<'a> {
         let mut raw_message_digest = picky_asn1_der::to_vec(&spc_indirect_data_content.message_digest)?;
         raw_spc_indirect_data_content.append(&mut raw_message_digest);
 
-        let content_info_hash = hash_algo.digest(&raw_spc_indirect_data_content);
+        let content_info_hash = hash_algo.digest(&raw_spc_indirect_data_content)?;
 
         if let AttributeValues::MessageDigest(message_digest_attr_val) = &message_digest_attr.value {
             if message_digest_attr_val
@@ -857,7 +859,7 @@ impl<'a> AuthenticodeValidator<'a> {
         };
 
         let raw_ca_name = picky_asn1_der::to_vec(&Name::from(ca_name.clone()))?;
-        let ca_name_md5_digest = HashAlgorithm::MD5.digest(&raw_ca_name);
+        let ca_name_md5_digest = HashAlgorithm::MD5.digest(&raw_ca_name)?;
 
         let ctl_entries = ctl.ctl_entries()?;
 
@@ -2313,7 +2315,8 @@ mod tests {
 
         let message_digest_value = HashAlgorithm::try_from(ShaVariant::SHA2_256)
             .unwrap()
-            .digest(raw_spc_indirect_data_content.as_ref());
+            .digest(raw_spc_indirect_data_content.as_ref())
+            .unwrap();
 
         let authenticated_attributes = vec![
             Attribute {

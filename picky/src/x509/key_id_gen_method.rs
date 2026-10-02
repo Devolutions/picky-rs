@@ -1,4 +1,4 @@
-use crate::hash::HashAlgorithm;
+use crate::hash::{HashAlgorithm, HashError};
 use crate::key::{KeyError, PublicKey};
 use picky_asn1::wrapper::BitStringAsn1Container;
 use picky_asn1_der::Asn1DerError;
@@ -16,6 +16,10 @@ pub enum KeyIdGenError {
     /// invalid key
     #[error("invalid key: {source}")]
     InvalidKey { source: KeyError },
+
+    /// hashing failed
+    #[error(transparent)]
+    Hash(#[from] HashError),
 }
 
 /// Describes which method to use to generate key identifiers.
@@ -43,26 +47,26 @@ impl KeyIdGenMethod {
                         source: e,
                         element: "RSA private key",
                     })?;
-                    Ok(hash_algo.digest(&der)[..20].to_vec())
+                    Ok(hash_algo.digest(&der)?[..20].to_vec())
                 }
                 InnerPublicKey::Ec(bitstring) => {
                     let der = bitstring.0.payload_view();
-                    Ok(hash_algo.digest(der)[..20].to_vec())
+                    Ok(hash_algo.digest(der)?[..20].to_vec())
                 }
                 InnerPublicKey::Ed(bitstring) => {
                     let der = bitstring.0.payload_view();
-                    Ok(hash_algo.digest(der)[..20].to_vec())
+                    Ok(hash_algo.digest(der)?[..20].to_vec())
                 }
                 InnerPublicKey::Mldsa(bitstring) => {
                     let der = bitstring.0.payload_view();
-                    Ok(hash_algo.digest(der)[..20].to_vec())
+                    Ok(hash_algo.digest(der)?[..20].to_vec())
                 }
             },
             KeyIdGenMethod::SPKFullDER(hash_algo) => {
                 let der = public_key
                     .to_der()
                     .map_err(|e| KeyIdGenError::InvalidKey { source: e })?;
-                Ok(hash_algo.digest(&der))
+                hash_algo.digest(&der).map_err(Into::into)
             }
         }
     }

@@ -50,6 +50,10 @@ pub enum CertError {
     #[error("signature error: {source}")]
     Signature { source: SignatureError },
 
+    /// secure random number generation error
+    #[error("secure random number generation failed: {context}")]
+    Random { context: &'static str },
+
     /// key id generation error
     #[error("key id generation error: {source}")]
     KeyIdGen { source: KeyIdGenError },
@@ -883,7 +887,7 @@ impl<'a> CertificateBuilder<'a> {
         let serial_number = if let Some(unsigned_integer_bytes) = inner.serial_number.take() {
             IntegerAsn1::from_bytes_be_unsigned(unsigned_integer_bytes)
         } else {
-            generate_serial_number()
+            generate_serial_number()?
         };
 
         let inherit_extensions_from_csr_attributes = inner.inherit_extensions_from_csr_attributes;
@@ -1014,14 +1018,22 @@ impl<'a> CertificateBuilder<'a> {
     }
 }
 
-fn generate_serial_number() -> IntegerAsn1 {
-    let x = rand::random::<u32>();
-    let b1 = ((x >> 24) & 0xff) as u8;
-    let b2 = ((x >> 16) & 0xff) as u8;
-    let b3 = ((x >> 8) & 0xff) as u8;
-    let b4 = (x & 0xff) as u8;
+fn generate_serial_number() -> Result<IntegerAsn1, CertError> {
+    #[cfg(feature = "fips-aws-lc")]
+    let bytes = {
+        use aws_lc_rs::rand::SecureRandom as _;
+        let mut bytes = [0u8; 4];
+        aws_lc_rs::rand::SystemRandom::new()
+            .fill(&mut bytes)
+            .map_err(|_| CertError::Random {
+                context: "AWS-LC failed to generate a certificate serial number",
+            })?;
+        bytes
+    };
+    #[cfg(feature = "rustcrypto")]
+    let bytes = rand::random::<[u8; 4]>();
     // serial number MUST be a positive integer
-    IntegerAsn1::from_bytes_be_unsigned(vec![b1, b2, b3, b4])
+    Ok(IntegerAsn1::from_bytes_be_unsigned(bytes.to_vec()))
 }
 
 #[cfg(test)]
@@ -1089,6 +1101,42 @@ mod tests {
         PrivateKey::from_pkcs8(pem.data()).unwrap()
     }
 
+    #[cfg(feature = "fips")]
+    #[test]
+    fn certificate_builder_rejects_legacy_key_id_hashes_without_panicking() {
+        let root_key = parse_key(picky_test_data::RSA_2048_PK_1);
+
+        for hash in [HashAlgorithm::SHA1, HashAlgorithm::MD5] {
+            let error = CertificateBuilder::new()
+                .validity(UtcDate::ymd(2065, 6, 15).unwrap(), UtcDate::ymd(2070, 6, 15).unwrap())
+                .self_signed(DirectoryName::new_common_name("FIPS root"), &root_key)
+                .ca(true)
+                .signature_hash_type(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256))
+                .key_id_gen_method(KeyIdGenMethod::SPKFullDER(hash))
+                .build()
+                .unwrap_err();
+
+            assert!(matches!(
+                error,
+                CertError::CertGeneration { ref source }
+                    if matches!(
+                        source.as_ref(),
+                        CertError::KeyIdGen {
+                            source: KeyIdGenError::Hash(crate::hash::HashError::Policy(policy_error))
+                        } if policy_error.algorithm == format!("{hash:?}")
+                    )
+            ));
+            assert_eq!(
+                error.to_string(),
+                format!(
+                    "couldn't generate certificate: key id generation error: \
+                     algorithm disabled by the active cryptographic policy: {hash:?}"
+                )
+            );
+        }
+    }
+
+    #[cfg(feature = "rustcrypto")]
     #[test]
     fn valid_ca_chain() {
         let root_key = parse_key(picky_test_data::RSA_2048_PK_1);
@@ -1247,6 +1295,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "rustcrypto")]
     #[test]
     fn ec_signing() {
         let root_key = parse_key(picky_test_data::EC_NIST256_PK_1);
@@ -1299,6 +1348,7 @@ mod tests {
             .expect("couldn't verify chain");
     }
 
+    #[cfg(feature = "rustcrypto")]
     #[test]
     fn ed25519_signing() {
         let root_key = parse_key(picky_test_data::ED25519_PEM_PK_1);
@@ -1351,6 +1401,7 @@ mod tests {
             .expect("couldn't verify chain");
     }
 
+    #[cfg(feature = "rustcrypto")]
     #[test]
     fn malicious_ca_chain() {
         let root_key = parse_key(picky_test_data::RSA_2048_PK_1);
@@ -1423,6 +1474,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "rustcrypto")]
     #[test]
     fn invalid_basic_constraints_chain() {
         let root_key = parse_key(picky_test_data::RSA_2048_PK_1);
@@ -1553,6 +1605,7 @@ mod tests {
         assert_eq!(cert.serial_number().as_unsigned_bytes_be(), unsigned_integer_bytes);
     }
 
+    #[cfg(feature = "rustcrypto")]
     #[test]
     fn validity_encoding() {
         use picky_asn1_x509::validity::Time;

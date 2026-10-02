@@ -4,22 +4,36 @@ pub(crate) mod ed;
 
 use crate::oid::ObjectIdentifier;
 use crate::pem::{Pem, PemError, parse_pem};
-use crypto_bigint::{BoxedUint, NonZero};
-use crypto_common::Generate as _;
 use picky_asn1::bit_string::BitString;
 use picky_asn1::wrapper::{BitStringAsn1Container, IntegerAsn1, OctetStringAsn1Container};
 use picky_asn1_der::Asn1DerError;
 use picky_asn1_x509::{
-    ECPrivateKey, PRIVATE_KEY_INFO_VERSION_1, PrivateKeyInfo, PrivateKeyValue, SubjectPublicKeyInfo, private_key_info,
+    ECPrivateKey, PRIVATE_KEY_INFO_VERSION_1, PrivateKeyInfo, PrivateKeyValue, SubjectPublicKeyInfo,
 };
-use rand::rngs::{StdRng, SysRng};
-use rand_core::SeedableRng as _;
-use rsa::traits::{PrivateKeyParts as _, PublicKeyParts as _};
-use rsa::{RsaPrivateKey, RsaPublicKey};
 use thiserror::Error;
 use zeroize::Zeroize;
 
-use ec::{EcComponent, NamedEcCurve, calculate_public_ec_key};
+#[cfg(feature = "rustcrypto")]
+use crypto_bigint::{BoxedUint, NonZero};
+#[cfg(feature = "rustcrypto")]
+use crypto_common::Generate as _;
+#[cfg(feature = "rustcrypto")]
+use picky_asn1_x509::private_key_info;
+#[cfg(feature = "rustcrypto")]
+use rand::rngs::{StdRng, SysRng};
+#[cfg(feature = "rustcrypto")]
+use rand_core::SeedableRng as _;
+#[cfg(feature = "rustcrypto")]
+use rsa::traits::{PrivateKeyParts as _, PublicKeyParts as _};
+#[cfg(feature = "rustcrypto")]
+use rsa::{RsaPrivateKey, RsaPublicKey};
+
+#[cfg(feature = "rustcrypto")]
+use ec::EcComponent;
+use ec::NamedEcCurve;
+#[cfg(feature = "rustcrypto")]
+use ec::calculate_public_ec_key;
+#[cfg(feature = "rustcrypto")]
 use ed::{NamedEdAlgorithm, X25519_FIELD_ELEMENT_SIZE, X25519FieldElement};
 
 pub use ec::EcCurve;
@@ -61,15 +75,21 @@ pub enum KeyError {
     #[error("unsupported algorithm: {algorithm}")]
     UnsupportedAlgorithm { algorithm: &'static str },
 
+    /// algorithm disabled by the active cryptographic policy
+    #[error("algorithm disabled by the active cryptographic policy: {algorithm}")]
+    AlgorithmDisabledByPolicy { algorithm: String },
+
     /// invalid PEM provided
     #[error("invalid PEM provided: {source}")]
     Pem { source: PemError },
 
+    #[cfg(feature = "rustcrypto")]
     #[error(transparent)]
     RandError(#[from] rand::rngs::SysError),
 }
 
 impl KeyError {
+    #[cfg(feature = "rustcrypto")]
     pub(crate) fn unsupported_curve(curve_oid: &ObjectIdentifier, context: &'static str) -> Self {
         let curve_oid: String = curve_oid.into();
         Self::EC {
@@ -77,6 +97,7 @@ impl KeyError {
         }
     }
 
+    #[cfg(feature = "rustcrypto")]
     pub(crate) fn unsupported_ed_algorithm(oid: &ObjectIdentifier, context: &'static str) -> Self {
         let oid: String = oid.into();
         Self::ED {
@@ -87,6 +108,7 @@ impl KeyError {
     }
 }
 
+#[cfg(feature = "rustcrypto")]
 impl From<rsa::errors::Error> for KeyError {
     fn from(e: rsa::errors::Error) -> Self {
         Self::Rsa { context: e.to_string() }
@@ -117,6 +139,7 @@ const EC_PRIVATE_KEY_LABEL: &str = "EC PRIVATE KEY";
 // Namely, `ring` library has bug in it, which causes it to fail when validating
 // encoded public key, comparing it with generated one (It assumes uncompressed point).
 // [https://github.com/briansmith/ring/blob/155231fb017acaaa94a044f124bb34a777d115ef/src/ec/suite_b.rs#L221-L225]
+#[cfg(feature = "rustcrypto")]
 const COMPRESS_EC_POINT_BY_DEFAULT: bool = false;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -156,6 +179,7 @@ pub struct PrivateKey {
     inner: PrivateKeyInfo,
 }
 
+#[cfg(feature = "rustcrypto")]
 impl TryFrom<&'_ PrivateKey> for RsaPrivateKey {
     type Error = KeyError;
 
@@ -182,6 +206,7 @@ impl TryFrom<&'_ PrivateKey> for RsaPrivateKey {
     }
 }
 
+#[cfg(feature = "rustcrypto")]
 impl TryFrom<&'_ PrivateKey> for RsaPublicKey {
     type Error = KeyError;
 
@@ -202,6 +227,7 @@ impl TryFrom<&'_ PrivateKey> for RsaPublicKey {
 }
 
 impl PrivateKey {
+    #[cfg(feature = "rustcrypto")]
     pub fn from_rsa_components(
         modulus: &BoxedUint,
         public_exponent: &BoxedUint,
@@ -262,6 +288,7 @@ impl PrivateKey {
 
     /// Builds new EC key from given components. Note that only curves, declared in [`EcCurve`]
     /// are supported for key generation.
+    #[cfg(feature = "rustcrypto")]
     pub fn from_ec_components(
         curve: EcCurve,
         secret: &BoxedUint,
@@ -429,48 +456,59 @@ impl PrivateKey {
                 Self::from_ec_decoded_der_with_curve_oid(curve_oid, key)
             }
             PrivateKeyValue::ED(OctetStringAsn1Container(key)) => {
-                let algorithm = NamedEdAlgorithm::from(inner.private_key_algorithm.oid());
-                let private_key = key.0.clone();
-                let public_key = match &algorithm {
-                    NamedEdAlgorithm::Known(EdAlgorithm::Ed25519) => {
-                        let private_key = private_key.as_slice().try_into().map_err(|e| KeyError::ED {
-                            context: format!("invalid size for private key: {e}"),
-                        })?;
-                        let private_key = ed25519_dalek::SigningKey::from_bytes(private_key);
+                #[cfg(feature = "fips")]
+                {
+                    let _ = key;
+                    Err(KeyError::AlgorithmDisabledByPolicy {
+                        algorithm: "Ed25519/X25519 private keys".to_string(),
+                    })
+                }
 
-                        let public_key = private_key.verifying_key();
+                #[cfg(feature = "rustcrypto")]
+                {
+                    let algorithm = NamedEdAlgorithm::from(inner.private_key_algorithm.oid());
+                    let private_key = key.0.clone();
+                    let public_key = match &algorithm {
+                        NamedEdAlgorithm::Known(EdAlgorithm::Ed25519) => {
+                            let private_key = private_key.as_slice().try_into().map_err(|e| KeyError::ED {
+                                context: format!("invalid size for private key: {e}"),
+                            })?;
+                            let private_key = ed25519_dalek::SigningKey::from_bytes(private_key);
 
-                        Some(public_key.to_bytes().to_vec())
-                    }
-                    NamedEdAlgorithm::Known(EdAlgorithm::X25519) => {
-                        let len = private_key.len();
+                            let public_key = private_key.verifying_key();
 
-                        let secret: X25519FieldElement =
+                            Some(public_key.to_bytes().to_vec())
+                        }
+                        NamedEdAlgorithm::Known(EdAlgorithm::X25519) => {
+                            let len = private_key.len();
+
+                            let secret: X25519FieldElement =
                             private_key.as_slice().try_into().map_err(|_| KeyError::ED {
                                 context: format!(
                                 "Invalid X25519 private key size. Expected: {X25519_FIELD_ELEMENT_SIZE}, actual: {len}"
                             ),
                             })?;
 
-                        let secret = x25519_dalek::StaticSecret::from(secret);
-                        let public_key = x25519_dalek::PublicKey::from(&secret);
+                            let secret = x25519_dalek::StaticSecret::from(secret);
+                            let public_key = x25519_dalek::PublicKey::from(&secret);
 
-                        Some(public_key.to_bytes().to_vec())
-                    }
-                    NamedEdAlgorithm::Unsupported(_) => {
-                        // We can't generate public key from private key for unsupported algorithms
-                        None
-                    }
-                };
+                            Some(public_key.to_bytes().to_vec())
+                        }
+                        NamedEdAlgorithm::Unsupported(_) => {
+                            // We can't generate public key from private key for unsupported algorithms
+                            None
+                        }
+                    };
 
-                Ok(Self {
-                    kind: PrivateKeyKind::Ed {
-                        algorithm_oid: algorithm.into(),
-                        public_key,
-                        private_key,
-                    },
-                    inner,
-                })
+                    Ok(Self {
+                        kind: PrivateKeyKind::Ed {
+                            algorithm_oid: algorithm.into(),
+                            public_key,
+                            private_key,
+                        },
+                        inner,
+                    })
+                }
             }
         }
     }
@@ -515,10 +553,22 @@ impl PrivateKey {
         // Generate the public key if it's not present in the `ECPrivateKey` representation
         let (public_key, public_key_is_generated) = match &decoded.public_key.0.0 {
             Some(bit_string) => (Some(bit_string.payload_view().to_vec()), false),
-            None => (
-                calculate_public_ec_key(&curve_oid, &decoded.private_key.0, COMPRESS_EC_POINT_BY_DEFAULT)?,
-                true,
-            ),
+            None => {
+                #[cfg(feature = "fips")]
+                {
+                    return Err(KeyError::AlgorithmDisabledByPolicy {
+                        algorithm: "deriving an EC public key during private-key import".to_string(),
+                    });
+                }
+
+                #[cfg(feature = "rustcrypto")]
+                {
+                    (
+                        calculate_public_ec_key(&curve_oid, &decoded.private_key.0, COMPRESS_EC_POINT_BY_DEFAULT)?,
+                        true,
+                    )
+                }
+            }
         };
         let private_key = decoded.private_key.0.clone();
         // if the public key is generated, we need to skip it when encoding, to preserve the
@@ -678,72 +728,92 @@ impl PrivateKey {
 
     /// **Beware**: this is insanely slow in debug builds.
     pub fn generate_rsa(bits: usize) -> Result<Self, KeyError> {
-        let key = RsaPrivateKey::new(&mut StdRng::try_from_rng(&mut SysRng)?, bits)?;
+        #[cfg(feature = "fips")]
+        {
+            Err(KeyError::AlgorithmDisabledByPolicy {
+                algorithm: format!("RSA key generation ({bits} bits) is not implemented by the selected provider"),
+            })
+        }
 
-        let modulus = key.n();
-        let public_exponent = key.e();
-        let private_exponent = key.d();
+        #[cfg(feature = "rustcrypto")]
+        {
+            let key = RsaPrivateKey::new(&mut StdRng::try_from_rng(&mut SysRng)?, bits)?;
 
-        Self::from_rsa_components(modulus, public_exponent, private_exponent, key.primes())
+            let modulus = key.n();
+            let public_exponent = key.e();
+            let private_exponent = key.d();
+
+            Self::from_rsa_components(modulus, public_exponent, private_exponent, key.primes())
+        }
     }
 
     /// Generates new ec key pair with specified supported curve.
     pub fn generate_ec(curve: EcCurve) -> Result<Self, KeyError> {
-        let curve_oid: ObjectIdentifier = NamedEcCurve::Known(curve).into();
+        #[cfg(feature = "fips")]
+        {
+            Err(KeyError::AlgorithmDisabledByPolicy {
+                algorithm: format!("{curve} key generation is not implemented by the selected provider"),
+            })
+        }
 
-        let (secret, point) = match curve {
-            EcCurve::NistP256 => {
-                use p256::elliptic_curve::sec1::ToSec1Point;
+        #[cfg(feature = "rustcrypto")]
+        {
+            let curve_oid: ObjectIdentifier = NamedEcCurve::Known(curve).into();
 
-                let key = p256::SecretKey::generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
-                let secret = key.to_bytes().to_vec();
-                let point = key
-                    .public_key()
-                    .to_sec1_point(COMPRESS_EC_POINT_BY_DEFAULT)
-                    .as_bytes()
-                    .to_vec();
-                (secret, point)
-            }
-            EcCurve::NistP384 => {
-                use p384::elliptic_curve::sec1::ToSec1Point;
+            let (secret, point) = match curve {
+                EcCurve::NistP256 => {
+                    use p256::elliptic_curve::sec1::ToSec1Point;
 
-                let key = p384::SecretKey::generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
-                let secret = key.to_bytes().to_vec();
-                let point = key
-                    .public_key()
-                    .to_sec1_point(COMPRESS_EC_POINT_BY_DEFAULT)
-                    .as_bytes()
-                    .to_vec();
-                (secret, point)
-            }
-            EcCurve::NistP521 => {
-                use p521::elliptic_curve::sec1::ToSec1Point;
+                    let key = p256::SecretKey::generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
+                    let secret = key.to_bytes().to_vec();
+                    let point = key
+                        .public_key()
+                        .to_sec1_point(COMPRESS_EC_POINT_BY_DEFAULT)
+                        .as_bytes()
+                        .to_vec();
+                    (secret, point)
+                }
+                EcCurve::NistP384 => {
+                    use p384::elliptic_curve::sec1::ToSec1Point;
 
-                let key = p521::SecretKey::generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
-                let secret = key.to_bytes().to_vec();
-                let point = key
-                    .public_key()
-                    .to_sec1_point(COMPRESS_EC_POINT_BY_DEFAULT)
-                    .as_bytes()
-                    .to_vec();
-                (secret, point)
-            }
-        };
+                    let key = p384::SecretKey::generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
+                    let secret = key.to_bytes().to_vec();
+                    let point = key
+                        .public_key()
+                        .to_sec1_point(COMPRESS_EC_POINT_BY_DEFAULT)
+                        .as_bytes()
+                        .to_vec();
+                    (secret, point)
+                }
+                EcCurve::NistP521 => {
+                    use p521::elliptic_curve::sec1::ToSec1Point;
 
-        let inner = PrivateKeyInfo::new_ec_encryption(
-            curve_oid.clone(),
-            secret.clone(),
-            Some(BitString::with_bytes(point.as_slice())),
-            false,
-        );
+                    let key = p521::SecretKey::generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
+                    let secret = key.to_bytes().to_vec();
+                    let point = key
+                        .public_key()
+                        .to_sec1_point(COMPRESS_EC_POINT_BY_DEFAULT)
+                        .as_bytes()
+                        .to_vec();
+                    (secret, point)
+                }
+            };
 
-        let kind = PrivateKeyKind::Ec {
-            curve_oid,
-            public_key: Some(point),
-            private_key: secret,
-        };
+            let inner = PrivateKeyInfo::new_ec_encryption(
+                curve_oid.clone(),
+                secret.clone(),
+                Some(BitString::with_bytes(point.as_slice())),
+                false,
+            );
 
-        Ok(Self { kind, inner })
+            let kind = PrivateKeyKind::Ec {
+                curve_oid,
+                public_key: Some(point),
+                private_key: secret,
+            };
+
+            Ok(Self { kind, inner })
+        }
     }
 
     /// Generates new ed key pair with specified supported algorithm.
@@ -751,33 +821,44 @@ impl PrivateKey {
     /// `write_public_key` specifies whether to include public key in the private key file.
     /// Note that OpenSSL does not support ed keys with public key included.
     pub fn generate_ed(algorithm: EdAlgorithm, write_public_key: bool) -> Result<Self, KeyError> {
-        let algorithm_oid: ObjectIdentifier = NamedEdAlgorithm::Known(algorithm).into();
+        #[cfg(feature = "fips")]
+        {
+            let _ = write_public_key;
+            Err(KeyError::AlgorithmDisabledByPolicy {
+                algorithm: format!("{algorithm:?} key generation"),
+            })
+        }
 
-        let (private_key, public_key) = match algorithm {
-            EdAlgorithm::Ed25519 => {
-                let private = ed25519_dalek::SigningKey::generate(&mut StdRng::try_from_rng(&mut SysRng)?);
-                let public = private.verifying_key();
-                (private.to_bytes().to_vec(), public.to_bytes().to_vec())
-            }
-            EdAlgorithm::X25519 => {
-                let private = x25519_dalek::StaticSecret::random_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
-                let public = x25519_dalek::PublicKey::from(&private);
-                (private.to_bytes().to_vec(), public.to_bytes().to_vec())
-            }
-        };
+        #[cfg(feature = "rustcrypto")]
+        {
+            let algorithm_oid: ObjectIdentifier = NamedEdAlgorithm::Known(algorithm).into();
 
-        let public_key_bit_string = write_public_key.then(|| BitString::with_bytes(public_key.as_slice()));
+            let (private_key, public_key) = match algorithm {
+                EdAlgorithm::Ed25519 => {
+                    let private = ed25519_dalek::SigningKey::generate(&mut StdRng::try_from_rng(&mut SysRng)?);
+                    let public = private.verifying_key();
+                    (private.to_bytes().to_vec(), public.to_bytes().to_vec())
+                }
+                EdAlgorithm::X25519 => {
+                    let private = x25519_dalek::StaticSecret::random_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
+                    let public = x25519_dalek::PublicKey::from(&private);
+                    (private.to_bytes().to_vec(), public.to_bytes().to_vec())
+                }
+            };
 
-        let inner =
-            PrivateKeyInfo::new_ed_encryption(algorithm_oid.clone(), private_key.clone(), public_key_bit_string);
+            let public_key_bit_string = write_public_key.then(|| BitString::with_bytes(public_key.as_slice()));
 
-        let kind = PrivateKeyKind::Ed {
-            algorithm_oid,
-            public_key: Some(public_key),
-            private_key,
-        };
+            let inner =
+                PrivateKeyInfo::new_ed_encryption(algorithm_oid.clone(), private_key.clone(), public_key_bit_string);
 
-        Ok(Self { kind, inner })
+            let kind = PrivateKeyKind::Ed {
+                algorithm_oid,
+                public_key: Some(public_key),
+                private_key,
+            };
+
+            Ok(Self { kind, inner })
+        }
     }
 
     pub fn kind(&self) -> KeyKind {
@@ -793,6 +874,7 @@ impl PrivateKey {
     }
 
     #[cfg(any(feature = "ssh", feature = "jose"))]
+    #[cfg_attr(feature = "fips", allow(dead_code))]
     pub(crate) fn as_kind(&self) -> &PrivateKeyKind {
         &self.kind
     }
@@ -858,6 +940,7 @@ impl AsRef<PublicKey> for PublicKey {
     }
 }
 
+#[cfg(feature = "rustcrypto")]
 impl TryFrom<&'_ PublicKey> for RsaPublicKey {
     type Error = KeyError;
 
@@ -882,11 +965,19 @@ impl TryFrom<&'_ PublicKey> for RsaPublicKey {
 }
 
 impl PublicKey {
-    pub fn from_rsa_components(modulus: &BoxedUint, public_exponent: &BoxedUint) -> Self {
+    pub(crate) fn from_rsa_encoded_components(modulus: &[u8], public_exponent: &[u8]) -> Self {
         PublicKey(SubjectPublicKeyInfo::new_rsa_key(
-            IntegerAsn1::from_bytes_be_unsigned(modulus.to_be_bytes_trimmed_vartime().into_vec()),
-            IntegerAsn1::from_bytes_be_unsigned(public_exponent.to_be_bytes_trimmed_vartime().into_vec()),
+            IntegerAsn1::from_bytes_be_unsigned(modulus.to_vec()),
+            IntegerAsn1::from_bytes_be_unsigned(public_exponent.to_vec()),
         ))
+    }
+
+    #[cfg(feature = "rustcrypto")]
+    pub fn from_rsa_components(modulus: &BoxedUint, public_exponent: &BoxedUint) -> Self {
+        Self::from_rsa_encoded_components(
+            &modulus.to_be_bytes_trimmed_vartime(),
+            &public_exponent.to_be_bytes_trimmed_vartime(),
+        )
     }
 
     /// `point` is SEC1 encoded point data
@@ -905,6 +996,7 @@ impl PublicKey {
     /// supported. For correct encoding of the point, we need to know which curve-specific
     /// arithmetic crate to use. If you want to use a curve that is not declared in [`EcCurve`],
     /// and encoded representation of the point is available - use [`Self::from_ec_encoded_components`]
+    #[cfg(feature = "rustcrypto")]
     pub fn from_ec_components(curve: EcCurve, x: &BoxedUint, y: &BoxedUint) -> Result<Self, KeyError> {
         let px_bytes = x.to_be_bytes_trimmed_vartime();
         let py_bytes = y.to_be_bytes_trimmed_vartime();
@@ -1079,13 +1171,13 @@ impl PublicKey {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "rustcrypto"))]
 mod tests {
     use super::*;
     use crate::hash::HashAlgorithm;
     use crate::key::ed::EdKeypair;
     use crate::signature::SignatureAlgorithm;
-    use rsa::traits::PublicKeyParts;
+    use rsa::traits::{PrivateKeyParts, PublicKeyParts};
     use rstest::rstest;
 
     cfg_if::cfg_if! { if #[cfg(feature = "x509")] {

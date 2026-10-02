@@ -51,7 +51,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Run clippy
-        run: cargo clippy --locked --workspace --all-features --all-targets -- -D warnings
+        run: cargo clippy --locked --workspace --all-targets --features picky/full -- -D warnings
 
   lints-wasm:
     name: Lints [wasm]
@@ -89,7 +89,30 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Run tests
-        run: cargo test --locked --verbose --workspace --all-features
+        run: cargo test --locked --verbose --workspace --features picky/full
+
+  fips:
+    name: AWS-LC FIPS provider
+    needs: [formatting]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Reject RustCrypto implementations in the FIPS graph
+        run: |
+          if cargo tree --locked -p picky --edges normal,build --no-default-features \
+            --features fips-aws-lc,x509,jose,jwe-crypto,pkcs12,ssh,time_conversion \
+            | grep -E 'aws-lc-sys v|rsa v|p256 v|p384 v|p521 v|ed25519|x25519|md-5|sha1 v|sha2 v|sha3 v|aes|chacha|poly1305|argon|scrypt|pbkdf|hmac|crypto-bigint|ring v'; then
+            echo "A non-FIPS cryptography implementation is present in the FIPS dependency graph"
+            exit 1
+          fi
+
+      - name: Check FIPS feature profile
+        run: cargo check --locked -p picky --no-default-features --features fips-aws-lc,x509,jose,jwe-crypto,pkcs12,ssh,time_conversion,http_signature,http_trait_impl
+
+      - name: Test FIPS policy and approved operations
+        run: cargo test --locked -p picky --no-default-features --features fips-aws-lc,x509,jose,jwe-crypto,pkcs12,ssh,time_conversion,http_signature,http_trait_impl --lib
 
   msrv:
     # Minimum supported Rust version check for published crates.
@@ -182,7 +205,7 @@ jobs:
   success:
     name: Success
     if: ${{ always() }}
-    needs: [formatting, lints, lints-wasm, tests, msrv, dotnet-tests]
+    needs: [formatting, lints, lints-wasm, tests, fips, msrv, dotnet-tests]
     runs-on: ubuntu-latest
 
     steps:

@@ -595,10 +595,11 @@ mod tests {
         assert_eq!(jwt.state.claims["iat"].as_i64().expect("iat"), 1516239022);
     }
 
+    #[cfg(feature = "jwe-crypto")]
     #[test]
     fn jwe_direct_aes_256_gcm() {
         let claims = get_strongly_typed_claims();
-        let key = crate::hash::HashAlgorithm::SHA2_256.digest(b"magic_password");
+        let key = crate::hash::HashAlgorithm::SHA2_256.digest(b"magic_password").unwrap();
         let jwt = CheckedJwtEnc::new(JweAlg::Direct, JweEnc::Aes256Gcm, claims);
         let encoded = jwt.encode_direct(&key).unwrap();
         let decoded = JwtEnc::decode_direct(&encoded, &key)
@@ -606,6 +607,25 @@ mod tests {
             .validate::<MyClaims>(&NO_CHECK_VALIDATOR)
             .unwrap();
         assert_eq!(decoded.state.claims, get_strongly_typed_claims());
+    }
+
+    #[cfg(all(feature = "fips", not(feature = "jwe-crypto")))]
+    #[test]
+    fn jwe_direct_aes_256_gcm_is_rejected_by_fips_provider() {
+        let claims = get_strongly_typed_claims();
+        let jwt = CheckedJwtEnc::new(JweAlg::Direct, JweEnc::Aes256Gcm, claims);
+
+        let error = jwt.encode_direct(&[0_u8; 32]).unwrap_err();
+
+        assert!(matches!(
+            error,
+            JweError::UnsupportedAlgorithm { ref algorithm }
+                if algorithm == "JWE encryption is not implemented by the selected FIPS provider"
+        ));
+        assert_eq!(
+            error.to_string(),
+            "unsupported algorithm: JWE encryption is not implemented by the selected FIPS provider"
+        );
     }
 
     #[derive(Deserialize)]
