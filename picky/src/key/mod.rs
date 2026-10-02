@@ -5,21 +5,29 @@ pub(crate) mod ed;
 use crate::oid::ObjectIdentifier;
 use crate::pem::{Pem, PemError, parse_pem};
 use crypto_bigint::{BoxedUint, NonZero};
-use crypto_common::Generate as _;
 use picky_asn1::bit_string::BitString;
 use picky_asn1::wrapper::{BitStringAsn1Container, IntegerAsn1, OctetStringAsn1Container};
 use picky_asn1_der::Asn1DerError;
 use picky_asn1_x509::{
     ECPrivateKey, PRIVATE_KEY_INFO_VERSION_1, PrivateKeyInfo, PrivateKeyValue, SubjectPublicKeyInfo, private_key_info,
 };
-use rand::rngs::{StdRng, SysRng};
-use rand_core::SeedableRng as _;
-use rsa::traits::{PrivateKeyParts as _, PublicKeyParts as _};
 use rsa::{RsaPrivateKey, RsaPublicKey};
 use thiserror::Error;
 use zeroize::Zeroize;
 
-use ec::{EcComponent, NamedEcCurve, calculate_public_ec_key};
+#[cfg(not(feature = "fips"))]
+use crypto_common::Generate as _;
+#[cfg(not(feature = "fips"))]
+use rand::rngs::{StdRng, SysRng};
+#[cfg(not(feature = "fips"))]
+use rand_core::SeedableRng as _;
+#[cfg(not(feature = "fips"))]
+use rsa::traits::{PrivateKeyParts as _, PublicKeyParts as _};
+
+#[cfg(not(feature = "fips"))]
+use ec::calculate_public_ec_key;
+use ec::{EcComponent, NamedEcCurve};
+#[cfg(not(feature = "fips"))]
 use ed::{NamedEdAlgorithm, X25519_FIELD_ELEMENT_SIZE, X25519FieldElement};
 
 pub use ec::EcCurve;
@@ -60,6 +68,10 @@ pub enum KeyError {
     /// unsupported algorithm
     #[error("unsupported algorithm: {algorithm}")]
     UnsupportedAlgorithm { algorithm: &'static str },
+
+    /// algorithm disabled by the active cryptographic policy
+    #[error("algorithm disabled by the active cryptographic policy: {algorithm}")]
+    AlgorithmDisabledByPolicy { algorithm: String },
 
     /// invalid PEM provided
     #[error("invalid PEM provided: {source}")]
@@ -429,48 +441,59 @@ impl PrivateKey {
                 Self::from_ec_decoded_der_with_curve_oid(curve_oid, key)
             }
             PrivateKeyValue::ED(OctetStringAsn1Container(key)) => {
-                let algorithm = NamedEdAlgorithm::from(inner.private_key_algorithm.oid());
-                let private_key = key.0.clone();
-                let public_key = match &algorithm {
-                    NamedEdAlgorithm::Known(EdAlgorithm::Ed25519) => {
-                        let private_key = private_key.as_slice().try_into().map_err(|e| KeyError::ED {
-                            context: format!("invalid size for private key: {e}"),
-                        })?;
-                        let private_key = ed25519_dalek::SigningKey::from_bytes(private_key);
+                #[cfg(feature = "fips")]
+                {
+                    let _ = key;
+                    Err(KeyError::AlgorithmDisabledByPolicy {
+                        algorithm: "Ed25519/X25519 private keys".to_string(),
+                    })
+                }
 
-                        let public_key = private_key.verifying_key();
+                #[cfg(not(feature = "fips"))]
+                {
+                    let algorithm = NamedEdAlgorithm::from(inner.private_key_algorithm.oid());
+                    let private_key = key.0.clone();
+                    let public_key = match &algorithm {
+                        NamedEdAlgorithm::Known(EdAlgorithm::Ed25519) => {
+                            let private_key = private_key.as_slice().try_into().map_err(|e| KeyError::ED {
+                                context: format!("invalid size for private key: {e}"),
+                            })?;
+                            let private_key = ed25519_dalek::SigningKey::from_bytes(private_key);
 
-                        Some(public_key.to_bytes().to_vec())
-                    }
-                    NamedEdAlgorithm::Known(EdAlgorithm::X25519) => {
-                        let len = private_key.len();
+                            let public_key = private_key.verifying_key();
 
-                        let secret: X25519FieldElement =
+                            Some(public_key.to_bytes().to_vec())
+                        }
+                        NamedEdAlgorithm::Known(EdAlgorithm::X25519) => {
+                            let len = private_key.len();
+
+                            let secret: X25519FieldElement =
                             private_key.as_slice().try_into().map_err(|_| KeyError::ED {
                                 context: format!(
                                 "Invalid X25519 private key size. Expected: {X25519_FIELD_ELEMENT_SIZE}, actual: {len}"
                             ),
                             })?;
 
-                        let secret = x25519_dalek::StaticSecret::from(secret);
-                        let public_key = x25519_dalek::PublicKey::from(&secret);
+                            let secret = x25519_dalek::StaticSecret::from(secret);
+                            let public_key = x25519_dalek::PublicKey::from(&secret);
 
-                        Some(public_key.to_bytes().to_vec())
-                    }
-                    NamedEdAlgorithm::Unsupported(_) => {
-                        // We can't generate public key from private key for unsupported algorithms
-                        None
-                    }
-                };
+                            Some(public_key.to_bytes().to_vec())
+                        }
+                        NamedEdAlgorithm::Unsupported(_) => {
+                            // We can't generate public key from private key for unsupported algorithms
+                            None
+                        }
+                    };
 
-                Ok(Self {
-                    kind: PrivateKeyKind::Ed {
-                        algorithm_oid: algorithm.into(),
-                        public_key,
-                        private_key,
-                    },
-                    inner,
-                })
+                    Ok(Self {
+                        kind: PrivateKeyKind::Ed {
+                            algorithm_oid: algorithm.into(),
+                            public_key,
+                            private_key,
+                        },
+                        inner,
+                    })
+                }
             }
         }
     }
@@ -515,10 +538,22 @@ impl PrivateKey {
         // Generate the public key if it's not present in the `ECPrivateKey` representation
         let (public_key, public_key_is_generated) = match &decoded.public_key.0.0 {
             Some(bit_string) => (Some(bit_string.payload_view().to_vec()), false),
-            None => (
-                calculate_public_ec_key(&curve_oid, &decoded.private_key.0, COMPRESS_EC_POINT_BY_DEFAULT)?,
-                true,
-            ),
+            None => {
+                #[cfg(feature = "fips")]
+                {
+                    return Err(KeyError::AlgorithmDisabledByPolicy {
+                        algorithm: "deriving an EC public key during private-key import".to_string(),
+                    });
+                }
+
+                #[cfg(not(feature = "fips"))]
+                {
+                    (
+                        calculate_public_ec_key(&curve_oid, &decoded.private_key.0, COMPRESS_EC_POINT_BY_DEFAULT)?,
+                        true,
+                    )
+                }
+            }
         };
         let private_key = decoded.private_key.0.clone();
         // if the public key is generated, we need to skip it when encoding, to preserve the
@@ -678,72 +713,92 @@ impl PrivateKey {
 
     /// **Beware**: this is insanely slow in debug builds.
     pub fn generate_rsa(bits: usize) -> Result<Self, KeyError> {
-        let key = RsaPrivateKey::new(&mut StdRng::try_from_rng(&mut SysRng)?, bits)?;
+        #[cfg(feature = "fips")]
+        {
+            Err(KeyError::AlgorithmDisabledByPolicy {
+                algorithm: format!("RSA key generation ({bits} bits) is not implemented by the selected provider"),
+            })
+        }
 
-        let modulus = key.n();
-        let public_exponent = key.e();
-        let private_exponent = key.d();
+        #[cfg(not(feature = "fips"))]
+        {
+            let key = RsaPrivateKey::new(&mut StdRng::try_from_rng(&mut SysRng)?, bits)?;
 
-        Self::from_rsa_components(modulus, public_exponent, private_exponent, key.primes())
+            let modulus = key.n();
+            let public_exponent = key.e();
+            let private_exponent = key.d();
+
+            Self::from_rsa_components(modulus, public_exponent, private_exponent, key.primes())
+        }
     }
 
     /// Generates new ec key pair with specified supported curve.
     pub fn generate_ec(curve: EcCurve) -> Result<Self, KeyError> {
-        let curve_oid: ObjectIdentifier = NamedEcCurve::Known(curve).into();
+        #[cfg(feature = "fips")]
+        {
+            Err(KeyError::AlgorithmDisabledByPolicy {
+                algorithm: format!("{curve} key generation is not implemented by the selected provider"),
+            })
+        }
 
-        let (secret, point) = match curve {
-            EcCurve::NistP256 => {
-                use p256::elliptic_curve::sec1::ToSec1Point;
+        #[cfg(not(feature = "fips"))]
+        {
+            let curve_oid: ObjectIdentifier = NamedEcCurve::Known(curve).into();
 
-                let key = p256::SecretKey::generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
-                let secret = key.to_bytes().to_vec();
-                let point = key
-                    .public_key()
-                    .to_sec1_point(COMPRESS_EC_POINT_BY_DEFAULT)
-                    .as_bytes()
-                    .to_vec();
-                (secret, point)
-            }
-            EcCurve::NistP384 => {
-                use p384::elliptic_curve::sec1::ToSec1Point;
+            let (secret, point) = match curve {
+                EcCurve::NistP256 => {
+                    use p256::elliptic_curve::sec1::ToSec1Point;
 
-                let key = p384::SecretKey::generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
-                let secret = key.to_bytes().to_vec();
-                let point = key
-                    .public_key()
-                    .to_sec1_point(COMPRESS_EC_POINT_BY_DEFAULT)
-                    .as_bytes()
-                    .to_vec();
-                (secret, point)
-            }
-            EcCurve::NistP521 => {
-                use p521::elliptic_curve::sec1::ToSec1Point;
+                    let key = p256::SecretKey::generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
+                    let secret = key.to_bytes().to_vec();
+                    let point = key
+                        .public_key()
+                        .to_sec1_point(COMPRESS_EC_POINT_BY_DEFAULT)
+                        .as_bytes()
+                        .to_vec();
+                    (secret, point)
+                }
+                EcCurve::NistP384 => {
+                    use p384::elliptic_curve::sec1::ToSec1Point;
 
-                let key = p521::SecretKey::generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
-                let secret = key.to_bytes().to_vec();
-                let point = key
-                    .public_key()
-                    .to_sec1_point(COMPRESS_EC_POINT_BY_DEFAULT)
-                    .as_bytes()
-                    .to_vec();
-                (secret, point)
-            }
-        };
+                    let key = p384::SecretKey::generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
+                    let secret = key.to_bytes().to_vec();
+                    let point = key
+                        .public_key()
+                        .to_sec1_point(COMPRESS_EC_POINT_BY_DEFAULT)
+                        .as_bytes()
+                        .to_vec();
+                    (secret, point)
+                }
+                EcCurve::NistP521 => {
+                    use p521::elliptic_curve::sec1::ToSec1Point;
 
-        let inner = PrivateKeyInfo::new_ec_encryption(
-            curve_oid.clone(),
-            secret.clone(),
-            Some(BitString::with_bytes(point.as_slice())),
-            false,
-        );
+                    let key = p521::SecretKey::generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
+                    let secret = key.to_bytes().to_vec();
+                    let point = key
+                        .public_key()
+                        .to_sec1_point(COMPRESS_EC_POINT_BY_DEFAULT)
+                        .as_bytes()
+                        .to_vec();
+                    (secret, point)
+                }
+            };
 
-        let kind = PrivateKeyKind::Ec {
-            curve_oid,
-            public_key: Some(point),
-            private_key: secret,
-        };
+            let inner = PrivateKeyInfo::new_ec_encryption(
+                curve_oid.clone(),
+                secret.clone(),
+                Some(BitString::with_bytes(point.as_slice())),
+                false,
+            );
 
-        Ok(Self { kind, inner })
+            let kind = PrivateKeyKind::Ec {
+                curve_oid,
+                public_key: Some(point),
+                private_key: secret,
+            };
+
+            Ok(Self { kind, inner })
+        }
     }
 
     /// Generates new ed key pair with specified supported algorithm.
@@ -751,33 +806,44 @@ impl PrivateKey {
     /// `write_public_key` specifies whether to include public key in the private key file.
     /// Note that OpenSSL does not support ed keys with public key included.
     pub fn generate_ed(algorithm: EdAlgorithm, write_public_key: bool) -> Result<Self, KeyError> {
-        let algorithm_oid: ObjectIdentifier = NamedEdAlgorithm::Known(algorithm).into();
+        #[cfg(feature = "fips")]
+        {
+            let _ = write_public_key;
+            Err(KeyError::AlgorithmDisabledByPolicy {
+                algorithm: format!("{algorithm:?} key generation"),
+            })
+        }
 
-        let (private_key, public_key) = match algorithm {
-            EdAlgorithm::Ed25519 => {
-                let private = ed25519_dalek::SigningKey::generate(&mut StdRng::try_from_rng(&mut SysRng)?);
-                let public = private.verifying_key();
-                (private.to_bytes().to_vec(), public.to_bytes().to_vec())
-            }
-            EdAlgorithm::X25519 => {
-                let private = x25519_dalek::StaticSecret::random_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
-                let public = x25519_dalek::PublicKey::from(&private);
-                (private.to_bytes().to_vec(), public.to_bytes().to_vec())
-            }
-        };
+        #[cfg(not(feature = "fips"))]
+        {
+            let algorithm_oid: ObjectIdentifier = NamedEdAlgorithm::Known(algorithm).into();
 
-        let public_key_bit_string = write_public_key.then(|| BitString::with_bytes(public_key.as_slice()));
+            let (private_key, public_key) = match algorithm {
+                EdAlgorithm::Ed25519 => {
+                    let private = ed25519_dalek::SigningKey::generate(&mut StdRng::try_from_rng(&mut SysRng)?);
+                    let public = private.verifying_key();
+                    (private.to_bytes().to_vec(), public.to_bytes().to_vec())
+                }
+                EdAlgorithm::X25519 => {
+                    let private = x25519_dalek::StaticSecret::random_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
+                    let public = x25519_dalek::PublicKey::from(&private);
+                    (private.to_bytes().to_vec(), public.to_bytes().to_vec())
+                }
+            };
 
-        let inner =
-            PrivateKeyInfo::new_ed_encryption(algorithm_oid.clone(), private_key.clone(), public_key_bit_string);
+            let public_key_bit_string = write_public_key.then(|| BitString::with_bytes(public_key.as_slice()));
 
-        let kind = PrivateKeyKind::Ed {
-            algorithm_oid,
-            public_key: Some(public_key),
-            private_key,
-        };
+            let inner =
+                PrivateKeyInfo::new_ed_encryption(algorithm_oid.clone(), private_key.clone(), public_key_bit_string);
 
-        Ok(Self { kind, inner })
+            let kind = PrivateKeyKind::Ed {
+                algorithm_oid,
+                public_key: Some(public_key),
+                private_key,
+            };
+
+            Ok(Self { kind, inner })
+        }
     }
 
     pub fn kind(&self) -> KeyKind {
@@ -1085,7 +1151,7 @@ mod tests {
     use crate::hash::HashAlgorithm;
     use crate::key::ed::EdKeypair;
     use crate::signature::SignatureAlgorithm;
-    use rsa::traits::PublicKeyParts;
+    use rsa::traits::{PrivateKeyParts, PublicKeyParts};
     use rstest::rstest;
 
     cfg_if::cfg_if! { if #[cfg(feature = "x509")] {

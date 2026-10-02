@@ -21,6 +21,11 @@ impl EcdsaKeypair {
     pub fn secret(&self) -> &[u8] {
         &self.private_key
     }
+
+    #[cfg(feature = "fips-aws-lc")]
+    pub fn public_key(&self) -> Option<&[u8]> {
+        self.public_key.as_deref()
+    }
 }
 
 impl Drop for EcdsaKeypair {
@@ -164,6 +169,7 @@ impl<'a> TryFrom<&'a PrivateKey> for EcdsaKeypair {
     }
 }
 
+#[cfg(not(feature = "fips"))]
 pub(crate) fn calculate_public_ec_key(
     curve_oid: &ObjectIdentifier,
     private_key: &[u8],

@@ -51,7 +51,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Run clippy
-        run: cargo clippy --locked --workspace --all-features --all-targets -- -D warnings
+        run: cargo clippy --locked --workspace --all-targets --features picky/full -- -D warnings
 
   lints-wasm:
     name: Lints [wasm]
@@ -89,7 +89,21 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Run tests
-        run: cargo test --locked --verbose --workspace --all-features
+        run: cargo test --locked --verbose --workspace --features picky/full
+
+  fips:
+    name: FIPS provider
+    needs: [formatting]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check FIPS feature profile
+        run: cargo check --locked -p picky --no-default-features --features fips-aws-lc,x509,jose,http_signature,http_trait_impl
+
+      - name: Test FIPS policy and approved signatures
+        run: cargo test --locked -p picky --no-default-features --features fips-aws-lc,x509,jose,http_signature,http_trait_impl crypto::tests
 
   msrv:
     # Minimum supported Rust version check for published crates.
@@ -182,7 +196,7 @@ jobs:
   success:
     name: Success
     if: ${{ always() }}
-    needs: [formatting, lints, lints-wasm, tests, msrv, dotnet-tests]
+    needs: [formatting, lints, lints-wasm, tests, fips, msrv, dotnet-tests]
     runs-on: ubuntu-latest
 
     steps:

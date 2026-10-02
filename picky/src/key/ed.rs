@@ -7,6 +7,7 @@ use std::fmt::Display;
 use zeroize::Zeroize;
 
 pub(crate) const X25519_FIELD_ELEMENT_SIZE: usize = 32;
+#[cfg(not(feature = "fips"))]
 pub(crate) type X25519FieldElement = [u8; X25519_FIELD_ELEMENT_SIZE];
 
 /// Name of supported Curve25519 and Curve448 based algorithms.

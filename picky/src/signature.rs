@@ -1,13 +1,16 @@
 //! Signature algorithms supported by picky
 
 use crate::hash::HashAlgorithm;
-use crate::key::ec::{EcComponent, EcCurve, NamedEcCurve};
 use crate::key::{KeyError, PrivateKey, PublicKey};
 
 use picky_asn1_x509::{AlgorithmIdentifier, oids};
-use rsa::signature::{SignatureEncoding as _, Signer};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+
+#[cfg(not(feature = "fips-aws-lc"))]
+use crate::key::ec::{EcComponent, EcCurve, NamedEcCurve};
+#[cfg(not(feature = "fips-aws-lc"))]
+use rsa::signature::{SignatureEncoding as _, Signer};
 
 #[derive(Debug, Error)]
 #[non_exhaustive]
@@ -35,6 +38,10 @@ pub enum SignatureError {
     /// unsupported algorithm
     #[error("unsupported algorithm: {algorithm}")]
     UnsupportedAlgorithm { algorithm: String },
+
+    /// algorithm disabled by the active cryptographic policy
+    #[error("algorithm disabled by the active cryptographic policy: {algorithm}")]
+    AlgorithmDisabledByPolicy { algorithm: String },
 }
 
 impl From<rsa::errors::Error> for SignatureError {
@@ -133,6 +140,12 @@ impl SignatureAlgorithm {
     }
 
     pub fn sign(self, msg: &[u8], private_key: &PrivateKey) -> Result<Vec<u8>, SignatureError> {
+        #[cfg(feature = "fips-aws-lc")]
+        {
+            crate::crypto::fips::sign(self, msg, private_key)
+        }
+
+        #[cfg(not(feature = "fips-aws-lc"))]
         match self {
             SignatureAlgorithm::RsaPkcs1v15(picky_hash_algo) => {
                 use rsa::signature::SignatureEncoding as _;
@@ -309,6 +322,12 @@ impl SignatureAlgorithm {
     }
 
     pub fn verify(self, public_key: &PublicKey, msg: &[u8], signature: &[u8]) -> Result<(), SignatureError> {
+        #[cfg(feature = "fips-aws-lc")]
+        {
+            crate::crypto::fips::verify(self, public_key, msg, signature)
+        }
+
+        #[cfg(not(feature = "fips-aws-lc"))]
         match self {
             SignatureAlgorithm::RsaPkcs1v15(picky_hash_algo) => {
                 use rsa::signature::Verifier as _;
@@ -489,6 +508,7 @@ impl SignatureAlgorithm {
             }
         }
 
+        #[cfg(not(feature = "fips-aws-lc"))]
         Ok(())
     }
 

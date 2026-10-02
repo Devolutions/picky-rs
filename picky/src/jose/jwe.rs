@@ -2,6 +2,8 @@
 //!
 //! See [RFC7516](https://tools.ietf.org/html/rfc7516).
 
+#![cfg_attr(feature = "fips", allow(dead_code))]
+
 use crate::jose::jwk::{Jwk, JwkError};
 use crate::key::ec::{EcComponent, EcdsaKeypair, EcdsaPublicKey, NamedEcCurve};
 use crate::key::ed::{EdKeypair, EdPublicKey, NamedEdAlgorithm, X25519_FIELD_ELEMENT_SIZE};
@@ -558,21 +560,57 @@ impl Jwe {
 
     /// Encodes with CEK encrypted and included in the token using asymmetric cryptography.
     pub fn encode(self, asymmetric_key: &PublicKey) -> Result<String, JweError> {
+        #[cfg(feature = "fips")]
+        {
+            let _ = asymmetric_key;
+            Err(JweError::UnsupportedAlgorithm {
+                algorithm: "JWE encryption is not implemented by the selected FIPS provider".to_string(),
+            })
+        }
+
+        #[cfg(not(feature = "fips"))]
         encode_impl(self, EncoderMode::Asymmetric(asymmetric_key))
     }
 
     /// Encodes with provided CEK (a symmetric key). This will ignore `alg` value and override it with "dir".
     pub fn encode_direct(self, cek: &[u8]) -> Result<String, JweError> {
+        #[cfg(feature = "fips")]
+        {
+            let _ = cek;
+            Err(JweError::UnsupportedAlgorithm {
+                algorithm: "JWE encryption is not implemented by the selected FIPS provider".to_string(),
+            })
+        }
+
+        #[cfg(not(feature = "fips"))]
         encode_impl(self, EncoderMode::Direct(cek))
     }
 
     /// Decodes with CEK encrypted and included in the token using asymmetric cryptography.
     pub fn decode(compact_repr: &str, key: &PrivateKey) -> Result<Jwe, JweError> {
+        #[cfg(feature = "fips")]
+        {
+            let _ = (compact_repr, key);
+            Err(JweError::UnsupportedAlgorithm {
+                algorithm: "JWE decryption is not implemented by the selected FIPS provider".to_string(),
+            })
+        }
+
+        #[cfg(not(feature = "fips"))]
         RawJwe::decode(compact_repr).and_then(|jwe| jwe.decrypt(key))
     }
 
     /// Decodes with provided CEK (a symmetric key).
     pub fn decode_direct(compact_repr: &str, cek: &[u8]) -> Result<Jwe, JweError> {
+        #[cfg(feature = "fips")]
+        {
+            let _ = (compact_repr, cek);
+            Err(JweError::UnsupportedAlgorithm {
+                algorithm: "JWE decryption is not implemented by the selected FIPS provider".to_string(),
+            })
+        }
+
+        #[cfg(not(feature = "fips"))]
         RawJwe::decode(compact_repr).and_then(|jwe| jwe.decrypt_direct(cek))
     }
 }
@@ -602,11 +640,29 @@ impl<'repr> RawJwe<'repr> {
 
     /// Decrypts the ciphertext using asymmetric cryptography and returns a verified `Jwe` structure.
     pub fn decrypt(self, key: &PrivateKey) -> Result<Jwe, JweError> {
+        #[cfg(feature = "fips")]
+        {
+            let _ = key;
+            Err(JweError::UnsupportedAlgorithm {
+                algorithm: "JWE decryption is not implemented by the selected FIPS provider".to_string(),
+            })
+        }
+
+        #[cfg(not(feature = "fips"))]
         decrypt_impl(self, DecoderMode::Normal(key))
     }
 
     /// Decrypts the ciphertext using the provided CEK (a symmetric key).
     pub fn decrypt_direct(self, cek: &[u8]) -> Result<Jwe, JweError> {
+        #[cfg(feature = "fips")]
+        {
+            let _ = cek;
+            Err(JweError::UnsupportedAlgorithm {
+                algorithm: "JWE decryption is not implemented by the selected FIPS provider".to_string(),
+            })
+        }
+
+        #[cfg(not(feature = "fips"))]
         decrypt_impl(self, DecoderMode::Direct(cek))
     }
 }

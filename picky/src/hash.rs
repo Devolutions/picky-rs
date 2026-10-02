@@ -74,6 +74,19 @@ impl TryFrom<ShaVariant> for HashAlgorithm {
 
 impl HashAlgorithm {
     pub fn digest(self, msg: &[u8]) -> Vec<u8> {
+        #[cfg(feature = "fips-aws-lc")]
+        {
+            crate::crypto::require_hash(self).unwrap_or_else(|error| panic!("{error}"));
+            let algorithm = match self {
+                Self::SHA2_256 => &aws_lc_rs::digest::SHA256,
+                Self::SHA2_384 => &aws_lc_rs::digest::SHA384,
+                Self::SHA2_512 => &aws_lc_rs::digest::SHA512,
+                _ => unreachable!("policy checked above"),
+            };
+            aws_lc_rs::digest::digest(algorithm, msg).as_ref().to_vec()
+        }
+
+        #[cfg(not(feature = "fips-aws-lc"))]
         match self {
             Self::MD5 => md5::Md5::digest(msg).as_slice().to_vec(),
             Self::SHA1 => sha1::Sha1::digest(msg).as_slice().to_vec(),
@@ -87,6 +100,11 @@ impl HashAlgorithm {
     }
 
     pub fn output_size(self) -> usize {
+        #[cfg(feature = "fips-aws-lc")]
+        {
+            crate::crypto::require_hash(self).unwrap_or_else(|error| panic!("{error}"));
+        }
+
         match self {
             Self::MD5 => md5::Md5::output_size(),
             Self::SHA1 => sha1::Sha1::output_size(),
