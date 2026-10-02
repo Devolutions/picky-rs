@@ -6,21 +6,26 @@ use aes::cipher::block_padding::NoPadding;
 use cbc::cipher::{BlockModeDecrypt, BlockModeEncrypt};
 use inout::InOutBufReserved;
 use rand_core::Rng;
+use zeroize::Zeroizing;
 
 pub const KEY_SIZE: usize = 32;
 pub const BLOCK_SIZE: usize = 16;
 
-/// Adds padding to the message if it is not a multiple of the AES block size.
-pub fn make_padding<R: Rng>(mut message: Vec<u8>, mut rng: R) -> Vec<u8> {
-    if message.len() % BLOCK_SIZE != 0 {
-        let unpadded_size = message.len();
-        let padding_size = BLOCK_SIZE - (unpadded_size % BLOCK_SIZE);
+/// Returns a copy of the message, padded with random bytes to a multiple of the AES block size.
+pub fn make_padding<R: Rng>(message: &[u8], mut rng: R) -> Zeroizing<Vec<u8>> {
+    let unpadded_size = message.len();
+    let padded_size = unpadded_size.next_multiple_of(BLOCK_SIZE);
 
-        message.resize(unpadded_size + padding_size, 0);
-        rng.fill_bytes(&mut message[unpadded_size..]);
+    // Allocate the final size up front so growing the buffer can't leave a copy of the key behind.
+    let mut padded = Zeroizing::new(Vec::with_capacity(padded_size));
+    padded.extend_from_slice(message);
+
+    if padded_size != unpadded_size {
+        padded.resize(padded_size, 0);
+        rng.fill_bytes(&mut padded[unpadded_size..]);
     }
 
-    message
+    padded
 }
 
 /// Encrypts the message in-place using AES-256 in CBC mode.
