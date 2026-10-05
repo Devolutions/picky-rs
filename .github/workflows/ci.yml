@@ -111,7 +111,7 @@ jobs:
       - name: Check FIPS feature profile
         run: cargo check --locked -p picky --no-default-features --features fips-aws-lc,x509,jose,jwe-crypto,pkcs12,ssh,time_conversion,http_signature,http_trait_impl
 
-      - name: Test FIPS policy and approved operations
+      - name: Test AWS-LC key lifecycle, signatures, JWE, PKCS#12, and SSH
         run: cargo test --locked -p picky --no-default-features --features fips-aws-lc,x509,jose,jwe-crypto,pkcs12,ssh,time_conversion,http_signature,http_trait_impl --lib
 
   msrv:

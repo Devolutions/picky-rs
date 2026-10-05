@@ -1,12 +1,9 @@
-use crate::key::{KeyError, PublicKey};
-#[cfg(feature = "rustcrypto")]
-use crate::key::{PrivateKey, PrivateKeyKind};
+use crate::key::{KeyError, PrivateKey, PrivateKeyKind, PublicKey};
 use crate::oid::ObjectIdentifier;
 
 use picky_asn1::wrapper::BitStringAsn1;
 use picky_asn1_x509::oids;
 use std::fmt::Display;
-#[cfg(feature = "rustcrypto")]
 use zeroize::Zeroize;
 
 #[cfg(feature = "rustcrypto")]
@@ -90,7 +87,6 @@ impl From<NamedEdAlgorithm> for ObjectIdentifier {
     }
 }
 
-#[cfg(feature = "rustcrypto")]
 #[derive(Debug)]
 pub(crate) struct EdKeypair {
     algorithm: NamedEdAlgorithm,
@@ -98,7 +94,6 @@ pub(crate) struct EdKeypair {
     public_key: Option<Vec<u8>>,
 }
 
-#[cfg(feature = "rustcrypto")]
 impl EdKeypair {
     pub fn algorithm(&self) -> &NamedEdAlgorithm {
         &self.algorithm
@@ -107,16 +102,19 @@ impl EdKeypair {
     pub fn secret(&self) -> &[u8] {
         &self.private_key
     }
+
+    #[cfg(feature = "fips-aws-lc")]
+    pub fn public_key(&self) -> Option<&[u8]> {
+        self.public_key.as_deref()
+    }
 }
 
-#[cfg(feature = "rustcrypto")]
 impl Drop for EdKeypair {
     fn drop(&mut self) {
         self.private_key.zeroize();
     }
 }
 
-#[cfg(feature = "rustcrypto")]
 impl<'a> TryFrom<&'a PrivateKey> for EdKeypair {
     type Error = KeyError;
 
@@ -156,7 +154,6 @@ impl EdPublicKey<'_> {
     }
 }
 
-#[cfg(feature = "rustcrypto")]
 impl<'a> TryFrom<&'a EdKeypair> for EdPublicKey<'a> {
     type Error = KeyError;
 

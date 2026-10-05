@@ -5,15 +5,18 @@
 use crate::jose::jwk::{Jwk, JwkError};
 use crate::key::{PrivateKey, PublicKey};
 
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
+use crate::key::EdAlgorithm;
 #[cfg(feature = "jwe-crypto")]
-#[cfg(feature = "rustcrypto")]
 use crate::key::PrivateKeyKind;
 #[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
-use crate::key::ec::{EcComponent, EcdsaKeypair, EcdsaPublicKey, NamedEcCurve};
+use crate::key::ec::EcComponent;
+#[cfg(feature = "jwe-crypto")]
+use crate::key::ec::{EcdsaKeypair, EcdsaPublicKey, NamedEcCurve};
 #[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 use crate::key::ed::{EdKeypair, EdPublicKey, NamedEdAlgorithm, X25519_FIELD_ELEMENT_SIZE};
-#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
-use crate::key::{EcCurve, EdAlgorithm, KeyError};
+#[cfg(feature = "jwe-crypto")]
+use crate::key::{EcCurve, KeyError};
 #[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 use aes::cipher::Array;
 #[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
@@ -24,6 +27,8 @@ use aes_kw::AesKw;
 use aws_lc_rs::aead::{Aad, BoundKey, Nonce, NonceSequence, OpeningKey, SealingKey, UnboundKey};
 #[cfg(all(feature = "jwe-crypto", feature = "fips-aws-lc"))]
 use aws_lc_rs::error::Unspecified;
+#[cfg(all(feature = "jwe-crypto", feature = "fips-aws-lc"))]
+use aws_lc_rs::key_wrap::{AES_128, AES_256, AesKek, KeyWrap as _};
 #[cfg(all(feature = "jwe-crypto", feature = "fips-aws-lc"))]
 use aws_lc_rs::rsa::{
     OAEP_SHA256_MGF1SHA256, OaepPrivateDecryptingKey, OaepPublicEncryptingKey, PrivateDecryptingKey,
@@ -255,6 +260,13 @@ enum KeyWrappingAlg {
     Aes256,
 }
 
+#[derive(Debug, Clone, Copy)]
+#[cfg(all(feature = "jwe-crypto", feature = "fips-aws-lc"))]
+enum KeyWrappingAlg {
+    Aes128,
+    Aes256,
+}
+
 #[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 impl KeyWrappingAlg {
     fn key_size(self) -> usize {
@@ -351,6 +363,63 @@ impl KeyWrappingAlg {
     }
 }
 
+#[cfg(all(feature = "jwe-crypto", feature = "fips-aws-lc"))]
+impl KeyWrappingAlg {
+    fn key_size(self) -> usize {
+        match self {
+            Self::Aes128 => 16,
+            Self::Aes256 => 32,
+        }
+    }
+
+    fn decrypt_key(
+        self,
+        cek_alg: JweEnc,
+        encrypted_cek: &[u8],
+        decryption_key: &[u8],
+    ) -> Result<Zeroizing<Vec<u8>>, JweError> {
+        let expected_size = cek_alg.key_size() + 8;
+        if encrypted_cek.len() != expected_size {
+            return Err(JweError::InvalidEncryptedKeySize {
+                expected: expected_size,
+                got: encrypted_cek.len(),
+            });
+        }
+        let cipher = match self {
+            Self::Aes128 => &AES_128,
+            Self::Aes256 => &AES_256,
+        };
+        let kek = AesKek::new(cipher, decryption_key).map_err(|_| JweError::InvalidDecryptionKeySize {
+            expected: self.key_size(),
+            got: decryption_key.len(),
+        })?;
+        let mut cek = Zeroizing::new(vec![0u8; cek_alg.key_size()]);
+        kek.unwrap(encrypted_cek, &mut cek)
+            .map_err(|_| JweError::CryptoProvider {
+                operation: "AWS-LC AES key unwrap",
+                code: -1,
+            })?;
+        Ok(cek)
+    }
+
+    fn encrypt_key(self, cek_alg: JweEnc, cek: &[u8], encryption_key: &[u8]) -> Result<Vec<u8>, JweError> {
+        let cipher = match self {
+            Self::Aes128 => &AES_128,
+            Self::Aes256 => &AES_256,
+        };
+        let kek = AesKek::new(cipher, encryption_key).map_err(|_| JweError::InvalidEncryptedKeySize {
+            expected: self.key_size(),
+            got: encryption_key.len(),
+        })?;
+        let mut wrapped = vec![0u8; cek_alg.key_size() + 8];
+        let wrapped = kek.wrap(cek, &mut wrapped).map_err(|_| JweError::CryptoProvider {
+            operation: "AWS-LC AES key wrap",
+            code: -1,
+        })?;
+        Ok(wrapped.to_vec())
+    }
+}
+
 impl JweAlg {
     /// Get algorithm string representation
     fn name(&self) -> String {
@@ -376,6 +445,15 @@ impl JweAlg {
         };
 
         Some(alg)
+    }
+
+    #[cfg(all(feature = "jwe-crypto", feature = "fips-aws-lc"))]
+    fn key_wrapping_alg(&self) -> Option<KeyWrappingAlg> {
+        match self {
+            JweAlg::EcdhEsAesKeyWrap128 => Some(KeyWrappingAlg::Aes128),
+            JweAlg::EcdhEsAesKeyWrap256 => Some(KeyWrappingAlg::Aes256),
+            _ => None,
+        }
     }
 }
 
@@ -421,7 +499,7 @@ pub enum JweEnc {
 
 impl JweEnc {
     /// Get algorithm string representation
-    #[cfg(feature = "rustcrypto")]
+    #[cfg(feature = "jwe-crypto")]
     fn name(&self) -> String {
         serde_json::to_value(self)
             .expect("BUG: JweEnc is always convertible to serde_json::Value")
@@ -880,21 +958,48 @@ fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
         EncoderMode::Asymmetric(public_key) => {
             require_fips_jwe_alg(jwe.header.alg)?;
             require_fips_jwe_enc(jwe.header.enc)?;
-
-            let rsa_key = PublicEncryptingKey::from_der(&public_key.to_der()?).map_err(|error| JweError::Rsa {
-                context: format!("AWS-LC rejected the RSA public key: {error}"),
-            })?;
-            let rsa_key = OaepPublicEncryptingKey::new(rsa_key).map_err(|error| JweError::Rsa {
-                context: format!("AWS-LC rejected the RSA public key for OAEP: {error}"),
-            })?;
-            let cek = generate_cek(jwe.header.enc)?;
-            let mut encrypted_key = vec![0u8; rsa_key.ciphertext_size()];
-            let encrypted_key = rsa_key
-                .encrypt(&OAEP_SHA256_MGF1SHA256, &cek, &mut encrypted_key, None)
-                .map_err(|error| JweError::Rsa {
-                    context: format!("AWS-LC RSA-OAEP-256 encryption failed: {error}"),
-                })?;
-            (general_purpose::URL_SAFE_NO_PAD.encode(encrypted_key), cek)
+            match &public_key.as_inner().subject_public_key {
+                picky_asn1_x509::PublicKey::Rsa(_) => {
+                    if jwe.header.alg != JweAlg::RsaOaep256 {
+                        return Err(JweError::UnsupportedAlgorithm {
+                            algorithm: format!("{} cannot be used with an RSA key", jwe.header.alg.name()),
+                        });
+                    }
+                    let rsa_key =
+                        PublicEncryptingKey::from_der(&public_key.to_der()?).map_err(|error| JweError::Rsa {
+                            context: format!("AWS-LC rejected the RSA public key: {error}"),
+                        })?;
+                    let rsa_key = OaepPublicEncryptingKey::new(rsa_key).map_err(|error| JweError::Rsa {
+                        context: format!("AWS-LC rejected the RSA public key for OAEP: {error}"),
+                    })?;
+                    let cek = generate_cek(jwe.header.enc)?;
+                    let mut encrypted_key = vec![0u8; rsa_key.ciphertext_size()];
+                    let encrypted_key = rsa_key
+                        .encrypt(&OAEP_SHA256_MGF1SHA256, &cek, &mut encrypted_key, None)
+                        .map_err(|error| JweError::Rsa {
+                            context: format!("AWS-LC RSA-OAEP-256 encryption failed: {error}"),
+                        })?;
+                    (general_purpose::URL_SAFE_NO_PAD.encode(encrypted_key), cek)
+                }
+                picky_asn1_x509::PublicKey::Ec(_) => {
+                    let context = prepare_ecdh_encryption_key(&jwe, public_key)?;
+                    jwe.header.epk = Some(Jwk::from_public_key(&context.epk)?);
+                    (
+                        general_purpose::URL_SAFE_NO_PAD.encode(context.encrypted_key),
+                        context.jwe_cek,
+                    )
+                }
+                picky_asn1_x509::PublicKey::Ed(_) => {
+                    return Err(JweError::UnsupportedAlgorithm {
+                        algorithm: "X25519 is not enabled by the FIPS JWE policy".to_string(),
+                    });
+                }
+                picky_asn1_x509::PublicKey::Mldsa(_) => {
+                    return Err(JweError::UnsupportedAlgorithm {
+                        algorithm: "MLDSA cannot be used for JWE key agreement".to_string(),
+                    });
+                }
+            }
         }
     };
 
@@ -924,7 +1029,7 @@ fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
     .join("."))
 }
 
-#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
+#[cfg(feature = "jwe-crypto")]
 struct JweEcdhEncryptionContext {
     jwe_cek: Zeroizing<Vec<u8>>,
     encrypted_key: Vec<u8>,
@@ -950,6 +1055,7 @@ fn prepare_ecdh_encryption_key(jwe: &Jwe, public_key: &PublicKey) -> Result<JweE
             // Encrypted key should be empty octet sequence in direct mode
             (vec![], cek, epk)
         }
+
         JweAlg::EcdhEsAesKeyWrap128 | JweAlg::EcdhEsAesKeyWrap192 | JweAlg::EcdhEsAesKeyWrap256 => {
             let alg_name = header.alg.name();
 
@@ -984,6 +1090,47 @@ fn prepare_ecdh_encryption_key(jwe: &Jwe, public_key: &PublicKey) -> Result<JweE
         encrypted_key,
         epk,
     })
+}
+
+#[cfg(all(feature = "jwe-crypto", feature = "fips-aws-lc"))]
+fn prepare_ecdh_encryption_key(jwe: &Jwe, public_key: &PublicKey) -> Result<JweEcdhEncryptionContext, JweError> {
+    let alg_name = match jwe.header.alg {
+        JweAlg::EcdhEs => jwe.header.enc.name(),
+        JweAlg::EcdhEsAesKeyWrap128 | JweAlg::EcdhEsAesKeyWrap256 => jwe.header.alg.name(),
+        unsupported => {
+            return Err(JweError::UnsupportedAlgorithm {
+                algorithm: format!("Algorithm `{}` is not supported for EC keys", unsupported.name()),
+            });
+        }
+    };
+    let derived_key_len = jwe
+        .header
+        .alg
+        .key_wrapping_alg()
+        .map_or_else(|| jwe.header.enc.key_size(), KeyWrappingAlg::key_size);
+    let (derived_key, epk) = generate_ecdh_shared_secret(
+        jwe.header.apu.as_deref(),
+        jwe.header.apv.as_deref(),
+        &alg_name,
+        public_key,
+        derived_key_len,
+    )?;
+
+    if let Some(wrapping_algorithm) = jwe.header.alg.key_wrapping_alg() {
+        let cek = generate_cek(jwe.header.enc)?;
+        let encrypted_key = wrapping_algorithm.encrypt_key(jwe.header.enc, &cek, &derived_key)?;
+        Ok(JweEcdhEncryptionContext {
+            jwe_cek: cek,
+            encrypted_key,
+            epk,
+        })
+    } else {
+        Ok(JweEcdhEncryptionContext {
+            jwe_cek: derived_key,
+            encrypted_key: Vec::new(),
+            epk,
+        })
+    }
 }
 
 // decoder
@@ -1132,20 +1279,38 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
         }
         DecoderMode::Normal(private_key) => {
             require_fips_jwe_alg(header.alg)?;
-            let rsa_key =
-                PrivateDecryptingKey::from_pkcs8(&private_key.to_pkcs8()?).map_err(|error| JweError::Rsa {
-                    context: format!("AWS-LC rejected the RSA private key: {error}"),
-                })?;
-            let rsa_key = OaepPrivateDecryptingKey::new(rsa_key).map_err(|error| JweError::Rsa {
-                context: format!("AWS-LC rejected the RSA private key for OAEP: {error}"),
-            })?;
-            let mut cek = vec![0u8; rsa_key.min_output_size()];
-            let cek = rsa_key
-                .decrypt(&OAEP_SHA256_MGF1SHA256, &encrypted_key, &mut cek, None)
-                .map_err(|error| JweError::Rsa {
-                    context: format!("AWS-LC RSA-OAEP-256 decryption failed: {error}"),
-                })?;
-            Zeroizing::new(cek.to_vec())
+            match private_key.as_kind() {
+                PrivateKeyKind::Rsa => {
+                    if header.alg != JweAlg::RsaOaep256 {
+                        return Err(JweError::UnsupportedAlgorithm {
+                            algorithm: format!("{} cannot be used with an RSA key", header.alg.name()),
+                        });
+                    }
+                    let rsa_key =
+                        PrivateDecryptingKey::from_pkcs8(&private_key.to_pkcs8()?).map_err(|error| JweError::Rsa {
+                            context: format!("AWS-LC rejected the RSA private key: {error}"),
+                        })?;
+                    let rsa_key = OaepPrivateDecryptingKey::new(rsa_key).map_err(|error| JweError::Rsa {
+                        context: format!("AWS-LC rejected the RSA private key for OAEP: {error}"),
+                    })?;
+                    let mut cek = vec![0u8; rsa_key.min_output_size()];
+                    let cek = rsa_key
+                        .decrypt(&OAEP_SHA256_MGF1SHA256, &encrypted_key, &mut cek, None)
+                        .map_err(|error| JweError::Rsa {
+                            context: format!("AWS-LC RSA-OAEP-256 decryption failed: {error}"),
+                        })?;
+                    Zeroizing::new(cek.to_vec())
+                }
+                PrivateKeyKind::Ec { .. } => {
+                    let sender_public_key = header.epk.as_ref().ok_or(JweError::MissingEpk)?.to_public_key()?;
+                    prepare_ecdh_decryption_key(&header, &encrypted_key, &sender_public_key, private_key)?
+                }
+                PrivateKeyKind::Ed { .. } => {
+                    return Err(JweError::UnsupportedAlgorithm {
+                        algorithm: "X25519 is not enabled by the FIPS JWE policy".to_string(),
+                    });
+                }
+            }
         }
     };
 
@@ -1187,7 +1352,10 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
 
 #[cfg(all(feature = "jwe-crypto", feature = "fips-aws-lc"))]
 fn require_fips_jwe_alg(algorithm: JweAlg) -> Result<(), JweError> {
-    if algorithm == JweAlg::RsaOaep256 {
+    if matches!(
+        algorithm,
+        JweAlg::RsaOaep256 | JweAlg::EcdhEs | JweAlg::EcdhEsAesKeyWrap128 | JweAlg::EcdhEsAesKeyWrap256
+    ) {
         Ok(())
     } else {
         Err(JweError::UnsupportedAlgorithm {
@@ -1284,6 +1452,47 @@ fn prepare_ecdh_decryption_key(
     }
 }
 
+#[cfg(all(feature = "jwe-crypto", feature = "fips-aws-lc"))]
+fn prepare_ecdh_decryption_key(
+    header: &JweHeader,
+    encrypted_key: &[u8],
+    sender_public_key: &PublicKey,
+    receiver_private_key: &PrivateKey,
+) -> Result<Zeroizing<Vec<u8>>, JweError> {
+    let algorithm_name = match header.alg {
+        JweAlg::EcdhEs => header.enc.name(),
+        JweAlg::EcdhEsAesKeyWrap128 | JweAlg::EcdhEsAesKeyWrap256 => header.alg.name(),
+        unsupported => {
+            return Err(JweError::UnsupportedAlgorithm {
+                algorithm: format!("Algorithm `{}` is not supported for EC keys", unsupported.name()),
+            });
+        }
+    };
+    let derived_key_len = header
+        .alg
+        .key_wrapping_alg()
+        .map_or_else(|| header.enc.key_size(), KeyWrappingAlg::key_size);
+    let derived_key = calculate_ecdh_shared_secret(
+        header.apu.as_deref(),
+        header.apv.as_deref(),
+        &algorithm_name,
+        sender_public_key,
+        receiver_private_key,
+        derived_key_len,
+    )?;
+
+    if let Some(wrapping_algorithm) = header.alg.key_wrapping_alg() {
+        wrapping_algorithm.decrypt_key(header.enc, encrypted_key, &derived_key)
+    } else if encrypted_key.is_empty() {
+        Ok(derived_key)
+    } else {
+        Err(JweError::InvalidEncryptedKeySize {
+            expected: 0,
+            got: encrypted_key.len(),
+        })
+    }
+}
+
 /// Expands the shared secret into a key of the desired size using the ECDH Concat KDF
 #[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 fn ecdh_concat_kdf(
@@ -1346,6 +1555,109 @@ fn ecdh_concat_kdf(
     hasher.update(&shared_key);
 
     Ok(shared_key)
+}
+
+#[cfg(all(feature = "jwe-crypto", feature = "fips-aws-lc"))]
+fn ecdh_concat_kdf(
+    alg: &str,
+    shared_key_len: usize,
+    derived_key: &[u8],
+    apu: Option<&str>,
+    apv: Option<&str>,
+) -> Result<Zeroizing<Vec<u8>>, JweError> {
+    let apu = apu
+        .map(|value| general_purpose::URL_SAFE_NO_PAD.decode(value))
+        .transpose()?;
+    let apv = apv
+        .map(|value| general_purpose::URL_SAFE_NO_PAD.decode(value))
+        .transpose()?;
+    let algorithm = alg.as_bytes();
+    let shared_key_len_bits = ((shared_key_len * 8) as u32).to_be_bytes();
+    let algorithm_len = (algorithm.len() as u32).to_be_bytes();
+    let apu_len = apu.as_ref().map_or(0, Vec::len) as u32;
+    let apv_len = apv.as_ref().map_or(0, Vec::len) as u32;
+    let block_size = 32;
+    let count = shared_key_len.div_ceil(block_size);
+    let mut shared_key = Zeroizing::new(Vec::with_capacity(block_size * count));
+
+    for counter in 1..=count {
+        let mut input = Vec::with_capacity(
+            4 + derived_key.len() + 4 + algorithm.len() + 4 + apu_len as usize + 4 + apv_len as usize + 4,
+        );
+        input.extend_from_slice(&(counter as u32).to_be_bytes());
+        input.extend_from_slice(derived_key);
+        input.extend_from_slice(&algorithm_len);
+        input.extend_from_slice(algorithm);
+        input.extend_from_slice(&apu_len.to_be_bytes());
+        if let Some(value) = apu.as_deref() {
+            input.extend_from_slice(value);
+        }
+        input.extend_from_slice(&apv_len.to_be_bytes());
+        if let Some(value) = apv.as_deref() {
+            input.extend_from_slice(value);
+        }
+        input.extend_from_slice(&shared_key_len_bits);
+        let digest = crate::hash::HashAlgorithm::SHA2_256
+            .digest(&input)
+            .map_err(|_| JweError::CryptoProvider {
+                operation: "AWS-LC ECDH Concat KDF SHA-256",
+                code: -1,
+            })?;
+        shared_key.extend_from_slice(&digest);
+    }
+    shared_key.truncate(shared_key_len);
+    Ok(shared_key)
+}
+
+#[cfg(all(feature = "jwe-crypto", feature = "fips-aws-lc"))]
+fn aws_lc_ecdh_algorithm(curve: EcCurve) -> &'static aws_lc_rs::agreement::Algorithm {
+    match curve {
+        EcCurve::NistP256 => &aws_lc_rs::agreement::ECDH_P256,
+        EcCurve::NistP384 => &aws_lc_rs::agreement::ECDH_P384,
+        EcCurve::NistP521 => &aws_lc_rs::agreement::ECDH_P521,
+    }
+}
+
+#[cfg(all(feature = "jwe-crypto", feature = "fips-aws-lc"))]
+fn generate_ecdh_shared_secret(
+    apu: Option<&str>,
+    apv: Option<&str>,
+    alg: &str,
+    receiver_public_key: &PublicKey,
+    cek_key_len: usize,
+) -> Result<(Zeroizing<Vec<u8>>, PublicKey), JweError> {
+    let receiver = EcdsaPublicKey::try_from(receiver_public_key)?;
+    let curve = match receiver.curve() {
+        NamedEcCurve::Known(curve) => *curve,
+        NamedEcCurve::Unsupported(_) => {
+            return Err(JweError::UnsupportedAlgorithm {
+                algorithm: "unsupported EC curve for FIPS ECDH-ES".to_string(),
+            });
+        }
+    };
+    let agreement_algorithm = aws_lc_ecdh_algorithm(curve);
+    let ephemeral_private =
+        aws_lc_rs::agreement::PrivateKey::generate(agreement_algorithm).map_err(|_| JweError::CryptoProvider {
+            operation: "AWS-LC ECDH ephemeral key generation",
+            code: -1,
+        })?;
+    let ephemeral_public = ephemeral_private
+        .compute_public_key()
+        .map_err(|_| JweError::CryptoProvider {
+            operation: "AWS-LC ECDH public-key derivation",
+            code: -1,
+        })?;
+    let peer = aws_lc_rs::agreement::UnparsedPublicKey::new(agreement_algorithm, receiver.encoded_point());
+    let provider_error = JweError::CryptoProvider {
+        operation: "AWS-LC ECDH agreement",
+        code: -1,
+    };
+    let shared_secret = aws_lc_rs::agreement::agree(&ephemeral_private, peer, provider_error, |secret| {
+        Ok(Zeroizing::new(secret.to_vec()))
+    })?;
+    let epk = PublicKey::from_ec_encoded_components(&NamedEcCurve::Known(curve).into(), ephemeral_public.as_ref());
+
+    Ok((ecdh_concat_kdf(alg, cek_key_len, &shared_secret, apu, apv)?, epk))
 }
 
 /// Returns ECDH ephemeral public key and shared secret required to build encrypted JWE
@@ -1649,6 +1961,55 @@ fn calculate_ecdh_shared_secret(
     ecdh_concat_kdf(alg, cek_key_len, &shared_secret, apu, apv)
 }
 
+#[cfg(all(feature = "jwe-crypto", feature = "fips-aws-lc"))]
+fn calculate_ecdh_shared_secret(
+    apu: Option<&str>,
+    apv: Option<&str>,
+    alg: &str,
+    sender_public_key: &PublicKey,
+    receiver_private_key: &PrivateKey,
+    cek_key_len: usize,
+) -> Result<Zeroizing<Vec<u8>>, JweError> {
+    let private_key = EcdsaKeypair::try_from(receiver_private_key)?;
+    let public_key = EcdsaPublicKey::try_from(sender_public_key).map_err(|source| JweError::KeyAlgorithmsMismatch {
+        context: source.to_string(),
+    })?;
+    if private_key.curve() != public_key.curve() {
+        return Err(JweError::KeyAlgorithmsMismatch {
+            context: format!(
+                "Receiver key has EC curve `{}`, but sender key has `{}` curve",
+                private_key.curve(),
+                public_key.curve()
+            ),
+        });
+    }
+    let curve = match private_key.curve() {
+        NamedEcCurve::Known(curve) => *curve,
+        NamedEcCurve::Unsupported(_) => {
+            return Err(JweError::UnsupportedAlgorithm {
+                algorithm: "unsupported EC curve for FIPS ECDH-ES".to_string(),
+            });
+        }
+    };
+    let agreement_algorithm = aws_lc_ecdh_algorithm(curve);
+    let private_key = aws_lc_rs::agreement::PrivateKey::from_private_key(agreement_algorithm, private_key.secret())
+        .map_err(|error| JweError::Key {
+            source: KeyError::EC {
+                context: format!("AWS-LC rejected the {curve} ECDH private key: {error}"),
+            },
+        })?;
+    let peer = aws_lc_rs::agreement::UnparsedPublicKey::new(agreement_algorithm, public_key.encoded_point());
+    let provider_error = JweError::CryptoProvider {
+        operation: "AWS-LC ECDH agreement",
+        code: -1,
+    };
+    let shared_secret = aws_lc_rs::agreement::agree(&private_key, peer, provider_error, |secret| {
+        Ok(Zeroizing::new(secret.to_vec()))
+    })?;
+
+    ecdh_concat_kdf(alg, cek_key_len, &shared_secret, apu, apv)
+}
+
 /// Generate content encryption key (CEK) for given algorithm and wraps it with zeroize-on-drop container
 #[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 fn generate_cek(alg: JweEnc) -> Result<Zeroizing<Vec<u8>>, JweError> {
@@ -1748,6 +2109,60 @@ mod fips_tests {
         assert_eq!(decoded.payload, payload);
         assert_eq!(decoded.header.alg, JweAlg::Direct);
         assert_eq!(decoded.header.enc, JweEnc::Aes128Gcm);
+    }
+
+    #[test]
+    fn ecdh_es_roundtrips_for_approved_curves() {
+        for (curve, pem) in [
+            ("P-256", picky_test_data::EC_NIST256_PK_1),
+            ("P-384", picky_test_data::EC_NIST384_PK_1),
+            ("P-521", picky_test_data::EC_NIST521_PK_1),
+        ] {
+            let private_key = PrivateKey::from_pem_str(pem).unwrap();
+            let public_key = private_key.to_public_key().unwrap();
+            let payload = b"AWS-LC FIPS ECDH-ES payload".to_vec();
+            let encoded = Jwe::new(JweAlg::EcdhEs, JweEnc::Aes256Gcm, payload.clone())
+                .encode(&public_key)
+                .unwrap();
+            let raw = RawJwe::decode(&encoded).unwrap();
+
+            assert!(raw.encrypted_key.is_empty());
+            assert!(raw.header.epk.is_some());
+            let decoded = raw
+                .decrypt(&private_key)
+                .unwrap_or_else(|error| panic!("{curve} ECDH-ES decryption failed: {error:?}"));
+            assert_eq!(decoded.payload, payload);
+        }
+    }
+
+    #[test]
+    fn ecdh_es_aes_key_wrap_roundtrips() {
+        let private_key = PrivateKey::from_pem_str(picky_test_data::EC_NIST384_PK_1).unwrap();
+        let public_key = private_key.to_public_key().unwrap();
+
+        for algorithm in [JweAlg::EcdhEsAesKeyWrap128, JweAlg::EcdhEsAesKeyWrap256] {
+            let payload = format!("AWS-LC FIPS {algorithm:?} payload").into_bytes();
+            let encoded = Jwe::new(algorithm, JweEnc::Aes128Gcm, payload.clone())
+                .encode(&public_key)
+                .unwrap();
+            let raw = RawJwe::decode(&encoded).unwrap();
+
+            assert_eq!(raw.encrypted_key.len(), JweEnc::Aes128Gcm.key_size() + 8);
+            assert!(raw.header.epk.is_some());
+            let decoded = raw.decrypt(&private_key).unwrap();
+            assert_eq!(decoded.payload, payload);
+        }
+    }
+
+    #[test]
+    fn rejects_ecdh_es_aes_192_key_wrap() {
+        let private_key = PrivateKey::from_pem_str(picky_test_data::EC_NIST256_PK_1).unwrap();
+        let public_key = private_key.to_public_key().unwrap();
+        let error = Jwe::new(JweAlg::EcdhEsAesKeyWrap192, JweEnc::Aes128Gcm, b"payload".to_vec())
+            .encode(&public_key)
+            .unwrap_err();
+
+        assert!(matches!(error, JweError::UnsupportedAlgorithm { .. }));
     }
 
     #[test]

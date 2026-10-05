@@ -13,6 +13,10 @@ use picky_asn1_x509::{
 use thiserror::Error;
 use zeroize::Zeroize;
 
+#[cfg(feature = "fips-aws-lc")]
+use aws_lc_rs::encoding::AsDer as _;
+#[cfg(feature = "fips-aws-lc")]
+use aws_lc_rs::signature::KeyPair as _;
 #[cfg(feature = "rustcrypto")]
 use crypto_bigint::{BoxedUint, NonZero};
 #[cfg(feature = "rustcrypto")]
@@ -38,6 +42,9 @@ use ed::{NamedEdAlgorithm, X25519_FIELD_ELEMENT_SIZE, X25519FieldElement};
 
 pub use ec::EcCurve;
 pub use ed::EdAlgorithm;
+
+#[cfg(all(test, feature = "fips-aws-lc"))]
+mod fips_tests;
 
 #[derive(Debug, Error)]
 pub enum KeyError {
@@ -141,6 +148,38 @@ const EC_PRIVATE_KEY_LABEL: &str = "EC PRIVATE KEY";
 // [https://github.com/briansmith/ring/blob/155231fb017acaaa94a044f124bb34a777d115ef/src/ec/suite_b.rs#L221-L225]
 #[cfg(feature = "rustcrypto")]
 const COMPRESS_EC_POINT_BY_DEFAULT: bool = false;
+
+#[cfg(feature = "fips-aws-lc")]
+fn aws_lc_ecdsa_algorithm(curve: EcCurve) -> &'static aws_lc_rs::signature::EcdsaSigningAlgorithm {
+    match curve {
+        EcCurve::NistP256 => &aws_lc_rs::signature::ECDSA_P256_SHA256_ASN1_SIGNING,
+        EcCurve::NistP384 => &aws_lc_rs::signature::ECDSA_P384_SHA384_ASN1_SIGNING,
+        EcCurve::NistP521 => &aws_lc_rs::signature::ECDSA_P521_SHA512_ASN1_SIGNING,
+    }
+}
+
+#[cfg(feature = "fips-aws-lc")]
+fn calculate_public_ec_key_aws_lc(
+    curve_oid: &ObjectIdentifier,
+    private_key: &[u8],
+) -> Result<Option<Vec<u8>>, KeyError> {
+    let curve = match NamedEcCurve::from(curve_oid) {
+        NamedEcCurve::Known(curve) => curve,
+        NamedEcCurve::Unsupported(_) => return Ok(None),
+    };
+    let private_key_info = PrivateKeyInfo::new_ec_encryption(curve_oid.clone(), private_key.to_vec(), None, false);
+    let pkcs8 = picky_asn1_der::to_vec(&private_key_info).map_err(|error| KeyError::Asn1Serialization {
+        source: error,
+        element: "EC private key for AWS-LC public-key derivation",
+    })?;
+    let key_pair =
+        aws_lc_rs::signature::EcdsaKeyPair::from_pkcs8(aws_lc_ecdsa_algorithm(curve), &pkcs8).map_err(|error| {
+            KeyError::EC {
+                context: format!("AWS-LC failed to derive the {curve} public key: {error}"),
+            }
+        })?;
+    Ok(Some(key_pair.public_key().as_ref().to_vec()))
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum PrivateKeyKind {
@@ -456,12 +495,34 @@ impl PrivateKey {
                 Self::from_ec_decoded_der_with_curve_oid(curve_oid, key)
             }
             PrivateKeyValue::ED(OctetStringAsn1Container(key)) => {
-                #[cfg(feature = "fips")]
+                #[cfg(feature = "fips-aws-lc")]
                 {
-                    let _ = key;
-                    Err(KeyError::AlgorithmDisabledByPolicy {
-                        algorithm: "Ed25519/X25519 private keys".to_string(),
-                    })
+                    let algorithm = ed::NamedEdAlgorithm::from(inner.private_key_algorithm.oid());
+                    match algorithm {
+                        ed::NamedEdAlgorithm::Known(EdAlgorithm::Ed25519) => {
+                            let key_pair =
+                                aws_lc_rs::signature::Ed25519KeyPair::from_seed_unchecked(&key.0).map_err(|error| {
+                                    KeyError::ED {
+                                        context: format!("AWS-LC rejected the Ed25519 private key: {error}"),
+                                    }
+                                })?;
+                            let public_key = Some(key_pair.public_key().as_ref().to_vec());
+                            Ok(Self {
+                                kind: PrivateKeyKind::Ed {
+                                    algorithm_oid: algorithm.into(),
+                                    public_key,
+                                    private_key: key.0.clone(),
+                                },
+                                inner,
+                            })
+                        }
+                        ed::NamedEdAlgorithm::Known(EdAlgorithm::X25519) => Err(KeyError::AlgorithmDisabledByPolicy {
+                            algorithm: "X25519 private keys".to_string(),
+                        }),
+                        ed::NamedEdAlgorithm::Unsupported(oid) => Err(KeyError::ED {
+                            context: format!("unsupported Edwards-curve private key OID: {oid:?}"),
+                        }),
+                    }
                 }
 
                 #[cfg(feature = "rustcrypto")]
@@ -554,11 +615,12 @@ impl PrivateKey {
         let (public_key, public_key_is_generated) = match &decoded.public_key.0.0 {
             Some(bit_string) => (Some(bit_string.payload_view().to_vec()), false),
             None => {
-                #[cfg(feature = "fips")]
+                #[cfg(feature = "fips-aws-lc")]
                 {
-                    return Err(KeyError::AlgorithmDisabledByPolicy {
-                        algorithm: "deriving an EC public key during private-key import".to_string(),
-                    });
+                    (
+                        calculate_public_ec_key_aws_lc(&curve_oid, &decoded.private_key.0)?,
+                        true,
+                    )
                 }
 
                 #[cfg(feature = "rustcrypto")]
@@ -728,11 +790,28 @@ impl PrivateKey {
 
     /// **Beware**: this is insanely slow in debug builds.
     pub fn generate_rsa(bits: usize) -> Result<Self, KeyError> {
-        #[cfg(feature = "fips")]
+        #[cfg(feature = "fips-aws-lc")]
         {
-            Err(KeyError::AlgorithmDisabledByPolicy {
-                algorithm: format!("RSA key generation ({bits} bits) is not implemented by the selected provider"),
-            })
+            let size = match bits {
+                2048 => aws_lc_rs::rsa::KeySize::Rsa2048,
+                3072 => aws_lc_rs::rsa::KeySize::Rsa3072,
+                4096 => aws_lc_rs::rsa::KeySize::Rsa4096,
+                8192 => aws_lc_rs::rsa::KeySize::Rsa8192,
+                _ => {
+                    return Err(KeyError::AlgorithmDisabledByPolicy {
+                        algorithm: format!(
+                            "RSA key generation requires a supported FIPS key size (2048, 3072, 4096, or 8192 bits), got {bits}"
+                        ),
+                    });
+                }
+            };
+            let key = aws_lc_rs::rsa::KeyPair::generate(size).map_err(|_| KeyError::Rsa {
+                context: format!("AWS-LC failed to generate a {bits}-bit RSA key"),
+            })?;
+            let document = key.as_der().map_err(|_| KeyError::Rsa {
+                context: "AWS-LC failed to serialize the generated RSA key".to_string(),
+            })?;
+            Self::from_pkcs8(document.as_ref())
         }
 
         #[cfg(feature = "rustcrypto")]
@@ -749,11 +828,15 @@ impl PrivateKey {
 
     /// Generates new ec key pair with specified supported curve.
     pub fn generate_ec(curve: EcCurve) -> Result<Self, KeyError> {
-        #[cfg(feature = "fips")]
+        #[cfg(feature = "fips-aws-lc")]
         {
-            Err(KeyError::AlgorithmDisabledByPolicy {
-                algorithm: format!("{curve} key generation is not implemented by the selected provider"),
-            })
+            let algorithm = aws_lc_ecdsa_algorithm(curve);
+            let document =
+                aws_lc_rs::signature::EcdsaKeyPair::generate_pkcs8(algorithm, &aws_lc_rs::rand::SystemRandom::new())
+                    .map_err(|_| KeyError::EC {
+                        context: format!("AWS-LC failed to generate a {curve} key"),
+                    })?;
+            Self::from_pkcs8(&document)
         }
 
         #[cfg(feature = "rustcrypto")]
@@ -821,12 +904,25 @@ impl PrivateKey {
     /// `write_public_key` specifies whether to include public key in the private key file.
     /// Note that OpenSSL does not support ed keys with public key included.
     pub fn generate_ed(algorithm: EdAlgorithm, write_public_key: bool) -> Result<Self, KeyError> {
-        #[cfg(feature = "fips")]
+        #[cfg(feature = "fips-aws-lc")]
         {
-            let _ = write_public_key;
-            Err(KeyError::AlgorithmDisabledByPolicy {
-                algorithm: format!("{algorithm:?} key generation"),
-            })
+            match algorithm {
+                EdAlgorithm::Ed25519 => {
+                    let rng = aws_lc_rs::rand::SystemRandom::new();
+                    let document = if write_public_key {
+                        aws_lc_rs::signature::Ed25519KeyPair::generate_pkcs8(&rng)
+                    } else {
+                        aws_lc_rs::signature::Ed25519KeyPair::generate_pkcs8v1(&rng)
+                    }
+                    .map_err(|_| KeyError::ED {
+                        context: "AWS-LC failed to generate an Ed25519 key".to_string(),
+                    })?;
+                    Self::from_pkcs8(&document)
+                }
+                EdAlgorithm::X25519 => Err(KeyError::AlgorithmDisabledByPolicy {
+                    algorithm: "X25519 key generation".to_string(),
+                }),
+            }
         }
 
         #[cfg(feature = "rustcrypto")]

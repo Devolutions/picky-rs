@@ -45,7 +45,12 @@ pub(crate) fn require_hash(algorithm: HashAlgorithm) -> Result<(), CryptoPolicyE
     if !fips_mode()
         || matches!(
             algorithm,
-            HashAlgorithm::SHA2_256 | HashAlgorithm::SHA2_384 | HashAlgorithm::SHA2_512
+            HashAlgorithm::SHA2_224
+                | HashAlgorithm::SHA2_256
+                | HashAlgorithm::SHA2_384
+                | HashAlgorithm::SHA2_512
+                | HashAlgorithm::SHA3_384
+                | HashAlgorithm::SHA3_512
         )
     {
         Ok(())
@@ -78,7 +83,10 @@ pub(crate) fn require_signature(
         ) | (
             SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_384),
             Some(EcCurve::NistP384)
-        )
+        ) | (
+            SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_512),
+            Some(EcCurve::NistP521)
+        ) | (SignatureAlgorithm::Ed25519, None)
     );
 
     if allowed {
@@ -98,6 +106,7 @@ mod aws_lc_fips {
     use super::{CryptoPolicyError, require_signature};
     use crate::hash::HashAlgorithm;
     use crate::key::ec::{EcCurve, EcdsaKeypair, EcdsaPublicKey, NamedEcCurve};
+    use crate::key::ed::{EdAlgorithm, EdKeypair, EdPublicKey, NamedEdAlgorithm};
     use crate::key::{PrivateKey, PublicKey};
     use crate::signature::{SignatureAlgorithm, SignatureError};
     use aws_lc_rs::rand::SystemRandom;
@@ -152,6 +161,7 @@ mod aws_lc_fips {
                 let signing_algorithm = match (curve, hash) {
                     (EcCurve::NistP256, HashAlgorithm::SHA2_256) => &signature::ECDSA_P256_SHA256_ASN1_SIGNING,
                     (EcCurve::NistP384, HashAlgorithm::SHA2_384) => &signature::ECDSA_P384_SHA384_ASN1_SIGNING,
+                    (EcCurve::NistP521, HashAlgorithm::SHA2_512) => &signature::ECDSA_P521_SHA512_ASN1_SIGNING,
                     _ => unreachable!("policy checked above"),
                 };
                 let key_pair = EcdsaKeyPair::from_private_key_and_public_key(
@@ -171,9 +181,28 @@ mod aws_lc_fips {
                         context: "AWS-LC ECDSA signing failed".to_string(),
                     })
             }
-            SignatureAlgorithm::Ed25519 => Err(SignatureError::AlgorithmDisabledByPolicy {
-                algorithm: "Ed25519".to_string(),
-            }),
+            SignatureAlgorithm::Ed25519 => {
+                require_signature(algorithm, None).map_err(policy_error)?;
+                let key = EdKeypair::try_from(private_key)?;
+                if key.algorithm() != &NamedEdAlgorithm::Known(EdAlgorithm::Ed25519) {
+                    return Err(SignatureError::AlgorithmDisabledByPolicy {
+                        algorithm: key.algorithm().to_string(),
+                    });
+                }
+                let key_pair = match key.public_key() {
+                    Some(public_key) => signature::Ed25519KeyPair::from_seed_and_public_key(key.secret(), public_key),
+                    None => signature::Ed25519KeyPair::from_seed_unchecked(key.secret()),
+                }
+                .map_err(|error| SignatureError::Ed {
+                    context: format!("AWS-LC rejected the Ed25519 keypair: {error}"),
+                })?;
+                key_pair
+                    .try_sign(msg)
+                    .map(|signature| signature.as_ref().to_vec())
+                    .map_err(|_| SignatureError::Ed {
+                        context: "AWS-LC Ed25519 signing failed".to_string(),
+                    })
+            }
         }
     }
 
@@ -208,14 +237,20 @@ mod aws_lc_fips {
                 let verification_algorithm: &dyn signature::VerificationAlgorithm = match (curve, hash) {
                     (EcCurve::NistP256, HashAlgorithm::SHA2_256) => &signature::ECDSA_P256_SHA256_ASN1,
                     (EcCurve::NistP384, HashAlgorithm::SHA2_384) => &signature::ECDSA_P384_SHA384_ASN1,
+                    (EcCurve::NistP521, HashAlgorithm::SHA2_512) => &signature::ECDSA_P521_SHA512_ASN1,
                     _ => unreachable!("policy checked above"),
                 };
                 (verification_algorithm, key.encoded_point().to_vec())
             }
             SignatureAlgorithm::Ed25519 => {
-                return Err(SignatureError::AlgorithmDisabledByPolicy {
-                    algorithm: "Ed25519".to_string(),
-                });
+                require_signature(algorithm, None).map_err(policy_error)?;
+                let key = EdPublicKey::try_from(public_key)?;
+                if key.algorithm() != &NamedEdAlgorithm::Known(EdAlgorithm::Ed25519) {
+                    return Err(SignatureError::AlgorithmDisabledByPolicy {
+                        algorithm: key.algorithm().to_string(),
+                    });
+                }
+                (&signature::ED25519, key.data().to_vec())
             }
         };
 
@@ -305,6 +340,7 @@ mod tests {
         for (pem, hash) in [
             (picky_test_data::EC_NIST256_PK_1, HashAlgorithm::SHA2_256),
             (picky_test_data::EC_NIST384_PK_1, HashAlgorithm::SHA2_384),
+            (picky_test_data::EC_NIST521_PK_1, HashAlgorithm::SHA2_512),
         ] {
             let key = PrivateKey::from_pem_str(pem).unwrap();
             let public_key = key.to_public_key().unwrap();
@@ -343,56 +379,39 @@ mod tests {
 
     #[cfg(feature = "fips")]
     #[test]
-    fn rejects_ed25519_signature_algorithm() {
-        use crate::key::{KeyError, PrivateKey, PublicKey};
+    fn approved_ed25519_signatures_use_fips_provider() {
+        use crate::key::PrivateKey;
         use crate::signature::SignatureError;
 
-        let key_error = PrivateKey::from_pem_str(picky_test_data::ED25519_PEM_PK_1).unwrap_err();
+        let key = PrivateKey::from_pem_str(picky_test_data::ED25519_PEM_PK_1).unwrap();
+        let public_key = key.to_public_key().unwrap();
+        let message = b"picky FIPS Ed25519 provider test";
+        let signature = SignatureAlgorithm::Ed25519.sign(message, &key).unwrap();
 
+        SignatureAlgorithm::Ed25519
+            .verify(&public_key, message, &signature)
+            .unwrap();
         assert!(matches!(
-            key_error,
-            KeyError::AlgorithmDisabledByPolicy { ref algorithm }
-                if algorithm == "Ed25519/X25519 private keys"
+            SignatureAlgorithm::Ed25519.verify(&public_key, b"tampered", &signature),
+            Err(SignatureError::BadSignature)
         ));
-        assert_eq!(
-            key_error.to_string(),
-            "algorithm disabled by the active cryptographic policy: Ed25519/X25519 private keys"
-        );
-
-        let public_key = PublicKey::from_pem_str(picky_test_data::ED25519_PEM_PK_1_PUB).unwrap();
-        let signature_error = SignatureAlgorithm::Ed25519
-            .verify(&public_key, b"legacy", &[0_u8; 64])
-            .unwrap_err();
-
-        assert!(matches!(
-            signature_error,
-            SignatureError::AlgorithmDisabledByPolicy { ref algorithm } if algorithm == "Ed25519"
-        ));
-        assert_eq!(
-            signature_error.to_string(),
-            "algorithm disabled by the active cryptographic policy: Ed25519"
-        );
     }
 
     #[cfg(feature = "fips")]
     #[test]
-    fn rejects_unapproved_p521_curve() {
+    fn approved_p521_curve_uses_fips_provider() {
         use crate::key::PrivateKey;
         use crate::signature::SignatureError;
 
         let key = PrivateKey::from_pem_str(picky_test_data::EC_NIST521_PK_1).unwrap();
-        let error = SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_512)
-            .sign(b"legacy", &key)
-            .unwrap_err();
+        let public_key = key.to_public_key().unwrap();
+        let algorithm = SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_512);
+        let signature = algorithm.sign(b"P-521", &key).unwrap();
 
+        algorithm.verify(&public_key, b"P-521", &signature).unwrap();
         assert!(matches!(
-            error,
-            SignatureError::AlgorithmDisabledByPolicy { ref algorithm }
-                if algorithm == "Ecdsa(SHA2_512) with NIST-P521"
+            algorithm.verify(&public_key, b"tampered", &signature),
+            Err(SignatureError::BadSignature)
         ));
-        assert_eq!(
-            error.to_string(),
-            "algorithm disabled by the active cryptographic policy: Ecdsa(SHA2_512) with NIST-P521"
-        );
     }
 }

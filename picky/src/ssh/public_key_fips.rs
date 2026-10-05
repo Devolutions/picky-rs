@@ -1,6 +1,7 @@
 use crate::hash::{HashAlgorithm, HashError};
 use crate::key::ec::{EcdsaPublicKey, NamedEcCurve};
-use crate::key::{EcCurve, KeyError, PublicKey};
+use crate::key::ed::{EdPublicKey, NamedEdAlgorithm};
+use crate::key::{EcCurve, EdAlgorithm, KeyError, PublicKey};
 use base64::Engine as _;
 use picky_asn1_x509::PublicKey as InnerPublicKey;
 use std::str::FromStr;
@@ -26,6 +27,7 @@ pub enum SshPublicKeyError {
 pub enum SshBasePublicKey {
     Rsa(PublicKey),
     Ec(PublicKey),
+    Ed(PublicKey),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,7 +48,7 @@ impl SshPublicKey {
 
     pub fn inner_key(&self) -> &PublicKey {
         match &self.inner_key {
-            SshBasePublicKey::Rsa(key) | SshBasePublicKey::Ec(key) => key,
+            SshBasePublicKey::Rsa(key) | SshBasePublicKey::Ec(key) | SshBasePublicKey::Ed(key) => key,
         }
     }
 
@@ -89,9 +91,10 @@ impl SshPublicKey {
                 let (key_type, identifier) = match key.curve() {
                     NamedEcCurve::Known(EcCurve::NistP256) => ("ecdsa-sha2-nistp256", "nistp256"),
                     NamedEcCurve::Known(EcCurve::NistP384) => ("ecdsa-sha2-nistp384", "nistp384"),
+                    NamedEcCurve::Known(EcCurve::NistP521) => ("ecdsa-sha2-nistp521", "nistp521"),
                     _ => {
                         return Err(SshPublicKeyError::UnsupportedKeyType(
-                            "only P-256 and P-384 EC keys are enabled by the FIPS policy".to_string(),
+                            "unsupported EC key type".to_string(),
                         ));
                     }
                 };
@@ -99,6 +102,15 @@ impl SshPublicKey {
                 write_string(&mut blob, identifier.as_bytes());
                 write_string(&mut blob, key.encoded_point());
                 key_type
+            }
+            SshBasePublicKey::Ed(key) => {
+                let key = EdPublicKey::try_from(key)?;
+                if key.algorithm() != &NamedEdAlgorithm::Known(EdAlgorithm::Ed25519) {
+                    return Err(SshPublicKeyError::UnsupportedKeyType(key.algorithm().to_string()));
+                }
+                write_string(&mut blob, b"ssh-ed25519");
+                write_string(&mut blob, key.data());
+                "ssh-ed25519"
             }
         };
         Ok((key_type, blob))
@@ -127,23 +139,32 @@ impl FromStr for SshPublicKey {
                 let modulus = read_mpint(&mut cursor)?;
                 SshBasePublicKey::Rsa(PublicKey::from_rsa_encoded_components(modulus, exponent))
             }
-            "ecdsa-sha2-nistp256" | "ecdsa-sha2-nistp384" => {
+            "ecdsa-sha2-nistp256" | "ecdsa-sha2-nistp384" | "ecdsa-sha2-nistp521" => {
                 let identifier = read_string(&mut cursor)?;
-                let expected_identifier = if outer_key_type.ends_with("nistp256") {
-                    b"nistp256".as_slice()
-                } else {
-                    b"nistp384".as_slice()
+                let (expected_identifier, curve) = match outer_key_type {
+                    "ecdsa-sha2-nistp256" => (b"nistp256".as_slice(), EcCurve::NistP256),
+                    "ecdsa-sha2-nistp384" => (b"nistp384".as_slice(), EcCurve::NistP384),
+                    "ecdsa-sha2-nistp521" => (b"nistp521".as_slice(), EcCurve::NistP521),
+                    _ => unreachable!("matched above"),
                 };
                 if identifier != expected_identifier {
                     return Err(SshPublicKeyError::InvalidEncoding);
                 }
                 let point = read_string(&mut cursor)?;
-                let curve = if identifier == b"nistp256" {
-                    NamedEcCurve::Known(EcCurve::NistP256)
-                } else {
-                    NamedEcCurve::Known(EcCurve::NistP384)
-                };
-                SshBasePublicKey::Ec(PublicKey::from_ec_encoded_components(&curve.into(), point))
+                SshBasePublicKey::Ec(PublicKey::from_ec_encoded_components(
+                    &NamedEcCurve::Known(curve).into(),
+                    point,
+                ))
+            }
+            "ssh-ed25519" => {
+                let public_key = read_string(&mut cursor)?;
+                if public_key.len() != 32 {
+                    return Err(SshPublicKeyError::InvalidEncoding);
+                }
+                SshBasePublicKey::Ed(PublicKey::from_ed_encoded_components(
+                    &EdAlgorithm::Ed25519.into(),
+                    public_key,
+                ))
             }
             unsupported => return Err(SshPublicKeyError::UnsupportedKeyType(unsupported.to_string())),
         };
@@ -218,6 +239,17 @@ mod tests {
             let key = SshPublicKey::from_str(encoded).unwrap();
             assert_eq!(key.to_string().unwrap(), encoded);
         }
+
+        let p521 = crate::key::PrivateKey::from_pem_str(picky_test_data::EC_NIST521_PK_1)
+            .unwrap()
+            .to_public_key()
+            .unwrap();
+        let key = SshPublicKey {
+            inner_key: SshBasePublicKey::Ec(p521),
+            comment: "p521@picky.com".to_string(),
+        };
+        let encoded = key.to_string().unwrap();
+        assert_eq!(SshPublicKey::from_str(&encoded).unwrap(), key);
     }
 
     #[test]
@@ -230,11 +262,11 @@ mod tests {
     }
 
     #[test]
-    fn rejects_ed25519_public_keys() {
-        let error = SshPublicKey::from_str(
-            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDKeXB8air8kVbyipmcfbnqvW5iSiDXmefB9o2vpNINr test",
-        )
-        .unwrap_err();
-        assert!(matches!(error, SshPublicKeyError::UnsupportedKeyType(_)));
+    fn ed25519_public_key_roundtrip() {
+        let encoded = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDKeXB8air8kVbyipmcfbnqvW5iSiDXmefB9o2vpNINr test\r\n";
+        let key = SshPublicKey::from_str(encoded).unwrap();
+
+        assert_eq!(key.to_string().unwrap(), encoded);
+        assert_ne!(key.fingerprint_sha256().unwrap(), [0u8; 32]);
     }
 }

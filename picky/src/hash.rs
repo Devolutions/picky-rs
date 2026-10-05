@@ -96,9 +96,12 @@ impl HashAlgorithm {
         {
             crate::crypto::require_hash(self)?;
             let algorithm = match self {
+                Self::SHA2_224 => &aws_lc_rs::digest::SHA224,
                 Self::SHA2_256 => &aws_lc_rs::digest::SHA256,
                 Self::SHA2_384 => &aws_lc_rs::digest::SHA384,
                 Self::SHA2_512 => &aws_lc_rs::digest::SHA512,
+                Self::SHA3_384 => &aws_lc_rs::digest::SHA3_384,
+                Self::SHA3_512 => &aws_lc_rs::digest::SHA3_512,
                 _ => unreachable!("policy checked above"),
             };
             Ok(aws_lc_rs::digest::digest(algorithm, msg).as_ref().to_vec())
@@ -142,8 +145,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn approved_sha2_digests_and_output_sizes_are_available() {
+    fn approved_digests_and_output_sizes_are_available() {
         for (algorithm, expected_hex, expected_size) in [
+            (
+                HashAlgorithm::SHA2_224,
+                "23097d223405d8228642a477bda255b32aadbce4bda0b3f7e36c9da7",
+                28,
+            ),
             (
                 HashAlgorithm::SHA2_256,
                 "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
@@ -161,6 +169,18 @@ mod tests {
                  2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f",
                 64,
             ),
+            (
+                HashAlgorithm::SHA3_384,
+                "ec01498288516fc926459f58e2c6ad8df9b473cb0fc08c2596da7cf0e49be4b\
+                 298d88cea927ac7f539f1edf228376d25",
+                48,
+            ),
+            (
+                HashAlgorithm::SHA3_512,
+                "b751850b1a57168a5693cd924b6b096e08f621827444f70d884f5d0240d2712\
+                 e10e116e9192af3c91a7ec57647e3934057340b4cf408d5a56592f8274eec53f0",
+                64,
+            ),
         ] {
             assert_eq!(algorithm.digest(b"abc").unwrap(), hex::decode(expected_hex).unwrap());
             assert_eq!(algorithm.output_size().unwrap(), expected_size);
@@ -170,13 +190,7 @@ mod tests {
     #[cfg(feature = "fips")]
     #[test]
     fn fips_rejects_unapproved_hashing_without_panicking() {
-        for algorithm in [
-            HashAlgorithm::MD5,
-            HashAlgorithm::SHA1,
-            HashAlgorithm::SHA2_224,
-            HashAlgorithm::SHA3_384,
-            HashAlgorithm::SHA3_512,
-        ] {
+        for algorithm in [HashAlgorithm::MD5, HashAlgorithm::SHA1] {
             let digest_error = algorithm.digest(b"attacker-controlled input").unwrap_err();
             assert!(matches!(
                 digest_error,

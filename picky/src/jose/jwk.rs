@@ -100,8 +100,6 @@ impl JwkKeyType {
     ///
     /// `x` and `y` are big-endian representation of the affine point coordinates.
     pub fn new_ec_key(curve: JwkEcPublicKeyCurve, x: &[u8], y: &[u8]) -> Self {
-        let x = h_strip_unrequired_leading_zero(x);
-        let y = h_strip_unrequired_leading_zero(y);
         Self::Ec(JwkPublicEcKey {
             crv: curve,
             x: general_purpose::URL_SAFE_NO_PAD.encode(x),
