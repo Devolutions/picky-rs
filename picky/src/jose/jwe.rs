@@ -31,8 +31,8 @@ use aws_lc_rs::error::Unspecified;
 use aws_lc_rs::key_wrap::{AES_128, AES_256, AesKek, KeyWrap as _};
 #[cfg(all(feature = "jwe-crypto", feature = "fips-aws-lc"))]
 use aws_lc_rs::rsa::{
-    OAEP_SHA256_MGF1SHA256, OaepPrivateDecryptingKey, OaepPublicEncryptingKey, PrivateDecryptingKey,
-    PublicEncryptingKey,
+    OAEP_SHA256_MGF1SHA256, OAEP_SHA384_MGF1SHA384, OAEP_SHA512_MGF1SHA512, OaepPrivateDecryptingKey,
+    OaepPublicEncryptingKey, PrivateDecryptingKey, PublicEncryptingKey,
 };
 use base64::engine::general_purpose;
 use base64::{DecodeError, Engine as _};
@@ -73,6 +73,10 @@ pub enum JweError {
     /// AES-GCM error (opaque)
     #[error("AES-GCM error (opaque)")]
     AesGcm,
+
+    /// AES-CBC-HMAC error (opaque)
+    #[error("AES-CBC-HMAC error (opaque)")]
+    AesCbcHmac,
 
     /// Selected cryptographic provider failed.
     #[error("cryptographic provider failed during {operation}: error code {code}")]
@@ -202,6 +206,14 @@ pub enum JweAlg {
     /// RSAES OAEP using SHA-256 and MGF1 with SHA-256
     #[serde(rename = "RSA-OAEP-256")]
     RsaOaep256,
+
+    /// RSAES OAEP using SHA-384 and MGF1 with SHA-384
+    #[serde(rename = "RSA-OAEP-384")]
+    RsaOaep384,
+
+    /// RSAES OAEP using SHA-512 and MGF1 with SHA-512
+    #[serde(rename = "RSA-OAEP-512")]
+    RsaOaep512,
 
     /// AES Key Wrap with default initial value using 128 bit key (unsupported)
     ///
@@ -464,17 +476,17 @@ impl JweAlg {
 /// [JSON Web Algorithms (JWA) draft-ietf-jose-json-web-algorithms-40 #5](https://www.rfc-editor.org/rfc/rfc7518.html#section-5.1)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum JweEnc {
-    /// AES_128_CBC_HMAC_SHA_256 authenticated encryption algorithm. (unsupported)
+    /// AES_128_CBC_HMAC_SHA_256 authenticated encryption algorithm.
     ///
     /// Required by RFC
     #[serde(rename = "A128CBC-HS256")]
     Aes128CbcHmacSha256,
 
-    /// AES_192_CBC_HMAC_SHA_384 authenticated encryption algorithm. (unsupported)
+    /// AES_192_CBC_HMAC_SHA_384 authenticated encryption algorithm.
     #[serde(rename = "A192CBC-HS384")]
     Aes192CbcHmacSha384,
 
-    /// AES_256_CBC_HMAC_SHA_512 authenticated encryption algorithm. (unsupported)
+    /// AES_256_CBC_HMAC_SHA_512 authenticated encryption algorithm.
     ///
     /// Required by RFC
     #[serde(rename = "A256CBC-HS512")]
@@ -510,9 +522,12 @@ impl JweEnc {
 
     pub fn key_size(self) -> usize {
         match self {
-            Self::Aes128CbcHmacSha256 | Self::Aes128Gcm => 16,
-            Self::Aes192CbcHmacSha384 | Self::Aes192Gcm => 24,
-            Self::Aes256CbcHmacSha512 | Self::Aes256Gcm => 32,
+            Self::Aes128CbcHmacSha256 => 32,
+            Self::Aes192CbcHmacSha384 => 48,
+            Self::Aes256CbcHmacSha512 => 64,
+            Self::Aes128Gcm => 16,
+            Self::Aes192Gcm => 24,
+            Self::Aes256Gcm => 32,
         }
     }
 
@@ -526,9 +541,9 @@ impl JweEnc {
     pub fn tag_size(self) -> usize {
         match self {
             Self::Aes128Gcm | Self::Aes192Gcm | Self::Aes256Gcm => 16usize,
-            Self::Aes128CbcHmacSha256 => 32usize,
-            Self::Aes192CbcHmacSha384 => 48usize,
-            Self::Aes256CbcHmacSha512 => 64usize,
+            Self::Aes128CbcHmacSha256 => 16usize,
+            Self::Aes192CbcHmacSha384 => 24usize,
+            Self::Aes256CbcHmacSha512 => 32usize,
         }
     }
 }
@@ -916,6 +931,8 @@ fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
                     JweAlg::RsaPkcs1v15 => RsaPaddingScheme::Pkcs1v15Encrypt,
                     JweAlg::RsaOaep => RsaPaddingScheme::Oaep(Oaep::<sha1::Sha1>::new()),
                     JweAlg::RsaOaep256 => RsaPaddingScheme::Oaep256(Oaep::<sha2::Sha256>::new()),
+                    JweAlg::RsaOaep384 => RsaPaddingScheme::Oaep384(Oaep::<sha2::Sha384>::new()),
+                    JweAlg::RsaOaep512 => RsaPaddingScheme::Oaep512(Oaep::<sha2::Sha512>::new()),
                     unsupported => {
                         return Err(JweError::UnsupportedAlgorithm {
                             algorithm: format!("{unsupported:?}"),
@@ -964,31 +981,12 @@ fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
     // - `epk` header could be set for ECDH-ES
     let protected_header_base64 = general_purpose::URL_SAFE_NO_PAD.encode(serde_json::to_vec(&jwe.header)?);
 
-    let mut buffer = jwe.payload;
-    let nonce = <aes_gcm::aead::Nonce<Aes128Gcm> as From<[u8; 12]>>::from(rand::random()); // 96-bits nonce for all AES-GCM variants
     let aad = protected_header_base64.as_bytes(); // The Additional Authenticated Data value used for AES-GCM.
-    let authentication_tag = match jwe.header.enc {
-        JweEnc::Aes128Gcm => {
-            let algo = Aes128Gcm::new_from_slice(&jwe_cek).map_err(|_| JweError::AesGcm)?;
-            algo.encrypt_inout_detached(&nonce, aad, buffer.as_mut_slice().into())?
-        }
-        JweEnc::Aes192Gcm => {
-            let algo = Aes192Gcm::new_from_slice(&jwe_cek).map_err(|_| JweError::AesGcm)?;
-            algo.encrypt_inout_detached(&nonce, aad, buffer.as_mut_slice().into())?
-        }
-        JweEnc::Aes256Gcm => {
-            let algo = Aes256Gcm::new_from_slice(&jwe_cek).map_err(|_| JweError::AesGcm)?;
-            algo.encrypt_inout_detached(&nonce, aad, buffer.as_mut_slice().into())?
-        }
-        unsupported => {
-            return Err(JweError::UnsupportedAlgorithm {
-                algorithm: format!("{unsupported:?}"),
-            });
-        }
-    };
+    let (initialization_vector, ciphertext, authentication_tag) =
+        rustcrypto_encrypt_content(jwe.header.enc, &jwe_cek, aad, &jwe.payload)?;
 
-    let initialization_vector_base64 = general_purpose::URL_SAFE_NO_PAD.encode(nonce.as_slice());
-    let ciphertext_base64 = general_purpose::URL_SAFE_NO_PAD.encode(&buffer);
+    let initialization_vector_base64 = general_purpose::URL_SAFE_NO_PAD.encode(initialization_vector);
+    let ciphertext_base64 = general_purpose::URL_SAFE_NO_PAD.encode(ciphertext);
     let authentication_tag_base64 = general_purpose::URL_SAFE_NO_PAD.encode(authentication_tag);
 
     Ok([
@@ -1041,11 +1039,16 @@ fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
             require_fips_jwe_enc(jwe.header.enc)?;
             match &public_key.as_inner().subject_public_key {
                 picky_asn1_x509::PublicKey::Rsa(_) => {
-                    if jwe.header.alg != JweAlg::RsaOaep256 {
-                        return Err(JweError::UnsupportedAlgorithm {
-                            algorithm: format!("{} cannot be used with an RSA key", jwe.header.alg.name()),
-                        });
-                    }
+                    let oaep_algorithm = match jwe.header.alg {
+                        JweAlg::RsaOaep256 => &OAEP_SHA256_MGF1SHA256,
+                        JweAlg::RsaOaep384 => &OAEP_SHA384_MGF1SHA384,
+                        JweAlg::RsaOaep512 => &OAEP_SHA512_MGF1SHA512,
+                        unsupported => {
+                            return Err(JweError::UnsupportedAlgorithm {
+                                algorithm: format!("{} cannot be used with an RSA key", unsupported.name()),
+                            });
+                        }
+                    };
                     let rsa_key =
                         PublicEncryptingKey::from_der(&public_key.to_der()?).map_err(|error| JweError::Rsa {
                             context: format!("AWS-LC rejected the RSA public key: {error}"),
@@ -1056,9 +1059,9 @@ fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
                     let cek = generate_cek(jwe.header.enc)?;
                     let mut encrypted_key = vec![0u8; rsa_key.ciphertext_size()];
                     let encrypted_key = rsa_key
-                        .encrypt(&OAEP_SHA256_MGF1SHA256, &cek, &mut encrypted_key, None)
+                        .encrypt(oaep_algorithm, &cek, &mut encrypted_key, None)
                         .map_err(|error| JweError::Rsa {
-                            context: format!("AWS-LC RSA-OAEP-256 encryption failed: {error}"),
+                            context: format!("AWS-LC {} encryption failed: {error}", jwe.header.alg.name()),
                         })?;
                     (general_purpose::URL_SAFE_NO_PAD.encode(encrypted_key), cek)
                 }
@@ -1085,26 +1088,18 @@ fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
     };
 
     let protected_header_base64 = general_purpose::URL_SAFE_NO_PAD.encode(serde_json::to_vec(&jwe.header)?);
-    let mut nonce_bytes = [0u8; 12];
-    aws_lc_rs::rand::fill(&mut nonce_bytes).map_err(|_| JweError::CryptoProvider {
-        operation: "AWS-LC random nonce generation",
-        code: -1,
-    })?;
-
-    let algorithm = fips_aead_algorithm(jwe.header.enc)?;
-    let unbound_key = UnboundKey::new(algorithm, &jwe_cek).map_err(|_| JweError::AesGcm)?;
-    let mut ciphertext_and_tag = jwe.payload;
-    let mut sealing_key = SealingKey::new(unbound_key, SingleNonce::new(nonce_bytes));
-    sealing_key
-        .seal_in_place_append_tag(Aad::from(protected_header_base64.as_bytes()), &mut ciphertext_and_tag)
-        .map_err(|_| JweError::AesGcm)?;
-    let authentication_tag = ciphertext_and_tag.split_off(ciphertext_and_tag.len() - algorithm.tag_len());
+    let (initialization_vector, ciphertext, authentication_tag) = fips_encrypt_content(
+        jwe.header.enc,
+        &jwe_cek,
+        protected_header_base64.as_bytes(),
+        &jwe.payload,
+    )?;
 
     Ok([
         protected_header_base64,
         encrypted_key_base64,
-        general_purpose::URL_SAFE_NO_PAD.encode(nonce_bytes),
-        general_purpose::URL_SAFE_NO_PAD.encode(ciphertext_and_tag),
+        general_purpose::URL_SAFE_NO_PAD.encode(initialization_vector),
+        general_purpose::URL_SAFE_NO_PAD.encode(ciphertext),
         general_purpose::URL_SAFE_NO_PAD.encode(authentication_tag),
     ]
     .join("."))
@@ -1243,7 +1238,17 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
         })?;
 
     let jwe_cek = match mode {
-        DecoderMode::Direct(symmetric_key) => Zeroizing::new(symmetric_key.to_vec()),
+        DecoderMode::Direct(symmetric_key) => {
+            if header.alg != JweAlg::Direct {
+                return Err(JweError::UnsupportedAlgorithm {
+                    algorithm: format!(
+                        "direct decryption requires `alg` to be `dir`, got `{}`",
+                        header.alg.name()
+                    ),
+                });
+            }
+            Zeroizing::new(symmetric_key.to_vec())
+        }
         DecoderMode::KeyWrap(kek) => match header.alg {
             JweAlg::AesKeyWrap128 | JweAlg::AesKeyWrap192 | JweAlg::AesKeyWrap256 => header
                 .alg
@@ -1267,6 +1272,8 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
                     JweAlg::RsaPkcs1v15 => RsaPaddingScheme::Pkcs1v15Encrypt,
                     JweAlg::RsaOaep => RsaPaddingScheme::Oaep(Oaep::<sha1::Sha1>::new()),
                     JweAlg::RsaOaep256 => RsaPaddingScheme::Oaep256(Oaep::<sha2::Sha256>::new()),
+                    JweAlg::RsaOaep384 => RsaPaddingScheme::Oaep384(Oaep::<sha2::Sha384>::new()),
+                    JweAlg::RsaOaep512 => RsaPaddingScheme::Oaep512(Oaep::<sha2::Sha512>::new()),
                     unsupported => {
                         return Err(JweError::UnsupportedAlgorithm {
                             algorithm: format!("{unsupported:?}"),
@@ -1312,35 +1319,16 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
         });
     }
 
-    let mut buffer = ciphertext;
-    let nonce = Array::try_from(&initialization_vector).expect("can't panic since the size is checked before");
-    let aad = protected_header_base64.as_bytes(); // The Additional Authenticated Data value used for AES-GCM.
-    let authentication_tag =
-        Array::try_from(&authentication_tag).expect("can't panic since the size is checked before");
-    match header.enc {
-        JweEnc::Aes128Gcm => {
-            let algo = Aes128Gcm::new_from_slice(&jwe_cek).map_err(|_| JweError::AesGcm)?;
-            algo.decrypt_inout_detached(&nonce, aad, buffer.as_mut_slice().into(), &authentication_tag)?;
-        }
-        JweEnc::Aes192Gcm => {
-            let algo = Aes192Gcm::new_from_slice(&jwe_cek).map_err(|_| JweError::AesGcm)?;
-            algo.decrypt_inout_detached(&nonce, aad, buffer.as_mut_slice().into(), &authentication_tag)?;
-        }
-        JweEnc::Aes256Gcm => {
-            let algo = Aes256Gcm::new_from_slice(&jwe_cek).map_err(|_| JweError::AesGcm)?;
-            algo.decrypt_inout_detached(&nonce, aad, buffer.as_mut_slice().into(), &authentication_tag)?;
-        }
-        unsupported => {
-            return Err(JweError::UnsupportedAlgorithm {
-                algorithm: format!("{unsupported:?}"),
-            });
-        }
-    };
+    let payload = rustcrypto_decrypt_content(
+        header.enc,
+        &jwe_cek,
+        protected_header_base64.as_bytes(),
+        &initialization_vector,
+        &ciphertext,
+        &authentication_tag,
+    )?;
 
-    Ok(Jwe {
-        header,
-        payload: buffer,
-    })
+    Ok(Jwe { header, payload })
 }
 
 #[cfg(all(feature = "jwe-crypto", feature = "fips-aws-lc"))]
@@ -1396,11 +1384,16 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
             require_fips_jwe_alg(header.alg)?;
             match private_key.as_kind() {
                 PrivateKeyKind::Rsa => {
-                    if header.alg != JweAlg::RsaOaep256 {
-                        return Err(JweError::UnsupportedAlgorithm {
-                            algorithm: format!("{} cannot be used with an RSA key", header.alg.name()),
-                        });
-                    }
+                    let oaep_algorithm = match header.alg {
+                        JweAlg::RsaOaep256 => &OAEP_SHA256_MGF1SHA256,
+                        JweAlg::RsaOaep384 => &OAEP_SHA384_MGF1SHA384,
+                        JweAlg::RsaOaep512 => &OAEP_SHA512_MGF1SHA512,
+                        unsupported => {
+                            return Err(JweError::UnsupportedAlgorithm {
+                                algorithm: format!("{} cannot be used with an RSA key", unsupported.name()),
+                            });
+                        }
+                    };
                     let rsa_key =
                         PrivateDecryptingKey::from_pkcs8(&private_key.to_pkcs8()?).map_err(|error| JweError::Rsa {
                             context: format!("AWS-LC rejected the RSA private key: {error}"),
@@ -1410,9 +1403,9 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
                     })?;
                     let mut cek = vec![0u8; rsa_key.min_output_size()];
                     let cek = rsa_key
-                        .decrypt(&OAEP_SHA256_MGF1SHA256, &encrypted_key, &mut cek, None)
+                        .decrypt(oaep_algorithm, &encrypted_key, &mut cek, None)
                         .map_err(|error| JweError::Rsa {
-                            context: format!("AWS-LC RSA-OAEP-256 decryption failed: {error}"),
+                            context: format!("AWS-LC {} decryption failed: {error}", header.alg.name()),
                         })?;
                     Zeroizing::new(cek.to_vec())
                 }
@@ -1436,14 +1429,13 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
             got: jwe_cek.len(),
         });
     }
-    let nonce_bytes: [u8; 12] = initialization_vector
-        .as_slice()
-        .try_into()
-        .map_err(|_| JweError::InvalidSize {
+    if initialization_vector.len() != header.enc.nonce_size() {
+        return Err(JweError::InvalidSize {
             ty: "initialization vector (nonce)",
-            expected: 12,
+            expected: header.enc.nonce_size(),
             got: initialization_vector.len(),
-        })?;
+        });
+    }
     if authentication_tag.len() != header.enc.tag_size() {
         return Err(JweError::InvalidSize {
             ty: "authentication tag",
@@ -1452,15 +1444,14 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
         });
     }
 
-    let algorithm = fips_aead_algorithm(header.enc)?;
-    let unbound_key = UnboundKey::new(algorithm, &jwe_cek).map_err(|_| JweError::AesGcm)?;
-    let mut opening_key = OpeningKey::new(unbound_key, SingleNonce::new(nonce_bytes));
-    let mut ciphertext_and_tag = ciphertext;
-    ciphertext_and_tag.extend_from_slice(&authentication_tag);
-    let plaintext = opening_key
-        .open_in_place(Aad::from(protected_header_base64.as_bytes()), &mut ciphertext_and_tag)
-        .map_err(|_| JweError::AesGcm)?;
-    let payload = plaintext.to_vec();
+    let payload = fips_decrypt_content(
+        header.enc,
+        &jwe_cek,
+        protected_header_base64.as_bytes(),
+        &initialization_vector,
+        &ciphertext,
+        &authentication_tag,
+    )?;
 
     Ok(Jwe { header, payload })
 }
@@ -1470,6 +1461,8 @@ fn require_fips_jwe_alg(algorithm: JweAlg) -> Result<(), JweError> {
     if matches!(
         algorithm,
         JweAlg::RsaOaep256
+            | JweAlg::RsaOaep384
+            | JweAlg::RsaOaep512
             | JweAlg::AesKeyWrap128
             | JweAlg::AesKeyWrap256
             | JweAlg::EcdhEs
@@ -1486,7 +1479,14 @@ fn require_fips_jwe_alg(algorithm: JweAlg) -> Result<(), JweError> {
 
 #[cfg(all(feature = "jwe-crypto", feature = "fips-aws-lc"))]
 fn require_fips_jwe_enc(algorithm: JweEnc) -> Result<(), JweError> {
-    if matches!(algorithm, JweEnc::Aes128Gcm | JweEnc::Aes256Gcm) {
+    if matches!(
+        algorithm,
+        JweEnc::Aes128CbcHmacSha256
+            | JweEnc::Aes192CbcHmacSha384
+            | JweEnc::Aes256CbcHmacSha512
+            | JweEnc::Aes128Gcm
+            | JweEnc::Aes256Gcm
+    ) {
         Ok(())
     } else {
         Err(JweError::UnsupportedAlgorithm {
@@ -1520,6 +1520,320 @@ impl SingleNonce {
 impl NonceSequence for SingleNonce {
     fn advance(&mut self) -> Result<Nonce, Unspecified> {
         self.0.take().ok_or(Unspecified)
+    }
+}
+
+#[cfg(feature = "jwe-crypto")]
+fn cbc_hmac_input(aad: &[u8], iv: &[u8], ciphertext: &[u8]) -> Result<Vec<u8>, JweError> {
+    let aad_bit_len = u64::try_from(aad.len())
+        .ok()
+        .and_then(|len| len.checked_mul(8))
+        .ok_or(JweError::AesCbcHmac)?;
+    let mut input = Vec::with_capacity(aad.len() + iv.len() + ciphertext.len() + 8);
+    input.extend_from_slice(aad);
+    input.extend_from_slice(iv);
+    input.extend_from_slice(ciphertext);
+    input.extend_from_slice(&aad_bit_len.to_be_bytes());
+    Ok(input)
+}
+
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
+fn rustcrypto_cbc_hmac_tag(
+    algorithm: JweEnc,
+    mac_key: &[u8],
+    aad: &[u8],
+    iv: &[u8],
+    ciphertext: &[u8],
+) -> Result<Vec<u8>, JweError> {
+    use crypto_common::KeyInit as _;
+    use hmac::{Hmac, Mac as _};
+
+    let input = cbc_hmac_input(aad, iv, ciphertext)?;
+    let tag = match algorithm {
+        JweEnc::Aes128CbcHmacSha256 => Hmac::<sha2::Sha256>::new_from_slice(mac_key)
+            .expect("HMAC accepts keys of any size")
+            .chain_update(&input)
+            .finalize()
+            .into_bytes()
+            .to_vec(),
+        JweEnc::Aes192CbcHmacSha384 => Hmac::<sha2::Sha384>::new_from_slice(mac_key)
+            .expect("HMAC accepts keys of any size")
+            .chain_update(&input)
+            .finalize()
+            .into_bytes()
+            .to_vec(),
+        JweEnc::Aes256CbcHmacSha512 => Hmac::<sha2::Sha512>::new_from_slice(mac_key)
+            .expect("HMAC accepts keys of any size")
+            .chain_update(&input)
+            .finalize()
+            .into_bytes()
+            .to_vec(),
+        _ => return Err(JweError::AesCbcHmac),
+    };
+    Ok(tag[..algorithm.tag_size()].to_vec())
+}
+
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
+type EncryptedContent = (Vec<u8>, Vec<u8>, Vec<u8>);
+
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
+fn rustcrypto_encrypt_content(
+    algorithm: JweEnc,
+    cek: &[u8],
+    aad: &[u8],
+    plaintext: &[u8],
+) -> Result<EncryptedContent, JweError> {
+    match algorithm {
+        JweEnc::Aes128Gcm | JweEnc::Aes192Gcm | JweEnc::Aes256Gcm => {
+            let nonce = <aes_gcm::aead::Nonce<Aes128Gcm> as From<[u8; 12]>>::from(rand::random());
+            let mut ciphertext = plaintext.to_vec();
+            let tag = match algorithm {
+                JweEnc::Aes128Gcm => Aes128Gcm::new_from_slice(cek)
+                    .map_err(|_| JweError::AesGcm)?
+                    .encrypt_inout_detached(&nonce, aad, ciphertext.as_mut_slice().into())?
+                    .to_vec(),
+                JweEnc::Aes192Gcm => Aes192Gcm::new_from_slice(cek)
+                    .map_err(|_| JweError::AesGcm)?
+                    .encrypt_inout_detached(&nonce, aad, ciphertext.as_mut_slice().into())?
+                    .to_vec(),
+                JweEnc::Aes256Gcm => Aes256Gcm::new_from_slice(cek)
+                    .map_err(|_| JweError::AesGcm)?
+                    .encrypt_inout_detached(&nonce, aad, ciphertext.as_mut_slice().into())?
+                    .to_vec(),
+                _ => unreachable!(),
+            };
+            Ok((nonce.as_slice().to_vec(), ciphertext, tag))
+        }
+        JweEnc::Aes128CbcHmacSha256 | JweEnc::Aes192CbcHmacSha384 | JweEnc::Aes256CbcHmacSha512 => {
+            use aes::cipher::BlockModeEncrypt;
+            use cbc::Encryptor;
+            use cbc::cipher::KeyIvInit;
+            use cbc::cipher::block_padding::Pkcs7;
+
+            let (mac_key, encryption_key) = cek.split_at(cek.len() / 2);
+            let iv = rand::random::<[u8; 16]>();
+            let ciphertext = match algorithm {
+                JweEnc::Aes128CbcHmacSha256 => Encryptor::<aes::Aes128>::new_from_slices(encryption_key, &iv)
+                    .map_err(|_| JweError::AesCbcHmac)?
+                    .encrypt_padded_vec::<Pkcs7>(plaintext),
+                JweEnc::Aes192CbcHmacSha384 => Encryptor::<aes::Aes192>::new_from_slices(encryption_key, &iv)
+                    .map_err(|_| JweError::AesCbcHmac)?
+                    .encrypt_padded_vec::<Pkcs7>(plaintext),
+                JweEnc::Aes256CbcHmacSha512 => Encryptor::<aes::Aes256>::new_from_slices(encryption_key, &iv)
+                    .map_err(|_| JweError::AesCbcHmac)?
+                    .encrypt_padded_vec::<Pkcs7>(plaintext),
+                _ => unreachable!(),
+            };
+            let tag = rustcrypto_cbc_hmac_tag(algorithm, mac_key, aad, &iv, &ciphertext)?;
+            Ok((iv.to_vec(), ciphertext, tag))
+        }
+    }
+}
+
+#[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
+fn rustcrypto_decrypt_content(
+    algorithm: JweEnc,
+    cek: &[u8],
+    aad: &[u8],
+    iv: &[u8],
+    ciphertext: &[u8],
+    authentication_tag: &[u8],
+) -> Result<Vec<u8>, JweError> {
+    match algorithm {
+        JweEnc::Aes128Gcm | JweEnc::Aes192Gcm | JweEnc::Aes256Gcm => {
+            let nonce = Array::try_from(iv).map_err(|_| JweError::AesGcm)?;
+            let tag = Array::try_from(authentication_tag).map_err(|_| JweError::AesGcm)?;
+            let mut plaintext = ciphertext.to_vec();
+            match algorithm {
+                JweEnc::Aes128Gcm => Aes128Gcm::new_from_slice(cek)
+                    .map_err(|_| JweError::AesGcm)?
+                    .decrypt_inout_detached(&nonce, aad, plaintext.as_mut_slice().into(), &tag)?,
+                JweEnc::Aes192Gcm => Aes192Gcm::new_from_slice(cek)
+                    .map_err(|_| JweError::AesGcm)?
+                    .decrypt_inout_detached(&nonce, aad, plaintext.as_mut_slice().into(), &tag)?,
+                JweEnc::Aes256Gcm => Aes256Gcm::new_from_slice(cek)
+                    .map_err(|_| JweError::AesGcm)?
+                    .decrypt_inout_detached(&nonce, aad, plaintext.as_mut_slice().into(), &tag)?,
+                _ => unreachable!(),
+            }
+            Ok(plaintext)
+        }
+        JweEnc::Aes128CbcHmacSha256 | JweEnc::Aes192CbcHmacSha384 | JweEnc::Aes256CbcHmacSha512 => {
+            use aes::cipher::BlockModeDecrypt;
+            use cbc::Decryptor;
+            use cbc::cipher::KeyIvInit;
+            use cbc::cipher::block_padding::Pkcs7;
+            use crypto_common::KeyInit as _;
+            use hmac::Mac as _;
+
+            let (mac_key, encryption_key) = cek.split_at(cek.len() / 2);
+            let input = cbc_hmac_input(aad, iv, ciphertext)?;
+            let verified = match algorithm {
+                JweEnc::Aes128CbcHmacSha256 => hmac::Hmac::<sha2::Sha256>::new_from_slice(mac_key)
+                    .expect("HMAC accepts keys of any size")
+                    .chain_update(&input)
+                    .verify_truncated_left(authentication_tag),
+                JweEnc::Aes192CbcHmacSha384 => hmac::Hmac::<sha2::Sha384>::new_from_slice(mac_key)
+                    .expect("HMAC accepts keys of any size")
+                    .chain_update(&input)
+                    .verify_truncated_left(authentication_tag),
+                JweEnc::Aes256CbcHmacSha512 => hmac::Hmac::<sha2::Sha512>::new_from_slice(mac_key)
+                    .expect("HMAC accepts keys of any size")
+                    .chain_update(&input)
+                    .verify_truncated_left(authentication_tag),
+                _ => unreachable!(),
+            };
+            verified.map_err(|_| JweError::AesCbcHmac)?;
+
+            let plaintext = match algorithm {
+                JweEnc::Aes128CbcHmacSha256 => Decryptor::<aes::Aes128>::new_from_slices(encryption_key, iv)
+                    .map_err(|_| JweError::AesCbcHmac)?
+                    .decrypt_padded_vec::<Pkcs7>(ciphertext),
+                JweEnc::Aes192CbcHmacSha384 => Decryptor::<aes::Aes192>::new_from_slices(encryption_key, iv)
+                    .map_err(|_| JweError::AesCbcHmac)?
+                    .decrypt_padded_vec::<Pkcs7>(ciphertext),
+                JweEnc::Aes256CbcHmacSha512 => Decryptor::<aes::Aes256>::new_from_slices(encryption_key, iv)
+                    .map_err(|_| JweError::AesCbcHmac)?
+                    .decrypt_padded_vec::<Pkcs7>(ciphertext),
+                _ => unreachable!(),
+            };
+            plaintext.map_err(|_| JweError::AesCbcHmac)
+        }
+    }
+}
+
+#[cfg(all(feature = "jwe-crypto", feature = "fips-aws-lc"))]
+fn fips_cbc_hmac_tag(
+    algorithm: JweEnc,
+    mac_key: &[u8],
+    aad: &[u8],
+    iv: &[u8],
+    ciphertext: &[u8],
+) -> Result<Vec<u8>, JweError> {
+    let hmac_algorithm = match algorithm {
+        JweEnc::Aes128CbcHmacSha256 => aws_lc_rs::hmac::HMAC_SHA256,
+        JweEnc::Aes192CbcHmacSha384 => aws_lc_rs::hmac::HMAC_SHA384,
+        JweEnc::Aes256CbcHmacSha512 => aws_lc_rs::hmac::HMAC_SHA512,
+        _ => return Err(JweError::AesCbcHmac),
+    };
+    let input = cbc_hmac_input(aad, iv, ciphertext)?;
+    let key = aws_lc_rs::hmac::Key::new(hmac_algorithm, mac_key);
+    let tag = aws_lc_rs::hmac::sign(&key, &input);
+    Ok(tag.as_ref()[..algorithm.tag_size()].to_vec())
+}
+
+#[cfg(all(feature = "jwe-crypto", feature = "fips-aws-lc"))]
+fn fips_cbc_algorithm(algorithm: JweEnc) -> Result<&'static aws_lc_rs::cipher::Algorithm, JweError> {
+    match algorithm {
+        JweEnc::Aes128CbcHmacSha256 => Ok(&aws_lc_rs::cipher::AES_128),
+        JweEnc::Aes192CbcHmacSha384 => Ok(&aws_lc_rs::cipher::AES_192),
+        JweEnc::Aes256CbcHmacSha512 => Ok(&aws_lc_rs::cipher::AES_256),
+        _ => Err(JweError::AesCbcHmac),
+    }
+}
+
+#[cfg(all(feature = "jwe-crypto", feature = "fips-aws-lc"))]
+type FipsEncryptedContent = (Vec<u8>, Vec<u8>, Vec<u8>);
+
+#[cfg(all(feature = "jwe-crypto", feature = "fips-aws-lc"))]
+fn fips_encrypt_content(
+    algorithm: JweEnc,
+    cek: &[u8],
+    aad: &[u8],
+    plaintext: &[u8],
+) -> Result<FipsEncryptedContent, JweError> {
+    match algorithm {
+        JweEnc::Aes128Gcm | JweEnc::Aes256Gcm => {
+            let mut nonce = [0u8; 12];
+            aws_lc_rs::rand::fill(&mut nonce).map_err(|_| JweError::CryptoProvider {
+                operation: "AWS-LC random nonce generation",
+                code: -1,
+            })?;
+            let aead_algorithm = fips_aead_algorithm(algorithm)?;
+            let unbound_key = UnboundKey::new(aead_algorithm, cek).map_err(|_| JweError::AesGcm)?;
+            let mut ciphertext = plaintext.to_vec();
+            let mut sealing_key = SealingKey::new(unbound_key, SingleNonce::new(nonce));
+            sealing_key
+                .seal_in_place_append_tag(Aad::from(aad), &mut ciphertext)
+                .map_err(|_| JweError::AesGcm)?;
+            let tag = ciphertext.split_off(ciphertext.len() - aead_algorithm.tag_len());
+            Ok((nonce.to_vec(), ciphertext, tag))
+        }
+        JweEnc::Aes128CbcHmacSha256 | JweEnc::Aes192CbcHmacSha384 | JweEnc::Aes256CbcHmacSha512 => {
+            use aws_lc_rs::cipher::{EncryptionContext, PaddedBlockEncryptingKey, UnboundCipherKey};
+            use aws_lc_rs::iv::{FixedLength, IV_LEN_128_BIT};
+
+            let (mac_key, encryption_key) = cek.split_at(cek.len() / 2);
+            let mut iv = [0u8; 16];
+            aws_lc_rs::rand::fill(&mut iv).map_err(|_| JweError::CryptoProvider {
+                operation: "AWS-LC random IV generation",
+                code: -1,
+            })?;
+            let key = UnboundCipherKey::new(fips_cbc_algorithm(algorithm)?, encryption_key)
+                .map_err(|_| JweError::AesCbcHmac)?;
+            let encryptor = PaddedBlockEncryptingKey::cbc_pkcs7(key).map_err(|_| JweError::AesCbcHmac)?;
+            let mut ciphertext = plaintext.to_vec();
+            encryptor
+                .less_safe_encrypt(
+                    &mut ciphertext,
+                    EncryptionContext::Iv128(FixedLength::<IV_LEN_128_BIT>::from(iv)),
+                )
+                .map_err(|_| JweError::AesCbcHmac)?;
+            let tag = fips_cbc_hmac_tag(algorithm, mac_key, aad, &iv, &ciphertext)?;
+            Ok((iv.to_vec(), ciphertext, tag))
+        }
+        JweEnc::Aes192Gcm => Err(JweError::UnsupportedAlgorithm {
+            algorithm: format!("{algorithm:?} is not enabled by the FIPS JWE policy"),
+        }),
+    }
+}
+
+#[cfg(all(feature = "jwe-crypto", feature = "fips-aws-lc"))]
+fn fips_decrypt_content(
+    algorithm: JweEnc,
+    cek: &[u8],
+    aad: &[u8],
+    iv: &[u8],
+    ciphertext: &[u8],
+    authentication_tag: &[u8],
+) -> Result<Vec<u8>, JweError> {
+    match algorithm {
+        JweEnc::Aes128Gcm | JweEnc::Aes256Gcm => {
+            let nonce: [u8; 12] = iv.try_into().map_err(|_| JweError::AesGcm)?;
+            let aead_algorithm = fips_aead_algorithm(algorithm)?;
+            let unbound_key = UnboundKey::new(aead_algorithm, cek).map_err(|_| JweError::AesGcm)?;
+            let mut opening_key = OpeningKey::new(unbound_key, SingleNonce::new(nonce));
+            let mut ciphertext_and_tag = ciphertext.to_vec();
+            ciphertext_and_tag.extend_from_slice(authentication_tag);
+            let plaintext = opening_key
+                .open_in_place(Aad::from(aad), &mut ciphertext_and_tag)
+                .map_err(|_| JweError::AesGcm)?;
+            Ok(plaintext.to_vec())
+        }
+        JweEnc::Aes128CbcHmacSha256 | JweEnc::Aes192CbcHmacSha384 | JweEnc::Aes256CbcHmacSha512 => {
+            use aws_lc_rs::cipher::{DecryptionContext, PaddedBlockDecryptingKey, UnboundCipherKey};
+            use aws_lc_rs::iv::{FixedLength, IV_LEN_128_BIT};
+
+            let (mac_key, encryption_key) = cek.split_at(cek.len() / 2);
+            let expected_tag = fips_cbc_hmac_tag(algorithm, mac_key, aad, iv, ciphertext)?;
+            aws_lc_rs::constant_time::verify_slices_are_equal(&expected_tag, authentication_tag)
+                .map_err(|_| JweError::AesCbcHmac)?;
+            let iv: [u8; 16] = iv.try_into().map_err(|_| JweError::AesCbcHmac)?;
+            let key = UnboundCipherKey::new(fips_cbc_algorithm(algorithm)?, encryption_key)
+                .map_err(|_| JweError::AesCbcHmac)?;
+            let decryptor = PaddedBlockDecryptingKey::cbc_pkcs7(key).map_err(|_| JweError::AesCbcHmac)?;
+            let mut plaintext = ciphertext.to_vec();
+            let plaintext = decryptor
+                .decrypt(
+                    &mut plaintext,
+                    DecryptionContext::Iv128(FixedLength::<IV_LEN_128_BIT>::from(iv)),
+                )
+                .map_err(|_| JweError::AesCbcHmac)?;
+            Ok(plaintext.to_vec())
+        }
+        JweEnc::Aes192Gcm => Err(JweError::UnsupportedAlgorithm {
+            algorithm: format!("{algorithm:?} is not enabled by the FIPS JWE policy"),
+        }),
     }
 }
 
@@ -2155,6 +2469,8 @@ enum RsaPaddingScheme {
     Pkcs1v15Encrypt,
     Oaep(Oaep<sha1::Sha1>),
     Oaep256(Oaep<sha2::Sha256>),
+    Oaep384(Oaep<sha2::Sha384>),
+    Oaep512(Oaep<sha2::Sha512>),
 }
 
 #[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
@@ -2171,6 +2487,8 @@ impl rsa::traits::PaddingScheme for RsaPaddingScheme {
             }
             RsaPaddingScheme::Oaep(oaep) => rsa::traits::PaddingScheme::decrypt(oaep, rng, priv_key, ciphertext),
             RsaPaddingScheme::Oaep256(oaep) => rsa::traits::PaddingScheme::decrypt(oaep, rng, priv_key, ciphertext),
+            RsaPaddingScheme::Oaep384(oaep) => rsa::traits::PaddingScheme::decrypt(oaep, rng, priv_key, ciphertext),
+            RsaPaddingScheme::Oaep512(oaep) => rsa::traits::PaddingScheme::decrypt(oaep, rng, priv_key, ciphertext),
         }
     }
 
@@ -2186,6 +2504,8 @@ impl rsa::traits::PaddingScheme for RsaPaddingScheme {
             }
             RsaPaddingScheme::Oaep(oaep) => rsa::traits::PaddingScheme::encrypt(oaep, rng, pub_key, msg),
             RsaPaddingScheme::Oaep256(oaep) => rsa::traits::PaddingScheme::encrypt(oaep, rng, pub_key, msg),
+            RsaPaddingScheme::Oaep384(oaep) => rsa::traits::PaddingScheme::encrypt(oaep, rng, pub_key, msg),
+            RsaPaddingScheme::Oaep512(oaep) => rsa::traits::PaddingScheme::encrypt(oaep, rng, pub_key, msg),
         }
     }
 }
@@ -2201,19 +2521,21 @@ mod fips_tests {
     }
 
     #[test]
-    fn rsa_oaep_256_aes_256_gcm_roundtrip() {
-        let payload = b"AWS-LC FIPS JWE payload".to_vec();
+    fn rsa_oaep_sha2_aes_256_gcm_roundtrips() {
         let private_key = rsa_private_key();
         let public_key = private_key.to_public_key().unwrap();
 
-        let encoded = Jwe::new(JweAlg::RsaOaep256, JweEnc::Aes256Gcm, payload.clone())
-            .encode(&public_key)
-            .unwrap();
-        let decoded = Jwe::decode(&encoded, &private_key).unwrap();
+        for algorithm in [JweAlg::RsaOaep256, JweAlg::RsaOaep384, JweAlg::RsaOaep512] {
+            let payload = format!("AWS-LC FIPS {algorithm:?} payload").into_bytes();
+            let encoded = Jwe::new(algorithm, JweEnc::Aes256Gcm, payload.clone())
+                .encode(&public_key)
+                .unwrap();
+            let decoded = Jwe::decode(&encoded, &private_key).unwrap();
 
-        assert_eq!(decoded.payload, payload);
-        assert_eq!(decoded.header.alg, JweAlg::RsaOaep256);
-        assert_eq!(decoded.header.enc, JweEnc::Aes256Gcm);
+            assert_eq!(decoded.payload, payload);
+            assert_eq!(decoded.header.alg, algorithm);
+            assert_eq!(decoded.header.enc, JweEnc::Aes256Gcm);
+        }
     }
 
     #[test]
@@ -2229,6 +2551,30 @@ mod fips_tests {
         assert_eq!(decoded.payload, payload);
         assert_eq!(decoded.header.alg, JweAlg::Direct);
         assert_eq!(decoded.header.enc, JweEnc::Aes128Gcm);
+    }
+
+    #[test]
+    fn direct_aes_cbc_hmac_roundtrips_and_rejects_tampering() {
+        for (algorithm, cek) in [
+            (JweEnc::Aes128CbcHmacSha256, vec![0x11; 32]),
+            (JweEnc::Aes192CbcHmacSha384, vec![0x22; 48]),
+            (JweEnc::Aes256CbcHmacSha512, vec![0x33; 64]),
+        ] {
+            let payload = format!("AWS-LC FIPS {algorithm:?} payload").into_bytes();
+            let encoded = Jwe::new(JweAlg::Direct, algorithm, payload.clone())
+                .encode_direct(&cek)
+                .unwrap();
+            let decoded = Jwe::decode_direct(&encoded, &cek).unwrap();
+            assert_eq!(decoded.payload, payload);
+            assert_eq!(decoded.header.enc, algorithm);
+
+            let mut segments = encoded.split('.').map(str::to_owned).collect::<Vec<_>>();
+            let mut tag = general_purpose::URL_SAFE_NO_PAD.decode(&segments[4]).unwrap();
+            tag[0] ^= 1;
+            segments[4] = general_purpose::URL_SAFE_NO_PAD.encode(tag);
+            let tampered = segments.join(".");
+            assert!(matches!(Jwe::decode_direct(&tampered, &cek), Err(JweError::AesCbcHmac)));
+        }
     }
 
     #[test]
@@ -2412,6 +2758,23 @@ mod tests {
     }
 
     #[test]
+    fn rsa_oaep_sha2_roundtrips() {
+        let private_key = get_private_key_1();
+        let public_key = private_key.to_public_key().unwrap();
+
+        for algorithm in [JweAlg::RsaOaep256, JweAlg::RsaOaep384, JweAlg::RsaOaep512] {
+            let payload = format!("{algorithm:?} payload").into_bytes();
+            let encoded = Jwe::new(algorithm, JweEnc::Aes256Gcm, payload.clone())
+                .encode(&public_key)
+                .unwrap();
+            let decoded = Jwe::decode(&encoded, &private_key).unwrap();
+
+            assert_eq!(decoded.payload, payload);
+            assert_eq!(decoded.header.alg, algorithm);
+        }
+    }
+
+    #[test]
     fn direct_aes_192_gcm_bad_key() {
         let payload = "和解をしよう？ 俺が？ 真っ平だ！ 真っ平御免だ！".as_bytes().to_vec();
 
@@ -2420,6 +2783,29 @@ mod tests {
 
         let err = Jwe::decode_direct(&encoded, b"zzzzzzzzabcdefghzzzzzzzz").err().unwrap();
         assert_eq!(err.to_string(), "AES-GCM error (opaque)");
+    }
+
+    #[test]
+    fn direct_aes_cbc_hmac_roundtrips_and_rejects_tampering() {
+        for (algorithm, cek) in [
+            (JweEnc::Aes128CbcHmacSha256, vec![0x11; 32]),
+            (JweEnc::Aes192CbcHmacSha384, vec![0x22; 48]),
+            (JweEnc::Aes256CbcHmacSha512, vec![0x33; 64]),
+        ] {
+            let payload = format!("{algorithm:?} payload").into_bytes();
+            let encoded = Jwe::new(JweAlg::Direct, algorithm, payload.clone())
+                .encode_direct(&cek)
+                .unwrap();
+            let decoded = Jwe::decode_direct(&encoded, &cek).unwrap();
+            assert_eq!(decoded.payload, payload);
+
+            let mut segments = encoded.split('.').map(str::to_owned).collect::<Vec<_>>();
+            let mut tag = general_purpose::URL_SAFE_NO_PAD.decode(&segments[4]).unwrap();
+            tag[0] ^= 1;
+            segments[4] = general_purpose::URL_SAFE_NO_PAD.encode(tag);
+            let tampered = segments.join(".");
+            assert!(matches!(Jwe::decode_direct(&tampered, &cek), Err(JweError::AesCbcHmac)));
+        }
     }
 
     #[test]
@@ -2550,4 +2936,81 @@ mod tests {
         let decoded = Jwe::decode(token, &private).expect("JWE decode failed");
         assert_eq!(String::from_utf8(decoded.payload).unwrap(), "Hello world!");
     }
+}
+#[cfg(all(test, feature = "jwe-crypto"))]
+fn decode_hex(input: &str) -> Vec<u8> {
+    input
+        .as_bytes()
+        .chunks_exact(2)
+        .map(|pair| {
+            let text = std::str::from_utf8(pair).unwrap();
+            u8::from_str_radix(text, 16).unwrap()
+        })
+        .collect()
+}
+
+#[cfg(all(test, feature = "jwe-crypto", feature = "rustcrypto"))]
+#[test]
+fn aes_128_cbc_hmac_sha_256_matches_rfc_7518_appendix_b() {
+    let key: Vec<u8> = (0..32).collect();
+    let iv = decode_hex("1af38c2dc2b96ffdd86694092341bc04");
+    let ciphertext = decode_hex(
+        "c80edfa32ddf39d5ef00c0b468834279\
+             a2e46a1b8049f792f76bfe54b903a9c9\
+             a94ac9b47ad2655c5f10f9aef71427e2\
+             fc6f9b3f399a221489f16362c7032336\
+             09d45ac69864e3321cf82935ac4096c8\
+             6e133314c54019e8ca7980dfa4b9cf1b\
+             384c486f3a54c51078158ee5d79de59f\
+             bd34d848b3d69550a67646344427ade5\
+             4b8851ffb598f7f80074b9473c82e2db",
+    );
+    let tag = decode_hex("652c3fa36b0a7c5b3219fab3a30bc1c4");
+    let plaintext = rustcrypto_decrypt_content(
+        JweEnc::Aes128CbcHmacSha256,
+        &key,
+        b"The second principle of Auguste Kerckhoffs",
+        &iv,
+        &ciphertext,
+        &tag,
+    )
+    .unwrap();
+
+    assert_eq!(
+            plaintext,
+            b"A cipher system must not be required to be secret, and it must be able to fall into the hands of the enemy without inconvenience"
+        );
+}
+
+#[cfg(all(test, feature = "jwe-crypto", feature = "fips-aws-lc"))]
+#[test]
+fn fips_aes_128_cbc_hmac_sha_256_matches_rfc_7518_appendix_b() {
+    let key: Vec<u8> = (0..32).collect();
+    let iv = decode_hex("1af38c2dc2b96ffdd86694092341bc04");
+    let ciphertext = decode_hex(
+        "c80edfa32ddf39d5ef00c0b468834279\
+         a2e46a1b8049f792f76bfe54b903a9c9\
+         a94ac9b47ad2655c5f10f9aef71427e2\
+         fc6f9b3f399a221489f16362c7032336\
+         09d45ac69864e3321cf82935ac4096c8\
+         6e133314c54019e8ca7980dfa4b9cf1b\
+         384c486f3a54c51078158ee5d79de59f\
+         bd34d848b3d69550a67646344427ade5\
+         4b8851ffb598f7f80074b9473c82e2db",
+    );
+    let tag = decode_hex("652c3fa36b0a7c5b3219fab3a30bc1c4");
+    let plaintext = fips_decrypt_content(
+        JweEnc::Aes128CbcHmacSha256,
+        &key,
+        b"The second principle of Auguste Kerckhoffs",
+        &iv,
+        &ciphertext,
+        &tag,
+    )
+    .unwrap();
+
+    assert_eq!(
+        plaintext,
+        b"A cipher system must not be required to be secret, and it must be able to fall into the hands of the enemy without inconvenience"
+    );
 }

@@ -46,6 +46,14 @@ pub enum JwsError {
         source: std::string::FromUtf8Error,
         input: Vec<u8>,
     },
+
+    /// HMAC key is shorter than required by the selected JWA algorithm.
+    #[error("HMAC key is too short: expected at least {expected} bytes, got {got}")]
+    InvalidHmacKeySize { expected: usize, got: usize },
+
+    /// HMAC verification failed.
+    #[error("invalid HMAC")]
+    InvalidHmac,
 }
 
 #[cfg(feature = "rustcrypto")]
@@ -90,15 +98,15 @@ mod jws_alg {
     /// [JSON Web Algorithms (JWA) draft-ietf-jose-json-web-algorithms-40 #3](https://tools.ietf.org/html/draft-ietf-jose-json-web-algorithms-40#section-3.1)
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
     pub enum JwsAlg {
-        /// HMAC using SHA-256 (unsupported)
+        /// HMAC using SHA-256
         ///
         /// Required by RFC
         HS256,
 
-        /// HMAC using SHA-384 (unsupported)
+        /// HMAC using SHA-384
         HS384,
 
-        /// HMAC using SHA-512 (unsupported)
+        /// HMAC using SHA-512
         HS512,
 
         /// RSASSA-PKCS-v1_5 using SHA-256
@@ -123,13 +131,13 @@ mod jws_alg {
         /// ECDSA using P-521 and SHA-512
         ES512,
 
-        /// RSASSA-PSS using SHA-256 and MGF1 with SHA-256 (unsupported)
+        /// RSASSA-PSS using SHA-256 and MGF1 with SHA-256
         PS256,
 
-        /// RSASSA-PSS using SHA-384 and MGF1 with SHA-384 (unsupported)
+        /// RSASSA-PSS using SHA-384 and MGF1 with SHA-384
         PS384,
 
-        /// RSASSA-PSS using SHA-512 and MGF1 with SHA-512 (unsupported)
+        /// RSASSA-PSS using SHA-512 and MGF1 with SHA-512
         PS512,
 
         /// EdDSA using Ed25519/Ed448
@@ -358,9 +366,25 @@ impl Jws {
         Ok([header_and_payload, signature_base64].join("."))
     }
 
+    /// Encodes this JWS using an HMAC key.
+    pub fn encode_hmac(&self, key: &[u8]) -> Result<String, JwsError> {
+        let header_base64 = general_purpose::URL_SAFE_NO_PAD.encode(serde_json::to_vec(&self.header)?);
+        let payload_base64 = general_purpose::URL_SAFE_NO_PAD.encode(&self.payload);
+        let header_and_payload = [header_base64, payload_base64].join(".");
+        let signature = sign_hmac(self.header.alg, key, header_and_payload.as_bytes())?;
+        let signature_base64 = general_purpose::URL_SAFE_NO_PAD.encode(signature);
+
+        Ok([header_and_payload, signature_base64].join("."))
+    }
+
     /// Verifies signature and returns decoded JWS payload.
     pub fn decode(encoded_token: &str, public_key: &PublicKey) -> Result<Self, JwsError> {
         RawJws::decode(encoded_token).and_then(|raw_jws| raw_jws.verify(public_key))
+    }
+
+    /// Verifies an HMAC and returns the decoded JWS payload.
+    pub fn decode_hmac(encoded_token: &str, key: &[u8]) -> Result<Self, JwsError> {
+        RawJws::decode(encoded_token).and_then(|raw_jws| raw_jws.verify_hmac(key))
     }
 }
 
@@ -393,6 +417,20 @@ impl<'repr> RawJws<'repr> {
     /// Verifies signature and returns a verified `Jws` structure.
     pub fn verify(self, public_key: &PublicKey) -> Result<Jws, JwsError> {
         verify_signature(&self.compact_repr, public_key, self.header.alg)?;
+        Ok(self.discard_signature())
+    }
+
+    /// Verifies an HMAC and returns a verified `Jws` structure.
+    pub fn verify_hmac(self, key: &[u8]) -> Result<Jws, JwsError> {
+        let last_dot_idx = self.compact_repr.rfind('.').ok_or_else(|| JwsError::InvalidEncoding {
+            input: self.compact_repr.clone().into_owned(),
+        })?;
+        verify_hmac(
+            self.header.alg,
+            key,
+            &self.compact_repr.as_bytes()[..last_dot_idx],
+            &self.signature,
+        )?;
         Ok(self.discard_signature())
     }
 
@@ -435,6 +473,114 @@ fn decode_impl(compact_repr: Cow<'_, str>) -> Result<RawJws<'_>, JwsError> {
         payload,
         signature,
     })
+}
+
+fn hmac_key_size(algorithm: JwsAlg) -> Result<usize, JwsError> {
+    match algorithm {
+        JwsAlg::HS256 => Ok(32),
+        JwsAlg::HS384 => Ok(48),
+        JwsAlg::HS512 => Ok(64),
+        unsupported => Err(SignatureError::UnsupportedAlgorithm {
+            algorithm: format!("{unsupported:?} is not an HMAC algorithm"),
+        }
+        .into()),
+    }
+}
+
+fn validate_hmac_key(algorithm: JwsAlg, key: &[u8]) -> Result<(), JwsError> {
+    let expected = hmac_key_size(algorithm)?;
+    if key.len() < expected {
+        Err(JwsError::InvalidHmacKeySize {
+            expected,
+            got: key.len(),
+        })
+    } else {
+        Ok(())
+    }
+}
+
+fn sign_hmac(algorithm: JwsAlg, key: &[u8], message: &[u8]) -> Result<Vec<u8>, JwsError> {
+    validate_hmac_key(algorithm, key)?;
+
+    #[cfg(feature = "rustcrypto")]
+    {
+        use crypto_common::KeyInit as _;
+        use hmac::{Hmac, Mac as _};
+
+        let signature = match algorithm {
+            JwsAlg::HS256 => Hmac::<sha2::Sha256>::new_from_slice(key)
+                .expect("HMAC accepts keys of any size")
+                .chain_update(message)
+                .finalize()
+                .into_bytes()
+                .to_vec(),
+            JwsAlg::HS384 => Hmac::<sha2::Sha384>::new_from_slice(key)
+                .expect("HMAC accepts keys of any size")
+                .chain_update(message)
+                .finalize()
+                .into_bytes()
+                .to_vec(),
+            JwsAlg::HS512 => Hmac::<sha2::Sha512>::new_from_slice(key)
+                .expect("HMAC accepts keys of any size")
+                .chain_update(message)
+                .finalize()
+                .into_bytes()
+                .to_vec(),
+            _ => unreachable!("validated above"),
+        };
+        Ok(signature)
+    }
+
+    #[cfg(feature = "fips-aws-lc")]
+    {
+        let algorithm = match algorithm {
+            JwsAlg::HS256 => aws_lc_rs::hmac::HMAC_SHA256,
+            JwsAlg::HS384 => aws_lc_rs::hmac::HMAC_SHA384,
+            JwsAlg::HS512 => aws_lc_rs::hmac::HMAC_SHA512,
+            _ => unreachable!("validated above"),
+        };
+        let key = aws_lc_rs::hmac::Key::new(algorithm, key);
+        Ok(aws_lc_rs::hmac::sign(&key, message).as_ref().to_vec())
+    }
+}
+
+fn verify_hmac(algorithm: JwsAlg, key: &[u8], message: &[u8], signature: &[u8]) -> Result<(), JwsError> {
+    validate_hmac_key(algorithm, key)?;
+
+    #[cfg(feature = "rustcrypto")]
+    {
+        use crypto_common::KeyInit as _;
+        use hmac::{Hmac, Mac as _};
+
+        let result = match algorithm {
+            JwsAlg::HS256 => Hmac::<sha2::Sha256>::new_from_slice(key)
+                .expect("HMAC accepts keys of any size")
+                .chain_update(message)
+                .verify_slice(signature),
+            JwsAlg::HS384 => Hmac::<sha2::Sha384>::new_from_slice(key)
+                .expect("HMAC accepts keys of any size")
+                .chain_update(message)
+                .verify_slice(signature),
+            JwsAlg::HS512 => Hmac::<sha2::Sha512>::new_from_slice(key)
+                .expect("HMAC accepts keys of any size")
+                .chain_update(message)
+                .verify_slice(signature),
+            _ => unreachable!("validated above"),
+        };
+        result.map_err(|_| JwsError::InvalidHmac)
+    }
+
+    #[cfg(feature = "fips-aws-lc")]
+    {
+        let algorithm = match algorithm {
+            JwsAlg::HS256 => aws_lc_rs::hmac::HMAC_SHA256,
+            JwsAlg::HS384 => aws_lc_rs::hmac::HMAC_SHA384,
+            JwsAlg::HS512 => aws_lc_rs::hmac::HMAC_SHA512,
+            _ => unreachable!("validated above"),
+        };
+        let key = aws_lc_rs::hmac::Key::new(algorithm, key);
+        aws_lc_rs::hmac::verify(&key, message, signature).map_err(|_| JwsError::InvalidHmac)
+    }
 }
 
 /// JWS verification primitive
@@ -630,6 +776,34 @@ mod tests {
 
         let decoded = Jws::decode(&token, &private_key.to_public_key().unwrap()).unwrap();
         assert_eq!(decoded.payload, PAYLOAD.as_bytes());
+    }
+
+    #[rstest]
+    #[case(JwsAlg::HS256, vec![0x11; 32])]
+    #[case(JwsAlg::HS384, vec![0x22; 48])]
+    #[case(JwsAlg::HS512, vec![0x33; 64])]
+    fn hmac_round_trip_and_tamper_rejection(#[case] algorithm: JwsAlg, #[case] key: Vec<u8>) {
+        let token = Jws::new(algorithm, PAYLOAD.as_bytes().to_vec())
+            .encode_hmac(&key)
+            .unwrap();
+        let decoded = Jws::decode_hmac(&token, &key).unwrap();
+        assert_eq!(decoded.payload, PAYLOAD.as_bytes());
+
+        let mut segments = token.split('.').map(str::to_owned).collect::<Vec<_>>();
+        let mut signature = general_purpose::URL_SAFE_NO_PAD.decode(&segments[2]).unwrap();
+        signature[0] ^= 1;
+        segments[2] = general_purpose::URL_SAFE_NO_PAD.encode(signature);
+        let tampered = segments.join(".");
+        assert!(matches!(Jws::decode_hmac(&tampered, &key), Err(JwsError::InvalidHmac)));
+    }
+
+    #[test]
+    fn hmac_rejects_key_shorter_than_hash_output() {
+        let error = Jws::new(JwsAlg::HS256, PAYLOAD.as_bytes().to_vec())
+            .encode_hmac(&[0x11; 31])
+            .unwrap_err();
+
+        assert!(matches!(error, JwsError::InvalidHmacKeySize { expected: 32, got: 31 }));
     }
 
     #[test]

@@ -38,12 +38,17 @@ ECDSA
 P-256/SHA-256, P-384/SHA-384, and P-521/SHA-512; and Ed25519. RSA
 2048/3072/4096/8192, P-256/P-384/P-521, and Ed25519 key generation and public
 key derivation use AWS-LC. JOSE supports `PS256`, `PS384`, and `PS512`, and
-X.509 certificates and CSRs can use the corresponding RSA-PSS parameters.
+`HS256`, `HS384`, and `HS512`; X.509 certificates and CSRs can use the
+corresponding RSA-PSS parameters. HMAC JWS APIs require symmetric keys at least
+as long as the selected hash output. JWT exposes the same symmetric routes
+through `encode_hmac`/`decode_hmac`.
 
-JWE supports `dir`, RSA-OAEP-256, standalone `A128KW` and `A256KW`, `ECDH-ES`,
-`ECDH-ES+A128KW`, and `ECDH-ES+A256KW` key management with AES-128-GCM or
-AES-256-GCM content encryption. ECDH uses P-256, P-384, or P-521. X25519,
-AES-192-GCM, A192KW, ECDH-ES+A192KW, and ChaCha20-Poly1305 remain unavailable.
+JWE supports `dir`, RSA-OAEP-256/384/512, standalone `A128KW` and `A256KW`,
+`ECDH-ES`, `ECDH-ES+A128KW`, and `ECDH-ES+A256KW` key management. Content
+encryption supports A128CBC-HS256, A192CBC-HS384, A256CBC-HS512, AES-128-GCM,
+and AES-256-GCM. ECDH uses P-256, P-384, or P-521. X25519, AES-192-GCM, A192KW,
+ECDH-ES+A192KW, and ChaCha20-Poly1305 remain unavailable. JWT exposes AES key
+wrapping through `encode_key_wrap`/`decode_key_wrap`.
 
 PKCS#12 supports PBES2 using PBKDF2-HMAC-SHA-2 and AES-CBC. PBES1 and the
 PKCS#12 Appendix B MAC KDF remain unavailable because they are outside the

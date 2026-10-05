@@ -317,6 +317,14 @@ where
         let encoded = jws.encode(private_key)?;
         Ok(encoded)
     }
+
+    pub fn encode_hmac(self, key: &[u8]) -> Result<String, JwtError> {
+        let jws = Jws {
+            header: self.header,
+            payload: serde_json::to_vec(&self.state.claims)?,
+        };
+        Ok(jws.encode_hmac(key)?)
+    }
 }
 
 impl JwtSig {
@@ -328,12 +336,25 @@ impl JwtSig {
         let encoded = jws.encode(private_key)?;
         Ok(encoded)
     }
+
+    pub fn encode_hmac(self, key: &[u8]) -> Result<String, JwtError> {
+        let jws = Jws {
+            header: self.header,
+            payload: self.state.payload,
+        };
+        Ok(jws.encode_hmac(key)?)
+    }
 }
 
 impl JwtSig {
     /// Verifies signature and returns decoded JWS payload.
     pub fn decode(encoded_token: &str, public_key: &PublicKey) -> Result<Self, JwtError> {
         let jws = Jws::decode(encoded_token, public_key)?;
+        Ok(Self::from(jws))
+    }
+
+    pub fn decode_hmac(encoded_token: &str, key: &[u8]) -> Result<Self, JwtError> {
+        let jws = Jws::decode_hmac(encoded_token, key)?;
         Ok(Self::from(jws))
     }
 }
@@ -392,6 +413,15 @@ where
         let encoded = jwe.encode_direct(cek)?;
         Ok(encoded)
     }
+
+    /// Encode with a randomly generated CEK wrapped by the provided AES key-encryption key.
+    pub fn encode_key_wrap(self, kek: &[u8]) -> Result<String, JweError> {
+        let jwe = Jwe {
+            header: self.header,
+            payload: serde_json::to_vec(&self.state.claims)?,
+        };
+        jwe.encode_key_wrap(kek)
+    }
 }
 
 impl JwtEnc {
@@ -404,6 +434,12 @@ impl JwtEnc {
     /// Decode with provided CEK (a symmetric key).
     pub fn decode_direct(encoded_token: &str, cek: &[u8]) -> Result<Self, JwtError> {
         let jwe = Jwe::decode_direct(encoded_token, cek)?;
+        Ok(Self::from(jwe))
+    }
+
+    /// Decode using the provided AES key-encryption key.
+    pub fn decode_key_wrap(encoded_token: &str, kek: &[u8]) -> Result<Self, JwtError> {
+        let jwe = Jwe::decode_key_wrap(encoded_token, kek)?;
         Ok(Self::from(jwe))
     }
 }
@@ -535,6 +571,35 @@ mod tests {
         let jwt = CheckedJwtSig::new(JwsAlg::RS256, claims);
         let encoded = jwt.encode(&get_private_key_1()).unwrap();
         assert_eq!(encoded, picky_test_data::JOSE_JWT_SIG_EXAMPLE);
+    }
+
+    #[test]
+    fn encode_decode_jws_hmac_sha256() {
+        let key = [0x42; 32];
+        let encoded = CheckedJwtSig::new(JwsAlg::HS256, get_strongly_typed_claims())
+            .encode_hmac(&key)
+            .unwrap();
+        let decoded = JwtSig::decode_hmac(&encoded, &key).unwrap();
+        let checked = decoded.validate::<MyClaims>(&JwtValidator::no_check()).unwrap();
+
+        assert_eq!(checked.state.claims, get_strongly_typed_claims());
+    }
+
+    #[test]
+    #[cfg(feature = "jwe-crypto")]
+    fn encode_decode_jwe_aes_key_wrap() {
+        let kek = [0x24; 32];
+        let encoded = CheckedJwtEnc::new(
+            JweAlg::AesKeyWrap256,
+            JweEnc::Aes128CbcHmacSha256,
+            get_strongly_typed_claims(),
+        )
+        .encode_key_wrap(&kek)
+        .unwrap();
+        let decoded = JwtEnc::decode_key_wrap(&encoded, &kek).unwrap();
+        let checked = decoded.validate::<MyClaims>(&JwtValidator::no_check()).unwrap();
+
+        assert_eq!(checked.state.claims, get_strongly_typed_claims());
     }
 
     #[test]
