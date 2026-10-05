@@ -154,6 +154,9 @@ impl TryFrom<SignatureAlgorithm> for JwsAlg {
             SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256) => Ok(Self::RS256),
             SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_384) => Ok(Self::RS384),
             SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_512) => Ok(Self::RS512),
+            SignatureAlgorithm::RsaPss(HashAlgorithm::SHA2_256) => Ok(Self::PS256),
+            SignatureAlgorithm::RsaPss(HashAlgorithm::SHA2_384) => Ok(Self::PS384),
+            SignatureAlgorithm::RsaPss(HashAlgorithm::SHA2_512) => Ok(Self::PS512),
             SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_256) => Ok(Self::ES256),
             SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_384) => Ok(Self::ES384),
             SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_512) => Ok(Self::ES512),
@@ -173,6 +176,9 @@ impl TryFrom<JwsAlg> for SignatureAlgorithm {
             JwsAlg::RS256 => Ok(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256)),
             JwsAlg::RS384 => Ok(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_384)),
             JwsAlg::RS512 => Ok(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_512)),
+            JwsAlg::PS256 => Ok(SignatureAlgorithm::RsaPss(HashAlgorithm::SHA2_256)),
+            JwsAlg::PS384 => Ok(SignatureAlgorithm::RsaPss(HashAlgorithm::SHA2_384)),
+            JwsAlg::PS512 => Ok(SignatureAlgorithm::RsaPss(HashAlgorithm::SHA2_512)),
             JwsAlg::ES256 => Ok(SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_256)),
             JwsAlg::ES384 => Ok(SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_384)),
             JwsAlg::ES512 => Ok(SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_512)),
@@ -607,6 +613,23 @@ mod tests {
         let public_key = get_private_key_1().to_public_key().unwrap();
         let jwt = Jws::decode(picky_test_data::JOSE_JWT_SIG_EXAMPLE, &public_key).unwrap();
         assert_eq!(jwt.payload.as_slice(), PAYLOAD.as_bytes());
+    }
+
+    #[rstest]
+    #[case(JwsAlg::PS256)]
+    #[case(JwsAlg::PS384)]
+    #[case(JwsAlg::PS512)]
+    fn rsa_pss_round_trip(#[case] algorithm: JwsAlg) {
+        let private_key = get_private_key_1();
+        let token = Jws {
+            header: JwsHeader::new(algorithm),
+            payload: PAYLOAD.as_bytes().to_vec(),
+        }
+        .encode(&private_key)
+        .unwrap();
+
+        let decoded = Jws::decode(&token, &private_key.to_public_key().unwrap()).unwrap();
+        assert_eq!(decoded.payload, PAYLOAD.as_bytes());
     }
 
     #[test]

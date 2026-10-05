@@ -75,7 +75,7 @@ pub(crate) fn require_signature(
         (
             SignatureAlgorithm::RsaPkcs1v15(
                 HashAlgorithm::SHA2_256 | HashAlgorithm::SHA2_384 | HashAlgorithm::SHA2_512,
-            ),
+            ) | SignatureAlgorithm::RsaPss(HashAlgorithm::SHA2_256 | HashAlgorithm::SHA2_384 | HashAlgorithm::SHA2_512,),
             None,
         ) | (
             SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_256),
@@ -124,7 +124,7 @@ mod aws_lc_fips {
         private_key: &PrivateKey,
     ) -> Result<Vec<u8>, SignatureError> {
         match algorithm {
-            SignatureAlgorithm::RsaPkcs1v15(hash) => {
+            algorithm @ (SignatureAlgorithm::RsaPkcs1v15(hash) | SignatureAlgorithm::RsaPss(hash)) => {
                 require_signature(algorithm, None).map_err(policy_error)?;
                 let key = RsaKeyPair::from_der(&private_key.to_pkcs1()?).map_err(|error| SignatureError::Rsa {
                     context: format!("AWS-LC rejected the RSA private key: {error}"),
@@ -134,10 +134,13 @@ mod aws_lc_fips {
                         algorithm: format!("RSA key smaller than 2048 bits ({} bits)", key.public_modulus_len() * 8),
                     });
                 }
-                let encoding = match hash {
-                    HashAlgorithm::SHA2_256 => &signature::RSA_PKCS1_SHA256,
-                    HashAlgorithm::SHA2_384 => &signature::RSA_PKCS1_SHA384,
-                    HashAlgorithm::SHA2_512 => &signature::RSA_PKCS1_SHA512,
+                let encoding = match (algorithm, hash) {
+                    (SignatureAlgorithm::RsaPkcs1v15(_), HashAlgorithm::SHA2_256) => &signature::RSA_PKCS1_SHA256,
+                    (SignatureAlgorithm::RsaPkcs1v15(_), HashAlgorithm::SHA2_384) => &signature::RSA_PKCS1_SHA384,
+                    (SignatureAlgorithm::RsaPkcs1v15(_), HashAlgorithm::SHA2_512) => &signature::RSA_PKCS1_SHA512,
+                    (SignatureAlgorithm::RsaPss(_), HashAlgorithm::SHA2_256) => &signature::RSA_PSS_SHA256,
+                    (SignatureAlgorithm::RsaPss(_), HashAlgorithm::SHA2_384) => &signature::RSA_PSS_SHA384,
+                    (SignatureAlgorithm::RsaPss(_), HashAlgorithm::SHA2_512) => &signature::RSA_PSS_SHA512,
                     _ => unreachable!("policy checked above"),
                 };
                 let mut output = vec![0; key.public_modulus_len()];
@@ -213,12 +216,21 @@ mod aws_lc_fips {
         signature_bytes: &[u8],
     ) -> Result<(), SignatureError> {
         let (verification_algorithm, key_bytes): (&dyn signature::VerificationAlgorithm, Vec<u8>) = match algorithm {
-            SignatureAlgorithm::RsaPkcs1v15(hash) => {
+            algorithm @ (SignatureAlgorithm::RsaPkcs1v15(hash) | SignatureAlgorithm::RsaPss(hash)) => {
                 require_signature(algorithm, None).map_err(policy_error)?;
                 let verification_algorithm: &dyn signature::VerificationAlgorithm = match hash {
-                    HashAlgorithm::SHA2_256 => &signature::RSA_PKCS1_2048_8192_SHA256,
-                    HashAlgorithm::SHA2_384 => &signature::RSA_PKCS1_2048_8192_SHA384,
-                    HashAlgorithm::SHA2_512 => &signature::RSA_PKCS1_2048_8192_SHA512,
+                    HashAlgorithm::SHA2_256 if matches!(algorithm, SignatureAlgorithm::RsaPkcs1v15(_)) => {
+                        &signature::RSA_PKCS1_2048_8192_SHA256
+                    }
+                    HashAlgorithm::SHA2_384 if matches!(algorithm, SignatureAlgorithm::RsaPkcs1v15(_)) => {
+                        &signature::RSA_PKCS1_2048_8192_SHA384
+                    }
+                    HashAlgorithm::SHA2_512 if matches!(algorithm, SignatureAlgorithm::RsaPkcs1v15(_)) => {
+                        &signature::RSA_PKCS1_2048_8192_SHA512
+                    }
+                    HashAlgorithm::SHA2_256 => &signature::RSA_PSS_2048_8192_SHA256,
+                    HashAlgorithm::SHA2_384 => &signature::RSA_PSS_2048_8192_SHA384,
+                    HashAlgorithm::SHA2_512 => &signature::RSA_PSS_2048_8192_SHA512,
                     _ => unreachable!("policy checked above"),
                 };
                 (verification_algorithm, public_key.to_pkcs1()?)
@@ -318,14 +330,15 @@ mod tests {
             HashAlgorithm::SHA2_384,
             HashAlgorithm::SHA2_512,
         ] {
-            let algorithm = SignatureAlgorithm::RsaPkcs1v15(hash);
-            let signature = algorithm.sign(message, &key).unwrap();
+            for algorithm in [SignatureAlgorithm::RsaPkcs1v15(hash), SignatureAlgorithm::RsaPss(hash)] {
+                let signature = algorithm.sign(message, &key).unwrap();
 
-            algorithm.verify(&public_key, message, &signature).unwrap();
-            assert!(matches!(
-                algorithm.verify(&public_key, b"tampered", &signature),
-                Err(SignatureError::BadSignature)
-            ));
+                algorithm.verify(&public_key, message, &signature).unwrap();
+                assert!(matches!(
+                    algorithm.verify(&public_key, b"tampered", &signature),
+                    Err(SignatureError::BadSignature)
+                ));
+            }
         }
     }
 

@@ -3,14 +3,17 @@
 use crate::hash::HashAlgorithm;
 use crate::key::{KeyError, PrivateKey, PublicKey};
 
-use picky_asn1_x509::{AlgorithmIdentifier, oids};
+use picky_asn1_x509::{
+    AlgorithmIdentifier, AlgorithmIdentifierParameters, HashAlgorithm as Asn1HashAlgorithm, MaskGenAlgorithm,
+    RsassaPssParams, oids,
+};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 #[cfg(feature = "rustcrypto")]
 use crate::key::ec::{EcComponent, EcCurve, NamedEcCurve};
 #[cfg(feature = "rustcrypto")]
-use rsa::signature::{SignatureEncoding as _, Signer};
+use rsa::signature::{RandomizedSigner, SignatureEncoding as _, Signer};
 
 #[derive(Debug, Error)]
 #[non_exhaustive]
@@ -69,6 +72,7 @@ impl From<KeyError> for SignatureError {
 #[non_exhaustive]
 pub enum SignatureAlgorithm {
     RsaPkcs1v15(HashAlgorithm),
+    RsaPss(HashAlgorithm),
     Ecdsa(HashAlgorithm),
     Ed25519,
 }
@@ -87,6 +91,31 @@ impl TryFrom<&'_ AlgorithmIdentifier> for SignatureAlgorithm {
             oids::SHA512_WITH_RSA_ENCRYPTION => Ok(Self::RsaPkcs1v15(HashAlgorithm::SHA2_512)),
             oids::ID_RSASSA_PKCS1_V1_5_WITH_SHA3_384 => Ok(Self::RsaPkcs1v15(HashAlgorithm::SHA3_384)),
             oids::ID_RSASSA_PKCS1_V1_5_WITH_SHA3_512 => Ok(Self::RsaPkcs1v15(HashAlgorithm::SHA3_512)),
+            oids::RSASSA_PSS => {
+                let AlgorithmIdentifierParameters::RsassaPss(params) = v.parameters() else {
+                    return Err(SignatureError::UnsupportedAlgorithm {
+                        algorithm: "RSASSA-PSS parameters are missing".to_string(),
+                    });
+                };
+                let hash = match params.hash_algorithm {
+                    Asn1HashAlgorithm::SHA256 => HashAlgorithm::SHA2_256,
+                    Asn1HashAlgorithm::SHA384 => HashAlgorithm::SHA2_384,
+                    Asn1HashAlgorithm::SHA512 => HashAlgorithm::SHA2_512,
+                    unsupported => {
+                        return Err(SignatureError::UnsupportedAlgorithm {
+                            algorithm: format!("RSASSA-PSS with {unsupported:?}"),
+                        });
+                    }
+                };
+                if params.mask_gen_algorithm != MaskGenAlgorithm::new(params.hash_algorithm)
+                    || params.salt_length != params.hash_algorithm.len()
+                {
+                    return Err(SignatureError::UnsupportedAlgorithm {
+                        algorithm: "RSASSA-PSS requires matching MGF1 hash and digest-sized salt".to_string(),
+                    });
+                }
+                Ok(Self::RsaPss(hash))
+            }
             oids::ECDSA_WITH_SHA256 => Ok(Self::Ecdsa(HashAlgorithm::SHA2_256)),
             oids::ECDSA_WITH_SHA384 => Ok(Self::Ecdsa(HashAlgorithm::SHA2_384)),
             oids::ED25519 => Ok(Self::Ed25519),
@@ -123,6 +152,19 @@ impl TryFrom<SignatureAlgorithm> for AlgorithmIdentifier {
             }
             SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA3_512) => {
                 Ok(AlgorithmIdentifier::new_sha3_512_with_rsa_encryption())
+            }
+            SignatureAlgorithm::RsaPss(hash) => {
+                let hash = match hash {
+                    HashAlgorithm::SHA2_256 => Asn1HashAlgorithm::SHA256,
+                    HashAlgorithm::SHA2_384 => Asn1HashAlgorithm::SHA384,
+                    HashAlgorithm::SHA2_512 => Asn1HashAlgorithm::SHA512,
+                    unsupported => {
+                        return Err(SignatureError::UnsupportedAlgorithm {
+                            algorithm: format!("RSASSA-PSS with {unsupported:?}"),
+                        });
+                    }
+                };
+                Ok(AlgorithmIdentifier::new_rsassa_pss(RsassaPssParams::new(hash)))
             }
             SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_256) => Ok(AlgorithmIdentifier::new_ecdsa_with_sha256()),
             SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_384) => Ok(AlgorithmIdentifier::new_ecdsa_with_sha384()),
@@ -178,6 +220,29 @@ impl SignatureAlgorithm {
                     }
                 };
 
+                Ok(signature.to_vec())
+            }
+            SignatureAlgorithm::RsaPss(picky_hash_algo) => {
+                use rsa::{RsaPrivateKey, pss};
+
+                let rsa_private_key = RsaPrivateKey::try_from(private_key)?;
+                let mut rng = rand::rng();
+                let signature = match picky_hash_algo {
+                    HashAlgorithm::SHA2_256 => {
+                        pss::SigningKey::<sha2::Sha256>::new(rsa_private_key).try_sign_with_rng(&mut rng, msg)?
+                    }
+                    HashAlgorithm::SHA2_384 => {
+                        pss::SigningKey::<sha2::Sha384>::new(rsa_private_key).try_sign_with_rng(&mut rng, msg)?
+                    }
+                    HashAlgorithm::SHA2_512 => {
+                        pss::SigningKey::<sha2::Sha512>::new(rsa_private_key).try_sign_with_rng(&mut rng, msg)?
+                    }
+                    unsupported => {
+                        return Err(SignatureError::UnsupportedAlgorithm {
+                            algorithm: format!("RSASSA-PSS with {unsupported:?}"),
+                        });
+                    }
+                };
                 Ok(signature.to_vec())
             }
             SignatureAlgorithm::Ecdsa(picky_hash_algo) => {
@@ -366,6 +431,30 @@ impl SignatureAlgorithm {
                 }
                 .map_err(|_| SignatureError::BadSignature)?;
             }
+            SignatureAlgorithm::RsaPss(picky_hash_algo) => {
+                use rsa::signature::Verifier as _;
+                use rsa::{RsaPublicKey, pss};
+
+                let rsa_public_key = RsaPublicKey::try_from(public_key)?;
+                let signature = pss::Signature::try_from(signature)?;
+                match picky_hash_algo {
+                    HashAlgorithm::SHA2_256 => {
+                        pss::VerifyingKey::<sha2::Sha256>::new(rsa_public_key).verify(msg, &signature)
+                    }
+                    HashAlgorithm::SHA2_384 => {
+                        pss::VerifyingKey::<sha2::Sha384>::new(rsa_public_key).verify(msg, &signature)
+                    }
+                    HashAlgorithm::SHA2_512 => {
+                        pss::VerifyingKey::<sha2::Sha512>::new(rsa_public_key).verify(msg, &signature)
+                    }
+                    unsupported => {
+                        return Err(SignatureError::UnsupportedAlgorithm {
+                            algorithm: format!("RSASSA-PSS with {unsupported:?}"),
+                        });
+                    }
+                }
+                .map_err(|_| SignatureError::BadSignature)?;
+            }
             SignatureAlgorithm::Ecdsa(picky_hash_algo) => {
                 let ec_pub_key = crate::key::ec::EcdsaPublicKey::try_from(public_key)?;
 
@@ -517,9 +606,42 @@ impl SignatureAlgorithm {
     pub fn hash_algorithm(&self) -> HashAlgorithm {
         match &self {
             SignatureAlgorithm::RsaPkcs1v15(hash_algo) => *hash_algo,
+            SignatureAlgorithm::RsaPss(hash_algo) => *hash_algo,
             SignatureAlgorithm::Ecdsa(hash_algo) => *hash_algo,
             SignatureAlgorithm::Ed25519 => HashAlgorithm::SHA2_512,
         }
+    }
+}
+
+#[cfg(test)]
+mod rsa_pss_tests {
+    use super::*;
+
+    #[test]
+    fn algorithm_identifier_round_trip() {
+        for hash in [
+            HashAlgorithm::SHA2_256,
+            HashAlgorithm::SHA2_384,
+            HashAlgorithm::SHA2_512,
+        ] {
+            let algorithm = SignatureAlgorithm::RsaPss(hash);
+            let identifier = AlgorithmIdentifier::try_from(algorithm).unwrap();
+
+            assert_eq!(SignatureAlgorithm::try_from(&identifier).unwrap(), algorithm);
+        }
+    }
+
+    #[test]
+    fn rejects_non_matching_mask_generation_hash() {
+        let mut params = RsassaPssParams::new(Asn1HashAlgorithm::SHA256);
+        params.mask_gen_algorithm = MaskGenAlgorithm::new(Asn1HashAlgorithm::SHA384);
+        let identifier = AlgorithmIdentifier::new_rsassa_pss(params);
+
+        assert!(matches!(
+            SignatureAlgorithm::try_from(&identifier),
+            Err(SignatureError::UnsupportedAlgorithm { algorithm })
+                if algorithm == "RSASSA-PSS requires matching MGF1 hash and digest-sized salt"
+        ));
     }
 }
 

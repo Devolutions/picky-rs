@@ -832,6 +832,9 @@ const HTTP_SIG_ALGO_RSA_SHA2_512: &str = "rsa-sha2-512";
 
 const HTTP_SIG_ALGO_RSA_SHA3_384: &str = "rsa-sha3-384";
 const HTTP_SIG_ALGO_RSA_SHA3_512: &str = "rsa-sha3-512";
+const HTTP_SIG_ALGO_RSA_PSS_SHA_256: &str = "rsa-pss-sha256";
+const HTTP_SIG_ALGO_RSA_PSS_SHA_384: &str = "rsa-pss-sha384";
+const HTTP_SIG_ALGO_RSA_PSS_SHA_512: &str = "rsa-pss-sha512";
 
 const HTTP_SIG_ALGO_ECDSA_SHA_256: &str = "ecdsa-sha256";
 const HTTP_SIG_ALGO_ECDSA_SHA_384: &str = "ecdsa-sha384";
@@ -848,6 +851,10 @@ fn to_http_sig_algo_str(algo: SignatureAlgorithm) -> &'static str {
         SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_512) => HTTP_SIG_ALGO_RSA_SHA_512,
         SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA3_384) => HTTP_SIG_ALGO_RSA_SHA3_384,
         SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA3_512) => HTTP_SIG_ALGO_RSA_SHA3_512,
+        SignatureAlgorithm::RsaPss(HashAlgorithm::SHA2_256) => HTTP_SIG_ALGO_RSA_PSS_SHA_256,
+        SignatureAlgorithm::RsaPss(HashAlgorithm::SHA2_384) => HTTP_SIG_ALGO_RSA_PSS_SHA_384,
+        SignatureAlgorithm::RsaPss(HashAlgorithm::SHA2_512) => HTTP_SIG_ALGO_RSA_PSS_SHA_512,
+        SignatureAlgorithm::RsaPss(_) => "RSA-PSS unsupported algorithm",
         SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_256) => HTTP_SIG_ALGO_ECDSA_SHA_256,
         SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_384) => HTTP_SIG_ALGO_ECDSA_SHA_384,
         SignatureAlgorithm::Ed25519 => HTTP_SIG_ALGO_ED25519_SHA512,
@@ -873,6 +880,9 @@ fn from_http_sig_algo_str(s: &str) -> Option<SignatureAlgorithm> {
         }
         HTTP_SIG_ALGO_RSA_SHA3_384 => Some(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA3_384)),
         HTTP_SIG_ALGO_RSA_SHA3_512 => Some(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA3_512)),
+        HTTP_SIG_ALGO_RSA_PSS_SHA_256 => Some(SignatureAlgorithm::RsaPss(HashAlgorithm::SHA2_256)),
+        HTTP_SIG_ALGO_RSA_PSS_SHA_384 => Some(SignatureAlgorithm::RsaPss(HashAlgorithm::SHA2_384)),
+        HTTP_SIG_ALGO_RSA_PSS_SHA_512 => Some(SignatureAlgorithm::RsaPss(HashAlgorithm::SHA2_512)),
         HTTP_SIG_ALGO_ECDSA_SHA_256 => Some(SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_256)),
         HTTP_SIG_ALGO_ECDSA_SHA_384 => Some(SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_384)),
         HTTP_SIG_ALGO_ED25519_SHA512 => Some(SignatureAlgorithm::Ed25519),
@@ -887,6 +897,9 @@ fn is_algo_compatible_with_key(algo: SignatureAlgorithm, key: &PublicKey) -> boo
     match algo {
         // Currently, SignatureHashType only contains RSA methods, so this is a an auto-win
         _ if key_algo == RSA_ENCRYPTION => true,
+        SignatureAlgorithm::RsaPss(_) if key_algo == RSASSA_PSS => {
+            SignatureAlgorithm::try_from(&key.as_inner().algorithm).is_ok_and(|key_algorithm| key_algorithm == algo)
+        }
 
         // Otherwise we need to check for specific hash algorithm
         SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA1) if key_algo == SHA1_WITH_RSA_ENCRYPTION => true,
@@ -1315,5 +1328,15 @@ mod tests {
     fn unknown_algorithms_are_ignored() {
         let http_signature = HttpSignature::from_str(HTTP_SIGNATURE_UNKNOWN_ALGO).expect("from str");
         assert_eq!(http_signature.algorithm.unwrap().as_str(), "magical-algo");
+    }
+}
+#[test]
+fn rsa_pss_algorithm_names_round_trip() {
+    for algorithm in [
+        SignatureAlgorithm::RsaPss(HashAlgorithm::SHA2_256),
+        SignatureAlgorithm::RsaPss(HashAlgorithm::SHA2_384),
+        SignatureAlgorithm::RsaPss(HashAlgorithm::SHA2_512),
+    ] {
+        assert_eq!(from_http_sig_algo_str(to_http_sig_algo_str(algorithm)), Some(algorithm));
     }
 }

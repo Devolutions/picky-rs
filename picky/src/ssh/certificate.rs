@@ -739,6 +739,11 @@ impl SshCertificateBuilder {
                             )));
                         }
                     },
+                    SignatureAlgorithm::RsaPss(_) => {
+                        return Err(SshCertificateGenerationError::IncorrectSignatureAlgorithm(
+                            "RSA-PSS signatures are not defined for OpenSSH certificates".to_owned(),
+                        ));
+                    }
                     SignatureAlgorithm::Ecdsa(_) => {
                         return Err(SshCertificateGenerationError::IncorrectSignatureAlgorithm(
                             "ECDSA signature algorithm can't be used with RSA keys".to_owned(),
@@ -766,7 +771,7 @@ impl SshCertificateBuilder {
                             )));
                         }
                     },
-                    SignatureAlgorithm::RsaPkcs1v15(_) => {
+                    SignatureAlgorithm::RsaPkcs1v15(_) | SignatureAlgorithm::RsaPss(_) => {
                         return Err(SshCertificateGenerationError::IncorrectSignatureAlgorithm(
                             "RSA signature algorithm can't be used with ECDSA keys".to_owned(),
                         ));

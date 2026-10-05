@@ -33,15 +33,17 @@ picky = { version = "7", default-features = false, features = ["fips-aws-lc", "x
 ```
 
 The AWS-LC profile supports SHA-224/256/384/512 and SHA3-384/512; RSA PKCS#1
-v1.5 signatures with SHA-2 and keys of at least 2048 bits; ECDSA
+v1.5 and RSA-PSS signatures with SHA-256/384/512 and keys of at least 2048 bits;
+ECDSA
 P-256/SHA-256, P-384/SHA-384, and P-521/SHA-512; and Ed25519. RSA
 2048/3072/4096/8192, P-256/P-384/P-521, and Ed25519 key generation and public
-key derivation use AWS-LC.
+key derivation use AWS-LC. JOSE supports `PS256`, `PS384`, and `PS512`, and
+X.509 certificates and CSRs can use the corresponding RSA-PSS parameters.
 
-JWE supports `dir`, RSA-OAEP-256, `ECDH-ES`, `ECDH-ES+A128KW`, and
-`ECDH-ES+A256KW` key management with AES-128-GCM or AES-256-GCM content
-encryption. ECDH uses P-256, P-384, or P-521. X25519, AES-192-GCM,
-ECDH-ES+A192KW, and ChaCha20-Poly1305 remain unavailable.
+JWE supports `dir`, RSA-OAEP-256, standalone `A128KW` and `A256KW`, `ECDH-ES`,
+`ECDH-ES+A128KW`, and `ECDH-ES+A256KW` key management with AES-128-GCM or
+AES-256-GCM content encryption. ECDH uses P-256, P-384, or P-521. X25519,
+AES-192-GCM, A192KW, ECDH-ES+A192KW, and ChaCha20-Poly1305 remain unavailable.
 
 PKCS#12 supports PBES2 using PBKDF2-HMAC-SHA-2 and AES-CBC. PBES1 and the
 PKCS#12 Appendix B MAC KDF remain unavailable because they are outside the

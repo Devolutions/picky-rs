@@ -180,3 +180,33 @@ fn h_generate_from_cri(
         signature: signature.into(),
     }))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::hash::HashAlgorithm;
+    use crate::key::PrivateKey;
+    use crate::signature::SignatureAlgorithm;
+    use crate::x509::name::DirectoryName;
+
+    #[test]
+    fn rsa_pss_csr_round_trip() {
+        let private_key = PrivateKey::from_pem_str(picky_test_data::RSA_2048_PK_1).unwrap();
+
+        for hash in [
+            HashAlgorithm::SHA2_256,
+            HashAlgorithm::SHA2_384,
+            HashAlgorithm::SHA2_512,
+        ] {
+            let csr = Csr::generate(
+                DirectoryName::new_common_name("RSA-PSS test"),
+                &private_key,
+                SignatureAlgorithm::RsaPss(hash),
+            )
+            .unwrap();
+            let reparsed = Csr::from_der(&csr.to_der().unwrap()).unwrap();
+
+            reparsed.verify().unwrap();
+        }
+    }
+}

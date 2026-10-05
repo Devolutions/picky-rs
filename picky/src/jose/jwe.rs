@@ -450,8 +450,8 @@ impl JweAlg {
     #[cfg(all(feature = "jwe-crypto", feature = "fips-aws-lc"))]
     fn key_wrapping_alg(&self) -> Option<KeyWrappingAlg> {
         match self {
-            JweAlg::EcdhEsAesKeyWrap128 => Some(KeyWrappingAlg::Aes128),
-            JweAlg::EcdhEsAesKeyWrap256 => Some(KeyWrappingAlg::Aes256),
+            JweAlg::AesKeyWrap128 | JweAlg::EcdhEsAesKeyWrap128 => Some(KeyWrappingAlg::Aes128),
+            JweAlg::AesKeyWrap256 | JweAlg::EcdhEsAesKeyWrap256 => Some(KeyWrappingAlg::Aes256),
             _ => None,
         }
     }
@@ -701,6 +701,20 @@ impl Jwe {
         encode_impl(self, EncoderMode::Direct(cek))
     }
 
+    /// Encodes with a randomly generated CEK wrapped by the provided AES key-encryption key.
+    pub fn encode_key_wrap(self, kek: &[u8]) -> Result<String, JweError> {
+        #[cfg(not(feature = "jwe-crypto"))]
+        {
+            let _ = kek;
+            Err(JweError::UnsupportedAlgorithm {
+                algorithm: "JWE encryption is not implemented by the selected provider".to_string(),
+            })
+        }
+
+        #[cfg(feature = "jwe-crypto")]
+        encode_impl(self, EncoderMode::KeyWrap(kek))
+    }
+
     /// Decodes with CEK encrypted and included in the token using asymmetric cryptography.
     pub fn decode(compact_repr: &str, key: &PrivateKey) -> Result<Jwe, JweError> {
         #[cfg(not(feature = "jwe-crypto"))]
@@ -727,6 +741,20 @@ impl Jwe {
 
         #[cfg(feature = "jwe-crypto")]
         RawJwe::decode(compact_repr).and_then(|jwe| jwe.decrypt_direct(cek))
+    }
+
+    /// Decodes using the provided AES key-encryption key to unwrap the CEK.
+    pub fn decode_key_wrap(compact_repr: &str, kek: &[u8]) -> Result<Jwe, JweError> {
+        #[cfg(not(feature = "jwe-crypto"))]
+        {
+            let _ = (compact_repr, kek);
+            Err(JweError::UnsupportedAlgorithm {
+                algorithm: "JWE decryption is not implemented by the selected provider".to_string(),
+            })
+        }
+
+        #[cfg(feature = "jwe-crypto")]
+        RawJwe::decode(compact_repr).and_then(|jwe| jwe.decrypt_key_wrap(kek))
     }
 }
 
@@ -780,6 +808,20 @@ impl<'repr> RawJwe<'repr> {
         #[cfg(feature = "jwe-crypto")]
         decrypt_impl(self, DecoderMode::Direct(cek))
     }
+
+    /// Decrypts using the provided AES key-encryption key to unwrap the CEK.
+    pub fn decrypt_key_wrap(self, kek: &[u8]) -> Result<Jwe, JweError> {
+        #[cfg(not(feature = "jwe-crypto"))]
+        {
+            let _ = kek;
+            Err(JweError::UnsupportedAlgorithm {
+                algorithm: "JWE decryption is not implemented by the selected provider".to_string(),
+            })
+        }
+
+        #[cfg(feature = "jwe-crypto")]
+        decrypt_impl(self, DecoderMode::KeyWrap(kek))
+    }
 }
 
 fn decode_impl(compact_repr: Cow<'_, str>) -> Result<RawJwe<'_>, JweError> {
@@ -826,6 +868,7 @@ fn decode_impl(compact_repr: Cow<'_, str>) -> Result<RawJwe<'_>, JweError> {
 enum EncoderMode<'a> {
     Asymmetric(&'a PublicKey),
     Direct(&'a [u8]),
+    KeyWrap(&'a [u8]),
 }
 
 #[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
@@ -846,6 +889,24 @@ fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
             jwe.header.alg = JweAlg::Direct;
 
             (String::new(), Zeroizing::new(symmetric_key.to_vec()))
+        }
+        EncoderMode::KeyWrap(kek) => {
+            let wrapping_algorithm = match jwe.header.alg {
+                JweAlg::AesKeyWrap128 | JweAlg::AesKeyWrap192 | JweAlg::AesKeyWrap256 => {
+                    jwe.header.alg.key_wrapping_alg().expect("matched key-wrap algorithm")
+                }
+                unsupported => {
+                    return Err(JweError::UnsupportedAlgorithm {
+                        algorithm: format!(
+                            "Algorithm `{}` is not a standalone AES key-wrap algorithm",
+                            unsupported.name()
+                        ),
+                    });
+                }
+            };
+            let cek = generate_cek(jwe.header.enc)?;
+            let encrypted_key = wrapping_algorithm.encrypt_key(jwe.header.enc, &cek, kek)?;
+            (general_purpose::URL_SAFE_NO_PAD.encode(encrypted_key), cek)
         }
         EncoderMode::Asymmetric(public_key) => match &public_key.as_inner().subject_public_key {
             RfcPublicKey::Rsa(_) => {
@@ -954,6 +1015,26 @@ fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
             }
             jwe.header.alg = JweAlg::Direct;
             (String::new(), Zeroizing::new(symmetric_key.to_vec()))
+        }
+        EncoderMode::KeyWrap(kek) => {
+            require_fips_jwe_alg(jwe.header.alg)?;
+            require_fips_jwe_enc(jwe.header.enc)?;
+            let wrapping_algorithm = match jwe.header.alg {
+                JweAlg::AesKeyWrap128 | JweAlg::AesKeyWrap256 => {
+                    jwe.header.alg.key_wrapping_alg().expect("matched key-wrap algorithm")
+                }
+                unsupported => {
+                    return Err(JweError::UnsupportedAlgorithm {
+                        algorithm: format!(
+                            "Algorithm `{}` is not a FIPS AES key-wrap algorithm",
+                            unsupported.name()
+                        ),
+                    });
+                }
+            };
+            let cek = generate_cek(jwe.header.enc)?;
+            let encrypted_key = wrapping_algorithm.encrypt_key(jwe.header.enc, &cek, kek)?;
+            (general_purpose::URL_SAFE_NO_PAD.encode(encrypted_key), cek)
         }
         EncoderMode::Asymmetric(public_key) => {
             require_fips_jwe_alg(jwe.header.alg)?;
@@ -1140,6 +1221,7 @@ fn prepare_ecdh_encryption_key(jwe: &Jwe, public_key: &PublicKey) -> Result<JweE
 enum DecoderMode<'a> {
     Normal(&'a PrivateKey),
     Direct(&'a [u8]),
+    KeyWrap(&'a [u8]),
 }
 
 #[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
@@ -1162,6 +1244,21 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
 
     let jwe_cek = match mode {
         DecoderMode::Direct(symmetric_key) => Zeroizing::new(symmetric_key.to_vec()),
+        DecoderMode::KeyWrap(kek) => match header.alg {
+            JweAlg::AesKeyWrap128 | JweAlg::AesKeyWrap192 | JweAlg::AesKeyWrap256 => header
+                .alg
+                .key_wrapping_alg()
+                .expect("matched key-wrap algorithm")
+                .decrypt_key(header.enc, &encrypted_key, kek)?,
+            unsupported => {
+                return Err(JweError::UnsupportedAlgorithm {
+                    algorithm: format!(
+                        "Algorithm `{}` is not a standalone AES key-wrap algorithm",
+                        unsupported.name()
+                    ),
+                });
+            }
+        },
         DecoderMode::Normal(private_key) => match &private_key.as_kind() {
             PrivateKeyKind::Rsa => {
                 let rsa_private_key = RsaPrivateKey::try_from(private_key)?;
@@ -1277,6 +1374,24 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
             }
             Zeroizing::new(symmetric_key.to_vec())
         }
+        DecoderMode::KeyWrap(kek) => {
+            require_fips_jwe_alg(header.alg)?;
+            match header.alg {
+                JweAlg::AesKeyWrap128 | JweAlg::AesKeyWrap256 => header
+                    .alg
+                    .key_wrapping_alg()
+                    .expect("matched key-wrap algorithm")
+                    .decrypt_key(header.enc, &encrypted_key, kek)?,
+                unsupported => {
+                    return Err(JweError::UnsupportedAlgorithm {
+                        algorithm: format!(
+                            "Algorithm `{}` is not a FIPS AES key-wrap algorithm",
+                            unsupported.name()
+                        ),
+                    });
+                }
+            }
+        }
         DecoderMode::Normal(private_key) => {
             require_fips_jwe_alg(header.alg)?;
             match private_key.as_kind() {
@@ -1354,7 +1469,12 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
 fn require_fips_jwe_alg(algorithm: JweAlg) -> Result<(), JweError> {
     if matches!(
         algorithm,
-        JweAlg::RsaOaep256 | JweAlg::EcdhEs | JweAlg::EcdhEsAesKeyWrap128 | JweAlg::EcdhEsAesKeyWrap256
+        JweAlg::RsaOaep256
+            | JweAlg::AesKeyWrap128
+            | JweAlg::AesKeyWrap256
+            | JweAlg::EcdhEs
+            | JweAlg::EcdhEsAesKeyWrap128
+            | JweAlg::EcdhEsAesKeyWrap256
     ) {
         Ok(())
     } else {
@@ -2112,6 +2232,26 @@ mod fips_tests {
     }
 
     #[test]
+    fn standalone_aes_key_wrap_roundtrips() {
+        for (algorithm, kek) in [
+            (JweAlg::AesKeyWrap128, &[0x11; 16][..]),
+            (JweAlg::AesKeyWrap256, &[0x22; 32][..]),
+        ] {
+            let payload = format!("AWS-LC FIPS {algorithm:?} payload").into_bytes();
+            let encoded = Jwe::new(algorithm, JweEnc::Aes256Gcm, payload.clone())
+                .encode_key_wrap(kek)
+                .unwrap();
+            let raw = RawJwe::decode(&encoded).unwrap();
+
+            assert_eq!(raw.encrypted_key.len(), JweEnc::Aes256Gcm.key_size() + 8);
+            assert!(raw.header.epk.is_none());
+            let decoded = raw.decrypt_key_wrap(kek).unwrap();
+            assert_eq!(decoded.payload, payload);
+            assert_eq!(decoded.header.alg, algorithm);
+        }
+    }
+
+    #[test]
     fn ecdh_es_roundtrips_for_approved_curves() {
         for (curve, pem) in [
             ("P-256", picky_test_data::EC_NIST256_PK_1),
@@ -2251,6 +2391,24 @@ mod tests {
 
         assert_eq!(jwe.payload, decoded.payload);
         assert_eq!(jwe.header, decoded.header);
+    }
+
+    #[test]
+    fn standalone_aes_key_wrap_roundtrips() {
+        for (algorithm, kek) in [
+            (JweAlg::AesKeyWrap128, &[0x11; 16][..]),
+            (JweAlg::AesKeyWrap192, &[0x22; 24][..]),
+            (JweAlg::AesKeyWrap256, &[0x33; 32][..]),
+        ] {
+            let payload = format!("{algorithm:?} payload").into_bytes();
+            let encoded = Jwe::new(algorithm, JweEnc::Aes256Gcm, payload.clone())
+                .encode_key_wrap(kek)
+                .unwrap();
+            let decoded = Jwe::decode_key_wrap(&encoded, kek).unwrap();
+
+            assert_eq!(decoded.payload, payload);
+            assert_eq!(decoded.header.alg, algorithm);
+        }
     }
 
     #[test]
