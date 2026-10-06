@@ -5,7 +5,6 @@ use base64::Engine as _;
 #[cfg(feature = "fips")]
 use picky::hash::HashAlgorithm;
 use picky::signature::SignatureAlgorithm;
-#[cfg(feature = "fips")]
 use picky::signature::SignatureError;
 use picky::ssh::certificate::{
     SshCertKeyType, SshCertType, SshCertificate, SshCertificateBuilder, SshCertificateGenerationError,
@@ -15,6 +14,74 @@ use picky::ssh::private_key::{SshBasePrivateKey, SshPrivateKey};
 #[cfg(feature = "fips")]
 use std::ops::Range;
 use std::str::FromStr as _;
+
+#[test]
+fn ssh_critical_options_use_nested_strings_and_empty_flags() {
+    use picky::ssh::certificate::{SshCriticalOption, SshCriticalOptionType};
+    use picky::ssh::decode::SshComplexTypeDecode as _;
+    use picky::ssh::encode::SshComplexTypeEncode as _;
+
+    for (option_type, data, expected) in [
+        (
+            SshCriticalOptionType::ForceCommand,
+            "echo hello",
+            &b"\0\0\0\x23\0\0\0\x0dforce-command\0\0\0\x0e\0\0\0\x0aecho hello"[..],
+        ),
+        (
+            SshCriticalOptionType::SourceAddress,
+            "192.0.2.0/24",
+            &b"\0\0\0\x26\0\0\0\x0esource-address\0\0\0\x10\0\0\0\x0c192.0.2.0/24"[..],
+        ),
+        (
+            SshCriticalOptionType::VerifyRequired,
+            "",
+            &b"\0\0\0\x17\0\0\0\x0fverify-required\0\0\0\0"[..],
+        ),
+    ] {
+        let option = SshCriticalOption {
+            option_type,
+            data: data.to_owned(),
+        };
+        let options = vec![option];
+        let mut encoded = Vec::new();
+        options.encode(&mut encoded).unwrap();
+        assert_eq!(encoded, expected);
+        let mut reader = expected;
+        assert_eq!(Vec::<SshCriticalOption>::decode(&mut reader).unwrap(), options);
+        assert!(reader.is_empty());
+    }
+}
+
+#[test]
+fn ssh_critical_options_reject_unwrapped_data_and_nonempty_flags() {
+    use picky::ssh::certificate::{SshCriticalOption, SshCriticalOptionType};
+    use picky::ssh::decode::SshComplexTypeDecode as _;
+    use picky::ssh::encode::SshComplexTypeEncode as _;
+    for encoded in [
+        &b"\0\0\0\x1f\0\0\0\x0dforce-command\0\0\0\x0aecho hello"[..],
+        &b"\0\0\0\x18\0\0\0\x0fverify-required\0\0\0\x01x"[..],
+        &b"\0\0\0\x24\0\0\0\x0dforce-command\0\0\0\x0f\0\0\0\x0aecho hellox"[..],
+    ] {
+        assert!(Vec::<SshCriticalOption>::decode(encoded).is_err());
+    }
+    assert!(
+        vec![SshCriticalOption {
+            option_type: SshCriticalOptionType::VerifyRequired,
+            data: "unexpected".to_owned(),
+        }]
+        .encode(Vec::new())
+        .is_err()
+    );
+}
+
+#[cfg(feature = "fips")]
+#[test]
+fn fips_public_keys_reject_legacy_fingerprints() {
+    let key = picky::ssh::SshPublicKey::from_str(picky_test_data::SSH_PUBLIC_KEY_RSA).unwrap();
+    assert!(key.fingerprint_md5().is_err());
+    assert!(key.fingerprint_sha1().is_err());
+    assert_ne!(key.fingerprint_sha256().unwrap(), [0; 32]);
+}
 
 #[derive(Clone, Copy, Debug)]
 enum ExpectedPrivateKeyKind {
@@ -77,7 +144,6 @@ fn build_host_certificate(
     builder.build()
 }
 
-#[cfg(feature = "fips")]
 fn assert_fips_certificate_sign_and_verify(private_key: &str, key_type: SshCertKeyType) {
     let certificate = build_host_certificate(private_key, key_type, None).unwrap();
     certificate.verify_signature().unwrap();
@@ -321,6 +387,28 @@ fn fips_rejects_oversized_rsa_before_crt_arithmetic() {
     assert!(SshPrivateKey::from_pem_str(&oversized, None).is_err());
 }
 
+#[cfg(feature = "fips")]
+#[test]
+fn fips_rejects_invalid_private_key_padding_and_none_kdf_options() {
+    let bad_padding = mutate_private_blob(picky_test_data::SSH_PRIVATE_KEY_RSA, |private| {
+        *private.last_mut().unwrap() = 0;
+    });
+    let misaligned = mutate_private_blob(picky_test_data::SSH_PRIVATE_KEY_RSA, |private| {
+        private.pop().unwrap();
+    });
+    let mut payload = decode_pem_payload(picky_test_data::SSH_PRIVATE_KEY_RSA);
+    let mut position = b"openssh-key-v1\0".len();
+    read_wire_field(&payload, &mut position);
+    read_wire_field(&payload, &mut position);
+    let options = read_wire_field(&payload, &mut position);
+    replace_wire_field(&mut payload, options, &[0; 8]);
+    let none_options = encode_pem_payload(&payload);
+
+    for malformed in [bad_padding, misaligned, none_options] {
+        assert!(SshPrivateKey::from_pem_str(&malformed, None).is_err());
+    }
+}
+
 #[test]
 fn fips_ssh_certificate_rsa_parse_serialize() {
     let certificate = build_host_certificate(
@@ -361,7 +449,6 @@ fn fips_ssh_certificate_ecdsa_p384_parse_serialize() {
     );
 }
 
-#[cfg(feature = "fips")]
 #[test]
 fn fips_ssh_certificate_ecdsa_p521_parse_serialize() {
     let certificate = build_host_certificate(
@@ -426,7 +513,6 @@ fn fips_rejects_invalid_rsa_ec_and_ed25519_certificate_subject_keys() {
     }
 }
 
-#[cfg(feature = "fips")]
 #[test]
 fn fips_ssh_certificate_rsa_sha2_sign_verify_and_reject_tampering() {
     assert_fips_certificate_sign_and_verify(picky_test_data::SSH_PRIVATE_KEY_RSA, SshCertKeyType::RsaSha2_256V01);
@@ -508,7 +594,6 @@ fn fips_ssh_short_ec_scalars_support_ecdh_jwe() {
     }
 }
 
-#[cfg(feature = "fips")]
 #[test]
 #[ignore = "requires OpenSSH ssh-keygen on PATH"]
 fn fips_standard_rsa_certificate_options_interoperate_with_openssh() {
@@ -566,7 +651,6 @@ fn fips_standard_rsa_certificate_options_interoperate_with_openssh() {
     }
 }
 
-#[cfg(feature = "fips")]
 #[test]
 fn fips_ssh_certificate_ecdsa_p256_sign_verify_and_reject_tampering() {
     assert_fips_certificate_sign_and_verify(
@@ -575,7 +659,6 @@ fn fips_ssh_certificate_ecdsa_p256_sign_verify_and_reject_tampering() {
     );
 }
 
-#[cfg(feature = "fips")]
 #[test]
 fn fips_ssh_certificate_ecdsa_p384_sign_verify_and_reject_tampering() {
     assert_fips_certificate_sign_and_verify(
@@ -584,7 +667,6 @@ fn fips_ssh_certificate_ecdsa_p384_sign_verify_and_reject_tampering() {
     );
 }
 
-#[cfg(feature = "fips")]
 #[test]
 fn fips_ssh_certificate_ecdsa_p521_sign_verify_and_reject_tampering() {
     assert_fips_certificate_sign_and_verify(
@@ -593,10 +675,50 @@ fn fips_ssh_certificate_ecdsa_p521_sign_verify_and_reject_tampering() {
     );
 }
 
-#[cfg(feature = "fips")]
 #[test]
 fn fips_ssh_certificate_ed25519_sign_verify_and_reject_tampering() {
     assert_fips_certificate_sign_and_verify(picky_test_data::SSH_PRIVATE_KEY_ED25519, SshCertKeyType::SshEd25519V01);
+}
+
+#[test]
+fn ssh_ecdsa_certificate_signatures_use_r_and_s_mpints() {
+    use picky::ssh::certificate::SshSignatureBlob;
+    use picky::ssh::decode::SshReadExt as _;
+
+    for (pem, key_type, width) in [
+        (
+            picky_test_data::SSH_PRIVATE_KEY_EC_P256,
+            SshCertKeyType::EcdsaSha2Nistp256V01,
+            32,
+        ),
+        (
+            picky_test_data::SSH_PRIVATE_KEY_EC_P384,
+            SshCertKeyType::EcdsaSha2Nistp384V01,
+            48,
+        ),
+        (
+            picky_test_data::SSH_PRIVATE_KEY_EC_P521,
+            SshCertKeyType::EcdsaSha2Nistp521V01,
+            66,
+        ),
+    ] {
+        let certificate = build_host_certificate(pem, key_type, None).unwrap();
+        let encoded = certificate.to_string().unwrap();
+        let parsed = SshCertificate::from_str(&encoded).unwrap();
+        assert_eq!(parsed.signature, certificate.signature);
+        let SshSignatureBlob::Standard(signature) = &parsed.signature.blob else {
+            panic!("ECDSA certificates must have standard signatures");
+        };
+        let mut signature = signature.as_slice();
+        for component in [
+            signature.read_ssh_mpint_bytes().unwrap(),
+            signature.read_ssh_mpint_bytes().unwrap(),
+        ] {
+            assert!(!component.is_empty() && component.len() <= width);
+        }
+        assert!(signature.is_empty(), "ECDSA signatures contain exactly two SSH mpints");
+        parsed.verify_signature().unwrap();
+    }
 }
 
 #[cfg(feature = "fips")]

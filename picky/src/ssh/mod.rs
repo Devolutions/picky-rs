@@ -1,51 +1,25 @@
-#[cfg(not(feature = "fips"))]
 pub mod certificate;
-#[cfg(feature = "fips")]
-#[path = "certificate_fips.rs"]
-pub mod certificate;
-#[cfg(not(feature = "fips"))]
 pub mod decode;
-#[cfg(not(feature = "fips"))]
 pub mod encode;
-#[cfg(not(feature = "fips"))]
 pub mod private_key;
-#[cfg(feature = "fips")]
-#[path = "private_key_fips.rs"]
-pub mod private_key;
-#[cfg(not(feature = "fips"))]
-pub mod public_key;
-#[cfg(feature = "fips")]
-#[path = "public_key_fips.rs"]
 pub mod public_key;
 
-#[cfg(not(feature = "fips"))]
 use crate::key::ec::NamedEcCurve;
-#[cfg(not(feature = "fips"))]
 use crate::key::ed::NamedEdAlgorithm;
-#[cfg(not(feature = "fips"))]
 use crate::key::{EcCurve, EdAlgorithm, KeyError};
 
-#[cfg(not(feature = "fips"))]
 use byteorder::ReadBytesExt;
-#[cfg(not(feature = "fips"))]
 use std::io::{self, Read};
 
 pub use certificate::{SshCertKeyType, SshCertType, SshCertificate, SshCertificateBuilder};
 pub use private_key::SshPrivateKey;
 pub use public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
 
-#[cfg(feature = "fips")]
-mod wire_fips;
-
-#[cfg(not(feature = "fips"))]
 pub(crate) type Base64Writer<'a, T, E> = base64::write::EncoderWriter<'a, T, E>;
-#[cfg(not(feature = "fips"))]
 pub(crate) type Base64Reader<'a, T, E> = base64::read::DecoderReader<'a, T, E>;
 
-#[cfg(not(feature = "fips"))]
-const SSH_COMBO_ED25519_KEY_LENGTH: usize = ed25519_dalek::SECRET_KEY_LENGTH + ed25519_dalek::PUBLIC_KEY_LENGTH;
+const SSH_COMBO_ED25519_KEY_LENGTH: usize = 64;
 
-#[cfg(not(feature = "fips"))]
 mod key_type {
     pub const RSA: &str = "ssh-rsa";
     pub const ECDSA_SHA2_NIST_P256: &str = "ecdsa-sha2-nistp256";
@@ -56,27 +30,26 @@ mod key_type {
     pub const SK_ED25519: &str = "sk-ssh-ed25519@openssh.com";
 }
 
-#[cfg(not(feature = "fips"))]
 mod key_identifier {
     pub const ECDSA_SHA2_NIST_P256: &str = "nistp256";
     pub const ECDSA_SHA2_NIST_P384: &str = "nistp384";
     pub const ECDSA_SHA2_NIST_P521: &str = "nistp521";
 }
 
-#[cfg(not(feature = "fips"))]
 trait EcCurveSshExt {
     fn to_ecdsa_ssh_key_type(&self) -> Result<&'static str, KeyError>;
     fn to_ecdsa_ssh_key_identifier(&self) -> Result<&'static str, KeyError>;
 }
 
-#[cfg(not(feature = "fips"))]
 impl EcCurveSshExt for NamedEcCurve {
     fn to_ecdsa_ssh_key_type(&self) -> Result<&'static str, KeyError> {
         match self {
             NamedEcCurve::Known(EcCurve::NistP256) => Ok(key_type::ECDSA_SHA2_NIST_P256),
             NamedEcCurve::Known(EcCurve::NistP384) => Ok(key_type::ECDSA_SHA2_NIST_P384),
             NamedEcCurve::Known(EcCurve::NistP521) => Ok(key_type::ECDSA_SHA2_NIST_P521),
-            NamedEcCurve::Unsupported(oid) => Err(KeyError::unsupported_curve(oid, "ssh key type serialization")),
+            NamedEcCurve::Unsupported(oid) => Err(KeyError::EC {
+                context: format!("unsupported SSH curve: {}", NamedEcCurve::Unsupported(oid.clone())),
+            }),
         }
     }
 
@@ -85,17 +58,17 @@ impl EcCurveSshExt for NamedEcCurve {
             NamedEcCurve::Known(EcCurve::NistP256) => Ok(key_identifier::ECDSA_SHA2_NIST_P256),
             NamedEcCurve::Known(EcCurve::NistP384) => Ok(key_identifier::ECDSA_SHA2_NIST_P384),
             NamedEcCurve::Known(EcCurve::NistP521) => Ok(key_identifier::ECDSA_SHA2_NIST_P521),
-            NamedEcCurve::Unsupported(oid) => Err(KeyError::unsupported_curve(oid, "ssh key identifier serialization")),
+            NamedEcCurve::Unsupported(oid) => Err(KeyError::EC {
+                context: format!("unsupported SSH curve: {}", NamedEcCurve::Unsupported(oid.clone())),
+            }),
         }
     }
 }
 
-#[cfg(not(feature = "fips"))]
 trait EdAlgorithmSshExt {
     fn to_ed_ssh_key_type(&self) -> Result<&'static str, KeyError>;
 }
 
-#[cfg(not(feature = "fips"))]
 impl EdAlgorithmSshExt for NamedEdAlgorithm {
     fn to_ed_ssh_key_type(&self) -> Result<&'static str, KeyError> {
         match self {
@@ -103,14 +76,16 @@ impl EdAlgorithmSshExt for NamedEdAlgorithm {
             NamedEdAlgorithm::Known(EdAlgorithm::X25519) => Err(KeyError::UnsupportedAlgorithm {
                 algorithm: "X25519 can't be use for SSH EdDSA keys",
             }),
-            NamedEdAlgorithm::Unsupported(oid) => {
-                Err(KeyError::unsupported_ed_algorithm(oid, "ssh key type serialization"))
-            }
+            NamedEdAlgorithm::Unsupported(oid) => Err(KeyError::ED {
+                context: format!(
+                    "unsupported SSH algorithm: {}",
+                    NamedEdAlgorithm::Unsupported(oid.clone())
+                ),
+            }),
         }
     }
 }
 
-#[cfg(not(feature = "fips"))]
 fn read_until_whitespace(stream: &mut dyn Read, buffer: &mut Vec<u8>) -> io::Result<()> {
     loop {
         match stream.read_u8() {
@@ -131,7 +106,6 @@ fn read_until_whitespace(stream: &mut dyn Read, buffer: &mut Vec<u8>) -> io::Res
     Ok(())
 }
 
-#[cfg(not(feature = "fips"))]
 fn read_until_linebreak(stream: &mut dyn Read, buffer: &mut Vec<u8>) -> io::Result<()> {
     loop {
         match stream.read_u8() {

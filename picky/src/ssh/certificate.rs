@@ -1,18 +1,15 @@
 use crate::hash::HashAlgorithm;
 use crate::key::KeyError;
+#[cfg(feature = "fips")]
 use crate::key::ec::EcdsaPublicKey;
+#[cfg(feature = "fips")]
 use crate::key::ed::EdPublicKey;
 use crate::signature::{SignatureAlgorithm, SignatureError};
-use crate::ssh::EcCurveSshExt as _;
 use crate::ssh::decode::SshComplexTypeDecode;
-use crate::ssh::encode::{SshComplexTypeEncode, SshWriteExt};
+use crate::ssh::encode::SshComplexTypeEncode;
 use crate::ssh::private_key::{SshBasePrivateKey, SshPrivateKey, SshPrivateKeyError};
 use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
 
-use byteorder::{BigEndian, WriteBytesExt};
-use rand::RngExt;
-use rsa::RsaPublicKey;
-use rsa::traits::PublicKeyParts as _;
 use serde::Deserialize;
 use std::cell::RefCell;
 use std::convert::TryFrom;
@@ -41,12 +38,15 @@ pub enum SshCertificateError {
     InvalidCertificateKeyType(String),
     #[error("Certificate had invalid public key: {0:?}")]
     InvalidPublicKey(#[from] SshPublicKeyError),
+    #[cfg(feature = "rustcrypto")]
     #[error(transparent)]
     RsaError(#[from] rsa::errors::Error),
     #[error(transparent)]
     KeyError(#[from] KeyError),
     #[error(transparent)]
     SshSignatureError(#[from] SshSignatureError),
+    #[error(transparent)]
+    SignatureError(#[from] SignatureError),
 }
 
 impl From<core::str::Utf8Error> for SshCertificateError {
@@ -111,6 +111,33 @@ pub enum SshCertKeyType {
 }
 
 impl SshCertKeyType {
+    pub(crate) fn subject_key_type(&self) -> Result<&'static str, SshCertificateError> {
+        use crate::ssh::key_type;
+        #[cfg(feature = "fips")]
+        if matches!(
+            self,
+            Self::SshDssV01 | Self::SkSshSha2Nistp256V01 | Self::SkSshEd25519V01
+        ) {
+            return Err(SshCertificateError::UnsupportedCertificateType(
+                self.as_str().to_owned(),
+            ));
+        }
+        Ok(match self {
+            Self::SshRsaV01 | Self::RsaSha2_256V01 | Self::RsaSha2_512v01 => key_type::RSA,
+            Self::EcdsaSha2Nistp256V01 => key_type::ECDSA_SHA2_NIST_P256,
+            Self::EcdsaSha2Nistp384V01 => key_type::ECDSA_SHA2_NIST_P384,
+            Self::EcdsaSha2Nistp521V01 => key_type::ECDSA_SHA2_NIST_P521,
+            Self::SshEd25519V01 => key_type::ED25519,
+            Self::SkSshSha2Nistp256V01 => key_type::SK_ECDSA_SHA2_NIST_P256,
+            Self::SkSshEd25519V01 => key_type::SK_ED25519,
+            Self::SshDssV01 => {
+                return Err(SshCertificateError::UnsupportedCertificateType(
+                    self.as_str().to_owned(),
+                ));
+            }
+        })
+    }
+
     pub fn as_str(&self) -> &str {
         match self {
             SshCertKeyType::SshRsaV01 => "ssh-rsa-cert-v01@openssh.com",
@@ -131,7 +158,7 @@ impl TryFrom<String> for SshCertKeyType {
     type Error = SshCertificateError;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
-        match value.as_str() {
+        let key_type = match value.as_str() {
             "ssh-rsa-cert-v01@openssh.com" => Ok(SshCertKeyType::SshRsaV01),
             "ssh-dss-cert-v01@openssh.com" => Ok(SshCertKeyType::SshDssV01),
             "rsa-sha2-256-cert-v01@openssh.com" => Ok(SshCertKeyType::RsaSha2_256V01),
@@ -143,7 +170,18 @@ impl TryFrom<String> for SshCertKeyType {
             "sk-ecdsa-sha2-nistp256-cert-v01@openssh.com" => Ok(SshCertKeyType::SkSshSha2Nistp256V01),
             "sk-ssh-ed25519-cert-v01@openssh.com" => Ok(SshCertKeyType::SkSshEd25519V01),
             _ => Err(SshCertificateError::InvalidCertificateKeyType(value)),
-        }
+        }?;
+        #[cfg(feature = "fips")]
+        key_type.subject_key_type()?;
+        Ok(key_type)
+    }
+}
+
+impl TryFrom<&str> for SshCertKeyType {
+    type Error = SshCertificateError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Self::try_from(value.to_owned())
     }
 }
 
@@ -189,6 +227,14 @@ impl TryFrom<String> for SshCriticalOptionType {
 pub struct SshCriticalOption {
     pub option_type: SshCriticalOptionType,
     pub data: String,
+}
+
+impl TryFrom<&str> for SshCriticalOptionType {
+    type Error = SshCriticalOptionError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Self::try_from(value.to_owned())
+    }
 }
 
 #[derive(Error, Debug)]
@@ -244,6 +290,14 @@ pub struct SshExtension {
     pub data: String,
 }
 
+impl TryFrom<&str> for SshExtensionType {
+    type Error = SshExtensionError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Self::try_from(value.to_owned())
+    }
+}
+
 impl SshExtension {
     pub fn new(extension_type: SshExtensionType, data: String) -> Self {
         Self { extension_type, data }
@@ -273,6 +327,15 @@ pub enum SshSignatureFormat {
 
 impl SshSignatureFormat {
     pub fn new<T: AsRef<str>>(format: T) -> Result<SshSignatureFormat, SshSignatureError> {
+        #[cfg(feature = "fips")]
+        if matches!(
+            format.as_ref(),
+            "ssh-rsa" | "sk-ecdsa-sha2-nistp256@openssh.com" | "sk-ssh-ed25519@openssh.com"
+        ) {
+            return Err(SshSignatureError::UnsupportedSignatureFormat(
+                format.as_ref().to_owned(),
+            ));
+        }
         match format.as_ref() {
             "ssh-rsa" => Ok(SshSignatureFormat::SshRsa),
             "rsa-sha2-256" => Ok(SshSignatureFormat::RsaSha256),
@@ -302,16 +365,20 @@ impl SshSignatureFormat {
             SshSignatureFormat::SkEd25519 => "sk-ssh-ed25519@openssh.com",
         }
     }
-}
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
-enum EcCurveIdentifier {
-    #[serde(rename = "nistp256")]
-    Nistp256,
-    #[serde(rename = "nistp384")]
-    Nistp384,
-    #[serde(rename = "nistp521")]
-    Nistp521,
+    fn algorithm(&self) -> Result<SignatureAlgorithm, SshSignatureError> {
+        Self::new(self.as_str())?;
+        Ok(match self {
+            Self::SshRsa => SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA1),
+            Self::RsaSha256 => SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256),
+            Self::RsaSha512 => SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_512),
+            Self::EcdsaSha2Nistp256 => SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_256),
+            Self::EcdsaSha2Nistp384 => SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_384),
+            Self::EcdsaSha2Nistp521 => SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_512),
+            Self::SshEd25519 => SignatureAlgorithm::Ed25519,
+            _ => return Err(SshSignatureError::UnsupportedSignatureFormat(self.as_str().to_owned())),
+        })
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -379,12 +446,38 @@ impl SshCertificate {
     pub fn builder(&self) -> SshCertificateBuilder {
         SshCertificateBuilder::init()
     }
+
+    /// Verify the certificate signature with its embedded signing key.
+    ///
+    /// Parsing does not authenticate a certificate; callers must also establish trust
+    /// in the signing key and check the certificate's validity and constraints.
+    pub fn verify_signature(&self) -> Result<(), SshCertificateError> {
+        let mut signed = Vec::new();
+        self.encode_signed(&mut signed)?;
+        let SshSignatureBlob::Standard(signature) = &self.signature.blob else {
+            return Err(
+                SshSignatureError::UnsupportedSignatureFormat(self.signature.format.as_str().to_owned()).into(),
+            );
+        };
+        let algorithm = self.signature.format.algorithm()?;
+        let signature = if matches!(algorithm, SignatureAlgorithm::Ecdsa(_)) {
+            ssh_ecdsa_to_der(signature)?
+        } else {
+            signature.clone()
+        };
+        algorithm.verify(self.signature_key.inner_key(), &signed, &signature)?;
+        Ok(())
+    }
 }
 
 impl FromStr for SshCertificate {
     type Err = SshCertificateError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let line = s.strip_suffix("\r\n").or_else(|| s.strip_suffix('\n')).unwrap_or(s);
+        if line.contains(['\r', '\n']) {
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "multiple SSH certificate lines").into());
+        }
         SshComplexTypeDecode::decode(s.as_bytes())
     }
 }
@@ -423,6 +516,10 @@ pub enum SshCertificateGenerationError {
     SshExtensionError(#[from] SshExtensionError),
     #[error(transparent)]
     SignatureError(#[from] SignatureError),
+    #[error(transparent)]
+    CertificateError(#[from] SshCertificateError),
+    #[error(transparent)]
+    KeyError(#[from] KeyError),
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -519,7 +616,8 @@ impl SshCertificateBuilder {
         self
     }
 
-    /// Optional. RsaPkcs1v15 with SHA256 is used by default.
+    /// Optional. Defaults to SHA-256 RSA PKCS#1 v1.5, the ECDSA curve's hash,
+    /// or Ed25519 according to the signing key.
     pub fn signature_algo(&self, signature_algo: SignatureAlgorithm) -> &Self {
         self.inner.borrow_mut().signature_algo = Some(signature_algo);
         self
@@ -557,11 +655,12 @@ impl SshCertificateBuilder {
             | SshCertKeyType::RsaSha2_512v01
             | SshCertKeyType::EcdsaSha2Nistp256V01
             | SshCertKeyType::EcdsaSha2Nistp384V01
+            | SshCertKeyType::EcdsaSha2Nistp521V01
             | SshCertKeyType::SshEd25519V01
             | SshCertKeyType::SkSshSha2Nistp256V01
             | SshCertKeyType::SkSshEd25519V01 => {}
 
-            SshCertKeyType::SshDssV01 | SshCertKeyType::EcdsaSha2Nistp521V01 => {
+            SshCertKeyType::SshDssV01 => {
                 return Err(SshCertificateGenerationError::UnsupportedCertificateKeyType(
                     cert_key_type.as_str().to_owned(),
                 ));
@@ -571,17 +670,19 @@ impl SshCertificateBuilder {
         let public_key = public_key
             .take()
             .ok_or(SshCertificateGenerationError::MissingPublicKey)?;
+        if cert_key_type.subject_key_type().ok() != Some(public_key.inner_key.key_type()?) {
+            return Err(SshCertificateGenerationError::UnsupportedCertificateKeyType(
+                cert_key_type.as_str().to_owned(),
+            ));
+        }
         let serial = serial.take().unwrap_or(0);
         let cert_type = cert_type
             .take()
             .ok_or(SshCertificateGenerationError::MissingCertificateType)?;
         let key_id = key_id.take().unwrap_or_default();
 
-        let mut nonce = Vec::new();
-        let mut rnd = rand::rng();
-        for _ in 0..32 {
-            nonce.push(rnd.random::<u8>());
-        }
+        let mut nonce = vec![0; 32];
+        super::private_key::fill_random(&mut nonce)?;
 
         let valid_after = valid_after.take().ok_or(SshCertificateGenerationError::InvalidTime)?;
         let valid_before = valid_before.take().ok_or(SshCertificateGenerationError::InvalidTime)?;
@@ -636,95 +737,48 @@ impl SshCertificateBuilder {
         extensions
             .sort_by(|lhs, rhs| lexical_sort::lexical_cmp(lhs.extension_type.as_str(), rhs.extension_type.as_str()));
 
-        let signature_algo = signature_algo.take().unwrap_or(match cert_key_type {
-            SshCertKeyType::EcdsaSha2Nistp256V01 => SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_256),
-            SshCertKeyType::EcdsaSha2Nistp384V01 => SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_384),
-            SshCertKeyType::EcdsaSha2Nistp521V01 => SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_512),
-            SshCertKeyType::SshEd25519V01 => SignatureAlgorithm::Ed25519,
-            SshCertKeyType::SkSshEd25519V01 => SignatureAlgorithm::Ed25519,
-            SshCertKeyType::SkSshSha2Nistp256V01 => SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_256),
-            // Fallback default algorithm
-            _ => SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256),
-        });
-
         let signature_key = signature_key
             .take()
             .ok_or(SshCertificateGenerationError::MissingSignatureKey)?;
+        let default_algorithm = default_signature_algorithm(signature_key.base_key())?;
+        let signature_algo = signature_algo.take().unwrap_or(default_algorithm);
+        if matches!(signature_algo, SignatureAlgorithm::RsaPss(_)) {
+            return Err(SshCertificateGenerationError::IncorrectSignatureAlgorithm(
+                "RSA-PSS signatures are not defined for OpenSSH certificates".to_owned(),
+            ));
+        }
+        if matches!(
+            signature_key.base_key(),
+            SshBasePrivateKey::Ec(_) | SshBasePrivateKey::Ed(_)
+        ) && signature_algo != default_algorithm
+        {
+            return Err(SshCertificateGenerationError::IncorrectSignatureAlgorithm(
+                "signature algorithm does not match the OpenSSH signing key".to_owned(),
+            ));
+        }
         let comment = comment.take().unwrap_or_default();
 
-        let raw_signature = {
-            let mut buff = Vec::with_capacity(1024);
-
-            buff.write_ssh_string(cert_key_type.as_str())
-                .map_err(SshCertificateGenerationError::IoError)?;
-
-            buff.write_ssh_bytes(&nonce)
-                .map_err(SshCertificateGenerationError::IoError)?;
-
-            match &public_key.inner_key {
-                SshBasePublicKey::Rsa(rsa) => {
-                    let rsa = RsaPublicKey::try_from(rsa)
-                        .map_err(|err| SshCertificateGenerationError::SshPublicKeyError(err.into()))?;
-                    buff.write_ssh_mpint(rsa.e())?;
-                    buff.write_ssh_mpint(rsa.n())?;
-                }
-                SshBasePublicKey::Ec(ec) => {
-                    let ec = EcdsaPublicKey::try_from(ec)
-                        .map_err(|err| SshCertificateGenerationError::SshPublicKeyError(err.into()))?;
-                    let curve_identifier = ec
-                        .curve()
-                        .to_ecdsa_ssh_key_identifier()
-                        .map_err(|err| SshCertificateGenerationError::SshPublicKeyError(err.into()))?;
-                    buff.write_ssh_string(curve_identifier)?;
-                    buff.write_ssh_bytes(ec.encoded_point())?;
-                }
-                SshBasePublicKey::Ed(ed) => {
-                    let ed = EdPublicKey::try_from(ed)
-                        .map_err(|err| SshCertificateGenerationError::SshPublicKeyError(err.into()))?;
-                    buff.write_ssh_bytes(ed.data())?;
-                }
-                SshBasePublicKey::SkEcdsaSha2NistP256 { base_key, application } => {
-                    let ec = EcdsaPublicKey::try_from(base_key)
-                        .map_err(|err| SshCertificateGenerationError::SshPublicKeyError(err.into()))?;
-                    let curve_identifier = ec
-                        .curve()
-                        .to_ecdsa_ssh_key_identifier()
-                        .map_err(|err| SshCertificateGenerationError::SshPublicKeyError(err.into()))?;
-                    buff.write_ssh_string(curve_identifier)?;
-                    buff.write_ssh_bytes(ec.encoded_point())?;
-                    buff.write_ssh_string(application)?;
-                }
-                SshBasePublicKey::SkEd25519 { base_key, application } => {
-                    let ed = EdPublicKey::try_from(base_key)
-                        .map_err(|err| SshCertificateGenerationError::SshPublicKeyError(err.into()))?;
-                    buff.write_ssh_bytes(ed.data())?;
-                    buff.write_ssh_string(application)?;
-                }
-            };
-
-            buff.write_u64::<BigEndian>(serial)
-                .map_err(SshCertificateGenerationError::IoError)?;
-
-            cert_type.encode(&mut buff)?;
-
-            buff.write_ssh_string(&key_id)?;
-            valid_principals.encode(&mut buff)?;
-
-            valid_after.encode(&mut buff)?;
-            valid_before.encode(&mut buff)?;
-
-            critical_options.encode(&mut buff)?;
-
-            extensions.encode(&mut buff)?;
-
-            buff.write_ssh_bytes(&[])?; // reserved
-
-            let mut buff2 = Vec::new();
-            signature_key.public_key().inner_key.encode(&mut buff2)?;
-            buff.write_ssh_bytes(&buff2)?;
-
-            buff
+        let mut certificate = SshCertificate {
+            cert_key_type,
+            public_key,
+            nonce,
+            serial,
+            cert_type,
+            key_id,
+            valid_principals,
+            valid_after,
+            valid_before,
+            critical_options,
+            extensions,
+            signature_key: signature_key.public_key().clone(),
+            signature: SshSignature {
+                format: SshSignatureFormat::RsaSha256,
+                blob: SshSignatureBlob::Standard(Vec::new()),
+            },
+            comment,
         };
+        let mut raw_signature = Vec::new();
+        certificate.encode_signed(&mut raw_signature)?;
 
         let (signature_blob, signature_format) = match signature_key.base_key() {
             SshBasePrivateKey::Rsa(rsa) => {
@@ -783,7 +837,7 @@ impl SshCertificateBuilder {
                     }
                 };
 
-                let signature = signature_algo.sign(&raw_signature, ec)?;
+                let signature = der_ecdsa_to_ssh(&signature_algo.sign(&raw_signature, ec)?)?;
                 (SshSignatureBlob::Standard(signature), signature_format)
             }
             SshBasePrivateKey::Ed(ed) => {
@@ -804,31 +858,113 @@ impl SshCertificateBuilder {
             }
         };
 
-        let signature = SshSignature {
+        certificate.signature = SshSignature {
             format: signature_format,
             blob: signature_blob,
         };
 
-        Ok(SshCertificate {
-            cert_key_type,
-            public_key,
-            nonce,
-            serial,
-            cert_type,
-            key_id,
-            valid_principals,
-            valid_after,
-            valid_before,
-            critical_options,
-            extensions,
-            signature_key: signature_key.public_key,
-            signature,
-            comment,
-        })
+        certificate.verify_signature()?;
+        Ok(certificate)
     }
 }
 
-#[cfg(test)]
+fn default_signature_algorithm(key: &SshBasePrivateKey) -> Result<SignatureAlgorithm, SshCertificateGenerationError> {
+    use crate::key::EcCurve;
+    use crate::key::ec::NamedEcCurve;
+    Ok(match key {
+        SshBasePrivateKey::Rsa(_) => SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256),
+        SshBasePrivateKey::Ec(key) => {
+            let key = crate::key::ec::EcdsaKeypair::try_from(key).map_err(SshPublicKeyError::from)?;
+            match key.curve() {
+                NamedEcCurve::Known(EcCurve::NistP256) => SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_256),
+                NamedEcCurve::Known(EcCurve::NistP384) => SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_384),
+                NamedEcCurve::Known(EcCurve::NistP521) => SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_512),
+                _ => {
+                    return Err(SshCertificateGenerationError::IncorrectSignatureAlgorithm(
+                        "unsupported ECDSA signing key".to_owned(),
+                    ));
+                }
+            }
+        }
+        SshBasePrivateKey::Ed(_) => SignatureAlgorithm::Ed25519,
+        SshBasePrivateKey::SkEd25519 { .. } | SshBasePrivateKey::SkEcdsaSha2NistP256 { .. } => {
+            return Err(SshCertificateGenerationError::IncorrectSignatureAlgorithm(
+                "signing with security keys is not supported".to_owned(),
+            ));
+        }
+    })
+}
+
+pub(crate) fn validate_public_key(key: &SshBasePublicKey) -> Result<(), SshCertificateError> {
+    #[cfg(feature = "rustcrypto")]
+    let _ = key;
+    #[cfg(feature = "fips")]
+    {
+        use crate::key::ec::NamedEcCurve;
+        use crate::key::ed::NamedEdAlgorithm;
+        use crate::key::{EcCurve, EdAlgorithm};
+        use aws_lc_rs::signature::{self, ParsedPublicKey};
+        let invalid = || io::Error::new(io::ErrorKind::InvalidData, "invalid SSH public key");
+        let (algorithm, bytes): (&'static dyn signature::VerificationAlgorithm, Vec<u8>) = match key {
+            SshBasePublicKey::Rsa(key) => {
+                let picky_asn1_x509::PublicKey::Rsa(rsa) = &key.as_inner().subject_public_key else {
+                    return Err(invalid().into());
+                };
+                let modulus = rsa.modulus.as_unsigned_bytes_be();
+                let exponent = rsa.public_exponent.as_unsigned_bytes_be();
+                if !matches!(modulus.len(), 256 | 384 | 512 | 1024) || exponent.is_empty() || exponent.len() > 5 {
+                    return Err(invalid().into());
+                }
+                (&signature::RSA_PKCS1_2048_8192_SHA256, key.to_pkcs1()?)
+            }
+            SshBasePublicKey::Ec(key) => {
+                let key = EcdsaPublicKey::try_from(key)?;
+                let algorithm: &'static dyn signature::VerificationAlgorithm = match key.curve() {
+                    NamedEcCurve::Known(EcCurve::NistP256) => &signature::ECDSA_P256_SHA256_ASN1,
+                    NamedEcCurve::Known(EcCurve::NistP384) => &signature::ECDSA_P384_SHA384_ASN1,
+                    NamedEcCurve::Known(EcCurve::NistP521) => &signature::ECDSA_P521_SHA512_ASN1,
+                    _ => return Err(invalid().into()),
+                };
+                (algorithm, key.encoded_point().to_vec())
+            }
+            SshBasePublicKey::Ed(key) => {
+                let key = EdPublicKey::try_from(key)?;
+                if key.algorithm() != &NamedEdAlgorithm::Known(EdAlgorithm::Ed25519) || key.data().len() != 32 {
+                    return Err(invalid().into());
+                }
+                (&signature::ED25519, key.data().to_vec())
+            }
+            _ => return Err(invalid().into()),
+        };
+        ParsedPublicKey::new(algorithm, bytes).map_err(|_| invalid())?;
+    }
+    Ok(())
+}
+
+fn der_ecdsa_to_ssh(der: &[u8]) -> Result<Vec<u8>, SshCertificateError> {
+    use crate::ssh::encode::SshWriteExt as _;
+    let signature: picky_asn1_x509::signature::EcdsaSignatureValue =
+        picky_asn1_der::from_bytes(der).map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
+    let mut output = Vec::new();
+    output.write_ssh_mpint_bytes(signature.r.as_unsigned_bytes_be())?;
+    output.write_ssh_mpint_bytes(signature.s.as_unsigned_bytes_be())?;
+    Ok(output)
+}
+
+fn ssh_ecdsa_to_der(mut ssh: &[u8]) -> Result<Vec<u8>, SshCertificateError> {
+    use crate::ssh::decode::SshReadExt as _;
+    use picky_asn1::wrapper::IntegerAsn1;
+    let signature = picky_asn1_x509::signature::EcdsaSignatureValue {
+        r: IntegerAsn1::from_bytes_be_unsigned(ssh.read_ssh_mpint_bytes()?),
+        s: IntegerAsn1::from_bytes_be_unsigned(ssh.read_ssh_mpint_bytes()?),
+    };
+    if !ssh.is_empty() {
+        return Err(io::Error::new(io::ErrorKind::InvalidData, "trailing SSH ECDSA signature data").into());
+    }
+    picky_asn1_der::to_vec(&signature).map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error).into())
+}
+
+#[cfg(all(test, feature = "rustcrypto"))]
 pub mod tests {
     use super::*;
     use crate::ssh::private_key::SshPrivateKey;

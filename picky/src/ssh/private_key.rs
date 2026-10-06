@@ -4,18 +4,26 @@ use crate::ssh::decode::{SshComplexTypeDecode, SshReadExt};
 use crate::ssh::encode::SshComplexTypeEncode;
 use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
 
+#[cfg(feature = "rustcrypto")]
 use aes::cipher::block_padding::NoPadding;
+#[cfg(feature = "rustcrypto")]
 use aes::cipher::{KeyIvInit, StreamCipher};
 use byteorder::{BigEndian, ReadBytesExt};
+#[cfg(feature = "rustcrypto")]
 use cbc::cipher::BlockModeDecrypt;
+#[cfg(feature = "rustcrypto")]
 use rand::RngExt;
 use std::io::{Cursor, Read};
 use std::string;
 use thiserror::Error;
 
+#[cfg(feature = "rustcrypto")]
 pub type Aes128CbcDec = cbc::Decryptor<aes::Aes128>;
+#[cfg(feature = "rustcrypto")]
 pub type Aes256CbcDec = cbc::Decryptor<aes::Aes256>;
+#[cfg(feature = "rustcrypto")]
 pub type Aes128Ctr = ctr::Ctr32BE<aes::Aes128>;
+#[cfg(feature = "rustcrypto")]
 pub type Aes256Ctr = ctr::Ctr32BE<aes::Aes256>;
 
 const SSH_PRIVATE_KEY_LABEL: &str = "OPENSSH PRIVATE KEY";
@@ -56,6 +64,7 @@ pub enum SshPrivateKeyError {
     InvalidKeyFormat,
     #[error("Can not decrypt private key: {0}")]
     DecryptionError(String),
+    #[cfg(feature = "rustcrypto")]
     #[error("Can not hash the passphrase: {0:?}")]
     HashingError(#[from] bcrypt_pbkdf::Error),
     #[error("Passphrase required for encrypted private key")]
@@ -179,12 +188,14 @@ impl SshPrivateKey {
     }
 
     pub fn from_pem(pem: &Pem, passphrase: Option<String>) -> Result<Self, SshPrivateKeyError> {
+        if pem.label() != SSH_PRIVATE_KEY_LABEL {
+            return Err(SshPrivateKeyError::InvalidKeyFormat);
+        }
         SshPrivateKey::decode(&mut pem.data(), passphrase)
     }
 
     pub fn from_pem_str(pem: &str, passphrase: Option<String>) -> Result<Self, SshPrivateKeyError> {
-        let pem = parse_pem(pem)?;
-        SshPrivateKey::decode(&mut pem.data(), passphrase)
+        Self::from_pem(&parse_pem(pem)?, passphrase)
     }
 
     pub fn to_pem(&self) -> Result<Pem<'static>, SshPrivateKeyError> {
@@ -224,14 +235,17 @@ impl SshPrivateKey {
         passphrase: Option<String>,
         comment: Option<String>,
     ) -> Result<SshPrivateKey, SshPrivateKeyError> {
+        #[cfg(feature = "fips")]
+        if passphrase.is_some() {
+            return Err(SshPrivateKeyError::UnsupportedCipher(
+                "encrypted OpenSSH private keys are disabled by the active cryptographic policy".to_owned(),
+            ));
+        }
         let (kdf, cipher_name) = match &passphrase {
             Some(_) => {
-                let mut salt: Vec<u8> = Vec::new();
+                let mut salt = vec![0; 16];
                 let rounds = 16;
-                let mut rnd = rand::rng();
-                for _ in 0..rounds {
-                    salt.push(rnd.random::<u8>());
-                }
+                fill_random(&mut salt)?;
 
                 let kdf = Kdf {
                     name: BCRYPT.to_owned(),
@@ -288,11 +302,18 @@ impl SshPrivateKey {
         if auth_magic != AUTH_MAGIC.as_bytes() {
             return Err(SshPrivateKeyError::InvalidAuthMagicHeader);
         }
-        stream.read_u8()?; // skip 1 byte (null-byte)
+        if stream.read_u8()? != 0 {
+            return Err(SshPrivateKeyError::InvalidAuthMagicHeader);
+        }
 
         let cipher_name = stream.read_ssh_string()?;
         let kdf_name = stream.read_ssh_string()?;
-        let kdf_option: KdfOption = SshComplexTypeDecode::decode(&mut stream)?;
+        let kdf_option_blob = stream.read_ssh_bytes()?;
+        if kdf_name == NONE && !kdf_option_blob.is_empty() {
+            return Err(SshPrivateKeyError::InvalidKeyFormat);
+        }
+        let kdf_option = KdfOption::decode_body(&kdf_option_blob)?;
+        validate_cipher_kdf(&cipher_name, &kdf_name, &kdf_option)?;
         let keys_amount = stream.read_u32::<BigEndian>()?;
 
         if keys_amount != 1 {
@@ -300,10 +321,15 @@ impl SshPrivateKey {
         }
 
         // read public key
-        let _ = stream.read_ssh_bytes()?;
+        let public_blob = stream.read_ssh_bytes()?;
 
         // read private key
         let private_key = stream.read_ssh_bytes()?;
+        let mut trailing = Vec::new();
+        stream.read_to_end(&mut trailing)?;
+        if !trailing.is_empty() {
+            return Err(SshPrivateKeyError::InvalidKeyFormat);
+        }
 
         let data = decrypt(&cipher_name, &kdf_name, &kdf_option, passphrase.as_deref(), private_key)?;
 
@@ -318,7 +344,22 @@ impl SshPrivateKey {
         let base_key: SshBasePrivateKey = SshComplexTypeDecode::decode(&mut cursor)?;
         let base_public_key = base_key.base_public_key()?;
 
-        let comment = cursor.read_ssh_string()?.trim_end().to_owned();
+        let comment = cursor.read_ssh_string()?;
+        let mut padding = Vec::new();
+        cursor.read_to_end(&mut padding)?;
+        let block_size = if cipher_name == NONE { 8 } else { 16 };
+        if cursor.get_ref().len() % block_size != 0
+            || padding.len() > block_size
+            || !padding.iter().copied().eq((1..=padding.len()).map(|value| value as u8))
+        {
+            return Err(SshPrivateKeyError::InvalidKeyFormat);
+        }
+        let mut expected_public_blob = Vec::new();
+        base_public_key.encode(&mut expected_public_blob)?;
+        if public_blob != expected_public_blob {
+            return Err(SshPrivateKeyError::InvalidKeyFormat);
+        }
+        let passphrase = if cipher_name == NONE { None } else { passphrase };
 
         Ok(SshPrivateKey {
             base_key,
@@ -351,70 +392,289 @@ pub(crate) fn decrypt(
     kdf_name: &str,
     kdf_options: &KdfOption,
     passphrase: Option<&str>,
-    mut data: Vec<u8>,
+    data: Vec<u8>,
 ) -> Result<Vec<u8>, SshPrivateKeyError> {
+    validate_cipher_kdf(cipher_name, kdf_name, kdf_options)?;
     if kdf_name == NONE {
         Ok(data)
     } else {
-        let n = match cipher_name {
-            AES128_CBC | AES128_CTR => 32,
-            AES256_CBC | AES256_CTR => 48,
-            name => return Err(SshPrivateKeyError::UnsupportedCipher(name.to_owned())),
-        };
-
-        let mut key = [0; 48];
-        match kdf_name {
-            BCRYPT => {
-                let salt = &kdf_options.salt;
-                let rounds = kdf_options.rounds;
-                let passphrase = passphrase.ok_or(SshPrivateKeyError::MissingPassphrase)?;
-
-                bcrypt_pbkdf::bcrypt_pbkdf(passphrase, salt, rounds, &mut key[..n])?;
-            }
-            name => return Err(SshPrivateKeyError::UnsupportedKdf(name.to_owned())),
-        };
-
-        let (key, iv) = key.split_at(n - 16);
-
-        let start_len = data.len();
-        data.resize(data.len() + 32, 0u8);
-        match cipher_name {
-            AES128_CBC => {
-                let cipher = Aes128CbcDec::new_from_slices(key, iv).unwrap();
-                let n = cipher
-                    .decrypt_padded_inout::<NoPadding>(data.as_mut_slice().into())
-                    .map_err(|e| SshPrivateKeyError::DecryptionError(e.to_string()))?
-                    .len();
-                data.truncate(n);
-                Ok(data)
-            }
-            AES256_CBC => {
-                let cipher = Aes256CbcDec::new_from_slices(key, iv).unwrap();
-                let n = cipher
-                    .decrypt_padded_inout::<NoPadding>(data.as_mut_slice().into())
-                    .map_err(|e| SshPrivateKeyError::DecryptionError(e.to_string()))?
-                    .len();
-                data.truncate(n);
-                Ok(data)
-            }
-            AES128_CTR => {
-                let mut cipher = Aes128Ctr::new_from_slices(key, iv).unwrap();
-                cipher.apply_keystream(&mut data);
-                data.truncate(start_len);
-                Ok(data)
-            }
-            AES256_CTR => {
-                let mut cipher = Aes256Ctr::new_from_slices(key, iv).unwrap();
-                cipher.apply_keystream(&mut data);
-                data.truncate(start_len);
-                Ok(data)
-            }
-            name => Err(SshPrivateKeyError::UnsupportedCipher(name.to_owned())),
-        }
+        decrypt_encrypted(cipher_name, kdf_name, kdf_options, passphrase, data)
     }
 }
 
+pub(crate) fn validate_cipher_kdf(
+    cipher_name: &str,
+    kdf_name: &str,
+    option: &KdfOption,
+) -> Result<(), SshPrivateKeyError> {
+    #[cfg(feature = "fips")]
+    if cipher_name != NONE {
+        return Err(SshPrivateKeyError::UnsupportedCipher(cipher_name.to_owned()));
+    }
+    if cipher_name == NONE {
+        if kdf_name != NONE {
+            return Err(SshPrivateKeyError::UnsupportedKdf(kdf_name.to_owned()));
+        }
+        if option != &KdfOption::default() {
+            return Err(SshPrivateKeyError::InvalidKeyFormat);
+        }
+    } else {
+        if !matches!(cipher_name, AES128_CBC | AES256_CBC | AES128_CTR | AES256_CTR) {
+            return Err(SshPrivateKeyError::UnsupportedCipher(cipher_name.to_owned()));
+        }
+        if kdf_name != BCRYPT {
+            return Err(SshPrivateKeyError::UnsupportedKdf(kdf_name.to_owned()));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(feature = "fips")]
+fn decrypt_encrypted(
+    cipher_name: &str,
+    _kdf_name: &str,
+    _option: &KdfOption,
+    _passphrase: Option<&str>,
+    _data: Vec<u8>,
+) -> Result<Vec<u8>, SshPrivateKeyError> {
+    Err(SshPrivateKeyError::UnsupportedCipher(cipher_name.to_owned()))
+}
+
+#[cfg(feature = "rustcrypto")]
+fn decrypt_encrypted(
+    cipher_name: &str,
+    kdf_name: &str,
+    kdf_options: &KdfOption,
+    passphrase: Option<&str>,
+    mut data: Vec<u8>,
+) -> Result<Vec<u8>, SshPrivateKeyError> {
+    let n = match cipher_name {
+        AES128_CBC | AES128_CTR => 32,
+        AES256_CBC | AES256_CTR => 48,
+        name => return Err(SshPrivateKeyError::UnsupportedCipher(name.to_owned())),
+    };
+
+    let mut key = [0; 48];
+    match kdf_name {
+        BCRYPT => {
+            let salt = &kdf_options.salt;
+            let rounds = kdf_options.rounds;
+            let passphrase = passphrase.ok_or(SshPrivateKeyError::MissingPassphrase)?;
+
+            bcrypt_pbkdf::bcrypt_pbkdf(passphrase, salt, rounds, &mut key[..n])?;
+        }
+        name => return Err(SshPrivateKeyError::UnsupportedKdf(name.to_owned())),
+    };
+
+    let (key, iv) = key.split_at(n - 16);
+
+    match cipher_name {
+        AES128_CBC => {
+            let cipher = Aes128CbcDec::new_from_slices(key, iv).unwrap();
+            let n = cipher
+                .decrypt_padded_inout::<NoPadding>(data.as_mut_slice().into())
+                .map_err(|e| SshPrivateKeyError::DecryptionError(e.to_string()))?
+                .len();
+            data.truncate(n);
+            Ok(data)
+        }
+        AES256_CBC => {
+            let cipher = Aes256CbcDec::new_from_slices(key, iv).unwrap();
+            let n = cipher
+                .decrypt_padded_inout::<NoPadding>(data.as_mut_slice().into())
+                .map_err(|e| SshPrivateKeyError::DecryptionError(e.to_string()))?
+                .len();
+            data.truncate(n);
+            Ok(data)
+        }
+        AES128_CTR => {
+            let mut cipher = Aes128Ctr::new_from_slices(key, iv).unwrap();
+            cipher.apply_keystream(&mut data);
+            Ok(data)
+        }
+        AES256_CTR => {
+            let mut cipher = Aes256Ctr::new_from_slices(key, iv).unwrap();
+            cipher.apply_keystream(&mut data);
+            Ok(data)
+        }
+        name => Err(SshPrivateKeyError::UnsupportedCipher(name.to_owned())),
+    }
+}
+
+pub(crate) fn encrypt(passphrase: &str, option: &KdfOption, data: &mut [u8]) -> Result<(), SshPrivateKeyError> {
+    #[cfg(feature = "rustcrypto")]
+    {
+        let mut hash = [0; 48];
+        bcrypt_pbkdf::bcrypt_pbkdf(passphrase, &option.salt, option.rounds, &mut hash)?;
+        let (key, iv) = hash.split_at(32);
+        let mut cipher = Aes256Ctr::new_from_slices(key, iv)
+            .map_err(|error| SshPrivateKeyError::DecryptionError(error.to_string()))?;
+        cipher.apply_keystream(data);
+        Ok(())
+    }
+    #[cfg(feature = "fips")]
+    {
+        let _ = (passphrase, option, data);
+        Err(SshPrivateKeyError::UnsupportedCipher(AES256_CTR.to_owned()))
+    }
+}
+
+pub(crate) fn fill_random(output: &mut [u8]) -> std::io::Result<()> {
+    #[cfg(feature = "rustcrypto")]
+    {
+        let mut rng = rand::rng();
+        for byte in output.iter_mut() {
+            *byte = rng.random();
+        }
+    }
+    #[cfg(feature = "fips")]
+    {
+        use aws_lc_rs::rand::SecureRandom as _;
+        aws_lc_rs::rand::SystemRandom::new()
+            .fill(output)
+            .map_err(|_| std::io::Error::other("AWS-LC random generation failed"))?;
+    }
+    Ok(())
+}
+
+pub(crate) fn import_ec_components(
+    curve: crate::key::ec::NamedEcCurve,
+    secret: &[u8],
+    point: &[u8],
+) -> Result<PrivateKey, SshPrivateKeyError> {
+    let crate::key::ec::NamedEcCurve::Known(named) = curve else {
+        return Err(SshPrivateKeyError::InvalidKeyFormat);
+    };
+    let width = named.field_bytes_size();
+    if secret.is_empty() || secret.len() > width {
+        return Err(SshPrivateKeyError::InvalidKeyFormat);
+    }
+    let mut padded = vec![0; width];
+    padded[width - secret.len()..].copy_from_slice(secret);
+    #[cfg(feature = "fips")]
+    {
+        use aws_lc_rs::signature::{self, EcdsaKeyPair};
+        let algorithm = match named {
+            EcCurve::NistP256 => &signature::ECDSA_P256_SHA256_ASN1_SIGNING,
+            EcCurve::NistP384 => &signature::ECDSA_P384_SHA384_ASN1_SIGNING,
+            EcCurve::NistP521 => &signature::ECDSA_P521_SHA512_ASN1_SIGNING,
+        };
+        EcdsaKeyPair::from_private_key_and_public_key(algorithm, &padded, point)
+            .map_err(|_| SshPrivateKeyError::InvalidKeyFormat)?;
+    }
+    #[cfg(feature = "rustcrypto")]
+    {
+        use crate::key::ec::calculate_public_ec_key;
+        if calculate_public_ec_key(&curve.clone().into(), &padded, false)?.as_deref() != Some(point) {
+            return Err(SshPrivateKeyError::InvalidKeyFormat);
+        }
+    }
+    Ok(PrivateKey::from_ec_encoded_components(
+        curve.into(),
+        &padded,
+        Some(point),
+    ))
+}
+
+pub(crate) fn import_ed_components(
+    algorithm: crate::key::ed::NamedEdAlgorithm,
+    secret: &[u8],
+    public: &[u8],
+) -> Result<PrivateKey, SshPrivateKeyError> {
+    #[cfg(feature = "fips")]
+    aws_lc_rs::signature::Ed25519KeyPair::from_seed_and_public_key(secret, public)
+        .map_err(|_| SshPrivateKeyError::InvalidKeyFormat)?;
+    #[cfg(feature = "rustcrypto")]
+    {
+        let seed: [u8; 32] = secret.try_into().map_err(|_| SshPrivateKeyError::InvalidKeyFormat)?;
+        if ed25519_dalek::SigningKey::from_bytes(&seed).verifying_key().as_bytes() != public {
+            return Err(SshPrivateKeyError::InvalidKeyFormat);
+        }
+    }
+    Ok(PrivateKey::from_ed_encoded_components(
+        algorithm.into(),
+        secret,
+        Some(public),
+    ))
+}
+
+pub(crate) fn import_rsa_components(
+    n: &[u8],
+    e: &[u8],
+    d: &[u8],
+    iqmp: &[u8],
+    p: &[u8],
+    q: &[u8],
+) -> Result<PrivateKey, SshPrivateKeyError> {
+    #[cfg(feature = "rustcrypto")]
+    {
+        use rsa::BoxedUint;
+        let key = PrivateKey::from_rsa_components(
+            &BoxedUint::from_be_slice_vartime(n),
+            &BoxedUint::from_be_slice_vartime(e),
+            &BoxedUint::from_be_slice_vartime(d),
+            &[BoxedUint::from_be_slice_vartime(p), BoxedUint::from_be_slice_vartime(q)],
+        )?;
+        let rsa = rsa::RsaPrivateKey::try_from(&key)?;
+        rsa.validate().map_err(|_| SshPrivateKeyError::InvalidKeyFormat)?;
+        let picky_asn1_x509::PrivateKeyValue::Rsa(inner) = &key.as_inner().private_key else {
+            return Err(SshPrivateKeyError::InvalidKeyFormat);
+        };
+        if inner.0.coefficient.as_unsigned_bytes_be() != iqmp {
+            return Err(SshPrivateKeyError::InvalidKeyFormat);
+        }
+        Ok(key)
+    }
+    #[cfg(feature = "fips")]
+    {
+        rsa_components::import(n, e, d, iqmp, p, q)
+    }
+}
+
+#[cfg(feature = "fips")]
+#[path = "rsa_components.rs"]
+mod rsa_components;
+
 #[cfg(test)]
+mod codec_tests {
+    use super::*;
+    use crate::ssh::encode::SshWriteExt as _;
+
+    #[test]
+    fn aligned_unencrypted_private_keys_allow_empty_padding_and_preserve_comment() {
+        let mut key = SshPrivateKey::from_pem_str(picky_test_data::SSH_PRIVATE_KEY_ED25519, None).unwrap();
+        for comment_len in 0..8 {
+            key.comment = format!("{}  ", "x".repeat(comment_len));
+            let mut encoded = Vec::new();
+            key.encode(&mut encoded).unwrap();
+            let mut cursor = Cursor::new(encoded);
+            cursor.set_position((AUTH_MAGIC.len() + 1) as u64);
+            for _ in 0..3 {
+                cursor.read_ssh_bytes().unwrap();
+            }
+            assert_eq!(cursor.read_u32::<BigEndian>().unwrap(), 1);
+            cursor.read_ssh_bytes().unwrap();
+            let private_offset = cursor.position() as usize;
+            let mut private = cursor.read_ssh_bytes().unwrap();
+            if private.last() != Some(&8) {
+                continue;
+            }
+            assert_eq!(&private[private.len() - 8..], &[1, 2, 3, 4, 5, 6, 7, 8]);
+            private.truncate(private.len() - 8);
+            let mut encoded = cursor.into_inner();
+            encoded.truncate(private_offset);
+            encoded.write_ssh_bytes(&private).unwrap();
+
+            let decoded = SshPrivateKey::decode(encoded.as_slice(), None).unwrap();
+            assert_eq!(decoded.comment, key.comment);
+            assert_eq!(decoded.inner_key(), key.inner_key());
+            return;
+        }
+        panic!("one of eight comment lengths must align the private payload");
+    }
+}
+
+#[cfg(all(test, feature = "rustcrypto"))]
 pub mod tests {
     use super::*;
     use crate::key::ec::EcdsaKeypair;

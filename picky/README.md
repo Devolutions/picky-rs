@@ -26,6 +26,17 @@ Doc doesn't have example yet, but [tests](https://github.com/Devolutions/picky-r
 FIPS builds must opt out of the default RustCrypto backend and select the
 AWS-LC provider.
 
+SSH and JOSE use shared protocol types, parsing, serialization, and key-management
+orchestration across backends. Provider-specific helpers implement cryptographic
+operations and key validation; selecting FIPS does not select another protocol
+implementation.
+
+Backend selection is currently build-time and mutually exclusive. Cargo features
+are unified across dependencies, so every dependency enabling Picky must avoid
+the default RustCrypto backend in a FIPS build. Additive backend features and an
+explicit runtime provider in a small shared crate are follow-up architecture work,
+not implemented by this profile.
+
 AWS-LC:
 
 ```toml

@@ -1,3 +1,4 @@
+use crate::hash::{HashAlgorithm, HashError};
 use crate::key::{KeyError, PublicKey};
 use crate::ssh::decode::SshComplexTypeDecode;
 use crate::ssh::encode::SshComplexTypeEncode;
@@ -12,6 +13,11 @@ pub enum SshPublicKeyError {
     IoError(#[from] io::Error),
     #[error("invalid UTF-8")]
     InvalidUtf8,
+    #[error("invalid SSH public key encoding")]
+    InvalidEncoding,
+    #[error("unsupported SSH key type: {0}")]
+    UnsupportedKeyType(String),
+    #[cfg(feature = "rustcrypto")]
     #[error(transparent)]
     RsaError(#[from] rsa::errors::Error),
     #[error(transparent)]
@@ -20,6 +26,8 @@ pub enum SshPublicKeyError {
     UnknownKeyType,
     #[error(transparent)]
     KeyError(#[from] KeyError),
+    #[error(transparent)]
+    HashError(#[from] HashError),
 }
 
 impl From<core::str::Utf8Error> for SshPublicKeyError {
@@ -75,42 +83,30 @@ impl SshPublicKey {
     }
 
     pub fn fingerprint_md5(&self) -> Result<[u8; 16], SshPublicKeyError> {
-        use md5::{Digest, Md5};
-
         let mut encoded = Vec::new();
         self.inner_key.encode(&mut encoded)?;
-
-        let mut hasher = Md5::new();
-        hasher.update(&encoded);
-        let fingerprint = hasher.finalize();
-
-        Ok(fingerprint.into())
+        HashAlgorithm::MD5
+            .digest(&encoded)?
+            .try_into()
+            .map_err(|_| SshPublicKeyError::InvalidEncoding)
     }
 
     pub fn fingerprint_sha1(&self) -> Result<[u8; 20], SshPublicKeyError> {
-        use sha1::{Digest, Sha1};
-
         let mut encoded = Vec::new();
         self.inner_key.encode(&mut encoded)?;
-
-        let mut hasher = Sha1::new();
-        hasher.update(&encoded);
-        let fingerprint = hasher.finalize();
-
-        Ok(fingerprint.into())
+        HashAlgorithm::SHA1
+            .digest(&encoded)?
+            .try_into()
+            .map_err(|_| SshPublicKeyError::InvalidEncoding)
     }
 
     pub fn fingerprint_sha256(&self) -> Result<[u8; 32], SshPublicKeyError> {
-        use sha2::{Digest, Sha256};
-
         let mut encoded = Vec::new();
         self.inner_key.encode(&mut encoded)?;
-
-        let mut hasher = Sha256::new();
-        hasher.update(&encoded);
-        let fingerprint = hasher.finalize();
-
-        Ok(fingerprint.into())
+        HashAlgorithm::SHA2_256
+            .digest(&encoded)?
+            .try_into()
+            .map_err(|_| SshPublicKeyError::InvalidEncoding)
     }
 }
 
@@ -118,6 +114,10 @@ impl FromStr for SshPublicKey {
     type Err = SshPublicKeyError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let line = s.strip_suffix("\r\n").or_else(|| s.strip_suffix('\n')).unwrap_or(s);
+        if line.contains(['\r', '\n']) {
+            return Err(SshPublicKeyError::InvalidEncoding);
+        }
         SshComplexTypeDecode::decode(s.as_bytes())
     }
 }
@@ -128,9 +128,11 @@ mod tests {
 
     use base64::Engine;
     use base64::engine::general_purpose::STANDARD_NO_PAD;
-    use crypto_bigint::BoxedUint;
+    #[cfg(feature = "rustcrypto")]
+    use rsa::BoxedUint;
     use rstest::rstest;
 
+    #[cfg(feature = "rustcrypto")]
     #[test]
     fn decode_ssh_rsa_4096_public_key() {
         // ssh-keygen -t rsa -b 4096 -C "test@picky.com"
@@ -173,6 +175,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "rustcrypto")]
     #[test]
     fn decode_ssh_rsa_2048_public_key() {
         // ssh-keygen -t rsa -b 2048 -C "test2@picky.com"
@@ -249,6 +252,7 @@ mod tests {
         assert_eq!(picky_test_data::SSH_PUBLIC_KEY_ED25519, ssh_public_key_after.as_str());
     }
 
+    #[cfg(feature = "rustcrypto")]
     #[test]
     fn sk_ed25519_roundtrip() {
         let public_key: SshPublicKey = SshPublicKey::from_str(picky_test_data::SSH_PUBLIC_KEY_SK_ED25519).unwrap();
@@ -259,6 +263,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "rustcrypto")]
     #[test]
     fn sk_ecdsa_roundtrip() {
         let public_key = SshPublicKey::from_str(picky_test_data::SSH_PUBLIC_KEY_SK_ECDSA).unwrap();
@@ -266,6 +271,7 @@ mod tests {
         assert_eq!(picky_test_data::SSH_PUBLIC_KEY_SK_ECDSA, ssh_public_key_after.as_str());
     }
 
+    #[cfg(feature = "rustcrypto")]
     #[test]
     fn fingerprint_md5_ssh_rsa_2048_public_key() {
         let ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDI9ht2g2qOPgSG5huVYjFUouyaw59/6QuQqUVGwgnITlhRbM+bkvJQfcuiqcv+vD9/86Dfugk79sSfg/aVK+V/plqAAZoujz/wALDjEphSxAUcAR+t4i2F39Pa71MSc37I9L30z31tcba1X7od7hzrVMl9iurkOyBC4xcIWa1H8h0mDyoXyWPTqoTONDUe9dB1eu6GbixCfUcxvdVt0pAVJTdOmbNXKwRo5WXfMrsqKsFT2Acg4Vm4TfLShSSUW4rqM6GOBCfF6jnxFvTSDentH5hykjWL3lMCghD+1hJyOdnMHJC/5qTUGOB86MxsR4RCXqS+LZrGpMScVyDQge7r test2@picky.com\r\n";
@@ -276,6 +282,7 @@ mod tests {
         assert_eq!(md5, "7b6b9cc2e44452aec58c3a0a31d6258d");
     }
 
+    #[cfg(feature = "rustcrypto")]
     #[test]
     fn fingerprint_sha1_ssh_rsa_2048_public_key() {
         let ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDI9ht2g2qOPgSG5huVYjFUouyaw59/6QuQqUVGwgnITlhRbM+bkvJQfcuiqcv+vD9/86Dfugk79sSfg/aVK+V/plqAAZoujz/wALDjEphSxAUcAR+t4i2F39Pa71MSc37I9L30z31tcba1X7od7hzrVMl9iurkOyBC4xcIWa1H8h0mDyoXyWPTqoTONDUe9dB1eu6GbixCfUcxvdVt0pAVJTdOmbNXKwRo5WXfMrsqKsFT2Acg4Vm4TfLShSSUW4rqM6GOBCfF6jnxFvTSDentH5hykjWL3lMCghD+1hJyOdnMHJC/5qTUGOB86MxsR4RCXqS+LZrGpMScVyDQge7r test2@picky.com\r\n";
