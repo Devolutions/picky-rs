@@ -190,6 +190,31 @@ mod tests {
     use crate::x509::name::DirectoryName;
 
     #[test]
+    fn p521_sha512_csr_round_trip() {
+        let private_key = PrivateKey::from_pem_str(picky_test_data::EC_NIST521_PK_1).unwrap();
+        let algorithm = SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_512);
+        let subject = DirectoryName::new_common_name("P-521 CSR");
+        let csr = Csr::generate(subject.clone(), &private_key, algorithm).unwrap();
+        let mut reparsed = Csr::from_der(&csr.to_der().unwrap()).unwrap();
+
+        assert_eq!(reparsed.subject_name(), subject);
+        assert_eq!(reparsed.public_key(), &private_key.to_public_key().unwrap());
+        assert_eq!(
+            SignatureAlgorithm::from_algorithm_identifier(&reparsed.0.signature_algorithm).unwrap(),
+            algorithm,
+        );
+        reparsed.verify().unwrap();
+
+        reparsed.0.certification_request_info.subject = DirectoryName::new_common_name("tampered").into();
+        assert!(matches!(
+            reparsed.verify(),
+            Err(CsrError::Signature {
+                source: SignatureError::BadSignature,
+            })
+        ));
+    }
+
+    #[test]
     fn rsa_pss_csr_round_trip() {
         let private_key = PrivateKey::from_pem_str(picky_test_data::RSA_2048_PK_1).unwrap();
 

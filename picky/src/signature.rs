@@ -118,6 +118,7 @@ impl TryFrom<&'_ AlgorithmIdentifier> for SignatureAlgorithm {
             }
             oids::ECDSA_WITH_SHA256 => Ok(Self::Ecdsa(HashAlgorithm::SHA2_256)),
             oids::ECDSA_WITH_SHA384 => Ok(Self::Ecdsa(HashAlgorithm::SHA2_384)),
+            oids::ECDSA_WITH_SHA512 => Ok(Self::Ecdsa(HashAlgorithm::SHA2_512)),
             oids::ED25519 => Ok(Self::Ed25519),
             _ => Err(SignatureError::UnsupportedAlgorithm { algorithm: oid_string }),
         }
@@ -610,6 +611,24 @@ impl SignatureAlgorithm {
             SignatureAlgorithm::Ecdsa(hash_algo) => *hash_algo,
             SignatureAlgorithm::Ed25519 => HashAlgorithm::SHA2_512,
         }
+    }
+}
+
+#[cfg(test)]
+mod algorithm_identifier_tests {
+    use super::*;
+
+    #[test]
+    fn ecdsa_sha512_algorithm_identifier_round_trip() {
+        let algorithm = SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_512);
+        let identifier = AlgorithmIdentifier::try_from(algorithm).unwrap();
+        assert_eq!(Into::<String>::into(identifier.oid()), oids::ECDSA_WITH_SHA512);
+        let encoded = picky_asn1_der::to_vec(&identifier).unwrap();
+        let decoded: AlgorithmIdentifier = picky_asn1_der::from_bytes(&encoded).unwrap();
+        assert_eq!(
+            SignatureAlgorithm::from_algorithm_identifier(&decoded).unwrap(),
+            algorithm
+        );
     }
 }
 

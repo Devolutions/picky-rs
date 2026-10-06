@@ -1295,6 +1295,60 @@ mod tests {
         );
     }
 
+    #[test]
+    fn p521_sha512_certificate_chain_round_trip() {
+        let ca_key = parse_key(picky_test_data::EC_NIST521_PK_1);
+        let leaf_key = parse_key(picky_test_data::EC_NIST256_PK_1);
+        let algorithm = SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_512);
+        let valid_from = UtcDate::ymd(2025, 1, 1).unwrap();
+        let valid_to = UtcDate::ymd(2030, 1, 1).unwrap();
+        let root = CertificateBuilder::new()
+            .validity(valid_from.clone(), valid_to.clone())
+            .self_signed(DirectoryName::new_common_name("P-521 Root CA"), &ca_key)
+            .signature_hash_type(algorithm)
+            .ca(true)
+            .build()
+            .unwrap();
+        let intermediate = CertificateBuilder::new()
+            .validity(valid_from.clone(), valid_to.clone())
+            .subject(
+                DirectoryName::new_common_name("P-521 Intermediate CA"),
+                ca_key.to_public_key().unwrap(),
+            )
+            .issuer_cert(&root, &ca_key)
+            .signature_hash_type(algorithm)
+            .ca(true)
+            .pathlen(0)
+            .build()
+            .unwrap();
+        let leaf = CertificateBuilder::new()
+            .validity(valid_from, valid_to)
+            .subject(
+                DirectoryName::new_common_name("P-521-signed leaf"),
+                leaf_key.to_public_key().unwrap(),
+            )
+            .issuer_cert(&intermediate, &ca_key)
+            .signature_hash_type(algorithm)
+            .build()
+            .unwrap();
+        let leaf = Cert::from_der(&leaf.to_der().unwrap()).unwrap();
+        let chain = [
+            Cert::from_der(&intermediate.to_der().unwrap()).unwrap(),
+            Cert::from_der(&root.to_der().unwrap()).unwrap(),
+        ];
+
+        assert_eq!(
+            SignatureAlgorithm::from_algorithm_identifier(leaf.signature_algorithm()).unwrap(),
+            algorithm
+        );
+        assert_eq!(leaf.public_key(), &leaf_key.to_public_key().unwrap());
+        leaf.verifier()
+            .chain(chain.iter())
+            .exact_date(&UtcDate::ymd(2026, 10, 5).unwrap())
+            .verify()
+            .unwrap();
+    }
+
     #[cfg(feature = "rustcrypto")]
     #[test]
     fn ec_signing() {
