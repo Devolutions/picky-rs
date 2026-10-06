@@ -24,7 +24,7 @@ use aes_gcm::{AeadInOut, Aes128Gcm, Aes256Gcm, KeyInit};
 #[cfg(all(feature = "jwe-crypto", feature = "rustcrypto"))]
 use aes_kw::AesKw;
 #[cfg(all(feature = "jwe-crypto", feature = "fips-aws-lc"))]
-use aws_lc_rs::aead::{Aad, BoundKey, Nonce, NonceSequence, OpeningKey, SealingKey, UnboundKey};
+use aws_lc_rs::aead::{Aad, BoundKey, Nonce, NonceSequence, OpeningKey, RandomizedNonceKey, UnboundKey};
 #[cfg(all(feature = "jwe-crypto", feature = "fips-aws-lc"))]
 use aws_lc_rs::error::Unspecified;
 #[cfg(all(feature = "jwe-crypto", feature = "fips-aws-lc"))]
@@ -1744,20 +1744,14 @@ fn fips_encrypt_content(
 ) -> Result<FipsEncryptedContent, JweError> {
     match algorithm {
         JweEnc::Aes128Gcm | JweEnc::Aes256Gcm => {
-            let mut nonce = [0u8; 12];
-            aws_lc_rs::rand::fill(&mut nonce).map_err(|_| JweError::CryptoProvider {
-                operation: "AWS-LC random nonce generation",
-                code: -1,
-            })?;
             let aead_algorithm = fips_aead_algorithm(algorithm)?;
-            let unbound_key = UnboundKey::new(aead_algorithm, cek).map_err(|_| JweError::AesGcm)?;
+            let sealing_key = RandomizedNonceKey::new(aead_algorithm, cek).map_err(|_| JweError::AesGcm)?;
             let mut ciphertext = plaintext.to_vec();
-            let mut sealing_key = SealingKey::new(unbound_key, SingleNonce::new(nonce));
-            sealing_key
+            let nonce = sealing_key
                 .seal_in_place_append_tag(Aad::from(aad), &mut ciphertext)
                 .map_err(|_| JweError::AesGcm)?;
             let tag = ciphertext.split_off(ciphertext.len() - aead_algorithm.tag_len());
-            Ok((nonce.to_vec(), ciphertext, tag))
+            Ok((nonce.as_ref().to_vec(), ciphertext, tag))
         }
         JweEnc::Aes128CbcHmacSha256 | JweEnc::Aes192CbcHmacSha384 | JweEnc::Aes256CbcHmacSha512 => {
             use aws_lc_rs::cipher::{EncryptionContext, PaddedBlockEncryptingKey, UnboundCipherKey};
@@ -2426,11 +2420,23 @@ fn calculate_ecdh_shared_secret(
         }
     };
     let agreement_algorithm = aws_lc_ecdh_algorithm(curve);
-    let private_key = aws_lc_rs::agreement::PrivateKey::from_private_key(agreement_algorithm, private_key.secret())
-        .map_err(|error| JweError::Key {
+    let scalar_len = curve.field_bytes_size();
+    if private_key.secret().len() > scalar_len {
+        return Err(JweError::Key {
             source: KeyError::EC {
-                context: format!("AWS-LC rejected the {curve} ECDH private key: {error}"),
+                context: format!("EC private scalar exceeds the {curve} field size"),
             },
+        });
+    }
+    let mut scalar = Zeroizing::new(vec![0u8; scalar_len]);
+    scalar[scalar_len - private_key.secret().len()..].copy_from_slice(private_key.secret());
+    let private_key =
+        aws_lc_rs::agreement::PrivateKey::from_private_key(agreement_algorithm, &scalar).map_err(|error| {
+            JweError::Key {
+                source: KeyError::EC {
+                    context: format!("AWS-LC rejected the {curve} ECDH private key: {error}"),
+                },
+            }
         })?;
     let peer = aws_lc_rs::agreement::UnparsedPublicKey::new(agreement_algorithm, public_key.encoded_point());
     let provider_error = JweError::CryptoProvider {
@@ -2551,6 +2557,32 @@ mod fips_tests {
         assert_eq!(decoded.payload, payload);
         assert_eq!(decoded.header.alg, JweAlg::Direct);
         assert_eq!(decoded.header.enc, JweEnc::Aes128Gcm);
+    }
+
+    #[test]
+    fn gcm_uses_provider_generated_nonces() {
+        for algorithm in [JweEnc::Aes128Gcm, JweEnc::Aes256Gcm] {
+            let cek = vec![0x42; algorithm.key_size()];
+            let aad = b"protected header";
+            let payload = b"randomized nonce AEAD";
+            let mut nonces = std::collections::HashSet::new();
+            for _ in 0..8 {
+                let (iv, mut ciphertext, tag) = fips_encrypt_content(algorithm, &cek, aad, payload).unwrap();
+                assert_eq!(iv.len(), 12);
+                assert_eq!(tag.len(), 16);
+                assert!(nonces.insert(iv.clone()));
+                ciphertext.extend_from_slice(&tag);
+                let key = RandomizedNonceKey::new(fips_aead_algorithm(algorithm).unwrap(), &cek).unwrap();
+                let plaintext = key
+                    .open_in_place(
+                        Nonce::try_assume_unique_for_key(&iv).unwrap(),
+                        Aad::from(aad),
+                        &mut ciphertext,
+                    )
+                    .unwrap();
+                assert_eq!(plaintext, payload);
+            }
+        }
     }
 
     #[test]

@@ -112,7 +112,8 @@ impl SshCertKeyType {
     fn approved(self) -> bool {
         matches!(
             self,
-            Self::RsaSha2_256V01
+            Self::SshRsaV01
+                | Self::RsaSha2_256V01
                 | Self::RsaSha2_512v01
                 | Self::EcdsaSha2Nistp256V01
                 | Self::EcdsaSha2Nistp384V01
@@ -806,7 +807,10 @@ fn validate_cert_key_pair(
     key: &SshBasePublicKey,
 ) -> Result<(), SshCertificateGenerationError> {
     let valid = match (key_type, key) {
-        (SshCertKeyType::RsaSha2_256V01 | SshCertKeyType::RsaSha2_512v01, SshBasePublicKey::Rsa(_)) => true,
+        (
+            SshCertKeyType::SshRsaV01 | SshCertKeyType::RsaSha2_256V01 | SshCertKeyType::RsaSha2_512v01,
+            SshBasePublicKey::Rsa(_),
+        ) => true,
         (
             SshCertKeyType::EcdsaSha2Nistp256V01
             | SshCertKeyType::EcdsaSha2Nistp384V01
@@ -879,7 +883,7 @@ fn decode_certificate_public_key(
     reader: &mut Reader<'_>,
 ) -> Result<SshBasePublicKey, SshCertificateError> {
     Ok(match key_type {
-        SshCertKeyType::RsaSha2_256V01 | SshCertKeyType::RsaSha2_512v01 => {
+        SshCertKeyType::SshRsaV01 | SshCertKeyType::RsaSha2_256V01 | SshCertKeyType::RsaSha2_512v01 => {
             let exponent = reader.read_mpint()?;
             let modulus = reader.read_mpint()?;
             let key = PublicKey::from_rsa_encoded_components(modulus, exponent);
@@ -1023,7 +1027,15 @@ fn encode_critical_options(values: &[SshCriticalOption], output: &mut Vec<u8>) -
     let mut inner = Vec::new();
     for value in values {
         write_string(&mut inner, value.option_type.as_str())?;
-        write_string(&mut inner, &value.data)?;
+        let mut data = Vec::new();
+        match value.option_type {
+            SshCriticalOptionType::ForceCommand | SshCriticalOptionType::SourceAddress => {
+                write_string(&mut data, &value.data)?;
+            }
+            SshCriticalOptionType::VerifyRequired if value.data.is_empty() => {}
+            SshCriticalOptionType::VerifyRequired => return Err(invalid_data()),
+        }
+        write_bytes(&mut inner, &data)?;
     }
     write_bytes(output, &inner)
 }
@@ -1033,7 +1045,16 @@ fn decode_critical_options(reader: &mut Reader<'_>) -> Result<Vec<SshCriticalOpt
     let mut values = Vec::new();
     while !inner.is_empty() {
         let option_type = SshCriticalOptionType::try_from(inner.read_string()?)?;
-        let data = inner.read_string()?.to_owned();
+        let mut option_data = Reader::new(inner.read_bytes()?);
+        let data = match option_type {
+            SshCriticalOptionType::ForceCommand | SshCriticalOptionType::SourceAddress => {
+                option_data.read_string()?.to_owned()
+            }
+            SshCriticalOptionType::VerifyRequired => String::new(),
+        };
+        if !option_data.is_empty() {
+            return Err(invalid_data().into());
+        }
         values.push(SshCriticalOption { option_type, data });
     }
     Ok(values)
@@ -1147,5 +1168,64 @@ impl<'a> DerReader<'a> {
             len
         };
         self.0.take(len)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn critical_options_use_nested_strings_and_empty_flags() {
+        for (option_type, data, expected) in [
+            (
+                SshCriticalOptionType::ForceCommand,
+                "echo hello",
+                &b"\0\0\0\x23\0\0\0\x0dforce-command\0\0\0\x0e\0\0\0\x0aecho hello"[..],
+            ),
+            (
+                SshCriticalOptionType::SourceAddress,
+                "192.0.2.0/24",
+                &b"\0\0\0\x26\0\0\0\x0esource-address\0\0\0\x10\0\0\0\x0c192.0.2.0/24"[..],
+            ),
+            (
+                SshCriticalOptionType::VerifyRequired,
+                "",
+                &b"\0\0\0\x17\0\0\0\x0fverify-required\0\0\0\0"[..],
+            ),
+        ] {
+            let option = SshCriticalOption {
+                option_type,
+                data: data.to_owned(),
+            };
+            let mut encoded = Vec::new();
+            encode_critical_options(std::slice::from_ref(&option), &mut encoded).unwrap();
+            assert_eq!(encoded, expected);
+            let mut reader = Reader::new(expected);
+            assert_eq!(decode_critical_options(&mut reader).unwrap(), vec![option]);
+            assert!(reader.is_empty());
+        }
+    }
+
+    #[test]
+    fn critical_options_reject_unwrapped_data_and_nonempty_flags() {
+        for encoded in [
+            &b"\0\0\0\x1f\0\0\0\x0dforce-command\0\0\0\x0aecho hello"[..],
+            &b"\0\0\0\x18\0\0\0\x0fverify-required\0\0\0\x01x"[..],
+            &b"\0\0\0\x24\0\0\0\x0dforce-command\0\0\0\x0f\0\0\0\x0aecho hellox"[..],
+        ] {
+            assert!(decode_critical_options(&mut Reader::new(encoded)).is_err());
+        }
+        let mut encoded = Vec::new();
+        assert!(
+            encode_critical_options(
+                &[SshCriticalOption {
+                    option_type: SshCriticalOptionType::VerifyRequired,
+                    data: "unexpected".to_owned(),
+                }],
+                &mut encoded,
+            )
+            .is_err()
+        );
     }
 }

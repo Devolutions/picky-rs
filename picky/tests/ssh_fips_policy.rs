@@ -452,6 +452,122 @@ fn fips_ssh_certificate_rsa_sha512_sign_verify() {
 
 #[cfg(feature = "fips")]
 #[test]
+fn fips_standard_rsa_certificates_allow_sha2_but_not_sha1_signatures() {
+    for hash in [HashAlgorithm::SHA2_256, HashAlgorithm::SHA2_512] {
+        let certificate = build_host_certificate(
+            picky_test_data::SSH_PRIVATE_KEY_RSA,
+            SshCertKeyType::SshRsaV01,
+            Some(SignatureAlgorithm::RsaPkcs1v15(hash)),
+        )
+        .unwrap();
+        let encoded = certificate.to_string().unwrap();
+        assert!(encoded.starts_with("ssh-rsa-cert-v01@openssh.com "));
+        let parsed = SshCertificate::from_str(&encoded).unwrap();
+        assert_eq!(parsed.cert_key_type, SshCertKeyType::SshRsaV01);
+        parsed.verify_signature().unwrap();
+    }
+    assert!(matches!(
+        build_host_certificate(
+            picky_test_data::SSH_PRIVATE_KEY_RSA,
+            SshCertKeyType::SshRsaV01,
+            Some(SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA1)),
+        ),
+        Err(SshCertificateGenerationError::SignatureError(
+            SignatureError::AlgorithmDisabledByPolicy { .. }
+        ))
+    ));
+}
+
+#[cfg(all(feature = "fips", feature = "jwe-crypto"))]
+#[test]
+fn fips_ssh_short_ec_scalars_support_ecdh_jwe() {
+    use picky::jose::jwe::{Jwe, JweAlg, JweEnc};
+    use picky::key::PrivateKey;
+    use picky_asn1_x509::oids;
+
+    for (curve_oid, agreement, width) in [
+        (oids::secp256r1(), &aws_lc_rs::agreement::ECDH_P256, 32),
+        (oids::secp384r1(), &aws_lc_rs::agreement::ECDH_P384, 48),
+        (oids::secp521r1(), &aws_lc_rs::agreement::ECDH_P521, 66),
+    ] {
+        let mut scalar = vec![0; width];
+        scalar[width - 1] = 1;
+        let provider_key = aws_lc_rs::agreement::PrivateKey::from_private_key(agreement, &scalar).unwrap();
+        let public = provider_key.compute_public_key().unwrap();
+        let key = PrivateKey::from_ec_encoded_components(curve_oid, &[1], Some(public.as_ref()));
+        let ssh = SshPrivateKey::try_from(key).unwrap().to_string().unwrap();
+        let imported = SshPrivateKey::from_pem_str(&ssh, None).unwrap();
+        for algorithm in [JweAlg::EcdhEs, JweAlg::EcdhEsAesKeyWrap128, JweAlg::EcdhEsAesKeyWrap256] {
+            let payload = b"SSH scalar-width regression".to_vec();
+            let encoded = Jwe::new(algorithm, JweEnc::Aes256Gcm, payload.clone())
+                .encode(imported.public_key().inner_key())
+                .unwrap();
+            let decoded = Jwe::decode(&encoded, imported.inner_key().unwrap()).unwrap();
+            assert_eq!(decoded.payload, payload);
+        }
+    }
+}
+
+#[cfg(feature = "fips")]
+#[test]
+#[ignore = "requires OpenSSH ssh-keygen on PATH"]
+fn fips_standard_rsa_certificate_options_interoperate_with_openssh() {
+    use picky::ssh::certificate::{SshCriticalOption, SshCriticalOptionType};
+    use std::io::Write as _;
+    use std::process::{Command, Stdio};
+
+    let key = SshPrivateKey::from_pem_str(picky_test_data::SSH_PRIVATE_KEY_RSA, None).unwrap();
+    let certificate = SshCertificateBuilder::init()
+        .cert_key_type(SshCertKeyType::SshRsaV01)
+        .key(key.public_key().clone())
+        .cert_type(SshCertType::Client)
+        .key_id("OpenSSH interoperability".to_owned())
+        .valid_after(1)
+        .valid_before(u64::MAX)
+        .critical_options(vec![
+            SshCriticalOption {
+                option_type: SshCriticalOptionType::ForceCommand,
+                data: "echo hello".to_owned(),
+            },
+            SshCriticalOption {
+                option_type: SshCriticalOptionType::SourceAddress,
+                data: "192.0.2.0/24".to_owned(),
+            },
+            SshCriticalOption {
+                option_type: SshCriticalOptionType::VerifyRequired,
+                data: String::new(),
+            },
+        ])
+        .signature_key(key)
+        .build()
+        .unwrap();
+    let encoded = certificate.to_string().unwrap();
+    let parsed = SshCertificate::from_str(&encoded).unwrap();
+    assert_eq!(parsed.critical_options, certificate.critical_options);
+    parsed.verify_signature().unwrap();
+    let mut child = Command::new("ssh-keygen")
+        .args(["-L", "-f", "-"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    child.stdin.take().unwrap().write_all(encoded.as_bytes()).unwrap();
+    let output = child.wait_with_output().unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let output = String::from_utf8(output.stdout).unwrap();
+    for expected in [
+        "rsa-sha2-256",
+        "force-command echo hello",
+        "source-address 192.0.2.0/24",
+        "verify-required",
+    ] {
+        assert!(output.contains(expected), "{output}");
+    }
+}
+
+#[cfg(feature = "fips")]
+#[test]
 fn fips_ssh_certificate_ecdsa_p256_sign_verify_and_reject_tampering() {
     assert_fips_certificate_sign_and_verify(
         picky_test_data::SSH_PRIVATE_KEY_EC_P256,

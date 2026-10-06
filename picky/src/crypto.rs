@@ -118,6 +118,27 @@ mod aws_lc_fips {
         }
     }
 
+    fn require_rsa_signature_key(public_key: &PublicKey) -> Result<(), SignatureError> {
+        let picky_asn1_x509::PublicKey::Rsa(key) = &public_key.as_inner().subject_public_key else {
+            return Err(SignatureError::Rsa {
+                context: "RSA signature requires an RSA key".to_string(),
+            });
+        };
+        let modulus = key.modulus.as_unsigned_bytes_be();
+        let bits = modulus.iter().position(|byte| *byte != 0).map_or(0, |start| {
+            (modulus.len() - start) * 8 - modulus[start].leading_zeros() as usize
+        });
+        // The pinned AWS-LC signature service requires an even modulus bit length.
+        if !(2048..=8192).contains(&bits) || bits % 2 != 0 {
+            return Err(SignatureError::AlgorithmDisabledByPolicy {
+                algorithm: format!(
+                    "RSA signature key must have an even bit length between 2048 and 8192 ({bits} bits)"
+                ),
+            });
+        }
+        Ok(())
+    }
+
     pub(crate) fn sign(
         algorithm: SignatureAlgorithm,
         msg: &[u8],
@@ -126,14 +147,10 @@ mod aws_lc_fips {
         match algorithm {
             algorithm @ (SignatureAlgorithm::RsaPkcs1v15(hash) | SignatureAlgorithm::RsaPss(hash)) => {
                 require_signature(algorithm, None).map_err(policy_error)?;
+                require_rsa_signature_key(&private_key.to_public_key()?)?;
                 let key = RsaKeyPair::from_der(&private_key.to_pkcs1()?).map_err(|error| SignatureError::Rsa {
                     context: format!("AWS-LC rejected the RSA private key: {error}"),
                 })?;
-                if key.public_modulus_len() < 256 {
-                    return Err(SignatureError::AlgorithmDisabledByPolicy {
-                        algorithm: format!("RSA key smaller than 2048 bits ({} bits)", key.public_modulus_len() * 8),
-                    });
-                }
                 let encoding = match (algorithm, hash) {
                     (SignatureAlgorithm::RsaPkcs1v15(_), HashAlgorithm::SHA2_256) => &signature::RSA_PKCS1_SHA256,
                     (SignatureAlgorithm::RsaPkcs1v15(_), HashAlgorithm::SHA2_384) => &signature::RSA_PKCS1_SHA384,
@@ -218,6 +235,7 @@ mod aws_lc_fips {
         let (verification_algorithm, key_bytes): (&dyn signature::VerificationAlgorithm, Vec<u8>) = match algorithm {
             algorithm @ (SignatureAlgorithm::RsaPkcs1v15(hash) | SignatureAlgorithm::RsaPss(hash)) => {
                 require_signature(algorithm, None).map_err(policy_error)?;
+                require_rsa_signature_key(public_key)?;
                 let verification_algorithm: &dyn signature::VerificationAlgorithm = match hash {
                     HashAlgorithm::SHA2_256 if matches!(algorithm, SignatureAlgorithm::RsaPkcs1v15(_)) => {
                         &signature::RSA_PKCS1_2048_8192_SHA256
@@ -339,6 +357,77 @@ mod tests {
                     Err(SignatureError::BadSignature)
                 ));
             }
+        }
+    }
+
+    #[cfg(feature = "fips-aws-lc")]
+    #[test]
+    fn rejects_odd_bit_rsa_signature_keys() {
+        use crate::key::PrivateKey;
+        use crate::signature::SignatureError;
+        use aws_lc_rs::signature::{self, RsaKeyPair};
+
+        // Unequal 1025/1024-bit primes yield a genuinely 2049-bit modulus.
+        let key = PrivateKey::from_pem_str(
+            r#"-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEBMWu5HlK+Ioo39MV0kMX+z5iUwVuMBEdNttxCO1EZkWGWCxfj
+Hc1f1jkJXj3NDFaIn3/mlEtI6w31jHmF1OVSYlzfLg6YFDYR/rO4e3lX0nIYKVJd
+ipszaOD7fis1wo5QlIQxyXTPj8fpRRa+2UxdfToeWZQ7Y1z9Bu1pQWl275EvMatv
+z9t0IIZjtY8Cqqd1V7mMgNS72AYNV2xsxMZNiMGl945gj6I2w2m8uhie+VuR4BwO
+FFn7ZTtx7Jhpyhpvkhn7W2pV23nsBGNQc1imw73B4keCYQNHrnJ5n+T48p/yJy6w
+TVq5WuGaBOZDfJBZzQY0SufdaMl4TWIAZSRDAQIDAQABAoIBAQDxwui9VRgGtUyH
+6AlWVDRY1dnimPnjpSGiPwX6eD758rpXu6ffPmO/alS9EcSPIKxzPUYjWti0n88g
+TE2g8YneLM/JYGoHjal+6Xp92tam0gPIKde70RDH01egTsn2YLruZRoX8uweT0ua
+kd+umKFkcC34ELtV8xSjeCiaS8aG6J7kfBAUtEwe1S3j7L+3Ls9k14qiPU2u0FXS
+p8yy/GNTRfBUmkt+nq6YjrG6MNC7TrSG1lf1qMRp4aROFxsLokH7PjqcqEwk8bdl
+lXjkpWeOvqBnxL4wiXvrROcKF9UnDeypZbIORXre8dESi5D6nY2HrIb9USVuG2Cr
+wP7YdbIlAoGBAYJTC2FCHRJt8pG8T92SvkEQvNJMSOqB1zTEVZCALAP4+ghQdEQJ
+h7Hq58n1sPZt/a8vhBpcSCMSkg29EGuZYAm9J6gDkx5jnOG65dca5l1hC7VKcwFT
+gVGe19UUyQSOOMxhnjkD3qYasOM0+U4rM4m4bBbUiH8+1Mm9JS39JTfjAoGBAMpj
+hzKeNEJEe0+IalctL981eBvKf6szSMtxeICnySk3TaaIWbmMSTSdinWXyYPMteXH
+/qo3Rir0/rPPJgrb8BCpFyY9dcBcpiOwjtZH8rZnPU/gXsQhIoBKGLbWJw5/YX0h
+SOUifhkFtcoXKlqVOj/FwRnsyT5/EP0b860T2ebLAoGBAOfw2e07l17AOhl7WOvr
+tWQ1G1ibSk/ZQo7AraqC+WotKlihjRxoKFsOcLlVVDiv0tZCDesRqpG8DYpID7q6
+K+nM8ikydDqTjdYMsv+Re+tmX3QpzaBnNUX+uxCIWSPuC3XRyf/rLdrGPZs7684d
+q+Ssn+CZG5Zh77lrYQ4aZSUHAoGADsIhOry0nNx3jX4qGv9NjV5NyuECXE6aEVPN
+8LvLfHju7aTlvhUPxYlzbk3KQRUtcnsaA/mR4VIKPLxvTr1pDR33dS9oJcXby6B1
+WgTXGxv+KZP39R9hb693i+Wj5Xe+eSxzL1pLjbGP5xO3X/Gf1MSr5yMQLcGAUKS4
+KTfYXO8CgYBAtN1e9tWX2OXySakxKjvk6q9buGls19PTnbC1e27gdfOug8xy5esC
+0n5M4n/YkuyVWCxXu3B/VFGf/SwjoBg+J9/DuZ0rgjzOja3u9SMZ5OWrY2yHPZSN
+t6WtoN4Zq7v+V5ZeVw6rnm8MEX/Fa+6Q24SGQqkaOmzDLLku6h02dg==
+-----END RSA PRIVATE KEY-----"#,
+        )
+        .unwrap();
+        let public_key = key.to_public_key().unwrap();
+        let picky_asn1_x509::PublicKey::Rsa(rsa) = &public_key.as_inner().subject_public_key else {
+            panic!("expected RSA key");
+        };
+        let modulus = rsa.modulus.as_unsigned_bytes_be();
+        assert_eq!(modulus.len() * 8 - modulus[0].leading_zeros() as usize, 2049);
+        let provider_key = RsaKeyPair::from_der(&key.to_pkcs1().unwrap()).unwrap();
+        let message = b"odd-bit RSA regression";
+        for (algorithm, encoding) in [
+            (
+                SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256),
+                &signature::RSA_PKCS1_SHA256,
+            ),
+            (
+                SignatureAlgorithm::RsaPss(HashAlgorithm::SHA2_256),
+                &signature::RSA_PSS_SHA256,
+            ),
+        ] {
+            let mut signature = vec![0; provider_key.public_modulus_len()];
+            provider_key
+                .sign(encoding, &aws_lc_rs::rand::SystemRandom::new(), message, &mut signature)
+                .unwrap();
+            assert!(matches!(
+                algorithm.sign(message, &key),
+                Err(SignatureError::AlgorithmDisabledByPolicy { algorithm }) if algorithm.contains("2049 bits")
+            ));
+            assert!(matches!(
+                algorithm.verify(&public_key, message, &signature),
+                Err(SignatureError::AlgorithmDisabledByPolicy { algorithm }) if algorithm.contains("2049 bits")
+            ));
         }
     }
 

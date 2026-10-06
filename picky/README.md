@@ -33,7 +33,8 @@ picky = { version = "7", default-features = false, features = ["fips-aws-lc", "x
 ```
 
 The AWS-LC profile supports SHA-224/256/384/512 and SHA3-384/512; RSA PKCS#1
-v1.5 and RSA-PSS signatures with SHA-256/384/512 and keys of at least 2048 bits;
+v1.5 and RSA-PSS signatures with SHA-256/384/512 and even modulus bit lengths
+between 2048 and 8192;
 ECDSA
 P-256/SHA-256, P-384/SHA-384, and P-521/SHA-512; and Ed25519. RSA
 2048/3072/4096/8192, P-256/P-384/P-521, and Ed25519 key generation and public
@@ -46,7 +47,8 @@ through `encode_hmac`/`decode_hmac`.
 JWE supports `dir`, RSA-OAEP-256/384/512, standalone `A128KW` and `A256KW`,
 `ECDH-ES`, `ECDH-ES+A128KW`, and `ECDH-ES+A256KW` key management. Content
 encryption supports A128CBC-HS256, A192CBC-HS384, A256CBC-HS512, AES-128-GCM,
-and AES-256-GCM. ECDH uses P-256, P-384, or P-521. X25519, AES-192-GCM, A192KW,
+and AES-256-GCM, with GCM nonces generated inside AWS-LC's approved AEAD service.
+ECDH uses P-256, P-384, or P-521. X25519, AES-192-GCM, A192KW,
 ECDH-ES+A192KW, and ChaCha20-Poly1305 remain unavailable. JWT exposes AES key
 wrapping through `encode_key_wrap`/`decode_key_wrap`.
 
@@ -61,8 +63,10 @@ satisfy the AWS-LC FIPS service indicator.
 The `ssh` feature supports RSA, P-256, P-384, P-521, and Ed25519 public keys,
 unencrypted `openssh-key-v1` private keys, and OpenSSH certificates in FIPS
 builds. Certificates can be signed and verified with RSA SHA-256/512, the
-curve-matched ECDSA SHA-2 algorithm, or Ed25519 through AWS-LC. Encrypted
-OpenSSH keys, SHA-1 `ssh-rsa` signatures, RSA-PSS, DSS, security-key formats,
+curve-matched ECDSA SHA-2 algorithm, or Ed25519 through AWS-LC.
+The standard `ssh-rsa-cert-v01@openssh.com` RSA certificate key format is
+supported with SHA-2 signatures; it does not imply the SHA-1 signature algorithm.
+Encrypted OpenSSH keys, SHA-1 `ssh-rsa` signatures, RSA-PSS, DSS, security-key formats,
 and PuTTY PPK files remain unavailable. MD5 and SHA-1 fingerprints are also
 rejected by the FIPS policy.
 
