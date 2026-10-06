@@ -218,6 +218,18 @@ pub struct PrivateKey {
     inner: PrivateKeyInfo,
 }
 
+#[cfg(feature = "fips")]
+pub(crate) struct RsaPrivateKeyComponents<'a> {
+    pub modulus: &'a [u8],
+    pub public_exponent: &'a [u8],
+    pub private_exponent: &'a [u8],
+    pub prime_1: &'a [u8],
+    pub prime_2: &'a [u8],
+    pub exponent_1: &'a [u8],
+    pub exponent_2: &'a [u8],
+    pub coefficient: &'a [u8],
+}
+
 #[cfg(feature = "rustcrypto")]
 impl TryFrom<&'_ PrivateKey> for RsaPrivateKey {
     type Error = KeyError;
@@ -266,6 +278,28 @@ impl TryFrom<&'_ PrivateKey> for RsaPublicKey {
 }
 
 impl PrivateKey {
+    #[cfg(feature = "fips")]
+    pub(crate) fn from_rsa_encoded_components(components: RsaPrivateKeyComponents<'_>) -> Self {
+        let inner = PrivateKeyInfo::new_rsa_encryption(
+            IntegerAsn1::from_bytes_be_unsigned(components.modulus.to_vec()),
+            IntegerAsn1::from_bytes_be_unsigned(components.public_exponent.to_vec()),
+            IntegerAsn1::from_bytes_be_unsigned(components.private_exponent.to_vec()),
+            (
+                IntegerAsn1::from_bytes_be_unsigned(components.prime_1.to_vec()),
+                IntegerAsn1::from_bytes_be_unsigned(components.prime_2.to_vec()),
+            ),
+            (
+                IntegerAsn1::from_bytes_be_unsigned(components.exponent_1.to_vec()),
+                IntegerAsn1::from_bytes_be_unsigned(components.exponent_2.to_vec()),
+            ),
+            IntegerAsn1::from_bytes_be_unsigned(components.coefficient.to_vec()),
+        );
+        Self {
+            kind: PrivateKeyKind::Rsa,
+            inner,
+        }
+    }
+
     #[cfg(feature = "rustcrypto")]
     pub fn from_rsa_components(
         modulus: &BoxedUint,

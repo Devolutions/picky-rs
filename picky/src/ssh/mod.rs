@@ -1,10 +1,16 @@
 #[cfg(not(feature = "fips"))]
 pub mod certificate;
+#[cfg(feature = "fips")]
+#[path = "certificate_fips.rs"]
+pub mod certificate;
 #[cfg(not(feature = "fips"))]
 pub mod decode;
 #[cfg(not(feature = "fips"))]
 pub mod encode;
 #[cfg(not(feature = "fips"))]
+pub mod private_key;
+#[cfg(feature = "fips")]
+#[path = "private_key_fips.rs"]
 pub mod private_key;
 #[cfg(not(feature = "fips"))]
 pub mod public_key;
@@ -24,11 +30,12 @@ use byteorder::ReadBytesExt;
 #[cfg(not(feature = "fips"))]
 use std::io::{self, Read};
 
-#[cfg(not(feature = "fips"))]
 pub use certificate::{SshCertKeyType, SshCertType, SshCertificate, SshCertificateBuilder};
-#[cfg(not(feature = "fips"))]
 pub use private_key::SshPrivateKey;
 pub use public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
+
+#[cfg(feature = "fips")]
+mod wire_fips;
 
 #[cfg(not(feature = "fips"))]
 pub(crate) type Base64Writer<'a, T, E> = base64::write::EncoderWriter<'a, T, E>;

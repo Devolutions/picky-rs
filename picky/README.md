@@ -58,12 +58,13 @@ cannot create or validate the conventional PKCS#12 MAC. PBKDF2 inputs must use
 at least 1000 iterations, a 16-byte salt, and 14 bytes of password material to
 satisfy the AWS-LC FIPS service indicator.
 
-The `ssh` feature supports parsing, encoding, and SHA-256 fingerprinting of RSA,
-P-256, P-384, P-521, and Ed25519 public keys in FIPS builds. OpenSSH private
-keys, SSH certificates, security-key formats, and PuTTY PPK files remain
-unavailable in this profile. Encrypted OpenSSH and PuTTY formats require
-bcrypt-PBKDF, Argon2, or SHA-1 constructions that are not enabled. MD5 and
-SHA-1 fingerprints are rejected by the FIPS policy.
+The `ssh` feature supports RSA, P-256, P-384, P-521, and Ed25519 public keys,
+unencrypted `openssh-key-v1` private keys, and OpenSSH certificates in FIPS
+builds. Certificates can be signed and verified with RSA SHA-256/512, the
+curve-matched ECDSA SHA-2 algorithm, or Ed25519 through AWS-LC. Encrypted
+OpenSSH keys, SHA-1 `ssh-rsa` signatures, RSA-PSS, DSS, security-key formats,
+and PuTTY PPK files remain unavailable. MD5 and SHA-1 fingerprints are also
+rejected by the FIPS policy.
 
 The `jose` feature contains JOSE/JWT/JWE parsing and signature support without
 enabling encryption crates. Select `jwe-crypto` for JWE encryption/decryption;

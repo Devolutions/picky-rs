@@ -74,7 +74,7 @@ impl SshPublicKey {
             .map_err(|_| SshPublicKeyError::InvalidEncoding)
     }
 
-    fn encode_blob(&self) -> Result<(&'static str, Vec<u8>), SshPublicKeyError> {
+    pub(crate) fn encode_blob(&self) -> Result<(&'static str, Vec<u8>), SshPublicKeyError> {
         let mut blob = Vec::new();
         let key_type = match &self.inner_key {
             SshBasePublicKey::Rsa(key) => {

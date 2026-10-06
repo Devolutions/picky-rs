@@ -112,7 +112,9 @@ jobs:
         run: cargo check --locked -p picky --no-default-features --features fips-aws-lc,x509,jose,jwe-crypto,pkcs12,ssh,time_conversion,http_signature,http_trait_impl
 
       - name: Test AWS-LC key lifecycle, signatures, JWE, PKCS#12, and SSH
-        run: cargo test --locked -p picky --no-default-features --features fips-aws-lc,x509,jose,jwe-crypto,pkcs12,ssh,time_conversion,http_signature,http_trait_impl --lib
+        run: |
+          cargo test --locked -p picky --no-default-features --features fips-aws-lc,x509,jose,jwe-crypto,pkcs12,ssh,time_conversion,http_signature,http_trait_impl --lib
+          cargo test --locked -p picky --no-default-features --features fips-aws-lc,x509,jose,jwe-crypto,pkcs12,ssh,time_conversion,http_signature,http_trait_impl --test ssh_fips_policy
 
   msrv:
     # Minimum supported Rust version check for published crates.
