@@ -10,7 +10,7 @@ Choose at most one optional scope for `<type>[optional scope][!]: <description>`
 ## Canonical scopes
 
 ```text
-picky picky-asn1 picky-asn1-der picky-asn1-x509 picky-krb picky-test-data
+picky picky-asn1 picky-asn1-der picky-asn1-x509 picky-crypto picky-krb picky-test-data
 ffi wasm fuzz release agents deps
 ```
 
@@ -18,6 +18,7 @@ Crate scopes use the full crate name.
 Use these aggregate mappings:
 
 - `picky`: the `picky` crate under `picky/`, excluding its fuzzing harness.
+- `picky-crypto`: the provider contract crate `picky-crypto` and every `picky-crypto-*` crate, including its testsuite, backends, and composed or policy crates.
 - `ffi`: the Rust FFI crate under `ffi/` and the generated or manual .NET and Swift bindings, including `ffi/dotnet`.
 - `wasm`: the WASM bindings under `ffi/wasm` and the npm package under `ffi/js`.
 - `fuzz`: fuzz targets, harnesses, corpora, and fuzzing automation under `picky/fuzz`.
