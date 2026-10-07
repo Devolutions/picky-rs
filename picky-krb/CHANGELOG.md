@@ -6,7 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## [[0.12.5](https://github.com/Devolutions/picky-rs/compare/picky-krb-v0.12.4...picky-krb-v0.12.5)] - 2026-09-29
+## [[0.13.0](https://github.com/Devolutions/picky-rs/compare/picky-krb-v0.12.5...picky-krb-v0.13.0)] - 2026-10-07
+
+This release has the same code as 0.12.5, re-released as 0.13.0.
+Version 0.12.5 is yanked because adding the `GssApiMessageError::InvalidMechanismOid` variant to the exhaustive `GssApiMessageError` enum is a breaking change, which broke the build of crates matching exhaustively on it (e.g., `sspi`).
+See the 0.12.5 entry below for the full list of changes.
+
+
+
+## [[0.12.5](https://github.com/Devolutions/picky-rs/compare/picky-krb-v0.12.4...picky-krb-v0.12.5)] - 2026-09-29 [YANKED]
 
 ### <!-- 1 -->Features
 
