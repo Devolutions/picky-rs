@@ -28,13 +28,13 @@ It parses no format: DER is carried opaquely in byte slices.
 These rules apply to every operation and are not repeated.
 
 1. **Owned, zeroizing outputs.**
-   Every buffer the contract returns is wiped on drop, with no exception: digests, MAC tags, ciphertext and plaintext, RC4 output, signatures, derived keys, shared secrets, public values and generated keys.
+   Every buffer the contract returns is wiped on drop, with no exception: digests, MAC tags, nonces, ciphertext and plaintext, RC4 output, signatures, derived keys, shared secrets, public values and generated keys.
    Variable-length outputs are a newly allocated `OutputBytes`, an opaque wrapper around `Zeroizing<Vec<u8>>`.
    Fixed-size values keep fixed-size types: the X25519 private key returned by `random_x25519_private_key` is an `X25519Scalar`, an opaque wrapper around `Zeroizing<[u8; 32]>`, which matches `PrivateKeyMaterial::X25519(&[u8; 32])`.
    Both dereference to their bytes, implement `AsRef<[u8]>`, and give back the `Zeroizing` value through `into_inner()`, never a plain buffer.
    Both implement `Clone`, which clones the inner `Zeroizing` value: a clone is itself wiped on drop, so a caller needing a copy has no reason to fall back to an unwiped `to_vec()`.
    Their `Debug` prints only the length, and they implement neither `Display` nor any comparison or hashing trait (`PartialEq`, `Eq`, `Hash`, `Ord`), so that no buffer is printed by accident.
-   MAC tags are the one exception to `OutputBytes`: they are a `MacTag` (section 6.2), which exposes no bytes except through `into_inner()`.
+   MAC results are `MacTag` and `MacVerifier` (section 6.2) rather than `OutputBytes`; `MacOutput` is their backend-side carrier.
    Whether an output is secret cannot be decided by operation: the NT hash is an MD4 digest, NTLMv2 and RFC 3961 derive keys from HMAC and hash outputs, and RC4 output is plaintext when decrypting; a uniform rule is fail-safe.
    `SecureRandom::fill` writes into the caller's buffer, which stays the caller's responsibility.
    Buffers the caller passes in, including `PrivateKeyMaterial`, belong to the caller, who is responsible for wiping them.
@@ -47,31 +47,34 @@ These rules apply to every operation and are not repeated.
    No input, however malformed, makes a backend panic.
    Some library APIs panic on out-of-range lengths; the adapter checks those bounds first and returns the error rule 4 prescribes.
 3. **Advertised means implemented.**
-   An entry advertises exactly one algorithm: the one its `algorithm()` returns (wrapped in `Algorithm`), or `PrivateKeyLoading(key_type())` for a `PrivateKeyLoader` entry, or `KeyAgreement(Ffdh)` for an `FfdhKeyAgreement` entry.
-   It implements that algorithm for every input in the operation's must-support set, except as allowed by rule 4.
-   An algorithm that a provider does not advertise cannot be reached through it: the lookup fails and the caller reports `Unsupported`.
+   An entry identifies exactly one algorithm: the one its `algorithm()` returns (wrapped in `Algorithm`), or `PrivateKeyLoading(key_type())` for a `PrivateKeyLoader` entry, or `KeyAgreement(Ffdh)` for an `FfdhKeyAgreement` entry.
+   `Mac`, `Cipher`, `Aead` and `KeyWrap` entries advertise only the protections their `supports()` reports (section 8); every other entry advertises every operation of its trait.
+   Each advertised operation implements its algorithm for every input in its must-support set, except as allowed by rule 4 and by a policy's input narrowing (section 8.2).
+   An algorithm with no provider entry cannot be reached through it: the lookup fails and the caller reports `Unsupported`.
    Private-key operations are advertised by the key itself (`PrivateKey::supports`, section 7), not by provider entries.
 4. **Valid domain and must-support set.**
    Each operation defines a valid domain (inputs that are well-formed for the algorithm) and, within it, a must-support set.
+   For an advertised operation:
    - An input outside the valid domain returns `InvalidKey` (key material) or `InvalidInput` (anything else), except that a verifier on a library with a single opaque failure may return `VerificationFailed` for an unusable public key (section 4).
    - An input inside the valid domain but outside the must-support set is either processed like an input in the must-support set or rejected with `Unsupported(algorithm)` (or, for such a verifier, `VerificationFailed`, section 4).
      For example, a backend may refuse RSA private keys other than 2048, 3072 or 4096-bit two-prime keys with equal-size primes, because some libraries accept only those.
-   - An input in the must-support set never returns `Unsupported`.
+   - An input in the must-support set never returns `Unsupported`, except for policy input narrowing (section 8.2).
    - Where an operation states no explicit domain for a length, any length is valid and lengths up to 2^31 − 1 bytes are in the must-support set.
    - Valid domains include the limits of the standard that defines the algorithm (for example RFC 8018's maximum derived-key length).
      Those limits are checked first, before allocation or any cryptographic processing, with overflow-safe arithmetic on `usize` arguments.
 5. **No RNG parameter.**
-   Operations that need randomness (key generation, ephemeral keys, ECDSA nonces, RSA encryption padding) use the backend's own secure random generator.
+   Operations that need randomness (key generation, ephemeral keys, ECDSA nonces, RSA encryption padding, AES-GCM seal nonces) use the backend's own secure random generator.
    No generator is passed in, because some libraries accept only their own.
 6. **Lengths are checked.**
-   Wrong key, IV, nonce or tag lengths are reported as `InvalidKey` (for keys) or `InvalidInput` (for anything else), never truncated or padded silently.
+   For advertised operations, wrong key, IV, open nonce or tag lengths are reported as `InvalidKey` (for keys) or `InvalidInput` (for anything else), never truncated or padded silently.
 7. **Thread safety and diagnostics.**
    Entries and private keys are `Send + Sync` (supertraits of their traits, so `dyn Trait` is the trait-object type used); contexts and ephemeral secrets are `Send`.
    `Debug` is not a supertrait: `picky-crypto` implements `Debug` for each capability and private-key trait object, printing only the algorithm (or key type) and `fips()`.
    `Box` and `Arc` of these trait objects are therefore `Debug`, so consumers can derive `Debug` on types that hold them.
    No backend's `Debug` output, which might reveal secret material, is reachable through the contract.
    Contexts and ephemeral secrets are not `Debug`.
-   `algorithm()`, `key_type()` and `fips()` are cheap and infallible and never access a device, like `supports()` (section 7); the `Debug` implementations call `fips()`.
+   `algorithm()`, `key_type()`, `key_size_bits()`, `fips()` and `supports()` (sections 7 and 8, including `Mac`, `Cipher`, `Aead` and `KeyWrap`) are cheap and infallible and never access a device; the `Debug` implementations call `fips()`.
+   `supports()` never performs the operation.
 8. **State after an error.**
    An error returned by `HashContext::update`, `MacContext::update` or `StreamCipherContext::apply` leaves the context unusable: the caller drops it, and any further call on it returns `ProviderFailure` without panicking.
    Contexts are not transactional: a failed call may or may not have consumed input or keystream.
@@ -117,22 +120,21 @@ Those features do not go through the provider; bringing them under it means addi
 
 The contract can gain algorithms and capability categories without a breaking change:
 
-- every algorithm enum, `Algorithm`, `Entry`, `KeyType`, `KeyOperation` and `PrivateKeyMaterial` is `#[non_exhaustive]`, so consumers and backends already match them with a wildcard arm;
-- `FfdhParameters` is `#[non_exhaustive]` and built with `FfdhParameters::new`; `PublicKey` is a tuple struct over one slice;
+- every algorithm enum, `Algorithm`, `Entry`, `KeyType`, `KeyOperation`, `Protection`, `Requirement`, `PrivateKeyMaterial`, `Error` and `BuildError` is `#[non_exhaustive]`, so consumers and backends already match them with a wildcard arm;
+- `FfdhParameters` and `Sealed` are `#[non_exhaustive]` and built with their `new` functions; `PublicKey` is a tuple struct over one slice;
 - a new capability is a new trait plus a new `Entry` and `Algorithm` variant; existing traits are untouched;
-- a new `PrivateKey` method gets a default that returns `Unsupported`.
-
-`Error` is deliberately exhaustive: it is the closed error set, and changing it is a contract change.
+- an optional `PrivateKey` operation gets a default that returns `Unsupported`.
 
 ## 4. Errors
 
-The error set is closed and carries no backend type.
+The error set is closed: only the contract defines variants, never a backend, and no backend type crosses the boundary.
+`Error` and `BuildError` are `#[non_exhaustive]` (section 3.1).
 
 | Variant | Meaning |
 |---|---|
-| `Unsupported(Algorithm)` | The provider or key does not implement this algorithm, or this size or parameter of it (rule 4). Data-dependent, never a panic. |
+| `Unsupported(Algorithm)` | The provider or key does not implement this algorithm, operation, size or parameter, or a policy refuses it (section 8.2). Data-dependent, never a panic. |
 | `InvalidKey` | Key material is malformed, of the wrong type or size for the algorithm, or rejected by the library's key validation. |
-| `InvalidInput` | A non-key input is malformed or out of range (except an RSA ciphertext value, see `VerificationFailed`): IV or nonce length, data length not a multiple of the block size, output length out of range, zero iterations, invalid peer public value. |
+| `InvalidInput` | A non-key input is malformed or out of range (except an RSA ciphertext value, see `VerificationFailed`): IV or open nonce length, data length not a multiple of the block size, output length out of range, zero iterations, invalid peer public value. |
 | `VerificationFailed` | A signature does not verify, an AEAD tag or key-unwrap integrity check fails, or RSA decryption fails (invalid padding, or a modulus-length ciphertext whose value is not less than the modulus). It carries no reason, so the error does not reveal which check failed. |
 | `ProviderFailure` | The backend failed for a reason that does not depend on the inputs: device removed, OS error, RNG failure, PIN required. Details stay in the backend. |
 
@@ -217,7 +219,7 @@ FFDH, which has no SPKI form here, uses the public value `y` as an unsigned big-
 
 ## 6. Capability traits
 
-Each capability trait is object-safe and has three kinds of methods: an identity method (`algorithm()`, or `key_type()` for `PrivateKeyLoader`), `fips()` (section 6.15), and the operations.
+Each capability trait is object-safe and has three kinds of methods: an identity method (`algorithm()`, or `key_type()` for `PrivateKeyLoader`), `fips()` (section 6.15), and the operations; `Mac`, `Cipher`, `Aead` and `KeyWrap` also report their protections with `supports(protection)` (section 8).
 `FfdhKeyAgreement` has no identity method: its algorithm is always `KeyAgreementAlgorithm::Ffdh`.
 No capability trait method has a default implementation.
 
@@ -236,26 +238,36 @@ Must support: total input up to 2^32 bytes; an entry whose library cannot hash t
 Above 2^32 bytes and inside the valid domain, an entry may return `Unsupported` where its library's own limit is reached.
 Errors: `ProviderFailure`, `Unsupported` as above, and `InvalidInput` beyond the algorithm's limit.
 
-### 6.2 MAC (`Mac`, `MacContext`)
+### 6.2 MAC (`Mac`, `MacContext`, `MacGeneration`, `MacVerification`)
 
-- `Mac::start(key) -> Result<Box<dyn MacContext>, Error>`: `key` of any length, including empty and longer than the hash block size, with RFC 2104 semantics.
+- `Mac::start(key, protection) -> Result<Box<dyn MacContext>, Error>`: `key` of any length, including empty and longer than the hash block size, with RFC 2104 semantics; `Unsupported(Algorithm::Mac(algorithm))` when `supports(protection)` is false (section 8).
 - `MacContext::update`: as for hashes.
-- `MacContext::finish(self: Box<Self>) -> Result<MacTag, Error>`: the full, untruncated tag.
-- `MacTag::verify(expected, len) -> bool`: compares the first `len` bytes of the tag with `expected` in constant time (best effort: Rust gives no constant-time guarantee).
+- `MacContext::finish(self: Box<Self>) -> Result<MacOutput, Error>`: the full, untruncated tag in an opaque, zeroizing backend-side carrier.
+- `MacGeneration::start(mac, key)` and `MacVerification::start(mac, key)`: call `mac.start(key, Protection::Apply)` and `mac.start(key, Protection::Process)` respectively.
+  Both expose `update` and consuming `finish`, returning `MacTag` for generation and `MacVerifier` for verification.
+- `MacVerifier::verify(expected, len) -> bool`: compares the first `len` bytes of the tag with `expected` in constant time (best effort: Rust gives no constant-time guarantee).
   It returns false unless `expected.len() == len` and `1 <= len <= tag_len`, where `tag_len` is the full tag length.
   `len` comes from the protocol definition (for example 12 bytes for Kerberos HMAC-SHA1-96, 8 for NTLM checksums), never from the received message, so that a peer cannot shorten the comparison.
 - `MacTag::into_inner() -> Zeroizing<Vec<u8>>`: the full tag, to emit a tag or derive from it.
 
-`MacTag` is wiped on drop, its `Debug` shows only the length, and it implements `Clone` (cloning the inner `Zeroizing` value, so a clone is itself wiped on drop) but no `Deref`, `AsRef`, `Display` or comparison trait, so the tag cannot be compared or printed except through `verify` and `into_inner()`.
-`verify` and `into_inner` are implemented by `picky-crypto` itself, not by backends: like the helpers of section 10, they are written above the backend and cannot be overridden, so they are not contract operations and the minimality exceptions do not apply to them.
+`MacTag` and `MacVerifier` are wiped on drop, their `Debug` shows only the length, and their `Clone` clones the zeroizing storage.
+Neither implements `Deref`, `AsRef`, `Display` or comparison traits; `MacTag` only exposes bytes through `into_inner()`, while `MacVerifier` only verifies.
+`MacOutput` has length-only `Debug`, no `Clone` and no public byte access.
+Only `picky-crypto` constructs `MacTag`, `MacVerifier`, `MacGeneration` and `MacVerification`; they have no public constructor from bytes.
+The wrapping types and the verifier's comparison are implemented by `picky-crypto`, not by backends, and are not contract operations, so the minimality exceptions do not apply.
 
 Valid domain: any key, and data such that every hash invocation of RFC 2104 (including the inner hash over the key block followed by the data, and the hashing of an over-long key) stays within the underlying hash's valid domain (section 6.1).
 Must support: keys of 0 to 1024 bytes, and data as for hashes; an update that takes the total beyond the valid domain returns `InvalidInput`.
 
 Algorithms: HMAC (RFC 2104, FIPS 198-1) with SHA-1, SHA-224, SHA-256, SHA-384, SHA-512.
-The two uses are split: `into_inner()` to emit or derive, `verify` to check.
-A tag sent to a peer (a Kerberos checksum, a JWS HS256 signature, an NTLM signature) and an HMAC output used as key material (a PRF block of a KDF built on `Mac`) are taken with `into_inner()`; truncation for output (Kerberos HMAC-SHA1-96, NTLM 8-byte checksums) is protocol code over those bytes.
-A received tag is always checked with `verify`, with the protocol's `len` for truncated tags, and `verify` is the one way to check a MAC.
+Generation and verification are separate operations, chosen at `start`: a composite entry must choose the serving member before processing data (section 8.1), and a policy may refuse generation while allowing verification (section 8.2).
+A tag sent to a peer (a Kerberos checksum, a JWS HS256 signature, an NTLM signature) or used as key material comes from `MacGeneration` and is read with `MacTag::into_inner()`; truncation is protocol code over those bytes.
+A received tag is always checked with `MacVerifier::verify`, the one way to check a MAC, with the protocol's `len`.
+A backend never constructs `MacTag` or `MacVerifier`, so a policy refuses generation by refusing `start(key, Protection::Apply)`.
+The split governs which services a provider offers, which is what a policy approves; it is not a confidentiality boundary against the calling code, which holds the key.
+Code that supplies its own `Mac` entry to `MacGeneration`, or probes `verify` with chosen prefixes, can obtain a verification tag's bytes, and such use is outside any approved service.
+Entries are trusted to report and behave honestly, as for `fips()` and `key_size_bits()`: the contract does not defend against a dishonest entry.
+Probing `verify` is open only to the calling code; a remote party cannot use it as an oracle, because `len` comes from the protocol definition.
 
 Exception 2: HMAC is derivable from the hash interface (key padding, inner and outer hash), but it is an approved algorithm that must run as a whole inside a validated module.
 
@@ -291,11 +303,13 @@ A library that only builds its own fixed-input layout from a label and a context
 
 Exception 2: both KDFs are derivable from the hash and MAC interfaces, but they are approved KDFs.
 Composed above the contract, they would run outside the validated module and be invisible to policy and to availability checks.
-Where a backend's library lacks them, a provider that builds them from another provider's entries supplies them, reporting `fips() == false` (section 11): the one-step KDF from `Hash` entries, and the counter-mode KDF from `Mac` entries, taking each PRF block with `MacTag::into_inner()`.
+Where a backend's library lacks them, a provider that builds them from another provider's entries supplies them, reporting `fips() == false` (section 11): the one-step KDF from `Hash` entries, and the counter-mode KDF from `Mac` entries, taking each PRF block from a `MacGeneration` with `MacTag::into_inner()` and requiring `Protection::Apply`.
+A policy judges `Kdf` entries by the rules for KDFs, independently of the `Mac` entries they build on.
 
 ### 6.5 Unauthenticated block cipher modes (`Cipher`)
 
 `encrypt(key, iv, plaintext) -> Result<OutputBytes, Error>` and `decrypt(key, iv, ciphertext) -> Result<OutputBytes, Error>`: one-shot CBC (NIST SP 800-38A) without padding; the output has the same length as the input.
+The entry reports its protections through `supports()` (section 8).
 
 | Algorithm | Key | IV | Data |
 |---|---|---|---|
@@ -326,21 +340,38 @@ There is no state cloning: computing an NTLM MIC without advancing the state is 
 
 ### 6.7 AEAD (`Aead`)
 
-- `seal(key, nonce, aad, plaintext) -> Result<OutputBytes, Error>`: returns `ciphertext || tag`.
+- `seal(key, aad, plaintext) -> Result<Sealed, Error>`: returns a `Sealed` with the generated `nonce` and `ciphertext_and_tag` (`ciphertext || tag`), named so that the two buffers cannot be swapped by position.
 - `open(key, nonce, aad, ciphertext_and_tag) -> Result<OutputBytes, Error>`: returns the plaintext, or `VerificationFailed` without releasing any plaintext.
 
-AES-GCM (NIST SP 800-38D): the key is exactly 16, 24 or 32 bytes for `Aes128Gcm`, `Aes192Gcm` and `Aes256Gcm` respectively (`InvalidKey` otherwise); nonce exactly 12 bytes; tag exactly 16 bytes.
+The entry reports its protections through `supports()` (section 8).
+
+AES-GCM (NIST SP 800-38D): the key is exactly 16, 24 or 32 bytes for `Aes128Gcm`, `Aes192Gcm` and `Aes256Gcm` respectively (`InvalidKey` otherwise); the generated seal nonce and the open nonce are exactly 12 bytes; the tag is exactly 16 bytes.
 Must support: plaintext up to 2^31 − 17 bytes, so that `ciphertext || tag` fits in 2^31 − 1 bytes, within the 32-bit `isize::MAX` allocation-size limit, and AAD up to 2^31 − 1 bytes (some handle-based APIs take the AAD length as a 32-bit integer).
 `open` input shorter than 16 bytes: `InvalidInput`.
 A detached tag (as in JOSE) is split and joined above the contract.
 
+The backend's library generates the seal nonce from its own secure random generator, never from caller input or a `SecureRandom` entry passed in (rule 5).
+Chaining the library's own nonce generation or RNG with its seal is argument mapping.
+A backend whose library is a FIPS module seals only through the module's internal IV generation (NIST SP 800-38D section 8.2.2).
+An IV passed into the module from outside, even one the module generated, is an external IV.
+The contract requires internal generation because whether a module approves an external IV depends on its validated configuration (SP 800-38D section 8.2.2); the AWS-LC FIPS module, for example, approves AES-GCM encryption only with an internally generated IV.
+A backend whose library cannot seal a key size through the required nonce generation reports `supports(Protection::Apply) == false` for that algorithm and keeps open.
+For example, aws-lc-rs's `RandomizedNonceKey` has no AES-192-GCM, so that entry reports only `Protection::Process` in every build of the adapter.
+
+With random 96-bit nonces, a key must be used for at most 2^32 seal calls (NIST SP 800-38D section 8.3).
+The backend keeps no per-key state and cannot count calls, so the caller enforces this limit.
+Generating the nonce removes caller-controlled nonce reuse, GCM's main failure mode.
+A protocol needing a caller-chosen seal nonce (for example `aes256-gcm@openssh.com`) requires a separate, explicitly non-approved capability through a contract change; adding a capability is non-breaking (section 3.1).
+
 Exception 2 and 3: GCM is derivable from single-block AES-CBC calls plus GHASH arithmetic above the contract.
-It is an approved mode that must run as a whole inside a validated module, and the backend provides constant-time GHASH and releases no plaintext before the tag is checked.
+It is an approved mode that must run as a whole inside a validated module, including internal IV generation under exception 2, and the backend provides constant-time GHASH and releases no plaintext before the tag is checked.
 
 ### 6.8 Key wrap (`KeyWrap`)
 
 - `wrap(kek, key_data) -> Result<OutputBytes, Error>`: RFC 3394 with the default IV `A6A6A6A6A6A6A6A6`; the output is 8 bytes longer.
 - `unwrap(kek, wrapped) -> Result<OutputBytes, Error>`: `VerificationFailed` if the integrity check fails.
+
+The entry reports its protections through `supports()` (section 8).
 
 KEK: exactly 16, 24 or 32 bytes for `Aes128Kw`, `Aes192Kw` and `Aes256Kw` respectively (`InvalidKey` otherwise); the wrapped `key_data` length is independent of the KEK size.
 Valid domain and must-support set (they coincide): `key_data` of 16, 24 or 32 bytes, so `wrapped` of 24, 32 or 40 bytes.
@@ -484,7 +515,7 @@ RSA generation is not derivable, because the contract offers no primality testin
 
 `fill(dest) -> Result<(), Error>`: fills `dest` from a cryptographically secure generator (an OS CSPRNG or an SP 800-90A DRBG); `ProviderFailure` if it fails.
 A provider has at most one `SecureRandom` entry (`RandomAlgorithm::SecureRandom`).
-Integers in a range, nonces, confounders and salts are built on top by consumers.
+Integers in a range, protocol nonces other than AEAD seal nonces (section 6.7), confounders and salts are built on top by consumers.
 
 ### 6.15 `fips()`
 
@@ -501,6 +532,7 @@ It is an input to policy, never a capability query.
 | Method | Default | Semantics |
 |---|---|---|
 | `key_type()` | required | The key's type. |
+| `key_size_bits()` | required | The key size in bits, as defined below; cheap, infallible and never accesses a device (rule 7). |
 | `supports(operation)` | required | Whether the key implements `operation` (`KeyOperation::Sign(alg)`, `Decrypt(alg)`, `Agree(alg)`, `PublicKey`) over that operation's must-support set. Never performs the operation (no PIN prompt, no device access beyond cached capabilities). |
 | `fips()` | required | As in section 6.15, for this key's operations. A key loaded by a provider entry reports that entry's `fips()`. A hardware key reports true only if every computation of its operations runs in a module whose status is established for the deployment (the token, by configuration or attestation, and, when it hashes in software, the `Hash` entry it uses), false otherwise. |
 | `sign(algorithm, message)` | `Unsupported` | Section 6.9 algorithms; the message is passed and the key hashes it; output encoding per section 5.4. |
@@ -509,14 +541,26 @@ It is an input to policy, never a capability query.
 | `public_key()` | `Unsupported(PublicKeyExport(key_type))` | Optional. The `subjectPublicKey` contents of the matching public key (section 5.1 encoding; 32 bytes for X25519). Not offered for FFDH keys, whose public value is `agree(Ffdh, g)` (the helper `ffdh_public_value`, section 10). |
 
 When `supports` returns false, the operation always returns `Unsupported`: algorithms that do not match the key's type and algorithms its implementation does not offer.
-When it returns true, the operation is available over its must-support set.
+When it returns true, the operation is available over its must-support set, subject to policy narrowing (section 8.2).
 Inputs inside the valid domain but outside the must-support set may still return `Unsupported` (rule 4).
 Cryptographically invalid inputs still fail with the specified error (for example `VerificationFailed` for a modulus-length ciphertext with invalid padding).
 `supports` is how private-key availability is queried per algorithm: provider entries advertise verification, encryption, ephemeral agreement and loading, and a key advertises its own signing, decryption, static agreement and public-key export.
-Conformance tests check every `KeyOperation`.
+Conformance tests check every `KeyOperation` on unwrapped keys.
 When `supports() == false`, the operation returns `Unsupported`.
 When `supports() == true`, valid known-answer and round-trip cases succeed, no must-support input returns `Unsupported`, and invalid inputs return the specified error.
 RSA keys with inconsistent components are checked as section 12 states.
+
+`key_size_bits()` reports:
+
+- RSA: the exact bit length of the modulus `n`, never a byte length times 8; a backend whose library returns only the modulus bytes measures their bit length, which is argument mapping (`INTENT.md`, "Design principle");
+- EC P-256, P-384, P-521: the bit length of the curve's field prime, respectively 256, 384, 521;
+- Ed25519 and X25519: 255, the bit length of the field prime 2^255 − 19;
+- FFDH: the bit length of `p` after leading zeros are ignored (section 6.11).
+
+A key type without a meaningful size returns 0, which every minimum-size check refuses.
+There is no such type in the current `KeyType` set, but the enum is `#[non_exhaustive]`.
+A hardware key reads its size when constructed and caches it like its capabilities.
+This metadata lets policy restrict provider-loaded and hardware keys by size without exporting them.
 
 Valid domain and must-support set:
 
@@ -556,7 +600,7 @@ The hash comes from the contract, never from a crypto library: the key implement
 If that provider lacks the hash, `supports(Sign(alg))` is false and `sign` returns `Unsupported`.
 A CNG/NCrypt key hashes and calls `NCryptSignHash` in the same way.
 
-Restricting a hardware key under a policy (section 8.2) filters its operations; it does not change the provider the key was constructed with, so a FIPS binary constructs hardware keys with its FIPS provider.
+Restricting a hardware key under a policy (section 8.2) filters its operations and key size; it does not change the provider the key was constructed with, so a FIPS binary constructs hardware keys with its FIPS provider.
 A binary using hardware keys composes its provider with a software fallback for the operations the token does not offer (for example verification); under FIPS, that fallback must itself be a FIPS provider behind the FIPS policy, because verification is a cryptographic service like any other.
 
 ## 8. Provider value
@@ -577,16 +621,47 @@ Storage is private.
 - `CryptoProvider::entries()`: iteration in unspecified order.
   It is not derivable from `get`, because consumers cannot enumerate a `#[non_exhaustive]` algorithm set; policy and composition need it.
 
-Availability is queryable per algorithm: `get(algorithm).is_some()`, or the `missing` helper for a list.
+`get(algorithm).is_some()` means that the entry exists and performs at least one operation, not necessarily every operation of its trait.
+For entries other than `Mac`, `Cipher`, `Aead` and `KeyWrap`, including loading, presence also means that every operation of the trait is advertised (rule 3).
 A provider never consults another provider implicitly.
+
+`Mac`, `Cipher`, `Aead` and `KeyWrap` require `supports(protection: Protection) -> bool`, with no default implementation and the metadata guarantees of rule 7.
+`Protection` follows NIST SP 800-131A Rev. 2 section 1.2.3: "applying cryptographic protection" versus "processing already protected information".
+
+| Capability | `Apply` | `Process` |
+|---|---|---|
+| `Mac` | tag generation | tag verification |
+| `Cipher` | `encrypt` | `decrypt` |
+| `Aead` | `seal` | `open` |
+| `KeyWrap` | `wrap` | `unwrap` |
+
+Signatures already separate the two: signing is a private-key operation (section 7), and verification is a provider entry.
+Hashes, KDFs, random generation and key agreement have no protection.
+Unlike `KeyOperation`, which includes an algorithm because a private key serves several algorithms, `Protection` names only the protection because an entry has one algorithm.
+When `supports(protection)` is false, that operation (`start(key, protection)` for `Mac`) returns `Unsupported(algorithm)` for every input.
+When it is true, rule 3 applies to that operation.
+A directional entry supports at least one protection; an entry that supports neither is never part of a provider.
+
+Provider-level availability is checked with `helpers::missing(provider, required: &[Requirement]) -> Vec<Requirement>` (section 10), which reports every unmet requirement:
+
+- `Requirement::Algorithm(alg)` requires an entry that performs every operation of its trait, including both protections for `Mac`, `Cipher`, `Aead` and `KeyWrap`;
+- `Requirement::Mac(alg, protection)`, `Requirement::Cipher(alg, protection)`, `Requirement::Aead(alg, protection)` and `Requirement::KeyWrap(alg, protection)` require an entry that supports the named protection.
+
+`Requirement::from(alg)` is `Requirement::Algorithm(alg)`, so naming only an algorithm never treats a one-protection entry as a full one.
+Input narrowing is visible only as `Unsupported` at call time (rule 4), not through availability queries.
+Private-key availability remains `PrivateKey::supports` (section 7).
 
 ### 8.1 Composition
 
 Composition is explicit: a binary composes providers, or a dedicated bundle crate fixes a composition (section 11); libraries never compose.
-`CryptoProvider::with_fallback(&self, fallback)` keeps the entries of `self` and adds the entries of `fallback` for algorithms `self` lacks.
-Composition is per algorithm, never per input.
-A primary entry still shadows the fallback when it accepts fewer inputs outside the must-support set (for example an aws-lc-rs loader refusing 1024-bit RSA keys, or a loader unable to compute a missing EC public key).
-Those inputs return `Unsupported`.
+`CryptoProvider::with_fallback(&self, fallback)` keeps the entries of `self` and adds what `fallback` advertises and `self` does not.
+Composition follows the granularity of advertisement: per algorithm, and per protection for `Mac`, `Cipher`, `Aead` and `KeyWrap`; never per input.
+For an algorithm whose `self` entry does not support a protection that the `fallback` entry supports, the result holds one composite entry with the same algorithm: each protection is served by `self` when `self` supports it, and by `fallback` otherwise.
+Its `supports(protection)` is true when either member's entry supports that protection.
+Its `fips()` is true only if every member entry that serves one of its protections reports `fips()`.
+For `Mac`, the composite starts each context on the member that serves the requested protection, so the member that computes the tag is the one whose approval counts.
+A primary entry still shadows the fallback for every input of an operation it advertises, including inputs outside the must-support set it refuses (for example an aws-lc-rs loader refusing 1024-bit RSA keys, or a loader unable to compute a missing EC public key) and inputs refused under section 8.2.
+Those calls return `Unsupported`, with no fallback.
 Binaries choose the order.
 
 `CryptoProvider::fips()` is true only if the provider has at least one entry, every entry reports `fips()`, and every provider it was composed from reported `fips()`.
@@ -599,12 +674,30 @@ Exception: composition is not derivable from `entries()` and the builder, becaus
 ### 8.2 Policy
 
 A policy is a function from provider to provider.
+
+A policy may narrow the inputs an entry accepts below its must-support set.
+A narrowed entry returns `Unsupported(algorithm)` for refused inputs: the input is valid for the algorithm but not permitted here, consistent with rule 4.
+Conformance tests run against unwrapped providers; policy tests cover the narrowing.
+Every threshold a policy applies cites its source (an SP 800-131A table, a module security policy) and its version.
+
+A policy restricts operations through the availability queries:
+
+- it wraps `Mac`, `Cipher`, `Aead` and `KeyWrap` entries so refused protections report `supports(protection) == false` and follow section 8's refusal behavior, for example keeping 3DES decryption and refusing encryption under NIST SP 800-131A Rev. 2;
+  MAC policy can likewise restrict use, for example, allowing HMAC-SHA-1 verification and refusing generation (NIST SP 800-131A Rev. 3 draft, section 13, Table 14).
+- it drops an entry if neither protection remains;
+- it restricts keys through `PrivateKey::supports` (section 7);
+- it restricts every other capability by dropping its entry or narrowing its inputs.
+
+A policy may narrow signature verification by public-key size.
+For RSA it uses the modulus bit length read from the `RSAPublicKey` bytes passed to the verifier; refused sizes return `Unsupported(algorithm)`.
+Reading the size is format code in the policy, not in the contract.
+
 The FIPS policy:
 
 - rejects any provider whose `fips()` is false, instead of silently dropping entries, so that a non-FIPS fallback composition cannot pass for FIPS; the error names the non-FIPS entries it can see, and may name none when the only non-FIPS member was entirely shadowed by the fallback composition (only its status is kept);
-- then, in a provider that reports `fips()`, keeps only the entries whose algorithm is approved for the intended use (filtering unapproved algorithms is not the same as accepting non-FIPS entries);
-- wraps each kept `PrivateKeyLoader` so that the keys it returns report `supports() == false` and return `Unsupported` for operations the policy does not allow (for example `sign(RsaPkcs1v15Sha1)`);
-- provides a key-restriction function for hardware keys, which do not come from a provider: it applies the same operation filter and rejects keys whose `fips()` is false.
+- then, in a provider that reports `fips()`, keeps entries approved for at least one operation, narrowed to the approved protections and inputs (filtering unapproved algorithms is not the same as accepting non-FIPS entries);
+- wraps each kept `PrivateKeyLoader` so that the keys it returns report `supports() == false` and return `Unsupported` for operations or key sizes the policy does not allow, using `key_size_bits()` (for example RSA signature generation below 2048 bits, disallowed by NIST SP 800-131A rev. 2, section 3);
+- provides a key-restriction function for hardware keys, which do not come from a provider: it applies the same operation and key-size filters and rejects keys whose `fips()` is false.
 
 The policy, not the backend, decides which algorithms are approved.
 It lives outside `picky-crypto`, because its approved-algorithm table changes with NIST transitions (for example the end of SHA-1 signature generation) while the contract must stay stable.
@@ -655,10 +748,15 @@ Fallible helpers return `Result<_, Error>` and propagate the underlying error un
 | `entry_algorithm(entry)`, `entry_fips(entry)` | a match on `Entry` plus the trait's `algorithm()` / `key_type()` / `fips()` (`Algorithm::KeyAgreement(Ffdh)` for an `FfdhKeyAgreement` entry) |
 | typed accessors, one per `Entry` variant: `hash(provider, alg) -> Result<&dyn Hash, Error>`, ..., `key_agreement(provider, alg)`, `ffdh_key_agreement(provider)` | `get` plus a match; `Unsupported(alg)` when absent; `key_agreement` with `KeyAgreementAlgorithm::Ffdh` returns `InvalidInput`, because the FFDH entry implements `FfdhKeyAgreement` and is reached through `ffdh_key_agreement` |
 | `digest(provider, alg, data)` | `Hash::start`, `update`, `finish` |
-| `compute_mac(provider, alg, key, data)` | `Mac::start`, `update`, `finish` |
+| `compute_mac(provider, alg, key, data) -> Result<MacTag, Error>` | `MacGeneration::start`, `update`, `finish` |
+| `verify_mac(provider, alg, key, data, expected, len) -> Result<bool, Error>` | `MacVerification::start`, `update`, `finish`, then `MacVerifier::verify` |
 | `random_x25519_private_key(provider) -> Result<X25519Scalar, Error>` | `SecureRandom::fill`, then RFC 7748 clamping (section 6.13); `Unsupported(Random(SecureRandom))` if the provider has no RNG |
 | `ffdh_public_value(key, parameters) -> Result<OutputBytes, Error>` | `PrivateKey::agree(Ffdh, g)`, whose result is `g^x mod p` left-padded to the length of `p`; precondition: `parameters` are those the key was loaded with, otherwise the result is unspecified (never a panic) |
-| `missing(provider, required) -> Vec<Algorithm>` | `get`; reports every missing algorithm at once (NTLM, for example, needs MD4, MD5 and RC4) |
+| `missing(provider, required: &[Requirement]) -> Vec<Requirement>` | `get` plus `Mac::supports` / `Cipher::supports` / `Aead::supports` / `KeyWrap::supports`; reports every unmet requirement (section 8), so no provider method is needed |
+
+Like `digest`, `compute_mac` and `verify_mac` are one-shot helpers derived from the streaming operations.
+
+NTLM's MD4, MD5 and RC4 requirements use `Requirement::from(Algorithm::Hash(HashAlgorithm::Md4))`, `Requirement::from(Algorithm::Hash(HashAlgorithm::Md5))` and `Requirement::from(Algorithm::StreamCipher(StreamCipherAlgorithm::Rc4))`.
 
 Protocol-specific constructions (Kerberos n-fold, ciphertext stealing and RFC 3961 key derivation; NTLM constructions; JOSE and SSH framing; the PKCS#12 key derivation) and format conversions stay in their consuming crates.
 
@@ -668,6 +766,7 @@ The contract does not depend on any of the following; they are described here be
 
 - **Providers built from other providers' entries.**
   A provider may build entries from another provider's contract entries, for algorithms that a backend's library lacks: the key-based KDFs (section 6.4), the one-step KDF from `Hash` entries and the counter-mode KDF from `Mac` entries.
+  The counter-mode KDF takes each PRF block from a `MacGeneration` with `MacTag::into_inner()`, requiring `Protection::Apply` from those entries; policy judges the resulting `Kdf` entry independently (section 6.4).
   Such a provider takes the entries it builds on explicitly at construction, contains no other cryptographic code, and reports `fips() == false`, so the FIPS policy rejects any provider composed with it.
   An entry of this kind exists only while some backend's library lacks the algorithm natively.
 - **FFDH provider.**
@@ -683,11 +782,16 @@ The contract does not depend on any of the following; they are described here be
 
 ## 12. Conformance testing
 
-The conformance suite uses published vectors (Wycheproof, NIST CAVP, RFC test vectors).
+The conformance suite runs on unwrapped providers and keys and uses published vectors (Wycheproof, NIST CAVP, RFC test vectors).
+
+The suite reads `supports()` on each `Mac`, `Cipher`, `Aead` and `KeyWrap` entry; an entry reporting neither protection fails.
+For each protection `p`, `start(key, p)` for `Mac` or the corresponding operation returns `Unsupported(algorithm)` exactly when `supports(p)` is false on must-support inputs.
+For each unsupported protection, the suite skips vector labels and checks that `missing` reports the directional requirement.
 
 Before a vector's label is applied, its eligibility is decided by the rules above:
 
-- for an algorithm the provider does not advertise, or a key operation for which `supports()` is false, the suite asserts `Unsupported` and does not apply the label;
+- for an absent entry or a key operation for which `supports()` is false, the suite asserts `Unsupported` and does not apply the label;
+- MAC, cipher, AEAD and key-wrap vectors apply only to supported protections;
 - for a vector whose inputs are in the operation's must-support set, the label is applied as below;
 - for a vector whose inputs are inside the valid domain but outside the must-support set (for example a 1024-bit RSA key), `Unsupported` is also accepted, and so is `VerificationFailed` from a verifier on a library with a single opaque failure (section 4); any other result must match the label.
 
@@ -697,6 +801,10 @@ Labels follow Wycheproof:
 - `acceptable` vectors only assert that nothing panics, unless this document pins the behavior, in which case the pinned behavior is asserted;
 - X25519 vectors labeled `acceptable` (twist, non-canonical, high-bit and low-order public values, and unclamped private keys) assert the published shared secret, because section 5.2 puts every 32-byte input in the must-support set; those whose shared secret is all zero assert `InvalidInput` (section 6.11);
 - where this document pins a behavior that a vector's label contradicts, this document wins: for example, ECDSA signatures with a high `s` are valid (section 6.9), and the Bitcoin-specific vectors that reject them do not apply.
+
+AEAD seal output is not deterministic, so seal is verified only through round trips (open of seal output) and cross-backend opens, with `Protection::Apply` supported by the sealing entry and `Protection::Process` by the opening entry.
+A round trip requires both protections on the same entry; known-answer AEAD tests run on open only.
+The suite checks that the returned nonce is 12 bytes.
 
 Behaviors left implementation-defined are excluded from differential tests between backends.
 For each of them, conformance tests assert that nothing panics and that the result is one of the outcomes this document allows for that case:
@@ -717,10 +825,15 @@ The inputs for that last property are derived from published keys, because the k
 - round-trip control: splitting a base key into its fields and reassembling them unchanged must reproduce the cited key's exact bytes, otherwise the test fails;
 - positive control: the unmodified base key loads and produces a result that verifies on the backend under test.
 
+Provider-value property tests against mock providers check composition (section 8.1) for `Mac`, `Cipher`, `Aead` and `KeyWrap`: a fallback fills in a protection the primary does not support, the primary serves a protection both members support, and the composite entry's `fips()` and the composed provider's `fips()` follow section 8.1.
+For `Mac`, each context starts on the member serving the requested protection.
+
 The FFDH exponent distribution (section 6.11) is mandatory but not observable from outputs; it is verified by review, while the suite checks the range of the public value and the round trip.
 
-For every returned `OutputBytes`, `X25519Scalar` and `MacTag`, the suite also asserts that the `Debug` output never contains the buffer's bytes.
-`MacTag::verify` is tested with the correct tag, a wrong tag, an `expected` whose length differs from `len`, `len` of 0 and greater than the tag length, and the truncated lengths used by Kerberos (12 bytes) and NTLM (8 bytes).
+For every returned `OutputBytes`, `X25519Scalar`, `MacTag`, `MacVerifier` and `Sealed` through its fields, the suite also asserts that the `Debug` output never contains the buffer's bytes.
+For every loaded key, the suite checks `key_size_bits()` against the exact size section 7 defines, including RSA keys whose modulus length is not a multiple of 8 bits (for example 3071 or 4095 bits) when the backend loads them; such keys come from cited sources like every other key.
+`MacVerifier::verify` is tested with the correct tag, a wrong tag, an `expected` whose length differs from `len`, `len` of 0 and greater than the tag length, and the truncated lengths used by Kerberos (12 bytes) and NTLM (8 bytes).
+A `MacTag` and a `MacVerifier` computed on the same key and data agree: the tag's `into_inner()` bytes verify through the verifier.
 
 A backend that fails a vector natively is a defect to investigate, not a reason to skip the vector or to patch the library's behavior in the adapter.
 
@@ -734,17 +847,23 @@ This avoids a second, narrower enum naming the same algorithms twice.
 
 **A small closed error set.**
 Five variants cover what a caller can act on: not available, bad key, bad input, failed check, provider failure.
+Closed means contract-defined, not exhaustively matchable (section 4).
 
 **Policy outside the contract, composition inside.**
-The FIPS policy is derivable from `entries()`, the builder and `fips()`, and changes with NIST transitions, so it lives in its own crate (section 8.2).
+The FIPS policy is derivable from the public API and changes with NIST transitions, so it lives in its own crate (section 8.2).
 Fallback composition is in the contract, because only the provider value can carry the FIPS status of shadowed members (section 8.1).
+
+**Availability per protection.**
+One-protection refusal comes from a library that lacks internal-IV seal for a key size or a policy that permits legacy processing only, including MAC verification and key unwrap.
+Per-algorithm availability alone would report a capability whose needed protection is refused: a Kerberos encryption type needs 3DES in both protections, but a policy may refuse 3DES encryption.
+Consumers state the protections they need through `Requirement` (section 8), and composition can fill in a missing protection (section 8.1).
 
 **Streaming hash and MAC.**
 Consumers process unbounded inputs and some already hash incrementally, and every library streams the algorithms it has; a one-shot interface would force large buffers and is a helper on top.
 
 **Owned buffers for ciphers and AEAD.**
 Inputs are borrowed and outputs are owned, the weakest shape every library supports; in-place APIs would force some libraries to copy anyway.
-AEAD returns `ciphertext || tag` because that is the common native layout.
+AEAD seal returns the generated nonce separately from `ciphertext || tag`, the common native ciphertext layout (section 6.7).
 
 **Optional key generation returning PKCS#8.**
 Generation returns the contract's private-key encoding, so a generated key can be loaded by any backend; a provider whose keys cannot be exported simply does not advertise generation.
@@ -767,7 +886,7 @@ Consumers take the group from the protocol, so the operation takes `p`, `g` and 
 
 **Non-FIPS algorithms as ordinary identifiers.**
 MD4, MD5, RC4, RC2, 3DES and FFDH are ordinary algorithm identifiers, and backends that lack them return `Unsupported`.
-Under the FIPS policy (section 8.2), an unapproved algorithm offered by a FIPS module is filtered out, while a provider containing any non-FIPS entry (for example the FFDH provider, or a RustCrypto entry) is rejected outright; either way, consumers fail with an error naming the missing algorithms.
+The FIPS policy filters or narrows entries according to their approved uses (section 8.2), while rejecting a provider containing any non-FIPS entry (for example the FFDH provider, or a RustCrypto entry) outright.
 There is no compile-time distinction, because algorithm choice comes from parsed data.
 
 **Lazy installation for convenience features.**
@@ -782,13 +901,15 @@ A FIPS binary therefore links a single `picky-crypto` instance and checks it in 
 It also installs its provider in every dynamic library that carries its own copy.
 Explicit provider parameters in consumer APIs would be a change to those APIs, not to the contract.
 
-**Composition per algorithm.**
-A fallback is chosen per algorithm, never per input, so the provider that serves an algorithm is known from the provider value alone and a policy can judge it; a primary that accepts fewer inputs shadows the fallback for that algorithm, and binaries choose the order (section 8.1).
+**Composition at the granularity of advertisement.**
+A fallback is chosen per algorithm, and per protection for `Mac`, `Cipher`, `Aead` and `KeyWrap`, never per input (section 8.1).
+Algorithms and protections are advertised and known when providers are composed, so the member that serves each operation is known from the provider value alone and a policy can judge it.
+Inputs are not advertised, so composing on them would make the serving member depend on data.
 
 **Zeroizing every output.**
 Whether a buffer is secret depends on how the consumer uses it, not on the operation that produced it (section 2, rule 1), so every returned buffer is wiped on drop.
 The returned types are opaque for the same reason: their `Debug` shows only the length.
-A MAC tag is a separate type with no byte access other than `into_inner()`, so that verification goes through `MacTag::verify`, in constant time and with a length fixed by the protocol (section 6.2).
+MAC results are split into a generated `MacTag`, whose bytes are read only through `into_inner()`, and a `MacVerifier` that only verifies, in constant time and with a length fixed by the protocol (section 6.2).
 
 ## Appendix A. Public API
 
@@ -806,13 +927,13 @@ use std::sync::Arc;
 
 pub use zeroize::Zeroizing;
 
-/// Every variable-length buffer an operation returns, except MAC tags (`MacTag`): wiped on drop, whatever the operation.
+/// Every variable-length buffer an operation returns, except MAC results (section 6.2): wiped on drop, whatever the operation.
 /// `Debug` prints only the length; `Clone` clones the zeroizing storage; no `Display` and no comparison or hashing traits.
 #[derive(Clone)]
 pub struct OutputBytes(Zeroizing<Vec<u8>>);
 
 impl OutputBytes {
-    /// Wraps zeroizing storage unchanged; backends build every returned buffer other than a MAC tag with it.
+    /// Wraps zeroizing storage unchanged; backends build every returned variable-length buffer other than a MAC result with it.
     pub fn new(bytes: Zeroizing<Vec<u8>>) -> Self {
         Self(bytes)
     }
@@ -878,24 +999,29 @@ impl fmt::Debug for X25519Scalar {
     }
 }
 
-/// A MAC tag: wiped on drop; `Debug` prints only the length; `Clone` clones the zeroizing storage.
-/// No `Deref`, `AsRef`, `Display` or comparison traits: check it with `verify`, or emit or derive from it with `into_inner`.
+/// Raw MAC output returned by a backend context: wiped on drop, `Debug` prints only the length.
+/// It exposes no bytes outside `picky-crypto`; `MacGeneration` and `MacVerification` turn it into a `MacTag` or a `MacVerifier`.
+pub struct MacOutput(Zeroizing<Vec<u8>>);
+
+impl MacOutput {
+    /// Wraps zeroizing storage unchanged; backends build every MAC result with it.
+    pub fn new(tag: Zeroizing<Vec<u8>>) -> Self {
+        Self(tag)
+    }
+}
+
+impl fmt::Debug for MacOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MacOutput").field("len", &self.0.len()).finish()
+    }
+}
+
+/// A generated MAC tag: wiped on drop; `Debug` prints only the length; `Clone` clones the zeroizing storage.
+/// No `Deref`, `AsRef`, `Display`, comparison or `verify`: emit it or derive from it with `into_inner`.
 #[derive(Clone)]
 pub struct MacTag(Zeroizing<Vec<u8>>);
 
 impl MacTag {
-    /// Wraps zeroizing storage unchanged; backends build every returned tag with it.
-    pub fn new(tag: Zeroizing<Vec<u8>>) -> Self {
-        Self(tag)
-    }
-
-    /// Compares the first `len` bytes of the tag with `expected` in constant time (best effort).
-    /// Returns false unless `expected.len() == len` and `1 <= len <=` the full tag length.
-    /// `len` comes from the protocol definition, never from the received message.
-    pub fn verify(&self, expected: &[u8], len: usize) -> bool {
-        unimplemented!()
-    }
-
     /// The full tag, to emit a tag or derive from it.
     pub fn into_inner(self) -> Zeroizing<Vec<u8>> {
         self.0
@@ -905,6 +1031,42 @@ impl MacTag {
 impl fmt::Debug for MacTag {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("MacTag").field("len", &self.0.len()).finish()
+    }
+}
+
+/// A tag computed to check a received one: wiped on drop; `Debug` prints only the length; `Clone` clones the zeroizing storage.
+/// No byte access, `Display` or comparison trait: the only operation is `verify`.
+#[derive(Clone)]
+pub struct MacVerifier(Zeroizing<Vec<u8>>);
+
+impl MacVerifier {
+    /// Compares the first `len` bytes of the tag with `expected` in constant time (best effort).
+    /// Returns false unless `expected.len() == len` and `1 <= len <=` the full tag length.
+    /// `len` comes from the protocol definition, never from the received message.
+    pub fn verify(&self, expected: &[u8], len: usize) -> bool {
+        unimplemented!()
+    }
+}
+
+impl fmt::Debug for MacVerifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MacVerifier").field("len", &self.0.len()).finish()
+    }
+}
+
+/// The output of `Aead::seal` (section 6.7): wiped on drop, `Debug` prints only lengths.
+#[non_exhaustive]
+#[derive(Clone, Debug)]
+pub struct Sealed {
+    /// The nonce generated by the backend's library: 12 bytes for AES-GCM.
+    pub nonce: OutputBytes,
+    /// `ciphertext || tag`.
+    pub ciphertext_and_tag: OutputBytes,
+}
+
+impl Sealed {
+    pub fn new(nonce: OutputBytes, ciphertext_and_tag: OutputBytes) -> Self {
+        Self { nonce, ciphertext_and_tag }
     }
 }
 
@@ -1097,13 +1259,38 @@ pub enum Algorithm {
     PublicKeyExport(KeyType),
 }
 
+/// Whether an operation applies cryptographic protection or processes protected data (NIST SP 800-131A).
+#[non_exhaustive]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Protection {
+    Apply,
+    Process,
+}
+
+#[non_exhaustive]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Requirement {
+    Algorithm(Algorithm),
+    Mac(MacAlgorithm, Protection),
+    Cipher(CipherAlgorithm, Protection),
+    Aead(AeadAlgorithm, Protection),
+    KeyWrap(KeyWrapAlgorithm, Protection),
+}
+
+impl From<Algorithm> for Requirement {
+    fn from(algorithm: Algorithm) -> Self {
+        Self::Algorithm(algorithm)
+    }
+}
+
 // ---------------------------------------------------------------------------
-// Errors (closed set: deliberately not `#[non_exhaustive]`)
+// Errors (closed to backend-defined variants; extensible by the contract)
 // ---------------------------------------------------------------------------
 
+#[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Error {
-    /// The algorithm, or this key size or parameter of it, is not available from this provider or key.
+    /// The algorithm, operation, key size or parameter is unavailable or refused by policy.
     Unsupported(Algorithm),
     /// Key material is malformed, of the wrong type or size, or rejected by key validation.
     InvalidKey,
@@ -1125,6 +1312,7 @@ impl fmt::Display for Error {
 impl std::error::Error for Error {}
 
 /// Returned by `ProviderBuilder::build`.
+#[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BuildError {
     /// Two entries implement the same algorithm.
@@ -1199,7 +1387,7 @@ pub enum KeyOperation {
 
 // ---------------------------------------------------------------------------
 // Capability traits: an entry implements exactly one algorithm.
-// `algorithm()`, `key_type()` and `fips()` are cheap, infallible and never access a device.
+// `algorithm()`, `key_type()`, `fips()` and `supports()` are cheap, infallible and never access a device.
 // ---------------------------------------------------------------------------
 
 pub trait Hash: Send + Sync {
@@ -1216,12 +1404,49 @@ pub trait HashContext: Send {
 pub trait Mac: Send + Sync {
     fn algorithm(&self) -> MacAlgorithm;
     fn fips(&self) -> bool;
-    fn start(&self, key: &[u8]) -> Result<Box<dyn MacContext>, Error>;
+    fn supports(&self, protection: Protection) -> bool;
+    /// Returns `Unsupported(Algorithm::Mac(algorithm))` when `supports(protection)` is false.
+    fn start(&self, key: &[u8], protection: Protection) -> Result<Box<dyn MacContext>, Error>;
 }
 
 pub trait MacContext: Send {
     fn update(&mut self, data: &[u8]) -> Result<(), Error>;
-    fn finish(self: Box<Self>) -> Result<MacTag, Error>;
+    /// The full, untruncated tag.
+    fn finish(self: Box<Self>) -> Result<MacOutput, Error>;
+}
+
+/// Streaming tag generation (`Protection::Apply`), implemented by `picky-crypto` over a `Mac` entry.
+pub struct MacGeneration(Box<dyn MacContext>);
+
+impl MacGeneration {
+    pub fn start(mac: &dyn Mac, key: &[u8]) -> Result<Self, Error> {
+        unimplemented!()
+    }
+
+    pub fn update(&mut self, data: &[u8]) -> Result<(), Error> {
+        unimplemented!()
+    }
+
+    pub fn finish(self) -> Result<MacTag, Error> {
+        unimplemented!()
+    }
+}
+
+/// Streaming tag verification (`Protection::Process`), implemented by `picky-crypto` over a `Mac` entry.
+pub struct MacVerification(Box<dyn MacContext>);
+
+impl MacVerification {
+    pub fn start(mac: &dyn Mac, key: &[u8]) -> Result<Self, Error> {
+        unimplemented!()
+    }
+
+    pub fn update(&mut self, data: &[u8]) -> Result<(), Error> {
+        unimplemented!()
+    }
+
+    pub fn finish(self) -> Result<MacVerifier, Error> {
+        unimplemented!()
+    }
 }
 
 pub trait PasswordKdf: Send + Sync {
@@ -1247,6 +1472,7 @@ pub trait Kdf: Send + Sync {
 pub trait Cipher: Send + Sync {
     fn algorithm(&self) -> CipherAlgorithm;
     fn fips(&self) -> bool;
+    fn supports(&self, protection: Protection) -> bool;
     fn encrypt(&self, key: &[u8], iv: &[u8], plaintext: &[u8]) -> Result<OutputBytes, Error>;
     fn decrypt(&self, key: &[u8], iv: &[u8], ciphertext: &[u8]) -> Result<OutputBytes, Error>;
 }
@@ -1265,15 +1491,18 @@ pub trait StreamCipherContext: Send {
 pub trait Aead: Send + Sync {
     fn algorithm(&self) -> AeadAlgorithm;
     fn fips(&self) -> bool;
-    /// Returns `ciphertext || tag`.
-    fn seal(&self, key: &[u8], nonce: &[u8], aad: &[u8], plaintext: &[u8]) -> Result<OutputBytes, Error>;
-    /// Takes `ciphertext || tag`.
+    fn supports(&self, protection: Protection) -> bool;
+    /// Returns the 12-byte nonce generated by the backend's library and `ciphertext || tag`.
+    /// Section 6.7 defines internal IV generation and the caller's per-key limit.
+    fn seal(&self, key: &[u8], aad: &[u8], plaintext: &[u8]) -> Result<Sealed, Error>;
+    /// Takes a 12-byte nonce and `ciphertext || tag`; returns no plaintext unless authentication succeeds.
     fn open(&self, key: &[u8], nonce: &[u8], aad: &[u8], ciphertext_and_tag: &[u8]) -> Result<OutputBytes, Error>;
 }
 
 pub trait KeyWrap: Send + Sync {
     fn algorithm(&self) -> KeyWrapAlgorithm;
     fn fips(&self) -> bool;
+    fn supports(&self, protection: Protection) -> bool;
     fn wrap(&self, kek: &[u8], key_data: &[u8]) -> Result<OutputBytes, Error>;
     fn unwrap(&self, kek: &[u8], wrapped: &[u8]) -> Result<OutputBytes, Error>;
 }
@@ -1332,6 +1561,9 @@ pub trait SecureRandom: Send + Sync {
 /// A private key: loaded by a provider, or a hardware/external key implementing this trait directly.
 pub trait PrivateKey: Send + Sync {
     fn key_type(&self) -> KeyType;
+
+    /// Key size in bits (section 7); cheap, infallible, cached for hardware keys, with 0 for no meaningful size.
+    fn key_size_bits(&self) -> usize;
 
     /// Whether the key implements `operation`.
     /// Never performs the operation.
@@ -1503,7 +1735,7 @@ impl CryptoProvider {
         unimplemented!()
     }
 
-    /// The entry implementing `algorithm`, if advertised.
+    /// The entry for `algorithm`, if present; it performs at least one operation (section 8).
     pub fn get(&self, algorithm: Algorithm) -> Option<&Entry> {
         unimplemented!()
     }
@@ -1519,7 +1751,7 @@ impl CryptoProvider {
         unimplemented!()
     }
 
-    /// Entries of `self`, plus entries of `fallback` for algorithms `self` lacks.
+    /// Entries of `self`, plus what `fallback` advertises and `self` does not: algorithms, and protections of `Mac`, `Cipher`, `Aead` and `KeyWrap` entries (section 8.1).
     /// The result's `fips()` is `self.fips() && fallback.fips()`.
     pub fn with_fallback(&self, fallback: &CryptoProvider) -> CryptoProvider {
         unimplemented!()
@@ -1661,6 +1893,17 @@ pub mod helpers {
         unimplemented!()
     }
 
+    pub fn verify_mac(
+        provider: &CryptoProvider,
+        algorithm: MacAlgorithm,
+        key: &[u8],
+        data: &[u8],
+        expected: &[u8],
+        len: usize,
+    ) -> Result<bool, Error> {
+        unimplemented!()
+    }
+
     /// 32 bytes from `SecureRandom` with RFC 7748 clamping applied: a new X25519 private key.
     pub fn random_x25519_private_key(provider: &CryptoProvider) -> Result<X25519Scalar, Error> {
         unimplemented!()
@@ -1671,8 +1914,8 @@ pub mod helpers {
         unimplemented!()
     }
 
-    /// Algorithms in `required` that `provider` does not advertise.
-    pub fn missing(provider: &CryptoProvider, required: &[Algorithm]) -> Vec<Algorithm> {
+    /// Every unmet requirement, using `get` and the entry's `supports` (section 8).
+    pub fn missing(provider: &CryptoProvider, required: &[Requirement]) -> Vec<Requirement> {
         unimplemented!()
     }
 }

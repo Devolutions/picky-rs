@@ -20,6 +20,7 @@ An operation that one of the reference libraries (RustCrypto, aws-lc-rs, ring, a
 A workaround is logic the adapter implements because the library lacks it: parsing or producing variable-length encodings, arithmetic on keys or values, padding, or any step of the algorithm.
 Using another library to fill a gap is also a workaround; a backend's library is the set of crates it declares as such.
 Chaining public library functions, filling fixed-layout structures, inserting algorithm-determined constants, and fixed-width transformations (splitting coordinates, stripping a fixed prefix byte, reversing byte order) are argument mapping, not workarounds.
+Measuring the length of a value the library returns, in bytes or bits, is argument mapping.
 The test: argument mapping never inspects the input beyond checking algorithm-fixed lengths and constant bytes.
 
 In practice:
