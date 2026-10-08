@@ -9,7 +9,7 @@ use core::fmt;
 use crypto_bigint::{BoxedUint, ConcatenatingMul, CtEq, NonZero, Odd};
 use zeroize::{ZeroizeOnDrop, Zeroizing};
 
-/// Maximum modulus encoding length: 16384 bits plus one sign byte.
+/// Maximum modulus encoding length in bytes, including an optional leading zero sign byte.
 pub const MAX_MODULUS_LEN: usize = 2049;
 
 /// Zeroizing, unsigned big-endian CRT parameters for a two-prime RSA private key.
@@ -48,7 +48,7 @@ impl fmt::Debug for CrtParams {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
-    /// The modulus is empty or too long, or another input is longer than the modulus.
+    /// The modulus is empty, exceeds 16384 bits or 2049 bytes, or another input is longer than the modulus.
     InvalidLength,
     /// The components fail one or more key consistency checks.
     InconsistentKey,
@@ -71,7 +71,11 @@ impl core::error::Error for Error {}
 /// The length and consistency checks are described in the crate documentation.
 pub fn complete_crt_params(n: &[u8], e: &[u8], d: &[u8], p: &[u8], q: &[u8]) -> Result<CrtParams, Error> {
     let (p_len, q_len) = (p.len(), q.len());
-    if n.is_empty() || n.len() > MAX_MODULUS_LEN || [e, d, p, q].iter().any(|v| v.len() > n.len()) {
+    if n.is_empty()
+        || n.len() > MAX_MODULUS_LEN
+        || (n.len() == MAX_MODULUS_LEN && n.first() != Some(&0))
+        || [e, d, p, q].iter().any(|v| v.len() > n.len())
+    {
         return Err(Error::InvalidLength);
     }
 

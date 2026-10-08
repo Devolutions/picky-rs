@@ -71,6 +71,14 @@ fn swapped_primes(#[case] key: Key) {
 #[rstest]
 #[case::other_p(Key { p: RSA_2048_OTHER.p, ..RSA_2048 }, Error::InconsistentKey)]
 #[case::other_q(Key { q: RSA_2048_OTHER.q, ..RSA_2048 }, Error::InconsistentKey)]
+// RSA_1024.coefficient (qinv) ends in 04 and is even.
+#[case::even_p(Key { p: RSA_1024.qinv, ..RSA_2048 }, Error::InconsistentKey)]
+// RSA_1024.coefficient (qinv) ends in 04 and is even.
+#[case::even_q(Key { q: RSA_1024.qinv, ..RSA_2048 }, Error::InconsistentKey)]
+// E_THREE is the published signature-generation key's publicExponent.
+#[case::small_p(Key { p: E_THREE, ..RSA_2048 }, Error::InconsistentKey)]
+// E_THREE is the published signature-generation key's publicExponent.
+#[case::small_q(Key { q: E_THREE, ..RSA_2048 }, Error::InconsistentKey)]
 #[case::other_n(Key { n: RSA_2048_OTHER.n, ..RSA_2048 }, Error::InconsistentKey)]
 #[case::other_d(Key { d: RSA_2048_OTHER.d, ..RSA_2048 }, Error::InconsistentKey)]
 #[case::other_e(Key { e: E_THREE, ..RSA_2048 }, Error::InconsistentKey)]
