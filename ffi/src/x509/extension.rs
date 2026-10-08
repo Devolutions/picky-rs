@@ -1,5 +1,3 @@
-#![allow(clippy::needless_lifetimes)] // Diplomat requires explicit lifetimes
-
 #[diplomat::bridge]
 pub mod ffi {
 
@@ -9,9 +7,8 @@ pub mod ffi {
     use diplomat_runtime::DiplomatWrite;
     use std::fmt::Write;
 
-    // Not `manually_disposable`: `get_value` returns a view that borrows from
-    // `self`, and Diplomat rejects retained borrows from a manually disposable type.
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct Extension(pub picky_asn1_x509::extension::Extension);
 
     impl Extension {
@@ -28,9 +25,8 @@ pub mod ffi {
         }
 
         #[diplomat::attr(auto, getter = "value")]
-        pub fn get_value<'a>(&'a self) -> Box<ExtensionView<'a>> {
-            let value = self.0.extn_value();
-            Box::new(ExtensionView(value))
+        pub fn get_value(&self) -> Box<ExtensionView> {
+            Box::new(ExtensionView(self.0.clone()))
         }
     }
 
@@ -44,9 +40,10 @@ pub mod ffi {
         }
     }
 
+    // Owns a copy of the extension so it doesn't borrow from `Extension`, which keeps that type disposable.
     #[diplomat::opaque]
     #[diplomat::attr(dotnet, manually_disposable)]
-    pub struct ExtensionView<'a>(pub picky_asn1_x509::extension::ExtensionView<'a>);
+    pub struct ExtensionView(pub picky_asn1_x509::extension::Extension);
 
     pub enum ExtensionViewType {
         AuthorityKeyIdentifier,
@@ -60,10 +57,10 @@ pub mod ffi {
         CrlNumber,
     }
 
-    impl<'a> ExtensionView<'a> {
+    impl ExtensionView {
         #[diplomat::attr(auto, getter = "type")]
-        pub fn get_type(&'a self) -> ExtensionViewType {
-            match self.0 {
+        pub fn get_type(&self) -> ExtensionViewType {
+            match self.0.extn_value() {
                 picky_asn1_x509::extension::ExtensionView::AuthorityKeyIdentifier(_) => {
                     ExtensionViewType::AuthorityKeyIdentifier
                 }
@@ -80,8 +77,8 @@ pub mod ffi {
             }
         }
 
-        pub fn to_authority_key_identifier(&'a self) -> Option<Box<AuthorityKeyIdentifier>> {
-            match self.0 {
+        pub fn to_authority_key_identifier(&self) -> Option<Box<AuthorityKeyIdentifier>> {
+            match self.0.extn_value() {
                 picky_asn1_x509::extension::ExtensionView::AuthorityKeyIdentifier(value) => {
                     Some(Box::new(AuthorityKeyIdentifier(value.clone())))
                 }
@@ -89,8 +86,8 @@ pub mod ffi {
             }
         }
 
-        pub fn to_subject_key_identifier(&'a self) -> Option<Box<crate::utils::ffi::VecU8>> {
-            match self.0 {
+        pub fn to_subject_key_identifier(&self) -> Option<Box<crate::utils::ffi::VecU8>> {
+            match self.0.extn_value() {
                 picky_asn1_x509::extension::ExtensionView::SubjectKeyIdentifier(value) => {
                     let buffer = crate::utils::ffi::VecU8::from_bytes(&value.0).boxed();
                     Some(buffer)
@@ -99,8 +96,8 @@ pub mod ffi {
             }
         }
 
-        pub fn to_key_usage(&'a self) -> Option<Box<VecU8>> {
-            match self.0 {
+        pub fn to_key_usage(&self) -> Option<Box<VecU8>> {
+            match self.0.extn_value() {
                 picky_asn1_x509::extension::ExtensionView::KeyUsage(value) => {
                     Some(VecU8::from_bytes(value.as_bytes()).boxed())
                 }
@@ -108,8 +105,8 @@ pub mod ffi {
             }
         }
 
-        pub fn to_subject_alt_name(&'a self) -> Option<Box<GeneralNameIterator>> {
-            match &self.0 {
+        pub fn to_subject_alt_name(&self) -> Option<Box<GeneralNameIterator>> {
+            match self.0.extn_value() {
                 picky_asn1_x509::extension::ExtensionView::SubjectAltName(value) => Some(Box::new(
                     GeneralNameIterator(value.clone().0.into_iter().map(GeneralName).collect()),
                 )),
@@ -117,8 +114,8 @@ pub mod ffi {
             }
         }
 
-        pub fn to_issuer_alt_name(&'a self) -> Option<Box<GeneralNameIterator>> {
-            match &self.0 {
+        pub fn to_issuer_alt_name(&self) -> Option<Box<GeneralNameIterator>> {
+            match self.0.extn_value() {
                 picky_asn1_x509::extension::ExtensionView::IssuerAltName(value) => Some(Box::new(GeneralNameIterator(
                     value.clone().0.into_iter().map(GeneralName).collect(),
                 ))),
@@ -126,8 +123,8 @@ pub mod ffi {
             }
         }
 
-        pub fn to_basic_constraints(&'a self) -> Option<Box<BasicConstraints>> {
-            match self.0 {
+        pub fn to_basic_constraints(&self) -> Option<Box<BasicConstraints>> {
+            match self.0.extn_value() {
                 picky_asn1_x509::extension::ExtensionView::BasicConstraints(value) => {
                     Some(Box::new(BasicConstraints(value.clone())))
                 }
@@ -135,8 +132,8 @@ pub mod ffi {
             }
         }
 
-        pub fn to_extended_key_usage(&'a self) -> Option<Box<OidIterator>> {
-            match self.0 {
+        pub fn to_extended_key_usage(&self) -> Option<Box<OidIterator>> {
+            match self.0.extn_value() {
                 picky_asn1_x509::extension::ExtensionView::ExtendedKeyUsage(value) => {
                     let vec = value.iter().map(|oid| oid.0.clone().into()).collect();
 
@@ -146,15 +143,15 @@ pub mod ffi {
             }
         }
 
-        pub fn to_generic(&'a self) -> Option<Box<crate::utils::ffi::VecU8>> {
-            match &self.0 {
+        pub fn to_generic(&self) -> Option<Box<crate::utils::ffi::VecU8>> {
+            match self.0.extn_value() {
                 picky_asn1_x509::extension::ExtensionView::Generic(value) => Some(VecU8::from_bytes(&value.0).boxed()),
                 _ => None,
             }
         }
 
-        pub fn to_crl_number(&'a self) -> Option<Box<crate::utils::ffi::VecU8>> {
-            match &self.0 {
+        pub fn to_crl_number(&self) -> Option<Box<crate::utils::ffi::VecU8>> {
+            match self.0.extn_value() {
                 picky_asn1_x509::extension::ExtensionView::CrlNumber(value) => {
                     Some(VecU8::from_bytes(&value.0).boxed())
                 }

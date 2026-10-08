@@ -66,7 +66,7 @@ public partial class AuthenticodeValidator: IDisposable
             BorrowLease<Raw.UtcDate>? exactLease = null;
             try
             {
-                selfLease = _diplomatHandle.Lease(BorrowKind.Shared);
+                selfLease = _diplomatHandle.Lease(BorrowKind.Exclusive);
                 exactLease = exact._diplomatHandle.Lease(BorrowKind.Shared);
                 Raw.AuthenticodeValidator.ExactDate(selfLease!.Ptr, exactLease!.Ptr);
             }
@@ -89,7 +89,7 @@ public partial class AuthenticodeValidator: IDisposable
             BorrowLease<Raw.UtcDate>? upperLease = null;
             try
             {
-                selfLease = _diplomatHandle.Lease(BorrowKind.Shared);
+                selfLease = _diplomatHandle.Lease(BorrowKind.Exclusive);
                 lowerLease = lower._diplomatHandle.Lease(BorrowKind.Shared);
                 upperLease = upper._diplomatHandle.Lease(BorrowKind.Shared);
                 Raw.AuthenticodeValidator.IntervalDate(selfLease!.Ptr, lowerLease!.Ptr, upperLease!.Ptr);
@@ -110,7 +110,7 @@ public partial class AuthenticodeValidator: IDisposable
             BorrowLease<Raw.AuthenticodeValidator>? selfLease = null;
             try
             {
-                selfLease = _diplomatHandle.Lease(BorrowKind.Shared);
+                selfLease = _diplomatHandle.Lease(BorrowKind.Exclusive);
                 Raw.AuthenticodeValidator.RequireNotBeforeCheck(selfLease!.Ptr);
             }
             finally
@@ -127,7 +127,7 @@ public partial class AuthenticodeValidator: IDisposable
             BorrowLease<Raw.AuthenticodeValidator>? selfLease = null;
             try
             {
-                selfLease = _diplomatHandle.Lease(BorrowKind.Shared);
+                selfLease = _diplomatHandle.Lease(BorrowKind.Exclusive);
                 Raw.AuthenticodeValidator.RequireNotAfterCheck(selfLease!.Ptr);
             }
             finally
@@ -144,7 +144,7 @@ public partial class AuthenticodeValidator: IDisposable
             BorrowLease<Raw.AuthenticodeValidator>? selfLease = null;
             try
             {
-                selfLease = _diplomatHandle.Lease(BorrowKind.Shared);
+                selfLease = _diplomatHandle.Lease(BorrowKind.Exclusive);
                 Raw.AuthenticodeValidator.IgnoreNotBeforeCheck(selfLease!.Ptr);
             }
             finally
@@ -161,7 +161,7 @@ public partial class AuthenticodeValidator: IDisposable
             BorrowLease<Raw.AuthenticodeValidator>? selfLease = null;
             try
             {
-                selfLease = _diplomatHandle.Lease(BorrowKind.Shared);
+                selfLease = _diplomatHandle.Lease(BorrowKind.Exclusive);
                 Raw.AuthenticodeValidator.IgnoreNotAfterCheck(selfLease!.Ptr);
             }
             finally
@@ -178,7 +178,7 @@ public partial class AuthenticodeValidator: IDisposable
             BorrowLease<Raw.AuthenticodeValidator>? selfLease = null;
             try
             {
-                selfLease = _diplomatHandle.Lease(BorrowKind.Shared);
+                selfLease = _diplomatHandle.Lease(BorrowKind.Exclusive);
                 Raw.AuthenticodeValidator.RequireSigningCertificateCheck(selfLease!.Ptr);
             }
             finally
@@ -195,7 +195,7 @@ public partial class AuthenticodeValidator: IDisposable
             BorrowLease<Raw.AuthenticodeValidator>? selfLease = null;
             try
             {
-                selfLease = _diplomatHandle.Lease(BorrowKind.Shared);
+                selfLease = _diplomatHandle.Lease(BorrowKind.Exclusive);
                 Raw.AuthenticodeValidator.IgnoreSigningCertificateCheck(selfLease!.Ptr);
             }
             finally
@@ -214,7 +214,7 @@ public partial class AuthenticodeValidator: IDisposable
             BorrowLease<Raw.VecU8>? expectedFileHashLease = null;
             try
             {
-                selfLease = _diplomatHandle.Lease(BorrowKind.Shared);
+                selfLease = _diplomatHandle.Lease(BorrowKind.Exclusive);
                 expectedFileHashLease = expectedFileHash._diplomatHandle.Lease(BorrowKind.Shared);
                 Raw.AuthenticodeValidator.RequireBasicAuthenticodeValidation(selfLease!.Ptr, expectedFileHashLease!.Ptr);
             }
@@ -233,7 +233,7 @@ public partial class AuthenticodeValidator: IDisposable
             BorrowLease<Raw.AuthenticodeValidator>? selfLease = null;
             try
             {
-                selfLease = _diplomatHandle.Lease(BorrowKind.Shared);
+                selfLease = _diplomatHandle.Lease(BorrowKind.Exclusive);
                 Raw.AuthenticodeValidator.IgnoreBasicAuthenticodeValidation(selfLease!.Ptr);
             }
             finally
@@ -250,7 +250,7 @@ public partial class AuthenticodeValidator: IDisposable
             BorrowLease<Raw.AuthenticodeValidator>? selfLease = null;
             try
             {
-                selfLease = _diplomatHandle.Lease(BorrowKind.Shared);
+                selfLease = _diplomatHandle.Lease(BorrowKind.Exclusive);
                 Raw.AuthenticodeValidator.RequireChainCheck(selfLease!.Ptr);
             }
             finally
@@ -267,7 +267,7 @@ public partial class AuthenticodeValidator: IDisposable
             BorrowLease<Raw.AuthenticodeValidator>? selfLease = null;
             try
             {
-                selfLease = _diplomatHandle.Lease(BorrowKind.Shared);
+                selfLease = _diplomatHandle.Lease(BorrowKind.Exclusive);
                 Raw.AuthenticodeValidator.IgnoreChainCheck(selfLease!.Ptr);
             }
             finally

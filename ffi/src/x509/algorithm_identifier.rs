@@ -1,14 +1,11 @@
-#![allow(clippy::needless_lifetimes)] // Diplomat requires explicit lifetimes
-
 #[diplomat::bridge]
 pub mod ffi {
     use crate::error::ffi::PickyError;
     use diplomat_runtime::DiplomatWrite;
     use std::fmt::Write;
 
-    // Not `manually_disposable`: `get_parameters` returns a view that borrows from
-    // `self`, and Diplomat rejects retained borrows from a manually disposable type.
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct AlgorithmIdentifier(pub picky::AlgorithmIdentifier);
 
     impl AlgorithmIdentifier {
@@ -26,15 +23,15 @@ pub mod ffi {
         }
 
         #[diplomat::attr(auto, getter = "parameters")]
-        pub fn get_parameters<'a>(&'a self) -> Box<AlgorithmIdentifierParameters<'a>> {
-            Box::new(AlgorithmIdentifierParameters(self.0.parameters()))
+        pub fn get_parameters(&self) -> Box<AlgorithmIdentifierParameters> {
+            Box::new(AlgorithmIdentifierParameters(self.0.parameters().clone()))
         }
     }
 
-    /// TODO/FIXME: Is having a reference here safe? We perhaps need to clone the parameters.
+    // Owns a copy so it doesn't borrow from `AlgorithmIdentifier`, which keeps that type disposable.
     #[diplomat::opaque]
     #[diplomat::attr(dotnet, manually_disposable)]
-    pub struct AlgorithmIdentifierParameters<'a>(pub &'a picky_asn1_x509::AlgorithmIdentifierParameters);
+    pub struct AlgorithmIdentifierParameters(pub picky_asn1_x509::AlgorithmIdentifierParameters);
 
     pub enum AlgorithmIdentifierParametersType {
         None,
@@ -44,10 +41,10 @@ pub mod ffi {
         RsassaPss,
     }
 
-    impl<'a> AlgorithmIdentifierParameters<'a> {
+    impl AlgorithmIdentifierParameters {
         #[diplomat::attr(auto, getter = "type")]
         pub fn get_type(&self) -> AlgorithmIdentifierParametersType {
-            match self.0 {
+            match &self.0 {
                 picky_asn1_x509::AlgorithmIdentifierParameters::None => AlgorithmIdentifierParametersType::None,
                 picky_asn1_x509::AlgorithmIdentifierParameters::Null => AlgorithmIdentifierParametersType::Null,
                 picky_asn1_x509::AlgorithmIdentifierParameters::Aes(_) => AlgorithmIdentifierParametersType::Aes,
@@ -59,7 +56,7 @@ pub mod ffi {
         }
 
         pub fn to_aes(&self) -> Option<Box<AesParameters>> {
-            match self.0 {
+            match &self.0 {
                 picky_asn1_x509::AlgorithmIdentifierParameters::Aes(params) => {
                     Some(Box::new(AesParameters(params.clone())))
                 }
@@ -68,7 +65,7 @@ pub mod ffi {
         }
 
         pub fn to_ec(&self) -> Option<Box<EcParameters>> {
-            match self.0 {
+            match &self.0 {
                 picky_asn1_x509::AlgorithmIdentifierParameters::Ec(params) => {
                     Some(Box::new(EcParameters(params.clone())))
                 }
@@ -77,7 +74,7 @@ pub mod ffi {
         }
 
         pub fn to_rsassa_pss(&self) -> Option<Box<RsassaPssParameters>> {
-            match self.0 {
+            match &self.0 {
                 picky_asn1_x509::AlgorithmIdentifierParameters::RsassaPss(params) => {
                     Some(Box::new(RsassaPssParameters(params.clone())))
                 }
