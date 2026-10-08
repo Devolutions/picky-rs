@@ -40,7 +40,7 @@ Commands for generating the bindings are issued with:
 $ just bindings
 ```
 
-Sanity tests are run with:
+Sanity tests, including the .NET Framework 4.8 marshalling tests, are run with:
 
 ```
 $ just test

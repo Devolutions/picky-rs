@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Devolutions.Picky", "Devolu
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Devolutions.Picky.Tests", "Devolutions.Picky.Tests\Devolutions.Picky.Tests.csproj", "{A3721F3C-A0C2-42BB-81AF-2A4781926C3D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Devolutions.Picky.Net48Tests", "Devolutions.Picky.Net48Tests\Devolutions.Picky.Net48Tests.csproj", "{2EDDBD45-8AB6-44B8-8F83-A8716C6184AA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -24,5 +26,9 @@ Global
 		{A3721F3C-A0C2-42BB-81AF-2A4781926C3D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A3721F3C-A0C2-42BB-81AF-2A4781926C3D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A3721F3C-A0C2-42BB-81AF-2A4781926C3D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2EDDBD45-8AB6-44B8-8F83-A8716C6184AA}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{2EDDBD45-8AB6-44B8-8F83-A8716C6184AA}.Debug|Any CPU.Build.0 = Debug|x64
+		{2EDDBD45-8AB6-44B8-8F83-A8716C6184AA}.Release|Any CPU.ActiveCfg = Release|x64
+		{2EDDBD45-8AB6-44B8-8F83-A8716C6184AA}.Release|Any CPU.Build.0 = Release|x64
 	EndGlobalSection
 EndGlobal
