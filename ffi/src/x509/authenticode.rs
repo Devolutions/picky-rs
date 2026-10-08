@@ -42,7 +42,7 @@ pub mod ffi {
             file_hash: &VecU8,
             hash_algorithm: ShaVariant,
             private_key: &PrivateKey,
-            program_name: Option<Box<RsString>>,
+            program_name: Option<&RsString>,
         ) -> Result<Box<AuthenticodeSignature>, Box<PickyError>> {
             let inner = picky::x509::pkcs7::authenticode::AuthenticodeSignature::new(
                 &pkcs7.0,
