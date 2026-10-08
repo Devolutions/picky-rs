@@ -32,7 +32,7 @@ Callers remain responsible for clearing input buffers.
 
 ### Limitations
 
-`crypto-bigint` does not zeroize all internal arithmetic temporaries, including safegcd inversion state, multiplication scratch space, and stack copies used by division and encoding.
-This crate cannot guarantee that every copy of secret material is erased.
+Only intermediate secret values this crate owns are zeroized.
+Scratch state inside `crypto-bigint`, including safegcd inversion state, multiplication scratch space, and stack copies used by division and encoding, is wiped only as far as that library does.
 
 [PKCS #1 definitions]: https://www.rfc-editor.org/rfc/rfc8017#section-3.2
