@@ -9,7 +9,8 @@ It does not factor `n`, generate keys, or perform RSA operations, and is not FIP
 Inputs are unsigned big-endian integers and may include leading zero bytes.
 Outputs are unsigned big-endian integers padded with zeros to the input encoding lengths: `dP` and `qInv` have `p.len()` bytes, and `dQ` has `q.len()` bytes.
 
-`complete_crt_params` returns `Error::InvalidLength` when `n` is empty, exceeds 2049 bytes (a 16384-bit modulus plus one sign byte), or any other input is longer than `n`.
+`complete_crt_params` returns `Error::InvalidLength` when `n` is empty, its value exceeds 16384 bits, its encoding exceeds 2049 bytes, or any other input is longer than `n`.
+At 2049 bytes, `n` must start with a zero sign byte.
 The limit bounds allocation and arithmetic work.
 It returns `Error::InconsistentKey` unless all of these checks hold:
 
