@@ -139,7 +139,8 @@ pub mod ffi {
 
         /// Encode PPK key file to a string.
         pub fn to_repr(&self, writeable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
-            writeable.write_str(&self.0.to_string()?)?;
+            let repr = zeroize::Zeroizing::new(self.0.to_string()?);
+            writeable.write_str(&repr)?;
             writeable.flush();
             Ok(())
         }
