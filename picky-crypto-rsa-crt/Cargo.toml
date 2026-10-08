@@ -1,0 +1,23 @@
+[package]
+name = "picky-crypto-rsa-crt"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+authors = [
+    "Benoît CORTIER <bcortier@devolutions.net>",
+    "Alexandr Yusuk <aleksandr.yusuk@apriorit.com>",
+    "Brian Maher",
+]
+keywords = ["rsa", "cryptography", "pkcs8"]
+categories = ["cryptography", "no-std"]
+description = "Complete CRT parameters for two-prime RSA private keys"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Devolutions/picky-rs"
+readme = "README.md"
+
+[dependencies]
+crypto-bigint = { version = "0.7.5", default-features = false, features = ["alloc", "zeroize"] }
+zeroize = { version = "1.8", default-features = false, features = ["alloc"] }
+
+[dev-dependencies]
+rstest = "0.26"
