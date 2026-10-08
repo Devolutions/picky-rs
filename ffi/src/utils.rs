@@ -8,6 +8,7 @@ pub mod ffi {
     use std::fmt::Write;
 
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct VecU8(pub Vec<u8>);
 
     impl VecU8 {
@@ -15,6 +16,7 @@ pub mod ffi {
             Box::new(VecU8(bytes.to_vec()))
         }
 
+        #[diplomat::attr(auto, getter = "length")]
         pub fn get_length(&self) -> usize {
             self.0.len()
         }
@@ -30,6 +32,7 @@ pub mod ffi {
     }
 
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct BufferTooSmallError;
 
     impl BufferTooSmallError {
@@ -40,6 +43,7 @@ pub mod ffi {
     }
 
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct VecU8Iterator(pub Vec<VecU8>);
 
     impl VecU8Iterator {
@@ -49,6 +53,7 @@ pub mod ffi {
     }
 
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct StringIterator(pub Box<dyn Iterator<Item = String>>);
 
     impl StringIterator {
@@ -65,6 +70,7 @@ pub mod ffi {
     }
 
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct StringNestedIterator(pub Vec<StringIterator>);
 
     impl StringNestedIterator {
@@ -74,6 +80,7 @@ pub mod ffi {
     }
 
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct RsString(pub String); // The reason we use this is to use string as optional in the bridge, this could be removed with future diplomat versions
 
     impl RsString {

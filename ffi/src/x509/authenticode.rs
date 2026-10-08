@@ -15,6 +15,9 @@ pub mod ffi {
     use crate::x509::ffi::{Cert, CertIterator};
     use crate::x509::name::ffi::DirectoryNameIterator;
 
+    // Not `manually_disposable`: `authenticode_verifier` returns a validator that
+    // borrows from `self`, and Diplomat rejects retained borrows from a manually
+    // disposable type.
     #[diplomat::opaque]
     pub struct AuthenticodeSignature(pub picky::x509::pkcs7::authenticode::AuthenticodeSignature);
 
@@ -128,6 +131,7 @@ pub mod ffi {
     }
 
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct AuthenticodeValidator<'a> {
         pub inner: picky::x509::pkcs7::authenticode::AuthenticodeValidator<'a>,
         //'exclude_cert_authorities' method down there a few lines takes a reference to a Vec<DirectoryName>,
@@ -198,6 +202,7 @@ pub mod ffi {
     }
 
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct AuthenticodeTimestamper(pub picky::x509::pkcs7::timestamp::http_timestamp::AuthenticodeTimestamper);
 
     impl AuthenticodeTimestamper {
