@@ -3,6 +3,7 @@ resolver = "2"
 
 members = [
     "xtask",
+    "picky-crypto",
     "picky",
     "picky-krb",
     "picky-asn1",
@@ -13,6 +14,7 @@ members = [
 ]
 
 default-members = [
+    "picky-crypto",
     "picky",
     "picky-krb",
     "picky-asn1",
