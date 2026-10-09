@@ -2,6 +2,7 @@
 resolver = "2"
 
 members = [
+    "xtask",
     "picky",
     "picky-krb",
     "picky-asn1",

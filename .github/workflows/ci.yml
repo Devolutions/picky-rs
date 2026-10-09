@@ -179,10 +179,25 @@ jobs:
         run: dotnet test ./ffi/dotnet/Devolutions.Picky.Tests/Devolutions.Picky.Tests.csproj -c Release --no-build
         shell: pwsh
 
+  no-downgrade:
+    name: Dependency no-downgrade check
+    if: ${{ github.event_name == 'pull_request' }}
+    needs: [formatting]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      # The pull request checkout is a merge commit whose first parent is the base branch.
+      - name: Check Cargo.lock versions
+        run: cargo --locked xtask check-no-downgrade --base HEAD^
+
   success:
     name: Success
     if: ${{ always() }}
-    needs: [formatting, lints, lints-wasm, tests, msrv, dotnet-tests]
+    needs: [formatting, lints, lints-wasm, tests, msrv, dotnet-tests, no-downgrade]
     runs-on: ubuntu-latest
 
     steps:
