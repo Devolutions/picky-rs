@@ -14,6 +14,7 @@ description = "Complete CRT parameters for two-prime RSA private keys"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Devolutions/picky-rs"
 readme = "README.md"
+publish = false
 
 [dependencies]
 crypto-bigint = { version = "0.7.5", default-features = false, features = ["alloc", "zeroize"] }
