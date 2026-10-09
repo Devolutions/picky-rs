@@ -61,20 +61,11 @@ impl Checks {
         if let Some(output) = value.downcast_ref::<MacTag>() {
             self.debug(id, output, &output.clone().into_inner());
         }
-        for (name, text) in [
-            (
-                "MacVerifier",
-                value.downcast_ref::<MacVerifier>().map(|v| format!("{v:?}")),
-            ),
-            ("MacOutput", value.downcast_ref::<MacOutput>().map(|v| format!("{v:?}"))),
-        ] {
-            if let Some(text) = text {
-                let length = text
-                    .strip_prefix(&format!("{name} {{ len: "))
-                    .and_then(|s| s.strip_suffix(" }"))
-                    .and_then(|s| s.parse::<usize>().ok());
-                self.check(id, length.is_some(), "opaque MAC Debug must contain only its length");
-            }
+        if let Some(output) = value.downcast_ref::<MacVerifier>() {
+            self.debug(id, output, &[]);
+        }
+        if let Some(output) = value.downcast_ref::<MacOutput>() {
+            self.debug(id, output, &[]);
         }
         if let Some((a, b)) = value.downcast_ref::<(OutputBytes, OutputBytes)>() {
             self.buffers(id, a);
@@ -204,10 +195,27 @@ impl Checks {
         self.debug(id, output, output);
     }
 
-    pub fn debug(&mut self, id: &str, value: &impl Debug, bytes: &[u8]) {
+    pub fn debug(&mut self, id: &str, value: &(impl Debug + Any), bytes: &[u8]) {
         let Ok(text) = catch_unwind(AssertUnwindSafe(|| format!("{value:?}"))) else {
             return self.check(id, false, "Debug panicked");
         };
+        if let Some((twins, lengths)) = constant_twins(value) {
+            self.check(
+                id,
+                twins.iter().all(|twin| *twin == text),
+                "Debug depends on buffer contents",
+            );
+            let shown = |len: &usize| text.split(|c: char| !c.is_ascii_digit()).any(|n| n == len.to_string());
+            self.check(id, lengths.iter().all(shown), "Debug doesn't show the buffer length");
+        }
+        let any = value as &dyn Any;
+        let mac = [
+            ("MacVerifier", any.is::<MacVerifier>()),
+            ("MacOutput", any.is::<MacOutput>()),
+        ];
+        if let Some((name, _)) = mac.into_iter().find(|(_, is)| *is) {
+            self.check(id, length_only(&text, name), "Debug must show only the length");
+        }
         if bytes.is_empty() {
             return;
         }
@@ -278,6 +286,68 @@ impl Checks {
             self.failures.join("\n")
         );
     }
+}
+
+/// Formats outputs of the same type and lengths, filled with all-zero and all-one bytes, and returns those lengths.
+/// A length-only `Debug` equals both formats and shows each length; one that depends on the bytes differs from at least one format.
+fn constant_twins(value: &dyn Any) -> Option<([String; 2], Vec<usize>)> {
+    let output = |len: usize, byte: u8| OutputBytes::new(Zeroizing::new(vec![byte; len]));
+    let twins = |format: &dyn Fn(u8) -> String| [0, 0xff].map(format);
+    if let Some(v) = value.downcast_ref::<OutputBytes>() {
+        return Some((twins(&|byte| format!("{:?}", output(v.len(), byte))), vec![v.len()]));
+    }
+    if let Some(v) = value.downcast_ref::<Sealed>() {
+        let lengths = vec![v.nonce.len(), v.ciphertext_and_tag.len()];
+        let format = |byte| format!("{:?}", Sealed::new(output(lengths[0], byte), output(lengths[1], byte)));
+        return Some((twins(&format), lengths.clone()));
+    }
+    if value.is::<X25519Scalar>() {
+        let format = |byte| format!("{:?}", X25519Scalar::new(Zeroizing::new([byte; 32])));
+        return Some((twins(&format), vec![32]));
+    }
+    let len = value.downcast_ref::<MacTag>()?.clone().into_inner().len();
+    Some((twins(&|byte| format!("{:?}", echo_mac(vec![byte; len]))), vec![len]))
+}
+
+/// Checks the length-only diagnostics of a MAC type whose length isn't observable through its public API.
+fn length_only(text: &str, name: &str) -> bool {
+    let digits = text
+        .strip_prefix(name)
+        .map(|rest| rest.trim_matches(|c: char| !c.is_ascii_digit()));
+    digits.is_some_and(|d| !d.is_empty() && d.bytes().all(|b| b.is_ascii_digit()))
+}
+
+/// A non-cryptographic MAC entry whose tag is the given bytes, used only to build `MacTag` values.
+struct EchoMac(Vec<u8>);
+struct EchoContext(Vec<u8>);
+impl Mac for EchoMac {
+    fn algorithm(&self) -> MacAlgorithm {
+        MacAlgorithm::HmacSha512
+    }
+    fn fips(&self) -> bool {
+        false
+    }
+    fn supports(&self, _: Protection) -> bool {
+        true
+    }
+    fn start(&self, _: &[u8], _: Protection) -> Result<Box<dyn MacContext>, Error> {
+        Ok(Box::new(EchoContext(self.0.clone())))
+    }
+}
+impl MacContext for EchoContext {
+    fn update(&mut self, _: &[u8]) -> Result<(), Error> {
+        Ok(())
+    }
+    fn finish(self: Box<Self>) -> Result<MacOutput, Error> {
+        Ok(MacOutput::new(Zeroizing::new(self.0)))
+    }
+}
+
+fn echo_mac(tag: Vec<u8>) -> MacTag {
+    let mac = EchoMac(tag);
+    MacGeneration::start(&mac, &[])
+        .and_then(MacGeneration::finish)
+        .expect("echo MAC")
 }
 
 pub fn malformed_public(options: Options) -> Expect {
@@ -379,37 +449,12 @@ mod tests {
         assert_eq!(c.failures.len(), 2);
     }
 
-    struct FixedMac(Vec<u8>);
-    struct FixedContext(Vec<u8>);
-    impl Mac for FixedMac {
-        fn algorithm(&self) -> MacAlgorithm {
-            MacAlgorithm::HmacSha256
-        }
-        fn fips(&self) -> bool {
-            false
-        }
-        fn supports(&self, _: Protection) -> bool {
-            true
-        }
-        fn start(&self, _: &[u8], _: Protection) -> Result<Box<dyn MacContext>, Error> {
-            Ok(Box::new(FixedContext(self.0.clone())))
-        }
-    }
-    impl MacContext for FixedContext {
-        fn update(&mut self, _: &[u8]) -> Result<(), Error> {
-            Ok(())
-        }
-        fn finish(self: Box<Self>) -> Result<MacOutput, Error> {
-            Ok(MacOutput::new(Zeroizing::new(self.0)))
-        }
-    }
-
     #[test]
     fn output_diagnostics_with_published_bytes() {
         let vectors = crate::vectors::wycheproof("hmac_sha256_test.json");
         let t = &crate::vectors::tests(&vectors.test_groups[0])[0];
         let bytes = crate::vectors::field(t, "tag");
-        let entry = FixedMac(bytes.clone());
+        let entry = EchoMac(bytes.clone());
         let key = crate::vectors::field(t, "key");
         let message = crate::vectors::field(t, "msg");
         let mut generation = MacGeneration::start(&entry, &key).unwrap();
@@ -436,10 +481,21 @@ mod tests {
         c.finish();
     }
 
-    struct Leaky<'a>(&'a [u8]);
-    impl Debug for Leaky<'_> {
+    #[rstest]
+    #[case("MacVerifier { len: 32 }", true)]
+    #[case("MacVerifier(32)", true)]
+    #[case("MacVerifier", false)]
+    #[case("MacVerifier { tag: 0a1b }", false)]
+    #[case("MacVerifier { len: 32, tag: 5 }", false)]
+    #[case("MacOutput { len: 32 }", false)]
+    fn mac_length_only_diagnostics(#[case] text: &str, #[case] accepted: bool) {
+        assert_eq!(length_only(text, "MacVerifier"), accepted);
+    }
+
+    struct Leaky(Vec<u8>);
+    impl Debug for Leaky {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "Leaky {{ bytes: {} }}", hex::encode(self.0))
+            write!(f, "Leaky {{ bytes: {} }}", hex::encode(&self.0))
         }
     }
 
@@ -460,7 +516,7 @@ mod tests {
         );
         c.finish();
         let mut c = Checks::default();
-        c.debug("leaky control", &Leaky(bytes), bytes);
+        c.debug("leaky control", &Leaky(bytes.to_vec()), bytes);
         assert_eq!(c.failures.len(), usize::from(len > 0));
     }
 
