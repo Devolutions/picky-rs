@@ -186,6 +186,9 @@ fn parse(text: &str) -> Result<Manifest> {
             }
         }
     }
+    if in_array {
+        return Err("manifest.toml: unterminated `files` array".into());
+    }
     for entry in &files {
         if let Some(key) = FILE_KEYS
             .iter()
@@ -260,5 +263,6 @@ extract = "groups"
         assert!(parse(&MANIFEST.replace("commit = \"abc\"\n", "")).is_err());
         assert!(parse(&MANIFEST.replace("version = \"a\"", "version = \"a\"\nversion = \"c\"")).is_err());
         assert!(parse(&MANIFEST.replace("path = \"nist/a.rsp\"", "path = nist/a.rsp")).is_err());
+        assert!(parse(MANIFEST.split("\n]\n").next().unwrap()).is_err());
     }
 }
