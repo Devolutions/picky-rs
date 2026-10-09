@@ -5,7 +5,10 @@
 //! The change fails when its `x.y.z` triple decreases, or when the new version is a prerelease and the old one isn't.
 //! Prerelease identifiers and build metadata aren't compared otherwise.
 //!
-//! Out of scope: added or removed package blocks, source-specific handling (git and path packages are compared like registry ones), and `Cargo.toml` requirement strings.
+//! Workspace and path packages are skipped: they have no `source = …` line, and their versions are release decisions.
+//! Git packages are compared like registry ones.
+//!
+//! Out of scope: added or removed package blocks, and `Cargo.toml` requirement strings.
 
 use std::{path::Path, process::Command};
 
@@ -47,12 +50,16 @@ fn violations(diff: &str, old: &str, new: &str) -> Result<Vec<String>> {
             new_index = start(rest.split(' ').next().unwrap_or_default())?;
             removed.clear();
         } else if let Some(text) = line.strip_prefix('-') {
-            if let Some(version) = quoted(text, "version") {
+            if let Some(version) = quoted(text, "version")
+                && sourced(&old, old_index)
+            {
                 removed.push((package(&old, old_index)?, version));
             }
             old_index += 1;
         } else if let Some(text) = line.strip_prefix('+') {
-            if let Some(new_version) = quoted(text, "version") {
+            if let Some(new_version) = quoted(text, "version")
+                && sourced(&new, new_index)
+            {
                 let name = package(&new, new_index)?;
                 if let Some((_, old_version)) = removed.iter().find(|(old_name, _)| *old_name == name) {
                     let (old_triple, old_prerelease) = parse(old_version)?;
@@ -80,6 +87,13 @@ fn package<'a>(lines: &[&'a str], index: usize) -> Result<&'a str> {
     name.ok_or_else(|| format!("no package name above Cargo.lock line {}", index + 1).into())
 }
 
+/// Returns whether the package block containing line `index` has a `source = …` line below it.
+fn sourced(lines: &[&str], index: usize) -> bool {
+    let below = lines.iter().skip(index + 1);
+    let mut block = below.take_while(|line| !line.is_empty() && **line != "[[package]]");
+    block.any(|line| line.starts_with("source = "))
+}
+
 fn quoted<'a>(line: &'a str, key: &str) -> Option<&'a str> {
     line.strip_prefix(key)?.strip_prefix(" = \"")?.strip_suffix('"')
 }
@@ -99,8 +113,13 @@ fn parse(version: &str) -> Result<([u64; 3], bool)> {
 mod tests {
     use super::*;
 
+    fn block(name: &str, version: &str) -> String {
+        let source = "registry+https://github.com/rust-lang/crates.io-index";
+        format!("[[package]]\nname = \"{name}\"\nversion = \"{version}\"\nsource = \"{source}\"\n")
+    }
+
     fn lock(a: &str, b: &str) -> String {
-        format!("[[package]]\nname = \"a\"\nversion = \"{a}\"\n\n[[package]]\nname = \"b\"\nversion = \"{b}\"\n")
+        format!("{}\n{}", block("a", a), block("b", b))
     }
 
     fn change_a(old: &str, new: &str) -> Vec<String> {
@@ -129,18 +148,33 @@ mod tests {
 
     #[test]
     fn names_the_package_in_each_hunk() {
-        let diff = "@@ -3 +3 @@\n-version = \"1.0.0\"\n+version = \"1.1.0\"\n@@ -7 +7 @@\n-version = \"2.0.0\"\n+version = \"1.0.0\"\n";
+        let diff = "@@ -3 +3 @@\n-version = \"1.0.0\"\n+version = \"1.1.0\"\n@@ -8 +8 @@\n-version = \"2.0.0\"\n+version = \"1.0.0\"\n";
         let failures = violations(diff, &lock("1.0.0", "2.0.0"), &lock("1.1.0", "1.0.0")).unwrap();
         assert_eq!(failures, ["b: 2.0.0 -> 1.0.0"]);
     }
 
     #[test]
     fn ignores_replaced_and_added_blocks() {
-        let old = "[[package]]\nname = \"a\"\nversion = \"2.0.0\"\n";
-        let new =
-            "[[package]]\nname = \"c\"\nversion = \"1.0.0-rc.1\"\n\n[[package]]\nname = \"d\"\nversion = \"0.1.0\"\n";
-        let diff = "@@ -2,2 +2,2 @@\n-name = \"a\"\n-version = \"2.0.0\"\n+name = \"c\"\n+version = \"1.0.0-rc.1\"\n@@ -3,0 +4,4 @@\n+\n+[[package]]\n+name = \"d\"\n+version = \"0.1.0\"\n";
-        assert!(violations(diff, old, new).unwrap().is_empty());
+        let old = block("a", "2.0.0");
+        let new = format!("{}\n{}", block("c", "1.0.0-rc.1"), block("d", "0.1.0"));
+        let diff = "@@ -2,2 +2,2 @@\n-name = \"a\"\n-version = \"2.0.0\"\n+name = \"c\"\n+version = \"1.0.0-rc.1\"\n@@ -4,0 +5,5 @@\n+\n+[[package]]\n+name = \"d\"\n+version = \"0.1.0\"\n+source = \"registry+https://github.com/rust-lang/crates.io-index\"\n";
+        assert!(violations(diff, &old, &new).unwrap().is_empty());
+    }
+
+    #[test]
+    fn skips_packages_without_source() {
+        let lock = |version: &str| {
+            format!(
+                "[[package]]\nname = \"picky\"\nversion = \"{version}\"\ndependencies = [\n \"a\",\n]\n\n{}",
+                block("a", "1.0.0")
+            )
+        };
+        let diff = "@@ -3 +3 @@\n-version = \"7.0.0\"\n+version = \"7.1.0-rc.1\"\n";
+        assert!(
+            violations(diff, &lock("7.0.0"), &lock("7.1.0-rc.1"))
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]
