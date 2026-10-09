@@ -101,7 +101,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        crate: [ picky-asn1, picky-asn1-der, picky-asn1-x509, picky ]
+        crate: [ picky-asn1, picky-asn1-der, picky-asn1-x509, picky, picky-crypto ]
         include:
           - crate: picky-asn1
             msvc: "1.85"
@@ -110,6 +110,8 @@ jobs:
           - crate: picky-asn1-x509
             msvc: "1.85"
           - crate: picky
+            msvc: "1.85"
+          - crate: picky-crypto
             msvc: "1.85"
 
     steps:
@@ -194,10 +196,39 @@ jobs:
       - name: Check Cargo.lock versions
         run: cargo --locked xtask check-no-downgrade --base HEAD^
 
+  picky-crypto-checks:
+    name: Crypto contract checks
+    needs: [formatting]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install cargo-hack
+        run: cargo install --locked cargo-hack --version 0.6.45
+
+      - name: Check feature powerset
+        run: cargo hack check --locked --feature-powerset -p picky-crypto
+
+      - name: Check documentation
+        run: cargo doc --locked -p picky-crypto --no-deps
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+
+      - name: Check contract citations
+        run: cargo xtask check-contract
+        shell: pwsh
+
+      - name: Install cargo-deny
+        run: cargo install --locked cargo-deny --version 0.20.2
+
+      - name: Check dependency allowlist
+        run: cargo deny --manifest-path picky-crypto/Cargo.toml --config picky-crypto/deny.toml check bans
+
   success:
     name: Success
     if: ${{ always() }}
-    needs: [formatting, lints, lints-wasm, tests, msrv, dotnet-tests, no-downgrade]
+    needs: [formatting, lints, lints-wasm, tests, msrv, dotnet-tests, no-downgrade, picky-crypto-checks]
     runs-on: ubuntu-latest
 
     steps:

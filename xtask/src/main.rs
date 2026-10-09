@@ -1,3 +1,4 @@
+mod contract;
 mod downgrade;
 
 use std::{error::Error, path::Path, process::ExitCode};
@@ -20,7 +21,8 @@ fn run() -> Result<()> {
         .ok_or("xtask must belong to the repository workspace")?;
     let args: Vec<_> = std::env::args().skip(1).collect();
     match args.as_slice() {
+        [command] if command == "check-contract" => contract::check(root),
         [command, flag, base] if command == "check-no-downgrade" && flag == "--base" => downgrade::check(root, base),
-        _ => Err("usage: cargo xtask check-no-downgrade --base <rev>".into()),
+        _ => Err("usage: cargo xtask check-contract | check-no-downgrade --base <rev>".into()),
     }
 }

@@ -1,0 +1,6 @@
+[bans]
+multiple-versions = "deny"
+allow = [
+    { name = "picky-crypto" },
+    { name = "zeroize" },
+]

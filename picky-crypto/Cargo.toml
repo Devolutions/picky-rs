@@ -1,0 +1,15 @@
+[package]
+name = "picky-crypto"
+version = "0.1.0"
+edition = "2024"
+publish = false
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Devolutions/picky-rs"
+description = "Minimal cryptographic provider contract for picky and its consumers"
+readme = "README.md"
+keywords = ["cryptography", "provider", "crypto"]
+categories = ["cryptography"]
+
+[dependencies]
+zeroize = { version = "1.8", default-features = false, features = ["alloc"] }
