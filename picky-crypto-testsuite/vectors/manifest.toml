@@ -1,0 +1,342 @@
+# Published test vectors used by the conformance suite.
+# `blob` is the git blob ID of the vendored file (`git hash-object --no-filters <file>`).
+# `upstream` is the blob ID of the published file; it differs from `blob` only for an `extract`, which keeps whole groups byte for byte.
+
+[wycheproof]
+path = "wycheproof"
+source = "https://github.com/C2SP/wycheproof"
+commit = "12fd3aaf33eb5fa1f52e026912ee00c054f9d984"
+files = [
+    "testvectors_v1/aes_gcm_test.json",
+    "testvectors_v1/aes_wrap_test.json",
+    "testvectors_v1/ecdh_secp256r1_ecpoint_test.json",
+    "testvectors_v1/ecdh_secp384r1_ecpoint_test.json",
+    "testvectors_v1/ecdh_secp521r1_ecpoint_test.json",
+    "testvectors_v1/ecdsa_secp256r1_sha256_p1363_test.json",
+    "testvectors_v1/ecdsa_secp384r1_sha384_p1363_test.json",
+    "testvectors_v1/ecdsa_secp521r1_sha512_p1363_test.json",
+    "testvectors_v1/ed25519_test.json",
+    "testvectors_v1/hmac_sha1_test.json",
+    "testvectors_v1/hmac_sha224_test.json",
+    "testvectors_v1/hmac_sha256_test.json",
+    "testvectors_v1/hmac_sha384_test.json",
+    "testvectors_v1/hmac_sha512_test.json",
+    "testvectors_v1/pbkdf2_hmacsha1_test.json",
+    "testvectors_v1/pbkdf2_hmacsha224_test.json",
+    "testvectors_v1/pbkdf2_hmacsha256_test.json",
+    "testvectors_v1/pbkdf2_hmacsha384_test.json",
+    "testvectors_v1/pbkdf2_hmacsha512_test.json",
+    "testvectors_v1/rsa_oaep_2048_sha1_mgf1sha1_test.json",
+    "testvectors_v1/rsa_oaep_2048_sha256_mgf1sha256_test.json",
+    "testvectors_v1/rsa_oaep_3072_sha256_mgf1sha256_test.json",
+    "testvectors_v1/rsa_oaep_4096_sha256_mgf1sha256_test.json",
+    "testvectors_v1/rsa_pkcs1_2048_sig_gen_test.json",
+    "testvectors_v1/rsa_pkcs1_2048_test.json",
+    "testvectors_v1/rsa_pkcs1_3072_sig_gen_test.json",
+    "testvectors_v1/rsa_pkcs1_4096_sig_gen_test.json",
+    "testvectors_v1/rsa_signature_2048_sha224_test.json",
+    "testvectors_v1/rsa_signature_2048_sha256_test.json",
+    "testvectors_v1/rsa_signature_2048_sha384_test.json",
+    "testvectors_v1/rsa_signature_2048_sha3_384_test.json",
+    "testvectors_v1/rsa_signature_2048_sha3_512_test.json",
+    "testvectors_v1/rsa_signature_2048_sha512_test.json",
+    "testvectors_v1/rsa_signature_3072_sha256_test.json",
+    "testvectors_v1/rsa_signature_4096_sha512_test.json",
+    "testvectors_v1/x25519_test.json",
+]
+
+[[file]]
+path = "nist/shs/SHA1Monte.rsp"
+source = "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/shs/shabytetestvectors.zip"
+version = "SHAVS byte-oriented test vectors, member shabytetestvectors/SHA1Monte.rsp, CAVS 11.1"
+upstream = "5088defab20ce96f661358de71192b260951aa4e"
+blob = "5088defab20ce96f661358de71192b260951aa4e"
+
+[[file]]
+path = "nist/shs/SHA1ShortMsg.rsp"
+source = "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/shs/shabytetestvectors.zip"
+version = "SHAVS byte-oriented test vectors, member shabytetestvectors/SHA1ShortMsg.rsp, CAVS 11.0"
+upstream = "35aa9b5fc5625da804c72259bd4460630b91de59"
+blob = "35aa9b5fc5625da804c72259bd4460630b91de59"
+
+[[file]]
+path = "nist/shs/SHA224Monte.rsp"
+source = "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/shs/shabytetestvectors.zip"
+version = "SHAVS byte-oriented test vectors, member shabytetestvectors/SHA224Monte.rsp, CAVS 11.1"
+upstream = "50648b8d0cd934f1686c0c324f49ca70b65e6001"
+blob = "50648b8d0cd934f1686c0c324f49ca70b65e6001"
+
+[[file]]
+path = "nist/shs/SHA224ShortMsg.rsp"
+source = "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/shs/shabytetestvectors.zip"
+version = "SHAVS byte-oriented test vectors, member shabytetestvectors/SHA224ShortMsg.rsp, CAVS 11.0"
+upstream = "a4542c3882323733e2a6602509fe96e9d8ac8ca9"
+blob = "a4542c3882323733e2a6602509fe96e9d8ac8ca9"
+
+[[file]]
+path = "nist/shs/SHA256Monte.rsp"
+source = "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/shs/shabytetestvectors.zip"
+version = "SHAVS byte-oriented test vectors, member shabytetestvectors/SHA256Monte.rsp, CAVS 11.1"
+upstream = "bda7a9e4009a7b00866ab6f0ec545454cd5d2bcc"
+blob = "bda7a9e4009a7b00866ab6f0ec545454cd5d2bcc"
+
+[[file]]
+path = "nist/shs/SHA256ShortMsg.rsp"
+source = "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/shs/shabytetestvectors.zip"
+version = "SHAVS byte-oriented test vectors, member shabytetestvectors/SHA256ShortMsg.rsp, CAVS 11.0"
+upstream = "ddcfefbd04125bfb3cf41fd01fb7b2988d593281"
+blob = "ddcfefbd04125bfb3cf41fd01fb7b2988d593281"
+
+[[file]]
+path = "nist/shs/SHA384Monte.rsp"
+source = "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/shs/shabytetestvectors.zip"
+version = "SHAVS byte-oriented test vectors, member shabytetestvectors/SHA384Monte.rsp, CAVS 11.1"
+upstream = "c7c30e7a605975521dee038b46184f7447e97044"
+blob = "c7c30e7a605975521dee038b46184f7447e97044"
+
+[[file]]
+path = "nist/shs/SHA384ShortMsg.rsp"
+source = "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/shs/shabytetestvectors.zip"
+version = "SHAVS byte-oriented test vectors, member shabytetestvectors/SHA384ShortMsg.rsp, CAVS 11.0"
+upstream = "15fd9adfc7bb3faf30e277b0cb13b7bb0819b529"
+blob = "15fd9adfc7bb3faf30e277b0cb13b7bb0819b529"
+
+[[file]]
+path = "nist/shs/SHA512Monte.rsp"
+source = "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/shs/shabytetestvectors.zip"
+version = "SHAVS byte-oriented test vectors, member shabytetestvectors/SHA512Monte.rsp, CAVS 11.1"
+upstream = "0b9c295af8c19a2d89859032ce081b62114635aa"
+blob = "0b9c295af8c19a2d89859032ce081b62114635aa"
+
+[[file]]
+path = "nist/shs/SHA512ShortMsg.rsp"
+source = "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/shs/shabytetestvectors.zip"
+version = "SHAVS byte-oriented test vectors, member shabytetestvectors/SHA512ShortMsg.rsp, CAVS 11.0"
+upstream = "ab5cd2a10d77482f031fe98ef719d82638b6b20b"
+blob = "ab5cd2a10d77482f031fe98ef719d82638b6b20b"
+
+[[file]]
+path = "nist/sha3/SHA3_384Monte.rsp"
+source = "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/sha3/sha-3bytetestvectors.zip"
+version = "SHA3VS byte-oriented test vectors, member SHA3_384Monte.rsp, CAVS 19.0"
+upstream = "e3bd17d5962f8efee0e61119f807b86895198c9a"
+blob = "e3bd17d5962f8efee0e61119f807b86895198c9a"
+
+[[file]]
+path = "nist/sha3/SHA3_384ShortMsg.rsp"
+source = "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/sha3/sha-3bytetestvectors.zip"
+version = "SHA3VS byte-oriented test vectors, member SHA3_384ShortMsg.rsp, CAVS 19.0"
+upstream = "491c5dbc5240ff81cbd9829ca1161411858661c1"
+blob = "491c5dbc5240ff81cbd9829ca1161411858661c1"
+
+[[file]]
+path = "nist/sha3/SHA3_512Monte.rsp"
+source = "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/sha3/sha-3bytetestvectors.zip"
+version = "SHA3VS byte-oriented test vectors, member SHA3_512Monte.rsp, CAVS 19.0"
+upstream = "cc2432ab62178d03dceeb41ea7cd9d810d549c04"
+blob = "cc2432ab62178d03dceeb41ea7cd9d810d549c04"
+
+[[file]]
+path = "nist/sha3/SHA3_512ShortMsg.rsp"
+source = "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/sha3/sha-3bytetestvectors.zip"
+version = "SHA3VS byte-oriented test vectors, member SHA3_512ShortMsg.rsp, CAVS 19.0"
+upstream = "37ed20d45ad751d581ce5815270bacb5e40cba5f"
+blob = "37ed20d45ad751d581ce5815270bacb5e40cba5f"
+
+[[file]]
+path = "nist/aes/CBCGFSbox128.rsp"
+source = "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/aes/KAT_AES.zip"
+version = "AESAVS known answer test vectors, member CBCGFSbox128.rsp, CAVS 11.1"
+upstream = "cd959718fc6d01613965ce2daa6ba1237fad97b7"
+blob = "cd959718fc6d01613965ce2daa6ba1237fad97b7"
+
+[[file]]
+path = "nist/aes/CBCGFSbox192.rsp"
+source = "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/aes/KAT_AES.zip"
+version = "AESAVS known answer test vectors, member CBCGFSbox192.rsp, CAVS 11.1"
+upstream = "acce67d4c507058fdfb880f4a41168fe9d25bfd5"
+blob = "acce67d4c507058fdfb880f4a41168fe9d25bfd5"
+
+[[file]]
+path = "nist/aes/CBCGFSbox256.rsp"
+source = "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/aes/KAT_AES.zip"
+version = "AESAVS known answer test vectors, member CBCGFSbox256.rsp, CAVS 11.1"
+upstream = "db99b2c4a5e11c6dcd3a2ef9fb5b4a21f36b7ae1"
+blob = "db99b2c4a5e11c6dcd3a2ef9fb5b4a21f36b7ae1"
+
+[[file]]
+path = "nist/aes/CBCKeySbox128.rsp"
+source = "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/aes/KAT_AES.zip"
+version = "AESAVS known answer test vectors, member CBCKeySbox128.rsp, CAVS 11.1"
+upstream = "0c4a2e35e35af2cd16683ffd4d4ff86f1196dd80"
+blob = "0c4a2e35e35af2cd16683ffd4d4ff86f1196dd80"
+
+[[file]]
+path = "nist/aes/CBCKeySbox192.rsp"
+source = "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/aes/KAT_AES.zip"
+version = "AESAVS known answer test vectors, member CBCKeySbox192.rsp, CAVS 11.1"
+upstream = "8205d8893b82ad6cb1581f9aa016604be543be59"
+blob = "8205d8893b82ad6cb1581f9aa016604be543be59"
+
+[[file]]
+path = "nist/aes/CBCKeySbox256.rsp"
+source = "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/aes/KAT_AES.zip"
+version = "AESAVS known answer test vectors, member CBCKeySbox256.rsp, CAVS 11.1"
+upstream = "0ebe408e4a334e73fbbf9a7ae17e00af72abf716"
+blob = "0ebe408e4a334e73fbbf9a7ae17e00af72abf716"
+
+[[file]]
+path = "nist/aes/CBCMMT128.rsp"
+source = "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/aes/aesmmt.zip"
+version = "AESAVS multiblock message test vectors, member CBCMMT128.rsp, CAVS 11.1"
+upstream = "5e293e1b5b63f7c2f259e9f9b68465e4f789e400"
+blob = "5e293e1b5b63f7c2f259e9f9b68465e4f789e400"
+
+[[file]]
+path = "nist/aes/CBCMMT192.rsp"
+source = "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/aes/aesmmt.zip"
+version = "AESAVS multiblock message test vectors, member CBCMMT192.rsp, CAVS 11.1"
+upstream = "0c43d0606cd61c4e373d910d18572b4e4c6ab660"
+blob = "0c43d0606cd61c4e373d910d18572b4e4c6ab660"
+
+[[file]]
+path = "nist/aes/CBCMMT256.rsp"
+source = "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/aes/aesmmt.zip"
+version = "AESAVS multiblock message test vectors, member CBCMMT256.rsp, CAVS 11.1"
+upstream = "56fae619761504c5af80872673b0d43815d198e8"
+blob = "56fae619761504c5af80872673b0d43815d198e8"
+
+[[file]]
+path = "nist/tdes/TCBCMMT2.rsp"
+source = "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/des/tdesmmt.zip"
+version = "TDES multiblock message test vectors, member TCBCMMT2.rsp, CAVS 18.0"
+upstream = "5ddd9dab84c8353d85a47663b016b2d5964408c8"
+blob = "5ddd9dab84c8353d85a47663b016b2d5964408c8"
+
+[[file]]
+path = "nist/tdes/TCBCMMT3.rsp"
+source = "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/des/tdesmmt.zip"
+version = "TDES multiblock message test vectors, member TCBCMMT3.rsp, CAVS 18.0"
+upstream = "ce8274969ed9cc5354a3b728a8f530367c5ffe57"
+blob = "ce8274969ed9cc5354a3b728a8f530367c5ffe57"
+
+[[file]]
+path = "nist/kbkdf/KDFCTR_gen.rsp"
+source = "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/KBKDF800-108/CounterMode.zip"
+version = "SP 800-108 counter mode test vectors, member KDFCTR_gen.rsp, CAVS 14.4"
+upstream = "d5e6c5ec93e8285da7b04b548a2f22648d8f8a77"
+blob = "3e299380020d955c151a1d432ce4317809cf2e5e"
+extract = "file header and the whole groups [PRF=HMAC_SHA1], [PRF=HMAC_SHA256], [PRF=HMAC_SHA384] and [PRF=HMAC_SHA512] with [CTRLOCATION=BEFORE_FIXED] and [RLEN=32_BITS], cut at group headers"
+
+[[file]]
+path = "nist/kas/KASValidityTest_ECCEphemeralUnified_KDFConcat_NOKC_init.fax"
+source = "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/keymgmt/KASTestVectorsECC2016.zip"
+version = "SP 800-56A KAS ECC test vectors, member KASTestVectorsECC2016/No Key Confirmation/ECC Ephemeral Unified Scheme/KASValidityTest_ECCEphemeralUnified_KDFConcat_NOKC_init.fax, CAVS 20.1"
+upstream = "af432b6b9beba7b25a3372f61c1837d52b3d3d0a"
+blob = "e158d71455ea2739dfc0e78bf449aa70a3514a84"
+extract = "file header and the whole groups [EC - SHA256], [EC - SHA384], [EC - SHA512], [ED - SHA384], [ED - SHA512] and [EE - SHA512], cut at group headers"
+
+[[file]]
+path = "nist/kas/KASValidityTest_FFCStatic_NOKC_ZZOnly_init.fax"
+source = "https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Algorithm-Validation-Program/documents/keymgmt/KASTestVectorsFFC2014.zip"
+version = "SP 800-56A KAS FFC test vectors, member KASTestVectorsFFC2014/Test of 800-56A excluding KDF/FFC Static Scheme/KASValidityTest_FFCStatic_NOKC_ZZOnly_init.fax, CAVS 17.4"
+upstream = "bb0c4bbc5386986dd738bdd708a7f05ed065ccb7"
+blob = "bb0c4bbc5386986dd738bdd708a7f05ed065ccb7"
+
+[[file]]
+path = "rfc/rfc1320.txt"
+source = "https://www.rfc-editor.org/rfc/rfc1320.txt"
+version = "RFC 1320"
+upstream = "6492345325c0080aa2784a69f5ac311b57fff601"
+blob = "6492345325c0080aa2784a69f5ac311b57fff601"
+
+[[file]]
+path = "rfc/rfc1321.txt"
+source = "https://www.rfc-editor.org/rfc/rfc1321.txt"
+version = "RFC 1321"
+upstream = "68af27d2be1e853db3fff48677a2febd72550eeb"
+blob = "68af27d2be1e853db3fff48677a2febd72550eeb"
+
+[[file]]
+path = "rfc/rfc2268.txt"
+source = "https://www.rfc-editor.org/rfc/rfc2268.txt"
+version = "RFC 2268"
+upstream = "cbbdf3bba12376dbbb686079488917692c90a7de"
+blob = "cbbdf3bba12376dbbb686079488917692c90a7de"
+
+[[file]]
+path = "rfc/rfc3526.txt"
+source = "https://www.rfc-editor.org/rfc/rfc3526.txt"
+version = "RFC 3526"
+upstream = "7b688a33f39316adcf07ecb1dad5fa4c518320db"
+blob = "7b688a33f39316adcf07ecb1dad5fa4c518320db"
+
+[[file]]
+path = "rfc/rfc4231.txt"
+source = "https://www.rfc-editor.org/rfc/rfc4231.txt"
+version = "RFC 4231"
+upstream = "46eae30c2340cdbf834f6272ba4028791fe0788c"
+blob = "46eae30c2340cdbf834f6272ba4028791fe0788c"
+
+[[file]]
+path = "rfc/rfc5114.txt"
+source = "https://www.rfc-editor.org/rfc/rfc5114.txt"
+version = "RFC 5114"
+upstream = "83d7a9fb42d4a6820728e8b81c02dae4b6f39f92"
+blob = "83d7a9fb42d4a6820728e8b81c02dae4b6f39f92"
+
+[[file]]
+path = "rfc/rfc6070.txt"
+source = "https://www.rfc-editor.org/rfc/rfc6070.txt"
+version = "RFC 6070"
+upstream = "67cd340b8ef131ba098af2fc6381e6e18a15888e"
+blob = "67cd340b8ef131ba098af2fc6381e6e18a15888e"
+
+[[file]]
+path = "rfc/rfc6229.txt"
+source = "https://www.rfc-editor.org/rfc/rfc6229.txt"
+version = "RFC 6229"
+upstream = "c960126ef84d639aeb2f431da9632960e6c98b47"
+blob = "c960126ef84d639aeb2f431da9632960e6c98b47"
+
+[[file]]
+path = "rfc/rfc7748.txt"
+source = "https://www.rfc-editor.org/rfc/rfc7748.txt"
+version = "RFC 7748"
+upstream = "078927cdbc123648cc42a882e0adcce29585208c"
+blob = "078927cdbc123648cc42a882e0adcce29585208c"
+
+[[file]]
+path = "rfc/rfc7919.txt"
+source = "https://www.rfc-editor.org/rfc/rfc7919.txt"
+version = "RFC 7919"
+upstream = "1c2b8b63b67aa908f15d68d6b8b2aed12ebc6700"
+blob = "1c2b8b63b67aa908f15d68d6b8b2aed12ebc6700"
+
+[[file]]
+path = "rfc/rfc8032.txt"
+source = "https://www.rfc-editor.org/rfc/rfc8032.txt"
+version = "RFC 8032"
+upstream = "b5dfdf0e348c68a8ac33d35f88db60d15f26fb66"
+blob = "b5dfdf0e348c68a8ac33d35f88db60d15f26fb66"
+
+[[file]]
+path = "rfc/rfc8410.txt"
+source = "https://www.rfc-editor.org/rfc/rfc8410.txt"
+version = "RFC 8410"
+upstream = "2c4b963312083b08623300a02cb5db7e95908c34"
+blob = "2c4b963312083b08623300a02cb5db7e95908c34"
+
+[[file]]
+path = "rfc/rfc9500.txt"
+source = "https://www.rfc-editor.org/rfc/rfc9500.txt"
+version = "RFC 9500"
+upstream = "2ba6699aefc0a6a6ae8040ce99b17112c2b60e1c"
+blob = "2ba6699aefc0a6a6ae8040ce99b17112c2b60e1c"
+
+[[file]]
+path = "rsa-labs/oaep-vect.txt"
+source = "https://github.com/pyca/cryptography/blob/d45b7930f93c9f139ab09cfb91990e3250bc989b/vectors/cryptography_vectors/asymmetric/RSA/pkcs-1v2-1d2-vec/oaep-vect.txt"
+version = "RSA Laboratories PKCS #1 v2.1 draft 2 test vectors (pkcs-1v2-1d2-vec.zip), as mirrored in pyca/cryptography at commit d45b7930f93c9f139ab09cfb91990e3250bc989b"
+upstream = "1e8279dcfc8117148eca71b388a65201a185d936"
+blob = "1e8279dcfc8117148eca71b388a65201a185d936"

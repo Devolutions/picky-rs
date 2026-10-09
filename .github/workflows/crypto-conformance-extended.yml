@@ -1,0 +1,22 @@
+name: Extended crypto conformance
+
+on:
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+jobs:
+  extended:
+    name: Extended conformance tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+
+      # Large property-test case counts and slow vectors; see the picky-crypto-testsuite crate documentation.
+      - name: Run tests
+        run: cargo test --locked --release --workspace --all-features
+        env:
+          PICKY_CRYPTO_TESTSUITE_EXTENDED: "1"

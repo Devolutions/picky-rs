@@ -1,0 +1,4 @@
+[submodule "picky-crypto-testsuite/vectors/wycheproof"]
+	path = picky-crypto-testsuite/vectors/wycheproof
+	url = https://github.com/C2SP/wycheproof.git
+	shallow = true

@@ -87,6 +87,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          submodules: true
 
       - name: Run tests
         run: cargo test --locked --verbose --workspace --all-features
@@ -203,6 +205,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          submodules: true
 
       - name: Install cargo-hack
         run: cargo install --locked cargo-hack --version 0.6.45
@@ -218,6 +222,9 @@ jobs:
       - name: Check contract citations
         run: cargo xtask check-contract
         shell: pwsh
+
+      - name: Check test vectors
+        run: cargo --locked xtask check-vectors
 
       - name: Install cargo-deny
         run: cargo install --locked cargo-deny --version 0.20.2
