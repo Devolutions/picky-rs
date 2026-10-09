@@ -192,7 +192,7 @@ jobs:
 
       # The pull request checkout is a merge commit whose first parent is the base branch.
       - name: Check Cargo.lock versions
-        run: cargo xtask check-no-downgrade --base HEAD^
+        run: cargo --locked xtask check-no-downgrade --base HEAD^
 
   success:
     name: Success

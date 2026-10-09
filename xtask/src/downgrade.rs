@@ -5,7 +5,7 @@
 //! The change fails when its `x.y.z` triple decreases, or when the new version is a prerelease and the old one isn't.
 //! Prerelease identifiers and build metadata aren't compared otherwise.
 //!
-//! Out of scope: added or removed package blocks, git and path sources, and `Cargo.toml` requirement strings.
+//! Out of scope: added or removed package blocks, source-specific handling (git and path packages are compared like registry ones), and `Cargo.toml` requirement strings.
 
 use std::{path::Path, process::Command};
 
