@@ -1,3 +1,6 @@
+[alias]
+xtask = "run --package xtask --"
+
 [target.wasm32-unknown-unknown]
 rustflags = [
   # 20 KiB heap size, to fit in 2 pages.
