@@ -181,6 +181,15 @@ pub fn loaded(
                 Expect::Error(Error::InvalidInput),
                 || key.agree(a, &[]),
             );
+            if a == KeyAgreementAlgorithm::X25519 {
+                for length in [31, 33] {
+                    c.call(
+                        &format!("{id}/{a:?}/peer length {length}"),
+                        Expect::Error(Error::InvalidInput),
+                        || key.agree(a, &vec![9; length]),
+                    );
+                }
+            }
         }
     }
     if !public_key || kind == KeyType::Ffdh {
@@ -858,11 +867,17 @@ pub fn key_agreement(p: &CryptoProvider, _: Options) {
                 }
             }
         }
-        for peer in [&[][..], &[0][..]] {
+        let x25519_lengths: &[usize] = if a == KeyAgreementAlgorithm::X25519 {
+            &[31, 33]
+        } else {
+            &[]
+        };
+        let wrong_lengths = x25519_lengths.iter().map(|&length| vec![9; length]);
+        for peer in [vec![], vec![0]].into_iter().chain(wrong_lengths) {
             c.call(
-                &format!("{id}/invalid peer"),
+                &format!("{id}/invalid peer of {} bytes", peer.len()),
                 Expect::Error(Error::InvalidInput),
-                || e.generate_ephemeral()?.agree(peer),
+                || e.generate_ephemeral()?.agree(&peer),
             );
         }
     }
