@@ -1126,9 +1126,57 @@ pub fn key_agreement(p: &CryptoProvider, _: Options) {
     c.finish();
 }
 
+fn ffdh_parameter_boundaries(c: &mut Checks, p: &CryptoProvider) {
+    let even = [[0x80].as_slice(), &[0; 127]].concat();
+    let odd = [[0x80].as_slice(), &[0; 126], &[1]].concat();
+    for (name, parameters) in [
+        ("even 1024-bit p", FfdhParameters::new(&even, &[2], None)),
+        ("g equals p minus one", FfdhParameters::new(&odd, &even, None)),
+    ] {
+        let id = format!("Ffdh/valid-domain/{name}");
+        if let Ok(entry) = helpers::ffdh_key_agreement(p) {
+            c.call(&format!("{id}/ephemeral"), Expect::Error(Error::InvalidInput), || {
+                entry.generate_ephemeral(parameters)
+            });
+        }
+        if let Ok(loader) = helpers::private_key_loader(p, KeyType::Ffdh) {
+            c.call(&format!("{id}/static load"), Expect::Error(Error::InvalidKey), || {
+                loader.load(PrivateKeyMaterial::Ffdh {
+                    parameters,
+                    private_value: &[1],
+                })
+            });
+        }
+    }
+}
+
+fn ffdh_exponent_boundaries(c: &mut Checks, p: &CryptoProvider, groups: &[v::DhGroup]) {
+    let Ok(loader) = helpers::private_key_loader(p, KeyType::Ffdh) else {
+        return;
+    };
+    for group in groups.iter().filter(|group| group.id.starts_with("rfc/rfc7919.txt/")) {
+        let order = group.q.as_deref().expect("published RFC 7919 subgroup order");
+        for q in [None, Some(order)] {
+            let id = format!(
+                "Ffdh/{}/x = published q/q {}",
+                group.id,
+                if q.is_some() { "present" } else { "absent" }
+            );
+            c.call(&id, Expect::Error(Error::InvalidKey), || {
+                loader.load(PrivateKeyMaterial::Ffdh {
+                    parameters: FfdhParameters::new(&group.p, &group.g, q),
+                    private_value: order,
+                })
+            });
+        }
+    }
+}
+
 pub fn ffdh(p: &CryptoProvider, _: Options) {
     let mut c = Checks::default();
     let groups = v::dh_groups();
+    ffdh_parameter_boundaries(&mut c, p);
+    ffdh_exponent_boundaries(&mut c, p, &groups);
     match helpers::ffdh_key_agreement(p) {
         Err(error) => c.absent::<()>(p, Algorithm::KeyAgreement(KeyAgreementAlgorithm::Ffdh), Err(error)),
         Ok(e) => {
@@ -1919,6 +1967,106 @@ mod tests {
         Arc,
         atomic::{AtomicUsize, Ordering},
     };
+
+    struct BoundaryInputs {
+        p: Vec<u8>,
+        g: Vec<u8>,
+        q: Option<Vec<u8>>,
+        x: Option<Vec<u8>>,
+    }
+    struct BoundaryProvider(Arc<std::sync::Mutex<Vec<BoundaryInputs>>>);
+    impl BoundaryProvider {
+        fn record(&self, parameters: FfdhParameters<'_>, x: Option<&[u8]>) {
+            self.0.lock().unwrap().push(BoundaryInputs {
+                p: parameters.p.to_vec(),
+                g: parameters.g.to_vec(),
+                q: parameters.q.map(<[u8]>::to_vec),
+                x: x.map(<[u8]>::to_vec),
+            });
+        }
+    }
+    impl FfdhKeyAgreement for BoundaryProvider {
+        fn fips(&self) -> bool {
+            false
+        }
+        fn generate_ephemeral(&self, parameters: FfdhParameters<'_>) -> Result<Box<dyn EphemeralSecret>, Error> {
+            self.record(parameters, None);
+            Err(Error::InvalidInput)
+        }
+    }
+    impl PrivateKeyLoader for BoundaryProvider {
+        fn key_type(&self) -> KeyType {
+            KeyType::Ffdh
+        }
+        fn fips(&self) -> bool {
+            false
+        }
+        fn load(&self, material: PrivateKeyMaterial<'_>) -> Result<Box<dyn PrivateKey>, Error> {
+            let PrivateKeyMaterial::Ffdh {
+                parameters,
+                private_value,
+            } = material
+            else {
+                return Err(Error::InvalidKey);
+            };
+            self.record(parameters, Some(private_value));
+            Err(Error::InvalidKey)
+        }
+    }
+
+    #[test]
+    fn ffdh_parameter_boundaries_reach_both_capabilities() {
+        let calls = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let provider = CryptoProvider::builder()
+            .with(Entry::FfdhKeyAgreement(Arc::new(BoundaryProvider(Arc::clone(&calls)))))
+            .with(Entry::PrivateKeyLoader(Arc::new(BoundaryProvider(Arc::clone(&calls)))))
+            .build()
+            .unwrap();
+        let mut checks = Checks::default();
+        ffdh_parameter_boundaries(&mut checks, &provider);
+        checks.finish();
+        let calls = calls.lock().unwrap();
+        assert_eq!(calls.len(), 4);
+        let even = [[0x80].as_slice(), &[0; 127]].concat();
+        let odd = [[0x80].as_slice(), &[0; 126], &[1]].concat();
+        for (pair, (p, g)) in calls.chunks_exact(2).zip([(&even, &[2][..]), (&odd, even.as_slice())]) {
+            for call in pair {
+                assert_eq!(&call.p, p);
+                assert_eq!(call.g, g);
+                assert!(call.q.is_none());
+                assert_eq!(der::bit_length(&call.p), 1024);
+            }
+            assert!(pair[0].x.is_none());
+            assert_eq!(pair[1].x.as_deref(), Some(&[1][..]));
+        }
+    }
+
+    #[test]
+    fn ffdh_exponent_boundaries_use_published_safe_prime_orders() {
+        let calls = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let provider = CryptoProvider::builder()
+            .with(Entry::PrivateKeyLoader(Arc::new(BoundaryProvider(Arc::clone(&calls)))))
+            .build()
+            .unwrap();
+        let groups = v::dh_groups();
+        let mut checks = Checks::default();
+        ffdh_exponent_boundaries(&mut checks, &provider, &groups);
+        checks.finish();
+        let calls = calls.lock().unwrap();
+        assert_eq!(calls.len(), 6);
+        for (pair, group) in calls
+            .chunks_exact(2)
+            .zip(groups.iter().filter(|group| group.id.starts_with("rfc/rfc7919.txt/")))
+        {
+            for call in pair {
+                assert_eq!(call.p, group.p);
+                assert_eq!(call.g, group.g);
+                assert_eq!(call.x, group.q);
+            }
+            assert!(pair[0].q.is_none());
+            assert_eq!(pair[1].q, group.q);
+        }
+    }
 
     #[derive(Clone)]
     struct BranchKey {
