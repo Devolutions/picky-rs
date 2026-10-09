@@ -2,7 +2,7 @@
 //!
 //! Every file under `vectors/`, outside the Wycheproof submodule, has exactly one `[[file]]` entry.
 //! Its blob ID (`git hash-object --no-filters`) equals the entry's `blob`, which equals `upstream` unless the entry has an `extract` rule.
-//! The submodule commit recorded in the index and the commit checked out both equal `[wycheproof] commit`, and every listed file exists in the checkout's commit.
+//! The submodule commit recorded in the index and the commit checked out both equal `[wycheproof] commit`, every listed file exists in the checkout's commit, and none is locally modified.
 //!
 //! The manifest is read line by line: `[section]` headers, `key = "value"` pairs and `files = [ … ]` arrays with one quoted path per line.
 
@@ -97,6 +97,10 @@ fn check_wycheproof(root: &Path, manifest: &Manifest) -> Result<Vec<String>> {
         if !found.lines().any(|line| line == file) {
             failures.push(format!("{submodule}/{file}: missing at {}", head.trim()));
         }
+    }
+    args[0..3].copy_from_slice(&["status", "--porcelain", "--untracked-files=no"]);
+    for line in git(&checkout, &args)?.lines() {
+        failures.push(format!("{submodule}: locally modified: {line}"));
     }
     Ok(failures)
 }

@@ -310,11 +310,17 @@ fn constant_twins(value: &dyn Any) -> Option<([String; 2], Vec<usize>)> {
 }
 
 /// Checks the length-only diagnostics of a MAC type whose length isn't observable through its public API.
+/// After the type name, the only words allowed are an optional `len` and one decimal number.
 fn length_only(text: &str, name: &str) -> bool {
-    let digits = text
-        .strip_prefix(name)
-        .map(|rest| rest.trim_matches(|c: char| !c.is_ascii_digit()));
-    digits.is_some_and(|d| !d.is_empty() && d.bytes().all(|b| b.is_ascii_digit()))
+    let Some(rest) = text.strip_prefix(name) else {
+        return false;
+    };
+    let words: Vec<_> = rest
+        .split(|c: char| !c.is_ascii_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .collect();
+    let number = |word: &str| word.bytes().all(|b| b.is_ascii_digit());
+    matches!(words.as_slice(), [n] | ["len", n] if number(n))
 }
 
 /// A non-cryptographic MAC entry whose tag is the given bytes, used only to build `MacTag` values.
@@ -487,6 +493,8 @@ mod tests {
     #[case("MacVerifier", false)]
     #[case("MacVerifier { tag: 0a1b }", false)]
     #[case("MacVerifier { len: 32, tag: 5 }", false)]
+    #[case("MacVerifier { len: 32, tag: deadbeef }", false)]
+    #[case("MacVerifier { 32 }", true)]
     #[case("MacOutput { len: 32 }", false)]
     fn mac_length_only_diagnostics(#[case] text: &str, #[case] accepted: bool) {
         assert_eq!(length_only(text, "MacVerifier"), accepted);
