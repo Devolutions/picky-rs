@@ -103,6 +103,7 @@ pub fn run(p: &CryptoProvider, _: Options) {
             }
         }
         let (id, key, iv, data, _, _) = select::cbc_control(a, &records);
+        assert_cbc_control(a, key, iv, data);
         for protection in [Protection::Apply, Protection::Process] {
             if !protections[usize::from(protection == Protection::Process)] {
                 continue;
@@ -141,25 +142,19 @@ pub fn run(p: &CryptoProvider, _: Options) {
                 }
             }
             for length in [0, 1, 15, 16, 17, 23, 24, 25, 31, 32, 33, 129] {
-                let valid = match a {
-                    CipherAlgorithm::Aes128Cbc => length == 16,
-                    CipherAlgorithm::Aes192Cbc => length == 24,
-                    CipherAlgorithm::Aes256Cbc => length == 32,
-                    CipherAlgorithm::TdesEde3Cbc => length == 24,
-                    CipherAlgorithm::Rc2Cbc => (1..=128).contains(&length),
-                    _ => false,
-                };
-                if valid {
+                if valid_key_length(a, length) {
                     continue;
                 }
+                // Repeating the published key keeps 3DES components non-weak and K1 != K2, so no weak-key check can reject first.
+                let wrong = key.iter().copied().cycle().take(length).collect::<Vec<_>>();
                 c.call(
                     &format!("{a:?}/{protection:?}/key length={length}"),
                     Expect::Error(Error::InvalidKey),
                     || {
                         if protection == Protection::Apply {
-                            e.encrypt(&vec![0; length], iv, data)
+                            e.encrypt(&wrong, iv, data)
                         } else {
-                            e.decrypt(&vec![0; length], iv, data)
+                            e.decrypt(&wrong, iv, data)
                         }
                     },
                 );
@@ -197,6 +192,33 @@ fn weak_tdes_checks(c: &mut Checks, e: &dyn Cipher, record: &CipherVector, prote
                 }
             }
         }
+    }
+}
+
+pub fn valid_key_length(a: CipherAlgorithm, length: usize) -> bool {
+    match a {
+        CipherAlgorithm::Aes128Cbc => length == 16,
+        CipherAlgorithm::Aes192Cbc => length == 24,
+        CipherAlgorithm::Aes256Cbc => length == 32,
+        CipherAlgorithm::TdesEde3Cbc => length == 24,
+        CipherAlgorithm::Rc2Cbc => (1..=128).contains(&length),
+        _ => false,
+    }
+}
+
+/// Asserts that a published control record is in the valid domain of section 6.5, with distinct 3DES components, so that a case changing one of its fields fails only for that field.
+pub fn assert_cbc_control(a: CipherAlgorithm, key: &[u8], iv: &[u8], data: &[u8]) {
+    let block = if a == CipherAlgorithm::TdesEde3Cbc || a == CipherAlgorithm::Rc2Cbc {
+        8
+    } else {
+        16
+    };
+    assert!(valid_key_length(a, key.len()), "{a:?} control key length");
+    assert_eq!(iv.len(), block, "{a:?} control IV length");
+    assert!(!data.is_empty() && data.len() % block == 0, "{a:?} control data length");
+    if a == CipherAlgorithm::TdesEde3Cbc {
+        let [k1, k2, k3] = [&key[..8], &key[8..16], &key[16..]];
+        assert!(k1 != k2 && k2 != k3 && k1 != k3, "3DES control components are distinct");
     }
 }
 

@@ -108,6 +108,11 @@ pub fn integer(value: &[u8]) -> Vec<u8> {
 pub fn unsigned(value: &[u8]) -> &[u8] {
     &value[value.iter().position(|b| *b != 0).unwrap_or(value.len())..]
 }
+/// Compares unsigned big-endian integers, ignoring leading zeros.
+pub fn less(a: &[u8], b: &[u8]) -> bool {
+    let (a, b) = (unsigned(a), unsigned(b));
+    (a.len(), a) < (b.len(), b)
+}
 pub fn bit_length(value: &[u8]) -> usize {
     let value = unsigned(value);
     value

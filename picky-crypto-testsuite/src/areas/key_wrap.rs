@@ -80,8 +80,13 @@ pub fn run(p: &CryptoProvider, _: Options) {
                 }
             }
         }
-        let base = select::wrap_control(&vectors, [128, 192, 256][index]);
+        let bits = [128, 192, 256][index];
+        let base = select::wrap_control(&vectors, bits);
         let key = v::field(base, "key");
+        assert!(
+            key.len() * 8 == bits && v::field(base, "ct").len() == v::field(base, "msg").len() + 8,
+            "{a:?} control KEK and wrapped lengths"
+        );
         for protection in [Protection::Apply, Protection::Process] {
             if !protections[usize::from(protection == Protection::Process)] {
                 continue;

@@ -87,6 +87,17 @@ pub fn ed25519_undecodable_keys() -> ([u8; 32], [(&'static str, [u8; 32]); 2]) {
     identity[0] = 1;
     let mut negative_zero = identity;
     negative_zero[31] |= 0x80;
+    // R = identity decodes (y = 1 < p, sign bit clear) and the signature's S = 0 is below L, so if A decoded as the identity both
+    // verification equations would hold, and only A's decoding can reject.
+    let y = |mut encoding: [u8; 32]| {
+        encoding[31] &= 0x7f;
+        encoding.reverse();
+        encoding
+    };
+    assert!(
+        identity[31] & 0x80 == 0 && der::less(&y(identity), &y(p)),
+        "identity R decodes"
+    );
     (
         identity,
         [

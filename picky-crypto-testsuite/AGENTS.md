@@ -15,3 +15,9 @@ Sources, versions and checksums are in `vectors/manifest.toml`; `cargo xtask che
 - Never edit a vector file or trim inside a group.
 - A boundary value may be derived from a published value by a change confined to known bytes and asserted in the test (for example p − 1 for odd p: only the last byte differs). Like other hand-written inputs, it only ever expects an error.
 - Report newly failing vectors, and the size of any vendored data added.
+
+## Hand-written inputs
+
+- Structural inputs are not limited to empty, zero, one, or lengths at or beyond a limit.
+- A hand-written input that targets one check carries a control in the test asserting that every other check holds, so it can fail only for the intended reason.
+- Prefer deriving such inputs from published ones.

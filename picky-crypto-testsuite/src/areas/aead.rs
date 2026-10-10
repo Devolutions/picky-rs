@@ -86,10 +86,15 @@ pub fn run(p: &CryptoProvider, _: Options) {
                 }
             }
         }
-        let valid = select::gcm_control(&vectors, [128, 192, 256][index]);
+        let bits = [128, 192, 256][index];
+        let valid = select::gcm_control(&vectors, bits);
         let key = v::field(valid, "key");
         let nonce = v::field(valid, "iv");
         let data = [v::field(valid, "ct"), v::field(valid, "tag")].concat();
+        assert!(
+            key.len() * 8 == bits && nonce.len() == 12 && data.len() >= 16,
+            "{a:?} control key, nonce and data lengths"
+        );
         if protections[0] {
             c.call(
                 &format!("{a:?}/seal invalid key"),

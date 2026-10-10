@@ -116,6 +116,7 @@ pub fn run(p: &CryptoProvider, _: Options) {
             );
         }
         let mut fields: Vec<_> = der::children(&material).iter().map(|f| f.encoded.to_vec()).collect();
+        assert_eq!(der::sequence(&fields), material, "{id}: split/reassemble control");
         fields[0] = der::integer(&[1]);
         fields.push(der::tlv(0x81, &[&[0][..], &public].concat()));
         let version1 = der::sequence(&fields);
@@ -174,6 +175,12 @@ pub fn run(p: &CryptoProvider, _: Options) {
             .iter()
             .map(|f| f.encoded.to_vec())
             .collect::<Vec<_>>();
+        assert_eq!(
+            der::sequence(&fields),
+            encoded,
+            "{}: split/reassemble control",
+            RSA_SIGN_FILES[0]
+        );
         fields[0] = der::integer(&[1]);
         fields.push(der::tlv(0x81, &[&[0][..], &der::rsa_public(&encoded)].concat()));
         let version1 = der::sequence(&fields);

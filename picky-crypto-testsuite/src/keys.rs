@@ -3,6 +3,7 @@
 use picky_crypto::*;
 
 use crate::algorithms::*;
+use crate::areas::ffdh;
 use crate::harness::{CheckedResult, Checks, Expect};
 use crate::{der, vectors as v};
 
@@ -156,11 +157,11 @@ pub fn loaded(
                 || key.agree(a, &[]),
             );
             if a == KeyAgreementAlgorithm::X25519 {
-                for length in [31, 33] {
+                for peer in x25519_wrong_length_peers() {
                     c.call(
-                        &format!("{id}/{a:?}/peer length {length}"),
+                        &format!("{id}/{a:?}/peer length {}", peer.len()),
                         Expect::Error(Error::InvalidInput),
-                        || key.agree(a, &vec![9; length]),
+                        || key.agree(a, &peer),
                     );
                 }
             }
@@ -236,7 +237,11 @@ pub fn loaded(
             .iter()
             .position(|a| *a == KeyAgreementAlgorithm::Ffdh)
             .unwrap()];
-        let overlong = vec![0; der::bit_length(parameters.p).div_ceil(8) + 2];
+        let overlong = ffdh::overlong(parameters.g, parameters.p);
+        assert!(
+            ffdh::failed_checks(parameters.p, parameters.g, parameters.q, None).is_empty(),
+            "{id}: g is a peer value in range, and of order q by the trusted group property"
+        );
         let below_modulus = modulus_minus_one(parameters.p);
         for (name, peer) in [
             ("empty", &[][..]),
@@ -270,6 +275,15 @@ pub fn modulus_minus_one(p: &[u8]) -> Vec<u8> {
     assert_eq!(&y[..rest.len()], rest, "p - 1 differs from p only in the last byte");
     assert_eq!(y[rest.len()], last - 1, "p - 1 ends with the last byte of p minus one");
     y
+}
+
+/// Returns the published X25519 base point u = 9 truncated to 31 bytes and extended with a zero byte to 33 bytes.
+/// Both still read as u = 9, whose secret is the nonzero public key, so only the 32-byte length check can reject them.
+pub fn x25519_wrong_length_peers() -> [Vec<u8>; 2] {
+    let (base_point, _) = v::x25519_iterations();
+    assert_eq!(base_point.len(), 32, "rfc/rfc7748.txt: base point length");
+    assert_eq!(base_point[31], 0, "rfc/rfc7748.txt: truncation drops a zero byte");
+    [base_point[..31].to_vec(), [base_point.as_slice(), &[0]].concat()]
 }
 
 pub fn exported(c: &mut Checks, id: &str, key: &dyn PrivateKey, expected: &[u8]) {

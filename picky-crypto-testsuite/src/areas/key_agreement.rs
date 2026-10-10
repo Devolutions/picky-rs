@@ -52,12 +52,11 @@ pub fn run(p: &CryptoProvider, _: Options) {
                 }
             }
         }
-        let x25519_lengths: &[usize] = if a == KeyAgreementAlgorithm::X25519 {
-            &[31, 33]
+        let wrong_lengths = if a == KeyAgreementAlgorithm::X25519 {
+            Vec::from(x25519_wrong_length_peers())
         } else {
-            &[]
+            Vec::new()
         };
-        let wrong_lengths = x25519_lengths.iter().map(|&length| vec![9; length]);
         for peer in [vec![], vec![0]].into_iter().chain(wrong_lengths) {
             c.call(
                 &format!("{id}/invalid peer of {} bytes", peer.len()),

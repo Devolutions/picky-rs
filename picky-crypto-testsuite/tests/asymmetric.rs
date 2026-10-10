@@ -68,17 +68,21 @@ fn ffdh_parameter_boundaries_reach_both_capabilities() {
         .with(Entry::PrivateKeyLoader(Arc::new(BoundaryProvider(Arc::clone(&calls)))))
         .build()
         .unwrap();
+    let groups = v::dh_groups();
     let mut checks = Checks::default();
-    ffdh_parameter_boundaries(&mut checks, &provider);
+    ffdh_parameter_boundaries(&mut checks, &provider, &groups);
     checks.finish();
     let calls = calls.lock().unwrap();
     assert_eq!(calls.len(), 4);
-    let even = [[0x80].as_slice(), &[0; 127]].concat();
-    let odd = [[0x80].as_slice(), &[0; 126], &[1]].concat();
-    for (pair, (p, g)) in calls.chunks_exact(2).zip([(&even, &[2][..]), (&odd, even.as_slice())]) {
+    let group = &groups[0];
+    let minus_one = modulus_minus_one(&group.p);
+    for (pair, (p, g)) in calls
+        .chunks_exact(2)
+        .zip([(&minus_one, &group.g), (&group.p, &minus_one)])
+    {
         for call in pair {
             assert_eq!(&call.p, p);
-            assert_eq!(call.g, g);
+            assert_eq!(&call.g, g);
             assert!(call.q.is_none());
             assert_eq!(der::bit_length(&call.p), 1024);
         }

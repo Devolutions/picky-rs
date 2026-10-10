@@ -24,13 +24,86 @@ pub fn below_modulus_minus_one(value: &[u8], modulus: &[u8]) -> bool {
         || padded[different + 1..].iter().any(|b| *b != 255)
 }
 
-pub fn ffdh_parameter_boundaries(c: &mut Checks, p: &CryptoProvider) {
-    let even = [[0x80].as_slice(), &[0; 127]].concat();
-    let odd = [[0x80].as_slice(), &[0; 126], &[1]].concat();
-    for (name, parameters) in [
-        ("even 1024-bit p", FfdhParameters::new(&even, &[2], None)),
-        ("g equals p minus one", FfdhParameters::new(&odd, &even, None)),
+fn in_peer_range(value: &[u8], p: &[u8]) -> bool {
+    der::less(&[1], value) && der::unsigned(value).len() <= der::unsigned(p).len() && below_modulus_minus_one(value, p)
+}
+
+/// Names the section 6.11 domain checks that FFDH inputs fail, so that a hand-written case can assert that it fails only its targeted check.
+/// Without `q`, `x` is held to the sufficient bound `bit_length(x) + 3 <= bit_length(p)`, which keeps it below `(p - 1) / 2 - 1`.
+pub fn failed_checks(p: &[u8], g: &[u8], q: Option<&[u8]>, x: Option<&[u8]>) -> Vec<&'static str> {
+    let width = der::bit_length(p).div_ceil(8);
+    let mut failed = Vec::new();
+    if [Some(p), Some(g), q, x]
+        .into_iter()
+        .flatten()
+        .any(|encoding| encoding.is_empty() || encoding.len() > width + 1)
+    {
+        failed.push("encoding");
+    }
+    if p.last().is_none_or(|b| b & 1 == 0) {
+        failed.push("p parity");
+    }
+    if der::bit_length(p) < 1024 {
+        failed.push("p size");
+    }
+    if !in_peer_range(g, p) {
+        failed.push("g");
+    }
+    if q.is_some_and(|q| !der::less(&[4], q) || !der::less(q, p)) {
+        failed.push("q");
+    }
+    if let Some(x) = x {
+        let below = match q {
+            Some(q) => der::less(x, q),
+            None => der::bit_length(x) + 3 <= der::bit_length(p),
+        };
+        if !der::less(&[0], x) || !below {
+            failed.push("x");
+        }
+    }
+    failed
+}
+
+/// Prefixes a published value with zero bytes to one byte beyond the encoding bound of section 6.11, keeping its value.
+pub fn overlong(value: &[u8], p: &[u8]) -> Vec<u8> {
+    let width = der::bit_length(p).div_ceil(8);
+    let encoded = [vec![0; 2], der::padded(value, width)].concat();
+    assert_eq!(encoded.len(), width + 2, "overlong encoding length");
+    assert_eq!(
+        der::unsigned(&encoded),
+        der::unsigned(value),
+        "overlong encoding adds only zeros"
+    );
+    encoded
+}
+
+/// Returns the last 127 bytes of a published odd modulus: an odd value below the 1024-bit minimum.
+pub fn short_modulus(p: &[u8]) -> &[u8] {
+    let short = &p[p.len() - 127..];
+    assert_eq!(short.last(), p.last(), "short modulus keeps the low byte of p");
+    short
+}
+
+pub fn ffdh_parameter_boundaries(c: &mut Checks, p: &CryptoProvider, groups: &[v::DhGroup]) {
+    let group = select::ffdh_group(groups, 1024);
+    let minus_one = modulus_minus_one(&group.p);
+    for (name, parameters, targeted) in [
+        (
+            "even 1024-bit p",
+            FfdhParameters::new(&minus_one, &group.g, None),
+            "p parity",
+        ),
+        (
+            "g equals p minus one",
+            FfdhParameters::new(&group.p, &minus_one, None),
+            "g",
+        ),
     ] {
+        assert_eq!(
+            failed_checks(parameters.p, parameters.g, parameters.q, Some(&[1])),
+            [targeted],
+            "{name}"
+        );
         let id = format!("Ffdh/valid-domain/{name}");
         if let Ok(entry) = helpers::ffdh_key_agreement(p) {
             c.call(&format!("{id}/ephemeral"), Expect::Error(Error::InvalidInput), || {
@@ -60,6 +133,7 @@ pub fn ffdh_exponent_boundaries(c: &mut Checks, p: &CryptoProvider, groups: &[v:
                 group.id,
                 if q.is_some() { "present" } else { "absent" }
             );
+            assert_eq!(failed_checks(&group.p, &group.g, q, Some(order)), ["x"], "{id}");
             c.call(&id, Expect::Error(Error::InvalidKey), || {
                 loader.load(PrivateKeyMaterial::Ffdh {
                     parameters: FfdhParameters::new(&group.p, &group.g, q),
@@ -73,7 +147,7 @@ pub fn ffdh_exponent_boundaries(c: &mut Checks, p: &CryptoProvider, groups: &[v:
 pub fn run(p: &CryptoProvider, _: Options) {
     let mut c = Checks::default();
     let groups = v::dh_groups();
-    ffdh_parameter_boundaries(&mut c, p);
+    ffdh_parameter_boundaries(&mut c, p, &groups);
     ffdh_exponent_boundaries(&mut c, p, &groups);
     match helpers::ffdh_key_agreement(p) {
         Err(error) => c.absent::<()>(p, Algorithm::KeyAgreement(KeyAgreementAlgorithm::Ffdh), Err(error)),
@@ -121,18 +195,24 @@ pub fn run(p: &CryptoProvider, _: Options) {
                         || e.generate_ephemeral(FfdhParameters::new(&group.p, invalid, group.q.as_deref())),
                     );
                 }
+                assert!(
+                    failed_checks(&group.p, &group.g, group.q.as_deref(), None).is_empty(),
+                    "{id}"
+                );
+                let short = short_modulus(&group.p);
+                let generator = select::ffdh_smallest_generator(&groups);
+                assert_eq!(failed_checks(short, generator, None, None), ["p size"], "{id}");
                 c.call(
                     &format!("{id}/short modulus"),
                     Expect::Error(Error::InvalidInput),
-                    || e.generate_ephemeral(FfdhParameters::new(&[1], &group.g, None)),
+                    || e.generate_ephemeral(FfdhParameters::new(short, generator, None)),
                 );
+                // g is a peer value in range, and of order q by the trusted group property.
+                let peer = overlong(&group.g, &group.p);
                 c.call(
                     &format!("{id}/overlong peer"),
                     Expect::Error(Error::InvalidInput),
-                    || {
-                        e.generate_ephemeral(group.parameters())?
-                            .agree(&vec![0; group.p.len() + 2])
-                    },
+                    || e.generate_ephemeral(group.parameters())?.agree(&peer),
                 );
                 for invalid in [&[][..], &[0][..], &[1][..], &[4][..], &group.p[..]] {
                     c.call(
@@ -141,16 +221,16 @@ pub fn run(p: &CryptoProvider, _: Options) {
                         || e.generate_ephemeral(FfdhParameters::new(&group.p, &group.g, Some(invalid))),
                     );
                 }
+                let generator = overlong(&group.g, &group.p);
+                assert_eq!(
+                    failed_checks(&group.p, &generator, group.q.as_deref(), None),
+                    ["encoding"],
+                    "{id}"
+                );
                 c.call(
                     &format!("{id}/overlong generator"),
                     Expect::Error(Error::InvalidInput),
-                    || {
-                        e.generate_ephemeral(FfdhParameters::new(
-                            &group.p,
-                            &vec![0; group.p.len() + 2],
-                            group.q.as_deref(),
-                        ))
-                    },
+                    || e.generate_ephemeral(FfdhParameters::new(&group.p, &generator, group.q.as_deref())),
                 );
             }
         }
@@ -236,39 +316,70 @@ pub fn run(p: &CryptoProvider, _: Options) {
                             })
                         },
                     );
-                    if invalid.len() <= 1 {
-                        c.call(
-                            &format!("{id}/invalid parameter modulus"),
-                            Expect::Error(Error::InvalidKey),
-                            || {
-                                loader.load(PrivateKeyMaterial::Ffdh {
-                                    parameters: FfdhParameters::new(invalid, &group.g, group.q.as_deref()),
-                                    private_value: x,
-                                })
-                            },
+                }
+                let minus_one = modulus_minus_one(&group.p);
+                let short = short_modulus(&group.p);
+                let generator = select::ffdh_smallest_generator(&groups);
+                // Moduli of at most one byte leave no g or q in range, so they only check that loading fails without a panic.
+                for (modulus, g, targeted) in [
+                    (&[][..], &group.g[..], None),
+                    (&[0][..], &group.g[..], None),
+                    (&[1][..], &group.g[..], None),
+                    (&minus_one[..], &group.g[..], Some("p parity")),
+                    (short, generator, Some("p size")),
+                ] {
+                    if let Some(targeted) = targeted {
+                        assert_eq!(
+                            failed_checks(modulus, g, group.q.as_deref(), Some(x)),
+                            [targeted],
+                            "{id}"
                         );
                     }
+                    c.call(
+                        &format!("{id}/invalid parameter modulus"),
+                        Expect::Error(Error::InvalidKey),
+                        || {
+                            loader.load(PrivateKeyMaterial::Ffdh {
+                                parameters: FfdhParameters::new(modulus, g, group.q.as_deref()),
+                                private_value: x,
+                            })
+                        },
+                    );
                 }
+                // x = 1 is in range for every q above 1, so q = 4 and q = p fail only the q check; q of at most 1 leaves no x in range.
                 for invalid in [&[][..], &[0][..], &[1][..], &[4][..], &group.p[..]] {
+                    if der::less(&[1], invalid) {
+                        assert_eq!(
+                            failed_checks(&group.p, &group.g, Some(invalid), Some(&[1])),
+                            ["q"],
+                            "{id}"
+                        );
+                    }
                     c.call(
                         &format!("{id}/invalid parameter q"),
                         Expect::Error(Error::InvalidKey),
                         || {
                             loader.load(PrivateKeyMaterial::Ffdh {
                                 parameters: FfdhParameters::new(&group.p, &group.g, Some(invalid)),
-                                private_value: x,
+                                private_value: &[1],
                             })
                         },
                     );
                 }
                 let prefix_zero = |field: &[u8]| [vec![0], field.to_vec()].concat();
+                let overlong_x = overlong(x, &group.p);
+                assert_eq!(
+                    failed_checks(&group.p, &group.g, group.q.as_deref(), Some(&overlong_x)),
+                    ["encoding"],
+                    "{id}"
+                );
                 c.call(
                     &format!("{id}/overlong private value"),
                     Expect::Error(Error::InvalidKey),
                     || {
                         loader.load(PrivateKeyMaterial::Ffdh {
                             parameters: group.parameters(),
-                            private_value: &vec![0; group.p.len() + 2],
+                            private_value: &overlong_x,
                         })
                     },
                 );

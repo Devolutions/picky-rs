@@ -4,7 +4,7 @@ use picky_crypto::*;
 use proptest::prelude::*;
 
 use crate::algorithms::*;
-use crate::areas::cipher::cipher_records;
+use crate::areas::cipher::{assert_cbc_control, cipher_records};
 use crate::harness::{CheckedResult, Checks, Expect, Options};
 use crate::keys::{ECC_FILE, RSA_SIGN_FILES, exported, rsa_plaintext_limit};
 use crate::{der, published, select, vectors as v};
@@ -173,13 +173,19 @@ pub fn run(p: &CryptoProvider, _: Options) {
             prop_assert_eq!(plaintext.as_ref(), data.as_slice(), "{}", id);
             Ok(())
         });
-        let (_, key, iv, _, _, _) = select::cbc_control(a, &inputs);
+        let (_, key, iv, data, _, _) = select::cbc_control(a, &inputs);
+        assert_cbc_control(a, key, iv, data);
+        // Each call shortens one field of the published control record below a block.
         c.property(
             &format!("{a:?}/out-of-domain"),
-            (0..iv.len(), 0..iv.len()),
+            (0..iv.len(), 1..iv.len()),
             |(ivlen, len)| {
                 prop_assert_eq!(
-                    e.encrypt(key, &vec![0; ivlen], &vec![0; len]).checked().err(),
+                    e.encrypt(key, &iv[..ivlen], data).checked().err(),
+                    Some(Error::InvalidInput)
+                );
+                prop_assert_eq!(
+                    e.encrypt(key, iv, &data[..len]).checked().err(),
                     Some(Error::InvalidInput)
                 );
                 Ok(())

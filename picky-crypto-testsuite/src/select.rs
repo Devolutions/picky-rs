@@ -222,6 +222,25 @@ pub fn ffdh_order(group: &v::DhGroup) -> &[u8] {
     required(&group.id, "FFDH subgroup order", group.q.as_deref())
 }
 
+pub fn ffdh_group(groups: &[v::DhGroup], bits: usize) -> &v::DhGroup {
+    required(
+        "rfc/rfc5114.txt; rfc/rfc3526.txt; rfc/rfc7919.txt",
+        &format!("{bits}-bit FFDH group"),
+        groups.iter().find(|group| der::bit_length(&group.p) == bits),
+    )
+}
+
+pub fn ffdh_smallest_generator(groups: &[v::DhGroup]) -> &[u8] {
+    required(
+        "rfc/rfc5114.txt; rfc/rfc3526.txt; rfc/rfc7919.txt",
+        "FFDH generator",
+        groups
+            .iter()
+            .map(|group| group.g.as_slice())
+            .min_by_key(|g| der::bit_length(g)),
+    )
+}
+
 pub fn ecc_private_control(kind: KeyType) -> (KeyType, picky_crypto::KeyAgreementAlgorithm, usize, v::Record) {
     required(
         keys::ECC_FILE,
