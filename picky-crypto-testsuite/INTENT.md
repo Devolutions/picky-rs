@@ -27,7 +27,7 @@ It is the executable form of the contract: a backend is correct when it passes t
 
 ## Required behavior
 
-Each backend crate runs the full suite through a single entry point provided by this crate.
+The suite exposes each conformance area as a function over a provider; the `picky-crypto-conformance` runner calls every area for every backend provider and composition the workspace ships.
 
 The suite verifies, for every algorithm a provider advertises:
 
@@ -39,7 +39,7 @@ The suite verifies, for every algorithm a provider advertises:
 
 For every algorithm a provider does not advertise, the suite verifies that the operation returns `Unsupported`.
 
-A separate entry point takes two providers and runs differential tests between them (for example, sign with one and verify with the other).
+Differential areas take two providers and compare them (for example, sign with one and verify with the other); the runner calls them for every pair of providers in a build.
 
 ## Authority
 
