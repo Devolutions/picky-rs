@@ -2,6 +2,8 @@ use digest::{block_api::EagerHash, typenum::Unsigned};
 use picky_crypto::{Algorithm, Entry, Error, OutputBytes, PasswordKdf, PasswordKdfAlgorithm, ProviderBuilder};
 use std::{marker::PhantomData, sync::Arc};
 
+const MUST_SUPPORT_MAX_OUTPUT_LEN: usize = 1024;
+
 struct Pbkdf2<D>(PasswordKdfAlgorithm, PhantomData<D>);
 impl<D: EagerHash + Send + Sync> PasswordKdf for Pbkdf2<D> {
     fn algorithm(&self) -> PasswordKdfAlgorithm {
@@ -17,9 +19,14 @@ impl<D: EagerHash + Send + Sync> PasswordKdf for Pbkdf2<D> {
         {
             return Err(Error::InvalidInput);
         }
-        // Lengths beyond the must-support maximum may be refused, so an allocation failure is Unsupported.
-        let mut output =
-            crate::util::buffer(output_len).map_err(|_| Error::Unsupported(Algorithm::PasswordKdf(self.0)))?;
+        // Only lengths beyond the must-support maximum may be refused as Unsupported.
+        let mut output = crate::util::buffer(output_len).map_err(|_| {
+            if output_len > MUST_SUPPORT_MAX_OUTPUT_LEN {
+                Error::Unsupported(Algorithm::PasswordKdf(self.0))
+            } else {
+                Error::ProviderFailure
+            }
+        })?;
         pbkdf2::pbkdf2::<hmac::Hmac<D>>(password, salt, iterations, &mut output).map_err(|_| Error::InvalidKey)?;
         Ok(OutputBytes::new(output))
     }

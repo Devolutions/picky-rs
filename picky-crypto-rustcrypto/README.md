@@ -5,7 +5,7 @@ Call `picky_crypto_rustcrypto::provider()` to build a provider with the enabled 
 Nothing is enabled by default; `all` enables every family below.
 Every entry, loader and private key reports `fips() == false`.
 
-Parsing and encoding formats needs no provider; only code that performs cryptographic operations through `picky-crypto` does.
+Parsing and encoding formats need no provider; only code that performs cryptographic operations through `picky-crypto` does.
 
 ## Features and the library
 
@@ -37,6 +37,7 @@ Enabling ed25519-dalek's `legacy_compatibility` feature anywhere in a build weak
 Key-based KDFs and finite-field Diffie-Hellman are not provided; they come from other providers.
 RSA key generation draws a 256-bit seed from the operating-system generator and expands it with ChaCha20, so a generator failure is reported instead of panicking.
 RSA signing and decryption blind the private-key operation with the operating-system generator.
+ECDSA signing mixes operating-system randomness into the RFC 6979 nonce as additional data.
 RSA public keys beyond the rsa crate's limits (a modulus above 8192 bits or a public exponent above 2^33 − 1) are unsupported.
 Private-key loading applies the same limits, although the rsa crate loads private keys of any modulus size.
 
