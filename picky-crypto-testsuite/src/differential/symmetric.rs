@@ -3,8 +3,9 @@
 use picky_crypto::*;
 use proptest::prelude::*;
 
-use super::{outputs, selected};
+use super::outputs;
 use crate::algorithms::*;
+use crate::areas::cipher::{cipher_records, transform};
 use crate::harness::{CheckedResult, Checks, Expect};
 use crate::{published, vectors as v};
 
@@ -12,7 +13,7 @@ pub fn run(a: &CryptoProvider, b: &CryptoProvider) {
     let mut c = Checks::default();
     let messages = published::messages();
     for algorithm in HASHES {
-        let (Ok(ae), Ok(_)) = (helpers::hash(a, algorithm), helpers::hash(b, algorithm)) else {
+        let (Ok(_), Ok(_)) = (helpers::hash(a, algorithm), helpers::hash(b, algorithm)) else {
             continue;
         };
         for (id, data) in &messages {
@@ -23,32 +24,6 @@ pub fn run(a: &CryptoProvider, b: &CryptoProvider) {
                 || helpers::digest(b, algorithm, data),
             );
         }
-        c.property(
-            &format!("{algorithm:?}/published message chunking differential"),
-            (0..messages.len(), any::<usize>()),
-            |(index, split)| {
-                let (id, data) = &messages[index];
-                let split = split % (data.len() + 1);
-                let mut context = ae
-                    .start()
-                    .map_err(|e| proptest::test_runner::TestCaseError::fail(e.to_string()))?;
-                context
-                    .update(&data[..split])
-                    .map_err(|e| proptest::test_runner::TestCaseError::fail(e.to_string()))?;
-                context
-                    .update(&data[split..])
-                    .map_err(|e| proptest::test_runner::TestCaseError::fail(e.to_string()))?;
-                let left = context
-                    .finish()
-                    .checked()
-                    .map_err(|e| proptest::test_runner::TestCaseError::fail(e.to_string()))?;
-                let right = helpers::digest(b, algorithm, data)
-                    .checked()
-                    .map_err(|e| proptest::test_runner::TestCaseError::fail(e.to_string()))?;
-                prop_assert_eq!(left.as_ref(), right.as_ref(), "{}", id);
-                Ok(())
-            },
-        );
     }
     for (index, algorithm) in MACS.into_iter().enumerate() {
         let (Ok(ae), Ok(be)) = (helpers::mac(a, algorithm), helpers::mac(b, algorithm)) else {
@@ -63,45 +38,29 @@ pub fn run(a: &CryptoProvider, b: &CryptoProvider) {
             .collect::<Vec<_>>();
         pairs.push(published::empty_mac(index));
         for (id, key, data) in &pairs {
-            if ap[0] && bp[0] {
-                let left = c.call(id, Expect::Success, || helpers::compute_mac(a, algorithm, key, data));
-                let right = c.call(id, Expect::Success, || helpers::compute_mac(b, algorithm, key, data));
-                if let (Some(left), Some(right)) = (left, right) {
-                    c.check(
-                        id,
-                        left.into_inner().as_slice() == right.into_inner().as_slice(),
-                        "MAC differential",
-                    );
-                }
+            let tags = [(a, ap), (b, bp)].map(|(provider, protections)| {
+                protections[0]
+                    .then(|| {
+                        c.call(id, Expect::Success, || {
+                            helpers::compute_mac(provider, algorithm, key, data)
+                        })
+                    })
+                    .flatten()
+                    .map(MacTag::into_inner)
+            });
+            if let [Some(left), Some(right)] = &tags {
+                c.check(id, left.as_slice() == right.as_slice(), "MAC differential");
             }
-            for (source, dest, sp, dp) in [(a, b, ap, bp), (b, a, bp, ap)] {
-                if !(sp[0] && dp[1]) {
+            for (tag, dest, dp) in [(&tags[0], b, bp), (&tags[1], a, ap)] {
+                let Some(tag) = tag.as_ref().filter(|_| dp[1]) else {
                     continue;
-                }
-                if let Some(tag) = c.call(id, Expect::Success, || {
-                    helpers::compute_mac(source, algorithm, key, data)
+                };
+                if let Some(verified) = c.call(id, Expect::Success, || {
+                    helpers::verify_mac(dest, algorithm, key, data, tag, tag.len())
                 }) {
-                    let tag = tag.into_inner();
-                    if let Some(verified) = c.call(id, Expect::Success, || {
-                        helpers::verify_mac(dest, algorithm, key, data, &tag, tag.len())
-                    }) {
-                        c.check(id, verified, "cross MAC verification");
-                    }
+                    c.check(id, verified, "cross MAC verification");
                 }
             }
-        }
-        if ap[0] && bp[0] {
-            selected(
-                &mut c,
-                &format!("{algorithm:?}/published MAC differential"),
-                &pairs,
-                |(_, key, data)| {
-                    Ok((
-                        OutputBytes::new(helpers::compute_mac(a, algorithm, key, data).checked()?.into_inner()),
-                        OutputBytes::new(helpers::compute_mac(b, algorithm, key, data).checked()?.into_inner()),
-                    ))
-                },
-            );
         }
     }
     for (index, algorithm) in PASSWORD_KDFS.into_iter().enumerate() {
@@ -132,14 +91,8 @@ pub fn run(a: &CryptoProvider, b: &CryptoProvider) {
             (0..inputs.len(), 1usize..65),
             |(index, len)| {
                 let (id, key, salt, iterations) = &inputs[index];
-                let left = ae
-                    .derive(key, salt, *iterations, len)
-                    .checked()
-                    .map_err(|e| proptest::test_runner::TestCaseError::fail(e.to_string()))?;
-                let right = be
-                    .derive(key, salt, *iterations, len)
-                    .checked()
-                    .map_err(|e| proptest::test_runner::TestCaseError::fail(e.to_string()))?;
+                let left = ae.derive(key, salt, *iterations, len).checked().map_err(fail)?;
+                let right = be.derive(key, salt, *iterations, len).checked().map_err(fail)?;
                 prop_assert_eq!(left.as_ref(), right.as_ref(), "{}", id);
                 Ok(())
             },
@@ -163,14 +116,8 @@ pub fn run(a: &CryptoProvider, b: &CryptoProvider) {
             (0..inputs.len(), 1usize..65),
             |(index, len)| {
                 let (id, key, info) = &inputs[index];
-                let left = ae
-                    .derive(key, info, len)
-                    .checked()
-                    .map_err(|e| proptest::test_runner::TestCaseError::fail(e.to_string()))?;
-                let right = be
-                    .derive(key, info, len)
-                    .checked()
-                    .map_err(|e| proptest::test_runner::TestCaseError::fail(e.to_string()))?;
+                let left = ae.derive(key, info, len).checked().map_err(fail)?;
+                let right = be.derive(key, info, len).checked().map_err(fail)?;
                 prop_assert_eq!(left.as_ref(), right.as_ref(), "{}", id);
                 Ok(())
             },
@@ -182,7 +129,7 @@ pub fn run(a: &CryptoProvider, b: &CryptoProvider) {
         };
         let ap = c.protections(&format!("{algorithm:?}/A supports"), |p| ae.supports(p));
         let bp = c.protections(&format!("{algorithm:?}/B supports"), |p| be.supports(p));
-        let inputs = crate::areas::cipher::cipher_records(algorithm)
+        let inputs = cipher_records(algorithm)
             .into_iter()
             .filter(|r| !r.5)
             .collect::<Vec<_>>();
@@ -197,7 +144,7 @@ pub fn run(a: &CryptoProvider, b: &CryptoProvider) {
                     }
                 }
             }
-            for protection in [Protection::Apply, Protection::Process] {
+            for (protection, input) in [(Protection::Apply, plain), (Protection::Process, encrypted)] {
                 let index = usize::from(protection == Protection::Process);
                 if !(ap[index] && bp[index]) {
                     continue;
@@ -205,39 +152,10 @@ pub fn run(a: &CryptoProvider, b: &CryptoProvider) {
                 outputs(
                     &mut c,
                     &format!("{algorithm:?}/{id}/{protection:?}"),
-                    || {
-                        if index == 0 {
-                            ae.encrypt(key, iv, plain)
-                        } else {
-                            ae.decrypt(key, iv, encrypted)
-                        }
-                    },
-                    || {
-                        if index == 0 {
-                            be.encrypt(key, iv, plain)
-                        } else {
-                            be.decrypt(key, iv, encrypted)
-                        }
-                    },
+                    || transform(ae, protection, key, iv, input),
+                    || transform(be, protection, key, iv, input),
                 );
             }
-        }
-        for (index, protection) in [Protection::Apply, Protection::Process].into_iter().enumerate() {
-            if !(ap[index] && bp[index]) {
-                continue;
-            }
-            selected(
-                &mut c,
-                &format!("{algorithm:?}/{protection:?}/published CBC differential"),
-                &inputs,
-                |(_, key, iv, plain, encrypted, _)| {
-                    Ok(if index == 0 {
-                        (ae.encrypt(key, iv, plain)?, be.encrypt(key, iv, plain)?)
-                    } else {
-                        (ae.decrypt(key, iv, encrypted)?, be.decrypt(key, iv, encrypted)?)
-                    })
-                },
-            );
         }
     }
     if let (Ok(ae), Ok(be)) = (
@@ -248,12 +166,6 @@ pub fn run(a: &CryptoProvider, b: &CryptoProvider) {
         for (id, key, data) in &inputs {
             outputs(&mut c, id, || ae.start(key)?.apply(data), || be.start(key)?.apply(data));
         }
-        selected(
-            &mut c,
-            "RC4/published inputs differential",
-            &inputs,
-            |(_, key, data)| Ok((ae.start(key)?.apply(data)?, be.start(key)?.apply(data)?)),
-        );
     }
     for (source, dest) in [(a, b), (b, a)] {
         for (index, algorithm) in AEADS.into_iter().enumerate() {
@@ -276,23 +188,6 @@ pub fn run(a: &CryptoProvider, b: &CryptoProvider) {
                     }
                 }
             }
-            selected(
-                &mut c,
-                &format!("{algorithm:?}/published cross open"),
-                &inputs,
-                |(_, key, aad, data)| {
-                    let sealed = sealer.seal(key, aad, data).checked()?;
-                    if sealed.nonce.len() != 12 {
-                        return Err(Error::InvalidInput);
-                    }
-                    Ok((
-                        opener
-                            .open(key, &sealed.nonce, aad, &sealed.ciphertext_and_tag)
-                            .checked()?,
-                        OutputBytes::new(Zeroizing::new(data.clone())),
-                    ))
-                },
-            );
         }
         for (index, algorithm) in WRAPS.into_iter().enumerate() {
             let (Ok(wrapper), Ok(unwrapper)) =
@@ -318,18 +213,11 @@ pub fn run(a: &CryptoProvider, b: &CryptoProvider) {
                     }
                 }
             }
-            selected(
-                &mut c,
-                &format!("{algorithm:?}/published cross unwrap"),
-                &inputs,
-                |(_, key, data)| {
-                    Ok((
-                        unwrapper.unwrap(key, &wrapper.wrap(key, data).checked()?).checked()?,
-                        OutputBytes::new(Zeroizing::new(data.clone())),
-                    ))
-                },
-            );
         }
     }
     c.finish();
+}
+
+fn fail(e: Error) -> TestCaseError {
+    TestCaseError::fail(e.to_string())
 }

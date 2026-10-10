@@ -18,14 +18,10 @@ pub fn run(p: &CryptoProvider, _: Options) {
                 continue;
             }
         };
-        let Some(protections) = c.metadata(&format!("{a:?}/supports"), || {
-            [e.supports(Protection::Apply), e.supports(Protection::Process)]
-        }) else {
+        let Some(protections) = c.directions(p, &format!("{a:?}/supports"), Algorithm::KeyWrap(a), |p| e.supports(p))
+        else {
             continue;
         };
-        for (protection, supported) in [Protection::Apply, Protection::Process].into_iter().zip(protections) {
-            c.direction(p, Algorithm::KeyWrap(a), protection, supported);
-        }
         for g in &vectors.test_groups {
             if v::number(g, "keySize") != [128, 192, 256][index] {
                 continue;
@@ -33,23 +29,17 @@ pub fn run(p: &CryptoProvider, _: Options) {
             for t in v::tests(g) {
                 let id = v::id(a, file, t);
                 let (key, plaintext, ciphertext) = (v::field(t, "key"), v::field(t, "msg"), v::field(t, "ct"));
-                for protection in [Protection::Apply, Protection::Process] {
-                    let supported = protections[usize::from(protection == Protection::Process)];
-                    let len = if protection == Protection::Apply {
-                        plaintext.len()
+                for (protection, supported) in [Protection::Apply, Protection::Process].into_iter().zip(protections) {
+                    let (input, output) = if protection == Protection::Apply {
+                        (&plaintext, &ciphertext)
                     } else {
-                        ciphertext.len()
-                    };
-                    let lengths = if protection == Protection::Apply {
-                        [16, 24, 32]
-                    } else {
-                        [24, 32, 40]
+                        (&ciphertext, &plaintext)
                     };
                     let expected = if !supported {
                         Expect::Error(Error::Unsupported(Algorithm::KeyWrap(a)))
                     } else if key.len() != [16, 24, 32][index] {
                         Expect::Error(Error::InvalidKey)
-                    } else if !lengths.contains(&len) {
+                    } else if !valid_length(protection, input.len()) {
                         Expect::Error(Error::InvalidInput)
                     } else if protection == Protection::Process && v::string(t, "result") == "invalid" {
                         Expect::Error(Error::VerificationFailed)
@@ -57,24 +47,10 @@ pub fn run(p: &CryptoProvider, _: Options) {
                         Expect::Success
                     };
                     if let Some(out) = c.call(&format!("{id}/{protection:?}"), expected, || {
-                        if protection == Protection::Apply {
-                            e.wrap(&key, &plaintext)
-                        } else {
-                            e.unwrap(&key, &ciphertext)
-                        }
+                        transform(e, protection, &key, input)
                     }) {
                         if protection == Protection::Process || v::string(t, "result") == "valid" {
-                            c.bytes(
-                                &id,
-                                &out,
-                                if protection == Protection::Apply {
-                                    &ciphertext
-                                } else {
-                                    &plaintext
-                                },
-                            );
-                        } else {
-                            c.debug(&id, &out, &out);
+                            c.bytes(&id, &out, output);
                         }
                     }
                 }
@@ -87,40 +63,44 @@ pub fn run(p: &CryptoProvider, _: Options) {
             key.len() * 8 == bits && v::field(base, "ct").len() == v::field(base, "msg").len() + 8,
             "{a:?} control KEK and wrapped lengths"
         );
-        for protection in [Protection::Apply, Protection::Process] {
-            if !protections[usize::from(protection == Protection::Process)] {
+        for (protection, supported) in [Protection::Apply, Protection::Process].into_iter().zip(protections) {
+            if !supported {
                 continue;
             }
             for length in [0, 1, 8, 15, 17, 23, 25, 31, 33, 39, 41] {
-                if (protection == Protection::Apply && [16, 24, 32].contains(&length))
-                    || (protection == Protection::Process && [24, 32, 40].contains(&length))
-                {
+                if valid_length(protection, length) {
                     continue;
                 }
                 c.call(
                     &format!("{a:?}/{protection:?}/length={length}"),
                     Expect::Error(Error::InvalidInput),
-                    || {
-                        if protection == Protection::Apply {
-                            e.wrap(&key, &vec![0; length])
-                        } else {
-                            e.unwrap(&key, &vec![0; length])
-                        }
-                    },
+                    || transform(e, protection, &key, &vec![0; length]),
                 );
             }
+            let input = v::field(base, if protection == Protection::Apply { "msg" } else { "ct" });
             c.call(
                 &format!("{a:?}/{protection:?}/bad KEK"),
                 Expect::Error(Error::InvalidKey),
-                || {
-                    if protection == Protection::Apply {
-                        e.wrap(&[], &v::field(base, "msg"))
-                    } else {
-                        e.unwrap(&[], &v::field(base, "ct"))
-                    }
-                },
+                || transform(e, protection, &[], &input),
             );
         }
     }
     c.finish();
+}
+
+fn valid_length(protection: Protection, length: usize) -> bool {
+    let lengths = if protection == Protection::Apply {
+        [16, 24, 32]
+    } else {
+        [24, 32, 40]
+    };
+    lengths.contains(&length)
+}
+
+fn transform(e: &dyn KeyWrap, protection: Protection, key: &[u8], input: &[u8]) -> Result<OutputBytes, Error> {
+    if protection == Protection::Apply {
+        e.wrap(key, input)
+    } else {
+        e.unwrap(key, input)
+    }
 }

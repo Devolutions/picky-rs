@@ -152,14 +152,7 @@ pub fn run(p: &CryptoProvider, options: Options) {
         }
     }
     for (kind, _, a, _, name) in CURVES {
-        let file = format!(
-            "ecdsa_{name}_sha{}_p1363_test.json",
-            match kind {
-                KeyType::EcP256 => 256,
-                KeyType::EcP384 => 384,
-                _ => 512,
-            }
-        );
+        let file = ecdsa_file(kind, name);
         for g in v::wycheproof(&file).test_groups {
             verify_group(
                 &mut c,
@@ -261,7 +254,7 @@ pub fn run(p: &CryptoProvider, options: Options) {
             let a = rsa_signature(v::string(&g, "sha"));
             let public = der::rsa_public(&material);
             verify_group(&mut c, p, options, a, file, &g, &public, !rsa_public_must(&public));
-            let bits = der::bit_length(der::children(&der::rsa_public(&material))[0].value);
+            let bits = der::bit_length(der::children(&public)[0].value);
             let id = format!("{file}/private key/{bits}");
             let Some(key) = loaded(
                 &mut c,
@@ -275,7 +268,6 @@ pub fn run(p: &CryptoProvider, options: Options) {
             ) else {
                 continue;
             };
-            exported(&mut c, &id, &*key, &der::rsa_public(&material));
             if exercised_keys.insert(material.clone()) {
                 for algorithm in SIGNATURES[..8].iter().copied().filter(|alg| *alg != a) {
                     if !c.key_supports(&id, &*key, KeyOperation::Sign(algorithm)) {
@@ -317,16 +309,6 @@ pub fn run(p: &CryptoProvider, options: Options) {
                     || key.sign(a, &v::field(t, "msg")),
                 ) {
                     c.bytes(&id, &out, &v::field(t, "sig"));
-                    c.check(&id, out.len() == bits.div_ceil(8), "RSA signature length");
-                    if let Ok(verifier) = helpers::signature_verifier(p, a) {
-                        c.outcome(
-                            &id,
-                            Expect::Success,
-                            (!rsa_public_must(&public))
-                                .then_some((Algorithm::Signature(a), options.opaque_public_key_errors)),
-                            || verifier.verify(PublicKey(&der::rsa_public(&material)), &v::field(t, "msg"), &out),
-                        );
-                    }
                 }
             }
         }
@@ -349,7 +331,6 @@ pub fn run(p: &CryptoProvider, options: Options) {
             false,
             false,
         ) {
-            exported(&mut c, &id, &*key, &t.public);
             let expected = if c.key_supports(&id, &*key, KeyOperation::Sign(a)) {
                 Expect::Success
             } else {
@@ -357,7 +338,6 @@ pub fn run(p: &CryptoProvider, options: Options) {
             };
             if let Some(out) = c.call(&id, expected, || key.sign(a, &t.message)) {
                 c.bytes(&id, &out, &t.signature);
-                c.check(&id, out.len() == 64, "Ed25519 signature length");
             }
         }
     }

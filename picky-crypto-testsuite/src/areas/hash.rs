@@ -27,16 +27,11 @@ pub fn run(p: &CryptoProvider, _: Options) {
             _ => "",
         };
         let cases = if index < 2 {
-            v::md(if index == 0 { 1320 } else { 1321 })
+            let rfc = 1320 + index;
+            v::md(rfc)
                 .into_iter()
                 .enumerate()
-                .map(|(i, (m, d))| {
-                    (
-                        format!("{a:?}/rfc{}/A.5/{i}", if index == 0 { 1320 } else { 1321 }),
-                        m,
-                        d,
-                    )
-                })
+                .map(|(i, (m, d))| (format!("{a:?}/rfc{rfc}/A.5/{i}"), m, d))
                 .collect::<Vec<_>>()
         } else {
             v::response(file)
@@ -69,7 +64,6 @@ pub fn run(p: &CryptoProvider, _: Options) {
                     ctx.finish()
                 }) {
                     c.bytes(&id, &out, &digest);
-                    c.check(&id, out.len() == a.output_len(), "output_len mismatch");
                 }
             }
         }

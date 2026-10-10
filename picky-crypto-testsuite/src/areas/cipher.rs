@@ -63,18 +63,18 @@ pub fn run(p: &CryptoProvider, _: Options) {
                 continue;
             }
         };
-        let Some(protections) = c.metadata(&format!("{a:?}/supports"), || {
-            [e.supports(Protection::Apply), e.supports(Protection::Process)]
-        }) else {
+        let Some(protections) = c.directions(p, &format!("{a:?}/supports"), Algorithm::Cipher(a), |p| e.supports(p))
+        else {
             continue;
         };
         let records = cipher_records(a);
-        for (protection, supported) in [Protection::Apply, Protection::Process].into_iter().zip(protections) {
-            c.direction(p, Algorithm::Cipher(a), protection, supported);
-        }
         for (id, key, iv, plaintext, ciphertext, variable) in &records {
-            for protection in [Protection::Apply, Protection::Process] {
-                let supported = protections[usize::from(protection == Protection::Process)];
+            for (protection, supported) in [Protection::Apply, Protection::Process].into_iter().zip(protections) {
+                let (input, output) = if protection == Protection::Apply {
+                    (plaintext, ciphertext)
+                } else {
+                    (ciphertext, plaintext)
+                };
                 let expected = if !supported {
                     Expect::Error(Error::Unsupported(Algorithm::Cipher(a)))
                 } else if *variable {
@@ -82,30 +82,17 @@ pub fn run(p: &CryptoProvider, _: Options) {
                 } else {
                     Expect::Success
                 };
-                let result = c.call(&format!("{a:?}/{id}/{protection:?}"), expected, || {
-                    if protection == Protection::Apply {
-                        e.encrypt(key, iv, plaintext)
-                    } else {
-                        e.decrypt(key, iv, ciphertext)
-                    }
-                });
-                if let Some(result) = result {
-                    c.bytes(
-                        id,
-                        &result,
-                        if protection == Protection::Apply {
-                            ciphertext
-                        } else {
-                            plaintext
-                        },
-                    );
+                if let Some(result) = c.call(&format!("{a:?}/{id}/{protection:?}"), expected, || {
+                    transform(e, protection, key, iv, input)
+                }) {
+                    c.bytes(id, &result, output);
                 }
             }
         }
         let (id, key, iv, data, _, _) = select::cbc_control(a, &records);
         assert_cbc_control(a, key, iv, data);
-        for protection in [Protection::Apply, Protection::Process] {
-            if !protections[usize::from(protection == Protection::Process)] {
+        for (protection, supported) in [Protection::Apply, Protection::Process].into_iter().zip(protections) {
+            if !supported {
                 continue;
             }
             for (k, i, d, error) in [
@@ -117,13 +104,7 @@ pub fn run(p: &CryptoProvider, _: Options) {
                 c.call(
                     &format!("{a:?}/{id}/length/{protection:?}"),
                     Expect::Error(error),
-                    || {
-                        if protection == Protection::Apply {
-                            e.encrypt(k, i, d)
-                        } else {
-                            e.decrypt(k, i, d)
-                        }
-                    },
+                    || transform(e, protection, k, i, d),
                 );
             }
             if matches!(
@@ -132,11 +113,7 @@ pub fn run(p: &CryptoProvider, _: Options) {
             ) {
                 let empty = &select::ed25519_empty().message;
                 if let Some(out) = c.call(&format!("{a:?}/{id}/empty"), Expect::Success, || {
-                    if protection == Protection::Apply {
-                        e.encrypt(key, iv, empty)
-                    } else {
-                        e.decrypt(key, iv, empty)
-                    }
+                    transform(e, protection, key, iv, empty)
                 }) {
                     c.check(id, out.is_empty(), "empty CBC result must be empty");
                 }
@@ -150,13 +127,7 @@ pub fn run(p: &CryptoProvider, _: Options) {
                 c.call(
                     &format!("{a:?}/{protection:?}/key length={length}"),
                     Expect::Error(Error::InvalidKey),
-                    || {
-                        if protection == Protection::Apply {
-                            e.encrypt(&wrong, iv, data)
-                        } else {
-                            e.decrypt(&wrong, iv, data)
-                        }
-                    },
+                    || transform(e, protection, &wrong, iv, data),
                 );
             }
         }
@@ -167,28 +138,42 @@ pub fn run(p: &CryptoProvider, _: Options) {
     c.finish();
 }
 
+/// Encrypts for [`Protection::Apply`] and decrypts for [`Protection::Process`].
+pub fn transform(
+    e: &dyn Cipher,
+    protection: Protection,
+    key: &[u8],
+    iv: &[u8],
+    input: &[u8],
+) -> Result<OutputBytes, Error> {
+    if protection == Protection::Apply {
+        e.encrypt(key, iv, input)
+    } else {
+        e.decrypt(key, iv, input)
+    }
+}
+
 fn weak_tdes_checks(c: &mut Checks, e: &dyn Cipher, record: &CipherVector, protections: [bool; 2]) {
     let (base_id, base, iv, plain, encrypted, _) = record;
     let weak = weak_tdes_key(base);
     let id = format!("{base_id}/KEY1 from rfc/rfc2268.txt/section 5/all-one key");
-    if protections[0] {
-        if let Some(out) = c.call(&id, Expect::Either(Error::InvalidKey), || e.encrypt(&weak, iv, plain)) {
-            c.check(&id, out.len() == plain.len(), "weak-key CBC length");
-            if protections[1] {
-                if let Some(restored) = c.call(&id, Expect::Either(Error::InvalidKey), || e.decrypt(&weak, iv, &out)) {
-                    c.bytes(&id, &restored, plain);
-                }
-            }
+    for (protection, inverse, input) in [
+        (Protection::Apply, Protection::Process, plain),
+        (Protection::Process, Protection::Apply, encrypted),
+    ] {
+        let supported = |p: Protection| protections[usize::from(p == Protection::Process)];
+        if !supported(protection) {
+            continue;
         }
-    }
-    if protections[1] {
         if let Some(out) = c.call(&id, Expect::Either(Error::InvalidKey), || {
-            e.decrypt(&weak, iv, encrypted)
+            transform(e, protection, &weak, iv, input)
         }) {
-            c.check(&id, out.len() == encrypted.len(), "weak-key CBC length");
-            if protections[0] {
-                if let Some(restored) = c.call(&id, Expect::Either(Error::InvalidKey), || e.encrypt(&weak, iv, &out)) {
-                    c.bytes(&id, &restored, encrypted);
+            c.check(&id, out.len() == input.len(), "weak-key CBC length");
+            if supported(inverse) {
+                if let Some(restored) = c.call(&id, Expect::Either(Error::InvalidKey), || {
+                    transform(e, inverse, &weak, iv, &out)
+                }) {
+                    c.bytes(&id, &restored, input);
                 }
             }
         }

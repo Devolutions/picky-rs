@@ -2,7 +2,7 @@
 
 use picky_crypto::*;
 
-use crate::harness::{CheckedResult, Checks, Expect, Options};
+use crate::harness::{Checks, Expect, Options};
 use crate::keys::*;
 use crate::{der, select, vectors as v};
 
@@ -155,18 +155,14 @@ pub fn run(p: &CryptoProvider, _: Options) {
             for group in &groups {
                 let id = &group.id;
                 if let Some((ap, bp, sa, sb)) = c.call(id, Expect::Success, || {
-                    let a = e.generate_ephemeral(group.parameters())?;
-                    let b = e.generate_ephemeral(group.parameters())?;
-                    let ap = a.public_key().checked()?;
-                    let bp = b.public_key().checked()?;
-                    let sa = a.agree(&bp).checked()?;
-                    let sb = b.agree(&ap).checked()?;
-                    Ok((ap, bp, sa, sb))
+                    exchange(
+                        e.generate_ephemeral(group.parameters())?,
+                        e.generate_ephemeral(group.parameters())?,
+                    )
                 }) {
                     c.bytes(id, &sa, &sb);
                     c.check(id, sa.len() == group.p.len(), "FFDH secret width");
                     for public in [ap, bp] {
-                        c.debug(id, &public, &public);
                         c.check(id, public.len() == group.p.len(), "FFDH public width");
                         let unsigned = der::unsigned(&public);
                         let modulus = der::unsigned(&group.p);

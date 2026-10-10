@@ -41,15 +41,12 @@ fn cross_keys(c: &mut Checks, source: &CryptoProvider, dest: &CryptoProvider) {
                 })
             });
             let public = der::rsa_public(&encoded);
-            exported(c, &key_id, &*sk, &public);
-            if let Some(key) = &dk {
-                exported(c, &key_id, &**key, &public);
-            }
             let k = der::bit_length(der::children(&public)[0].value).div_ceil(8);
+            let sign = rsa_signature(v::string(&g, "sha"));
             if rsa_keys.insert(encoded.clone()) {
                 let t = select::group_nonempty_message(file, &g);
                 let data = v::field(t, "msg");
-                for algorithm in SIGNATURES[..8].iter().copied() {
+                for algorithm in SIGNATURES[..8].iter().copied().filter(|alg| *alg != sign) {
                     let id = format!("{}/all RSA signing algorithms", v::id(algorithm, file, t));
                     let ss = c.key_supports(&id, &*sk, KeyOperation::Sign(algorithm));
                     let ds = dk
@@ -75,7 +72,6 @@ fn cross_keys(c: &mut Checks, source: &CryptoProvider, dest: &CryptoProvider) {
                     }
                 }
             }
-            let sign = rsa_signature(v::string(&g, "sha"));
             let ss = c.key_supports(&key_id, &*sk, KeyOperation::Sign(sign));
             let ds = dk
                 .as_ref()
@@ -152,10 +148,6 @@ fn cross_keys(c: &mut Checks, source: &CryptoProvider, dest: &CryptoProvider) {
         };
         let dk = dl.and_then(|dl| c.call(&id, Expect::Success, || dl.load(PrivateKeyMaterial::Pkcs8(&encoded))));
         let algorithm = SignatureAlgorithm::Ed25519;
-        exported(c, &id, &*sk, &t.public);
-        if let Some(key) = &dk {
-            exported(c, &id, &**key, &t.public);
-        }
         let ss = c.key_supports(&id, &*sk, KeyOperation::Sign(algorithm));
         let ds = dk
             .as_ref()
@@ -207,10 +199,6 @@ fn cross_keys(c: &mut Checks, source: &CryptoProvider, dest: &CryptoProvider) {
             continue;
         };
         let dk = dl.and_then(|dl| c.call(&id, Expect::Success, || dl.load(PrivateKeyMaterial::Pkcs8(&encoded))));
-        exported(c, &id, &*sk, &own);
-        if let Some(key) = &dk {
-            exported(c, &id, &**key, &own);
-        }
         let ss = c.key_supports(&id, &*sk, KeyOperation::Agree(a));
         let ds = dk
             .as_ref()

@@ -49,30 +49,27 @@ pub fn run(p: &CryptoProvider, _: Options) {
         let Some(loader) = helpers::private_key_loader(p, kind).ok() else {
             continue;
         };
-        for parameters in [None, Some(kind)] {
-            let material = der::ec(kind, &scalar, Some(&public), parameters);
-            if let Some(key) = loaded(
-                &mut c,
-                p,
-                kind,
-                PrivateKeyMaterial::Pkcs8(&material),
-                &id,
-                if width == 66 { 521 } else { width * 8 },
-                false,
-                false,
-            ) {
-                exported(&mut c, &id, &*key, &public);
-                agree_kat(&mut c, &id, &*key, a, &peer, &der::padded(&r.bytes("Z"), width), false);
-                let sign = CURVES.iter().find(|(k, _, _, _, _)| *k == kind).unwrap().2;
-                if c.key_supports(&id, &*key, KeyOperation::Sign(sign)) {
-                    if let Some(signature) = c.call(&id, Expect::Success, || key.sign(sign, &r.bytes("OI"))) {
-                        c.check(&id, signature.len() == width * 2, "ECDSA P1363 length");
-                        c.debug(&id, &signature, &signature);
-                        if let Ok(verifier) = helpers::signature_verifier(p, sign) {
-                            c.call(&id, Expect::Success, || {
-                                verifier.verify(PublicKey(&public), &r.bytes("OI"), &signature)
-                            });
-                        }
+        // The key agreement area loads the same key without parameters.
+        let explicit = der::ec(kind, &scalar, Some(&public), Some(kind));
+        if let Some(key) = loaded(
+            &mut c,
+            p,
+            kind,
+            PrivateKeyMaterial::Pkcs8(&explicit),
+            &id,
+            ec_bits(width),
+            false,
+            false,
+        ) {
+            agree_kat(&mut c, &id, &*key, a, &peer, &der::padded(&r.bytes("Z"), width), false);
+            let sign = CURVES.iter().find(|(k, _, _, _, _)| *k == kind).unwrap().2;
+            if c.key_supports(&id, &*key, KeyOperation::Sign(sign)) {
+                if let Some(signature) = c.call(&id, Expect::Success, || key.sign(sign, &r.bytes("OI"))) {
+                    c.check(&id, signature.len() == width * 2, "ECDSA P1363 length");
+                    if let Ok(verifier) = helpers::signature_verifier(p, sign) {
+                        c.call(&id, Expect::Success, || {
+                            verifier.verify(PublicKey(&public), &r.bytes("OI"), &signature)
+                        });
                     }
                 }
             }
@@ -101,28 +98,14 @@ pub fn run(p: &CryptoProvider, _: Options) {
             kind,
             PrivateKeyMaterial::Pkcs8(&absent),
             &id,
-            if width == 66 { 521 } else { width * 8 },
+            ec_bits(width),
             false,
             true,
         ) {
             exported(&mut c, &id, &*key, &public);
             agree_kat(&mut c, &id, &*key, a, &peer, &der::padded(&r.bytes("Z"), width), false);
         }
-        for length in [0, 1, material.len() / 2, material.len() - 1] {
-            c.call(
-                &format!("{id}/truncation/{length}"),
-                Expect::Error(Error::InvalidKey),
-                || loader.load(PrivateKeyMaterial::Pkcs8(&material[..length])),
-            );
-        }
-        let mut fields: Vec<_> = der::children(&material).iter().map(|f| f.encoded.to_vec()).collect();
-        assert_eq!(der::sequence(&fields), material, "{id}: split/reassemble control");
-        fields[0] = der::integer(&[1]);
-        fields.push(der::tlv(0x81, &[&[0][..], &public].concat()));
-        let version1 = der::sequence(&fields);
-        c.call(&format!("{id}/version 1"), Expect::Error(Error::InvalidKey), || {
-            loader.load(PrivateKeyMaterial::Pkcs8(&version1))
-        });
+        malformed_pkcs8(&mut c, loader, (&id, &format!("{id}/")), &material, &public);
     }
     for (i, t) in v::ed25519().iter().enumerate() {
         let id = format!("Ed25519/rfc/rfc8032.txt/7.1/{i}/private key");
@@ -171,33 +154,37 @@ pub fn run(p: &CryptoProvider, _: Options) {
         let vectors = v::wycheproof(RSA_SIGN_FILES[0]);
         let g = select::rsa_private_group(RSA_SIGN_FILES[0], &vectors);
         let encoded = v::field(g, "privateKeyPkcs8");
-        let mut fields = der::children(&encoded)
-            .iter()
-            .map(|f| f.encoded.to_vec())
-            .collect::<Vec<_>>();
-        assert_eq!(
-            der::sequence(&fields),
-            encoded,
-            "{}: split/reassemble control",
-            RSA_SIGN_FILES[0]
+        let prefix = format!("{}/RSA ", RSA_SIGN_FILES[0]);
+        malformed_pkcs8(
+            &mut c,
+            loader,
+            (RSA_SIGN_FILES[0], &prefix),
+            &encoded,
+            &der::rsa_public(&encoded),
         );
-        fields[0] = der::integer(&[1]);
-        fields.push(der::tlv(0x81, &[&[0][..], &der::rsa_public(&encoded)].concat()));
-        let version1 = der::sequence(&fields);
-        c.call(
-            &format!("{}/RSA version 1", RSA_SIGN_FILES[0]),
-            Expect::Error(Error::InvalidKey),
-            || loader.load(PrivateKeyMaterial::Pkcs8(&version1)),
-        );
-        for len in [0, 1, encoded.len() / 2, encoded.len() - 1] {
-            c.call(
-                &format!("{}/RSA truncation/{len}", RSA_SIGN_FILES[0]),
-                Expect::Error(Error::InvalidKey),
-                || loader.load(PrivateKeyMaterial::Pkcs8(&encoded[..len])),
-            );
-        }
     }
     c.finish();
+}
+
+/// Checks that truncations of a published PKCS#8 key, and its version 1 form with the published public key added, fail to load.
+/// `ids` holds the source named by the split/reassemble control and the prefix of each check.
+fn malformed_pkcs8(c: &mut Checks, loader: &dyn PrivateKeyLoader, ids: (&str, &str), encoded: &[u8], public: &[u8]) {
+    let (source, prefix) = ids;
+    for length in [0, 1, encoded.len() / 2, encoded.len() - 1] {
+        c.call(
+            &format!("{prefix}truncation/{length}"),
+            Expect::Error(Error::InvalidKey),
+            || loader.load(PrivateKeyMaterial::Pkcs8(&encoded[..length])),
+        );
+    }
+    let mut fields: Vec<_> = der::children(encoded).iter().map(|f| f.encoded.to_vec()).collect();
+    assert_eq!(der::sequence(&fields), encoded, "{source}: split/reassemble control");
+    fields[0] = der::integer(&[1]);
+    fields.push(der::tlv(0x81, &[&[0][..], public].concat()));
+    let version1 = der::sequence(&fields);
+    c.call(&format!("{prefix}version 1"), Expect::Error(Error::InvalidKey), || {
+        loader.load(PrivateKeyMaterial::Pkcs8(&version1))
+    });
 }
 
 pub fn inconsistent_rsa(c: &mut Checks, p: &CryptoProvider) {
@@ -341,7 +328,6 @@ fn inconsistent_rsa_signing(c: &mut Checks, p: &CryptoProvider) {
             }) else {
                 continue;
             };
-            exported(c, &id, &*base, &der::rsa_public(&encoding));
             let other = bases
                 .iter()
                 .find(|other| v::field(other, "privateKeyPkcs8") != encoding)
@@ -362,34 +348,48 @@ fn inconsistent_rsa_signing(c: &mut Checks, p: &CryptoProvider) {
     }
 }
 
+/// A published test, its group's PKCS#8 key and another key of the same size.
+pub type DecryptionBase<'a> = (&'a Value, Vec<u8>, Option<Vec<u8>>);
+
+/// Returns each must-support key of an RSA decryption file with its first valid unlabeled test and another key of the same size for the `qInv` substitution.
+pub fn decryption_bases(vectors: &v::Wycheproof) -> Vec<DecryptionBase<'_>> {
+    let groups = &vectors.test_groups;
+    groups
+        .iter()
+        .filter_map(|g| {
+            let encoded = v::field(g, "privateKeyPkcs8");
+            if !der::rsa_must(&encoded) {
+                return None;
+            }
+            let t = v::tests(g)
+                .iter()
+                .find(|t| v::string(t, "result") == "valid" && t["label"].as_str().is_none_or(str::is_empty))?;
+            let other = groups
+                .iter()
+                .find(|other| {
+                    v::field(other, "privateKeyPkcs8") != encoded
+                        && v::number(other, "keySize") == v::number(g, "keySize")
+                })
+                .map(|g| v::field(g, "privateKeyPkcs8"));
+            Some((t, encoded, other))
+        })
+        .collect()
+}
+
 fn inconsistent_rsa_decryption(c: &mut Checks, p: &CryptoProvider) {
     let Ok(loader) = helpers::private_key_loader(p, KeyType::Rsa) else {
         return;
     };
     for (file, a) in RSA_DECRYPT_FILES {
         let vectors = v::wycheproof(file);
-        for g in &vectors.test_groups {
-            let encoded = v::field(g, "privateKeyPkcs8");
-            if !der::rsa_must(&encoded) {
-                continue;
-            }
-            let Some(t) = v::tests(g)
-                .iter()
-                .find(|t| v::string(t, "result") == "valid" && t["label"].as_str().is_none_or(str::is_empty))
-            else {
-                continue;
-            };
+        for (t, encoded, other) in decryption_bases(&vectors) {
             let id = format!("{file}/tcId={}/inconsistent components", v::number(t, "tcId"));
             let Some(base) = c.call(&format!("{id}/positive control"), Expect::Success, || {
                 loader.load(PrivateKeyMaterial::Pkcs8(&encoded))
             }) else {
                 continue;
             };
-            exported(c, &id, &*base, &der::rsa_public(&encoded));
-            if !c
-                .metadata(&id, || base.supports(KeyOperation::Decrypt(a)))
-                .unwrap_or(false)
-            {
+            if !c.key_supports(&id, &*base, KeyOperation::Decrypt(a)) {
                 continue;
             }
             let ciphertext = v::field(t, "ct");
@@ -397,14 +397,6 @@ fn inconsistent_rsa_decryption(c: &mut Checks, p: &CryptoProvider) {
             if let Some(out) = c.call(&id, Expect::Success, || base.decrypt(a, &ciphertext)) {
                 c.bytes(&id, &out, &plaintext);
             }
-            let other = vectors
-                .test_groups
-                .iter()
-                .find(|other| {
-                    v::field(other, "privateKeyPkcs8") != encoded
-                        && v::number(other, "keySize") == v::number(g, "keySize")
-                })
-                .map(|g| v::field(g, "privateKeyPkcs8"));
             for (i, derived) in der::inconsistent_rsa(&encoded, other.as_deref())
                 .into_iter()
                 .enumerate()
@@ -414,9 +406,7 @@ fn inconsistent_rsa_decryption(c: &mut Checks, p: &CryptoProvider) {
                     loader.load(PrivateKeyMaterial::Pkcs8(&derived))
                 }) {
                     exported(c, &id, &*key, &der::rsa_public(&encoded));
-                    if c.metadata(&id, || key.supports(KeyOperation::Decrypt(a)))
-                        .unwrap_or(false)
-                    {
+                    if c.key_supports(&id, &*key, KeyOperation::Decrypt(a)) {
                         if let Some(out) =
                             c.call(&id, Expect::Either(Error::InvalidKey), || key.decrypt(a, &ciphertext))
                         {

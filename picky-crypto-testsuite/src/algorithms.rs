@@ -121,6 +121,16 @@ pub const CURVES: [(KeyType, KeyAgreementAlgorithm, SignatureAlgorithm, usize, &
     ),
 ];
 
+/// Names the Wycheproof P1363 ECDSA file of a curve in [`CURVES`].
+pub fn ecdsa_file(kind: KeyType, name: &str) -> String {
+    let bits = match kind {
+        KeyType::EcP256 => 256,
+        KeyType::EcP384 => 384,
+        _ => 512,
+    };
+    format!("ecdsa_{name}_sha{bits}_p1363_test.json")
+}
+
 pub fn all() -> Vec<Algorithm> {
     let mut a = Vec::new();
     a.extend(HASHES.map(Algorithm::Hash));

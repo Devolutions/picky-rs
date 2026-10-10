@@ -25,18 +25,11 @@ pub fn run(p: &CryptoProvider, _: Options) {
             _ => 32,
         };
         if let Some((a_public, b_public, a_secret, b_secret)) = c.call(&id, Expect::Success, || {
-            let a = e.generate_ephemeral()?;
-            let b = e.generate_ephemeral()?;
-            let ap = a.public_key().checked()?;
-            let bp = b.public_key().checked()?;
-            let sa = a.agree(&bp).checked()?;
-            let sb = b.agree(&ap).checked()?;
-            Ok((ap, bp, sa, sb))
+            exchange(e.generate_ephemeral()?, e.generate_ephemeral()?)
         }) {
             c.bytes(&id, &a_secret, &b_secret);
             c.check(&id, a_secret.len() == size, "shared secret length");
             for public in [a_public, b_public] {
-                c.debug(&id, &public, &public);
                 c.check(
                     &id,
                     public.len()
@@ -75,11 +68,10 @@ pub fn run(p: &CryptoProvider, _: Options) {
             kind,
             PrivateKeyMaterial::Pkcs8(&material),
             &id,
-            if width == 66 { 521 } else { width * 8 },
+            ec_bits(width),
             false,
             false,
         ) {
-            exported(&mut c, &id, &*key, &public);
             let reason = r.text("Result");
             if reason.contains("Z changed") {
                 continue;
@@ -123,11 +115,10 @@ pub fn run(p: &CryptoProvider, _: Options) {
             kind,
             PrivateKeyMaterial::Pkcs8(&material),
             &id,
-            if width == 66 { 521 } else { width * 8 },
+            ec_bits(width),
             false,
             false,
         ) {
-            exported(&mut c, &id, &*key, &own);
             agree_kat(&mut c, &id, &*key, a, &peer, &der::padded(&fields["x_Z"], width), false);
         }
     }
@@ -303,7 +294,7 @@ pub fn run(p: &CryptoProvider, _: Options) {
                     kind,
                     PrivateKeyMaterial::Pkcs8(&material),
                     &id,
-                    if width == 66 { 521 } else { width * 8 },
+                    ec_bits(width),
                     false,
                     true,
                 ) {

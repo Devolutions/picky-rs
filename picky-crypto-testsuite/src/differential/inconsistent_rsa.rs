@@ -3,7 +3,7 @@
 use picky_crypto::*;
 
 use crate::algorithms::*;
-use crate::areas::private_key::{inconsistent_roundtrip, inconsistent_signatures};
+use crate::areas::private_key::{decryption_bases, inconsistent_roundtrip, inconsistent_signatures};
 use crate::harness::{Checks, Expect};
 use crate::keys::*;
 use crate::{der, select, vectors as v};
@@ -43,7 +43,6 @@ fn cross_inconsistent(c: &mut Checks, source: &CryptoProvider, dest: &CryptoProv
             }) else {
                 continue;
             };
-            exported(c, &id, &*base, &public);
             let base_decrypts = ENCRYPTIONS.map(|a| c.key_supports(&id, &*base, KeyOperation::Decrypt(a)));
             for derived in der::inconsistent_rsa(&encoded, other.as_deref()) {
                 let Some(key) = c.call(&id, Expect::Either(Error::InvalidKey), || {
@@ -85,52 +84,20 @@ fn cross_inconsistent(c: &mut Checks, source: &CryptoProvider, dest: &CryptoProv
     }
     for (file, a) in RSA_DECRYPT_FILES {
         let vectors = v::wycheproof(file);
-        for g in &vectors.test_groups {
-            let encoded = v::field(g, "privateKeyPkcs8");
-            if !der::rsa_must(&encoded) {
-                continue;
-            }
-            let Some(t) = v::tests(g)
-                .iter()
-                .find(|t| v::string(t, "result") == "valid" && t["label"].as_str().is_none_or(str::is_empty))
-            else {
-                continue;
-            };
+        for (t, encoded, other) in decryption_bases(&vectors) {
             let id = format!("{}/cross inconsistent decryption", v::id(a, file, t));
             let Some(base) = c.call(&format!("{id}/positive control"), Expect::Success, || {
                 loader.load(PrivateKeyMaterial::Pkcs8(&encoded))
             }) else {
                 continue;
             };
-            exported(c, &id, &*base, &der::rsa_public(&encoded));
             if !c.key_supports(&id, &*base, KeyOperation::Decrypt(a)) {
                 continue;
             }
-            let ciphertext = v::field(t, "ct");
-            let plaintext = v::field(t, "msg");
-            if let Some(out) = c.call(&id, Expect::Success, || base.decrypt(a, &ciphertext)) {
-                c.bytes(&id, &out, &plaintext);
-            }
-            let other = vectors
-                .test_groups
-                .iter()
-                .find(|other| {
-                    v::field(other, "privateKeyPkcs8") != encoded
-                        && v::number(other, "keySize") == v::number(g, "keySize")
-                })
-                .map(|g| v::field(g, "privateKeyPkcs8"));
             for derived in der::inconsistent_rsa(&encoded, other.as_deref()) {
                 if let Some(key) = c.call(&id, Expect::Either(Error::InvalidKey), || {
                     loader.load(PrivateKeyMaterial::Pkcs8(&derived))
                 }) {
-                    exported(c, &id, &*key, &der::rsa_public(&encoded));
-                    if c.key_supports(&id, &*key, KeyOperation::Decrypt(a)) {
-                        if let Some(out) =
-                            c.call(&id, Expect::Either(Error::InvalidKey), || key.decrypt(a, &ciphertext))
-                        {
-                            c.bytes(&id, &out, &plaintext);
-                        }
-                    }
                     inconsistent_roundtrip(c, (source, Some(dest)), (&*base, &*key), &id, &encoded, a);
                 }
             }

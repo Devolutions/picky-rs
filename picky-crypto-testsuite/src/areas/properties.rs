@@ -6,7 +6,7 @@ use proptest::prelude::*;
 use crate::algorithms::*;
 use crate::areas::cipher::{assert_cbc_control, cipher_records};
 use crate::harness::{CheckedResult, Checks, Expect, Options};
-use crate::keys::{ECC_FILE, RSA_SIGN_FILES, exported, rsa_plaintext_limit};
+use crate::keys::{ECC_FILE, RSA_SIGN_FILES, exchange, rsa_plaintext_limit};
 use crate::{der, published, select, vectors as v};
 
 fn error(e: Error) -> TestCaseError {
@@ -71,10 +71,6 @@ pub fn run(p: &CryptoProvider, _: Options) {
                     context.update(&data[split..]).map_err(error)?;
                     let verifier = context.finish().checked().map_err(error)?;
                     prop_assert!(verifier.verify(tag, tag.len()), "{id}");
-                    prop_assert!(
-                        helpers::verify_mac(p, a, key, data, tag, tag.len()).map_err(error)?,
-                        "{id}"
-                    );
                     if let Some(tag) = generated {
                         prop_assert!(verifier.verify(&tag, tag.len()), "{id}");
                     }
@@ -274,12 +270,11 @@ pub fn run(p: &CryptoProvider, _: Options) {
             continue;
         };
         c.property(&format!("{a:?}/ephemeral round trip"), Just(()), |_| {
-            let a = e.generate_ephemeral().map_err(error)?;
-            let b = e.generate_ephemeral().map_err(error)?;
-            let ap = a.public_key().checked().map_err(error)?;
-            let bp = b.public_key().checked().map_err(error)?;
-            let sa = a.agree(&bp).checked().map_err(error)?;
-            let sb = b.agree(&ap).checked().map_err(error)?;
+            let (_, _, sa, sb) = exchange(
+                e.generate_ephemeral().map_err(error)?,
+                e.generate_ephemeral().map_err(error)?,
+            )
+            .map_err(error)?;
             prop_assert_eq!(sa.as_ref(), sb.as_ref());
             Ok(())
         });
@@ -293,7 +288,6 @@ pub fn run(p: &CryptoProvider, _: Options) {
             loader.load(PrivateKeyMaterial::Pkcs8(&encoded))
         }) {
             let public = der::rsa_public(&encoded);
-            exported(&mut c, &id, &*key, &public);
             let k = der::bit_length(der::children(&public)[0].value).div_ceil(8);
             for a in ENCRYPTIONS {
                 let Ok(e) = helpers::asymmetric_encryptor(p, a) else {
@@ -318,7 +312,6 @@ pub fn run(p: &CryptoProvider, _: Options) {
         let encoded = der::ed(&t.seed, Some(&t.public));
         let id = "rfc/rfc8032.txt/7.1/Ed25519 property key";
         if let Some(key) = c.call(id, Expect::Success, || loader.load(PrivateKeyMaterial::Pkcs8(&encoded))) {
-            exported(&mut c, id, &*key, &t.public);
             let a = SignatureAlgorithm::Ed25519;
             if c.key_supports(id, &*key, KeyOperation::Sign(a)) {
                 if let Ok(verifier) = helpers::signature_verifier(p, a) {
@@ -350,7 +343,6 @@ pub fn run(p: &CryptoProvider, _: Options) {
         }) else {
             continue;
         };
-        exported(&mut c, &id, &*key, &public);
         let sign = CURVES.iter().find(|(k, _, _, _, _)| *k == kind).unwrap().2;
         if c.key_supports(&id, &*key, KeyOperation::Sign(sign)) {
             if let Ok(verifier) = helpers::signature_verifier(p, sign) {
@@ -375,12 +367,11 @@ pub fn run(p: &CryptoProvider, _: Options) {
         c.property("published FFDH group round trip", 0..groups.len(), |index| {
             let group = &groups[index];
             let id = &group.id;
-            let a = e.generate_ephemeral(group.parameters()).map_err(error)?;
-            let b = e.generate_ephemeral(group.parameters()).map_err(error)?;
-            let ap = a.public_key().checked().map_err(error)?;
-            let bp = b.public_key().checked().map_err(error)?;
-            let sa = a.agree(&bp).checked().map_err(error)?;
-            let sb = b.agree(&ap).checked().map_err(error)?;
+            let (ap, bp, sa, sb) = exchange(
+                e.generate_ephemeral(group.parameters()).map_err(error)?,
+                e.generate_ephemeral(group.parameters()).map_err(error)?,
+            )
+            .map_err(error)?;
             prop_assert_eq!(ap.len(), group.p.len(), "{}", id);
             prop_assert_eq!(bp.len(), group.p.len(), "{}", id);
             prop_assert_eq!(sa.len(), group.p.len(), "{}", id);

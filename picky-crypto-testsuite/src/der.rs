@@ -1,6 +1,6 @@
 use picky_crypto::KeyType;
 
-use crate::algorithms::CURVES;
+use crate::algorithms::{CURVES, ecdsa_file};
 use crate::keys::{RSA_DECRYPT_FILES, RSA_SIGN_FILES};
 use crate::vectors;
 
@@ -412,17 +412,7 @@ fn ec_control() {
         let parameters = parts.iter().any(|p| p.tag == 0xa0).then_some(curve);
         assert_eq!(ec_inner(curve, &scalar, Some(&public), parameters), published);
         assert_eq!(rebuild(&published), published);
-        let file = format!(
-            "ecdsa_{name}_sha{}_p1363_test.json",
-            if curve == KeyType::EcP256 {
-                256
-            } else if curve == KeyType::EcP384 {
-                384
-            } else {
-                512
-            }
-        );
-        let g = &vectors::wycheproof(&file).test_groups[0];
+        let g = &vectors::wycheproof(&ecdsa_file(curve, name)).test_groups[0];
         let spki = vectors::field(g, "publicKeyDer");
         assert_eq!(algorithm(curve), children(&spki)[0].encoded);
     }

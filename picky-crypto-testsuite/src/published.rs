@@ -77,16 +77,21 @@ pub fn password(index: usize) -> Vec<Password> {
 }
 
 pub fn kdf(index: usize) -> Vec<Pair> {
-    let inputs: Vec<Pair> = if (1..4).contains(&index) {
-        v::response(ECC_FILE)
+    let one_step = (1..4).contains(&index);
+    let file = if one_step {
+        ECC_FILE
+    } else {
+        "nist/kbkdf/KDFCTR_gen.rsp"
+    };
+    let inputs: Vec<Pair> = if one_step {
+        v::response(file)
             .into_iter()
             .filter(|r| {
                 r.group.contains(["SHA1", "SHA256", "SHA384", "SHA512"][index]) && r.text("Result").starts_with('P')
             })
-            .map(|r| (r.id(ECC_FILE), r.bytes("Z"), r.bytes("OI")))
+            .map(|r| (r.id(file), r.bytes("Z"), r.bytes("OI")))
             .collect()
     } else {
-        let file = "nist/kbkdf/KDFCTR_gen.rsp";
         let prf = ["HMAC_SHA1", "HMAC_SHA256", "HMAC_SHA384", "HMAC_SHA512"][index.saturating_sub(4)];
         v::response(file)
             .into_iter()
@@ -94,15 +99,7 @@ pub fn kdf(index: usize) -> Vec<Pair> {
             .map(|r| (r.id(file), r.bytes("KI"), r.bytes("FixedInputData")))
             .collect()
     };
-    select::nonempty(
-        if (1..4).contains(&index) {
-            ECC_FILE
-        } else {
-            "nist/kbkdf/KDFCTR_gen.rsp"
-        },
-        &format!("inputs for {:?}", KDFS[index]),
-        &inputs,
-    );
+    select::nonempty(file, &format!("inputs for {:?}", KDFS[index]), &inputs);
     inputs
 }
 
@@ -145,7 +142,7 @@ pub fn wrap(index: usize) -> Vec<Pair> {
     inputs
 }
 
-pub fn rc4() -> Vec<(String, Vec<u8>, Vec<u8>)> {
+pub fn rc4() -> Vec<Pair> {
     let messages = messages();
     let inputs = v::rc4()
         .into_iter()

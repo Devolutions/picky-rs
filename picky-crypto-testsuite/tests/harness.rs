@@ -101,6 +101,10 @@ fn buffer_audit_visits_agreement_tuples_and_nested_outputs() {
     let source = picky_crypto_testsuite::vectors::x25519_dh().4;
     let output = OutputBytes::new(Zeroizing::new(source));
     let mut checks = Checks::default();
+    // Areas rely on `call` to audit every returned buffer; catches a `call` that skips the audit.
+    checks.call("returned output", Expect::Success, || Ok(output.clone()));
+    assert_eq!(checks.buffer_audits, 1);
+    checks.buffer_audits = 0;
     checks.buffers(
         "agreement outputs",
         &(output.clone(), output.clone(), output.clone(), output.clone()),

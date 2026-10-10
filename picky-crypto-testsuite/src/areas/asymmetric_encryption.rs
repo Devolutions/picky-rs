@@ -19,20 +19,16 @@ pub fn run(p: &CryptoProvider, _: Options) {
             let material = v::field(&g, "privateKeyPkcs8");
             let public = der::rsa_public(&material);
             let bits = der::bit_length(der::children(&public)[0].value);
-            let id = format!("{a:?}/{file}/key");
             let key = loaded(
                 &mut c,
                 p,
                 KeyType::Rsa,
                 PrivateKeyMaterial::Pkcs8(&material),
-                &id,
+                &format!("{a:?}/{file}/key"),
                 bits,
                 !der::rsa_must(&material),
                 false,
             );
-            if let Some(key) = &key {
-                exported(&mut c, &id, &**key, &public);
-            }
             for t in v::tests(&g) {
                 let nonempty_label = t["label"].as_str().is_some_and(|s| !s.is_empty());
                 let id = v::id(a, file, t);
@@ -67,7 +63,6 @@ pub fn run(p: &CryptoProvider, _: Options) {
                             || e.encrypt(PublicKey(&public), &msg),
                         ) {
                             c.check(&id, encrypted.len() == bits.div_ceil(8), "RSA ciphertext length");
-                            c.debug(&id, &encrypted, &encrypted);
                             if let Some(key) = key
                                 .as_ref()
                                 .filter(|k| c.key_supports(&id, &***k, KeyOperation::Decrypt(a)))
@@ -77,15 +72,11 @@ pub fn run(p: &CryptoProvider, _: Options) {
                                 }
                             }
                         }
-                        let overhead = match a {
-                            AsymmetricEncryptionAlgorithm::RsaPkcs1v15 => 11,
-                            AsymmetricEncryptionAlgorithm::RsaOaepSha1 => 42,
-                            _ => 66,
-                        };
+                        let too_long = rsa_plaintext_limit(a, bits.div_ceil(8)) + 1;
                         c.call(
                             &format!("{id}/plaintext too long"),
                             Expect::Error(Error::InvalidInput),
-                            || e.encrypt(PublicKey(&public), &vec![0; bits.div_ceil(8) - overhead + 1]),
+                            || e.encrypt(PublicKey(&public), &vec![0; too_long]),
                         );
                         c.call(
                             &format!("{id}/bad public key"),
@@ -114,7 +105,6 @@ pub fn run(p: &CryptoProvider, _: Options) {
             false,
         ) {
             let a = AsymmetricEncryptionAlgorithm::RsaOaepSha1;
-            exported(&mut c, &id, &*key, &der::rsa_public(&material));
             if c.key_supports(&id, &*key, KeyOperation::Decrypt(a)) {
                 for (j, (msg, encrypted)) in published.cases.iter().enumerate() {
                     let id = format!("{id}/example {}", j + 1);

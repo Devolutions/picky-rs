@@ -30,7 +30,6 @@ fn cross_encryption(c: &mut Checks, source: &CryptoProvider, dest: &CryptoProvid
         return;
     };
     let public = der::rsa_public(&encoded);
-    exported(c, &id, &*key, &public);
     let k = der::bit_length(der::children(&public)[0].value).div_ceil(8);
     for a in ENCRYPTIONS {
         let Ok(encryptor) = helpers::asymmetric_encryptor(source, a) else {

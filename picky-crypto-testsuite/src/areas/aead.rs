@@ -18,14 +18,10 @@ pub fn run(p: &CryptoProvider, _: Options) {
                 continue;
             }
         };
-        let Some(protections) = c.metadata(&format!("{a:?}/supports"), || {
-            [e.supports(Protection::Apply), e.supports(Protection::Process)]
-        }) else {
+        let Some(protections) = c.directions(p, &format!("{a:?}/supports"), Algorithm::Aead(a), |p| e.supports(p))
+        else {
             continue;
         };
-        for (protection, supported) in [Protection::Apply, Protection::Process].into_iter().zip(protections) {
-            c.direction(p, Algorithm::Aead(a), protection, supported);
-        }
         for g in &vectors.test_groups {
             if v::number(g, "keySize") != [128, 192, 256][index] {
                 continue;
@@ -73,8 +69,6 @@ pub fn run(p: &CryptoProvider, _: Options) {
                             sealed.ciphertext_and_tag.len() == plaintext.len() + 16,
                             "seal ciphertext length",
                         );
-                        c.debug(&id, &sealed, &sealed.nonce);
-                        c.debug(&id, &sealed, &sealed.ciphertext_and_tag);
                         if protections[1] {
                             if let Some(out) = c.call(&id, Expect::Success, || {
                                 e.open(&key, &sealed.nonce, &aad, &sealed.ciphertext_and_tag)

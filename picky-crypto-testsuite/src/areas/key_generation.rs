@@ -34,7 +34,6 @@ pub fn run(p: &CryptoProvider, _: Options) {
         for invocation in 0..2 {
             let id = format!("{a:?}/generation/{invocation}");
             if let Some(out) = c.call(&id, Expect::Success, || generator.generate()) {
-                c.debug(&id, &out, &out);
                 let validation = der::generated_public(kind, bits, &out);
                 c.check(
                     &id,
@@ -59,11 +58,9 @@ pub fn run(p: &CryptoProvider, _: Options) {
                     false,
                     false,
                 ) {
-                    exported(&mut c, &id, &*key, &public);
                     if c.key_supports(&id, &*key, KeyOperation::Sign(sign)) {
                         let message = &select::ed25519_nonempty().message;
                         if let Some(sig) = c.call(&id, Expect::Success, || key.sign(sign, message)) {
-                            c.debug(&id, &sig, &sig);
                             if let Ok(verifier) = helpers::signature_verifier(p, sign) {
                                 c.call(&id, Expect::Success, || {
                                     verifier.verify(PublicKey(&public), message, &sig)

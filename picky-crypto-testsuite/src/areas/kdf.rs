@@ -4,6 +4,7 @@ use picky_crypto::*;
 
 use crate::algorithms::*;
 use crate::harness::{Checks, Expect, Options};
+use crate::keys::ECC_FILE;
 use crate::vectors as v;
 
 pub(super) fn maximum(hlen: usize) -> Option<usize> {
@@ -13,7 +14,7 @@ pub(super) fn maximum(hlen: usize) -> Option<usize> {
 pub fn run(p: &CryptoProvider, _: Options) {
     let mut c = Checks::default();
     let counter = "nist/kbkdf/KDFCTR_gen.rsp";
-    let ecc = "nist/kas/KASValidityTest_ECCEphemeralUnified_KDFConcat_NOKC_init.fax";
+    let ecc = ECC_FILE;
     for (index, a) in KDFS.into_iter().enumerate() {
         let e = match helpers::kdf(p, a) {
             Ok(e) => e,

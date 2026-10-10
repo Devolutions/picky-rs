@@ -179,27 +179,26 @@ pub fn loaded(
             || key.public_key(),
         );
     } else if let Some(output) = c.call(&format!("{id}/public key export"), Expect::Success, || key.public_key()) {
-        let mut published_public = false;
-        if let PrivateKeyMaterial::Pkcs8(encoded) = material {
-            if let Some(expected) = der::encoded_public(kind, encoded) {
-                c.bytes(id, &output, &expected);
-                published_public = true;
-            }
-        }
-        let expected_len = match kind {
-            KeyType::EcP256 => Some(65),
-            KeyType::EcP384 => Some(97),
-            KeyType::EcP521 => Some(133),
-            KeyType::Ed25519 | KeyType::X25519 => Some(32),
+        let published = match material {
+            PrivateKeyMaterial::Pkcs8(encoded) => der::encoded_public(kind, encoded),
             _ => None,
         };
-        if let Some(len) = expected_len {
-            c.check(id, output.len() == len, "public key export length");
-        }
-        if matches!(kind, KeyType::EcP256 | KeyType::EcP384 | KeyType::EcP521) {
-            c.check(id, output.first() == Some(&4), "public key export must be uncompressed");
-        }
-        if !published_public {
+        if let Some(expected) = published {
+            c.bytes(id, &output, &expected);
+        } else {
+            let expected_len = match kind {
+                KeyType::EcP256 => Some(65),
+                KeyType::EcP384 => Some(97),
+                KeyType::EcP521 => Some(133),
+                KeyType::Ed25519 | KeyType::X25519 => Some(32),
+                _ => None,
+            };
+            if let Some(len) = expected_len {
+                c.check(id, output.len() == len, "public key export length");
+            }
+            if matches!(kind, KeyType::EcP256 | KeyType::EcP384 | KeyType::EcP521) {
+                c.check(id, output.first() == Some(&4), "public key export must be uncompressed");
+            }
             let algorithm = match kind {
                 KeyType::EcP256 => Some(KeyAgreementAlgorithm::EcdhP256),
                 KeyType::EcP384 => Some(KeyAgreementAlgorithm::EcdhP384),
@@ -262,6 +261,22 @@ pub fn loaded(
         }
     }
     Some(key)
+}
+
+/// Returns the bit size of a NIST curve from its field-element width in bytes.
+pub fn ec_bits(width: usize) -> usize {
+    if width == 66 { 521 } else { width * 8 }
+}
+
+pub type Exchange = (OutputBytes, OutputBytes, OutputBytes, OutputBytes);
+
+/// Completes an exchange between two ephemeral secrets, returning both public values, then both shared secrets.
+pub fn exchange(a: Box<dyn EphemeralSecret>, b: Box<dyn EphemeralSecret>) -> Result<Exchange, Error> {
+    let ap = a.public_key().checked()?;
+    let bp = b.public_key().checked()?;
+    let sa = a.agree(&bp).checked()?;
+    let sb = b.agree(&ap).checked()?;
+    Ok((ap, bp, sa, sb))
 }
 
 /// Returns p − 1 for a published odd p by clearing the low bit of its last byte, asserting that no other byte changes.

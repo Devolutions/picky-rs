@@ -39,7 +39,6 @@ pub fn run(p: &CryptoProvider, _: Options) {
                     key[0] & 7 == 0 && key[31] & 128 == 0 && key[31] & 64 != 0,
                     "scalar not clamped",
                 );
-                c.debug("random/clamping", &key, &key[..]);
             }
         }
     }

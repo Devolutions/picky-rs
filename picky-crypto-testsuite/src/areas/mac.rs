@@ -16,14 +16,10 @@ pub fn run(p: &CryptoProvider, _: Options) {
                 continue;
             }
         };
-        let Some(protections) = c.metadata(&format!("{a:?}/supports"), || {
-            [e.supports(Protection::Apply), e.supports(Protection::Process)]
-        }) else {
+        let Some(protections) = c.directions(p, &format!("{a:?}/supports"), Algorithm::Mac(a), |p| e.supports(p))
+        else {
             continue;
         };
-        for (protection, supported) in [Protection::Apply, Protection::Process].into_iter().zip(protections) {
-            c.direction(p, Algorithm::Mac(a), protection, supported);
-        }
         let file = format!("hmac_{sha}_test.json");
         for group in v::wycheproof(&file).test_groups {
             for t in v::tests(&group) {
@@ -126,7 +122,6 @@ fn mac_case(
                 .map(Vec::as_slice)
                 .or_else(|| (valid && tag.len() == full_len).then_some(tag));
             if let Some(correct) = correct {
-                c.debug(id, &verifier, correct);
                 c.check(
                     id,
                     verifier.verify(correct, correct.len()),

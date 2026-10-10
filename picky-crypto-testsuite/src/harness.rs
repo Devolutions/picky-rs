@@ -260,6 +260,21 @@ impl Checks {
         );
     }
 
+    /// Reads an entry's protections under `id` and checks the directional availability of each.
+    pub fn directions(
+        &mut self,
+        provider: &CryptoProvider,
+        id: &str,
+        a: Algorithm,
+        supports: impl Fn(Protection) -> bool,
+    ) -> Option<[bool; 2]> {
+        let protections = self.metadata(id, || [supports(Protection::Apply), supports(Protection::Process)])?;
+        for (protection, supported) in [Protection::Apply, Protection::Process].into_iter().zip(protections) {
+            self.direction(provider, a, protection, supported);
+        }
+        Some(protections)
+    }
+
     pub fn direction(&mut self, provider: &CryptoProvider, a: Algorithm, p: Protection, supported: bool) {
         let requirement = match a {
             Algorithm::Mac(a) => Requirement::Mac(a, p),
