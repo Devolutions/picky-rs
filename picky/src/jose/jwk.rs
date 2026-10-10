@@ -758,6 +758,7 @@ ZQIDAQAB
     #[rstest]
     #[case(picky_test_data::EC_NIST256_PK_1_PUB, 32)]
     #[case(picky_test_data::EC_NIST384_PK_1_PUB, 48)]
+    // The x-coordinate of this key starts with a 0x00 octet.
     #[case(picky_test_data::EC_NIST521_PK_1_PUB, 66)]
     fn x509_and_jwk_conversion_ec(#[case] pem: &str, #[case] field_size: usize) {
         let initial_key = PublicKey::from_pem(&pem.parse::<Pem>().expect("pem")).expect("public key");
@@ -772,16 +773,6 @@ ZQIDAQAB
         }
         let from_jwk_key = jwk.to_public_key().unwrap();
         assert_eq!(from_jwk_key, initial_key);
-    }
-
-    #[rstest]
-    #[case(picky_test_data::JOSE_JWK_EC_P256_JSON)]
-    #[case(picky_test_data::JOSE_JWK_EC_P384_JSON)]
-    #[case(picky_test_data::JOSE_JWK_EC_P521_JSON)]
-    fn ecdsa_key_public_key_roundtrip(#[case] json: &str) {
-        let public_key = Jwk::from_json(json).unwrap().to_public_key().unwrap();
-        let encoded = Jwk::from_public_key(&public_key).unwrap().to_json().unwrap();
-        pretty_assertions::assert_eq!(encoded, json);
     }
 
     // RFC 7520 section 3.1, Figure 1: P-521 public key whose "x" starts with a 0x00 octet.

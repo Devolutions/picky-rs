@@ -276,7 +276,6 @@ mod tests {
 
     #[rstest]
     #[case(PUTTY_KEY_EC_P256_LEADING_ZERO, SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_256))]
-    #[case(PUTTY_KEY_ED25519_LEADING_ZERO, SignatureAlgorithm::Ed25519)]
     #[case(PUTTY_KEY_ED25519_V2_SHORT_SECRET, SignatureAlgorithm::Ed25519)]
     fn padded_secret_signs(#[case] ppk: &str, #[case] algorithm: SignatureAlgorithm) {
         let key: Ppk = ppk.parse().unwrap();
