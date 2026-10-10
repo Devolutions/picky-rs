@@ -202,7 +202,7 @@ pub const PUTTY_KEY_ED25519_V2_ENCRYPTED: &str = include_str!("../test_assets/pu
 pub const PUTTY_KEY_RSA_PUBLIC_EMPTY_COMMENT: &str = include_str!("../test_assets/putty/rsa_pub_empty_comment");
 pub const PUTTY_KEY_RSA_PUBLIC_ESCAPED_COMMENT: &str = include_str!("../test_assets/putty/rsa_pub_escaped_conmment");
 
-// Secrets that need padding when decoded; see test_assets/ssh/README.md.
+// Secrets with a zero byte that a minimal encoding drops; see test_assets/ssh/README.md.
 pub const PUTTY_KEY_EC_P256_LEADING_ZERO: &str = include_str!("../test_assets/putty/p256_leading_zero.ppk");
 pub const PUTTY_KEY_ED25519_LEADING_ZERO: &str = include_str!("../test_assets/putty/ed25519_leading_zero.ppk");
 pub const PUTTY_KEY_ED25519_V2_SHORT_SECRET: &str = include_str!("../test_assets/putty/ed25519_v2_short_secret.ppk");

@@ -1,6 +1,6 @@
-# Keys with leading-zero secrets
+# Keys with zero bytes at the edge of the secret
 
-These fixtures cover secrets whose stored encoding needs padding to reach the fixed key length:
+These fixtures cover fixed-length secrets with a zero byte at one end, which a minimal integer encoding drops:
 
 - `ssh_key_p256_leading_zero`: OpenSSH ECDSA P-256 key whose secret starts with `0x00`, so its `mpint` is 31 bytes.
 - `ssh_key_ed25519_leading_zero`: OpenSSH Ed25519 key whose seed starts with `0x00`.
@@ -24,7 +24,7 @@ Run the script from an empty directory, then move the PPK files to `../putty`.
 # Usage: PUTTYGEN=puttygen-0.81 PUTTYGEN_OLD=puttygen-0.73 ./gen.sh
 set -euo pipefail
 
-# Exits with 0 when the secret in $1 needs padding when decoded:
+# Exits with 0 when the secret in $1 has the wanted zero byte:
 # its first byte is 0x00 (openssh-ecdsa, openssh-ed25519),
 # or PuTTY stored it shorter than 32 bytes (ppk-ed25519-short).
 is_wanted_key() {
