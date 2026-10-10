@@ -4,7 +4,7 @@
 
 use crate::jose::jwe::{JweAlg, JweEnc};
 use crate::jose::jws::JwsAlg;
-use crate::key::ec::{EcdsaPublicKey, NamedEcCurve};
+use crate::key::ec::{EcComponent, EcdsaPublicKey, NamedEcCurve};
 use crate::key::ed::{EdPublicKey, NamedEdAlgorithm};
 use crate::key::{EcCurve, EdAlgorithm, PublicKey};
 use base64::engine::general_purpose;
@@ -99,14 +99,22 @@ impl JwkKeyType {
 
     /// Build a JWK key from EC components.
     ///
-    /// `x` and `y` are the big-endian affine point coordinates, each the full field length of the curve.
-    /// They are encoded as given, leading zero octets included, as required by
-    /// [RFC 7518 section 6.2.1.2](https://www.rfc-editor.org/rfc/rfc7518#section-6.2.1.2).
+    /// `x` and `y` are the big-endian affine point coordinates.
+    /// Leading zero octets are removed or added so that each coordinate is the field length of the curve.
+    /// This is required by [RFC 7518 section 6.2.1.2](https://www.rfc-editor.org/rfc/rfc7518#section-6.2.1.2).
+    /// Signed encodings with an extra sign octet are therefore accepted.
+    /// A coordinate still longer than the field length passes through unchanged, and [`Jwk::to_public_key`] rejects it.
     pub fn new_ec_key(curve: JwkEcPublicKeyCurve, x: &[u8], y: &[u8]) -> Self {
+        let to_field_length = |component: EcComponent<'_>, value: &[u8]| {
+            h_ec_curve(curve)
+                .pad_component(component)
+                .unwrap_or_else(|_| value.to_vec())
+        };
+
         Self::Ec(JwkPublicEcKey {
             crv: curve,
-            x: general_purpose::URL_SAFE_NO_PAD.encode(x),
-            y: general_purpose::URL_SAFE_NO_PAD.encode(y),
+            x: general_purpose::URL_SAFE_NO_PAD.encode(to_field_length(EcComponent::PointX(x), x)),
+            y: general_purpose::URL_SAFE_NO_PAD.encode(to_field_length(EcComponent::PointY(y), y)),
         })
     }
 
@@ -429,11 +437,7 @@ impl Jwk {
                 Ok(spki.into())
             }
             JwkKeyType::Ec(ec) => {
-                let curve = match ec.crv {
-                    JwkEcPublicKeyCurve::P256 => EcCurve::NistP256,
-                    JwkEcPublicKeyCurve::P384 => EcCurve::NistP384,
-                    JwkEcPublicKeyCurve::P521 => EcCurve::NistP521,
-                };
+                let curve = h_ec_curve(ec.crv);
 
                 // RFC 7518 section 6.2.1.2: each coordinate is the full field length, leading zeros included.
                 let x = general_purpose::URL_SAFE_NO_PAD.decode(&ec.x)?;
@@ -536,6 +540,14 @@ pub enum JwkEcPublicKeyCurve {
     P384,
     #[serde(rename = "P-521")]
     P521,
+}
+
+fn h_ec_curve(curve: JwkEcPublicKeyCurve) -> EcCurve {
+    match curve {
+        JwkEcPublicKeyCurve::P256 => EcCurve::NistP256,
+        JwkEcPublicKeyCurve::P384 => EcCurve::NistP384,
+        JwkEcPublicKeyCurve::P521 => EcCurve::NistP521,
+    }
 }
 
 // === public ec key === //
@@ -790,5 +802,21 @@ ZQIDAQAB
         ec_key.x = general_purpose::URL_SAFE_NO_PAD.encode(resize(&x));
 
         assert!(matches!(jwk.to_public_key(), Err(JwkError::InvalidEcPointCoordinates)));
+    }
+
+    #[test]
+    fn ec_key_from_signed_coordinate() {
+        let jwk = Jwk::from_json(picky_test_data::JOSE_JWK_EC_P256_JSON).unwrap();
+        let ec_key = jwk.key.as_ec().unwrap();
+        let x = general_purpose::URL_SAFE_NO_PAD.decode(&ec_key.x).unwrap();
+        let y = general_purpose::URL_SAFE_NO_PAD.decode(&ec_key.y).unwrap();
+
+        // The high bit of x is set, so its signed big-endian encoding has a zero sign octet: 33 bytes for P-256.
+        assert!(x[0] >= 0x80);
+        let signed_x = [&[0][..], &x].concat();
+
+        let key = JwkKeyType::new_ec_key(JwkEcPublicKeyCurve::P256, &signed_x, &y);
+        assert_eq!(key, jwk.key);
+        assert_eq!(Jwk::new(key).to_public_key().unwrap(), jwk.to_public_key().unwrap());
     }
 }
