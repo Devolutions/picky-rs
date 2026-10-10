@@ -143,7 +143,7 @@ The error set is closed: only the contract defines variants, never a backend, an
 [`install_default`] returns the rejected provider instead of an error value.
 
 When both [`Error::InvalidKey`] and [`Error::InvalidInput`] could apply, report [`Error::InvalidKey`].
-Library validation failures map to [`Error::InvalidKey`], except when the library only rejects a well-formed key for its size or parameters, which maps to [`Error::Unsupported`] (rule 4).
+Library key-validation failures map to [`Error::InvalidKey`], except when the library only rejects a well-formed key for its size or parameters, which maps to [`Error::Unsupported`] (rule 4).
 [`Error::ProviderFailure`] includes "PIN required", which callers therefore cannot distinguish from other device failures; this is a known limit of the closed set, to revisit if a consumer needs to prompt for a PIN.
 Some libraries report a single opaque failure for verification; a backend on such a library may report [`Error::VerificationFailed`] for a public key it cannot use, including an RSA modulus outside its range.
 Conformance tests therefore expect [`Error::InvalidKey`] for a malformed public key, and accept either the result expected for a key in the must-support set or [`Error::Unsupported`] for a well-formed public key outside it; for a backend on such a library they also accept [`Error::VerificationFailed`] in both cases.
