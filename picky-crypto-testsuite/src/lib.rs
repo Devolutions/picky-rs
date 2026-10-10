@@ -1,120 +1,23 @@
-//! Published-vector conformance tests for unwrapped `picky-crypto` providers.
-//! Invoke the macros in a backend's integration test:
+//! Conformance suite for `picky-crypto` providers, derived from the contract and published vectors.
 //!
-//! ```text
-//! picky_crypto_testsuite::conformance_tests!(my_backend::provider());
-//! picky_crypto_testsuite::differential_tests!(my_backend::provider(), another_backend::provider());
-//! ```
+//! A runner calls the `run` function of every module in [`areas`] on a provider, and of every module in [`differential`] on a pair of providers.
+//! [`for_each_area!`] and [`for_each_differential_area!`] list these modules, so a runner can't miss one.
+//! Each takes the name of a runner macro and invokes it with the module names, for example `hash, mac, ...`.
+//! The runner macro defines one test per name, calling `picky_crypto_testsuite::areas::$name::run(&provider, Options::default())` or `picky_crypto_testsuite::differential::$name::run(&a, &b)`.
+//! Each `run` function panics with a report of every failed check.
 //!
-//! The macros need no test dependencies beyond this crate and `picky-crypto`.
 //! The Wycheproof vectors are a git submodule: run `git submodule update --init` before running tests.
 //! Set `PICKY_CRYPTO_TESTSUITE_EXTENDED=1` for expensive iteration tests, RSA generation, and larger property runs.
 //! `PROPTEST_CASES` overrides the property case count.
-//! [`Options`] permits only the contract's opaque public-key verification failure tolerance.
+//! [`harness::Options`] permits only the contract's opaque public-key verification failure tolerance.
 #![forbid(unsafe_code)]
 
-#[doc(hidden)]
 pub mod algorithms;
-#[doc(hidden)]
-pub mod asymmetric;
-#[doc(hidden)]
+pub mod areas;
 pub mod der;
-#[doc(hidden)]
 pub mod differential;
-#[doc(hidden)]
 pub mod harness;
-#[doc(hidden)]
-pub mod properties;
-#[doc(hidden)]
+pub mod keys;
 pub mod published;
-#[doc(hidden)]
 pub mod select;
-#[doc(hidden)]
-pub mod symmetric;
-#[doc(hidden)]
 pub mod vectors;
-
-/// Contract-sanctioned variations in verification diagnostics.
-#[non_exhaustive]
-#[derive(Clone, Copy, Debug, Default)]
-pub struct Options {
-    /// Accept `VerificationFailed` for an unusable public key (contract section 4).
-    pub opaque_public_key_errors: bool,
-}
-
-#[doc(hidden)]
-pub use asymmetric::{asymmetric_encryption, ffdh, key_agreement, key_generation, private_key, signature};
-#[doc(hidden)]
-pub use differential::differential;
-#[doc(hidden)]
-pub use harness::provider;
-#[doc(hidden)]
-pub use picky_crypto::CryptoProvider as __Provider;
-#[doc(hidden)]
-pub use properties::properties;
-#[doc(hidden)]
-pub use symmetric::{aead, cipher, hash, kdf, key_wrap, mac, password_kdf, random, stream_cipher};
-pub use vectors::wycheproof_private_key;
-
-/// Instantiates one conformance test per capability area.
-#[macro_export]
-macro_rules! conformance_tests {
-    ($provider:expr) => {
-        $crate::conformance_tests!($provider, $crate::Options::default());
-    };
-    ($provider:expr, $options:expr) => {
-        fn __crypto_conformance_provider() -> $crate::__Provider {
-            $provider
-        }
-        fn __crypto_conformance_options() -> $crate::Options {
-            $options
-        }
-        mod crypto_conformance {
-            macro_rules! area {
-                ($name:ident) => {
-                    #[test]
-                    fn $name() {
-                        $crate::$name(
-                            &super::__crypto_conformance_provider(),
-                            super::__crypto_conformance_options(),
-                        );
-                    }
-                };
-            }
-            area!(hash);
-            area!(mac);
-            area!(password_kdf);
-            area!(kdf);
-            area!(cipher);
-            area!(stream_cipher);
-            area!(aead);
-            area!(key_wrap);
-            area!(signature);
-            area!(asymmetric_encryption);
-            area!(key_agreement);
-            area!(ffdh);
-            area!(private_key);
-            area!(key_generation);
-            area!(random);
-            area!(provider);
-            area!(properties);
-        }
-    };
-}
-
-/// Instantiates cross-provider deterministic and interoperability tests.
-#[macro_export]
-macro_rules! differential_tests {
-    ($a:expr, $b:expr) => {
-        fn __crypto_differential_providers() -> ($crate::__Provider, $crate::__Provider) {
-            ($a, $b)
-        }
-        mod crypto_differential {
-            #[test]
-            fn interoperability() {
-                let (a, b) = super::__crypto_differential_providers();
-                $crate::differential(&a, &b);
-            }
-        }
-    };
-}

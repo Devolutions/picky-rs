@@ -111,7 +111,7 @@ fn buffer_audit_visits_agreement_tuples_and_nested_outputs() {
     checks.buffers("output list", &vec![output.clone(), output.clone()]);
     assert_eq!(checks.buffer_audits, 8);
     checks.finish();
-    picky_crypto_testsuite::properties::property("property output audit", proptest::strategy::Just(()), |_| {
+    property("property output audit", proptest::strategy::Just(()), |_| {
         let mut checks = Checks::default();
         checks.buffers("property output", &output);
         assert_eq!(checks.buffer_audits, 1);

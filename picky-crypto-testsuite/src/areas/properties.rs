@@ -1,59 +1,19 @@
+//! Property tests over published inputs: chunking, prefixes and round trips.
+
 use picky_crypto::*;
 use proptest::prelude::*;
-use proptest::test_runner::{Config, FileFailurePersistence, RngSeed, TestRunner};
 
 use crate::algorithms::*;
-use crate::asymmetric::{ECC_FILE, RSA_SIGN_FILES, exported};
-use crate::harness::{CheckedResult, Checks, Expect};
-use crate::{Options, der, published, select, vectors as v};
-
-thread_local! {
-    static PERSIST_FAILURES: std::cell::Cell<bool> = const { std::cell::Cell::new(true) };
-}
-
-/// Runs `f` without recording property failures in the committed regression file.
-/// Used by self-tests whose mock providers fail properties on purpose.
-pub fn without_failure_persistence<R>(f: impl FnOnce() -> R) -> R {
-    let previous = PERSIST_FAILURES.replace(false);
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f));
-    PERSIST_FAILURES.set(previous);
-    result.unwrap_or_else(|payload| std::panic::resume_unwind(payload))
-}
-
-pub fn runner(file: &'static str) -> TestRunner {
-    let cases = std::env::var("PROPTEST_CASES")
-        .ok()
-        .map(|s| s.parse().expect("PROPTEST_CASES must be an integer"))
-        .unwrap_or(if extended() { 1024 } else { 16 });
-    TestRunner::new(Config {
-        cases,
-        rng_seed: RngSeed::Fixed(0x7069636b79),
-        failure_persistence: PERSIST_FAILURES
-            .get()
-            .then(|| Box::new(FileFailurePersistence::Direct(file)) as _),
-        ..Config::default()
-    })
-}
-
-pub fn property<S: Strategy>(id: &str, strategy: S, test: impl Fn(S::Value) -> Result<(), TestCaseError>) {
-    let result = runner(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/proptest-regressions/properties.txt"
-    ))
-    .run(&strategy, |value| {
-        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| test(value))) {
-            Ok(result) => result,
-            Err(_) => Err(TestCaseError::fail(format!("{id}: provider panic"))),
-        }
-    });
-    assert!(result.is_ok(), "{id}: {result:?}");
-}
+use crate::areas::cipher::cipher_records;
+use crate::harness::{CheckedResult, Checks, Expect, Options};
+use crate::keys::{ECC_FILE, RSA_SIGN_FILES, exported, rsa_plaintext_limit};
+use crate::{der, published, select, vectors as v};
 
 fn error(e: Error) -> TestCaseError {
     TestCaseError::fail(format!("unexpected provider error: {e:?}"))
 }
 
-pub fn properties(p: &CryptoProvider, _: Options) {
+pub fn run(p: &CryptoProvider, _: Options) {
     let mut c = Checks::default();
     let messages = published::messages();
     for a in HASHES {
@@ -205,10 +165,7 @@ pub fn properties(p: &CryptoProvider, _: Options) {
         if !(protections[0] && protections[1]) {
             continue;
         }
-        let inputs = crate::symmetric::cipher_records(a)
-            .into_iter()
-            .filter(|r| !r.5)
-            .collect::<Vec<_>>();
+        let inputs = cipher_records(a).into_iter().filter(|r| !r.5).collect::<Vec<_>>();
         c.property(&format!("{a:?}/published CBC round trip"), 0..inputs.len(), |index| {
             let (id, key, iv, data, _, _) = &inputs[index];
             let encrypted = e.encrypt(key, iv, data).checked().map_err(error)?;
@@ -339,7 +296,7 @@ pub fn properties(p: &CryptoProvider, _: Options) {
                 if !c.key_supports(&id, &*key, KeyOperation::Decrypt(a)) {
                     continue;
                 }
-                let inputs = select::rsa_messages(crate::asymmetric::rsa_plaintext_limit(a, k));
+                let inputs = select::rsa_messages(rsa_plaintext_limit(a, k));
                 c.property(&format!("{a:?}/published RSA round trip"), 0..inputs.len(), |index| {
                     let (id, data) = &inputs[index];
                     let encrypted = e.encrypt(PublicKey(&public), data).checked().map_err(error)?;

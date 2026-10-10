@@ -1,7 +1,8 @@
 use picky_crypto::{CipherAlgorithm, KeyType};
 use serde_json::Value;
 
-use crate::{asymmetric, der, published, symmetric::CipherVector, vectors as v};
+use crate::areas::cipher::CipherVector;
+use crate::{der, keys, published, vectors as v};
 
 fn required<T>(file: &str, property: &str, selected: Option<T>) -> T {
     selected.unwrap_or_else(|| panic!("{file}: no published {property}"))
@@ -30,7 +31,7 @@ fn test<'a>(
 pub fn signature_control<'a>(file: &str, vectors: &'a v::Wycheproof) -> (&'a Value, &'a Value) {
     test(file, vectors, "valid signature with its own public key", |g, t| {
         v::string(t, "result") == "valid"
-            && (!g["publicKeyAsn"].is_string() || asymmetric::rsa_public_must(&v::field(g, "publicKeyAsn")))
+            && (!g["publicKeyAsn"].is_string() || keys::rsa_public_must(&v::field(g, "publicKeyAsn")))
     })
 }
 
@@ -232,9 +233,9 @@ pub fn ffdh_order(group: &v::DhGroup) -> &[u8] {
 
 pub fn ecc_private_control(kind: KeyType) -> (KeyType, picky_crypto::KeyAgreementAlgorithm, usize, v::Record) {
     required(
-        asymmetric::ECC_FILE,
+        keys::ECC_FILE,
         &format!("passing {kind:?} private key"),
-        asymmetric::ecc_cases()
+        keys::ecc_cases()
             .into_iter()
             .find(|(k, _, _, r)| *k == kind && r.text("Result").starts_with('P')),
     )

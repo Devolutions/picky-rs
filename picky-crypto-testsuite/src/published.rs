@@ -1,4 +1,4 @@
-use crate::{algorithms::*, asymmetric::ECC_FILE, select, vectors as v};
+use crate::{algorithms::*, keys::ECC_FILE, select, vectors as v};
 
 pub type Pair = (String, Vec<u8>, Vec<u8>);
 pub type Triple = (String, Vec<u8>, Vec<u8>, Vec<u8>);

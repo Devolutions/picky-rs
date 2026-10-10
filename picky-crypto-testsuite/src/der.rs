@@ -1,7 +1,7 @@
 use picky_crypto::KeyType;
 
 use crate::algorithms::CURVES;
-use crate::asymmetric::{RSA_DECRYPT_FILES, RSA_SIGN_FILES};
+use crate::keys::{RSA_DECRYPT_FILES, RSA_SIGN_FILES};
 use crate::vectors;
 
 pub const RSA_OID: &[u8] = &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 1, 1, 1];

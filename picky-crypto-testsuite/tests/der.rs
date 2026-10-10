@@ -7,7 +7,7 @@ fn generated_examples() -> Vec<(KeyType, usize, Vec<u8>)> {
     let mut examples = Vec::new();
     for (bits, file) in [2048, 3072, 4096]
         .into_iter()
-        .zip(picky_crypto_testsuite::asymmetric::RSA_SIGN_FILES)
+        .zip(picky_crypto_testsuite::keys::RSA_SIGN_FILES)
     {
         let corpus = vectors::wycheproof(file);
         let group = corpus
@@ -111,9 +111,9 @@ fn published_encodings_are_reproduced() {
 
 #[test]
 fn derived_key_controls() {
-    for file in picky_crypto_testsuite::asymmetric::RSA_SIGN_FILES
+    for file in picky_crypto_testsuite::keys::RSA_SIGN_FILES
         .into_iter()
-        .chain(picky_crypto_testsuite::asymmetric::RSA_DECRYPT_FILES.map(|(file, _)| file))
+        .chain(picky_crypto_testsuite::keys::RSA_DECRYPT_FILES.map(|(file, _)| file))
     {
         let vectors = vectors::wycheproof(file);
         let base = vectors::field(&vectors.test_groups[0], "privateKeyPkcs8");
@@ -145,7 +145,7 @@ fn derived_key_controls() {
             }
         }
     }
-    for (kind, _, size, r) in picky_crypto_testsuite::asymmetric::ecc_cases() {
+    for (kind, _, size, r) in picky_crypto_testsuite::keys::ecc_cases() {
         let own = point(&r.bytes("QeIUTx"), &r.bytes("QeIUTy"), size);
         let peer = point(&r.bytes("QeCAVSx"), &r.bytes("QeCAVSy"), size);
         assert_ne!(own, peer, "public-key substitution must change the field");

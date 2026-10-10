@@ -4,7 +4,8 @@ use std::sync::Arc;
 use picky_crypto::*;
 use rstest::rstest;
 
-use picky_crypto_testsuite::{Options, algorithms::*, asymmetric, der, published, select, symmetric, vectors as v};
+use picky_crypto_testsuite::harness::{Options, without_failure_persistence};
+use picky_crypto_testsuite::{algorithms::*, areas, der, keys, published, select, vectors as v};
 
 #[rstest]
 #[case("rsa_signature_2048_sha224_test.json")]
@@ -112,7 +113,7 @@ fn symmetric_controls(#[values(128, 192, 256)] key_bits: usize) {
 #[case(CipherAlgorithm::TdesEde3Cbc)]
 #[case(CipherAlgorithm::Rc2Cbc)]
 fn cbc_controls(#[case] algorithm: CipherAlgorithm) {
-    let records = symmetric::cipher_records(algorithm);
+    let records = areas::cipher::cipher_records(algorithm);
     let control = select::cbc_control(algorithm, &records);
     assert!(!control.5);
     if algorithm == CipherAlgorithm::TdesEde3Cbc {
@@ -174,7 +175,7 @@ fn rfc_and_nist_controls() {
     }
     for bits in [2048, 3072, 4096] {
         for algorithm in ENCRYPTIONS {
-            let limit = asymmetric::rsa_plaintext_limit(algorithm, bits / 8);
+            let limit = keys::rsa_plaintext_limit(algorithm, bits / 8);
             let (_, message) = select::rsa_plaintext(limit);
             assert!(!message.is_empty() && message.len() <= limit);
             assert!(select::rsa_messages(limit).iter().all(|(_, m)| m.len() <= limit));
@@ -383,31 +384,16 @@ fn error_only_entries_never_bypass_the_conformance_report() {
     type Area = fn(&CryptoProvider, Options);
     let provider = rejecting_provider();
     assert!(all().iter().all(|a| provider.get(*a).is_some()));
-    let areas: &[(&str, Area)] = &[
-        ("hash", picky_crypto_testsuite::hash),
-        ("mac", picky_crypto_testsuite::mac),
-        ("password_kdf", picky_crypto_testsuite::password_kdf),
-        ("kdf", picky_crypto_testsuite::kdf),
-        ("cipher", picky_crypto_testsuite::cipher),
-        ("stream_cipher", picky_crypto_testsuite::stream_cipher),
-        ("aead", picky_crypto_testsuite::aead),
-        ("key_wrap", picky_crypto_testsuite::key_wrap),
-        ("signature", picky_crypto_testsuite::signature),
-        ("asymmetric_encryption", picky_crypto_testsuite::asymmetric_encryption),
-        ("key_agreement", picky_crypto_testsuite::key_agreement),
-        ("ffdh", picky_crypto_testsuite::ffdh),
-        ("private_key", picky_crypto_testsuite::private_key),
-        ("key_generation", picky_crypto_testsuite::key_generation),
-        ("random", picky_crypto_testsuite::random),
-        ("provider", picky_crypto_testsuite::provider),
-        ("properties", picky_crypto_testsuite::properties),
-    ];
-    for (name, area) in areas {
-        let outcome = picky_crypto_testsuite::properties::without_failure_persistence(|| {
-            catch_unwind(AssertUnwindSafe(|| area(&provider, Options::default())))
-        });
+    macro_rules! area_list {
+        ($($area:ident),* $(,)?) => {
+            [$((stringify!($area), areas::$area::run as Area)),*]
+        };
+    }
+    for (name, area) in picky_crypto_testsuite::for_each_area!(area_list) {
+        let outcome =
+            without_failure_persistence(|| catch_unwind(AssertUnwindSafe(|| area(&provider, Options::default()))));
         match outcome {
-            Ok(()) => assert_eq!(*name, "provider", "{name}: failing operations must fail conformance"),
+            Ok(()) => assert_eq!(name, "provider", "{name}: failing operations must fail conformance"),
             Err(panic) => {
                 let message = panic.downcast_ref::<String>().expect("conformance report");
                 assert!(message.contains(" conformance failure(s):\n"), "{name}: {message}");

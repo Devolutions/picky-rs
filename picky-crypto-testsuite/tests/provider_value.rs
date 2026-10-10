@@ -4,7 +4,7 @@ use picky_crypto::*;
 use proptest::prelude::*;
 use rstest::rstest;
 
-use picky_crypto_testsuite::properties::property;
+use picky_crypto_testsuite::harness::property;
 
 #[derive(Clone)]
 struct Mock {

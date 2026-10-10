@@ -1,8 +1,13 @@
 use picky_crypto::*;
 use picky_crypto_testsuite::algorithms::*;
-use picky_crypto_testsuite::asymmetric::*;
-use picky_crypto_testsuite::harness::{Checks, Expect};
-use picky_crypto_testsuite::{Options, der, vectors as v};
+use picky_crypto_testsuite::areas::ffdh::{
+    FFC_FILE, below_modulus_minus_one, ffdh_exponent_boundaries, ffdh_parameter_boundaries,
+};
+use picky_crypto_testsuite::areas::private_key::{inconsistent_roundtrip, inconsistent_rsa};
+use picky_crypto_testsuite::areas::{key_generation, signature, signature::ed25519_undecodable_keys};
+use picky_crypto_testsuite::harness::{Checks, Expect, Options, without_failure_persistence};
+use picky_crypto_testsuite::keys::*;
+use picky_crypto_testsuite::{der, vectors as v};
 use rstest::rstest;
 use std::sync::{
     Arc, Mutex,
@@ -354,7 +359,7 @@ fn generated_key_freshness_compares_public_fields() {
         .build()
         .unwrap();
     let failure = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        key_generation(&provider, Options::default())
+        key_generation::run(&provider, Options::default())
     }))
     .unwrap_err();
     let message = failure.downcast_ref::<String>().unwrap();
@@ -632,8 +637,8 @@ fn ed25519_undecodable_public_keys_reach_the_verifier(
         .unwrap();
     let mut options = Options::default();
     options.opaque_public_key_errors = opaque;
-    let report = picky_crypto_testsuite::properties::without_failure_persistence(|| {
-        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| signature(&provider, options)))
+    let report = without_failure_persistence(|| {
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| signature::run(&provider, options)))
     })
     .expect_err("a verifier with a fixed result fails the published vectors");
     let report = report.downcast_ref::<String>().unwrap();

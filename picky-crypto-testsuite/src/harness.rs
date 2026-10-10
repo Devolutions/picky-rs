@@ -1,9 +1,21 @@
+//! Check collection, expected outcomes, buffer audits and property runner shared by every area.
+
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::{any::Any, fmt::Debug};
 
 use picky_crypto::*;
+use proptest::strategy::Strategy;
+use proptest::test_runner::{Config, FileFailurePersistence, RngSeed, TestCaseError, TestRunner};
 
-use crate::{Options, algorithms};
+use crate::algorithms::extended;
+
+/// Contract-sanctioned variations in verification diagnostics.
+#[non_exhaustive]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Options {
+    /// Accept `VerificationFailed` for an unusable public key (contract section 4).
+    pub opaque_public_key_errors: bool,
+}
 
 #[derive(Default)]
 pub struct Checks {
@@ -107,7 +119,7 @@ impl Checks {
         test: impl Fn(S::Value) -> Result<(), proptest::test_runner::TestCaseError>,
     ) {
         self.call(id, Expect::Success, || {
-            crate::properties::property(id, strategy, test);
+            property(id, strategy, test);
             Ok(())
         });
     }
@@ -362,67 +374,44 @@ pub fn malformed_public(options: Options) -> Expect {
     }
 }
 
-#[doc(hidden)]
-pub fn provider(provider: &CryptoProvider, _: Options) {
-    let mut c = Checks::default();
-    c.call(
-        "helpers::key_agreement/Ffdh",
-        Expect::Error(Error::InvalidInput),
-        || helpers::key_agreement(provider, KeyAgreementAlgorithm::Ffdh).map(|_| ()),
-    );
-    if let Some((nonempty, entries_fips, reported)) = c.metadata("provider/FIPS", || {
-        (
-            provider.entries().next().is_some(),
-            provider.entries().all(helpers::entry_fips),
-            provider.fips(),
-        )
-    }) {
-        c.check(
-            "provider/FIPS",
-            !reported || (nonempty && entries_fips),
-            "FIPS report requires nonempty, FIPS entries",
-        );
-    }
-    for entry in provider.entries() {
-        let Some(id) = c.metadata("provider/entry identity", || helpers::entry_algorithm(entry)) else {
-            continue;
-        };
-        c.check(
-            &format!("{id:?}"),
-            provider.get(id).is_some(),
-            "entry not found under own algorithm",
-        );
-        c.call(&format!("{id:?}/Debug"), Expect::Success, || {
-            let text = format!("{entry:?}");
-            if !text.contains("fips") {
-                return Err(Error::InvalidInput);
-            }
-            Ok(())
-        });
-        let protections = c
-            .metadata(&format!("{id:?}/protections"), || match entry {
-                Entry::Mac(e) => Some((e.supports(Protection::Apply), e.supports(Protection::Process))),
-                Entry::Cipher(e) => Some((e.supports(Protection::Apply), e.supports(Protection::Process))),
-                Entry::Aead(e) => Some((e.supports(Protection::Apply), e.supports(Protection::Process))),
-                Entry::KeyWrap(e) => Some((e.supports(Protection::Apply), e.supports(Protection::Process))),
-                _ => None,
-            })
-            .flatten();
-        if let Some((a, b)) = protections {
-            c.check(&format!("{id:?}"), a || b, "entry supports neither protection");
+thread_local! {
+    static PERSIST_FAILURES: std::cell::Cell<bool> = const { std::cell::Cell::new(true) };
+}
+
+/// Runs `f` without recording property failures in the committed regression file.
+/// Used by self-tests whose mock providers fail properties on purpose.
+pub fn without_failure_persistence<R>(f: impl FnOnce() -> R) -> R {
+    let previous = PERSIST_FAILURES.replace(false);
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f));
+    PERSIST_FAILURES.set(previous);
+    result.unwrap_or_else(|payload| std::panic::resume_unwind(payload))
+}
+
+pub fn runner(file: &'static str) -> TestRunner {
+    let cases = std::env::var("PROPTEST_CASES")
+        .ok()
+        .map(|s| s.parse().expect("PROPTEST_CASES must be an integer"))
+        .unwrap_or(if extended() { 1024 } else { 16 });
+    TestRunner::new(Config {
+        cases,
+        rng_seed: RngSeed::Fixed(0x7069636b79),
+        failure_persistence: PERSIST_FAILURES
+            .get()
+            .then(|| Box::new(FileFailurePersistence::Direct(file)) as _),
+        ..Config::default()
+    })
+}
+
+pub fn property<S: Strategy>(id: &str, strategy: S, test: impl Fn(S::Value) -> Result<(), TestCaseError>) {
+    let result = runner(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/proptest-regressions/properties.txt"
+    ))
+    .run(&strategy, |value| {
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| test(value))) {
+            Ok(result) => result,
+            Err(_) => Err(TestCaseError::fail(format!("{id}: provider panic"))),
         }
-        let bytes = &crate::select::ed25519_empty().seed;
-        c.debug(&format!("{id:?}/Debug"), entry, bytes);
-        c.debug("provider/Debug", provider, bytes);
-    }
-    for a in algorithms::all() {
-        if provider.get(a).is_none() {
-            c.check(
-                &format!("{a:?}"),
-                helpers::missing(provider, &[a.into()]) == [a.into()],
-                "missing omitted absent entry",
-            );
-        }
-    }
-    c.finish();
+    });
+    assert!(result.is_ok(), "{id}: {result:?}");
 }

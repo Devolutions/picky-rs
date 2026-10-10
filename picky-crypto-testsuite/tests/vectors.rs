@@ -188,7 +188,7 @@ fn wycheproof_schema(#[case] file: &str) {
 #[test]
 fn assembled_inputs() {
     for a in picky_crypto_testsuite::algorithms::CIPHERS {
-        let records = picky_crypto_testsuite::symmetric::cipher_records(a);
+        let records = picky_crypto_testsuite::areas::cipher::cipher_records(a);
         assert!(!records.is_empty());
         for (_, key, iv, plaintext, ciphertext, _) in records {
             assert!(!key.is_empty());
@@ -197,7 +197,7 @@ fn assembled_inputs() {
             assert_eq!(plaintext.len() % iv.len(), 0);
         }
     }
-    for (_, _, _, r) in picky_crypto_testsuite::asymmetric::ecc_cases() {
+    for (_, _, _, r) in picky_crypto_testsuite::keys::ecc_cases() {
         for name in ["QeCAVSx", "QeCAVSy", "OI", "DKM", "Z"] {
             r.bytes(name);
         }
@@ -215,8 +215,9 @@ fn assembled_inputs() {
         }
         assert_eq!(g.p.len(), if i == 0 { 128 } else { 256 });
     }
-    let base = &picky_crypto_testsuite::symmetric::cipher_records(picky_crypto_testsuite::algorithms::CIPHERS[3])[0].1;
-    let derived = picky_crypto_testsuite::symmetric::weak_tdes_key(base);
+    let base =
+        &picky_crypto_testsuite::areas::cipher::cipher_records(picky_crypto_testsuite::algorithms::CIPHERS[3])[0].1;
+    let derived = picky_crypto_testsuite::areas::cipher::weak_tdes_key(base);
     assert_eq!(derived.len(), 24);
     assert_eq!(&derived[8..], &base[8..]);
 }

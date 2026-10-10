@@ -8,4 +8,4 @@
 ffi/dotnet/Devolutions.Picky/Generated/** linguist-generated merge=binary
 
 # Published test vectors are kept byte-identical to their sources.
-picky-crypto-testsuite/vectors/** -text
+picky-crypto-testsuite/vectors/** -text linguist-generated

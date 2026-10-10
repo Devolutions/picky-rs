@@ -1,7 +1,8 @@
 use picky_crypto::*;
-use picky_crypto_testsuite::asymmetric::{RSA_SIGN_FILES, inconsistent_signatures};
-use picky_crypto_testsuite::differential::*;
+use picky_crypto_testsuite::areas::private_key::inconsistent_signatures;
+use picky_crypto_testsuite::differential;
 use picky_crypto_testsuite::harness::Checks;
+use picky_crypto_testsuite::keys::RSA_SIGN_FILES;
 use picky_crypto_testsuite::vectors as v;
 use std::sync::{Arc, Mutex};
 
@@ -93,10 +94,7 @@ fn rsa_cross_signing_includes_algorithms_without_generation_vectors() {
     let b_calls = Arc::new(Mutex::new(Vec::new()));
     let a = mock(&signature, Arc::clone(&a_calls));
     let b = mock(&signature, Arc::clone(&b_calls));
-    let mut c = Checks::default();
-    cross_keys(&mut c, &a, &b);
-    cross_keys(&mut c, &b, &a);
-    c.finish();
+    differential::private_key::run(&a, &b);
     for calls in [a_calls, b_calls] {
         let calls = calls.lock().unwrap();
         assert!(PARTIAL.iter().all(|algorithm| calls.contains(algorithm)));
