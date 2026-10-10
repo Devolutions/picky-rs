@@ -18,15 +18,16 @@ impl Mock {
     fn supports(&self, p: Protection) -> bool {
         self.protections[usize::from(p == Protection::Process)]
     }
-    fn record(&self, p: Protection) -> Result<(), Error> {
+    fn record(&self, p: Protection, algorithm: Algorithm) -> Result<(), Error> {
         if !self.supports(p) {
-            return Err(Error::Unsupported(self.algorithm()));
+            return Err(Error::Unsupported(algorithm));
         }
         self.calls.lock().unwrap().push((self.member, p));
         Ok(())
     }
-    fn algorithm(&self) -> Algorithm {
-        Algorithm::Mac(MacAlgorithm::HmacSha256)
+    fn fail<T>(&self, p: Protection, algorithm: Algorithm) -> Result<T, Error> {
+        self.record(p, algorithm)?;
+        Err(Error::ProviderFailure)
     }
 }
 
@@ -51,12 +52,10 @@ impl Mac for Mock {
         self.fips
     }
     fn start(&self, key: &[u8], p: Protection) -> Result<Box<dyn MacContext>, Error> {
-        if !self.supports(p) {
-            return Err(Error::Unsupported(Algorithm::Mac(MacAlgorithm::HmacSha256)));
-        }
-        self.record(p)?;
+        let algorithm = Algorithm::Mac(MacAlgorithm::HmacSha256);
+        self.record(p, algorithm)?;
         if key.is_empty() {
-            return Err(Error::Unsupported(Algorithm::Mac(MacAlgorithm::HmacSha256)));
+            return Err(Error::Unsupported(algorithm));
         }
         Ok(Box::new(Context(self.clone())))
     }
@@ -72,19 +71,10 @@ impl Cipher for Mock {
         self.fips
     }
     fn encrypt(&self, _: &[u8], _: &[u8], _: &[u8]) -> Result<OutputBytes, Error> {
-        self.cipher_call(Protection::Apply)
+        self.fail(Protection::Apply, Algorithm::Cipher(CipherAlgorithm::Aes128Cbc))
     }
     fn decrypt(&self, _: &[u8], _: &[u8], _: &[u8]) -> Result<OutputBytes, Error> {
-        self.cipher_call(Protection::Process)
-    }
-}
-impl Mock {
-    fn cipher_call(&self, p: Protection) -> Result<OutputBytes, Error> {
-        if !self.supports(p) {
-            return Err(Error::Unsupported(Algorithm::Cipher(CipherAlgorithm::Aes128Cbc)));
-        }
-        self.record(p)?;
-        Err(Error::ProviderFailure)
+        self.fail(Protection::Process, Algorithm::Cipher(CipherAlgorithm::Aes128Cbc))
     }
 }
 impl Aead for Mock {
@@ -98,18 +88,10 @@ impl Aead for Mock {
         self.fips
     }
     fn seal(&self, _: &[u8], _: &[u8], _: &[u8]) -> Result<Sealed, Error> {
-        if !self.supports(Protection::Apply) {
-            return Err(Error::Unsupported(Algorithm::Aead(AeadAlgorithm::Aes128Gcm)));
-        }
-        self.record(Protection::Apply)?;
-        Err(Error::ProviderFailure)
+        self.fail(Protection::Apply, Algorithm::Aead(AeadAlgorithm::Aes128Gcm))
     }
     fn open(&self, _: &[u8], _: &[u8], _: &[u8], _: &[u8]) -> Result<OutputBytes, Error> {
-        if !self.supports(Protection::Process) {
-            return Err(Error::Unsupported(Algorithm::Aead(AeadAlgorithm::Aes128Gcm)));
-        }
-        self.record(Protection::Process)?;
-        Err(Error::ProviderFailure)
+        self.fail(Protection::Process, Algorithm::Aead(AeadAlgorithm::Aes128Gcm))
     }
 }
 impl KeyWrap for Mock {
@@ -123,19 +105,10 @@ impl KeyWrap for Mock {
         self.fips
     }
     fn wrap(&self, _: &[u8], _: &[u8]) -> Result<OutputBytes, Error> {
-        self.wrap_call(Protection::Apply)
+        self.fail(Protection::Apply, Algorithm::KeyWrap(KeyWrapAlgorithm::Aes128Kw))
     }
     fn unwrap(&self, _: &[u8], _: &[u8]) -> Result<OutputBytes, Error> {
-        self.wrap_call(Protection::Process)
-    }
-}
-impl Mock {
-    fn wrap_call(&self, p: Protection) -> Result<OutputBytes, Error> {
-        if !self.supports(p) {
-            return Err(Error::Unsupported(Algorithm::KeyWrap(KeyWrapAlgorithm::Aes128Kw)));
-        }
-        self.record(p)?;
-        Err(Error::ProviderFailure)
+        self.fail(Protection::Process, Algorithm::KeyWrap(KeyWrapAlgorithm::Aes128Kw))
     }
 }
 impl Hash for Mock {
@@ -187,11 +160,7 @@ fn protections(mask: u8) -> [bool; 2] {
 }
 
 #[rstest]
-#[case(0)]
-#[case(1)]
-#[case(2)]
-#[case(3)]
-fn builder_errors(#[case] area: usize) {
+fn builder_errors(#[values(0, 1, 2, 3)] area: usize) {
     let calls = Arc::default();
     let e = entry(area, mock(1, [false, false], false, calls));
     let algorithm = helpers::entry_algorithm(&e);
@@ -216,11 +185,7 @@ fn mismatched_agreement() {
 }
 
 #[rstest]
-#[case(0)]
-#[case(1)]
-#[case(2)]
-#[case(3)]
-fn composition(#[case] area: usize) {
+fn composition(#[values(0, 1, 2, 3)] area: usize) {
     property(
         "provider-value/protection composition",
         (1u8..4, 1u8..4, any::<bool>(), any::<bool>()),

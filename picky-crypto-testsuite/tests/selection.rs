@@ -89,10 +89,7 @@ fn ecdh_controls(#[case] file: &str) {
 }
 
 #[rstest]
-#[case(128)]
-#[case(192)]
-#[case(256)]
-fn symmetric_controls(#[case] key_bits: usize) {
+fn symmetric_controls(#[values(128, 192, 256)] key_bits: usize) {
     let mut gcm = v::wycheproof("aes_gcm_test.json");
     let mut wrap = v::wycheproof("aes_wrap_test.json");
     gcm.test_groups.reverse();
@@ -139,12 +136,7 @@ fn monte_seeds(#[case] file: &str) {
 }
 
 #[rstest]
-#[case(0)]
-#[case(1)]
-#[case(2)]
-#[case(3)]
-#[case(4)]
-fn mac_controls(#[case] index: usize) {
+fn mac_controls(#[values(0, 1, 2, 3, 4)] index: usize) {
     let inputs = published::mac(index);
     assert!(select::mac_message(index, &inputs, true).2.is_empty());
     assert!(!select::mac_message(index, &inputs, false).2.is_empty());

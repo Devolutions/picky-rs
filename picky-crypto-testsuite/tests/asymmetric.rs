@@ -5,7 +5,7 @@ use picky_crypto_testsuite::harness::{Checks, Expect};
 use picky_crypto_testsuite::{Options, der, vectors as v};
 use rstest::rstest;
 use std::sync::{
-    Arc,
+    Arc, Mutex,
     atomic::{AtomicUsize, Ordering},
 };
 
@@ -15,7 +15,7 @@ struct BoundaryInputs {
     q: Option<Vec<u8>>,
     x: Option<Vec<u8>>,
 }
-struct BoundaryProvider(Arc<std::sync::Mutex<Vec<BoundaryInputs>>>);
+struct BoundaryProvider(Arc<Mutex<Vec<BoundaryInputs>>>);
 impl BoundaryProvider {
     fn record(&self, parameters: FfdhParameters<'_>, x: Option<&[u8]>) {
         self.0.lock().unwrap().push(BoundaryInputs {
@@ -57,7 +57,7 @@ impl PrivateKeyLoader for BoundaryProvider {
 
 #[test]
 fn ffdh_parameter_boundaries_reach_both_capabilities() {
-    let calls = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let calls = Arc::default();
     let provider = CryptoProvider::builder()
         .with(Entry::FfdhKeyAgreement(Arc::new(BoundaryProvider(Arc::clone(&calls)))))
         .with(Entry::PrivateKeyLoader(Arc::new(BoundaryProvider(Arc::clone(&calls)))))
@@ -84,7 +84,7 @@ fn ffdh_parameter_boundaries_reach_both_capabilities() {
 
 #[test]
 fn ffdh_exponent_boundaries_use_published_safe_prime_orders() {
-    let calls = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let calls = Arc::default();
     let provider = CryptoProvider::builder()
         .with(Entry::PrivateKeyLoader(Arc::new(BoundaryProvider(Arc::clone(&calls)))))
         .build()
@@ -109,6 +109,8 @@ fn ffdh_exponent_boundaries_use_published_safe_prime_orders() {
     }
 }
 
+type Calls = Arc<Mutex<Vec<(KeyOperation, Vec<u8>)>>>;
+
 #[derive(Clone)]
 struct BranchKey {
     kind: KeyType,
@@ -116,7 +118,7 @@ struct BranchKey {
     enabled: Option<KeyOperation>,
     input: Vec<u8>,
     output: Vec<u8>,
-    calls: Arc<std::sync::Mutex<Vec<KeyOperation>>>,
+    calls: Calls,
 }
 struct BranchLoader(BranchKey);
 impl PrivateKeyLoader for BranchLoader {
@@ -130,18 +132,20 @@ impl PrivateKeyLoader for BranchLoader {
         Ok(Box::new(self.0.clone()))
     }
 }
+fn operation_algorithm(operation: KeyOperation, kind: KeyType) -> Algorithm {
+    match operation {
+        KeyOperation::Sign(a) => Algorithm::Signature(a),
+        KeyOperation::Decrypt(a) => Algorithm::AsymmetricEncryption(a),
+        KeyOperation::Agree(a) => Algorithm::KeyAgreement(a),
+        KeyOperation::PublicKey => Algorithm::PublicKeyExport(kind),
+        _ => unreachable!(),
+    }
+}
 impl BranchKey {
     fn operation(&self, operation: KeyOperation, input: &[u8]) -> Result<OutputBytes, Error> {
-        self.calls.lock().unwrap().push(operation);
-        let algorithm = match operation {
-            KeyOperation::Sign(a) => Algorithm::Signature(a),
-            KeyOperation::Decrypt(a) => Algorithm::AsymmetricEncryption(a),
-            KeyOperation::Agree(a) => Algorithm::KeyAgreement(a),
-            KeyOperation::PublicKey => Algorithm::PublicKeyExport(self.kind),
-            _ => unreachable!(),
-        };
+        self.calls.lock().unwrap().push((operation, input.to_vec()));
         if !self.supports(operation) {
-            return Err(Error::Unsupported(algorithm));
+            return Err(Error::Unsupported(operation_algorithm(operation, self.kind)));
         }
         if matches!(operation, KeyOperation::Decrypt(_) | KeyOperation::Agree(_)) && input.is_empty() {
             return Err(Error::InvalidInput);
@@ -180,15 +184,10 @@ impl PrivateKey for BranchKey {
 }
 
 #[rstest]
-#[case(0, false)]
-#[case(0, true)]
-#[case(1, false)]
-#[case(1, true)]
-#[case(2, false)]
-#[case(2, true)]
-#[case(3, false)]
-#[case(3, true)]
-fn private_operation_branches_use_advertisement(#[case] area: usize, #[case] advertised: bool) {
+fn private_operation_branches_use_advertisement(
+    #[values(0, 1, 2, 3)] area: usize,
+    #[values(false, true)] advertised: bool,
+) {
     let (kind, bits, operation, encoded, input, output, id) = match area {
         0 => {
             let corpus = v::wycheproof(RSA_SIGN_FILES[0]);
@@ -255,7 +254,7 @@ fn private_operation_branches_use_advertisement(#[case] area: usize, #[case] adv
             )
         }
     };
-    let calls = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let calls = Arc::default();
     let mock = BranchKey {
         kind,
         bits,
@@ -280,7 +279,7 @@ fn private_operation_branches_use_advertisement(#[case] area: usize, #[case] adv
         false,
     )
     .unwrap();
-    let selection_calls = calls.lock().unwrap().clone();
+    let selection_calls: Vec<_> = calls.lock().unwrap().iter().map(|(call, _)| *call).collect();
     let selected_count = selection_calls.iter().filter(|&&call| call == operation).count();
     assert_eq!(selected_count, if advertised && area == 0 { 0 } else { 1 });
     if !advertised {
@@ -295,17 +294,10 @@ fn private_operation_branches_use_advertisement(#[case] area: usize, #[case] adv
         }
         assert!(selection_calls.contains(&KeyOperation::PublicKey));
     }
-    let algorithm = match operation {
-        KeyOperation::Sign(a) => Algorithm::Signature(a),
-        KeyOperation::Decrypt(a) => Algorithm::AsymmetricEncryption(a),
-        KeyOperation::Agree(a) => Algorithm::KeyAgreement(a),
-        KeyOperation::PublicKey => Algorithm::PublicKeyExport(kind),
-        _ => unreachable!(),
-    };
     let expected = if advertised {
         Expect::Success
     } else {
-        Expect::Error(Error::Unsupported(algorithm))
+        Expect::Error(Error::Unsupported(operation_algorithm(operation, kind)))
     };
     match operation {
         KeyOperation::Agree(a) => agree_kat(&mut checks, &id, &*key, a, &input, &output, false),
@@ -344,52 +336,6 @@ impl KeyGenerator for RepeatedGenerator {
     }
 }
 
-struct StaticFfdhLoader {
-    peers: Arc<std::sync::Mutex<Vec<Vec<u8>>>>,
-}
-struct StaticFfdhKey {
-    bits: usize,
-    peers: Arc<std::sync::Mutex<Vec<Vec<u8>>>>,
-}
-impl PrivateKeyLoader for StaticFfdhLoader {
-    fn key_type(&self) -> KeyType {
-        KeyType::Ffdh
-    }
-    fn fips(&self) -> bool {
-        false
-    }
-    fn load(&self, material: PrivateKeyMaterial<'_>) -> Result<Box<dyn PrivateKey>, Error> {
-        let PrivateKeyMaterial::Ffdh { parameters, .. } = material else {
-            return Err(Error::InvalidKey);
-        };
-        Ok(Box::new(StaticFfdhKey {
-            bits: der::bit_length(parameters.p),
-            peers: Arc::clone(&self.peers),
-        }))
-    }
-}
-impl PrivateKey for StaticFfdhKey {
-    fn key_type(&self) -> KeyType {
-        KeyType::Ffdh
-    }
-    fn key_size_bits(&self) -> usize {
-        self.bits
-    }
-    fn fips(&self) -> bool {
-        false
-    }
-    fn supports(&self, operation: KeyOperation) -> bool {
-        operation == KeyOperation::Agree(KeyAgreementAlgorithm::Ffdh)
-    }
-    fn agree(&self, algorithm: KeyAgreementAlgorithm, peer: &[u8]) -> Result<OutputBytes, Error> {
-        if algorithm != KeyAgreementAlgorithm::Ffdh {
-            return Err(Error::Unsupported(Algorithm::KeyAgreement(algorithm)));
-        }
-        self.peers.lock().unwrap().push(peer.to_vec());
-        Err(Error::InvalidInput)
-    }
-}
-
 #[test]
 fn generated_key_freshness_compares_public_fields() {
     let (scalar, x, y, _) = v::ec9500().into_iter().next().unwrap();
@@ -417,12 +363,18 @@ fn generated_key_freshness_compares_public_fields() {
 }
 
 #[test]
-fn modulus_minus_one_changes_only_the_last_byte_of_published_groups() {
-    for group in v::dh_groups() {
+fn ffdh_boundary_helpers_on_published_groups() {
+    for (i, group) in v::dh_groups().iter().enumerate() {
         let y = modulus_minus_one(&group.p);
         assert_eq!(y.len(), group.p.len(), "{}", group.id);
         assert_eq!(y[..y.len() - 1], group.p[..group.p.len() - 1], "{}", group.id);
         assert_eq!(y[y.len() - 1] + 1, group.p[group.p.len() - 1], "{}", group.id);
+        assert!(!below_modulus_minus_one(&group.p, &group.p), "{}", group.id);
+        if i < 3 {
+            let published = v::rfc5114(i + 1);
+            assert!(below_modulus_minus_one(&published["yA"], &group.p));
+            assert!(below_modulus_minus_one(&published["yB"], &group.p));
+        }
     }
 }
 
@@ -430,12 +382,19 @@ fn modulus_minus_one_changes_only_the_last_byte_of_published_groups() {
 fn static_ffdh_peer_errors_need_no_ephemeral_entry() {
     let group = &v::dh_groups()[0];
     let fields = v::rfc5114(1);
+    let agree = KeyOperation::Agree(KeyAgreementAlgorithm::Ffdh);
     for q in [group.q.as_deref(), None] {
-        let peers = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let calls = Arc::default();
+        let key = BranchKey {
+            kind: KeyType::Ffdh,
+            bits: der::bit_length(&group.p),
+            enabled: Some(agree),
+            input: Vec::new(),
+            output: Vec::new(),
+            calls: Arc::clone(&calls),
+        };
         let provider = CryptoProvider::builder()
-            .with(Entry::PrivateKeyLoader(Arc::new(StaticFfdhLoader {
-                peers: Arc::clone(&peers),
-            })))
+            .with(Entry::PrivateKeyLoader(Arc::new(BranchLoader(key))))
             .build()
             .unwrap();
         assert!(helpers::ffdh_key_agreement(&provider).is_err());
@@ -455,7 +414,13 @@ fn static_ffdh_peer_errors_need_no_ephemeral_entry() {
         )
         .unwrap();
         c.finish();
-        let peers = peers.lock().unwrap();
+        let peers: Vec<_> = calls
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(call, _)| *call == agree)
+            .map(|(_, peer)| peer.clone())
+            .collect();
         assert!(peers.iter().any(Vec::is_empty));
         assert!(peers.iter().any(|peer| peer == &[0]));
         assert!(peers.iter().any(|peer| peer == &[1]));
@@ -468,15 +433,47 @@ fn static_ffdh_peer_errors_need_no_ephemeral_entry() {
 struct DecryptOnlyLoader {
     base: Vec<u8>,
     derived: Vec<Vec<u8>>,
-    ciphertext: Vec<u8>,
-    plaintext: Vec<u8>,
-    decrypts: Arc<AtomicUsize>,
+    key: BranchKey,
     derived_loads: Arc<AtomicUsize>,
 }
-struct DecryptOnlyKey {
-    ciphertext: Vec<u8>,
-    plaintext: Vec<u8>,
-    decrypts: Arc<AtomicUsize>,
+impl PrivateKeyLoader for DecryptOnlyLoader {
+    fn key_type(&self) -> KeyType {
+        KeyType::Rsa
+    }
+    fn fips(&self) -> bool {
+        false
+    }
+    fn load(&self, material: PrivateKeyMaterial<'_>) -> Result<Box<dyn PrivateKey>, Error> {
+        let PrivateKeyMaterial::Pkcs8(encoded) = material else {
+            return Err(Error::InvalidKey);
+        };
+        if self.derived.iter().any(|key| key == encoded) {
+            self.derived_loads.fetch_add(1, Ordering::Relaxed);
+            return Err(Error::InvalidKey);
+        }
+        if encoded != self.base {
+            return Err(Error::InvalidKey);
+        }
+        Ok(Box::new(self.key.clone()))
+    }
+}
+fn decrypt_only(ciphertext: &[u8], plaintext: Vec<u8>, calls: &Calls) -> BranchKey {
+    BranchKey {
+        kind: KeyType::Rsa,
+        bits: 2048,
+        enabled: Some(KeyOperation::Decrypt(AsymmetricEncryptionAlgorithm::RsaPkcs1v15)),
+        input: ciphertext.to_vec(),
+        output: plaintext,
+        calls: Arc::clone(calls),
+    }
+}
+fn decrypts(calls: &Calls, ciphertext: &[u8]) -> usize {
+    calls
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(call, input)| matches!(call, KeyOperation::Decrypt(_)) && input == ciphertext)
+        .count()
 }
 struct ReferenceEncryptor {
     ciphertext: Vec<u8>,
@@ -512,22 +509,14 @@ fn inconsistent_roundtrip_can_use_another_provider_encryptor() {
         .unwrap()
         .1
         .clone();
-    let decrypts = Arc::new(AtomicUsize::new(0));
+    let calls = Arc::default();
     let encrypts = Arc::new(AtomicUsize::new(0));
-    let base = DecryptOnlyKey {
-        ciphertext: ciphertext.clone(),
-        plaintext: message.clone(),
-        decrypts: Arc::clone(&decrypts),
-    };
-    let derived = DecryptOnlyKey {
-        ciphertext: ciphertext.clone(),
-        plaintext: message,
-        decrypts: Arc::clone(&decrypts),
-    };
+    let base = decrypt_only(&ciphertext, message.clone(), &calls);
+    let derived = decrypt_only(&ciphertext, message, &calls);
     let local = CryptoProvider::builder().build().unwrap();
     let other = CryptoProvider::builder()
         .with(Entry::AsymmetricEncryptor(Arc::new(ReferenceEncryptor {
-            ciphertext,
+            ciphertext: ciphertext.clone(),
             calls: Arc::clone(&encrypts),
         })))
         .build()
@@ -543,59 +532,7 @@ fn inconsistent_roundtrip_can_use_another_provider_encryptor() {
     );
     checks.finish();
     assert_eq!(encrypts.load(Ordering::Relaxed), 1);
-    assert_eq!(decrypts.load(Ordering::Relaxed), 2);
-}
-impl PrivateKeyLoader for DecryptOnlyLoader {
-    fn key_type(&self) -> KeyType {
-        KeyType::Rsa
-    }
-    fn fips(&self) -> bool {
-        false
-    }
-    fn load(&self, material: PrivateKeyMaterial<'_>) -> Result<Box<dyn PrivateKey>, Error> {
-        let PrivateKeyMaterial::Pkcs8(encoded) = material else {
-            return Err(Error::InvalidKey);
-        };
-        if self.derived.iter().any(|key| key == encoded) {
-            self.derived_loads.fetch_add(1, Ordering::Relaxed);
-            return Err(Error::InvalidKey);
-        }
-        if encoded != self.base {
-            return Err(Error::InvalidKey);
-        }
-        Ok(Box::new(DecryptOnlyKey {
-            ciphertext: self.ciphertext.clone(),
-            plaintext: self.plaintext.clone(),
-            decrypts: Arc::clone(&self.decrypts),
-        }))
-    }
-}
-impl PrivateKey for DecryptOnlyKey {
-    fn key_type(&self) -> KeyType {
-        KeyType::Rsa
-    }
-    fn key_size_bits(&self) -> usize {
-        2048
-    }
-    fn fips(&self) -> bool {
-        false
-    }
-    fn supports(&self, operation: KeyOperation) -> bool {
-        operation == KeyOperation::Decrypt(AsymmetricEncryptionAlgorithm::RsaPkcs1v15)
-    }
-    fn decrypt(&self, algorithm: AsymmetricEncryptionAlgorithm, ciphertext: &[u8]) -> Result<OutputBytes, Error> {
-        if algorithm != AsymmetricEncryptionAlgorithm::RsaPkcs1v15 {
-            return Err(Error::Unsupported(Algorithm::AsymmetricEncryption(algorithm)));
-        }
-        if ciphertext.len() != self.ciphertext.len() {
-            return Err(Error::InvalidInput);
-        }
-        if ciphertext != self.ciphertext {
-            return Err(Error::VerificationFailed);
-        }
-        self.decrypts.fetch_add(1, Ordering::Relaxed);
-        Ok(OutputBytes::new(Zeroizing::new(self.plaintext.clone())))
-    }
+    assert_eq!(decrypts(&calls, &ciphertext), 2);
 }
 
 #[test]
@@ -607,14 +544,13 @@ fn inconsistent_decryption_does_not_require_signing() {
         .iter()
         .find(|t| v::string(t, "result") == "valid")
         .unwrap();
-    let decrypts = Arc::new(AtomicUsize::new(0));
+    let ciphertext = v::field(t, "ct");
+    let calls = Arc::default();
     let derived_loads = Arc::new(AtomicUsize::new(0));
     let loader = DecryptOnlyLoader {
         derived: der::inconsistent_rsa(&base, None),
         base,
-        ciphertext: v::field(t, "ct"),
-        plaintext: v::field(t, "msg"),
-        decrypts: Arc::clone(&decrypts),
+        key: decrypt_only(&ciphertext, v::field(t, "msg"), &calls),
         derived_loads: Arc::clone(&derived_loads),
     };
     let provider = CryptoProvider::builder()
@@ -623,20 +559,9 @@ fn inconsistent_decryption_does_not_require_signing() {
         .unwrap();
     let mut c = Checks::default();
     inconsistent_rsa(&mut c, &provider);
-    assert!(decrypts.load(Ordering::Relaxed) > 0);
+    assert!(decrypts(&calls, &ciphertext) > 0);
     assert!(derived_loads.load(Ordering::Relaxed) >= 2);
 }
-
-#[test]
-fn public_range_comparison() {
-    for (i, group) in v::dh_groups().iter().take(3).enumerate() {
-        let published = v::rfc5114(i + 1);
-        assert!(below_modulus_minus_one(&published["yA"], &group.p));
-        assert!(below_modulus_minus_one(&published["yB"], &group.p));
-        assert!(!below_modulus_minus_one(&group.p, &group.p));
-    }
-}
-
 #[test]
 fn changed_ffc_exponents_are_in_range() {
     let cases = v::response(FFC_FILE)

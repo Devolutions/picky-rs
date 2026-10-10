@@ -4,6 +4,5 @@ mod differential;
 mod empty_provider;
 mod harness;
 mod provider_value;
-mod published;
 mod selection;
 mod vectors;

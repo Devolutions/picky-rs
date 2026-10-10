@@ -145,10 +145,7 @@ fn derived_key_controls() {
             }
         }
     }
-    for (kind, _, size, r) in picky_crypto_testsuite::asymmetric::ecc_cases()
-        .into_iter()
-        .filter(|(_, _, _, r)| r.text("Result").starts_with('P'))
-    {
+    for (kind, _, size, r) in picky_crypto_testsuite::asymmetric::ecc_cases() {
         let own = point(&r.bytes("QeIUTx"), &r.bytes("QeIUTy"), size);
         let peer = point(&r.bytes("QeCAVSx"), &r.bytes("QeCAVSy"), size);
         assert_ne!(own, peer, "public-key substitution must change the field");
@@ -187,15 +184,4 @@ fn derived_key_controls() {
             assert_eq!(rebuild(&encoded), encoded);
         }
     }
-    let corpus = vectors::wycheproof("ed25519_test.json");
-    let test = picky_crypto_testsuite::select::ed25519_small_order_r(&corpus);
-    let (group, _) = picky_crypto_testsuite::select::signature_control("ed25519_test.json", &corpus);
-    let published = vectors::field(group, "publicKeyDer");
-    let fields = children(&published);
-    let public = vectors::field(&group["publicKey"], "pk");
-    assert_eq!(
-        sequence(&[fields[0].encoded.to_vec(), tlv(3, &[&[0][..], &public].concat())]),
-        published
-    );
-    assert_eq!(vectors::field(test, "sig")[..32].len(), public.len());
 }

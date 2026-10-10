@@ -5,6 +5,12 @@ use picky_crypto_testsuite::harness::Checks;
 use picky_crypto_testsuite::vectors as v;
 use std::sync::{Arc, Mutex};
 
+const PARTIAL: [SignatureAlgorithm; 3] = [
+    SignatureAlgorithm::RsaPkcs1v15Md5,
+    SignatureAlgorithm::RsaPkcs1v15Sha3_384,
+    SignatureAlgorithm::RsaPkcs1v15Sha3_512,
+];
+
 struct SigningLoader {
     signature: Vec<u8>,
 }
@@ -40,14 +46,7 @@ impl PrivateKey for SigningKey {
         false
     }
     fn supports(&self, operation: KeyOperation) -> bool {
-        matches!(
-            operation,
-            KeyOperation::Sign(
-                SignatureAlgorithm::RsaPkcs1v15Md5
-                    | SignatureAlgorithm::RsaPkcs1v15Sha3_384
-                    | SignatureAlgorithm::RsaPkcs1v15Sha3_512
-            )
-        )
+        matches!(operation, KeyOperation::Sign(a) if PARTIAL.contains(&a))
     }
     fn sign(&self, algorithm: SignatureAlgorithm, _: &[u8]) -> Result<OutputBytes, Error> {
         if !self.supports(KeyOperation::Sign(algorithm)) {
@@ -76,11 +75,7 @@ fn mock(signature: &[u8], calls: Arc<Mutex<Vec<SignatureAlgorithm>>>) -> CryptoP
     let mut builder = CryptoProvider::builder().with(Entry::PrivateKeyLoader(Arc::new(SigningLoader {
         signature: signature.to_vec(),
     })));
-    for algorithm in [
-        SignatureAlgorithm::RsaPkcs1v15Md5,
-        SignatureAlgorithm::RsaPkcs1v15Sha3_384,
-        SignatureAlgorithm::RsaPkcs1v15Sha3_512,
-    ] {
+    for algorithm in PARTIAL {
         builder = builder.with(Entry::SignatureVerifier(Arc::new(Verifier {
             algorithm,
             signature: signature.to_vec(),
@@ -104,13 +99,7 @@ fn rsa_cross_signing_includes_algorithms_without_generation_vectors() {
     c.finish();
     for calls in [a_calls, b_calls] {
         let calls = calls.lock().unwrap();
-        for algorithm in [
-            SignatureAlgorithm::RsaPkcs1v15Md5,
-            SignatureAlgorithm::RsaPkcs1v15Sha3_384,
-            SignatureAlgorithm::RsaPkcs1v15Sha3_512,
-        ] {
-            assert!(calls.contains(&algorithm));
-        }
+        assert!(PARTIAL.iter().all(|algorithm| calls.contains(algorithm)));
     }
 }
 
@@ -144,11 +133,7 @@ fn inconsistent_signatures_cover_partial_keys_and_fallback_verification() {
         c.finish();
         let calls = calls.lock().unwrap();
         let other_calls = other_calls.lock().unwrap();
-        for algorithm in [
-            SignatureAlgorithm::RsaPkcs1v15Md5,
-            SignatureAlgorithm::RsaPkcs1v15Sha3_384,
-            SignatureAlgorithm::RsaPkcs1v15Sha3_512,
-        ] {
+        for algorithm in PARTIAL {
             assert_eq!(
                 calls.iter().filter(|&&actual| actual == algorithm).count(),
                 if local.entries().next().is_some() { 2 } else { 0 }

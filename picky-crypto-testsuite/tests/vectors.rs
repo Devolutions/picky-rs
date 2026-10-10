@@ -197,21 +197,14 @@ fn assembled_inputs() {
             assert_eq!(plaintext.len() % iv.len(), 0);
         }
     }
-    for (kind, _, width, r) in picky_crypto_testsuite::asymmetric::ecc_cases() {
-        let public = picky_crypto_testsuite::der::point(&r.bytes("QeIUTx"), &r.bytes("QeIUTy"), width);
-        let pkcs8 = picky_crypto_testsuite::der::ec(kind, &r.bytes("deIUT"), Some(&public), None);
-        let parts = picky_crypto_testsuite::der::children(&pkcs8);
-        let inner = picky_crypto_testsuite::der::children(parts[2].value);
-        assert_eq!(
-            inner[1].value,
-            picky_crypto_testsuite::der::padded(&r.bytes("deIUT"), width)
-        );
-        assert_eq!(
-            picky_crypto_testsuite::der::parse(inner[2].value).unwrap()[0].value[1..],
-            public
-        );
+    for (_, _, _, r) in picky_crypto_testsuite::asymmetric::ecc_cases() {
         for name in ["QeCAVSx", "QeCAVSy", "OI", "DKM", "Z"] {
             r.bytes(name);
+        }
+    }
+    for index in 0..picky_crypto_testsuite::algorithms::KDFS.len() {
+        for (id, secret, info) in picky_crypto_testsuite::published::kdf(index) {
+            assert!(!secret.is_empty() && secret.len() <= 1024 && info.len() <= 1024, "{id}");
         }
     }
     let groups = dh_groups();

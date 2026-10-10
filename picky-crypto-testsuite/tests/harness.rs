@@ -77,11 +77,7 @@ impl Debug for Leaky {
 }
 
 #[rstest]
-#[case(0)]
-#[case(1)]
-#[case(2)]
-#[case(3)]
-fn short_output_diagnostics(#[case] len: usize) {
+fn short_output_diagnostics(#[values(0, 1, 2, 3)] len: usize) {
     let vectors = picky_crypto_testsuite::vectors::wycheproof("hmac_sha256_test.json");
     let tag = picky_crypto_testsuite::vectors::field(
         &picky_crypto_testsuite::vectors::tests(&vectors.test_groups[0])[0],
