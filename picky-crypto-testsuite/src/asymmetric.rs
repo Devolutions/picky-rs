@@ -566,12 +566,12 @@ pub fn signature(p: &CryptoProvider, options: Options) {
             )
         });
         let (identity, keys) = ed25519_undecodable_keys();
-        let signature = [identity, [0; 32]].concat();
+        let identity_signature = [identity, [0; 32]].concat();
         for (name, key) in keys {
             c.call(
                 &format!("Ed25519/rfc/rfc8032.txt/5.1.3/A {name}"),
                 malformed_public(options),
-                || verifier.verify(PublicKey(&key), &[], &signature),
+                || verifier.verify(PublicKey(&key), &[], &identity_signature),
             );
         }
     }

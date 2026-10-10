@@ -144,7 +144,9 @@ fn mac_controls(#[values(0, 1, 2, 3, 4)] index: usize) {
         select::mac_probe(index, &inputs).3.len(),
         HASHES[index + 2].output_len()
     );
-    published::empty_mac(index);
+    let (_, key, data) = published::empty_mac(index);
+    assert!(key.is_empty());
+    assert!(!data.is_empty() && inputs.iter().any(|t| t.2 == data));
 }
 
 #[test]

@@ -221,7 +221,7 @@ fn assembled_inputs() {
     assert_eq!(&derived[8..], &base[8..]);
 }
 
-// Catches an accessor that pads odd-length hex as other parsers do: no published privateKey field is odd-length.
+// Catches the accessor's decoding helper padding odd-length hex as other parsers do; no published privateKey field is odd-length.
 #[test]
 #[should_panic(expected = "Odd number of digits")]
 fn even_hex_rejects_odd_length() {

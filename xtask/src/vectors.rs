@@ -272,7 +272,7 @@ extract = "groups"
         // An array left open at the end of the file must fail on its own, not through an empty section.
         let (wycheproof, files) = MANIFEST.split_once("\n[[file]]").unwrap();
         let unterminated = format!("[[file]]{files}\n{}", wycheproof.trim_end().trim_end_matches(']'));
-        assert!(parse(&unterminated).is_err());
+        assert!(parse(&unterminated).unwrap_err().to_string().contains("unterminated"));
         assert!(parse(&MANIFEST.replace("source = \"https://example.org/wycheproof\"\n", "")).is_err());
         let no_files = MANIFEST.replace("    \"testvectors_v1/a.json\",\n    \"testvectors_v1/b.json\",\n", "");
         assert!(parse(&no_files).is_err());
