@@ -17,4 +17,5 @@ crypto-bigint = { version = "0.7.5", default-features = false, features = ["allo
 zeroize = { version = "1.8", default-features = false, features = ["alloc"] }
 
 [dev-dependencies]
+picky-crypto-testsuite = { path = "../picky-crypto-testsuite" }
 rstest = "0.26"

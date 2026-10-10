@@ -5,29 +5,13 @@ use picky_crypto_rsa_crt::{CrtParams, Error, MAX_MODULUS_LEN, complete_crt_param
 use rstest::rstest;
 use vectors::*;
 
-fn decode(hex: &str) -> Vec<u8> {
-    hex.as_bytes()
-        .chunks_exact(2)
-        .map(|pair| {
-            let pair = core::str::from_utf8(pair).expect("published hexadecimal");
-            u8::from_str_radix(pair, 16).expect("published hexadecimal")
-        })
-        .collect()
-}
-
 fn integer(bytes: &[u8]) -> &[u8] {
     let start = bytes.iter().position(|byte| *byte != 0).unwrap_or(bytes.len());
     &bytes[start..]
 }
 
-fn complete(key: Key) -> Result<CrtParams, Error> {
-    complete_crt_params(
-        &decode(key.n),
-        &decode(key.e),
-        &decode(key.d),
-        &decode(key.p),
-        &decode(key.q),
-    )
+fn complete(key: &Key) -> Result<CrtParams, Error> {
+    complete_crt_params(&key.n, &key.e, &key.d, &key.p, &key.q)
 }
 
 #[rstest]
@@ -41,54 +25,53 @@ fn complete(key: Key) -> Result<CrtParams, Error> {
 #[case::rsa_4032(RSA_4032)]
 #[case::rsa_4096(RSA_4096)]
 #[case::rsa_8192(RSA_8192)]
-fn published_crt_parameters(#[case] key: Key) {
-    let params = complete(key).expect("consistent published key");
-    assert_eq!(integer(params.dp()), integer(&decode(key.dp)));
-    assert_eq!(integer(params.dq()), integer(&decode(key.dq)));
-    assert_eq!(integer(params.qinv()), integer(&decode(key.qinv)));
-    assert_eq!(params.dp().len(), decode(key.p).len());
-    assert_eq!(params.dq().len(), decode(key.q).len());
-    assert_eq!(params.qinv().len(), decode(key.p).len());
+fn published_crt_parameters(#[case] source: Source) {
+    let key = source.key();
+    let params = complete(&key).expect("consistent published key");
+    assert_eq!(integer(params.dp()), integer(&key.dp));
+    assert_eq!(integer(params.dq()), integer(&key.dq));
+    assert_eq!(integer(params.qinv()), integer(&key.qinv));
+    assert_eq!(params.dp().len(), key.p.len());
+    assert_eq!(params.dq().len(), key.q.len());
+    assert_eq!(params.qinv().len(), key.p.len());
 }
 
 #[rstest]
 #[case::rsa_2048(RSA_2048)]
 #[case::rsa_3104(RSA_3104)]
-fn swapped_primes(#[case] key: Key) {
-    let swapped = Key {
-        p: key.q,
-        q: key.p,
-        ..key
-    };
-    let params = complete(swapped).expect("consistent swapped primes");
-    assert_eq!(integer(params.dp()), integer(&decode(key.dq)));
-    assert_eq!(integer(params.dq()), integer(&decode(key.dp)));
-    assert_eq!(params.dp().len(), decode(key.q).len());
-    assert_eq!(params.dq().len(), decode(key.p).len());
-    assert_eq!(params.qinv().len(), decode(key.q).len());
+fn swapped_primes(#[case] source: Source) {
+    let key = source.key();
+    let mut swapped = source.key();
+    core::mem::swap(&mut swapped.p, &mut swapped.q);
+    let params = complete(&swapped).expect("consistent swapped primes");
+    assert_eq!(integer(params.dp()), integer(&key.dq));
+    assert_eq!(integer(params.dq()), integer(&key.dp));
+    assert_eq!(params.dp().len(), key.q.len());
+    assert_eq!(params.dq().len(), key.p.len());
+    assert_eq!(params.qinv().len(), key.q.len());
 }
 
 #[rstest]
-#[case::other_p(Key { p: RSA_2048_OTHER.p, ..RSA_2048 }, Error::InconsistentKey)]
-#[case::other_q(Key { q: RSA_2048_OTHER.q, ..RSA_2048 }, Error::InconsistentKey)]
-// RSA_1024.coefficient (qinv) ends in 04 and is even.
-#[case::even_p(Key { p: RSA_1024.qinv, ..RSA_2048 }, Error::InconsistentKey)]
-// RSA_1024.coefficient (qinv) ends in 04 and is even.
-#[case::even_q(Key { q: RSA_1024.qinv, ..RSA_2048 }, Error::InconsistentKey)]
-// E_THREE is the published signature-generation key's publicExponent.
-#[case::small_p(Key { p: E_THREE, ..RSA_2048 }, Error::InconsistentKey)]
-// E_THREE is the published signature-generation key's publicExponent.
-#[case::small_q(Key { q: E_THREE, ..RSA_2048 }, Error::InconsistentKey)]
-#[case::other_n(Key { n: RSA_2048_OTHER.n, ..RSA_2048 }, Error::InconsistentKey)]
-#[case::other_d(Key { d: RSA_2048_OTHER.d, ..RSA_2048 }, Error::InconsistentKey)]
-#[case::other_e(Key { e: E_THREE, ..RSA_2048 }, Error::InconsistentKey)]
-#[case::equal_primes(Key { q: RSA_2048.p, ..RSA_2048 }, Error::InconsistentKey)]
-#[case::long_d(Key { d: RSA_4096.d, ..RSA_2048 }, Error::InvalidLength)]
-#[case::long_p(Key { p: RSA_8192.p, ..RSA_2048 }, Error::InvalidLength)]
-#[case::long_q(Key { q: RSA_8192.q, ..RSA_2048 }, Error::InvalidLength)]
-#[case::short_n(Key { n: RSA_1024.n, ..RSA_2048 }, Error::InvalidLength)]
+#[case::other_p(Key { p: RSA_2048_OTHER.key().p, ..RSA_2048.key() }, Error::InconsistentKey)]
+#[case::other_q(Key { q: RSA_2048_OTHER.key().q, ..RSA_2048.key() }, Error::InconsistentKey)]
+// The published RSA_1024 coefficient (qinv) ends in 04, so it is even.
+#[case::even_p(Key { p: RSA_1024.key().qinv, ..RSA_2048.key() }, Error::InconsistentKey)]
+// The published RSA_1024 coefficient (qinv) ends in 04, so it is even.
+#[case::even_q(Key { q: RSA_1024.key().qinv, ..RSA_2048.key() }, Error::InconsistentKey)]
+// e_three() is a published signature-generation key's publicExponent (3).
+#[case::small_p(Key { p: e_three(), ..RSA_2048.key() }, Error::InconsistentKey)]
+// e_three() is a published signature-generation key's publicExponent (3).
+#[case::small_q(Key { q: e_three(), ..RSA_2048.key() }, Error::InconsistentKey)]
+#[case::other_n(Key { n: RSA_2048_OTHER.key().n, ..RSA_2048.key() }, Error::InconsistentKey)]
+#[case::other_d(Key { d: RSA_2048_OTHER.key().d, ..RSA_2048.key() }, Error::InconsistentKey)]
+#[case::other_e(Key { e: e_three(), ..RSA_2048.key() }, Error::InconsistentKey)]
+#[case::equal_primes(Key { q: RSA_2048.key().p, ..RSA_2048.key() }, Error::InconsistentKey)]
+#[case::long_d(Key { d: RSA_4096.key().d, ..RSA_2048.key() }, Error::InvalidLength)]
+#[case::long_p(Key { p: RSA_8192.key().p, ..RSA_2048.key() }, Error::InvalidLength)]
+#[case::long_q(Key { q: RSA_8192.key().q, ..RSA_2048.key() }, Error::InvalidLength)]
+#[case::short_n(Key { n: RSA_1024.key().n, ..RSA_2048.key() }, Error::InvalidLength)]
 fn substituted_components(#[case] key: Key, #[case] error: Error) {
-    assert_eq!(complete(key).expect_err("inconsistent substituted key"), error);
+    assert_eq!(complete(&key).expect_err("inconsistent substituted key"), error);
 }
 
 // Structural input with a specified error outcome; not a test vector.
@@ -105,18 +88,21 @@ fn structural_inputs(
     #[case] q: Option<Vec<u8>>,
     #[case] error: Error,
 ) {
-    let n = n.unwrap_or_else(|| decode(RSA_2048.n));
-    let p = p.unwrap_or_else(|| decode(RSA_2048.p));
-    let q = q.unwrap_or_else(|| decode(RSA_2048.q));
-    let result = complete_crt_params(&n, &decode(RSA_2048.e), &decode(RSA_2048.d), &p, &q);
-    assert_eq!(result.expect_err("structural input"), error);
+    let base = RSA_2048.key();
+    let key = Key {
+        n: n.unwrap_or_else(|| base.n.clone()),
+        p: p.unwrap_or_else(|| base.p.clone()),
+        q: q.unwrap_or_else(|| base.q.clone()),
+        ..base
+    };
+    assert_eq!(complete(&key).expect_err("structural input"), error);
 }
 
 #[test]
 fn redacted_debug_and_error_traits() {
     fn zeroizes_on_drop<T: zeroize::ZeroizeOnDrop>() {}
     zeroizes_on_drop::<CrtParams>();
-    let params = complete(RSA_2048).expect("consistent published key");
+    let params = complete(&RSA_2048.key()).expect("consistent published key");
     assert_eq!(format!("{params:?}"), "CrtParams { [REDACTED] }");
     assert_eq!(
         Error::InvalidLength.to_string(),

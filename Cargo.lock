@@ -1387,6 +1387,7 @@ name = "picky-crypto-rsa-crt"
 version = "0.1.0"
 dependencies = [
  "crypto-bigint",
+ "picky-crypto-testsuite",
  "rstest",
  "zeroize",
 ]
