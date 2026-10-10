@@ -47,6 +47,12 @@ pub const RSA_1024: Source = Source {
     file: "rsa_oaep_misc_test.json",
     group: 0,
 };
+/// rsa_oaep_misc_test.json, testGroups[35], tcId 106..=108.
+/// Its dP and qInv are published at the encoding length of p, and dQ at that of q.
+pub const RSA_1536_EQUAL_LENGTHS: Source = Source {
+    file: "rsa_oaep_misc_test.json",
+    group: 35,
+};
 /// rsa_oaep_2048_sha1_mgf1sha1_test.json, testGroups[0], tcId 1..=36.
 pub const RSA_2048: Source = Source {
     file: "rsa_oaep_2048_sha1_mgf1sha1_test.json",
