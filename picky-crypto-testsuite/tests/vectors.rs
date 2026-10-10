@@ -220,3 +220,10 @@ fn assembled_inputs() {
     assert_eq!(derived.len(), 24);
     assert_eq!(&derived[8..], &base[8..]);
 }
+
+// Catches an accessor that pads odd-length hex as other parsers do: no published privateKey field is odd-length.
+#[test]
+#[should_panic(expected = "Odd number of digits")]
+fn even_hex_rejects_odd_length() {
+    picky_crypto_testsuite::vectors::even_hex("privateKey.modulus", "abc");
+}

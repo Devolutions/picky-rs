@@ -101,10 +101,14 @@ pub fn wycheproof_private_key(file: &str, group: usize) -> BTreeMap<String, Vec<
             let text = value
                 .as_str()
                 .unwrap_or_else(|| panic!("{file}: privateKey.{name} is not a string"));
-            let decoded = hex::decode(text).unwrap_or_else(|e| panic!("{file}: privateKey.{name}: {e}"));
-            (name.clone(), decoded)
+            (name.clone(), even_hex(&format!("{file}: privateKey.{name}"), text))
         })
         .collect()
+}
+
+/// Decodes published hex exactly, rejecting an odd number of digits instead of padding it.
+pub fn even_hex(context: &str, text: &str) -> Vec<u8> {
+    hex::decode(text).unwrap_or_else(|e| panic!("{context}: {e}"))
 }
 
 pub fn id(algorithm: impl std::fmt::Debug, file: &str, test: &Value) -> String {

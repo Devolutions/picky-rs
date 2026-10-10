@@ -472,7 +472,9 @@ fn decrypts(calls: &Calls, ciphertext: &[u8]) -> usize {
         .lock()
         .unwrap()
         .iter()
-        .filter(|(call, input)| matches!(call, KeyOperation::Decrypt(_)) && input == ciphertext)
+        .filter(|(call, input)| {
+            *call == KeyOperation::Decrypt(AsymmetricEncryptionAlgorithm::RsaPkcs1v15) && input == ciphertext
+        })
         .count()
 }
 struct ReferenceEncryptor {
@@ -580,7 +582,7 @@ fn changed_ffc_exponents_are_in_range() {
 }
 
 type VerifyCalls = Arc<Mutex<Vec<(Vec<u8>, Vec<u8>)>>>;
-struct UndecodableKeys(VerifyCalls);
+struct UndecodableKeys(VerifyCalls, Result<(), Error>);
 impl SignatureVerifier for UndecodableKeys {
     fn algorithm(&self) -> SignatureAlgorithm {
         SignatureAlgorithm::Ed25519
@@ -590,33 +592,55 @@ impl SignatureVerifier for UndecodableKeys {
     }
     fn verify(&self, public_key: PublicKey<'_>, _: &[u8], signature: &[u8]) -> Result<(), Error> {
         self.0.lock().unwrap().push((public_key.0.to_vec(), signature.to_vec()));
-        Err(Error::InvalidKey)
+        self.1
     }
 }
 
 #[test]
-fn ed25519_undecodable_public_keys_reach_the_verifier() {
+fn ed25519_undecodable_keys_follow_rfc8032_encoding() {
+    let (identity, [(_, non_canonical), (_, negative_zero)]) = ed25519_undecodable_keys();
+    // p = 2^255 - 19 is ed ff .. ff 7f little-endian, so p + 1 only changes the low byte.
+    let mut p_plus_one = [0xff; 32];
+    p_plus_one[0] = 0xee;
+    p_plus_one[31] = 0x7f;
+    assert_eq!(non_canonical, p_plus_one);
+    let mut y_one = [0; 32];
+    y_one[0] = 1;
+    assert_eq!(identity, y_one);
+    y_one[31] = 0x80;
+    assert_eq!(negative_zero, y_one);
+}
+
+#[rstest]
+#[case::invalid_key(Err(Error::InvalidKey), false, false)]
+#[case::accepted(Ok(()), false, true)]
+#[case::opaque_failure_without_option(Err(Error::VerificationFailed), false, true)]
+#[case::opaque_failure_with_option(Err(Error::VerificationFailed), true, false)]
+fn ed25519_undecodable_public_keys_reach_the_verifier(
+    #[case] result: Result<(), Error>,
+    #[case] opaque: bool,
+    #[case] reported: bool,
+) {
     let (identity, keys) = ed25519_undecodable_keys();
-    assert_eq!(identity[0], 1);
-    assert!(identity[1..].iter().all(|b| *b == 0));
     let calls = Arc::new(Mutex::new(Vec::new()));
     let provider = CryptoProvider::builder()
-        .with(Entry::SignatureVerifier(Arc::new(UndecodableKeys(Arc::clone(&calls)))))
+        .with(Entry::SignatureVerifier(Arc::new(UndecodableKeys(
+            Arc::clone(&calls),
+            result,
+        ))))
         .build()
         .unwrap();
+    let mut options = Options::default();
+    options.opaque_public_key_errors = opaque;
     let report = picky_crypto_testsuite::properties::without_failure_persistence(|| {
-        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            signature(&provider, Options::default())
-        }))
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| signature(&provider, options)))
     })
-    .expect_err("an always-failing verifier fails the published valid vectors");
+    .expect_err("a verifier with a fixed result fails the published vectors");
     let report = report.downcast_ref::<String>().unwrap();
-    assert!(
-        !report.contains("rfc/rfc8032.txt/5.1.3/A "),
-        "InvalidKey is accepted: {report}"
-    );
-    let calls = calls.lock().unwrap();
-    for (_, key) in keys {
+    for (name, key) in keys {
+        let id = format!("rfc/rfc8032.txt/5.1.3/A {name}:");
+        assert_eq!(report.contains(&id), reported, "{id} in {report}");
+        let calls = calls.lock().unwrap();
         let call = calls
             .iter()
             .find(|(public, _)| public[..] == key[..])

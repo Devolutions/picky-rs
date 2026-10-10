@@ -269,7 +269,10 @@ extract = "groups"
         assert!(parse(&MANIFEST.replace("commit = \"abc\"\n", "")).is_err());
         assert!(parse(&MANIFEST.replace("version = \"a\"", "version = \"a\"\nversion = \"c\"")).is_err());
         assert!(parse(&MANIFEST.replace("path = \"nist/a.rsp\"", "path = nist/a.rsp")).is_err());
-        assert!(parse(MANIFEST.split("\n]\n").next().unwrap()).is_err());
+        // An array left open at the end of the file must fail on its own, not through an empty section.
+        let (wycheproof, files) = MANIFEST.split_once("\n[[file]]").unwrap();
+        let unterminated = format!("[[file]]{files}\n{}", wycheproof.trim_end().trim_end_matches(']'));
+        assert!(parse(&unterminated).is_err());
         assert!(parse(&MANIFEST.replace("source = \"https://example.org/wycheproof\"\n", "")).is_err());
         let no_files = MANIFEST.replace("    \"testvectors_v1/a.json\",\n    \"testvectors_v1/b.json\",\n", "");
         assert!(parse(&no_files).is_err());
