@@ -3,7 +3,7 @@ use serde_json::Value;
 
 use crate::algorithms::*;
 use crate::harness::{CheckedResult, Checks, Expect, malformed_public};
-use crate::{Options, der, vectors as v};
+use crate::{Options, der, select, vectors as v};
 
 pub const RSA_VERIFY_FILES: [&str; 8] = [
     "rsa_signature_2048_sha224_test.json",
@@ -416,11 +416,7 @@ pub fn signature(p: &CryptoProvider, options: Options) {
                 "rsa_signature_2048_sha256_test.json"
             };
             let vectors = v::wycheproof(file);
-            let group = &vectors.test_groups[0];
-            let t = v::tests(group)
-                .iter()
-                .find(|t| v::string(t, "result") == "valid")
-                .unwrap();
+            let (group, t) = select::signature_control(file, &vectors);
             let public = v::field(group, "publicKeyAsn");
             assert!(rsa_public_must(&public));
             let message = v::field(t, "msg");
@@ -474,11 +470,7 @@ pub fn signature(p: &CryptoProvider, options: Options) {
         }
         if let Ok(verifier) = helpers::signature_verifier(p, a) {
             let signatures = v::wycheproof(&file);
-            let valid_group = &signatures.test_groups[0];
-            let valid = v::tests(valid_group)
-                .iter()
-                .find(|t| v::string(t, "result") == "valid")
-                .unwrap();
+            let (_, valid) = select::signature_control(&file, &signatures);
             let ecpoint_file = format!("ecdh_{name}_ecpoint_test.json");
             for group in v::wycheproof(&ecpoint_file).test_groups {
                 for t in v::tests(&group).iter().filter(|t| {
@@ -517,16 +509,8 @@ pub fn signature(p: &CryptoProvider, options: Options) {
     }
     if let Ok(verifier) = helpers::signature_verifier(p, SignatureAlgorithm::Ed25519) {
         let vectors = v::wycheproof("ed25519_test.json");
-        let (group, t) = vectors
-            .test_groups
-            .iter()
-            .find_map(|g| {
-                v::tests(g)
-                    .iter()
-                    .find(|t| v::string(t, "comment") == "R==0")
-                    .map(|t| (g, t))
-            })
-            .unwrap();
+        let t = select::ed25519_small_order_r(&vectors);
+        let (group, positive) = select::signature_control("ed25519_test.json", &vectors);
         let signature = v::field(t, "sig");
         // RFC 8032 uses the same point encoding for A and R.
         let small_order = &signature[..32];
@@ -538,10 +522,6 @@ pub fn signature(p: &CryptoProvider, options: Options) {
             spki,
             "Ed25519 SPKI split/reassemble control"
         );
-        let positive = v::tests(group)
-            .iter()
-            .find(|t| v::string(t, "result") == "valid")
-            .unwrap();
         let id = format!(
             "Ed25519/ed25519_test.json/tcId={}/public key from tcId={}/R",
             v::number(positive, "tcId"),
@@ -588,7 +568,7 @@ pub fn signature(p: &CryptoProvider, options: Options) {
                     if !c.key_supports(&id, &*key, KeyOperation::Sign(algorithm)) {
                         continue;
                     }
-                    let message = v::field(&v::tests(&g)[0], "msg");
+                    let message = v::field(select::group_message(file, &g), "msg");
                     let id = format!("{algorithm:?}/{file}/private-key round trip");
                     if let Some(sig) = c.outcome(
                         &id,
@@ -1098,9 +1078,10 @@ pub fn key_agreement(p: &CryptoProvider, _: Options) {
     // Without a published own public point, raw-scalar vectors use the contract's optional-public-key encoding.
     for (kind, a, _, width, name) in CURVES {
         let file = format!("ecdh_{name}_ecpoint_test.json");
-        for g in v::wycheproof(&file).test_groups {
-            let tests = v::tests(&g);
-            let fallback_positive = tests.iter().find(|t| v::string(t, "result") == "valid").unwrap();
+        let vectors = v::wycheproof(&file);
+        let fallback_positive = select::ecdh_control(&file, &vectors);
+        for g in &vectors.test_groups {
+            let tests = v::tests(g);
             for t in tests {
                 let peer = v::field(t, "public");
                 let invalid_peer =
@@ -1185,7 +1166,7 @@ fn ffdh_exponent_boundaries(c: &mut Checks, p: &CryptoProvider, groups: &[v::DhG
         return;
     };
     for group in groups.iter().filter(|group| group.id.starts_with("rfc/rfc7919.txt/")) {
-        let order = group.q.as_deref().expect("published RFC 7919 subgroup order");
+        let order = select::ffdh_order(group);
         for q in [None, Some(order)] {
             let id = format!(
                 "Ffdh/{}/x = published q/q {}",
@@ -1345,7 +1326,7 @@ pub fn ffdh(p: &CryptoProvider, _: Options) {
                 }
             }
             if let Ok(loader) = helpers::private_key_loader(p, KeyType::Ffdh) {
-                for invalid in [&[][..], &[0][..], &group.p[..], group.q.as_deref().unwrap()] {
+                for invalid in [&[][..], &[0][..], &group.p[..], select::ffdh_order(group)] {
                     c.call(
                         &format!("{id}/invalid exponent"),
                         Expect::Error(Error::InvalidKey),
@@ -1519,7 +1500,7 @@ pub fn private_key(p: &CryptoProvider, _: Options) {
                     );
                 }
                 if kind != KeyType::Ed25519 {
-                    let t = &v::ed25519()[0];
+                    let t = select::ed25519_empty();
                     let material = der::ed(&t.seed, Some(&t.public));
                     c.call(
                         &format!("{kind:?}/wrong encoded key type"),
@@ -1638,7 +1619,7 @@ pub fn private_key(p: &CryptoProvider, _: Options) {
                 }
             }
         }
-        let mismatched = der::ed(&t.seed, Some(&v::ed25519()[(i + 1) % v::ed25519().len()].public));
+        let mismatched = der::ed(&t.seed, Some(select::ed25519_other_public(&t.public)));
         if let Ok(loader) = helpers::private_key_loader(p, KeyType::Ed25519) {
             c.call(
                 &format!("{id}/mismatched public key"),
@@ -1648,20 +1629,20 @@ pub fn private_key(p: &CryptoProvider, _: Options) {
         }
     }
     if let Ok(loader) = helpers::private_key_loader(p, KeyType::Ed25519) {
-        let keys = v::ed8410();
+        let encoded = select::ed25519_attributes();
         if let Some(key) = c.call(
             "Ed25519/rfc/rfc8410.txt/10.3/attributes",
             Expect::Either(Error::InvalidKey),
-            || loader.load(PrivateKeyMaterial::Pkcs8(&keys[1])),
+            || loader.load(PrivateKeyMaterial::Pkcs8(&encoded)),
         ) {
-            let public = der::encoded_public(KeyType::Ed25519, &keys[1]).unwrap();
+            let public = der::encoded_public(KeyType::Ed25519, &encoded).unwrap();
             exported(&mut c, "Ed25519/rfc/rfc8410.txt/10.3/attributes", &*key, &public);
         }
     }
     inconsistent_rsa(&mut c, p);
     if let Ok(loader) = helpers::private_key_loader(p, KeyType::Rsa) {
         let vectors = v::wycheproof(RSA_SIGN_FILES[0]);
-        let g = &vectors.test_groups[0];
+        let g = select::rsa_private_group(RSA_SIGN_FILES[0], &vectors);
         let encoded = v::field(g, "privateKeyPkcs8");
         let mut fields = der::children(&encoded)
             .iter()
@@ -1792,22 +1773,18 @@ pub fn inconsistent_roundtrip(
     };
     let public = der::rsa_public(encoded);
     let limit = rsa_plaintext_limit(algorithm, der::bit_length(der::children(&public)[0].value).div_ceil(8));
-    let messages = crate::published::messages();
-    let (source, message) = messages
-        .iter()
-        .find(|(_, message)| !message.is_empty() && message.len() <= limit)
-        .expect("published RSA plaintext within limit");
+    let (source, message) = select::rsa_plaintext(limit);
     let id = format!("{id}/{algorithm:?}/round trip/{source}");
-    if let Some(ciphertext) = c.call(&id, Expect::Success, || encryptor.encrypt(PublicKey(&public), message)) {
+    if let Some(ciphertext) = c.call(&id, Expect::Success, || encryptor.encrypt(PublicKey(&public), &message)) {
         if let Some(positive) = c.call(&format!("{id}/positive control"), Expect::Success, || {
             base.decrypt(algorithm, &ciphertext)
         }) {
-            c.bytes(&id, &positive, message);
+            c.bytes(&id, &positive, &message);
         }
         if let Some(plaintext) = c.call(&id, Expect::Either(Error::InvalidKey), || {
             key.decrypt(algorithm, &ciphertext)
         }) {
-            c.bytes(&id, &plaintext, message);
+            c.bytes(&id, &plaintext, &message);
         }
     }
 }
@@ -1974,7 +1951,7 @@ pub fn key_generation(p: &CryptoProvider, _: Options) {
                 ) {
                     exported(&mut c, &id, &*key, &public);
                     if c.key_supports(&id, &*key, KeyOperation::Sign(sign)) {
-                        let message = &v::ed25519()[1].message;
+                        let message = &select::ed25519_nonempty().message;
                         if let Some(sig) = c.call(&id, Expect::Success, || key.sign(sign, message)) {
                             c.debug(&id, &sig, &sig);
                             if let Ok(verifier) = helpers::signature_verifier(p, sign) {

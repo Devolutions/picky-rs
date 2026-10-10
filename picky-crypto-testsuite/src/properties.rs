@@ -3,9 +3,9 @@ use proptest::prelude::*;
 use proptest::test_runner::{Config, FileFailurePersistence, RngSeed, TestRunner};
 
 use crate::algorithms::*;
-use crate::asymmetric::{ECC_FILE, RSA_SIGN_FILES, ecc_cases, exported};
+use crate::asymmetric::{ECC_FILE, RSA_SIGN_FILES, exported};
 use crate::harness::{CheckedResult, Checks, Expect};
-use crate::{Options, der, published, vectors as v};
+use crate::{Options, der, published, select, vectors as v};
 
 pub fn runner(file: &'static str) -> TestRunner {
     let cases = std::env::var("PROPTEST_CASES")
@@ -15,7 +15,11 @@ pub fn runner(file: &'static str) -> TestRunner {
     TestRunner::new(Config {
         cases,
         rng_seed: RngSeed::Fixed(0x7069636b79),
-        failure_persistence: Some(Box::new(FileFailurePersistence::Direct(file))),
+        failure_persistence: if cfg!(test) {
+            None
+        } else {
+            Some(Box::new(FileFailurePersistence::Direct(file)))
+        },
         ..Config::default()
     })
 }
@@ -109,7 +113,7 @@ pub fn properties(p: &CryptoProvider, _: Options) {
         );
         let (id, key, data) = published::empty_mac(index);
         if protections[1] && !protections[0] {
-            let probe = &inputs[0].3;
+            let probe = &select::mac_probe(index, &inputs).3;
             c.property(&format!("{id}/verification chunking"), any::<usize>(), |split| {
                 let split = split % (data.len() + 1);
                 let mut whole = MacVerification::start(e, &key).map_err(error)?;
@@ -201,7 +205,7 @@ pub fn properties(p: &CryptoProvider, _: Options) {
             prop_assert_eq!(plaintext.as_ref(), data.as_slice(), "{}", id);
             Ok(())
         });
-        let (_, key, iv, _, _, _) = &inputs[0];
+        let (_, key, iv, _, _, _) = select::cbc_control(a, &inputs);
         c.property(
             &format!("{a:?}/out-of-domain"),
             (0..iv.len(), 0..iv.len()),
@@ -308,11 +312,7 @@ pub fn properties(p: &CryptoProvider, _: Options) {
     }
     if let Ok(loader) = helpers::private_key_loader(p, KeyType::Rsa) {
         let vectors = v::wycheproof(RSA_SIGN_FILES[0]);
-        let g = vectors
-            .test_groups
-            .iter()
-            .find(|g| der::rsa_must(&v::field(g, "privateKeyPkcs8")))
-            .unwrap();
+        let g = select::rsa_private_group(RSA_SIGN_FILES[0], &vectors);
         let encoded = v::field(g, "privateKeyPkcs8");
         let id = format!("{}/RSA property key", RSA_SIGN_FILES[0]);
         if let Some(key) = c.call(&id, Expect::Success, || {
@@ -328,12 +328,9 @@ pub fn properties(p: &CryptoProvider, _: Options) {
                 if !c.key_supports(&id, &*key, KeyOperation::Decrypt(a)) {
                     continue;
                 }
-                let inputs = messages
-                    .iter()
-                    .filter(|(_, msg)| msg.len() <= crate::asymmetric::rsa_plaintext_limit(a, k))
-                    .collect::<Vec<_>>();
+                let inputs = select::rsa_messages(crate::asymmetric::rsa_plaintext_limit(a, k));
                 c.property(&format!("{a:?}/published RSA round trip"), 0..inputs.len(), |index| {
-                    let (id, data) = inputs[index];
+                    let (id, data) = &inputs[index];
                     let encrypted = e.encrypt(PublicKey(&public), data).checked().map_err(error)?;
                     let plain = key.decrypt(a, &encrypted).checked().map_err(error)?;
                     prop_assert_eq!(plain.as_ref(), data.as_slice(), "{}", id);
@@ -343,7 +340,7 @@ pub fn properties(p: &CryptoProvider, _: Options) {
         }
     }
     if let Ok(loader) = helpers::private_key_loader(p, KeyType::Ed25519) {
-        let t = &v::ed25519()[0];
+        let t = select::ed25519_empty();
         let encoded = der::ed(&t.seed, Some(&t.public));
         let id = "rfc/rfc8032.txt/7.1/Ed25519 property key";
         if let Some(key) = c.call(id, Expect::Success, || loader.load(PrivateKeyMaterial::Pkcs8(&encoded))) {
@@ -364,12 +361,10 @@ pub fn properties(p: &CryptoProvider, _: Options) {
             }
         }
     }
-    let ecc = ecc_cases();
-    for (kind, _, width, r) in CURVES.into_iter().filter_map(|(kind, _, _, _, _)| {
-        ecc.iter()
-            .find(|(k, _, _, r)| *k == kind && r.text("Result").starts_with('P'))
-            .cloned()
-    }) {
+    for (kind, _, width, r) in CURVES
+        .into_iter()
+        .map(|(kind, _, _, _, _)| select::ecc_private_control(kind))
+    {
         let Ok(loader) = helpers::private_key_loader(p, kind) else {
             continue;
         };

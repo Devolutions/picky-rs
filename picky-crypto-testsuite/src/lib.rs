@@ -22,6 +22,9 @@ mod properties;
 #[cfg(test)]
 mod provider_value;
 mod published;
+mod select;
+#[cfg(test)]
+mod selection_tests;
 mod symmetric;
 mod vectors;
 

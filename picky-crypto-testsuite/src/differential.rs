@@ -7,7 +7,7 @@ use crate::asymmetric::{
     rsa_plaintext_limit, x25519_export,
 };
 use crate::harness::{CheckedResult, Checks, Expect};
-use crate::{der, published, vectors as v};
+use crate::{der, published, select, vectors as v};
 
 fn outputs(
     c: &mut Checks,
@@ -492,10 +492,7 @@ fn cross_keys(c: &mut Checks, source: &CryptoProvider, dest: &CryptoProvider) {
             }
             let k = der::bit_length(der::children(&public)[0].value).div_ceil(8);
             if rsa_keys.insert(encoded.clone()) {
-                let t = v::tests(&g)
-                    .iter()
-                    .find(|t| !v::field(t, "msg").is_empty())
-                    .unwrap_or(&v::tests(&g)[0]);
+                let t = select::group_nonempty_message(file, &g);
                 let data = v::field(t, "msg");
                 for algorithm in SIGNATURES[..8].iter().copied() {
                     let id = format!("{}/all RSA signing algorithms", v::id(algorithm, file, t));
@@ -684,11 +681,7 @@ fn cross_encryption(c: &mut Checks, source: &CryptoProvider, dest: &CryptoProvid
         return;
     };
     let vectors = v::wycheproof(RSA_SIGN_FILES[0]);
-    let g = vectors
-        .test_groups
-        .iter()
-        .find(|g| der::rsa_must(&v::field(g, "privateKeyPkcs8")))
-        .unwrap();
+    let g = select::rsa_private_group(RSA_SIGN_FILES[0], &vectors);
     let encoded = v::field(g, "privateKeyPkcs8");
     let id = format!("{}/published cross encryption", RSA_SIGN_FILES[0]);
     let Some(key) = c.call(&id, Expect::Success, || {
@@ -706,10 +699,7 @@ fn cross_encryption(c: &mut Checks, source: &CryptoProvider, dest: &CryptoProvid
         if !c.key_supports(&id, &*key, KeyOperation::Decrypt(a)) {
             continue;
         }
-        let messages = published::messages()
-            .into_iter()
-            .filter(|(_, msg)| msg.len() <= rsa_plaintext_limit(a, k))
-            .collect::<Vec<_>>();
+        let messages = select::rsa_messages(rsa_plaintext_limit(a, k));
         selected(c, &format!("{a:?}/{id}"), &messages, |(_, data)| {
             let encrypted = encryptor.encrypt(PublicKey(&public), data).checked()?;
             Ok((
@@ -736,7 +726,7 @@ fn cross_inconsistent(c: &mut Checks, source: &CryptoProvider, dest: &CryptoProv
                 .iter()
                 .find(|g| v::field(g, "privateKeyPkcs8") != encoded)
                 .map(|g| v::field(g, "privateKeyPkcs8"));
-            let t = &v::tests(g)[0];
+            let t = select::group_message(file, g);
             let data = v::field(t, "msg");
             let sign = rsa_signature(v::string(g, "sha"));
             let id = format!("{}/cross inconsistent key", v::id(sign, file, t));

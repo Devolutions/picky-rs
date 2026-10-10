@@ -2,7 +2,7 @@ use picky_crypto::*;
 
 use crate::algorithms::*;
 use crate::harness::{CheckedResult, Checks, Expect};
-use crate::{Options, vectors as v};
+use crate::{Options, select, vectors as v};
 
 pub fn hash(p: &CryptoProvider, _: Options) {
     let mut c = Checks::default();
@@ -75,7 +75,7 @@ pub fn hash(p: &CryptoProvider, _: Options) {
         if let Some(stem) = stem {
             let file = format!("{stem}Monte.rsp");
             let records = v::response(&file);
-            let mut seed = records[0].bytes("Seed");
+            let mut seed = select::monte_seed(&file, &records);
             for r in records {
                 let id = format!("{a:?}/{}", r.id(&file));
                 let next = c.call(&id, Expect::Success, || {
@@ -438,6 +438,7 @@ pub fn cipher_records(a: CipherAlgorithm) -> Vec<CipherVector> {
             }
         }
     }
+    select::cbc_control(a, &result);
     result
 }
 
@@ -490,7 +491,7 @@ pub fn cipher(p: &CryptoProvider, _: Options) {
                 }
             }
         }
-        let (id, key, iv, data, _, _) = records.iter().find(|r| !r.5).expect("published must-support CBC key");
+        let (id, key, iv, data, _, _) = select::cbc_control(a, &records);
         for protection in [Protection::Apply, Protection::Process] {
             if !protections[usize::from(protection == Protection::Process)] {
                 continue;
@@ -517,7 +518,7 @@ pub fn cipher(p: &CryptoProvider, _: Options) {
                 a,
                 CipherAlgorithm::Aes128Cbc | CipherAlgorithm::Aes192Cbc | CipherAlgorithm::Aes256Cbc
             ) {
-                let empty = &v::ed25519()[0].message;
+                let empty = &select::ed25519_empty().message;
                 if let Some(out) = c.call(&format!("{a:?}/{id}/empty"), Expect::Success, || {
                     if protection == Protection::Apply {
                         e.encrypt(key, iv, empty)
@@ -554,7 +555,7 @@ pub fn cipher(p: &CryptoProvider, _: Options) {
             }
         }
         if a == CipherAlgorithm::TdesEde3Cbc {
-            weak_tdes_checks(&mut c, e, &records[0], protections);
+            weak_tdes_checks(&mut c, e, select::cbc_control(a, &records), protections);
         }
     }
     c.finish();
@@ -592,11 +593,7 @@ pub fn weak_tdes_key(base: &[u8]) -> Vec<u8> {
     let fields = base.chunks_exact(8).map(<[u8]>::to_vec).collect::<Vec<_>>();
     assert_eq!(fields.len(), 3);
     assert_eq!(fields.concat(), base, "TCBCMMT3 split/reassemble control");
-    let published = v::rc2()
-        .into_iter()
-        .map(|r| r.bytes("Key"))
-        .find(|key| key.len() == 8 && key.iter().all(|b| *b == 255))
-        .unwrap();
+    let published = select::weak_des_component();
     [published, fields[1].clone(), fields[2].clone()].concat()
 }
 
@@ -708,13 +705,7 @@ pub fn aead(p: &CryptoProvider, _: Options) {
                 }
             }
         }
-        let valid = vectors
-            .test_groups
-            .iter()
-            .filter(|g| v::number(g, "keySize") == [128, 192, 256][index])
-            .flat_map(v::tests)
-            .find(|t| v::field(t, "iv").len() == 12 && v::string(t, "result") == "valid")
-            .unwrap();
+        let valid = select::gcm_control(&vectors, [128, 192, 256][index]);
         let key = v::field(valid, "key");
         let nonce = v::field(valid, "iv");
         let data = [v::field(valid, "ct"), v::field(valid, "tag")].concat();
@@ -814,10 +805,7 @@ pub fn key_wrap(p: &CryptoProvider, _: Options) {
                 }
             }
         }
-        let base = v::tests(&vectors.test_groups[index])
-            .iter()
-            .find(|t| v::string(t, "result") == "valid")
-            .unwrap();
+        let base = select::wrap_control(&vectors, [128, 192, 256][index]);
         let key = v::field(base, "key");
         for protection in [Protection::Apply, Protection::Process] {
             if !protections[usize::from(protection == Protection::Process)] {

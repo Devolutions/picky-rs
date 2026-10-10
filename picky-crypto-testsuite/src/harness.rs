@@ -413,7 +413,7 @@ pub fn provider(provider: &CryptoProvider, _: Options) {
         if let Some((a, b)) = protections {
             c.check(&format!("{id:?}"), a || b, "entry supports neither protection");
         }
-        let bytes = &crate::vectors::ed25519()[0].seed;
+        let bytes = &crate::select::ed25519_empty().seed;
         c.debug(&format!("{id:?}/Debug"), entry, bytes);
         c.debug("provider/Debug", provider, bytes);
     }

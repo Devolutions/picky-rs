@@ -606,16 +606,8 @@ mod tests {
             }
         }
         let corpus = vectors::wycheproof("ed25519_test.json");
-        let (group, test) = corpus
-            .test_groups
-            .iter()
-            .find_map(|g| {
-                vectors::tests(g)
-                    .iter()
-                    .find(|t| vectors::string(t, "comment") == "R==0")
-                    .map(|t| (g, t))
-            })
-            .unwrap();
+        let test = crate::select::ed25519_small_order_r(&corpus);
+        let (group, _) = crate::select::signature_control("ed25519_test.json", &corpus);
         let published = vectors::field(group, "publicKeyDer");
         let fields = children(&published);
         let public = vectors::field(&group["publicKey"], "pk");
