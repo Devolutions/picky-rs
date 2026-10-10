@@ -2,7 +2,7 @@
 
 These fixtures cover fixed-length secrets with a zero byte at one end, which a minimal integer encoding drops:
 
-- `ssh_key_p256_leading_zero`: OpenSSH ECDSA P-256 key whose secret starts with `0x00`, so its `mpint` is 31 bytes.
+- `ssh_key_p256_leading_zero`: OpenSSH ECDSA P-256 key whose secret starts with `0x00`; its `mpint` is 31 bytes.
 - `ssh_key_ed25519_leading_zero`: OpenSSH Ed25519 key whose seed starts with `0x00`.
 - `../putty/p256_leading_zero.ppk` and `../putty/ed25519_leading_zero.ppk`: the same two keys converted to PPK v3.
 - `../putty/ed25519_v2_short_secret.ppk`: PPK v2 Ed25519 key whose little-endian secret PuTTY wrote as 31 bytes, without its trailing zero byte.

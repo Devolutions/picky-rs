@@ -775,8 +775,10 @@ ZQIDAQAB
         assert_eq!(from_jwk_key, initial_key);
     }
 
-    #[test]
-    fn ec_coordinate_shorter_than_field_is_rejected() {
+    #[rstest]
+    #[case::shorter(|x: &[u8]| x[1..].to_vec())]
+    #[case::longer(|x: &[u8]| [&[0], x].concat())]
+    fn ec_coordinate_not_field_length_is_rejected(#[case] resize: fn(&[u8]) -> Vec<u8>) {
         let mut jwk = Jwk::from_json(picky_test_data::JOSE_JWK_EC_P521_JSON).unwrap();
         let JwkKeyType::Ec(ec_key) = &mut jwk.key else {
             panic!("Unexpected key type");
@@ -784,8 +786,8 @@ ZQIDAQAB
         let x = general_purpose::URL_SAFE_NO_PAD.decode(&ec_key.x).unwrap();
         assert_eq!(x[0], 0);
 
-        // RFC 7518 section 6.2.1.2 requires the full field length, so the leading zero octet cannot be dropped.
-        ec_key.x = general_purpose::URL_SAFE_NO_PAD.encode(&x[1..]);
+        // RFC 7518 section 6.2.1.2 requires exactly the field length, so leading zero octets are neither dropped nor added.
+        ec_key.x = general_purpose::URL_SAFE_NO_PAD.encode(resize(&x));
 
         assert!(matches!(jwk.to_public_key(), Err(JwkError::InvalidEcPointCoordinates)));
     }

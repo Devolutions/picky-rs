@@ -295,17 +295,17 @@ mod tests {
         assert_eq!(&key.to_inner_key().unwrap(), ssh_key.inner_key().unwrap());
     }
 
-    #[test]
-    fn ed25519_secret_not_matching_public_key() {
+    #[rstest]
+    #[case(&[0x01; 32], "public and private key mismatch")]
+    // Longer than any accepted encoding; must be rejected without panicking.
+    #[case(&[0x01; 33], "invalid private key data")]
+    fn ed25519_invalid_secret(#[case] secret: &[u8], #[case] error: &str) {
         let ssh_key = SshPrivateKey::from_pem_str(picky_test_data::SSH_PRIVATE_KEY_ED25519, None).unwrap();
 
         let mut key = PuttyBasePrivateKey::from_openssh(&ssh_key.base_key).unwrap();
         key.data.clear();
-        key.data.write_ssh_bytes(&[0x01; 32]).unwrap();
+        key.data.write_ssh_bytes(secret).unwrap();
 
-        assert!(matches!(
-            key.to_inner_key(),
-            Err(PuttyError::PublicAndPrivateKeyMismatch)
-        ));
+        assert_eq!(key.to_inner_key().unwrap_err().to_string(), error);
     }
 }
