@@ -2,6 +2,7 @@
 name = "picky-crypto-testsuite"
 version = "0.0.0"
 edition = "2024"
+authors = ["Devolutions Inc. <infos@devolutions.net>"]
 publish = false
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
