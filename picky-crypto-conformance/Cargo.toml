@@ -1,0 +1,20 @@
+[package]
+name = "picky-crypto-conformance"
+version = "0.0.0"
+edition = "2024"
+authors = ["Devolutions Inc. <infos@devolutions.net>"]
+publish = false
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Devolutions/picky-rs"
+description = "Runs the picky-crypto conformance suite against every registered provider"
+autotests = false
+
+[[test]]
+name = "conformance"
+path = "tests/main.rs"
+harness = true
+
+[dev-dependencies]
+picky-crypto = { path = "../picky-crypto" }
+picky-crypto-testsuite = { path = "../picky-crypto-testsuite" }

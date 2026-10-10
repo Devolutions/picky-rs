@@ -1375,6 +1375,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "picky-crypto-conformance"
+version = "0.0.0"
+dependencies = [
+ "picky-crypto",
+ "picky-crypto-testsuite",
+]
+
+[[package]]
 name = "picky-crypto-testsuite"
 version = "0.0.0"
 dependencies = [
