@@ -263,10 +263,12 @@ pub fn loaded(
             .position(|a| *a == KeyAgreementAlgorithm::Ffdh)
             .unwrap()];
         let overlong = vec![0; der::bit_length(parameters.p).div_ceil(8) + 2];
+        let below_modulus = modulus_minus_one(parameters.p);
         for (name, peer) in [
             ("empty", &[][..]),
             ("zero", &[0][..]),
             ("one", &[1][..]),
+            ("modulus minus one", below_modulus.as_slice()),
             ("modulus", parameters.p),
             ("overlong", overlong.as_slice()),
         ] {
@@ -281,6 +283,19 @@ pub fn loaded(
         }
     }
     Some(key)
+}
+
+/// Returns p − 1 for a published odd p by clearing the low bit of its last byte, asserting that no other byte changes.
+/// The result is a boundary input that only ever expects an error.
+fn modulus_minus_one(p: &[u8]) -> Vec<u8> {
+    let (&last, rest) = p.split_last().expect("published modulus is not empty");
+    assert_eq!(last & 1, 1, "published modulus is odd");
+    let mut y = p.to_vec();
+    y[rest.len()] = last & !1;
+    assert_eq!(y.len(), p.len(), "p - 1 has the length of p");
+    assert_eq!(&y[..rest.len()], rest, "p - 1 differs from p only in the last byte");
+    assert_eq!(y[rest.len()], last - 1, "p - 1 ends with the last byte of p minus one");
+    y
 }
 
 pub fn exported(c: &mut Checks, id: &str, key: &dyn PrivateKey, expected: &[u8]) {
@@ -1225,9 +1240,10 @@ pub fn ffdh(p: &CryptoProvider, _: Options) {
                         );
                     }
                 }
-                for invalid in [&[][..], &[0][..], &[1][..], &group.p[..]] {
+                let below_modulus = modulus_minus_one(&group.p);
+                for invalid in [&[][..], &[0][..], &[1][..], &below_modulus[..], &group.p[..]] {
                     c.call(
-                        &format!("{id}/invalid peer"),
+                        &format!("{id}/invalid peer of {} bytes", invalid.len()),
                         Expect::Error(Error::InvalidInput),
                         || e.generate_ephemeral(group.parameters())?.agree(invalid),
                     );
@@ -2391,6 +2407,16 @@ mod tests {
     }
 
     #[test]
+    fn modulus_minus_one_changes_only_the_last_byte_of_published_groups() {
+        for group in v::dh_groups() {
+            let y = modulus_minus_one(&group.p);
+            assert_eq!(y.len(), group.p.len(), "{}", group.id);
+            assert_eq!(y[..y.len() - 1], group.p[..group.p.len() - 1], "{}", group.id);
+            assert_eq!(y[y.len() - 1] + 1, group.p[group.p.len() - 1], "{}", group.id);
+        }
+    }
+
+    #[test]
     fn static_ffdh_peer_errors_need_no_ephemeral_entry() {
         let group = &v::dh_groups()[0];
         let fields = v::rfc5114(1);
@@ -2424,6 +2450,7 @@ mod tests {
             assert!(peers.iter().any(|peer| peer == &[0]));
             assert!(peers.iter().any(|peer| peer == &[1]));
             assert!(peers.contains(&group.p));
+            assert!(peers.contains(&modulus_minus_one(&group.p)));
             assert!(peers.iter().any(|peer| peer.len() > group.p.len() + 1));
         }
     }

@@ -13,4 +13,5 @@ Sources, versions and checksums are in `vectors/manifest.toml`; `cargo xtask che
   Record the source URL and version; the checksum is `git hash-object --no-filters <file>`.
 - To update a vendored source, replace its files wholesale and rerun the suite against every backend.
 - Never edit a vector file or trim inside a group.
+- A boundary value may be derived from a published value by a change confined to known bytes and asserted in the test (for example p − 1 for odd p: only the last byte differs). Like other hand-written inputs, it only ever expects an error.
 - Report newly failing vectors, and the size of any vendored data added.
