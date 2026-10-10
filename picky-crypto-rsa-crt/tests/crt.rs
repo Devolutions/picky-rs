@@ -59,6 +59,11 @@ fn swapped_primes() {
     assert_eq!(params.dp().len(), key.q.len());
     assert_eq!(params.dq().len(), key.p.len());
     assert_eq!(params.qinv().len(), key.q.len());
+    // Only the length of qInv is published for this order, so check its defining relation q·qInv ≡ 1 (mod p).
+    let bits = u32::try_from(16 * key.n.len()).expect("small precision");
+    let int = |bytes: &[u8]| BoxedUint::from_be_slice(bytes, bits).expect("fits the precision");
+    let p = NonZero::new(int(&swapped.p)).into_option().expect("nonzero prime");
+    assert_eq!(int(&swapped.q).wrapping_mul(int(params.qinv())).rem(&p), int(&[1]));
 }
 
 #[rstest]
