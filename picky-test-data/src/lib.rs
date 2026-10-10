@@ -165,6 +165,10 @@ pub const SSH_PUBLIC_KEY_SK_ED25519: &str = include_str!("../test_assets/ssh/ssh
 
 pub const SSH_PUBLIC_KEY_RSA: &str = include_str!("../test_assets/ssh/ssh_key_rsa.pub");
 
+// Secrets with a leading zero byte; see test_assets/ssh/README.md.
+pub const SSH_PRIVATE_KEY_EC_P256_LEADING_ZERO: &str = include_str!("../test_assets/ssh/ssh_key_p256_leading_zero");
+pub const SSH_PRIVATE_KEY_ED25519_LEADING_ZERO: &str = include_str!("../test_assets/ssh/ssh_key_ed25519_leading_zero");
+
 // ssh-keygen -h -s ./ssh_ca_key -V '+1000w' -I abcd -z 00001 -n server.example.com ./ssh_key_p256.pub
 pub const SSH_CERT_EC_P256: &str = include_str!("../test_assets/ssh/ssh_cert_p256.crt");
 // ssh-keygen -h -s ./ssh_ca_key -V '+1000w' -I abcd -z 00001 -n server.example.com ./ssh_key_p384.pub
@@ -197,6 +201,11 @@ pub const PUTTY_KEY_ED25519_V2_ENCRYPTED: &str = include_str!("../test_assets/pu
 
 pub const PUTTY_KEY_RSA_PUBLIC_EMPTY_COMMENT: &str = include_str!("../test_assets/putty/rsa_pub_empty_comment");
 pub const PUTTY_KEY_RSA_PUBLIC_ESCAPED_COMMENT: &str = include_str!("../test_assets/putty/rsa_pub_escaped_conmment");
+
+// Secrets with a zero byte that a minimal encoding drops; see test_assets/ssh/README.md.
+pub const PUTTY_KEY_EC_P256_LEADING_ZERO: &str = include_str!("../test_assets/putty/p256_leading_zero.ppk");
+pub const PUTTY_KEY_ED25519_LEADING_ZERO: &str = include_str!("../test_assets/putty/ed25519_leading_zero.ppk");
+pub const PUTTY_KEY_ED25519_V2_SHORT_SECRET: &str = include_str!("../test_assets/putty/ed25519_v2_short_secret.ppk");
 // }}
 
 pub const PEM_BYTES: &[u8] = include_bytes!("../test_assets/intermediate_ca.crt");

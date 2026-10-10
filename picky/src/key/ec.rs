@@ -35,6 +35,16 @@ pub(crate) enum EcComponent<'a> {
     Secret(&'a [u8]),
 }
 
+impl<'a> EcComponent<'a> {
+    fn into_parts(self) -> (&'a [u8], &'static str) {
+        match self {
+            EcComponent::PointX(buf) => (buf, "Invalid `point.x` component size"),
+            EcComponent::PointY(buf) => (buf, "Invalid `point.y` component size"),
+            EcComponent::Secret(buf) => (buf, "Invalid `secret` component size"),
+        }
+    }
+}
+
 /// Elliptic curve name to use for curve operations which require curve-specific arithmetic.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum EcCurve {
@@ -72,11 +82,7 @@ impl EcCurve {
     /// We need to validate input data sizes to prevent panics in the underlying `generic_array`
     /// library code.
     pub(crate) fn validate_component<'a>(&self, component: EcComponent<'a>) -> Result<&'a [u8], KeyError> {
-        let (buffer, error_message) = match component {
-            EcComponent::PointX(buf) => (buf, "Invalid `point.x` component size"),
-            EcComponent::PointY(buf) => (buf, "Invalid `point.y` component size"),
-            EcComponent::Secret(buf) => (buf, "Invalid `secret` component size"),
-        };
+        let (buffer, error_message) = component.into_parts();
 
         if buffer.len() != self.field_bytes_size() {
             return Err(KeyError::EC {
@@ -85,6 +91,29 @@ impl EcCurve {
         }
 
         Ok(buffer)
+    }
+
+    /// Converts a big-endian unsigned integer into the fixed-length field encoding of this curve.
+    ///
+    /// Leading zero bytes are removed or added as needed, so minimal encodings such as SSH `mpint` are accepted.
+    /// Values that do not fit in the field length are rejected.
+    pub(crate) fn pad_component(&self, component: EcComponent<'_>) -> Result<Vec<u8>, KeyError> {
+        let (buffer, error_message) = component.into_parts();
+
+        let leading_zeros = buffer.iter().take_while(|&&byte| byte == 0).count();
+        let significant = &buffer[leading_zeros..];
+        let size = self.field_bytes_size();
+
+        if significant.len() > size {
+            return Err(KeyError::EC {
+                context: error_message.to_string(),
+            });
+        }
+
+        let mut padded = vec![0; size];
+        padded[size - significant.len()..].copy_from_slice(significant);
+
+        Ok(padded)
     }
 }
 

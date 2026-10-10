@@ -1,4 +1,4 @@
-use crate::key::ec::{EcdsaKeypair, EcdsaPublicKey, NamedEcCurve};
+use crate::key::ec::{EcComponent, EcdsaKeypair, EcdsaPublicKey, NamedEcCurve};
 use crate::key::ed::{EdKeypair, EdPublicKey, NamedEdAlgorithm};
 use crate::key::{EcCurve, EdAlgorithm, PrivateKey};
 use crate::putty::PuttyError;
@@ -127,7 +127,8 @@ impl PuttyBasePrivateKey {
             SshBasePrivateKey::Ed(key) => {
                 let ed_key = EdKeypair::try_from(key)?;
 
-                cursor.write_ssh_mpint(&BoxedUint::from_be_slice_vartime(ed_key.secret()))?;
+                // PuTTY 0.75 and later write the little-endian Ed25519 secret at its full length.
+                cursor.write_ssh_bytes(ed_key.secret())?;
 
                 let algorithm = match ed_key.algorithm() {
                     NamedEdAlgorithm::Known(EdAlgorithm::Ed25519) => PpkKeyAlgorithmValue::Ed25519,
@@ -181,18 +182,21 @@ impl PuttyBasePrivateKey {
                     _ => return Err(PuttyError::PublicAndPrivateKeyMismatch),
                 };
 
-                let secret = data.read_ssh_mpint()?;
+                let secret = data.read_ssh_bytes()?;
 
                 let curve = match self.algorithm {
-                    PpkKeyAlgorithmValue::EcdsaSha2Nistp256 => NamedEcCurve::Known(EcCurve::NistP256),
-                    PpkKeyAlgorithmValue::EcdsaSha2Nistp384 => NamedEcCurve::Known(EcCurve::NistP384),
-                    PpkKeyAlgorithmValue::EcdsaSha2Nistp521 => NamedEcCurve::Known(EcCurve::NistP521),
+                    PpkKeyAlgorithmValue::EcdsaSha2Nistp256 => EcCurve::NistP256,
+                    PpkKeyAlgorithmValue::EcdsaSha2Nistp384 => EcCurve::NistP384,
+                    PpkKeyAlgorithmValue::EcdsaSha2Nistp521 => EcCurve::NistP521,
                     _ => unreachable!("BUG: algorithm is checked above"),
                 };
 
+                // The secret is a minimal `mpint`, so it may be shorter than the field length.
+                let secret = curve.pad_component(EcComponent::Secret(&secret))?;
+
                 let private_key = PrivateKey::from_ec_encoded_components(
-                    curve.into(),
-                    &secret.to_be_bytes_trimmed_vartime(),
+                    NamedEcCurve::Known(curve).into(),
+                    &secret,
                     Some(public.encoded_point()),
                 );
 
@@ -204,11 +208,11 @@ impl PuttyBasePrivateKey {
                     _ => return Err(PuttyError::PublicAndPrivateKeyMismatch),
                 };
 
-                let secret = data.read_ssh_mpint()?;
+                let secret = decode_ed25519_secret(data.read_ssh_bytes()?, public.data())?;
 
                 let private_key = PrivateKey::from_ed_encoded_components(
                     NamedEdAlgorithm::Known(EdAlgorithm::Ed25519).into(),
-                    &secret.to_be_bytes_trimmed_vartime(),
+                    &secret,
                     Some(public.data()),
                 );
 
@@ -231,5 +235,77 @@ impl PuttyBasePrivateKey {
         };
 
         Ok(inner)
+    }
+}
+
+/// Restores the 32-byte Ed25519 secret from a PPK private blob and checks it against the public key.
+///
+/// PuTTY stores the secret as a little-endian integer, and versions before 0.75 omit its trailing zero bytes.
+/// Earlier picky versions wrote a big-endian `mpint` instead, which omits leading zero bytes and adds one before a first byte of 0x80 or more.
+fn decode_ed25519_secret(mut secret: Vec<u8>, public_key: &[u8]) -> Result<Vec<u8>, PuttyError> {
+    const SECRET_LENGTH: usize = ed25519_dalek::SECRET_KEY_LENGTH;
+
+    if secret.len() == SECRET_LENGTH + 1 && secret[0] == 0 {
+        secret.remove(0);
+    }
+
+    let padding = SECRET_LENGTH
+        .checked_sub(secret.len())
+        .ok_or(PuttyError::InvalidPrivateKeyData)?;
+    let mut little_endian = [0; SECRET_LENGTH];
+    little_endian[..secret.len()].copy_from_slice(&secret);
+    let mut big_endian = [0; SECRET_LENGTH];
+    big_endian[padding..].copy_from_slice(&secret);
+
+    [little_endian, big_endian]
+        .into_iter()
+        .find(|candidate| {
+            ed25519_dalek::SigningKey::from_bytes(candidate)
+                .verifying_key()
+                .as_bytes()
+                == public_key
+        })
+        .map(|candidate| candidate.to_vec())
+        .ok_or(PuttyError::PublicAndPrivateKeyMismatch)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::rstest;
+
+    // Earlier picky versions wrote the Ed25519 secret as a big-endian `mpint`.
+    #[rstest]
+    #[case(picky_test_data::SSH_PRIVATE_KEY_ED25519, 33)]
+    #[case(picky_test_data::SSH_PRIVATE_KEY_ED25519_LEADING_ZERO, 31)]
+    fn ed25519_secret_written_as_mpint(#[case] pem: &str, #[case] mpint_length: usize) {
+        let ssh_key = SshPrivateKey::from_pem_str(pem, None).unwrap();
+        let secret = EdKeypair::try_from(ssh_key.inner_key().unwrap())
+            .unwrap()
+            .secret()
+            .to_vec();
+
+        let mut key = PuttyBasePrivateKey::from_openssh(&ssh_key.base_key).unwrap();
+        key.data.clear();
+        key.data
+            .write_ssh_mpint(&BoxedUint::from_be_slice_vartime(&secret))
+            .unwrap();
+        assert_eq!(key.data.len(), 4 + mpint_length);
+
+        assert_eq!(&key.to_inner_key().unwrap(), ssh_key.inner_key().unwrap());
+    }
+
+    #[rstest]
+    #[case(&[0x01; 32], "public and private key mismatch")]
+    // 33 bytes without a leading zero sign byte; must be rejected without panicking.
+    #[case(&[0x01; 33], "invalid private key data")]
+    fn ed25519_invalid_secret(#[case] secret: &[u8], #[case] error: &str) {
+        let ssh_key = SshPrivateKey::from_pem_str(picky_test_data::SSH_PRIVATE_KEY_ED25519, None).unwrap();
+
+        let mut key = PuttyBasePrivateKey::from_openssh(&ssh_key.base_key).unwrap();
+        key.data.clear();
+        key.data.write_ssh_bytes(secret).unwrap();
+
+        assert_eq!(key.to_inner_key().unwrap_err().to_string(), error);
     }
 }

@@ -269,11 +269,11 @@ impl PrivateKey {
         point_y: &BoxedUint,
     ) -> Result<Self, KeyError> {
         let curve_oid: ObjectIdentifier = NamedEcCurve::Known(curve).into();
-        let px_bytes = point_x.to_be_bytes_trimmed_vartime().into_vec();
-        let py_bytes = point_y.to_be_bytes_trimmed_vartime().into_vec();
+        let px_bytes = curve.pad_component(EcComponent::PointX(&point_x.to_be_bytes()))?;
+        let py_bytes = curve.pad_component(EcComponent::PointY(&point_y.to_be_bytes()))?;
 
-        let px_validated = curve.validate_component(EcComponent::PointX(&px_bytes))?;
-        let py_validated = curve.validate_component(EcComponent::PointY(&py_bytes))?;
+        let px_validated = px_bytes.as_slice();
+        let py_validated = py_bytes.as_slice();
 
         let point_bytes = match curve {
             EcCurve::NistP256 => {
@@ -332,7 +332,7 @@ impl PrivateKey {
             }
         };
 
-        let secret = secret.to_be_bytes_trimmed_vartime().into_vec();
+        let secret = curve.pad_component(EcComponent::Secret(&secret.to_be_bytes()))?;
 
         let inner = PrivateKeyInfo::new_ec_encryption(
             curve_oid.clone(),
@@ -906,11 +906,11 @@ impl PublicKey {
     /// arithmetic crate to use. If you want to use a curve that is not declared in [`EcCurve`],
     /// and encoded representation of the point is available - use [`Self::from_ec_encoded_components`]
     pub fn from_ec_components(curve: EcCurve, x: &BoxedUint, y: &BoxedUint) -> Result<Self, KeyError> {
-        let px_bytes = x.to_be_bytes_trimmed_vartime();
-        let py_bytes = y.to_be_bytes_trimmed_vartime();
+        let px_bytes = curve.pad_component(EcComponent::PointX(&x.to_be_bytes()))?;
+        let py_bytes = curve.pad_component(EcComponent::PointY(&y.to_be_bytes()))?;
 
-        let px_validated = curve.validate_component(EcComponent::PointX(&px_bytes))?;
-        let py_validated = curve.validate_component(EcComponent::PointY(&py_bytes))?;
+        let px_validated = px_bytes.as_slice();
+        let py_validated = py_bytes.as_slice();
 
         match curve {
             EcCurve::NistP256 => {
@@ -1295,5 +1295,35 @@ mod tests {
 
         let key = PrivateKey::from_pkcs8(&pkcs8_bytes).unwrap();
         let _pair = EdKeypair::try_from(&key).unwrap();
+    }
+
+    #[test]
+    fn ec_components_with_leading_zero_secret() {
+        use base64::Engine as _;
+        let decode = |value| base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(value).unwrap();
+
+        // RFC 7520 section 3.2, Figure 2: P-521 private key whose "x" and "d" start with a 0x00 octet.
+        let x = decode("AHKZLLOsCOzz5cY97ewNUajB957y-C-U88c3v13nmGZx6sYl_oJXu9A5RkTKqjqvjyekWF-7ytDyRXYgCF5cj0Kt");
+        let y = decode("AdymlHvOiLxXkEhayXQnNCvDX4h9htZaCJN34kfmC6pV5OhQHiraVySsUdaQkAgDPrwQrJmbnX9cwlGfP-HqHZR1");
+        let d = decode("AAhRON2r9cqXX1hg-RoI6R1tX5p2rUAYdmpHZoC1XNM56KtscrX6zbKipQrCW9CGZH3T4ubpnoTKLDYJ_fF3_rJt");
+        assert_eq!((x[0], d[0]), (0, 0));
+
+        let x = BoxedUint::from_be_slice_vartime(&x);
+        let y = BoxedUint::from_be_slice_vartime(&y);
+        let private_key =
+            PrivateKey::from_ec_components(EcCurve::NistP521, &BoxedUint::from_be_slice_vartime(&d), &x, &y).unwrap();
+        let public_key = PublicKey::from_ec_components(EcCurve::NistP521, &x, &y).unwrap();
+
+        assert_eq!(ec::EcdsaKeypair::try_from(&private_key).unwrap().secret(), d.as_slice());
+        assert_eq!(private_key.to_public_key().unwrap(), public_key);
+    }
+
+    #[test]
+    fn ec_components_reject_oversized_values() {
+        let oversized = BoxedUint::from_be_slice_vartime(&[0x01; 33]);
+        let one = BoxedUint::one();
+
+        PublicKey::from_ec_components(EcCurve::NistP256, &oversized, &one).unwrap_err();
+        PrivateKey::from_ec_components(EcCurve::NistP256, &oversized, &one, &one).unwrap_err();
     }
 }
