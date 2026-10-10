@@ -45,13 +45,8 @@ fn swapped_primes() {
     assert_eq!(params.qinv().len(), key.q.len());
 }
 
-// All checks share one error and a substituted prime also breaks p·q = n.
-// The parity, size and invertibility cases exercise their checks without isolating them.
 #[rstest]
 #[case::other_n(Key { n: RSA_2048_OTHER.key().n, ..RSA_2048.key() }, Error::InconsistentKey)]
-// The published RSA_1024 coefficient (qinv) ends in 04, so it is even.
-#[case::even_p(Key { p: RSA_1024.key().qinv, ..RSA_2048.key() }, Error::InconsistentKey)]
-#[case::equal_primes(Key { q: RSA_2048.key().p, ..RSA_2048.key() }, Error::InconsistentKey)]
 // e_three() is a published signature-generation key's publicExponent (3).
 #[case::e_three(Key { e: e_three(), ..RSA_2048.key() }, Error::InconsistentKey)]
 #[case::long_d(Key { d: RSA_8192.key().d, ..RSA_2048.key() }, Error::InvalidLength)]
@@ -60,8 +55,38 @@ fn substituted_components(#[case] key: Key, #[case] error: Error) {
 }
 
 // Structural input with a specified error outcome; not a test vector.
+// A substituted published prime also breaks p·q = n, so each small key targets one check and passes the others.
 #[rstest]
-#[case::empty_n(Some(vec![]), None, None, Error::InvalidLength)]
+#[case::empty_n(&[], &[], &[], &[], &[], Error::InvalidLength)]
+#[case::n_above_limit(&[0; MAX_MODULUS_LEN + 1], &[], &[], &[], &[], Error::InvalidLength)]
+// An even p also fails the inversion, which then runs modulo a placeholder of one.
+#[case::even_p(&[12], &[1], &[1], &[4], &[3], Error::InconsistentKey)]
+#[case::even_q(&[12], &[1], &[1], &[3], &[4], Error::InconsistentKey)]
+#[case::non_invertible_q(&[9], &[1], &[1], &[3], &[3], Error::InconsistentKey)]
+#[case::e_dp(&[15], &[1], &[3], &[5], &[3], Error::InconsistentKey)]
+#[case::e_dq(&[15], &[1], &[3], &[3], &[5], Error::InconsistentKey)]
+// (2^32 + 1)(2^32 + 3) = 2^64 + n, so the product matches n only modulo the 64-bit precision.
+#[case::product_overflow(
+    &[0, 0, 0, 4, 0, 0, 0, 3],
+    &[1],
+    &[1],
+    &[1, 0, 0, 0, 1],
+    &[1, 0, 0, 0, 3],
+    Error::InconsistentKey
+)]
+fn literal_keys(
+    #[case] n: &[u8],
+    #[case] e: &[u8],
+    #[case] d: &[u8],
+    #[case] p: &[u8],
+    #[case] q: &[u8],
+    #[case] error: Error,
+) {
+    assert_eq!(complete_crt_params(n, e, d, p, q).expect_err("structural input"), error);
+}
+
+// Structural input with a specified error outcome; not a test vector.
+#[rstest]
 #[case::oversized_n(Some(vec![0xff; MAX_MODULUS_LEN]), None, None, Error::InvalidLength)]
 #[case::zero_p(None, Some(vec![0x00]), None, Error::InconsistentKey)]
 #[case::one_p(None, Some(vec![0x01]), None, Error::InconsistentKey)]
