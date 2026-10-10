@@ -15,6 +15,12 @@ name = "conformance"
 path = "tests/main.rs"
 harness = true
 
+[features]
+rustcrypto = ["dep:picky-crypto-rustcrypto"]
+
+[dependencies]
+picky-crypto-rustcrypto = { path = "../picky-crypto-rustcrypto", features = ["all"], optional = true }
+
 [dev-dependencies]
 picky-crypto = { path = "../picky-crypto" }
 picky-crypto-testsuite = { path = "../picky-crypto-testsuite" }

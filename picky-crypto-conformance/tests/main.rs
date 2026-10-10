@@ -75,6 +75,11 @@ providers! {
     empty => empty(), Options::default();
 }
 
+#[cfg(feature = "rustcrypto")]
+providers! {
+    rustcrypto => picky_crypto_rustcrypto::provider(), Options::default();
+}
+
 pairs! {
     empty_empty => (empty(), empty());
 }

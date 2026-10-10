@@ -1,0 +1,59 @@
+[package]
+name = "picky-crypto-rustcrypto"
+version = "0.1.0"
+edition = "2024"
+publish = false
+rust-version = "1.85"
+authors = ["Devolutions Inc. <infos@devolutions.net>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Devolutions/picky-rs"
+description = "RustCrypto backend for the picky cryptographic provider contract"
+readme = "README.md"
+keywords = ["cryptography", "provider", "crypto"]
+categories = ["cryptography"]
+
+[features]
+digest = ["dep:sha1", "dep:sha2", "dep:sha3", "dep:hmac", "dep:pbkdf2", "dep:digest", "dep:crypto-common"]
+aes = ["dep:aes", "dep:cbc", "dep:cipher"]
+aead = ["dep:aes-gcm", "dep:aes", "dep:getrandom", "dep:crypto-common"]
+key-wrap = ["dep:aes-kw", "dep:aes"]
+rsa = ["dep:rsa", "dep:md-5", "dep:sha1", "dep:sha2", "dep:sha3", "dep:getrandom", "dep:chacha20", "dep:crypto-common"]
+nist-ec = ["dep:p256", "dep:p384", "dep:p521", "dep:sha2", "dep:hmac", "dep:getrandom", "dep:crypto-common", "dep:sec1"]
+curve25519 = ["dep:ed25519-dalek", "dep:ed25519", "dep:x25519-dalek", "dep:sha2", "dep:getrandom", "dep:crypto-common"]
+legacy = ["dep:md4", "dep:md-5", "dep:rc4", "dep:des", "dep:rc2", "dep:cbc", "dep:cipher", "dep:digest"]
+all = ["digest", "aes", "aead", "key-wrap", "rsa", "nist-ec", "curve25519", "legacy"]
+
+[dependencies]
+picky-crypto = { path = "../picky-crypto" }
+zeroize = { version = "1.9", default-features = false, features = ["alloc"] }
+crypto-common = { version = "0.2.2", optional = true, features = ["rand_core", "zeroize"] }
+aes = { version = "0.9.2", optional = true, features = ["zeroize"] }
+aes-gcm = { version = "0.11.1", optional = true, default-features = false, features = ["aes", "alloc", "rand_core", "zeroize"] }
+aes-kw = { version = "0.3.1", optional = true, features = ["zeroize"] }
+cbc = { version = "0.2.1", optional = true, default-features = false, features = ["zeroize"] }
+cipher = { version = "0.5.2", optional = true, features = ["zeroize"] }
+digest = { version = "0.11.3", optional = true, features = ["zeroize"] }
+des = { version = "0.9.0", optional = true, features = ["zeroize"] }
+rc2 = { version = "0.9.0", optional = true, features = ["zeroize"] }
+rc4 = { version = "0.2.0", optional = true, features = ["zeroize"] }
+md4 = { version = "0.11.0", optional = true, features = ["zeroize"] }
+md-5 = { version = "0.11.0", optional = true, features = ["oid", "zeroize"] }
+sha1 = { version = "0.11.0", optional = true, features = ["oid", "zeroize"] }
+sha2 = { version = "0.11.0", optional = true, features = ["oid", "zeroize"] }
+sha3 = { version = "0.12.0", optional = true, features = ["oid", "zeroize"] }
+hmac = { version = "0.13.0", optional = true, features = ["zeroize"] }
+pbkdf2 = { version = "0.13.0", optional = true, default-features = false, features = ["hmac"] }
+rsa = { version = "=0.10.0-rc.18", optional = true }
+chacha20 = { version = "0.10.2", optional = true, default-features = false, features = ["rng", "zeroize"] }
+sec1 = { version = "0.8.1", optional = true, default-features = false, features = ["der", "zeroize"] }
+p256 = { version = "0.14.0", optional = true, default-features = false, features = ["ecdsa", "ecdh", "pkcs8", "alloc", "precomputed-tables", "std"] }
+p384 = { version = "0.14.0", optional = true, default-features = false, features = ["ecdsa", "ecdh", "pkcs8", "alloc", "precomputed-tables", "std"] }
+p521 = { version = "0.14.0", optional = true, default-features = false, features = ["ecdsa", "ecdh", "pkcs8", "alloc", "precomputed-tables", "std"] }
+ed25519-dalek = { version = "3.0.0", optional = true, default-features = false, features = ["alloc", "digest", "fast", "pkcs8", "rand_core", "zeroize"] }
+ed25519 = { version = "3.0.0", optional = true, default-features = false, features = ["pkcs8", "zeroize"] }
+x25519-dalek = { version = "3.0.0", optional = true, default-features = false, features = ["precomputed-tables", "static_secrets", "zeroize"] }
+getrandom = { version = "0.4.3", optional = true, features = ["sys_rng"] }
+
+[dev-dependencies]
+# Test keys outside the library's checked constructors (small moduli, large exponents).
+rsa = { version = "=0.10.0-rc.18", features = ["hazmat"] }

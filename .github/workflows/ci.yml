@@ -227,7 +227,7 @@ jobs:
         run: cargo --locked xtask check-vectors
 
       - name: Run conformance suite
-        run: cargo test --locked -p picky-crypto-conformance
+        run: cargo test --locked -p picky-crypto-conformance --features rustcrypto
 
       - name: Install cargo-deny
         run: cargo install --locked cargo-deny --version 0.20.2
@@ -235,10 +235,37 @@ jobs:
       - name: Check dependency allowlist
         run: cargo deny --manifest-path picky-crypto/Cargo.toml --config picky-crypto/deny.toml check bans
 
+  picky-crypto-rustcrypto:
+    name: RustCrypto backend checks
+    needs: [formatting]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+
+      - name: Install cargo-hack
+        run: cargo install --locked cargo-hack --version 0.6.45
+
+      - name: Check feature powerset
+        run: cargo hack clippy --locked --feature-powerset --depth 2 -p picky-crypto-rustcrypto --all-targets -- -D warnings
+
+      - name: Check documentation
+        run: cargo doc --locked -p picky-crypto-rustcrypto --no-deps --all-features
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+
+      - name: Install cargo-deny
+        run: cargo install --locked cargo-deny --version 0.20.2
+
+      - name: Check banned features
+        run: cargo deny --manifest-path Cargo.toml --workspace --all-features --config picky-crypto-rustcrypto/deny.toml check bans
+
   success:
     name: Success
     if: ${{ always() }}
-    needs: [formatting, lints, lints-wasm, tests, msrv, dotnet-tests, no-downgrade, picky-crypto-checks]
+    needs: [formatting, lints, lints-wasm, tests, msrv, dotnet-tests, no-downgrade, picky-crypto-checks, picky-crypto-rustcrypto]
     runs-on: ubuntu-latest
 
     steps:
