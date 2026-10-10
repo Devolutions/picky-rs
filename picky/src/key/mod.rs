@@ -269,11 +269,11 @@ impl PrivateKey {
         point_y: &BoxedUint,
     ) -> Result<Self, KeyError> {
         let curve_oid: ObjectIdentifier = NamedEcCurve::Known(curve).into();
-        let px_bytes = point_x.to_be_bytes_trimmed_vartime().into_vec();
-        let py_bytes = point_y.to_be_bytes_trimmed_vartime().into_vec();
+        let px_bytes = curve.pad_component(EcComponent::PointX(&point_x.to_be_bytes()))?;
+        let py_bytes = curve.pad_component(EcComponent::PointY(&point_y.to_be_bytes()))?;
 
-        let px_validated = curve.validate_component(EcComponent::PointX(&px_bytes))?;
-        let py_validated = curve.validate_component(EcComponent::PointY(&py_bytes))?;
+        let px_validated = px_bytes.as_slice();
+        let py_validated = py_bytes.as_slice();
 
         let point_bytes = match curve {
             EcCurve::NistP256 => {
@@ -332,7 +332,7 @@ impl PrivateKey {
             }
         };
 
-        let secret = secret.to_be_bytes_trimmed_vartime().into_vec();
+        let secret = curve.pad_component(EcComponent::Secret(&secret.to_be_bytes()))?;
 
         let inner = PrivateKeyInfo::new_ec_encryption(
             curve_oid.clone(),
@@ -906,11 +906,11 @@ impl PublicKey {
     /// arithmetic crate to use. If you want to use a curve that is not declared in [`EcCurve`],
     /// and encoded representation of the point is available - use [`Self::from_ec_encoded_components`]
     pub fn from_ec_components(curve: EcCurve, x: &BoxedUint, y: &BoxedUint) -> Result<Self, KeyError> {
-        let px_bytes = x.to_be_bytes_trimmed_vartime();
-        let py_bytes = y.to_be_bytes_trimmed_vartime();
+        let px_bytes = curve.pad_component(EcComponent::PointX(&x.to_be_bytes()))?;
+        let py_bytes = curve.pad_component(EcComponent::PointY(&y.to_be_bytes()))?;
 
-        let px_validated = curve.validate_component(EcComponent::PointX(&px_bytes))?;
-        let py_validated = curve.validate_component(EcComponent::PointY(&py_bytes))?;
+        let px_validated = px_bytes.as_slice();
+        let py_validated = py_bytes.as_slice();
 
         match curve {
             EcCurve::NistP256 => {
@@ -1295,5 +1295,88 @@ mod tests {
 
         let key = PrivateKey::from_pkcs8(&pkcs8_bytes).unwrap();
         let _pair = EdKeypair::try_from(&key).unwrap();
+    }
+
+    fn hex_to_bytes(hex: &str) -> Vec<u8> {
+        (0..hex.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap())
+            .collect()
+    }
+
+    fn base64url_to_bytes(value: &str) -> Vec<u8> {
+        use base64::Engine as _;
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(value).unwrap()
+    }
+
+    fn sign_and_verify(private_key: &PrivateKey, public_key: &PublicKey) {
+        let algorithm = SignatureAlgorithm::Ecdsa(HashAlgorithm::SHA2_512);
+        let signature = algorithm.sign(b"message", private_key).unwrap();
+        algorithm.verify(public_key, b"message", &signature).unwrap();
+    }
+
+    #[test]
+    fn ec_components_with_leading_zero_secret() {
+        // RFC 7520 section 3.2, Figure 2: P-521 private key whose "x" and "d" start with a 0x00 octet.
+        let x = base64url_to_bytes(
+            "AHKZLLOsCOzz5cY97ewNUajB957y-C-U88c3v13nmGZx6sYl_oJXu9A5RkTKqjqvjyekWF-7ytDyRXYgCF5cj0Kt",
+        );
+        let y = base64url_to_bytes(
+            "AdymlHvOiLxXkEhayXQnNCvDX4h9htZaCJN34kfmC6pV5OhQHiraVySsUdaQkAgDPrwQrJmbnX9cwlGfP-HqHZR1",
+        );
+        let d = base64url_to_bytes(
+            "AAhRON2r9cqXX1hg-RoI6R1tX5p2rUAYdmpHZoC1XNM56KtscrX6zbKipQrCW9CGZH3T4ubpnoTKLDYJ_fF3_rJt",
+        );
+        assert_eq!((x[0], d[0]), (0, 0));
+
+        let x = BoxedUint::from_be_slice_vartime(&x);
+        let y = BoxedUint::from_be_slice_vartime(&y);
+        let private_key =
+            PrivateKey::from_ec_components(EcCurve::NistP521, &BoxedUint::from_be_slice_vartime(&d), &x, &y).unwrap();
+        let public_key = PublicKey::from_ec_components(EcCurve::NistP521, &x, &y).unwrap();
+
+        assert_eq!(ec::EcdsaKeypair::try_from(&private_key).unwrap().secret(), d.as_slice());
+        assert_eq!(private_key.to_public_key().unwrap(), public_key);
+        sign_and_verify(&private_key, &public_key);
+    }
+
+    #[test]
+    fn ec_components_accept_p521_base_point() {
+        // SEC 2 version 2.0, section 2.6.1: the secp521r1 base point G, whose x-coordinate starts with a 0x00 octet.
+        let gx = hex_to_bytes(
+            "00C6858E06B70404E9CD9E3ECB662395B4429C648139053FB521F828AF606B4D3DBAA14B5E77EFE75928FE1DC127A2FFA8DE3348B3C1856A429BF97E7E31C2E5BD66",
+        );
+        let gy = hex_to_bytes(
+            "011839296A789A3BC0045C8A5FB42C7D1BD998F54449579B446817AFBD17273E662C97EE72995EF42640C550B9013FAD0761353C7086A272C24088BE94769FD16650",
+        );
+
+        let x = BoxedUint::from_be_slice_vartime(&gx);
+        let y = BoxedUint::from_be_slice_vartime(&gy);
+        // G is the public key of the secret 1.
+        let private_key = PrivateKey::from_ec_components(EcCurve::NistP521, &BoxedUint::one(), &x, &y).unwrap();
+        let public_key = PublicKey::from_ec_components(EcCurve::NistP521, &x, &y).unwrap();
+
+        let secret = ec::EcdsaKeypair::try_from(&private_key).unwrap().secret().to_vec();
+        let mut expected_secret = vec![0; 66];
+        expected_secret[65] = 1;
+        assert_eq!(secret, expected_secret);
+
+        let point = [&[0x04][..], &gx, &gy].concat();
+        let curve_oid = NamedEcCurve::Known(EcCurve::NistP521).into();
+        assert_eq!(
+            calculate_public_ec_key(&curve_oid, &secret, false).unwrap(),
+            Some(point)
+        );
+        assert_eq!(private_key.to_public_key().unwrap(), public_key);
+        sign_and_verify(&private_key, &public_key);
+    }
+
+    #[test]
+    fn ec_components_reject_oversized_values() {
+        let oversized = BoxedUint::from_be_slice_vartime(&[0x01; 33]);
+        let one = BoxedUint::one();
+
+        PublicKey::from_ec_components(EcCurve::NistP256, &oversized, &one).unwrap_err();
+        PrivateKey::from_ec_components(EcCurve::NistP256, &oversized, &one, &one).unwrap_err();
     }
 }

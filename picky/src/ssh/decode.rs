@@ -1,4 +1,4 @@
-use crate::key::ec::{EcCurve, NamedEcCurve};
+use crate::key::ec::{EcComponent, EcCurve, NamedEcCurve};
 use crate::key::ed::NamedEdAlgorithm;
 use crate::key::{EdAlgorithm, PrivateKey, PublicKey};
 use crate::ssh::certificate::{
@@ -331,7 +331,13 @@ impl SshComplexTypeDecode for SshBasePrivateKey {
             key_type::ECDSA_SHA2_NIST_P256 | key_type::ECDSA_SHA2_NIST_P384 | key_type::ECDSA_SHA2_NIST_P521 => {
                 let (curve, point) = decode_ec_public_key_body_impl(key_type.as_str(), &mut stream)?;
 
-                let private_key_secret = stream.read_ssh_mpint()?.to_be_bytes_trimmed_vartime();
+                let field_curve = match key_type.as_str() {
+                    key_type::ECDSA_SHA2_NIST_P256 => EcCurve::NistP256,
+                    key_type::ECDSA_SHA2_NIST_P384 => EcCurve::NistP384,
+                    _ => EcCurve::NistP521,
+                };
+                // The secret is a minimal `mpint`, so it may be shorter than the field length.
+                let private_key_secret = field_curve.pad_component(EcComponent::Secret(&stream.read_ssh_bytes()?))?;
 
                 Ok(SshBasePrivateKey::Ec(PrivateKey::from_ec_encoded_components(
                     curve.into(),
@@ -342,7 +348,7 @@ impl SshComplexTypeDecode for SshBasePrivateKey {
             key_type::ED25519 => {
                 let (algorithm, public_key) = decode_ed25519_public_key_body_impl(key_type.as_str(), &mut stream)?;
 
-                let private_key_secret = stream.read_ssh_mpint()?.to_be_bytes_trimmed_vartime();
+                let private_key_secret = stream.read_ssh_bytes()?;
 
                 // OpenSSH is really strange in regards to private ed25519 keys. It stores them as
                 // 64 byte-array, but actually only first 32 bytes are the private key, and the rest

@@ -99,10 +99,10 @@ impl JwkKeyType {
 
     /// Build a JWK key from EC components.
     ///
-    /// `x` and `y` are big-endian representation of the affine point coordinates.
+    /// `x` and `y` are the big-endian affine point coordinates, each the full field length of the curve.
+    /// They are encoded as given, leading zero octets included, as required by
+    /// [RFC 7518 section 6.2.1.2](https://www.rfc-editor.org/rfc/rfc7518#section-6.2.1.2).
     pub fn new_ec_key(curve: JwkEcPublicKeyCurve, x: &[u8], y: &[u8]) -> Self {
-        let x = h_strip_unrequired_leading_zero(x);
-        let y = h_strip_unrequired_leading_zero(y);
         Self::Ec(JwkPublicEcKey {
             crv: curve,
             x: general_purpose::URL_SAFE_NO_PAD.encode(x),
@@ -435,8 +435,16 @@ impl Jwk {
                     JwkEcPublicKeyCurve::P521 => EcCurve::NistP521,
                 };
 
-                let x = BoxedUint::from_be_slice_vartime(&ec.x_signed_bytes_be()?);
-                let y = BoxedUint::from_be_slice_vartime(&ec.y_signed_bytes_be()?);
+                // RFC 7518 section 6.2.1.2: each coordinate is the full field length, leading zeros included.
+                let x = general_purpose::URL_SAFE_NO_PAD.decode(&ec.x)?;
+                let y = general_purpose::URL_SAFE_NO_PAD.decode(&ec.y)?;
+
+                if x.len() != curve.field_bytes_size() || y.len() != curve.field_bytes_size() {
+                    return Err(JwkError::InvalidEcPointCoordinates);
+                }
+
+                let x = BoxedUint::from_be_slice_vartime(&x);
+                let y = BoxedUint::from_be_slice_vartime(&y);
 
                 PublicKey::from_ec_components(curve, &x, &y).map_err(|_| JwkError::InvalidEcPointCoordinates)
             }
@@ -748,20 +756,65 @@ ZQIDAQAB
     }
 
     #[rstest]
-    #[case(picky_test_data::EC_NIST256_PK_1_PUB)]
-    #[case(picky_test_data::EC_NIST384_PK_1_PUB)]
-    fn x509_and_jwk_conversion_ec(#[case] pem: &str) {
+    #[case(picky_test_data::EC_NIST256_PK_1_PUB, 32)]
+    #[case(picky_test_data::EC_NIST384_PK_1_PUB, 48)]
+    #[case(picky_test_data::EC_NIST521_PK_1_PUB, 66)]
+    fn x509_and_jwk_conversion_ec(#[case] pem: &str, #[case] field_size: usize) {
         let initial_key = PublicKey::from_pem(&pem.parse::<Pem>().expect("pem")).expect("public key");
         let jwk = Jwk::from_public_key(&initial_key).unwrap();
-        if let JwkKeyType::Ec(rsa_key) = &jwk.key {
-            let x = general_purpose::URL_SAFE_NO_PAD.decode(&rsa_key.x).unwrap();
-            assert_ne!(x[0], 0x00);
-            let y = general_purpose::URL_SAFE_NO_PAD.decode(&rsa_key.y).unwrap();
-            assert_ne!(y[0], 0x00);
+        if let JwkKeyType::Ec(ec_key) = &jwk.key {
+            let x = general_purpose::URL_SAFE_NO_PAD.decode(&ec_key.x).unwrap();
+            assert_eq!(x.len(), field_size);
+            let y = general_purpose::URL_SAFE_NO_PAD.decode(&ec_key.y).unwrap();
+            assert_eq!(y.len(), field_size);
         } else {
             panic!("Unexpected key type");
         }
         let from_jwk_key = jwk.to_public_key().unwrap();
         assert_eq!(from_jwk_key, initial_key);
+    }
+
+    #[rstest]
+    #[case(picky_test_data::JOSE_JWK_EC_P256_JSON)]
+    #[case(picky_test_data::JOSE_JWK_EC_P384_JSON)]
+    #[case(picky_test_data::JOSE_JWK_EC_P521_JSON)]
+    fn ecdsa_key_public_key_roundtrip(#[case] json: &str) {
+        let public_key = Jwk::from_json(json).unwrap().to_public_key().unwrap();
+        let encoded = Jwk::from_public_key(&public_key).unwrap().to_json().unwrap();
+        pretty_assertions::assert_eq!(encoded, json);
+    }
+
+    // RFC 7520 section 3.1, Figure 1: P-521 public key whose "x" starts with a 0x00 octet.
+    const RFC7520_P521_X: &str =
+        "AHKZLLOsCOzz5cY97ewNUajB957y-C-U88c3v13nmGZx6sYl_oJXu9A5RkTKqjqvjyekWF-7ytDyRXYgCF5cj0Kt";
+    const RFC7520_P521_Y: &str =
+        "AdymlHvOiLxXkEhayXQnNCvDX4h9htZaCJN34kfmC6pV5OhQHiraVySsUdaQkAgDPrwQrJmbnX9cwlGfP-HqHZR1";
+
+    #[test]
+    fn rfc7520_p521_public_key_roundtrip() {
+        let jwk = Jwk::new(JwkKeyType::Ec(JwkPublicEcKey {
+            crv: JwkEcPublicKeyCurve::P521,
+            x: RFC7520_P521_X.to_owned(),
+            y: RFC7520_P521_Y.to_owned(),
+        }));
+
+        let public_key = jwk.to_public_key().unwrap();
+        let encoded = Jwk::from_public_key(&public_key).unwrap();
+        let ec_key = encoded.key.as_ec().unwrap();
+
+        assert_eq!(ec_key.x, RFC7520_P521_X);
+        assert_eq!(ec_key.y, RFC7520_P521_Y);
+    }
+
+    #[test]
+    fn ec_coordinate_shorter_than_field_is_rejected() {
+        let x = general_purpose::URL_SAFE_NO_PAD.decode(RFC7520_P521_X).unwrap();
+        let jwk = Jwk::new(JwkKeyType::Ec(JwkPublicEcKey {
+            crv: JwkEcPublicKeyCurve::P521,
+            x: general_purpose::URL_SAFE_NO_PAD.encode(&x[1..]),
+            y: RFC7520_P521_Y.to_owned(),
+        }));
+
+        assert!(matches!(jwk.to_public_key(), Err(JwkError::InvalidEcPointCoordinates)));
     }
 }
