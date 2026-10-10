@@ -8,9 +8,16 @@ rust-version = "1.85"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Devolutions/picky-rs"
 description = "Conformance suite for picky-crypto providers"
+autotests = false
 
 [lib]
 doctest = false
+test = false
+
+[[test]]
+name = "integration_tests"
+path = "tests/main.rs"
+harness = true
 
 [dependencies]
 picky-crypto = { path = "../picky-crypto" }

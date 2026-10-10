@@ -4,7 +4,7 @@ use std::sync::Arc;
 use picky_crypto::*;
 use rstest::rstest;
 
-use crate::{Options, algorithms::*, asymmetric, der, published, select, symmetric, vectors as v};
+use picky_crypto_testsuite::{Options, algorithms::*, asymmetric, der, published, select, symmetric, vectors as v};
 
 #[rstest]
 #[case("rsa_signature_2048_sha224_test.json")]
@@ -390,26 +390,29 @@ fn error_only_entries_never_bypass_the_conformance_report() {
     let provider = rejecting_provider();
     assert!(all().iter().all(|a| provider.get(*a).is_some()));
     let areas: &[(&str, Area)] = &[
-        ("hash", crate::hash),
-        ("mac", crate::mac),
-        ("password_kdf", crate::password_kdf),
-        ("kdf", crate::kdf),
-        ("cipher", crate::cipher),
-        ("stream_cipher", crate::stream_cipher),
-        ("aead", crate::aead),
-        ("key_wrap", crate::key_wrap),
-        ("signature", crate::signature),
-        ("asymmetric_encryption", crate::asymmetric_encryption),
-        ("key_agreement", crate::key_agreement),
-        ("ffdh", crate::ffdh),
-        ("private_key", crate::private_key),
-        ("key_generation", crate::key_generation),
-        ("random", crate::random),
-        ("provider", crate::provider),
-        ("properties", crate::properties),
+        ("hash", picky_crypto_testsuite::hash),
+        ("mac", picky_crypto_testsuite::mac),
+        ("password_kdf", picky_crypto_testsuite::password_kdf),
+        ("kdf", picky_crypto_testsuite::kdf),
+        ("cipher", picky_crypto_testsuite::cipher),
+        ("stream_cipher", picky_crypto_testsuite::stream_cipher),
+        ("aead", picky_crypto_testsuite::aead),
+        ("key_wrap", picky_crypto_testsuite::key_wrap),
+        ("signature", picky_crypto_testsuite::signature),
+        ("asymmetric_encryption", picky_crypto_testsuite::asymmetric_encryption),
+        ("key_agreement", picky_crypto_testsuite::key_agreement),
+        ("ffdh", picky_crypto_testsuite::ffdh),
+        ("private_key", picky_crypto_testsuite::private_key),
+        ("key_generation", picky_crypto_testsuite::key_generation),
+        ("random", picky_crypto_testsuite::random),
+        ("provider", picky_crypto_testsuite::provider),
+        ("properties", picky_crypto_testsuite::properties),
     ];
     for (name, area) in areas {
-        match catch_unwind(AssertUnwindSafe(|| area(&provider, Options::default()))) {
+        let outcome = picky_crypto_testsuite::properties::without_failure_persistence(|| {
+            catch_unwind(AssertUnwindSafe(|| area(&provider, Options::default())))
+        });
+        match outcome {
             Ok(()) => assert_eq!(*name, "provider", "{name}: failing operations must fail conformance"),
             Err(panic) => {
                 let message = panic.downcast_ref::<String>().expect("conformance report");

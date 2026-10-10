@@ -7,6 +7,19 @@ use crate::asymmetric::{ECC_FILE, RSA_SIGN_FILES, exported};
 use crate::harness::{CheckedResult, Checks, Expect};
 use crate::{Options, der, published, select, vectors as v};
 
+thread_local! {
+    static PERSIST_FAILURES: std::cell::Cell<bool> = const { std::cell::Cell::new(true) };
+}
+
+/// Runs `f` without recording property failures in the committed regression file.
+/// Used by self-tests whose mock providers fail properties on purpose.
+pub fn without_failure_persistence<R>(f: impl FnOnce() -> R) -> R {
+    let previous = PERSIST_FAILURES.replace(false);
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f));
+    PERSIST_FAILURES.set(previous);
+    result.unwrap_or_else(|payload| std::panic::resume_unwind(payload))
+}
+
 pub fn runner(file: &'static str) -> TestRunner {
     let cases = std::env::var("PROPTEST_CASES")
         .ok()
@@ -15,11 +28,9 @@ pub fn runner(file: &'static str) -> TestRunner {
     TestRunner::new(Config {
         cases,
         rng_seed: RngSeed::Fixed(0x7069636b79),
-        failure_persistence: if cfg!(test) {
-            None
-        } else {
-            Some(Box::new(FileFailurePersistence::Direct(file)))
-        },
+        failure_persistence: PERSIST_FAILURES
+            .get()
+            .then(|| Box::new(FileFailurePersistence::Direct(file)) as _),
         ..Config::default()
     })
 }

@@ -13,20 +13,26 @@
 //! [`Options`] permits only the contract's opaque public-key verification failure tolerance.
 #![forbid(unsafe_code)]
 
-mod algorithms;
-mod asymmetric;
-mod der;
-mod differential;
-mod harness;
-mod properties;
-#[cfg(test)]
-mod provider_value;
-mod published;
-mod select;
-#[cfg(test)]
-mod selection_tests;
-mod symmetric;
-mod vectors;
+#[doc(hidden)]
+pub mod algorithms;
+#[doc(hidden)]
+pub mod asymmetric;
+#[doc(hidden)]
+pub mod der;
+#[doc(hidden)]
+pub mod differential;
+#[doc(hidden)]
+pub mod harness;
+#[doc(hidden)]
+pub mod properties;
+#[doc(hidden)]
+pub mod published;
+#[doc(hidden)]
+pub mod select;
+#[doc(hidden)]
+pub mod symmetric;
+#[doc(hidden)]
+pub mod vectors;
 
 /// Contract-sanctioned variations in verification diagnostics.
 #[non_exhaustive]
