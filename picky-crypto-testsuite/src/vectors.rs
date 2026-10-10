@@ -75,6 +75,38 @@ pub fn tests(group: &Value) -> &[Value] {
     group["tests"].as_array().expect("missing published tests")
 }
 
+/// Returns the hex fields of `testGroups[group].privateKey` in a Wycheproof `testvectors_v1` file, decoded exactly as published.
+///
+/// `file` is a file name such as `rsa_oaep_misc_test.json`, listed in `vectors/manifest.toml`.
+/// Leading zero bytes are kept.
+/// The file goes through the same schema and test-count checks as the suite's own vectors.
+///
+/// # Panics
+///
+/// Panics if the file isn't listed in the manifest or fails those checks, if the group or its `privateKey` is missing, or if a field isn't even-length hex.
+pub fn wycheproof_private_key(file: &str, group: usize) -> BTreeMap<String, Vec<u8>> {
+    assert!(
+        read("manifest.toml").contains(&format!("\"testvectors_v1/{file}\"")),
+        "{file} is not listed in vectors/manifest.toml"
+    );
+    let vectors = wycheproof(file);
+    let key = vectors
+        .test_groups
+        .get(group)
+        .unwrap_or_else(|| panic!("{file}: no test group {group}"))["privateKey"]
+        .as_object()
+        .unwrap_or_else(|| panic!("{file}: test group {group} has no privateKey"));
+    key.iter()
+        .map(|(name, value)| {
+            let text = value
+                .as_str()
+                .unwrap_or_else(|| panic!("{file}: privateKey.{name} is not a string"));
+            let decoded = hex::decode(text).unwrap_or_else(|e| panic!("{file}: privateKey.{name}: {e}"));
+            (name.clone(), decoded)
+        })
+        .collect()
+}
+
 pub fn id(algorithm: impl std::fmt::Debug, file: &str, test: &Value) -> String {
     format!(
         "{algorithm:?}/{file}/tcId={}/{}",
@@ -715,6 +747,70 @@ pub fn ec9500() -> Vec<EcEncodingControl> {
 mod tests {
     use super::*;
     use rstest::rstest;
+
+    const CRT_FIELDS: [&str; 8] = [
+        "coefficient",
+        "exponent1",
+        "exponent2",
+        "modulus",
+        "prime1",
+        "prime2",
+        "privateExponent",
+        "publicExponent",
+    ];
+
+    #[rstest]
+    #[case("rsa_oaep_misc_test.json", 0, true)]
+    #[case("rsa_oaep_misc_test.json", 127, true)]
+    #[case("rsa_oaep_2048_sha1_mgf1sha1_test.json", 0, true)]
+    #[case("rsa_oaep_2048_sha224_mgf1sha1_test.json", 0, true)]
+    #[case("rsa_oaep_3072_sha256_mgf1sha1_test.json", 0, true)]
+    #[case("rsa_oaep_4096_sha256_mgf1sha1_test.json", 0, true)]
+    #[case("rsa_pkcs1_2048_sig_gen_test.json", 0, false)]
+    fn wycheproof_private_key_fields(#[case] file: &str, #[case] group: usize, #[case] crt: bool) {
+        let key = wycheproof_private_key(file, group);
+        let expected: Vec<_> = if crt {
+            CRT_FIELDS.to_vec()
+        } else {
+            vec!["modulus", "privateExponent", "publicExponent"]
+        };
+        assert_eq!(key.keys().map(String::as_str).collect::<Vec<_>>(), expected);
+        let published = &wycheproof(file).test_groups[group];
+        for (name, bytes) in &key {
+            let text = string(&published["privateKey"], name);
+            assert_eq!(bytes.len() * 2, text.len(), "{file}/{group}/{name}");
+            assert_eq!(hex::encode(bytes), text.to_ascii_lowercase(), "{file}/{group}/{name}");
+        }
+        let modulus = &key["modulus"];
+        let significant = modulus.iter().skip_while(|b| **b == 0).count();
+        assert!(
+            modulus.len() > significant,
+            "{file}/{group}: published leading zero byte kept"
+        );
+        assert_eq!(
+            crate::der::bit_length(modulus),
+            number(published, "keySize"),
+            "{file}/{group}: modulus size"
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "no test group")]
+    fn wycheproof_private_key_rejects_missing_group() {
+        wycheproof_private_key("rsa_pkcs1_2048_sig_gen_test.json", 8);
+    }
+
+    #[test]
+    #[should_panic(expected = "not listed")]
+    fn wycheproof_private_key_rejects_unlisted_file() {
+        wycheproof_private_key("rsa_oaep_2048_sha512_mgf1sha1_test.json", 0);
+    }
+
+    #[test]
+    #[should_panic(expected = "has no privateKey")]
+    fn wycheproof_private_key_rejects_groups_without_private_key() {
+        wycheproof_private_key("rsa_signature_2048_sha256_test.json", 0);
+    }
 
     #[rstest]
     #[case("nist/shs/SHA1ShortMsg.rsp", 65)]

@@ -45,6 +45,7 @@ pub use picky_crypto::CryptoProvider as __Provider;
 pub use properties::properties;
 #[doc(hidden)]
 pub use symmetric::{aead, cipher, hash, kdf, key_wrap, mac, password_kdf, random, stream_cipher};
+pub use vectors::wycheproof_private_key;
 
 /// Instantiates one conformance test per capability area.
 #[macro_export]
