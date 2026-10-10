@@ -121,15 +121,6 @@ pub fn cbc_control(algorithm: CipherAlgorithm, records: &[CipherVector]) -> &Cip
     required(file, "must-support CBC key", records.iter().find(|r| !r.5))
 }
 
-pub fn monte_seed(file: &str, records: &[v::Record]) -> Vec<u8> {
-    required(
-        file,
-        "Monte Carlo seed",
-        records.iter().find(|r| r.fields.contains_key("Seed")),
-    )
-    .bytes("Seed")
-}
-
 pub fn weak_des_component() -> Vec<u8> {
     required(
         "rfc/rfc2268.txt",

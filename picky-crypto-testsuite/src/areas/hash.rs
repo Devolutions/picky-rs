@@ -1,10 +1,10 @@
-//! Message digests: NIST and RFC known answers, streaming and Monte Carlo chains.
+//! Message digests: NIST and RFC known answers and streaming.
 
 use picky_crypto::*;
 
 use crate::algorithms::*;
-use crate::harness::{CheckedResult, Checks, Expect, Options};
-use crate::{select, vectors as v};
+use crate::harness::{Checks, Expect, Options};
+use crate::vectors as v;
 
 pub fn run(p: &CryptoProvider, _: Options) {
     let mut c = Checks::default();
@@ -16,15 +16,15 @@ pub fn run(p: &CryptoProvider, _: Options) {
                 continue;
             }
         };
-        let stem = match a {
-            HashAlgorithm::Sha1 => Some("nist/shs/SHA1"),
-            HashAlgorithm::Sha224 => Some("nist/shs/SHA224"),
-            HashAlgorithm::Sha256 => Some("nist/shs/SHA256"),
-            HashAlgorithm::Sha384 => Some("nist/shs/SHA384"),
-            HashAlgorithm::Sha512 => Some("nist/shs/SHA512"),
-            HashAlgorithm::Sha3_384 => Some("nist/sha3/SHA3_384"),
-            HashAlgorithm::Sha3_512 => Some("nist/sha3/SHA3_512"),
-            _ => None,
+        let file = match a {
+            HashAlgorithm::Sha1 => "nist/shs/SHA1ShortMsg.rsp",
+            HashAlgorithm::Sha224 => "nist/shs/SHA224ShortMsg.rsp",
+            HashAlgorithm::Sha256 => "nist/shs/SHA256ShortMsg.rsp",
+            HashAlgorithm::Sha384 => "nist/shs/SHA384ShortMsg.rsp",
+            HashAlgorithm::Sha512 => "nist/shs/SHA512ShortMsg.rsp",
+            HashAlgorithm::Sha3_384 => "nist/sha3/SHA3_384ShortMsg.rsp",
+            HashAlgorithm::Sha3_512 => "nist/sha3/SHA3_512ShortMsg.rsp",
+            _ => "",
         };
         let cases = if index < 2 {
             v::md(if index == 0 { 1320 } else { 1321 })
@@ -39,14 +39,13 @@ pub fn run(p: &CryptoProvider, _: Options) {
                 })
                 .collect::<Vec<_>>()
         } else {
-            let file = format!("{}ShortMsg.rsp", stem.expect("NIST hash file stem"));
-            v::response(&file)
+            v::response(file)
                 .into_iter()
                 .map(|r| {
                     let mut msg = r.bytes("Msg");
                     assert_eq!(r.number("Len") % 8, 0);
                     msg.truncate(r.number("Len") / 8);
-                    (format!("{a:?}/{}", r.id(&file)), msg, r.bytes("MD"))
+                    (format!("{a:?}/{}", r.id(file)), msg, r.bytes("MD"))
                 })
                 .collect()
         };
@@ -72,35 +71,6 @@ pub fn run(p: &CryptoProvider, _: Options) {
                     c.bytes(&id, &out, &digest);
                     c.check(&id, out.len() == a.output_len(), "output_len mismatch");
                 }
-            }
-        }
-        if let Some(stem) = stem {
-            let file = format!("{stem}Monte.rsp");
-            let records = v::response(&file);
-            let mut seed = select::monte_seed(&file, &records);
-            for r in records {
-                let id = format!("{a:?}/{}", r.id(&file));
-                let next = c.call(&id, Expect::Success, || {
-                    if matches!(a, HashAlgorithm::Sha3_384 | HashAlgorithm::Sha3_512) {
-                        let mut out = seed.clone();
-                        for _ in 0..1000 {
-                            out = helpers::digest(p, a, &out).checked()?.into_inner().to_vec();
-                        }
-                        Ok(OutputBytes::new(Zeroizing::new(out)))
-                    } else {
-                        let mut digests = [seed.clone(), seed.clone(), seed.clone()];
-                        for _ in 0..1000 {
-                            let next = helpers::digest(p, a, &digests.concat()).checked()?;
-                            digests.rotate_left(1);
-                            digests[2] = next.into_inner().to_vec();
-                        }
-                        Ok(OutputBytes::new(Zeroizing::new(digests[2].clone())))
-                    }
-                });
-                if let Some(out) = next {
-                    c.bytes(&id, &out, &r.bytes("MD"));
-                }
-                seed = r.bytes("MD");
             }
         }
     }

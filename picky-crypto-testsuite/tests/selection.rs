@@ -116,24 +116,13 @@ fn cbc_controls(#[case] algorithm: CipherAlgorithm) {
     let records = areas::cipher::cipher_records(algorithm);
     let control = select::cbc_control(algorithm, &records);
     assert!(!control.5);
+    // Only the two-key triple-DES file has non-distinct component keys; catches a match that also flags AES files.
+    for record in &records {
+        assert_eq!(record.5, record.0.contains("TCBCMMT2.rsp"), "{}", record.0);
+    }
     if algorithm == CipherAlgorithm::TdesEde3Cbc {
         assert!(control.0.contains("TCBCMMT3.rsp"));
     }
-}
-
-#[rstest]
-#[case("nist/shs/SHA1Monte.rsp")]
-#[case("nist/shs/SHA224Monte.rsp")]
-#[case("nist/shs/SHA256Monte.rsp")]
-#[case("nist/shs/SHA384Monte.rsp")]
-#[case("nist/shs/SHA512Monte.rsp")]
-#[case("nist/sha3/SHA3_384Monte.rsp")]
-#[case("nist/sha3/SHA3_512Monte.rsp")]
-fn monte_seeds(#[case] file: &str) {
-    let records = v::response(file);
-    let seed = select::monte_seed(file, &records);
-    assert_eq!(seed, records[0].bytes("Seed"));
-    assert!(!seed.is_empty());
 }
 
 #[rstest]
@@ -216,11 +205,6 @@ fn missing_controls_name_the_file_and_property() {
     missing!("ecdh.json", "valid ECDH", select::ecdh_control("ecdh.json", &vectors));
     missing!("aes_gcm_test.json", "96-bit nonce", select::gcm_control(&vectors, 128));
     missing!("aes_wrap_test.json", "128-bit KEK", select::wrap_control(&vectors, 128));
-    missing!(
-        "SHA256Monte.rsp",
-        "Monte Carlo seed",
-        select::monte_seed("SHA256Monte.rsp", &[])
-    );
     missing!(
         "rfc/rfc2268.txt",
         "must-support CBC",

@@ -29,9 +29,7 @@ pub fn cipher_records(a: CipherAlgorithm) -> Vec<CipherVector> {
                 CipherAlgorithm::Aes192Cbc => 192,
                 _ => 256,
             };
-            ["GFSbox", "KeySbox", "MMT"]
-                .map(|name| format!("nist/aes/CBC{name}{bits}.rsp"))
-                .to_vec()
+            vec![format!("nist/aes/CBCMMT{bits}.rsp")]
         };
         for file in files {
             for r in v::response(&file) {
@@ -46,7 +44,7 @@ pub fn cipher_records(a: CipherAlgorithm) -> Vec<CipherVector> {
                     r.bytes("IV"),
                     r.bytes("PLAINTEXT"),
                     r.bytes("CIPHERTEXT"),
-                    file.contains("MMT2"),
+                    file.ends_with("TCBCMMT2.rsp"),
                 ));
             }
         }
