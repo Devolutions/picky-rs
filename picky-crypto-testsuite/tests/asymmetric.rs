@@ -578,3 +578,49 @@ fn changed_ffc_exponents_are_in_range() {
         assert!(x.len() < q.len() || x.len() == q.len() && x < q, "{}", r.id(FFC_FILE));
     }
 }
+
+type VerifyCalls = Arc<Mutex<Vec<(Vec<u8>, Vec<u8>)>>>;
+struct UndecodableKeys(VerifyCalls);
+impl SignatureVerifier for UndecodableKeys {
+    fn algorithm(&self) -> SignatureAlgorithm {
+        SignatureAlgorithm::Ed25519
+    }
+    fn fips(&self) -> bool {
+        false
+    }
+    fn verify(&self, public_key: PublicKey<'_>, _: &[u8], signature: &[u8]) -> Result<(), Error> {
+        self.0.lock().unwrap().push((public_key.0.to_vec(), signature.to_vec()));
+        Err(Error::InvalidKey)
+    }
+}
+
+#[test]
+fn ed25519_undecodable_public_keys_reach_the_verifier() {
+    let (identity, keys) = ed25519_undecodable_keys();
+    assert_eq!(identity[0], 1);
+    assert!(identity[1..].iter().all(|b| *b == 0));
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let provider = CryptoProvider::builder()
+        .with(Entry::SignatureVerifier(Arc::new(UndecodableKeys(Arc::clone(&calls)))))
+        .build()
+        .unwrap();
+    let report = picky_crypto_testsuite::properties::without_failure_persistence(|| {
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            signature(&provider, Options::default())
+        }))
+    })
+    .expect_err("an always-failing verifier fails the published valid vectors");
+    let report = report.downcast_ref::<String>().unwrap();
+    assert!(
+        !report.contains("rfc/rfc8032.txt/5.1.3/A "),
+        "InvalidKey is accepted: {report}"
+    );
+    let calls = calls.lock().unwrap();
+    for (_, key) in keys {
+        let call = calls
+            .iter()
+            .find(|(public, _)| public[..] == key[..])
+            .expect("undecodable key verified");
+        assert_eq!(call.1, [identity, [0; 32]].concat());
+    }
+}

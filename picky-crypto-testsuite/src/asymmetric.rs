@@ -403,6 +403,38 @@ fn verify_group(
     }
 }
 
+/// Structural Ed25519 point encodings (RFC 8032 section 5.1.2) whose expected outcome is an error.
+/// Returns the identity encoding, used as `R`, and two public keys `A` that fail section 5.1.3 decoding.
+pub fn ed25519_undecodable_keys() -> ([u8; 32], [(&'static str, [u8; 32]); 2]) {
+    // p = 2^255 - 19 in the 32-byte little-endian encoding of section 5.1.2.
+    let mut p = [0xff; 32];
+    p[0] = 0xed;
+    p[31] = 0x7f;
+    assert_eq!(p[0], (256 - 19) as u8, "low byte of 2^255 - 19");
+    // y = p + 1 is not below p, so decoding fails at step 2; the sign bit stays clear.
+    let mut non_canonical = p;
+    non_canonical[0] += 1;
+    assert_eq!(non_canonical[1..], p[1..], "p + 1 differs from p only in the low byte");
+    assert_eq!(non_canonical[31] & 0x80, 0, "sign bit clear");
+    // y = 1 gives x = 0, so the set sign bit makes decoding fail at step 4.
+    let mut identity = [0; 32];
+    identity[0] = 1;
+    let mut negative_zero = identity;
+    negative_zero[31] |= 0x80;
+    assert_eq!(
+        negative_zero[..31],
+        identity[..31],
+        "only the sign bit differs from y = 1"
+    );
+    (
+        identity,
+        [
+            ("y = p + 1", non_canonical),
+            ("x = 0 with the sign bit set", negative_zero),
+        ],
+    )
+}
+
 pub fn signature(p: &CryptoProvider, options: Options) {
     let mut c = Checks::default();
     let mut exercised_keys = std::collections::BTreeSet::new();
@@ -541,6 +573,15 @@ pub fn signature(p: &CryptoProvider, options: Options) {
                 &v::field(positive, "sig"),
             )
         });
+        let (identity, keys) = ed25519_undecodable_keys();
+        let signature = [identity, [0; 32]].concat();
+        for (name, key) in keys {
+            c.call(
+                &format!("Ed25519/rfc/rfc8032.txt/5.1.3/A {name}"),
+                malformed_public(options),
+                || verifier.verify(PublicKey(&key), &[], &signature),
+            );
+        }
     }
     for file in RSA_SIGN_FILES {
         for g in v::wycheproof(file).test_groups {
