@@ -1,6 +1,7 @@
 # Published test vectors used by the conformance suite.
 # `blob` is the git blob ID of the vendored file (`git hash-object --no-filters <file>`).
-# `upstream` is the blob ID of the published file; it differs from `blob` only for an `extract`, which keeps whole groups byte for byte.
+# `upstream` is the blob ID of the published file; it differs from `blob` only for an `extract`, which keeps whole groups or sections byte for byte.
+# `lines` lists the upstream line ranges an `extract` keeps (1-based, inclusive).
 
 [wycheproof]
 path = "wycheproof"
@@ -231,6 +232,7 @@ version = "SP 800-108 counter mode test vectors, member KDFCTR_gen.rsp, CAVS 14.
 upstream = "d5e6c5ec93e8285da7b04b548a2f22648d8f8a77"
 blob = "3e299380020d955c151a1d432ce4317809cf2e5e"
 extract = "file header and the whole groups [PRF=HMAC_SHA1], [PRF=HMAC_SHA256], [PRF=HMAC_SHA384] and [PRF=HMAC_SHA512] with [CTRLOCATION=BEFORE_FIXED] and [RLEN=32_BITS], cut at group headers"
+lines = "1-9, 19628-19913, 27132-27417, 30884-31169, 34636-34921"
 
 [[file]]
 path = "nist/kas/KASValidityTest_ECCEphemeralUnified_KDFConcat_NOKC_init.fax"
@@ -239,6 +241,7 @@ version = "SP 800-56A KAS ECC test vectors, member KASTestVectorsECC2016/No Key 
 upstream = "af432b6b9beba7b25a3372f61c1837d52b3d3d0a"
 blob = "e158d71455ea2739dfc0e78bf449aa70a3514a84"
 extract = "file header and the whole groups [EC - SHA256], [EC - SHA384], [EC - SHA512], [ED - SHA384], [ED - SHA512] and [EE - SHA512], cut at group headers"
+lines = "1-46, 2095-5165"
 
 [[file]]
 path = "nist/kas/KASValidityTest_FFCStatic_NOKC_ZZOnly_init.fax"
@@ -252,91 +255,117 @@ path = "rfc/rfc1320.txt"
 source = "https://www.rfc-editor.org/rfc/rfc1320.txt"
 version = "RFC 1320"
 upstream = "6492345325c0080aa2784a69f5ac311b57fff601"
-blob = "6492345325c0080aa2784a69f5ac311b57fff601"
+blob = "5d6002e65c45f1a5028a101f284679bbd52ce653"
+extract = "section A.5 (Test suite)"
+lines = "1048-1070"
 
 [[file]]
 path = "rfc/rfc1321.txt"
 source = "https://www.rfc-editor.org/rfc/rfc1321.txt"
 version = "RFC 1321"
 upstream = "68af27d2be1e853db3fff48677a2febd72550eeb"
-blob = "68af27d2be1e853db3fff48677a2febd72550eeb"
+blob = "03364173e92c256f01ec9be8c13eaa1a68f887f3"
+extract = "section A.5 (Test suite)"
+lines = "1133-1148"
 
 [[file]]
 path = "rfc/rfc2268.txt"
 source = "https://www.rfc-editor.org/rfc/rfc2268.txt"
 version = "RFC 2268"
 upstream = "cbbdf3bba12376dbbb686079488917692c90a7de"
-blob = "cbbdf3bba12376dbbb686079488917692c90a7de"
+blob = "b4d2dc70e371149db2ff30c78f62b2bb85c3fedd"
+extract = "section 5 (Test vectors)"
+lines = "388-457"
 
 [[file]]
 path = "rfc/rfc3526.txt"
 source = "https://www.rfc-editor.org/rfc/rfc3526.txt"
 version = "RFC 3526"
 upstream = "7b688a33f39316adcf07ecb1dad5fa4c518320db"
-blob = "7b688a33f39316adcf07ecb1dad5fa4c518320db"
+blob = "61db1a4a80e0476cc6fbaedf44594c3709770de0"
+extract = "sections 3, 4 and 5 (2048-, 3072- and 4096-bit MODP groups)"
+lines = "141-286"
 
 [[file]]
 path = "rfc/rfc4231.txt"
 source = "https://www.rfc-editor.org/rfc/rfc4231.txt"
 version = "RFC 4231"
 upstream = "46eae30c2340cdbf834f6272ba4028791fe0788c"
-blob = "46eae30c2340cdbf834f6272ba4028791fe0788c"
+blob = "4f22fbc2f90b5299c6fa788da1ac4e3449111a63"
+extract = "sections 4.2 to 4.8 (Test Cases 1 to 7)"
+lines = "175-379"
 
 [[file]]
 path = "rfc/rfc5114.txt"
 source = "https://www.rfc-editor.org/rfc/rfc5114.txt"
 version = "RFC 5114"
 upstream = "83d7a9fb42d4a6820728e8b81c02dae4b6f39f92"
-blob = "83d7a9fb42d4a6820728e8b81c02dae4b6f39f92"
+blob = "7c96e9d7cef46c7b77308da6930551d955bc4b97"
+extract = "sections 2.1 to 2.3 (MODP groups with prime order subgroups), A.1 to A.3 (their test data) and A.6 to A.8 (test data for the 256-, 384- and 521-bit random ECP groups)"
+lines = "184-305, 791-926, 985-1086"
 
 [[file]]
 path = "rfc/rfc6070.txt"
 source = "https://www.rfc-editor.org/rfc/rfc6070.txt"
 version = "RFC 6070"
 upstream = "67cd340b8ef131ba098af2fc6381e6e18a15888e"
-blob = "67cd340b8ef131ba098af2fc6381e6e18a15888e"
+blob = "f145bc90f54510c9689577e68254eef66b3ed032"
+extract = "section 2 (PBKDF2 HMAC-SHA1 test vectors)"
+lines = "89-184"
 
 [[file]]
 path = "rfc/rfc6229.txt"
 source = "https://www.rfc-editor.org/rfc/rfc6229.txt"
 version = "RFC 6229"
 upstream = "c960126ef84d639aeb2f431da9632960e6c98b47"
-blob = "c960126ef84d639aeb2f431da9632960e6c98b47"
+blob = "1aec19176ba31bfba797abd18a5d3d9b824f8aa4"
+extract = "section 2 (test vectors for RC4)"
+lines = "126-532"
 
 [[file]]
 path = "rfc/rfc7748.txt"
 source = "https://www.rfc-editor.org/rfc/rfc7748.txt"
 version = "RFC 7748"
 upstream = "078927cdbc123648cc42a882e0adcce29585208c"
-blob = "078927cdbc123648cc42a882e0adcce29585208c"
+blob = "d2fdba45235e843f0b632268bd4a52546ffd198c"
+extract = "sections 5.2 (test vectors) and 6.1 (Curve25519 Diffie-Hellman)"
+lines = "567-734, 737-790"
 
 [[file]]
 path = "rfc/rfc7919.txt"
 source = "https://www.rfc-editor.org/rfc/rfc7919.txt"
 version = "RFC 7919"
 upstream = "1c2b8b63b67aa908f15d68d6b8b2aed12ebc6700"
-blob = "1c2b8b63b67aa908f15d68d6b8b2aed12ebc6700"
+blob = "985df55963e01d2148b5d08c53ae547e942d4a15"
+extract = "sections A.1 to A.3 (ffdhe2048, ffdhe3072 and ffdhe4096)"
+lines = "1042-1270"
 
 [[file]]
 path = "rfc/rfc8032.txt"
 source = "https://www.rfc-editor.org/rfc/rfc8032.txt"
 version = "RFC 8032"
 upstream = "b5dfdf0e348c68a8ac33d35f88db60d15f26fb66"
-blob = "b5dfdf0e348c68a8ac33d35f88db60d15f26fb66"
+blob = "f89035193ae606679e032dd49197f36f3df01212"
+extract = "section 7.1 (test vectors for Ed25519)"
+lines = "1295-1499"
 
 [[file]]
 path = "rfc/rfc8410.txt"
 source = "https://www.rfc-editor.org/rfc/rfc8410.txt"
 version = "RFC 8410"
 upstream = "2c4b963312083b08623300a02cb5db7e95908c34"
-blob = "2c4b963312083b08623300a02cb5db7e95908c34"
+blob = "4ed9efd1d1df8019f1bdeb74a304aa4d3172e0ee"
+extract = "section 10.3 (examples of Ed25519 private key)"
+lines = "735-815"
 
 [[file]]
 path = "rfc/rfc9500.txt"
 source = "https://www.rfc-editor.org/rfc/rfc9500.txt"
 version = "RFC 9500"
 upstream = "2ba6699aefc0a6a6ae8040ce99b17112c2b60e1c"
-blob = "2ba6699aefc0a6a6ae8040ce99b17112c2b60e1c"
+blob = "2e7a26c00283d78db3b876d3f9085797dde8dd5d"
+extract = "section 2.3 (ECDLP keys)"
+lines = "1302-1417"
 
 [[file]]
 path = "rsa-labs/oaep-vect.txt"

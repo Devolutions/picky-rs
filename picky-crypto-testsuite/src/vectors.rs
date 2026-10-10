@@ -318,7 +318,7 @@ pub fn ed25519() -> &'static [EdVector] {
     static CACHE: OnceLock<Vec<EdVector>> = OnceLock::new();
     CACHE.get_or_init(|| {
         let text = read("rfc/rfc8032.txt");
-        let section = between(&text, "-----TEST 1", "7.2.  Test Vectors for Ed25519ctx");
+        let section = text.split_once("-----TEST 1").unwrap().1;
         let cases: Vec<_> = section
             .split("SECRET KEY:")
             .skip(1)
@@ -357,8 +357,7 @@ pub fn pem(text: &str, label: &str) -> Vec<Vec<u8>> {
 pub fn ed8410() -> Vec<Vec<u8>> {
     let text = read("rfc/rfc8410.txt");
     let start = text.rfind("10.3.  Examples").unwrap();
-    let section = text[start..].split_once("11.  IANA Considerations").unwrap().0;
-    let keys = pem(section, "PRIVATE KEY");
+    let keys = pem(&text[start..], "PRIVATE KEY");
     assert_eq!(keys.len(), 2, "RFC 8410 section 10.3");
     keys
 }
@@ -438,13 +437,7 @@ type X25519Dh = (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>);
 pub fn x25519_dh() -> X25519Dh {
     let text = read("rfc/rfc7748.txt");
     let s = &text[text.rfind("6.1.  Curve25519").unwrap()..];
-    let s = s
-        .split_once("Test vector:")
-        .unwrap()
-        .1
-        .split_once("6.2.  Curve448")
-        .unwrap()
-        .0;
+    let s = s.split_once("Test vector:").unwrap().1;
     (
         hex_lines(between(s, "Alice's private key, a:", "Alice's public key")),
         hex_lines(between(s, "Alice's public key, X25519(a, 9):", "Bob's private key")),
@@ -480,7 +473,7 @@ pub fn rfc5114(section: usize) -> BTreeMap<String, Vec<u8>> {
     let anchor = format!("A.{section}.  ");
     let start = text.rfind(&anchor).expect("RFC 5114 appendix");
     let rest = &text[start..];
-    let end = rest.find(&format!("A.{}.  ", section + 1)).unwrap_or(rest.len());
+    let end = rest.find("\nA.").unwrap_or(rest.len());
     assignment_hex(&rest[..end])
 }
 
@@ -526,8 +519,7 @@ pub fn pbkdf2_rfc() -> Vec<Record> {
 
 pub fn hmac_rfc() -> Vec<Record> {
     let text = read("rfc/rfc4231.txt");
-    let start = text.rfind("4.2.  Test Case 1").unwrap();
-    let section = &text[start..text.rfind("5.  Security Considerations").unwrap()];
+    let section = &text[text.rfind("4.2.  Test Case 1").unwrap()..];
     let mut records = Vec::new();
     let mut fields = BTreeMap::<String, String>::new();
     let mut current = String::new();
@@ -603,9 +595,9 @@ impl DhGroup {
 pub fn dh_groups() -> Vec<DhGroup> {
     let mut result = Vec::new();
     let rfc = read("rfc/rfc5114.txt");
-    for section in 1..=3 {
+    for (section, next) in [(1, "2.2.  "), (2, "2.3.  "), (3, "A.1.  ")] {
         let start = rfc.rfind(&format!("2.{section}.  ")).unwrap();
-        let end = rfc[start..].find(&format!("2.{}.  ", section + 1)).unwrap();
+        let end = rfc[start..].find(next).unwrap();
         let fields = assignment_hex(&rfc[start..start + end]);
         result.push(DhGroup {
             id: format!("rfc/rfc5114.txt/2.{section}"),
@@ -616,9 +608,8 @@ pub fn dh_groups() -> Vec<DhGroup> {
     }
     let rfc = read("rfc/rfc3526.txt");
     for (section, bits) in [(3, 2048), (4, 3072), (5, 4096)] {
-        let start = rfc.rfind(&format!("{section}.  {bits}-bit MODP Group")).unwrap();
-        let end = rfc[start..].find(&format!("{}.  ", section + 1)).unwrap();
-        let s = &rfc[start..start + end];
+        let s = &rfc[rfc.rfind(&format!("{section}.  {bits}-bit MODP Group")).unwrap()..];
+        let s = s.find(&format!("{}.  ", section + 1)).map_or(s, |end| &s[..end]);
         let p = hex_lines(between(s, "Its hexadecimal value is:", "The generator is:"));
         let g = bytes(between(s, "The generator is:", ".").trim());
         assert_eq!(p.len() * 8, bits);
@@ -631,9 +622,8 @@ pub fn dh_groups() -> Vec<DhGroup> {
     }
     let rfc = read("rfc/rfc7919.txt");
     for (section, bits) in [(1, 2048), (2, 3072), (3, 4096)] {
-        let start = rfc.rfind(&format!("A.{section}.  ffdhe{bits}")).unwrap();
-        let end = rfc[start..].find(&format!("A.{}.  ", section + 1)).unwrap();
-        let s = &rfc[start..start + end];
+        let s = &rfc[rfc.rfind(&format!("A.{section}.  ffdhe{bits}")).unwrap()..];
+        let s = s.find(&format!("A.{}.  ", section + 1)).map_or(s, |end| &s[..end]);
         let p = hex_lines(between(
             s,
             "The hexadecimal representation of p is:",

@@ -2,6 +2,7 @@
 //!
 //! Every file under `vectors/`, outside the Wycheproof submodule, has exactly one `[[file]]` entry.
 //! Its blob ID (`git hash-object --no-filters`) equals the entry's `blob`, which equals `upstream` unless the entry has an `extract` rule.
+//! An entry has `lines` exactly when it has `extract`: ascending, non-overlapping 1-based inclusive ranges of upstream lines (`"a-b, c-d"`) whose total equals the vendored file's line count, and its `blob` differs from `upstream`.
 //! The submodule commit recorded in the index and the commit checked out both equal `[wycheproof] commit`, every listed file exists in the checkout's commit, and none is locally modified.
 //!
 //! The manifest is read line by line: `[section]` headers, `key = "value"` pairs and `files = [ … ]` arrays with one quoted path per line.
@@ -56,6 +57,8 @@ pub(crate) fn check(root: &Path) -> Result<()> {
             if !entry.contains_key("extract") && entry["blob"] != entry["upstream"] {
                 failures.push(format!("{path}: blob differs from upstream without an extract rule"));
             }
+            let lines = line_count(&std::fs::read(vectors.join(path))?);
+            failures.extend(check_extract(entry, lines).into_iter().map(|f| format!("{path}: {f}")));
         }
     }
 
@@ -112,6 +115,53 @@ fn git(dir: &Path, args: &[&str]) -> Result<String> {
         return Err(format!("git {} failed: {stderr}", args.join(" ")).into());
     }
     Ok(String::from_utf8(output.stdout)?)
+}
+
+/// Counts runs of bytes ending in `\n`; a last run without one also counts.
+fn line_count(bytes: &[u8]) -> usize {
+    bytes.iter().filter(|byte| **byte == b'\n').count() + usize::from(bytes.last().is_some_and(|byte| *byte != b'\n'))
+}
+
+/// Parses `"a-b, c-d"` into 1-based inclusive line ranges, requiring them ascending and non-overlapping.
+fn parse_ranges(text: &str) -> std::result::Result<Vec<(usize, usize)>, String> {
+    let mut ranges: Vec<(usize, usize)> = Vec::new();
+    for item in text.split(',') {
+        let range = item
+            .trim()
+            .split_once('-')
+            .and_then(|(start, end)| Some((start.parse::<usize>().ok()?, end.parse::<usize>().ok()?)));
+        let Some((start, end)) = range.filter(|(start, end)| 1 <= *start && start <= end) else {
+            return Err(format!("`lines` has an invalid range `{}`", item.trim()));
+        };
+        if ranges.last().is_some_and(|(_, previous)| start <= *previous) {
+            return Err(format!("`lines` range `{start}-{end}` isn't after the previous one"));
+        }
+        ranges.push((start, end));
+    }
+    Ok(ranges)
+}
+
+/// Checks an entry's extraction metadata against its vendored file's line count.
+fn check_extract(entry: &BTreeMap<String, String>, lines: usize) -> Vec<String> {
+    let mut failures = Vec::new();
+    match (entry.contains_key("extract"), entry.get("lines")) {
+        (false, None) => return failures,
+        (true, None) => failures.push("`extract` without `lines`".to_owned()),
+        (false, Some(_)) => failures.push("`lines` without `extract`".to_owned()),
+        (true, Some(ranges)) => match parse_ranges(ranges) {
+            Ok(ranges) => {
+                let total: usize = ranges.iter().map(|(start, end)| end - start + 1).sum();
+                if total != lines {
+                    failures.push(format!("{lines} lines, `lines` covers {total}"));
+                }
+            }
+            Err(failure) => failures.push(failure),
+        },
+    }
+    if entry.contains_key("extract") && entry["blob"] == entry["upstream"] {
+        failures.push("an extract identical to upstream".to_owned());
+    }
+    failures
 }
 
 /// Collects the paths of files under `dir`, relative to `base` with `/` separators, except the manifest and the submodule.
@@ -248,6 +298,7 @@ version = "b"
 upstream = "2"
 blob = "3"
 extract = "groups"
+lines = "1-2, 5-6"
 "#;
 
     #[test]
@@ -261,6 +312,50 @@ extract = "groups"
         );
         assert_eq!(manifest.files.len(), 2);
         assert_eq!(manifest.files[1]["extract"], "groups");
+        assert_eq!(manifest.files[1]["lines"], "1-2, 5-6");
+    }
+
+    #[test]
+    fn counts_lines() {
+        assert_eq!(line_count(b""), 0);
+        assert_eq!(line_count(b"\n"), 1);
+        assert_eq!(line_count(b"a\r\nb\n"), 2);
+        assert_eq!(line_count(b"a\n\x0c"), 2);
+    }
+
+    #[test]
+    fn parses_ranges() {
+        assert_eq!(parse_ranges("1-9").unwrap(), [(1, 9)]);
+        assert_eq!(parse_ranges("1-1, 3-4,7-9").unwrap(), [(1, 1), (3, 4), (7, 9)]);
+        for invalid in ["", "1", "1-", "0-2", "3-2", "a-b", "1-2; 4-5", "1-2,", "-1-2"] {
+            assert!(parse_ranges(invalid).is_err(), "{invalid}");
+        }
+        for unordered in ["1-5, 5-7", "1-5, 3-7", "6-7, 1-2"] {
+            assert!(
+                parse_ranges(unordered).unwrap_err().contains("isn't after"),
+                "{unordered}"
+            );
+        }
+    }
+
+    #[test]
+    fn checks_extracts() {
+        let manifest = parse(MANIFEST).unwrap();
+        let (whole, extract) = (&manifest.files[0], &manifest.files[1]);
+        assert!(check_extract(whole, 100).is_empty());
+        assert!(check_extract(extract, 4).is_empty());
+        assert_eq!(check_extract(extract, 5), ["5 lines, `lines` covers 4"]);
+        let mut entry = extract.clone();
+        entry.insert("blob".to_owned(), "2".to_owned());
+        assert_eq!(check_extract(&entry, 4), ["an extract identical to upstream"]);
+        entry.insert("lines".to_owned(), "2-1".to_owned());
+        assert_eq!(check_extract(&entry, 4).len(), 2);
+        let mut entry = extract.clone();
+        entry.remove("lines");
+        assert_eq!(check_extract(&entry, 4), ["`extract` without `lines`"]);
+        let mut entry = whole.clone();
+        entry.insert("lines".to_owned(), "1-100".to_owned());
+        assert_eq!(check_extract(&entry, 100), ["`lines` without `extract`"]);
     }
 
     #[test]
