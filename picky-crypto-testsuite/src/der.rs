@@ -1,5 +1,9 @@
 use picky_crypto::KeyType;
 
+use crate::algorithms::CURVES;
+use crate::asymmetric::{RSA_DECRYPT_FILES, RSA_SIGN_FILES};
+use crate::vectors;
+
 pub const RSA_OID: &[u8] = &[0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 1, 1, 1];
 pub const EC_OID: &[u8] = &[0x2a, 0x86, 0x48, 0xce, 0x3d, 2, 1];
 pub const ED_OID: &[u8] = &[0x2b, 0x65, 0x70];
@@ -159,7 +163,6 @@ pub fn spki_public(spki: &[u8]) -> Vec<u8> {
     assert_eq!(parts[1].value[0], 0);
     parts[1].value[1..].to_vec()
 }
-#[cfg(test)]
 pub fn rebuild(bytes: &[u8]) -> Vec<u8> {
     parse(bytes)
         .expect("published DER")
@@ -189,10 +192,6 @@ pub fn encoded_public(kind: KeyType, pkcs8: &[u8]) -> Option<Vec<u8>> {
         }
         _ => None,
     }
-}
-#[cfg(test)]
-pub fn private_public(kind: KeyType, pkcs8: &[u8]) -> Vec<u8> {
-    encoded_public(kind, pkcs8).expect("key has no PKCS#8 public field")
 }
 
 fn single(bytes: &[u8], tag: u8) -> Result<Tlv<'_>, &'static str> {
@@ -328,12 +327,105 @@ pub fn rsa_must(pkcs8: &[u8]) -> bool {
     matches!(bit_length(n), 2048 | 3072 | 4096) && unsigned(e) == [1, 0, 1] && bit_length(p) == bit_length(q)
 }
 
+/// Checks that the re-encoding code reproduces every published dual-form key encoding byte for byte.
+/// It needs no provider, and a failed control panics naming its source.
+pub fn encoding_controls() {
+    for file in RSA_SIGN_FILES
+        .into_iter()
+        .chain(RSA_DECRYPT_FILES.map(|(file, _)| file))
+    {
+        rsa_control(file);
+    }
+    ed25519_control();
+    ec_control();
+}
+
+fn rsa_control(file: &str) {
+    for group in vectors::wycheproof(file).test_groups {
+        let expected = vectors::field(&group, "privateKeyPkcs8");
+        let inner = children(&expected)[2].value.to_vec();
+        assert_eq!(rsa(&inner), expected, "{file}");
+        let fields = rsa_fields(&expected);
+        assert_eq!(rsa(&sequence(&fields)), expected);
+        assert_eq!(rebuild(&expected), expected);
+        let raw = &group["privateKey"];
+        let names = [
+            "modulus",
+            "publicExponent",
+            "privateExponent",
+            "prime1",
+            "prime2",
+            "exponent1",
+            "exponent2",
+            "coefficient",
+        ];
+        if raw["prime1"].is_string() {
+            let mut encoded = vec![integer(&[0])];
+            encoded.extend(names.map(|name| integer(&vectors::field(raw, name))));
+            assert_eq!(rsa(&sequence(&encoded)), expected, "{file}: components");
+        } else {
+            let pem = vectors::pem(vectors::string(&group, "privateKeyPem"), "RSA PRIVATE KEY");
+            assert_eq!(pem.len(), 1);
+            assert_eq!(rsa(&pem[0]), expected);
+            for (name, index) in [("modulus", 1), ("publicExponent", 2), ("privateExponent", 3)] {
+                assert_eq!(integer(&vectors::field(raw, name)), fields[index]);
+            }
+        }
+    }
+}
+
+fn ed25519_control() {
+    let text = vectors::read("rfc/rfc8410.txt");
+    let section = &text[text.rfind("10.3.  Examples").unwrap()..];
+    let keys = vectors::ed8410();
+    assert_eq!(keys.len(), 2);
+    let seed = vectors::hex_lines(vectors::between(
+        section,
+        "Note that the value of the private key is:",
+        "An example",
+    ));
+    assert_eq!(ed(&seed, None), keys[0]);
+    let parts = children(&keys[1]);
+    let public = &parts.iter().find(|p| p.tag == 0x81).unwrap().value[1..];
+    let generated = ed(&seed, Some(public));
+    let mut fields = children(&generated)
+        .iter()
+        .map(|p| p.encoded.to_vec())
+        .collect::<Vec<_>>();
+    fields.insert(3, parts.iter().find(|p| p.tag == 0xa0).unwrap().encoded.to_vec());
+    assert_eq!(sequence(&fields), keys[1]);
+    for key in keys {
+        assert_eq!(rebuild(&key), key);
+    }
+}
+
+fn ec_control() {
+    for ((curve, _, _, _, name), (scalar, x, y, published)) in CURVES.into_iter().zip(vectors::ec9500()) {
+        let parts = children(&published);
+        let public = point(&x, &y, width(curve));
+        assert_eq!(parts[1].value, scalar);
+        let parameters = parts.iter().any(|p| p.tag == 0xa0).then_some(curve);
+        assert_eq!(ec_inner(curve, &scalar, Some(&public), parameters), published);
+        assert_eq!(rebuild(&published), published);
+        let file = format!(
+            "ecdsa_{name}_sha{}_p1363_test.json",
+            if curve == KeyType::EcP256 {
+                256
+            } else if curve == KeyType::EcP384 {
+                384
+            } else {
+                512
+            }
+        );
+        let g = &vectors::wycheproof(&file).test_groups[0];
+        let spki = vectors::field(g, "publicKeyDer");
+        assert_eq!(algorithm(curve), children(&spki)[0].encoded);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::algorithms::CURVES;
-    use crate::vectors;
-    use rstest::rstest;
 
     fn generated_examples() -> Vec<(KeyType, usize, Vec<u8>)> {
         let mut examples = Vec::new();
@@ -363,7 +455,7 @@ mod tests {
         for (kind, bits, encoded) in generated_examples() {
             assert_eq!(
                 generated_public(kind, bits, &encoded).unwrap(),
-                private_public(kind, &encoded)
+                encoded_public(kind, &encoded).expect("key has no PKCS#8 public field")
             );
             let fields = children(&encoded);
             assert_eq!(
@@ -433,98 +525,9 @@ mod tests {
         }
     }
 
-    #[rstest]
-    #[case("rsa_pkcs1_2048_sig_gen_test.json")]
-    #[case("rsa_pkcs1_3072_sig_gen_test.json")]
-    #[case("rsa_pkcs1_4096_sig_gen_test.json")]
-    #[case("rsa_pkcs1_2048_test.json")]
-    #[case("rsa_oaep_2048_sha1_mgf1sha1_test.json")]
-    #[case("rsa_oaep_2048_sha256_mgf1sha256_test.json")]
-    #[case("rsa_oaep_3072_sha256_mgf1sha256_test.json")]
-    #[case("rsa_oaep_4096_sha256_mgf1sha256_test.json")]
-    fn rsa_controls(#[case] file: &str) {
-        for group in vectors::wycheproof(file).test_groups {
-            let expected = vectors::field(&group, "privateKeyPkcs8");
-            let inner = children(&expected)[2].value.to_vec();
-            assert_eq!(rsa(&inner), expected, "{file}");
-            let fields = rsa_fields(&expected);
-            assert_eq!(rsa(&sequence(&fields)), expected);
-            assert_eq!(rebuild(&expected), expected);
-            let raw = &group["privateKey"];
-            let names = [
-                "modulus",
-                "publicExponent",
-                "privateExponent",
-                "prime1",
-                "prime2",
-                "exponent1",
-                "exponent2",
-                "coefficient",
-            ];
-            if raw["prime1"].is_string() {
-                let mut encoded = vec![integer(&[0])];
-                encoded.extend(names.map(|name| integer(&vectors::field(raw, name))));
-                assert_eq!(rsa(&sequence(&encoded)), expected, "{file}: components");
-            } else {
-                let pem = vectors::pem(vectors::string(&group, "privateKeyPem"), "RSA PRIVATE KEY");
-                assert_eq!(pem.len(), 1);
-                assert_eq!(rsa(&pem[0]), expected);
-                for (name, index) in [("modulus", 1), ("publicExponent", 2), ("privateExponent", 3)] {
-                    assert_eq!(integer(&vectors::field(raw, name)), fields[index]);
-                }
-            }
-        }
-    }
-
     #[test]
-    fn ed25519_control() {
-        let text = vectors::read("rfc/rfc8410.txt");
-        let section = &text[text.rfind("10.3.  Examples").unwrap()..];
-        let keys = vectors::ed8410();
-        assert_eq!(keys.len(), 2);
-        let seed = vectors::hex_lines(vectors::between(
-            section,
-            "Note that the value of the private key is:",
-            "An example",
-        ));
-        assert_eq!(ed(&seed, None), keys[0]);
-        let parts = children(&keys[1]);
-        let public = &parts.iter().find(|p| p.tag == 0x81).unwrap().value[1..];
-        let generated = ed(&seed, Some(public));
-        let mut fields = children(&generated)
-            .iter()
-            .map(|p| p.encoded.to_vec())
-            .collect::<Vec<_>>();
-        fields.insert(3, parts.iter().find(|p| p.tag == 0xa0).unwrap().encoded.to_vec());
-        assert_eq!(sequence(&fields), keys[1]);
-        for key in keys {
-            assert_eq!(rebuild(&key), key);
-        }
-    }
-
-    #[test]
-    fn ec_controls() {
-        for ((curve, _, _, _, name), (scalar, x, y, published)) in CURVES.into_iter().zip(vectors::ec9500()) {
-            let parts = children(&published);
-            let public = point(&x, &y, width(curve));
-            assert_eq!(parts[1].value, scalar);
-            let parameters = parts.iter().any(|p| p.tag == 0xa0).then_some(curve);
-            assert_eq!(ec_inner(curve, &scalar, Some(&public), parameters), published);
-            assert_eq!(rebuild(&published), published);
-            let file = format!(
-                "ecdsa_{name}_sha{}_p1363_test.json",
-                if curve == KeyType::EcP256 {
-                    256
-                } else if curve == KeyType::EcP384 {
-                    384
-                } else {
-                    512
-                }
-            );
-            let g = &vectors::wycheproof(&file).test_groups[0];
-            let spki = vectors::field(g, "publicKeyDer");
-            assert_eq!(algorithm(curve), children(&spki)[0].encoded);
-        }
+    fn published_encodings_are_reproduced() {
+        encoding_controls();
     }
 
     #[test]

@@ -8,7 +8,6 @@ use crate::{Options, algorithms};
 #[derive(Default)]
 pub struct Checks {
     failures: Vec<String>,
-    #[cfg(test)]
     buffer_audits: usize,
 }
 
@@ -37,7 +36,6 @@ impl<T: 'static> CheckedResult<T> for Result<T, Error> {
 
 impl Checks {
     pub fn buffers(&mut self, id: &str, value: &dyn Any) {
-        #[cfg(test)]
         if value.is::<OutputBytes>()
             || value.is::<X25519Scalar>()
             || value.is::<MacTag>()

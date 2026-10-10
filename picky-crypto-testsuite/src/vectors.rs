@@ -710,9 +710,7 @@ pub fn rsa_labs() -> Vec<RsaOaep> {
     records
 }
 
-#[cfg(test)]
 type EcEncodingControl = (Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>);
-#[cfg(test)]
 pub fn ec9500() -> Vec<EcEncodingControl> {
     let text = read("rfc/rfc9500.txt");
     let start = text.rfind("2.3.  ECDLP Keys").unwrap();

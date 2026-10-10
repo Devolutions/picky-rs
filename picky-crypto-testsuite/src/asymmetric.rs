@@ -1485,6 +1485,7 @@ pub fn ffdh(p: &CryptoProvider, _: Options) {
 
 pub fn private_key(p: &CryptoProvider, _: Options) {
     let mut c = Checks::default();
+    c.metadata("published key encoding controls", der::encoding_controls);
     for kind in KEY_TYPES {
         match helpers::private_key_loader(p, kind) {
             Err(error) => c.absent::<()>(p, Algorithm::PrivateKeyLoading(kind), Err(error)),
