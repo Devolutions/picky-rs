@@ -775,36 +775,17 @@ ZQIDAQAB
         assert_eq!(from_jwk_key, initial_key);
     }
 
-    // RFC 7520 section 3.1, Figure 1: P-521 public key whose "x" starts with a 0x00 octet.
-    const RFC7520_P521_X: &str =
-        "AHKZLLOsCOzz5cY97ewNUajB957y-C-U88c3v13nmGZx6sYl_oJXu9A5RkTKqjqvjyekWF-7ytDyRXYgCF5cj0Kt";
-    const RFC7520_P521_Y: &str =
-        "AdymlHvOiLxXkEhayXQnNCvDX4h9htZaCJN34kfmC6pV5OhQHiraVySsUdaQkAgDPrwQrJmbnX9cwlGfP-HqHZR1";
-
-    #[test]
-    fn rfc7520_p521_public_key_roundtrip() {
-        let jwk = Jwk::new(JwkKeyType::Ec(JwkPublicEcKey {
-            crv: JwkEcPublicKeyCurve::P521,
-            x: RFC7520_P521_X.to_owned(),
-            y: RFC7520_P521_Y.to_owned(),
-        }));
-
-        let public_key = jwk.to_public_key().unwrap();
-        let encoded = Jwk::from_public_key(&public_key).unwrap();
-        let ec_key = encoded.key.as_ec().unwrap();
-
-        assert_eq!(ec_key.x, RFC7520_P521_X);
-        assert_eq!(ec_key.y, RFC7520_P521_Y);
-    }
-
     #[test]
     fn ec_coordinate_shorter_than_field_is_rejected() {
-        let x = general_purpose::URL_SAFE_NO_PAD.decode(RFC7520_P521_X).unwrap();
-        let jwk = Jwk::new(JwkKeyType::Ec(JwkPublicEcKey {
-            crv: JwkEcPublicKeyCurve::P521,
-            x: general_purpose::URL_SAFE_NO_PAD.encode(&x[1..]),
-            y: RFC7520_P521_Y.to_owned(),
-        }));
+        let mut jwk = Jwk::from_json(picky_test_data::JOSE_JWK_EC_P521_JSON).unwrap();
+        let JwkKeyType::Ec(ec_key) = &mut jwk.key else {
+            panic!("Unexpected key type");
+        };
+        let x = general_purpose::URL_SAFE_NO_PAD.decode(&ec_key.x).unwrap();
+        assert_eq!(x[0], 0);
+
+        // RFC 7518 section 6.2.1.2 requires the full field length, so the leading zero octet cannot be dropped.
+        ec_key.x = general_purpose::URL_SAFE_NO_PAD.encode(&x[1..]);
 
         assert!(matches!(jwk.to_public_key(), Err(JwkError::InvalidEcPointCoordinates)));
     }
