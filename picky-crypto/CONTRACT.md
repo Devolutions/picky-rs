@@ -143,6 +143,7 @@ The error set is closed: only the contract defines variants, never a backend, an
 [`install_default`] returns the rejected provider instead of an error value.
 
 When both [`Error::InvalidKey`] and [`Error::InvalidInput`] could apply, report [`Error::InvalidKey`].
+Library key-validation failures map to [`Error::InvalidKey`], except when the library only rejects a well-formed key for its size or parameters, which maps to [`Error::Unsupported`] (rule 4).
 [`Error::ProviderFailure`] includes "PIN required", which callers therefore cannot distinguish from other device failures; this is a known limit of the closed set, to revisit if a consumer needs to prompt for a PIN.
 Some libraries report a single opaque failure for verification; a backend on such a library may report [`Error::VerificationFailed`] for a public key it cannot use, including an RSA modulus outside its range.
 Conformance tests therefore expect [`Error::InvalidKey`] for a malformed public key, and accept either the result expected for a key in the must-support set or [`Error::Unsupported`] for a well-formed public key outside it; for a backend on such a library they also accept [`Error::VerificationFailed`] in both cases.
@@ -549,7 +550,7 @@ Cryptographically invalid inputs still fail with the specified error (for exampl
 Conformance tests check every [`KeyOperation`] on unwrapped keys.
 When [`PrivateKey::supports`] is false, the operation returns [`Error::Unsupported`].
 When [`PrivateKey::supports`] is true, valid known-answer and round-trip cases succeed, no must-support input returns [`Error::Unsupported`], and invalid inputs return the specified error.
-RSA keys with inconsistent components are checked as section 12 states.
+RSA keys with inconsistent or non-distinct components are checked as section 12 states.
 
 [`PrivateKey::key_size_bits`] reports:
 
@@ -573,11 +574,12 @@ RSASSA-PKCS1-v1_5 signatures always encode NULL DigestInfo parameters (section 6
 
 RSA private-key results are checked: every signature or plaintext is the correct result under the key's public components (`n`, `e`), or the operation fails.
 A backend never outputs a signature or plaintext computed from inconsistent key components, because a single faulty CRT signature reveals a prime factor of `n`.
-Handling an RSA private key with inconsistent components (wrong `dP`, `dQ`, `qInv` or `d`) is implementation-defined.
-It may be rejected at loading with [`Error::InvalidKey`], rejected at the first private-key operation with [`Error::InvalidKey`], or used with components the library recomputes from `n`, `e`, `d`, `p` and `q`.
-Every one of these outcomes satisfies the property above.
+Handling an RSA private key with inconsistent or non-distinct components (wrong `dP`, `dQ`, `qInv` or `d`, or `p` = `q`) is implementation-defined.
+The outcome may differ per call: each private-key call either returns [`Error::InvalidKey`] or behaves as specified for the key's public components (`n`, `e`), producing a signature or plaintext correct under them or the error specified for that input, such as [`Error::VerificationFailed`] when the correctly decrypted value has invalid padding.
+For example, a backend may reject the key at loading with [`Error::InvalidKey`], reject it at the first private-key operation with [`Error::InvalidKey`], use CRT components the library recomputes from `n`, `e`, `d`, `p` and `q` when the primes are distinct, or check each result against (`n`, `e`).
+Every one of these outcomes satisfies the checked-result property above.
 This is an exception to rule 4, which would otherwise require rejection at loading.
-An inconsistency detected during [`PrivateKey::sign`] or [`PrivateKey::decrypt`] returns [`Error::InvalidKey`], never the padding error [`Error::VerificationFailed`].
+An inconsistency detected during [`PrivateKey::sign`] or [`PrivateKey::decrypt`] returns [`Error::InvalidKey`], never the padding error [`Error::VerificationFailed`], which applies only to a decrypted value correct under (`n`, `e`).
 Conformance tests check these keys only as section 12 states.
 
 Derivability:
@@ -810,7 +812,7 @@ For each of them, conformance tests assert that nothing panics and that the resu
 - RSA PKCS#1 v1.5 verification of a DigestInfo with absent parameters (section 6.9): success or [`Error::VerificationFailed`], the result section 6.9 gives for a signature that does not verify;
 - loading a PKCS#8 document that carries `attributes` (section 5.2): success or [`Error::InvalidKey`];
 - a 3DES key whose component keys are not pairwise distinct or are DES weak or semi-weak keys (section 6.5): success or [`Error::InvalidKey`];
-- handling of an RSA private key with inconsistent components (section 7): loading returns [`Error::InvalidKey`], or every private-key operation either returns [`Error::InvalidKey`] or produces a result that verifies under (`n`, `e`).
+- handling of an RSA private key with inconsistent or non-distinct components (section 7): loading returns [`Error::InvalidKey`], or every private-key operation either returns [`Error::InvalidKey`], produces a result that verifies under (`n`, `e`), or returns the error section 7 specifies for that input.
   For decryption, verification uses a round trip through the provider's encryptor, or through a reference encryptor supplied by the test harness when the implementation under test has no encryptor (for example a hardware key).
   In differential runs, the result is also verified with the other backend, but the outcomes themselves are not compared.
 
@@ -820,6 +822,8 @@ The inputs for that last property are derived from published keys, because the k
 - an input is derived only by swapping or substituting whole encoded INTEGER fields between cited keys: `dP` with `dQ`, `p` with `q` leaving `qInv` unchanged, or `qInv` taken from another cited key of the same size; no arithmetic, no generated bytes and no randomness;
 - round-trip control: splitting a base key into its fields and reassembling them unchanged must reproduce the cited key's exact bytes, otherwise the test fails;
 - positive control: the unmodified base key loads and produces a result that verifies on the backend under test.
+
+No known published key has non-distinct components (`p` = `q`, so `n` = `p`²), and these derivations cannot produce one, so that case has no conformance vector.
 
 Provider-value property tests against mock providers check composition (section 8.1) for [`Mac`], [`Cipher`], [`Aead`] and [`KeyWrap`]: a fallback fills in a protection the primary does not support, the primary serves a protection both members support, and the composite entry's FIPS report and the composed provider's [`CryptoProvider::fips`] follow section 8.1.
 For [`Mac`], each context starts on the member serving the requested protection.

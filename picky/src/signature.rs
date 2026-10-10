@@ -5,7 +5,7 @@ use crate::key::ec::{EcComponent, EcCurve, NamedEcCurve};
 use crate::key::{KeyError, PrivateKey, PublicKey};
 
 use picky_asn1_x509::{AlgorithmIdentifier, oids};
-use rsa::signature::{SignatureEncoding as _, Signer};
+use rsa::signature::Signer;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -295,7 +295,7 @@ impl SignatureAlgorithm {
 
                         let signature = ed25519_dalek::hazmat::raw_sign::<sha2::Sha512>(&esk, msg, &verifying_key);
 
-                        Ok(signature.to_vec())
+                        Ok(rsa::signature::SignatureEncoding::to_vec(&signature))
                     }
                     NamedEdAlgorithm::Known(EdAlgorithm::X25519) => Err(SignatureError::Ed {
                         context: "X25519 algorithm is not designed for signing".to_string(),

@@ -1,0 +1,6 @@
+[bans]
+multiple-versions = "allow"
+
+[[bans.features]]
+crate = "ed25519-dalek"
+deny = ["legacy_compatibility"]
