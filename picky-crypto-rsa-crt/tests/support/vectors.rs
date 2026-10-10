@@ -2,7 +2,7 @@
 //!
 //! Each source names a file in `picky-crypto-testsuite/vectors/wycheproof/testvectors_v1` and the index of a test group whose `privateKey` is used verbatim.
 
-use picky_crypto_testsuite::wycheproof_private_key;
+use picky_crypto_testsuite::vectors::wycheproof_private_key;
 
 #[derive(Clone, Copy)]
 pub struct Source {
