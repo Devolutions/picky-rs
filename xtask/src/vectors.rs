@@ -197,11 +197,16 @@ fn parse(text: &str) -> Result<Manifest> {
             return Err(format!("manifest.toml: a [[file]] entry has no `{key}`").into());
         }
     }
+    if wycheproof_files.is_empty() || files.is_empty() {
+        return Err("manifest.toml: [wycheproof] files and [[file]] entries must not be empty".into());
+    }
     let mut take = |key: &str| {
         wycheproof
             .remove(key)
+            .filter(|value| !value.is_empty())
             .ok_or_else(|| format!("manifest.toml: [wycheproof] has no `{key}`"))
     };
+    take("source")?;
     Ok(Manifest {
         wycheproof_path: take("path")?,
         wycheproof_commit: take("commit")?,
@@ -222,6 +227,7 @@ mod tests {
 
 [wycheproof]
 path = "wycheproof"
+source = "https://example.org/wycheproof"
 commit = "abc"
 files = [
     "testvectors_v1/a.json",
@@ -264,5 +270,9 @@ extract = "groups"
         assert!(parse(&MANIFEST.replace("version = \"a\"", "version = \"a\"\nversion = \"c\"")).is_err());
         assert!(parse(&MANIFEST.replace("path = \"nist/a.rsp\"", "path = nist/a.rsp")).is_err());
         assert!(parse(MANIFEST.split("\n]\n").next().unwrap()).is_err());
+        assert!(parse(&MANIFEST.replace("source = \"https://example.org/wycheproof\"\n", "")).is_err());
+        let no_files = MANIFEST.replace("    \"testvectors_v1/a.json\",\n    \"testvectors_v1/b.json\",\n", "");
+        assert!(parse(&no_files).is_err());
+        assert!(parse(MANIFEST.split("\n[[file]]").next().unwrap()).is_err());
     }
 }
