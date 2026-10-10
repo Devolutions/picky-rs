@@ -103,7 +103,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        crate: [ picky-asn1, picky-asn1-der, picky-asn1-x509, picky, picky-crypto ]
+        crate: [ picky-asn1, picky-asn1-der, picky-asn1-x509, picky, picky-crypto, picky-crypto-rsa-crt ]
         include:
           - crate: picky-asn1
             msvc: "1.85"
@@ -114,6 +114,8 @@ jobs:
           - crate: picky
             msvc: "1.85"
           - crate: picky-crypto
+            msvc: "1.85"
+          - crate: picky-crypto-rsa-crt
             msvc: "1.85"
 
     steps:
@@ -126,6 +128,20 @@ jobs:
 
       - name: cargo check ${{ matrix.crate }}
         run: cargo +${{ matrix.msvc }} check -p ${{ matrix.crate }}
+
+  rsa-crt-features:
+    name: Check RSA CRT features
+    needs: [formatting]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install cargo-hack
+        run: cargo install cargo-hack --version 0.6.45 --locked
+
+      - name: Check feature combinations
+        run: cargo hack check --feature-powerset --locked -p picky-crypto-rsa-crt
 
   dotnet-tests:
     name: .NET binding tests
@@ -238,7 +254,7 @@ jobs:
   success:
     name: Success
     if: ${{ always() }}
-    needs: [formatting, lints, lints-wasm, tests, msrv, dotnet-tests, no-downgrade, picky-crypto-checks]
+    needs: [formatting, lints, lints-wasm, tests, msrv, rsa-crt-features, dotnet-tests, no-downgrade, picky-crypto-checks]
     runs-on: ubuntu-latest
 
     steps:

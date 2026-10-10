@@ -1383,6 +1383,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "picky-crypto-rsa-crt"
+version = "0.1.0"
+dependencies = [
+ "crypto-bigint",
+ "picky-crypto-testsuite",
+ "rstest",
+ "zeroize",
+]
+
+[[package]]
 name = "picky-crypto-testsuite"
 version = "0.0.0"
 dependencies = [
