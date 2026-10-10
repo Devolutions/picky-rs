@@ -1,0 +1,70 @@
+5. Test vectors
+
+   Test vectors for encryption with RC2 are provided below.
+
+
+
+Rivest                       Informational                      [Page 7]
+
+RFC 2268              RC2(r) Encryption Algorithm             March 1998
+
+
+   All quantities are given in hexadecimal notation.
+
+   Key length (bytes) = 8
+   Effective key length (bits) = 63
+   Key = 00000000 00000000
+   Plaintext = 00000000 00000000
+   Ciphertext = ebb773f9 93278eff
+
+   Key length (bytes) = 8
+   Effective key length (bits) = 64
+   Key = ffffffff ffffffff
+   Plaintext = ffffffff ffffffff
+   Ciphertext = 278b27e4 2e2f0d49
+
+   Key length (bytes) = 8
+   Effective key length (bits) = 64
+   Key = 30000000 00000000
+   Plaintext = 10000000 00000001
+   Ciphertext = 30649edf 9be7d2c2
+
+   Key length (bytes) = 1
+   Effective key length (bits) = 64
+   Key = 88
+   Plaintext = 00000000 00000000
+   Ciphertext = 61a8a244 adacccf0
+
+   Key length (bytes) = 7
+   Effective key length (bits) = 64
+   Key = 88bca90e 90875a
+   Plaintext = 00000000 00000000
+   Ciphertext = 6ccf4308 974c267f
+
+   Key length (bytes) = 16
+   Effective key length (bits) = 64
+   Key = 88bca90e 90875a7f 0f79c384 627bafb2
+   Plaintext = 00000000 00000000
+   Ciphertext = 1a807d27 2bbe5db1
+
+   Key length (bytes) = 16
+   Effective key length (bits) = 128
+   Key = 88bca90e 90875a7f 0f79c384 627bafb2
+   Plaintext = 00000000 00000000
+   Ciphertext = 2269552a b0f85ca6
+
+   Key length (bytes) = 33
+   Effective key length (bits) = 129
+   Key = 88bca90e 90875a7f 0f79c384 627bafb2 16f80a6f 85920584
+         c42fceb0 be255daf 1e
+
+
+
+Rivest                       Informational                      [Page 8]
+
+RFC 2268              RC2(r) Encryption Algorithm             March 1998
+
+
+   Plaintext = 00000000 00000000
+   Ciphertext = 5b78d3a4 3dfff1f1
+

@@ -1,5 +1,6 @@
 mod contract;
 mod downgrade;
+mod vectors;
 
 use std::{error::Error, path::Path, process::ExitCode};
 
@@ -23,6 +24,7 @@ fn run() -> Result<()> {
     match args.as_slice() {
         [command] if command == "check-contract" => contract::check(root),
         [command, flag, base] if command == "check-no-downgrade" && flag == "--base" => downgrade::check(root, base),
-        _ => Err("usage: cargo xtask check-contract | check-no-downgrade --base <rev>".into()),
+        [command] if command == "check-vectors" => vectors::check(root),
+        _ => Err("usage: cargo xtask check-contract | check-no-downgrade --base <rev> | check-vectors".into()),
     }
 }

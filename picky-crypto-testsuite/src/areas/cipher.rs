@@ -1,0 +1,216 @@
+//! CBC block cipher known answers, key and input lengths, and weak triple-DES keys.
+
+use picky_crypto::*;
+
+use crate::algorithms::*;
+use crate::harness::{Checks, Expect, Options};
+use crate::{select, vectors as v};
+
+pub type CipherVector = (String, Vec<u8>, Vec<u8>, Vec<u8>, Vec<u8>, bool);
+pub fn cipher_records(a: CipherAlgorithm) -> Vec<CipherVector> {
+    let mut result = Vec::new();
+    if a == CipherAlgorithm::Rc2Cbc {
+        for r in v::rc2() {
+            result.push((
+                r.id("rfc/rfc2268.txt"),
+                r.bytes("Key"),
+                vec![0; 8],
+                r.bytes("Plaintext"),
+                r.bytes("Ciphertext"),
+                false,
+            ));
+        }
+    } else {
+        let files = if a == CipherAlgorithm::TdesEde3Cbc {
+            vec!["nist/tdes/TCBCMMT3.rsp".to_owned(), "nist/tdes/TCBCMMT2.rsp".to_owned()]
+        } else {
+            let bits = match a {
+                CipherAlgorithm::Aes128Cbc => 128,
+                CipherAlgorithm::Aes192Cbc => 192,
+                _ => 256,
+            };
+            vec![format!("nist/aes/CBCMMT{bits}.rsp")]
+        };
+        for file in files {
+            for r in v::response(&file) {
+                let key = if a == CipherAlgorithm::TdesEde3Cbc {
+                    [r.bytes("KEY1"), r.bytes("KEY2"), r.bytes("KEY3")].concat()
+                } else {
+                    r.bytes("KEY")
+                };
+                result.push((
+                    r.id(&file),
+                    key,
+                    r.bytes("IV"),
+                    r.bytes("PLAINTEXT"),
+                    r.bytes("CIPHERTEXT"),
+                    file.ends_with("TCBCMMT2.rsp"),
+                ));
+            }
+        }
+    }
+    select::cbc_control(a, &result);
+    result
+}
+
+pub fn run(p: &CryptoProvider, _: Options) {
+    let mut c = Checks::default();
+    for a in CIPHERS {
+        let e = match helpers::cipher(p, a) {
+            Ok(e) => e,
+            result => {
+                c.absent(p, Algorithm::Cipher(a), result);
+                continue;
+            }
+        };
+        let Some(protections) = c.directions(p, &format!("{a:?}/supports"), Algorithm::Cipher(a), |p| e.supports(p))
+        else {
+            continue;
+        };
+        let records = cipher_records(a);
+        for (id, key, iv, plaintext, ciphertext, variable) in &records {
+            for (protection, supported) in [Protection::Apply, Protection::Process].into_iter().zip(protections) {
+                let (input, output) = if protection == Protection::Apply {
+                    (plaintext, ciphertext)
+                } else {
+                    (ciphertext, plaintext)
+                };
+                let expected = if !supported {
+                    Expect::Error(Error::Unsupported(Algorithm::Cipher(a)))
+                } else if *variable {
+                    Expect::Either(Error::InvalidKey)
+                } else {
+                    Expect::Success
+                };
+                if let Some(result) = c.call(&format!("{a:?}/{id}/{protection:?}"), expected, || {
+                    transform(e, protection, key, iv, input)
+                }) {
+                    c.bytes(id, &result, output);
+                }
+            }
+        }
+        let (id, key, iv, data, _, _) = select::cbc_control(a, &records);
+        assert_cbc_control(a, key, iv, data);
+        for (protection, supported) in [Protection::Apply, Protection::Process].into_iter().zip(protections) {
+            if !supported {
+                continue;
+            }
+            for (k, i, d, error) in [
+                (&[][..], &iv[..], &data[..], Error::InvalidKey),
+                (&key[..], &[][..], &data[..], Error::InvalidInput),
+                (&key[..], &iv[..], &[0][..], Error::InvalidInput),
+                (&[][..], &[][..], &[0][..], Error::InvalidKey),
+            ] {
+                c.call(
+                    &format!("{a:?}/{id}/length/{protection:?}"),
+                    Expect::Error(error),
+                    || transform(e, protection, k, i, d),
+                );
+            }
+            if matches!(
+                a,
+                CipherAlgorithm::Aes128Cbc | CipherAlgorithm::Aes192Cbc | CipherAlgorithm::Aes256Cbc
+            ) {
+                let empty = &select::ed25519_empty().message;
+                if let Some(out) = c.call(&format!("{a:?}/{id}/empty"), Expect::Success, || {
+                    transform(e, protection, key, iv, empty)
+                }) {
+                    c.check(id, out.is_empty(), "empty CBC result must be empty");
+                }
+            }
+            for length in [0, 1, 15, 16, 17, 23, 24, 25, 31, 32, 33, 129] {
+                if valid_key_length(a, length) {
+                    continue;
+                }
+                // Repeating the published key keeps 3DES components non-weak and K1 != K2, so no weak-key check can reject first.
+                let wrong = key.iter().copied().cycle().take(length).collect::<Vec<_>>();
+                c.call(
+                    &format!("{a:?}/{protection:?}/key length={length}"),
+                    Expect::Error(Error::InvalidKey),
+                    || transform(e, protection, &wrong, iv, data),
+                );
+            }
+        }
+        if a == CipherAlgorithm::TdesEde3Cbc {
+            weak_tdes_checks(&mut c, e, select::cbc_control(a, &records), protections);
+        }
+    }
+    c.finish();
+}
+
+/// Encrypts for [`Protection::Apply`] and decrypts for [`Protection::Process`].
+pub fn transform(
+    e: &dyn Cipher,
+    protection: Protection,
+    key: &[u8],
+    iv: &[u8],
+    input: &[u8],
+) -> Result<OutputBytes, Error> {
+    if protection == Protection::Apply {
+        e.encrypt(key, iv, input)
+    } else {
+        e.decrypt(key, iv, input)
+    }
+}
+
+fn weak_tdes_checks(c: &mut Checks, e: &dyn Cipher, record: &CipherVector, protections: [bool; 2]) {
+    let (base_id, base, iv, plain, encrypted, _) = record;
+    let weak = weak_tdes_key(base);
+    let id = format!("{base_id}/KEY1 from rfc/rfc2268.txt/section 5/all-one key");
+    for (protection, inverse, input) in [
+        (Protection::Apply, Protection::Process, plain),
+        (Protection::Process, Protection::Apply, encrypted),
+    ] {
+        let supported = |p: Protection| protections[usize::from(p == Protection::Process)];
+        if !supported(protection) {
+            continue;
+        }
+        if let Some(out) = c.call(&id, Expect::Either(Error::InvalidKey), || {
+            transform(e, protection, &weak, iv, input)
+        }) {
+            c.check(&id, out.len() == input.len(), "weak-key CBC length");
+            if supported(inverse) {
+                if let Some(restored) = c.call(&id, Expect::Either(Error::InvalidKey), || {
+                    transform(e, inverse, &weak, iv, &out)
+                }) {
+                    c.bytes(&id, &restored, input);
+                }
+            }
+        }
+    }
+}
+
+pub fn valid_key_length(a: CipherAlgorithm, length: usize) -> bool {
+    match a {
+        CipherAlgorithm::Aes128Cbc => length == 16,
+        CipherAlgorithm::Aes192Cbc => length == 24,
+        CipherAlgorithm::Aes256Cbc => length == 32,
+        CipherAlgorithm::TdesEde3Cbc => length == 24,
+        CipherAlgorithm::Rc2Cbc => (1..=128).contains(&length),
+        _ => false,
+    }
+}
+
+/// Asserts that a published control record is in the valid domain of section 6.5, with distinct 3DES components, so that a case changing one of its fields fails only for that field.
+pub fn assert_cbc_control(a: CipherAlgorithm, key: &[u8], iv: &[u8], data: &[u8]) {
+    let block = if a == CipherAlgorithm::TdesEde3Cbc || a == CipherAlgorithm::Rc2Cbc {
+        8
+    } else {
+        16
+    };
+    assert!(valid_key_length(a, key.len()), "{a:?} control key length");
+    assert_eq!(iv.len(), block, "{a:?} control IV length");
+    assert!(!data.is_empty() && data.len() % block == 0, "{a:?} control data length");
+    if a == CipherAlgorithm::TdesEde3Cbc {
+        let [k1, k2, k3] = [&key[..8], &key[8..16], &key[16..]];
+        assert!(k1 != k2 && k2 != k3 && k1 != k3, "3DES control components are distinct");
+    }
+}
+
+pub fn weak_tdes_key(base: &[u8]) -> Vec<u8> {
+    let fields = base.chunks_exact(8).map(<[u8]>::to_vec).collect::<Vec<_>>();
+    assert_eq!(fields.len(), 3);
+    assert_eq!(fields.concat(), base, "TCBCMMT3 split/reassemble control");
+    let published = select::weak_des_component();
+    [published, fields[1].clone(), fields[2].clone()].concat()
+}

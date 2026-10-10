@@ -1,0 +1,45 @@
+name: Extended crypto conformance
+
+on:
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+jobs:
+  changes:
+    name: Check for new commits
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      # A scheduled run is skipped when nothing was committed since the previous weekly run.
+      - name: Compare the last commit with the schedule period
+        id: check
+        run: |
+          if [ "${{ github.event_name }}" != "schedule" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          elif [ $(( $(date +%s) - $(git log -1 --format=%ct) )) -lt 604800 ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  extended:
+    name: Extended conformance tests
+    needs: [changes]
+    if: ${{ needs.changes.outputs.run == 'true' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+
+      # Large property-test case counts and slow vectors; see the picky-crypto-testsuite crate documentation.
+      - name: Run tests
+        run: cargo test --locked --release --workspace --all-features
+        env:
+          PICKY_CRYPTO_TESTSUITE_EXTENDED: "1"
