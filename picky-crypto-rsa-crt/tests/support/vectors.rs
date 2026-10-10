@@ -47,15 +47,15 @@ pub const RSA_1024: Source = Source {
     file: "rsa_oaep_misc_test.json",
     group: 0,
 };
-/// rsa_oaep_misc_test.json, testGroups[20], tcId 61..=63.
-pub const RSA_1536: Source = Source {
-    file: "rsa_oaep_misc_test.json",
-    group: 20,
+/// rsa_oaep_2048_sha1_mgf1sha1_test.json, testGroups[0], tcId 1..=36.
+pub const RSA_2048: Source = Source {
+    file: "rsa_oaep_2048_sha1_mgf1sha1_test.json",
+    group: 0,
 };
-/// rsa_oaep_misc_test.json, testGroups[125], tcId 376..=384.
-pub const RSA_2688: Source = Source {
-    file: "rsa_oaep_misc_test.json",
-    group: 125,
+/// rsa_oaep_2048_sha224_mgf1sha1_test.json, testGroups[0], tcId 1..=31.
+pub const RSA_2048_OTHER: Source = Source {
+    file: "rsa_oaep_2048_sha224_mgf1sha1_test.json",
+    group: 0,
 };
 /// rsa_oaep_misc_test.json, testGroups[127], tcId 392..=395.
 pub const RSA_3104: Source = Source {
@@ -71,26 +71,6 @@ pub const RSA_4032: Source = Source {
 pub const RSA_8192: Source = Source {
     file: "rsa_oaep_misc_test.json",
     group: 110,
-};
-/// rsa_oaep_2048_sha1_mgf1sha1_test.json, testGroups[0], tcId 1..=36.
-pub const RSA_2048: Source = Source {
-    file: "rsa_oaep_2048_sha1_mgf1sha1_test.json",
-    group: 0,
-};
-/// rsa_oaep_3072_sha256_mgf1sha1_test.json, testGroups[0], tcId 1..=32.
-pub const RSA_3072: Source = Source {
-    file: "rsa_oaep_3072_sha256_mgf1sha1_test.json",
-    group: 0,
-};
-/// rsa_oaep_4096_sha256_mgf1sha1_test.json, testGroups[0], tcId 1..=32.
-pub const RSA_4096: Source = Source {
-    file: "rsa_oaep_4096_sha256_mgf1sha1_test.json",
-    group: 0,
-};
-/// rsa_oaep_2048_sha224_mgf1sha1_test.json, testGroups[0], tcId 1..=31.
-pub const RSA_2048_OTHER: Source = Source {
-    file: "rsa_oaep_2048_sha224_mgf1sha1_test.json",
-    group: 0,
 };
 
 /// rsa_pkcs1_2048_sig_gen_test.json, testGroups[5], tcId 154: `privateKey.publicExponent` (3).
