@@ -297,7 +297,7 @@ mod tests {
 
     #[rstest]
     #[case(&[0x01; 32], "public and private key mismatch")]
-    // Longer than any accepted encoding; must be rejected without panicking.
+    // 33 bytes without a leading zero sign byte; must be rejected without panicking.
     #[case(&[0x01; 33], "invalid private key data")]
     fn ed25519_invalid_secret(#[case] secret: &[u8], #[case] error: &str) {
         let ssh_key = SshPrivateKey::from_pem_str(picky_test_data::SSH_PRIVATE_KEY_ED25519, None).unwrap();
