@@ -20,7 +20,7 @@ macro_rules! curve {
                 SecretKey, ecdh,
                 ecdsa::{
                     Signature, SigningKey, VerifyingKey,
-                    signature::{Signer, Verifier},
+                    signature::{RandomizedSigner, Verifier},
                 },
                 elliptic_curve::{Generate, sec1::ToSec1Point},
                 pkcs8::{EncodePrivateKey, PrivateKeyInfoRef, Version, der::Decode},
@@ -102,7 +102,11 @@ macro_rules! curve {
                         return Err(Error::Unsupported(Algorithm::Signature(algorithm)));
                     }
                     let signing = SigningKey::from(&self.0);
-                    let signature: Signature = signing.try_sign(message).map_err(|_| Error::InvalidKey)?;
+                    // Hedged RFC 6979 nonce: random bytes enter as additional data, and an RNG failure is
+                    // the only error on this path (ecdsa 0.17.0, src\signing.rs:209–232, 242–265).
+                    let signature: Signature = signing
+                        .try_sign_with_rng(&mut getrandom::SysRng, message)
+                        .map_err(|_| Error::ProviderFailure)?;
                     let bytes = Zeroizing::new(signature.to_bytes());
                     crate::util::output(&bytes)
                 }
