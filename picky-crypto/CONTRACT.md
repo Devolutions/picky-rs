@@ -821,12 +821,12 @@ The inputs for that last property are derived from published keys, because the k
 - round-trip control: splitting a base key into its fields and reassembling them unchanged must reproduce the cited key's exact bytes, otherwise the test fails;
 - positive control: the unmodified base key loads and produces a result that verifies on the backend under test.
 
-`picky-crypto`'s own tests check composition (section 8.1) for [`Mac`], [`Cipher`], [`Aead`] and [`KeyWrap`] against mock providers, over every combination of supported protections and FIPS reports: a fallback fills in a protection the primary does not support, the primary serves a protection both members support, and the composite entry's FIPS report and the composed provider's [`CryptoProvider::fips`] follow section 8.1.
+`picky-crypto`'s tests check composition (section 8.1) for [`Mac`], [`Cipher`], [`Aead`] and [`KeyWrap`] against mock providers, over every combination of supported protections and FIPS reports: a fallback fills in a protection the primary does not support, the primary serves a protection both members support, and the composite entry's FIPS report and the composed provider's [`CryptoProvider::fips`] follow section 8.1.
 For [`Mac`], each context starts on the member serving the requested protection.
 
 The FFDH exponent distribution (section 6.11) is mandatory but not observable from outputs; it is verified by review, while the suite checks the range of the public value and the round trip.
 
-`picky-crypto` implements the [`Debug`](std::fmt::Debug) of [`OutputBytes`], [`X25519Scalar`], [`MacTag`], [`MacVerifier`], [`MacOutput`], [`Sealed`] and the trait objects (section 2), so no backend can change it; its own tests assert the exact output, and the suite does not repeat them.
+`picky-crypto` implements the [`Debug`](std::fmt::Debug) of [`OutputBytes`], [`X25519Scalar`], [`MacTag`], [`MacVerifier`], [`MacOutput`], [`Sealed`] and the trait objects (section 2), so no backend can change it; `picky-crypto`'s tests check that it shows only the length, or the algorithm and FIPS report.
 For every loaded key, the suite checks [`PrivateKey::key_size_bits`] against the exact size section 7 defines, including RSA keys whose modulus length is not a multiple of 8 bits (for example 3071 or 4095 bits) when the backend loads them; such keys come from cited sources like every other key.
 [`MacVerifier::verify`] is tested with the correct tag, a wrong tag, an `expected` whose length differs from `len`, `len` of 0 and greater than the tag length, and the truncated lengths used by Kerberos (12 bytes) and NTLM (8 bytes).
 A [`MacTag`] and a [`MacVerifier`] computed on the same key and data agree: the tag's [`MacTag::into_inner`] bytes verify through the verifier.
