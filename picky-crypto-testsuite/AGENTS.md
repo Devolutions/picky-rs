@@ -1,6 +1,5 @@
 # picky-crypto-testsuite
 
-`INTENT.md` states the principles for vectors, derived inputs and failing tests.
 Sources, versions and checksums are in `vectors/manifest.toml`; `cargo xtask check-vectors` checks it.
 
 ## Changing the vector set
