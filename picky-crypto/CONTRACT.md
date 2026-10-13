@@ -146,7 +146,6 @@ When both [`Error::InvalidKey`] and [`Error::InvalidInput`] could apply, report 
 Library key-validation failures map to [`Error::InvalidKey`], except when the library only rejects a well-formed key for its size or parameters, which maps to [`Error::Unsupported`] (rule 4).
 Size limits take precedence: an input beyond a backend's size limit may be refused with [`Error::Unsupported`] before its structure is examined, whether or not it is also malformed.
 A size limit is a backend's capacity bound inside the valid domain, above the must-support set.
-A size limit lies above the must-support set and never applies to a length the algorithm or the operation fixes, such as those of rule 6.
 [`Error::ProviderFailure`] includes "PIN required", which callers therefore cannot distinguish from other device failures; this is a known limit of the closed set, to revisit if a consumer needs to prompt for a PIN.
 Some libraries report a single opaque failure for verification; a backend on such a library may report [`Error::VerificationFailed`] for a public key it cannot use, including an RSA modulus outside its range.
 Conformance tests therefore expect [`Error::InvalidKey`] for a malformed public key within the backend's size limit, and accept either the result expected for a key in the must-support set or [`Error::Unsupported`] for a well-formed public key outside it; for a backend on such a library they also accept [`Error::VerificationFailed`] in both cases.
@@ -799,7 +798,10 @@ Before a vector's label is applied, its eligibility is decided by the rules abov
 
 Inputs just outside a length the algorithm or the operation fixes, or a range the algorithm's standard defines, expect the specified error and never [`Error::Unsupported`] (rule 4).
 They are hand-written structural inputs, and the suite checks at least RC2 keys of 0 and 129 bytes, RC4 keys of 0 and 257 bytes, and PBKDF2 with zero iterations, an empty output or an output one byte above the RFC 8018 maximum where [`usize`] can represent it.
-Each of these has a control at the adjacent in-range value, either a published input or the in-range value with published other inputs, which succeeds, or returns [`Error::Unsupported`] when that value is outside the must-support set.
+Each of these, except the PBKDF2 output above the maximum, has a control at the adjacent in-range value, either a published input or the in-range value with published other inputs, which succeeds, or returns [`Error::Unsupported`] when that value is outside the must-support set.
+PBKDF2 also has a control at the edge of the must-support set, an output one byte above it, which succeeds or returns [`Error::Unsupported`], never [`Error::InvalidInput`].
+In differential runs, the outputs of these controls are also compared between the two backends whenever both produce one and the control has no published answer.
+Known gap: an inward off-by-one at the PBKDF2 maximum output length is not detected, because a control at that length could exhaust a conforming backend's time or memory.
 
 Labels follow Wycheproof:
 

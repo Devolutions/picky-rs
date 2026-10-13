@@ -24,7 +24,9 @@ It is the executable form of the contract: a backend is correct when it passes t
   Every re-encoded key is also used by at least one published vector that expects success, so an encoding error can't make failure vectors pass vacuously.
 - A vector is an input paired with a computed expected output.
   Literal structural inputs whose expected outcome is a specified error (empty, zero, one, lengths at or beyond a limit) are not vectors and may be written by hand.
-  A hand-written input never expects success.
+  A hand-written input never carries a computed expected output.
+  It expects a specified error, or, as a control at a boundary the contract defines (a range limit or the edge of the must-support set), acceptance (success, or `Unsupported` above the must-support set), checked only through properties the contract states.
+  No control is so large that processing it could exhaust time or memory.
 
 ## Required behavior
 
