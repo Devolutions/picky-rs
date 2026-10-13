@@ -32,14 +32,16 @@ macro_rules! differential_tests {
 }
 
 /// Defines a module per provider, with one test per conformance area, and the registry of every provider with its backend.
+/// Attributes on an entry, such as `#[cfg(feature = "...")]` for a feature-gated backend, apply to its module and its registry element.
 macro_rules! providers {
-    ($($name:ident ($backend:literal) => $provider:expr, $options:expr;)+) => {
+    ($($(#[$attr:meta])* $name:ident ($backend:literal) => $provider:expr, $options:expr;)+) => {
         fn registry() -> &'static [(&'static str, CryptoProvider)] {
             static REGISTRY: OnceLock<Vec<(&'static str, CryptoProvider)>> = OnceLock::new();
-            REGISTRY.get_or_init(|| vec![$(($backend, $provider)),+])
+            REGISTRY.get_or_init(|| Vec::from([$($(#[$attr])* ($backend, $provider)),+]))
         }
 
         $(
+            $(#[$attr])*
             mod $name {
                 use super::*;
 
