@@ -8,7 +8,7 @@ use crate::harness::{Checks, Expect, Options};
 use crate::keys::*;
 use crate::{der, select, vectors as v};
 
-pub fn run(p: &CryptoProvider, _: Options) {
+pub fn run(p: &CryptoProvider, options: Options) {
     let mut c = Checks::default();
     c.metadata("published key encoding controls", der::encoding_controls);
     for kind in KEY_TYPES {
@@ -149,7 +149,7 @@ pub fn run(p: &CryptoProvider, _: Options) {
             exported(&mut c, "Ed25519/rfc/rfc8410.txt/10.3/attributes", &*key, &public);
         }
     }
-    inconsistent_rsa(&mut c, p);
+    inconsistent_rsa(&mut c, p, options);
     if let Ok(loader) = helpers::private_key_loader(p, KeyType::Rsa) {
         let vectors = v::wycheproof(RSA_SIGN_FILES[0]);
         let g = select::rsa_private_group(RSA_SIGN_FILES[0], &vectors);
@@ -187,9 +187,9 @@ fn malformed_pkcs8(c: &mut Checks, loader: &dyn PrivateKeyLoader, ids: (&str, &s
     });
 }
 
-pub fn inconsistent_rsa(c: &mut Checks, p: &CryptoProvider) {
-    inconsistent_rsa_signing(c, p);
-    inconsistent_rsa_decryption(c, p);
+pub fn inconsistent_rsa(c: &mut Checks, p: &CryptoProvider, options: Options) {
+    inconsistent_rsa_signing(c, p, options);
+    inconsistent_rsa_decryption(c, p, options);
 }
 
 pub fn inconsistent_signatures(
@@ -263,42 +263,110 @@ pub fn inconsistent_signatures(
     }
 }
 
-pub fn inconsistent_roundtrip(
+/// Where the ciphertext of a derived key's decryption check comes from, in order of preference.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CiphertextSource {
+    /// A published ciphertext of the base key, which decrypts to its published plaintext.
+    Published,
+    /// The encryptor of [`Options::reference_provider`], a different backend in the build.
+    Reference,
+    /// The encryptor of the provider under test, as a round trip.
+    Own,
+}
+
+/// A published ciphertext of the base key, with its algorithm and plaintext.
+pub type PublishedCiphertext<'a> = (AsymmetricEncryptionAlgorithm, &'a [u8], &'a [u8]);
+
+/// Checks decryption with an RSA key derived with inconsistent components, for every encryption algorithm the contract defines.
+///
+/// A derived key that doesn't advertise an algorithm must return `Unsupported` for it.
+/// Otherwise the ciphertext comes from the first [`CiphertextSource`] that produces one, and the check fails if none does.
+/// Each check counts its source in the coverage report.
+pub fn inconsistent_decryption(
     c: &mut Checks,
     p: &CryptoProvider,
+    options: Options,
     keys: (&dyn PrivateKey, &dyn PrivateKey),
     id: &str,
     encoded: &[u8],
-    algorithm: AsymmetricEncryptionAlgorithm,
+    published: Option<PublishedCiphertext<'_>>,
 ) {
     let (base, key) = keys;
-    if !c.key_supports(id, base, KeyOperation::Decrypt(algorithm))
-        || !c.key_supports(id, key, KeyOperation::Decrypt(algorithm))
-    {
-        return;
-    }
-    let Ok(encryptor) = helpers::asymmetric_encryptor(p, algorithm) else {
-        return;
-    };
     let public = der::rsa_public(encoded);
-    let limit = rsa_plaintext_limit(algorithm, der::bit_length(der::children(&public)[0].value).div_ceil(8));
-    let (source, message) = select::rsa_plaintext(limit);
-    let id = format!("{id}/{algorithm:?}/round trip/{source}");
-    if let Some(ciphertext) = c.call(&id, Expect::Success, || encryptor.encrypt(PublicKey(&public), &message)) {
-        if let Some(positive) = c.call(&format!("{id}/positive control"), Expect::Success, || {
-            base.decrypt(algorithm, &ciphertext)
-        }) {
-            c.bytes(&id, &positive, &message);
+    let modulus_len = der::bit_length(der::children(&public)[0].value).div_ceil(8);
+    for algorithm in ENCRYPTIONS {
+        let id = format!("{id}/{algorithm:?}");
+        if !c.key_supports(&id, key, KeyOperation::Decrypt(algorithm)) {
+            // A modulus-length ciphertext of value zero is in the valid domain, so only the advertisement decides the outcome.
+            let ciphertext = vec![0; modulus_len];
+            c.call(
+                &format!("{id}/not advertised"),
+                Expect::Error(Error::Unsupported(Algorithm::AsymmetricEncryption(algorithm))),
+                || key.decrypt(algorithm, &ciphertext),
+            );
+            continue;
+        }
+        let Some((source, ciphertext, expected)) =
+            ciphertext_source(p, options, algorithm, &public, modulus_len, published)
+        else {
+            c.check(&id, false, "no source produced a ciphertext for the derived key");
+            continue;
+        };
+        c.count(format!("inconsistent RSA decryption ciphertext from {source:?}"));
+        let id = format!("{id}/{source:?} ciphertext");
+        if c.key_supports(&id, base, KeyOperation::Decrypt(algorithm)) {
+            if let Some(positive) = c.call(&format!("{id}/positive control"), Expect::Success, || {
+                base.decrypt(algorithm, &ciphertext)
+            }) {
+                c.bytes(&id, &positive, &expected);
+            }
         }
         if let Some(plaintext) = c.call(&id, Expect::Either(Error::InvalidKey), || {
             key.decrypt(algorithm, &ciphertext)
         }) {
-            c.bytes(&id, &plaintext, &message);
+            c.bytes(&id, &plaintext, &expected);
         }
     }
 }
 
-fn inconsistent_rsa_signing(c: &mut Checks, p: &CryptoProvider) {
+/// Returns the first ciphertext a [`CiphertextSource`] produces, with its source and expected plaintext.
+fn ciphertext_source(
+    p: &CryptoProvider,
+    options: Options,
+    algorithm: AsymmetricEncryptionAlgorithm,
+    public: &[u8],
+    modulus_len: usize,
+    published: Option<PublishedCiphertext<'_>>,
+) -> Option<(CiphertextSource, Vec<u8>, Vec<u8>)> {
+    if let Some((_, ciphertext, plaintext)) = published.filter(|(a, _, _)| *a == algorithm) {
+        return Some((CiphertextSource::Published, ciphertext.to_vec(), plaintext.to_vec()));
+    }
+    let (_, message) = select::rsa_plaintext(rsa_plaintext_limit(algorithm, modulus_len));
+    [
+        (CiphertextSource::Reference, options.reference_provider),
+        (CiphertextSource::Own, Some(p)),
+    ]
+    .into_iter()
+    .find_map(|(source, provider)| {
+        let encryptor = helpers::asymmetric_encryptor(provider?, algorithm).ok()?;
+        let ciphertext = encryptor.encrypt(PublicKey(public), &message).ok()?;
+        Some((source, ciphertext.to_vec(), message.clone()))
+    })
+}
+
+/// Checks public-key export from an RSA key derived with inconsistent components: `InvalidKey`, or exactly the base key's encoding.
+pub fn derived_export(c: &mut Checks, id: &str, key: &dyn PrivateKey, expected: &[u8]) {
+    let outcome = if c.key_supports(id, key, KeyOperation::PublicKey) {
+        Expect::Either(Error::InvalidKey)
+    } else {
+        Expect::Error(Error::Unsupported(Algorithm::PublicKeyExport(KeyType::Rsa)))
+    };
+    if let Some(out) = c.call(&format!("{id}/public_key"), outcome, || key.public_key()) {
+        c.bytes(id, &out, expected);
+    }
+}
+
+fn inconsistent_rsa_signing(c: &mut Checks, p: &CryptoProvider, options: Options) {
     let Ok(loader) = helpers::private_key_loader(p, KeyType::Rsa) else {
         return;
     };
@@ -309,8 +377,11 @@ fn inconsistent_rsa_signing(c: &mut Checks, p: &CryptoProvider) {
             .iter()
             .filter(|g| der::rsa_must(&v::field(g, "privateKeyPkcs8")))
             .collect();
+        let mut decrypted = std::collections::BTreeSet::new();
         for g in &bases {
             let encoding = v::field(g, "privateKeyPkcs8");
+            // Groups of one file can share a key; export and decryption don't depend on the group.
+            let first = decrypted.insert(encoding.clone());
             let id = format!("{file}/inconsistent components");
             let Some(base) = c.call(&format!("{id}/positive control"), Expect::Success, || {
                 loader.load(PrivateKeyMaterial::Pkcs8(&encoding))
@@ -329,8 +400,11 @@ fn inconsistent_rsa_signing(c: &mut Checks, p: &CryptoProvider) {
                 if let Some(key) = c.call(&id, Expect::Either(Error::InvalidKey), || {
                     loader.load(PrivateKeyMaterial::Pkcs8(&malformed))
                 }) {
-                    exported(c, &id, &*key, &der::rsa_public(&encoding));
                     inconsistent_signatures(c, p, &*base, &*key, &id, (file, g));
+                    if first {
+                        derived_export(c, &id, &*key, &der::rsa_public(&encoding));
+                        inconsistent_decryption(c, p, options, (&*base, &*key), &id, &encoding, None);
+                    }
                 }
             }
         }
@@ -365,7 +439,7 @@ fn decryption_bases(vectors: &v::Wycheproof) -> Vec<DecryptionBase<'_>> {
         .collect()
 }
 
-fn inconsistent_rsa_decryption(c: &mut Checks, p: &CryptoProvider) {
+fn inconsistent_rsa_decryption(c: &mut Checks, p: &CryptoProvider, options: Options) {
     let Ok(loader) = helpers::private_key_loader(p, KeyType::Rsa) else {
         return;
     };
@@ -378,14 +452,8 @@ fn inconsistent_rsa_decryption(c: &mut Checks, p: &CryptoProvider) {
             }) else {
                 continue;
             };
-            if !c.key_supports(&id, &*base, KeyOperation::Decrypt(a)) {
-                continue;
-            }
             let ciphertext = v::field(t, "ct");
             let plaintext = v::field(t, "msg");
-            if let Some(out) = c.call(&id, Expect::Success, || base.decrypt(a, &ciphertext)) {
-                c.bytes(&id, &out, &plaintext);
-            }
             for (i, derived) in der::inconsistent_rsa(&encoded, other.as_deref())
                 .into_iter()
                 .enumerate()
@@ -394,15 +462,9 @@ fn inconsistent_rsa_decryption(c: &mut Checks, p: &CryptoProvider) {
                 if let Some(key) = c.call(&id, Expect::Either(Error::InvalidKey), || {
                     loader.load(PrivateKeyMaterial::Pkcs8(&derived))
                 }) {
-                    exported(c, &id, &*key, &der::rsa_public(&encoded));
-                    if c.key_supports(&id, &*key, KeyOperation::Decrypt(a)) {
-                        if let Some(out) =
-                            c.call(&id, Expect::Either(Error::InvalidKey), || key.decrypt(a, &ciphertext))
-                        {
-                            c.bytes(&id, &out, &plaintext);
-                        }
-                    }
-                    inconsistent_roundtrip(c, p, (&*base, &*key), &id, &encoded, a);
+                    derived_export(c, &id, &*key, &der::rsa_public(&encoded));
+                    let published = Some((a, ciphertext.as_slice(), plaintext.as_slice()));
+                    inconsistent_decryption(c, p, options, (&*base, &*key), &id, &encoded, published);
                 }
             }
         }

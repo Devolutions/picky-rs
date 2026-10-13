@@ -3,7 +3,9 @@ use picky_crypto_testsuite::algorithms::*;
 use picky_crypto_testsuite::areas::ffdh::{
     FFC_FILE, below_modulus_minus_one, ffdh_exponent_boundaries, ffdh_parameter_boundaries,
 };
-use picky_crypto_testsuite::areas::private_key::{inconsistent_roundtrip, inconsistent_rsa, inconsistent_signatures};
+use picky_crypto_testsuite::areas::private_key::{
+    CiphertextSource, derived_export, inconsistent_decryption, inconsistent_rsa, inconsistent_signatures,
+};
 use picky_crypto_testsuite::areas::{key_generation, signature, signature::ed25519_undecodable_keys};
 use picky_crypto_testsuite::harness::{Checks, Expect, Options, without_failure_persistence};
 use picky_crypto_testsuite::keys::*;
@@ -476,73 +478,323 @@ fn decrypt_only(ciphertext: &[u8], plaintext: Vec<u8>, calls: &Calls) -> BranchK
         calls: Arc::clone(calls),
     }
 }
-fn decrypts(calls: &Calls, ciphertext: &[u8]) -> usize {
-    calls
-        .lock()
-        .unwrap()
-        .iter()
-        .filter(|(call, input)| {
-            *call == KeyOperation::Decrypt(AsymmetricEncryptionAlgorithm::RsaPkcs1v15) && input == ciphertext
-        })
-        .count()
-}
-struct ReferenceEncryptor {
-    ciphertext: Vec<u8>,
+/// Ciphertexts with their plaintexts, shared by mock encryptors and keys as if they used one RSA key pair.
+type Table = Arc<Mutex<Vec<(Vec<u8>, Vec<u8>)>>>;
+type DecryptCalls = Arc<Mutex<Vec<(AsymmetricEncryptionAlgorithm, Vec<u8>)>>>;
+
+/// Encrypts to a ciphertext of `tag` bytes and records the plaintext in the table.
+struct TableEncryptor {
+    algorithm: AsymmetricEncryptionAlgorithm,
+    tag: u8,
+    table: Table,
     calls: Arc<AtomicUsize>,
 }
-impl AsymmetricEncryptor for ReferenceEncryptor {
+impl AsymmetricEncryptor for TableEncryptor {
     fn algorithm(&self) -> AsymmetricEncryptionAlgorithm {
-        AsymmetricEncryptionAlgorithm::RsaPkcs1v15
+        self.algorithm
     }
     fn fips(&self) -> bool {
         false
     }
-    fn encrypt(&self, _: PublicKey<'_>, _: &[u8]) -> Result<OutputBytes, Error> {
+    fn encrypt(&self, _: PublicKey<'_>, message: &[u8]) -> Result<OutputBytes, Error> {
         self.calls.fetch_add(1, Ordering::Relaxed);
-        Ok(OutputBytes::new(Zeroizing::new(self.ciphertext.clone())))
+        let ciphertext = vec![self.tag; 256];
+        self.table.lock().unwrap().push((ciphertext.clone(), message.to_vec()));
+        Ok(OutputBytes::new(Zeroizing::new(ciphertext)))
+    }
+}
+
+/// An RSA key that decrypts through the table.
+#[derive(Clone)]
+struct TableKey {
+    decrypts: Vec<AsymmetricEncryptionAlgorithm>,
+    /// Returned by every advertised decryption instead of the table's plaintext.
+    error: Option<Error>,
+    /// Returned by unadvertised decryptions instead of `Unsupported`.
+    unadvertised: Option<Error>,
+    exports: bool,
+    export: Result<Vec<u8>, Error>,
+    table: Table,
+    calls: DecryptCalls,
+}
+impl TableKey {
+    fn new(decrypts: &[AsymmetricEncryptionAlgorithm], table: &Table) -> Self {
+        TableKey {
+            decrypts: decrypts.to_vec(),
+            error: None,
+            unadvertised: None,
+            exports: false,
+            export: Err(Error::Unsupported(Algorithm::PublicKeyExport(KeyType::Rsa))),
+            table: Arc::clone(table),
+            calls: Arc::default(),
+        }
+    }
+    fn inputs(&self, algorithm: AsymmetricEncryptionAlgorithm) -> Vec<Vec<u8>> {
+        let calls = self.calls.lock().unwrap();
+        calls
+            .iter()
+            .filter(|(a, _)| *a == algorithm)
+            .map(|(_, input)| input.clone())
+            .collect()
+    }
+}
+impl PrivateKey for TableKey {
+    fn key_type(&self) -> KeyType {
+        KeyType::Rsa
+    }
+    fn key_size_bits(&self) -> usize {
+        2048
+    }
+    fn fips(&self) -> bool {
+        false
+    }
+    fn supports(&self, operation: KeyOperation) -> bool {
+        match operation {
+            KeyOperation::Decrypt(a) => self.decrypts.contains(&a),
+            KeyOperation::PublicKey => self.exports,
+            _ => false,
+        }
+    }
+    fn sign(&self, a: SignatureAlgorithm, _: &[u8]) -> Result<OutputBytes, Error> {
+        Err(Error::Unsupported(Algorithm::Signature(a)))
+    }
+    fn decrypt(&self, a: AsymmetricEncryptionAlgorithm, input: &[u8]) -> Result<OutputBytes, Error> {
+        self.calls.lock().unwrap().push((a, input.to_vec()));
+        if !self.decrypts.contains(&a) {
+            return Err(self
+                .unadvertised
+                .unwrap_or(Error::Unsupported(Algorithm::AsymmetricEncryption(a))));
+        }
+        if let Some(error) = self.error {
+            return Err(error);
+        }
+        let table = self.table.lock().unwrap();
+        let (_, plaintext) = table.iter().find(|(c, _)| c == input).ok_or(Error::InvalidInput)?;
+        Ok(OutputBytes::new(Zeroizing::new(plaintext.clone())))
+    }
+    fn agree(&self, a: KeyAgreementAlgorithm, _: &[u8]) -> Result<OutputBytes, Error> {
+        Err(Error::Unsupported(Algorithm::KeyAgreement(a)))
+    }
+    fn public_key(&self) -> Result<OutputBytes, Error> {
+        self.export.clone().map(|key| OutputBytes::new(Zeroizing::new(key)))
+    }
+}
+
+/// A must-support key of the first RSA decryption file, with the algorithm and a valid published ciphertext and plaintext.
+fn published_decryption() -> (Vec<u8>, AsymmetricEncryptionAlgorithm, Vec<u8>, Vec<u8>) {
+    let (file, algorithm) = RSA_DECRYPT_FILES[0];
+    let corpus = v::wycheproof(file);
+    let group = corpus
+        .test_groups
+        .iter()
+        .find(|g| der::rsa_must(&v::field(g, "privateKeyPkcs8")))
+        .unwrap();
+    let t = v::tests(group)
+        .iter()
+        .find(|t| v::string(t, "result") == "valid" && !v::field(t, "msg").is_empty())
+        .unwrap();
+    (
+        v::field(group, "privateKeyPkcs8"),
+        algorithm,
+        v::field(t, "ct"),
+        v::field(t, "msg"),
+    )
+}
+
+/// Runs the derived-key decryption checks with the published ciphertext, a reference encryptor and the provider's own encryptor as selected.
+fn derived_decryption(derived: &TableKey, sources: [bool; 3]) -> (Checks, [usize; 2]) {
+    let [published, reference, own] = sources;
+    let (encoded, algorithm, ciphertext, plaintext) = published_decryption();
+    derived
+        .table
+        .lock()
+        .unwrap()
+        .push((ciphertext.clone(), plaintext.clone()));
+    let base = TableKey::new(&ENCRYPTIONS, &derived.table);
+    let encryptor = |tag, calls: &Arc<AtomicUsize>| {
+        let mut builder = CryptoProvider::builder();
+        if tag == 1 && reference || tag == 2 && own {
+            builder = builder.with(Entry::AsymmetricEncryptor(Arc::new(TableEncryptor {
+                algorithm,
+                tag,
+                table: Arc::clone(&derived.table),
+                calls: Arc::clone(calls),
+            })));
+        }
+        builder.build().unwrap()
+    };
+    let counts = [Arc::new(AtomicUsize::new(0)), Arc::new(AtomicUsize::new(0))];
+    let mut options = Options::default();
+    options.reference_provider = Some(Box::leak(Box::new(encryptor(1, &counts[0]))));
+    let mut c = Checks::default();
+    inconsistent_decryption(
+        &mut c,
+        &encryptor(2, &counts[1]),
+        options,
+        (&base, derived),
+        "derived",
+        &encoded,
+        published.then_some((algorithm, ciphertext.as_slice(), plaintext.as_slice())),
+    );
+    (c, counts.map(|count| count.load(Ordering::Relaxed)))
+}
+
+#[rstest]
+fn derived_decryption_uses_the_first_available_source(
+    #[values(false, true)] published: bool,
+    #[values(false, true)] reference: bool,
+    #[values(false, true)] own: bool,
+) {
+    let (_, algorithm, ciphertext, _) = published_decryption();
+    let derived = TableKey::new(&[algorithm], &Table::default());
+    let (c, counts) = derived_decryption(&derived, [published, reference, own]);
+    let expected = [
+        (published, CiphertextSource::Published, ciphertext),
+        (reference, CiphertextSource::Reference, vec![1; 256]),
+        (own, CiphertextSource::Own, vec![2; 256]),
+    ]
+    .into_iter()
+    .find(|(available, _, _)| *available);
+    let Some((_, source, input)) = expected else {
+        assert!(c.failures.iter().any(|f| f.contains("no source produced a ciphertext")));
+        assert!(derived.inputs(algorithm).is_empty());
+        return;
+    };
+    assert!(c.failures.is_empty(), "{:?}", c.failures);
+    assert_eq!(derived.inputs(algorithm), [input]);
+    assert_eq!(
+        counts,
+        [
+            usize::from(source == CiphertextSource::Reference),
+            usize::from(source == CiphertextSource::Own)
+        ]
+    );
+    let label = format!("inconsistent RSA decryption ciphertext from {source:?}");
+    assert_eq!(c.coverage.into_iter().collect::<Vec<_>>(), [(label, 1)]);
+}
+
+#[rstest]
+#[case::plaintext(None, true)]
+#[case::invalid_key(Some(Error::InvalidKey), true)]
+#[case::verification_failed(Some(Error::VerificationFailed), false)]
+#[case::invalid_input(Some(Error::InvalidInput), false)]
+fn derived_decryption_outcomes(#[case] error: Option<Error>, #[case] passes: bool, #[values(false, true)] own: bool) {
+    let (_, algorithm, _, _) = published_decryption();
+    let mut derived = TableKey::new(&[algorithm], &Table::default());
+    derived.error = error;
+    let (c, _) = derived_decryption(&derived, [!own, false, own]);
+    assert_eq!(c.failures.is_empty(), passes, "{:?}", c.failures);
+}
+
+#[test]
+fn derived_decryption_compares_the_plaintext() {
+    let (_, algorithm, ciphertext, _) = published_decryption();
+    let table = Table::default();
+    table.lock().unwrap().push((ciphertext, b"wrong".to_vec()));
+    let (c, _) = derived_decryption(&TableKey::new(&[algorithm], &table), [true, false, false]);
+    assert!(!c.failures.is_empty());
+}
+
+#[rstest]
+#[case::unsupported(None, true)]
+#[case::invalid_key(Some(Error::InvalidKey), false)]
+fn unadvertised_derived_decryption_is_unsupported(#[case] unadvertised: Option<Error>, #[case] passes: bool) {
+    let mut derived = TableKey::new(&[], &Table::default());
+    derived.unadvertised = unadvertised;
+    let (c, counts) = derived_decryption(&derived, [true, true, true]);
+    assert_eq!(c.failures.is_empty(), passes, "{:?}", c.failures);
+    assert_eq!(counts, [0, 0]);
+    for algorithm in ENCRYPTIONS {
+        assert_eq!(derived.inputs(algorithm), [vec![0; 256]]);
+    }
+}
+
+#[rstest]
+#[case::base_key(true, |public: &[u8]| Ok(public.to_vec()), true)]
+#[case::invalid_key(true, |_: &[u8]| Err(Error::InvalidKey), true)]
+#[case::other_key(true, |public: &[u8]| Ok([public, &[0]].concat()), false)]
+#[case::verification_failed(true, |_: &[u8]| Err(Error::VerificationFailed), false)]
+#[case::unsupported(false, |_: &[u8]| Err(Error::Unsupported(Algorithm::PublicKeyExport(KeyType::Rsa))), true)]
+#[case::unadvertised_export(false, |public: &[u8]| Ok(public.to_vec()), false)]
+fn derived_export_outcomes(
+    #[case] exports: bool,
+    #[case] export: fn(&[u8]) -> Result<Vec<u8>, Error>,
+    #[case] passes: bool,
+) {
+    let (encoded, ..) = published_decryption();
+    let public = der::rsa_public(&encoded);
+    let mut derived = TableKey::new(&[], &Table::default());
+    derived.exports = exports;
+    derived.export = export(&public);
+    let mut c = Checks::default();
+    derived_export(&mut c, "derived", &derived, &public);
+    assert_eq!(c.failures.is_empty(), passes, "{:?}", c.failures);
+}
+
+/// Loads every RSA key except the listed ones as a [`TableKey`].
+struct TableLoader {
+    key: TableKey,
+    rejected: Vec<Vec<u8>>,
+}
+impl PrivateKeyLoader for TableLoader {
+    fn key_type(&self) -> KeyType {
+        KeyType::Rsa
+    }
+    fn fips(&self) -> bool {
+        false
+    }
+    fn load(&self, material: PrivateKeyMaterial<'_>) -> Result<Box<dyn PrivateKey>, Error> {
+        match material {
+            PrivateKeyMaterial::Pkcs8(encoded) if !self.rejected.iter().any(|key| key == encoded) => {
+                Ok(Box::new(self.key.clone()))
+            }
+            _ => Err(Error::InvalidKey),
+        }
     }
 }
 
 #[test]
-fn inconsistent_roundtrip_uses_the_provider_encryptor() {
-    let corpus = v::wycheproof(RSA_DECRYPT_FILES[0].0);
-    let group = &corpus.test_groups[0];
-    let encoded = v::field(group, "privateKeyPkcs8");
-    let t = v::tests(group)
-        .iter()
-        .find(|t| v::string(t, "result") == "valid")
-        .unwrap();
-    let ciphertext = v::field(t, "ct");
-    let messages = picky_crypto_testsuite::published::messages();
-    let message = messages
-        .iter()
-        .find(|(_, m)| !m.is_empty() && m.len() <= 245)
-        .unwrap()
-        .1
-        .clone();
-    let calls = Arc::default();
-    let encrypts = Arc::new(AtomicUsize::new(0));
-    let base = decrypt_only(&ciphertext, message.clone(), &calls);
-    let derived = decrypt_only(&ciphertext, message, &calls);
-    let provider = CryptoProvider::builder()
-        .with(Entry::AsymmetricEncryptor(Arc::new(ReferenceEncryptor {
-            ciphertext: ciphertext.clone(),
-            calls: Arc::clone(&encrypts),
-        })))
-        .build()
-        .unwrap();
-    let mut checks = Checks::default();
-    inconsistent_roundtrip(
-        &mut checks,
-        &provider,
-        (&base, &derived),
-        "published reference encryption",
-        &encoded,
-        AsymmetricEncryptionAlgorithm::RsaPkcs1v15,
+fn signing_file_keys_get_decryption_checks() {
+    let keys = |files: &[&str]| -> Vec<Vec<u8>> {
+        files
+            .iter()
+            .flat_map(|file| v::wycheproof(file).test_groups)
+            .map(|g| v::field(&g, "privateKeyPkcs8"))
+            .collect()
+    };
+    let rejected = keys(&RSA_DECRYPT_FILES.map(|(file, _)| file));
+    let signing = keys(&RSA_SIGN_FILES);
+    // Rejecting every decryption-file key leaves signing-file keys as the only source of decryption checks.
+    assert!(
+        signing.iter().any(|key| !rejected.contains(key)),
+        "control: a signing key remains"
     );
-    checks.finish();
-    assert_eq!(encrypts.load(Ordering::Relaxed), 1);
-    assert_eq!(decrypts(&calls, &ciphertext), 2);
+    let table = Table::default();
+    let mut builder = CryptoProvider::builder().with(Entry::PrivateKeyLoader(Arc::new(TableLoader {
+        key: TableKey::new(&ENCRYPTIONS, &table),
+        rejected,
+    })));
+    for (tag, algorithm) in (1..).zip(ENCRYPTIONS) {
+        builder = builder.with(Entry::AsymmetricEncryptor(Arc::new(TableEncryptor {
+            algorithm,
+            tag,
+            table: Arc::clone(&table),
+            calls: Arc::default(),
+        })));
+    }
+    let mut c = Checks::default();
+    inconsistent_rsa(&mut c, &builder.build().unwrap(), Options::default());
+    assert!(
+        c.failures.iter().all(|f| f.contains("positive control")),
+        "{:?}",
+        c.failures
+    );
+    let label = format!(
+        "inconsistent RSA decryption ciphertext from {:?}",
+        CiphertextSource::Own
+    );
+    assert_eq!(c.coverage.keys().collect::<Vec<_>>(), [&label]);
+    assert!(c.coverage[&label] >= RSA_SIGN_FILES.len() * ENCRYPTIONS.len());
 }
 
 #[test]
@@ -568,8 +820,7 @@ fn inconsistent_decryption_does_not_require_signing() {
         .build()
         .unwrap();
     let mut c = Checks::default();
-    inconsistent_rsa(&mut c, &provider);
-    assert!(decrypts(&calls, &ciphertext) > 0);
+    inconsistent_rsa(&mut c, &provider, Options::default());
     assert!(derived_loads.load(Ordering::Relaxed) >= 2);
 }
 #[test]

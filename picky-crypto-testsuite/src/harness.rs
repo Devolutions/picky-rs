@@ -8,17 +8,22 @@ use proptest::test_runner::{Config, FileFailurePersistence, RngSeed, TestCaseErr
 
 use crate::algorithms::extended;
 
-/// Contract-sanctioned variations in verification diagnostics.
+/// Per-run settings a runner passes to every area.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Options {
     /// Accept `VerificationFailed` for an unusable public key (contract section 4).
     pub opaque_public_key_errors: bool,
+    /// A provider from a different backend in the same build, whose RSA encryptors produce reference ciphertexts.
+    /// Decryption checks on RSA keys with inconsistent components use it when the base key has no published ciphertext for the algorithm.
+    pub reference_provider: Option<&'static CryptoProvider>,
 }
 
 #[derive(Default)]
 pub struct Checks {
     pub failures: Vec<String>,
+    /// How many checks used each kind of input, printed by [`Checks::finish`] so passing runs show their coverage.
+    pub coverage: std::collections::BTreeMap<String, usize>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -189,7 +194,15 @@ impl Checks {
         }
     }
 
+    /// Counts one check under `label` in the coverage report.
+    pub fn count(&mut self, label: impl Into<String>) {
+        *self.coverage.entry(label.into()).or_default() += 1;
+    }
+
     pub fn finish(self) {
+        for (label, count) in &self.coverage {
+            println!("coverage: {label}: {count}");
+        }
         assert!(
             self.failures.is_empty(),
             "{} conformance failure(s):\n{}",

@@ -1,7 +1,10 @@
 //! One test per (provider, area) and per (provider pair, differential area).
 //! Filter with `cargo test -p picky-crypto-conformance <provider>::<area>`.
 
-use picky_crypto::CryptoProvider;
+use std::sync::OnceLock;
+
+use picky_crypto::{CryptoProvider, helpers};
+use picky_crypto_testsuite::algorithms::ENCRYPTIONS;
 use picky_crypto_testsuite::harness::Options;
 
 /// Defines one test per conformance area, calling the enclosing module's `provider_under_test` and `options_under_test`.
@@ -29,9 +32,14 @@ macro_rules! differential_tests {
     };
 }
 
-/// Defines a module per provider, with one test per conformance area.
+/// Defines a module per provider, with one test per conformance area, and the registry of every provider with its backend.
 macro_rules! providers {
-    ($($name:ident => $provider:expr, $options:expr;)+) => {
+    ($($name:ident ($backend:literal) => $provider:expr, $options:expr;)+) => {
+        fn registry() -> &'static [(&'static str, CryptoProvider)] {
+            static REGISTRY: OnceLock<Vec<(&'static str, CryptoProvider)>> = OnceLock::new();
+            REGISTRY.get_or_init(|| vec![$(($backend, $provider)),+])
+        }
+
         $(
             mod $name {
                 use super::*;
@@ -41,7 +49,9 @@ macro_rules! providers {
                 }
 
                 fn options_under_test() -> Options {
-                    $options
+                    let mut options: Options = $options;
+                    options.reference_provider = reference_provider($backend);
+                    options
                 }
 
                 picky_crypto_testsuite::for_each_area!(area_tests);
@@ -67,12 +77,20 @@ macro_rules! pairs {
     };
 }
 
+/// Returns the first registered provider of another backend with an RSA encryptor, which supplies reference ciphertexts to the decryption checks on inconsistent RSA keys.
+fn reference_provider(backend: &str) -> Option<&'static CryptoProvider> {
+    registry()
+        .iter()
+        .find(|(b, p)| *b != backend && ENCRYPTIONS.iter().any(|a| helpers::asymmetric_encryptor(p, *a).is_ok()))
+        .map(|(_, p)| p)
+}
+
 fn empty() -> CryptoProvider {
     CryptoProvider::builder().build().expect("an empty provider builds")
 }
 
 providers! {
-    empty => empty(), Options::default();
+    empty ("none") => empty(), Options::default();
 }
 
 pairs! {
