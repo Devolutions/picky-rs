@@ -575,11 +575,11 @@ RSASSA-PKCS1-v1_5 signatures always encode NULL DigestInfo parameters (section 6
 RSA private-key results are checked: every signature or plaintext is the correct result under the key's public components (`n`, `e`), or the operation fails.
 A backend never outputs a signature or plaintext computed from inconsistent key components, because a single faulty CRT signature reveals a prime factor of `n`.
 Handling an RSA private key with inconsistent or non-distinct components (wrong `dP`, `dQ`, `qInv` or `d`, or `p` = `q`) is implementation-defined.
-The outcome may differ per call: each private-key call either returns [`Error::InvalidKey`] or behaves as specified for the key's public components (`n`, `e`), producing a signature or plaintext correct under them or the error specified for that input, such as [`Error::VerificationFailed`] when the correctly decrypted value has invalid padding.
+The outcome may differ per call: each operation for which [`PrivateKey::supports`] is true, including [`PrivateKey::public_key`], either returns [`Error::InvalidKey`] or behaves as specified for the key's public components (`n`, `e`), producing a signature or plaintext correct under them or the error specified for that input, such as [`Error::VerificationFailed`] when the correctly decrypted value has invalid padding.
 For example, a backend may reject the key at loading with [`Error::InvalidKey`], reject it at the first private-key operation with [`Error::InvalidKey`], use CRT components the library recomputes from `n`, `e`, `d`, `p` and `q` when the primes are distinct, or check each result against (`n`, `e`).
-Every one of these outcomes satisfies the checked-result property above.
+Each of these is allowed only when every result satisfies the rules above.
 This is an exception to rule 4, which would otherwise require rejection at loading.
-An inconsistency detected during [`PrivateKey::sign`] or [`PrivateKey::decrypt`] returns [`Error::InvalidKey`], never the padding error [`Error::VerificationFailed`], which applies only to a decrypted value correct under (`n`, `e`).
+An inconsistency detected during [`PrivateKey::sign`] or [`PrivateKey::decrypt`] returns [`Error::InvalidKey`], never [`Error::VerificationFailed`], which here reports only invalid padding in a value decrypted correctly under (`n`, `e`) or a ciphertext not less than `n`.
 Conformance tests check these keys only as section 12 states.
 
 Derivability:
@@ -812,18 +812,24 @@ For each of them, conformance tests assert that nothing panics and that the resu
 - RSA PKCS#1 v1.5 verification of a DigestInfo with absent parameters (section 6.9): success or [`Error::VerificationFailed`], the result section 6.9 gives for a signature that does not verify;
 - loading a PKCS#8 document that carries `attributes` (section 5.2): success or [`Error::InvalidKey`];
 - a 3DES key whose component keys are not pairwise distinct or are DES weak or semi-weak keys (section 6.5): success or [`Error::InvalidKey`];
-- handling of an RSA private key with inconsistent or non-distinct components (section 7): loading returns [`Error::InvalidKey`], or every private-key operation either returns [`Error::InvalidKey`], produces a result that verifies under (`n`, `e`), or returns the error section 7 specifies for that input.
+- handling of an RSA private key with inconsistent or non-distinct components (section 7): loading returns [`Error::InvalidKey`] or succeeds.
+  A loaded key returns [`Error::Unsupported`] for every operation for which [`PrivateKey::supports`] is false; for an operation for which it is true, only the outcomes below are allowed for each test input.
+  Exporting the public key returns [`Error::InvalidKey`] or exactly the section 5.1 encoding of the published (`n`, `e`) of the base key (below).
+  Signing returns [`Error::InvalidKey`] or a signature that verifies under (`n`, `e`).
   For decryption, the ciphertext comes from the first source that produces one for the algorithm: the base key's published ciphertexts, then the conformance runner's reference encryptor from another backend in the same build, then the provider's own encryptor.
   The expected plaintext is the published one for a published ciphertext, and the plaintext the suite encrypted for the other two sources.
   The check is never skipped: it fails if no source produces a ciphertext.
+  Keys derived from base keys published only with signature vectors get decryption checks in the same way.
+  Decryption returns [`Error::InvalidKey`] or the expected plaintext.
+  The suite uses only published ciphertexts labeled valid, so every ciphertext from any of the three sources has valid padding, and [`Error::VerificationFailed`] is a conformance failure for it, because a decryption correct under (`n`, `e`) recovers the valid padding.
   Each backend is checked on its own; differential runs do not repeat this check or compare outcomes between backends.
 
-The inputs for that last property are derived from published keys, because the known published RSA test vectors contain no keys with inconsistent components:
+The keys for that last property are derived from published keys, because the known published RSA test vectors contain no keys with inconsistent components:
 
-- base keys come from cited published sources;
-- an input is derived only by swapping or substituting whole encoded INTEGER fields between cited keys: `dP` with `dQ`, `p` with `q` leaving `qInv` unchanged, or `qInv` taken from another cited key of the same size; no arithmetic, no generated bytes and no randomness;
+- base keys come from cited published sources and are in the must-support set of section 7;
+- a key is derived only by swapping or substituting whole encoded INTEGER fields between cited keys: `dP` with `dQ`, `p` with `q` leaving `qInv` unchanged, or `qInv` taken from another cited key of the same size; no arithmetic, no generated bytes and no randomness;
 - round-trip control: splitting a base key into its fields and reassembling them unchanged must reproduce the cited key's exact bytes, otherwise the test fails;
-- positive control: the unmodified base key loads and produces a result that verifies on the backend under test.
+- positive control: the unmodified base key loads and, for each operation for which [`PrivateKey::supports`] is true, its exported public key is exactly the section 5.1 encoding of (`n`, `e`), its signatures verify and, with a ciphertext from the source chosen as for its derived keys, its decryptions return the expected plaintext on the backend under test.
 
 No known published key has non-distinct components (`p` = `q`, so `n` = `p`²), and these derivations cannot produce one, so that case has no conformance vector.
 
