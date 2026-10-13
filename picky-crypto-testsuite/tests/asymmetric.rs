@@ -3,7 +3,7 @@ use picky_crypto_testsuite::algorithms::*;
 use picky_crypto_testsuite::areas::ffdh::{
     FFC_FILE, below_modulus_minus_one, ffdh_exponent_boundaries, ffdh_parameter_boundaries,
 };
-use picky_crypto_testsuite::areas::private_key::{inconsistent_roundtrip, inconsistent_rsa};
+use picky_crypto_testsuite::areas::private_key::{inconsistent_roundtrip, inconsistent_rsa, inconsistent_signatures};
 use picky_crypto_testsuite::areas::{key_generation, signature, signature::ed25519_undecodable_keys};
 use picky_crypto_testsuite::harness::{Checks, Expect, Options, without_failure_persistence};
 use picky_crypto_testsuite::keys::*;
@@ -504,7 +504,7 @@ impl AsymmetricEncryptor for ReferenceEncryptor {
 }
 
 #[test]
-fn inconsistent_roundtrip_can_use_another_provider_encryptor() {
+fn inconsistent_roundtrip_uses_the_provider_encryptor() {
     let corpus = v::wycheproof(RSA_DECRYPT_FILES[0].0);
     let group = &corpus.test_groups[0];
     let encoded = v::field(group, "privateKeyPkcs8");
@@ -524,8 +524,7 @@ fn inconsistent_roundtrip_can_use_another_provider_encryptor() {
     let encrypts = Arc::new(AtomicUsize::new(0));
     let base = decrypt_only(&ciphertext, message.clone(), &calls);
     let derived = decrypt_only(&ciphertext, message, &calls);
-    let local = CryptoProvider::builder().build().unwrap();
-    let other = CryptoProvider::builder()
+    let provider = CryptoProvider::builder()
         .with(Entry::AsymmetricEncryptor(Arc::new(ReferenceEncryptor {
             ciphertext: ciphertext.clone(),
             calls: Arc::clone(&encrypts),
@@ -535,7 +534,7 @@ fn inconsistent_roundtrip_can_use_another_provider_encryptor() {
     let mut checks = Checks::default();
     inconsistent_roundtrip(
         &mut checks,
-        (&local, Some(&other)),
+        &provider,
         (&base, &derived),
         "published reference encryption",
         &encoded,
@@ -655,5 +654,125 @@ fn ed25519_undecodable_public_keys_reach_the_verifier(
             .find(|(public, _)| public[..] == key[..])
             .expect("undecodable key verified");
         assert_eq!(call.1, [identity, [0; 32]].concat());
+    }
+}
+
+/// RSA signature algorithms without generation vectors for the published keys.
+pub(crate) const PARTIAL: [SignatureAlgorithm; 3] = [
+    SignatureAlgorithm::RsaPkcs1v15Md5,
+    SignatureAlgorithm::RsaPkcs1v15Sha3_384,
+    SignatureAlgorithm::RsaPkcs1v15Sha3_512,
+];
+
+struct SigningLoader {
+    signature: Vec<u8>,
+}
+struct SigningKey {
+    signature: Vec<u8>,
+}
+struct FixedVerifier {
+    algorithm: SignatureAlgorithm,
+    signature: Vec<u8>,
+    calls: Arc<Mutex<Vec<SignatureAlgorithm>>>,
+}
+impl PrivateKeyLoader for SigningLoader {
+    fn key_type(&self) -> KeyType {
+        KeyType::Rsa
+    }
+    fn fips(&self) -> bool {
+        false
+    }
+    fn load(&self, _: PrivateKeyMaterial<'_>) -> Result<Box<dyn PrivateKey>, Error> {
+        Ok(Box::new(SigningKey {
+            signature: self.signature.clone(),
+        }))
+    }
+}
+impl PrivateKey for SigningKey {
+    fn key_type(&self) -> KeyType {
+        KeyType::Rsa
+    }
+    fn key_size_bits(&self) -> usize {
+        2048
+    }
+    fn fips(&self) -> bool {
+        false
+    }
+    fn supports(&self, operation: KeyOperation) -> bool {
+        matches!(operation, KeyOperation::Sign(a) if PARTIAL.contains(&a))
+    }
+    fn sign(&self, algorithm: SignatureAlgorithm, _: &[u8]) -> Result<OutputBytes, Error> {
+        if !self.supports(KeyOperation::Sign(algorithm)) {
+            return Err(Error::Unsupported(Algorithm::Signature(algorithm)));
+        }
+        Ok(OutputBytes::new(Zeroizing::new(self.signature.clone())))
+    }
+}
+impl SignatureVerifier for FixedVerifier {
+    fn algorithm(&self) -> SignatureAlgorithm {
+        self.algorithm
+    }
+    fn fips(&self) -> bool {
+        false
+    }
+    fn verify(&self, _: PublicKey<'_>, _: &[u8], signature: &[u8]) -> Result<(), Error> {
+        self.calls.lock().unwrap().push(self.algorithm);
+        if signature == self.signature {
+            Ok(())
+        } else {
+            Err(Error::VerificationFailed)
+        }
+    }
+}
+
+/// A provider whose RSA keys sign the `PARTIAL` algorithms with `signature`, with verifiers that accept only it when `verifiers` is set.
+pub(crate) fn signing_provider(
+    signature: &[u8],
+    verifiers: bool,
+    calls: &Arc<Mutex<Vec<SignatureAlgorithm>>>,
+) -> CryptoProvider {
+    let mut builder = CryptoProvider::builder().with(Entry::PrivateKeyLoader(Arc::new(SigningLoader {
+        signature: signature.to_vec(),
+    })));
+    for algorithm in PARTIAL.into_iter().filter(|_| verifiers) {
+        builder = builder.with(Entry::SignatureVerifier(Arc::new(FixedVerifier {
+            algorithm,
+            signature: signature.to_vec(),
+            calls: Arc::clone(calls),
+        })));
+    }
+    builder.build().unwrap()
+}
+
+#[test]
+fn inconsistent_signatures_cover_algorithms_without_generation_vectors() {
+    let source = v::wycheproof(RSA_SIGN_FILES[0]);
+    let group = &source.test_groups[0];
+    let signature = v::field(&v::tests(group)[0], "sig");
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let base = SigningKey {
+        signature: signature.clone(),
+    };
+    let derived = SigningKey {
+        signature: signature.clone(),
+    };
+    for verifiers in [true, false] {
+        calls.lock().unwrap().clear();
+        let provider = signing_provider(&signature, verifiers, &calls);
+        let mut c = Checks::default();
+        inconsistent_signatures(
+            &mut c,
+            &provider,
+            &base,
+            &derived,
+            "inconsistent RSA routing",
+            (RSA_SIGN_FILES[0], group),
+        );
+        c.finish();
+        let calls = calls.lock().unwrap();
+        for algorithm in PARTIAL {
+            let count = calls.iter().filter(|&&actual| actual == algorithm).count();
+            assert_eq!(count, if verifiers { 2 } else { 0 }, "{algorithm:?}");
+        }
     }
 }

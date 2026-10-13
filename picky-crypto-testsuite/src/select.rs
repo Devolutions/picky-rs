@@ -1,3 +1,9 @@
+//! Lookups of the published vectors that checks need beyond running whole files.
+//!
+//! A check that builds a test from published data, or needs a baseline that must succeed, picks the vector here by property, never by position.
+//! Each function only finds and returns a vector; callers transform it.
+//! When nothing matches, the function panics with the file and the missing property, so a check can't pass without the vector it relies on.
+
 use picky_crypto::{CipherAlgorithm, KeyType};
 use serde_json::Value;
 

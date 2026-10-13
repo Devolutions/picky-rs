@@ -194,8 +194,7 @@ pub fn inconsistent_rsa(c: &mut Checks, p: &CryptoProvider) {
 
 pub fn inconsistent_signatures(
     c: &mut Checks,
-    local: &CryptoProvider,
-    fallback: Option<&CryptoProvider>,
+    p: &CryptoProvider,
     base: &dyn PrivateKey,
     key: &dyn PrivateKey,
     id: &str,
@@ -210,10 +209,7 @@ pub fn inconsistent_signatures(
         if !base_supported && !derived_supported {
             continue;
         }
-        let verifiers = [
-            helpers::signature_verifier(local, algorithm).ok(),
-            fallback.and_then(|provider| helpers::signature_verifier(provider, algorithm).ok()),
-        ];
+        let verifier = helpers::signature_verifier(p, algorithm).ok();
         let tests = v::tests(group);
         let tests = if algorithm == source_algorithm {
             tests
@@ -234,7 +230,7 @@ pub fn inconsistent_signatures(
                 if algorithm == source_algorithm {
                     c.bytes(&id, signature, &v::field(t, "sig"));
                 }
-                for verifier in verifiers.iter().flatten() {
+                if let Some(verifier) = verifier {
                     c.call(&format!("{id}/positive verification"), Expect::Success, || {
                         verifier.verify(PublicKey(&public), &message, signature)
                     });
@@ -249,21 +245,18 @@ pub fn inconsistent_signatures(
                 if algorithm == source_algorithm {
                     c.bytes(&id, &signature, &v::field(t, "sig"));
                 }
-                for verifier in verifiers.iter().flatten() {
+                if let Some(verifier) = verifier {
                     c.call(&id, Expect::Success, || {
                         verifier.verify(PublicKey(&public), &message, &signature)
                     });
-                }
-                if verifiers.iter().all(Option::is_none) {
-                    if let Some(positive) = &positive {
-                        c.bytes(&id, &signature, positive);
-                    } else {
-                        c.check(
-                            &id,
-                            false,
-                            "no verifier or deterministic positive control for inconsistent-key signature",
-                        );
-                    }
+                } else if let Some(positive) = &positive {
+                    c.bytes(&id, &signature, positive);
+                } else {
+                    c.check(
+                        &id,
+                        false,
+                        "no verifier or deterministic positive control for inconsistent-key signature",
+                    );
                 }
             }
         }
@@ -272,23 +265,19 @@ pub fn inconsistent_signatures(
 
 pub fn inconsistent_roundtrip(
     c: &mut Checks,
-    providers: (&CryptoProvider, Option<&CryptoProvider>),
+    p: &CryptoProvider,
     keys: (&dyn PrivateKey, &dyn PrivateKey),
     id: &str,
     encoded: &[u8],
     algorithm: AsymmetricEncryptionAlgorithm,
 ) {
-    let (local, other) = providers;
     let (base, key) = keys;
     if !c.key_supports(id, base, KeyOperation::Decrypt(algorithm))
         || !c.key_supports(id, key, KeyOperation::Decrypt(algorithm))
     {
         return;
     }
-    let encryptor = helpers::asymmetric_encryptor(local, algorithm)
-        .ok()
-        .or_else(|| other.and_then(|provider| helpers::asymmetric_encryptor(provider, algorithm).ok()));
-    let Some(encryptor) = encryptor else {
+    let Ok(encryptor) = helpers::asymmetric_encryptor(p, algorithm) else {
         return;
     };
     let public = der::rsa_public(encoded);
@@ -341,7 +330,7 @@ fn inconsistent_rsa_signing(c: &mut Checks, p: &CryptoProvider) {
                     loader.load(PrivateKeyMaterial::Pkcs8(&malformed))
                 }) {
                     exported(c, &id, &*key, &der::rsa_public(&encoding));
-                    inconsistent_signatures(c, p, None, &*base, &*key, &id, (file, g));
+                    inconsistent_signatures(c, p, &*base, &*key, &id, (file, g));
                 }
             }
         }
@@ -349,10 +338,10 @@ fn inconsistent_rsa_signing(c: &mut Checks, p: &CryptoProvider) {
 }
 
 /// A published test, its group's PKCS#8 key and another key of the same size.
-pub type DecryptionBase<'a> = (&'a Value, Vec<u8>, Option<Vec<u8>>);
+type DecryptionBase<'a> = (&'a Value, Vec<u8>, Option<Vec<u8>>);
 
 /// Returns each must-support key of an RSA decryption file with its first valid unlabeled test and another key of the same size for the `qInv` substitution.
-pub fn decryption_bases(vectors: &v::Wycheproof) -> Vec<DecryptionBase<'_>> {
+fn decryption_bases(vectors: &v::Wycheproof) -> Vec<DecryptionBase<'_>> {
     let groups = &vectors.test_groups;
     groups
         .iter()
@@ -413,7 +402,7 @@ fn inconsistent_rsa_decryption(c: &mut Checks, p: &CryptoProvider) {
                             c.bytes(&id, &out, &plaintext);
                         }
                     }
-                    inconsistent_roundtrip(c, (p, None), (&*base, &*key), &id, &encoded, a);
+                    inconsistent_roundtrip(c, p, (&*base, &*key), &id, &encoded, a);
                 }
             }
         }

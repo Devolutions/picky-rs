@@ -1,8 +1,8 @@
 //! RSA encryption by one provider and decryption by the other.
 
 use picky_crypto::*;
+use proptest::prelude::*;
 
-use super::selected;
 use crate::algorithms::*;
 use crate::harness::{Checks, Expect};
 use crate::keys::*;
@@ -39,12 +39,14 @@ fn cross_encryption(c: &mut Checks, source: &CryptoProvider, dest: &CryptoProvid
             continue;
         }
         let messages = select::rsa_messages(rsa_plaintext_limit(a, k));
-        selected(c, &format!("{a:?}/{id}"), &messages, |(_, data)| {
-            let encrypted = encryptor.encrypt(PublicKey(&public), data)?;
-            Ok((
-                key.decrypt(a, &encrypted)?,
-                OutputBytes::new(Zeroizing::new(data.clone())),
-            ))
+        let id = format!("{a:?}/{id}");
+        c.property(&id, 0..messages.len(), |index| {
+            let fail = |e: Error| TestCaseError::fail(format!("{id}/index={index}: {e}"));
+            let (_, data) = &messages[index];
+            let encrypted = encryptor.encrypt(PublicKey(&public), data).map_err(fail)?;
+            let decrypted = key.decrypt(a, &encrypted).map_err(fail)?;
+            prop_assert_eq!(decrypted.as_ref(), data.as_slice());
+            Ok(())
         });
     }
 }

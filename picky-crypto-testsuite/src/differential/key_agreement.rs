@@ -1,8 +1,7 @@
-//! Cross-provider ephemeral agreement and static agreement with the same published keys.
+//! Ephemeral agreement between the two providers: each must accept the public values the other generates.
 
 use picky_crypto::*;
 
-use super::outputs;
 use crate::algorithms::*;
 use crate::harness::{Checks, Expect};
 use crate::keys::*;
@@ -31,61 +30,6 @@ pub fn run(a: &CryptoProvider, b: &CryptoProvider) {
                     be.generate_ephemeral(group.parameters())?,
                 )?)
             });
-        }
-    }
-    if let (Ok(al), Ok(bl)) = (
-        helpers::private_key_loader(a, KeyType::X25519),
-        helpers::private_key_loader(b, KeyType::X25519),
-    ) {
-        for g in v::wycheproof("x25519_test.json").test_groups {
-            for t in v::tests(&g) {
-                if v::field(t, "shared").iter().all(|b| *b == 0) {
-                    continue;
-                }
-                let scalar: [u8; 32] = v::field(t, "private").try_into().unwrap();
-                let id = v::id(KeyAgreementAlgorithm::X25519, "x25519_test.json", t);
-                let left = c.call(&id, Expect::Success, || al.load(PrivateKeyMaterial::X25519(&scalar)));
-                let right = c.call(&id, Expect::Success, || bl.load(PrivateKeyMaterial::X25519(&scalar)));
-                if let (Some(left), Some(right)) = (left, right) {
-                    let ls = c.key_supports(&id, &*left, KeyOperation::Agree(KeyAgreementAlgorithm::X25519));
-                    let rs = c.key_supports(&id, &*right, KeyOperation::Agree(KeyAgreementAlgorithm::X25519));
-                    if ls && rs {
-                        outputs(
-                            &mut c,
-                            &id,
-                            || left.agree(KeyAgreementAlgorithm::X25519, &v::field(t, "public")),
-                            || right.agree(KeyAgreementAlgorithm::X25519, &v::field(t, "public")),
-                        );
-                    }
-                }
-            }
-        }
-    }
-    if let (Ok(al), Ok(bl)) = (
-        helpers::private_key_loader(a, KeyType::Ffdh),
-        helpers::private_key_loader(b, KeyType::Ffdh),
-    ) {
-        for (i, group) in v::dh_groups().into_iter().take(3).enumerate() {
-            let fields = v::rfc5114(i + 1);
-            let id = format!("{}/A.{}/cross static FFDH", group.id, i + 1);
-            let material = PrivateKeyMaterial::Ffdh {
-                parameters: group.parameters(),
-                private_value: &fields["xA"],
-            };
-            let left = c.call(&id, Expect::Success, || al.load(material));
-            let right = c.call(&id, Expect::Success, || bl.load(material));
-            if let (Some(left), Some(right)) = (left, right) {
-                let ls = c.key_supports(&id, &*left, KeyOperation::Agree(KeyAgreementAlgorithm::Ffdh));
-                let rs = c.key_supports(&id, &*right, KeyOperation::Agree(KeyAgreementAlgorithm::Ffdh));
-                if ls && rs {
-                    outputs(
-                        &mut c,
-                        &id,
-                        || left.agree(KeyAgreementAlgorithm::Ffdh, &fields["yB"]),
-                        || right.agree(KeyAgreementAlgorithm::Ffdh, &fields["yB"]),
-                    );
-                }
-            }
         }
     }
     c.finish();

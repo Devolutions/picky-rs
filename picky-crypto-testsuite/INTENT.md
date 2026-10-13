@@ -41,6 +41,7 @@ The suite verifies, for every algorithm a provider advertises:
 For every algorithm a provider does not advertise, the suite verifies that the operation returns `Unsupported`.
 
 Differential areas take two providers and compare them (for example, sign with one and verify with the other); the runner calls them for every pair of providers in a build.
+A check is differential only if one provider alone can't show the same thing.
 
 ## Authority
 
