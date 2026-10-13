@@ -20,7 +20,8 @@ Sources, versions and checksums are in `vectors/manifest.toml`; `cargo xtask che
 
 - Structural inputs are not limited to empty, zero, one, or lengths at or beyond a limit.
 - A hand-written input that targets one check carries a control in the test asserting that every other check holds, so it can fail only for the intended reason.
-- A control sits at a boundary the contract defines: the accepted value next to a rejected range limit, or just above the must-support set, where it accepts success or `Unsupported`.
+- A control sits at a boundary the contract defines: the accepted value next to a rejected range limit, or the value just above the must-support set.
+  It accepts success, or `Unsupported` when its value is outside the must-support set.
   It asserts only contract properties, and differential runs compare its output between backends when it has no published answer.
 - Keep controls small: omit any control whose processing could exhaust a conforming backend's time or memory, and record the boundary it leaves unchecked as a known gap in `CONTRACT.md` section 12.
 - Prefer deriving such inputs from published ones.

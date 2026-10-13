@@ -802,6 +802,7 @@ Each of these, except the PBKDF2 output above the maximum, has a control at the 
 PBKDF2 also has a control at the edge of the must-support set, an output one byte above it, which succeeds or returns [`Error::Unsupported`], never [`Error::InvalidInput`].
 In differential runs, the outputs of these controls are also compared between the two backends whenever both produce one and the control has no published answer.
 Known gap: an inward off-by-one at the PBKDF2 maximum output length is not detected, because a control at that length could exhaust a conforming backend's time or memory.
+Known gap: the error a backend's PBKDF2 size limit returns is not checked, because reaching it needs an output too large for a control.
 
 Labels follow Wycheproof:
 
