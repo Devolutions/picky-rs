@@ -130,6 +130,18 @@ pub fn run(p: &CryptoProvider, _: Options) {
                     || transform(e, protection, &wrong, iv, data),
                 );
             }
+            if a == CipherAlgorithm::Rc2Cbc {
+                // Controls for the rejected lengths 0 and 129: the adjacent in-range lengths, outside the must-support set.
+                for length in [1, 128] {
+                    let (source, in_range) = select::message_of_length(length);
+                    let id = format!("{a:?}/{protection:?}/key length={length}/{source}");
+                    if let Some(out) = c.outcome(&id, Expect::Success, Some((Algorithm::Cipher(a), false)), || {
+                        transform(e, protection, &in_range, iv, data)
+                    }) {
+                        c.check(&id, out.len() == data.len(), "output length");
+                    }
+                }
+            }
         }
         if a == CipherAlgorithm::TdesEde3Cbc {
             weak_tdes_checks(&mut c, e, select::cbc_control(a, &records), protections);

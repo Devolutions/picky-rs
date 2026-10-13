@@ -19,7 +19,19 @@ pub fn run(p: &CryptoProvider, _: Options) {
             }
         };
         let file = format!("pbkdf2_hmac{sha}_test.json");
-        for group in v::wycheproof(&file).test_groups {
+        let vectors = v::wycheproof(&file);
+        // Bound checks use a published password and salt, so they can fail only for the bound under test.
+        let (source, password, salt) = vectors
+            .test_groups
+            .iter()
+            .flat_map(v::tests)
+            .find(|t| v::string(t, "result") == "valid")
+            .map(|t| {
+                let source = format!("{file}/tcId={}", v::number(t, "tcId"));
+                (source, v::field(t, "password"), v::field(t, "salt"))
+            })
+            .expect("a valid PBKDF2 test");
+        for group in vectors.test_groups {
             for t in v::tests(&group) {
                 let id = v::id(a, &file, t);
                 let iterations = v::number(t, "iterationCount");
@@ -41,14 +53,25 @@ pub fn run(p: &CryptoProvider, _: Options) {
                 }
             }
         }
-        for (iterations, length) in [(0, 1), (1, 0)]
-            .into_iter()
-            .chain(maximum(HASHES[index + 2].output_len()).map(|n| (1, n)))
-        {
+        let maximum = maximum(HASHES[index + 2].output_len());
+        for (iterations, length) in [(0, 1), (1, 0)].into_iter().chain(maximum.map(|n| (1, n))) {
             c.call(
-                &format!("{a:?}/bounds/{iterations}/{length}"),
+                &format!("{a:?}/bounds/{iterations}/{length}/{source}"),
                 Expect::Error(Error::InvalidInput),
-                || e.derive(&[], &[], iterations, length),
+                || e.derive(&password, &salt, iterations, length),
+            );
+        }
+        // Controls: one iteration with a one-byte output is in the must-support set, and the RFC 8018 maximum is in the valid domain.
+        let id = format!("{a:?}/bounds/1/1/{source}");
+        if let Some(out) = c.call(&id, Expect::Success, || e.derive(&password, &salt, 1, 1)) {
+            c.check(&id, out.len() == 1, "output length");
+        }
+        if let Some(n) = maximum {
+            c.outcome(
+                &format!("{a:?}/bounds/1/{}/{source}", n - 1),
+                Expect::Success,
+                Some((Algorithm::PasswordKdf(a), false)),
+                || e.derive(&password, &salt, 1, n - 1).map(|_| ()),
             );
         }
         if a == PasswordKdfAlgorithm::Pbkdf2HmacSha1 {

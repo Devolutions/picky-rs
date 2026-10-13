@@ -211,6 +211,16 @@ pub fn rc4_longest_key() -> (String, Vec<u8>) {
     (format!("{file}/tcId={}/ct", v::number(t, "tcId")), v::field(t, "ct"))
 }
 
+/// A published message of exactly `len` bytes, used as an in-range key next to a rejected length; checks using it expect only contract properties.
+pub fn message_of_length(len: usize) -> (String, Vec<u8>) {
+    let file = "hmac_sha1_test.json";
+    let vectors = v::wycheproof(file);
+    let (_, t) = test(file, &vectors, &format!("{len}-byte message"), |_, t| {
+        v::field(t, "msg").len() == len
+    });
+    (format!("{file}/tcId={}/msg", v::number(t, "tcId")), v::field(t, "msg"))
+}
+
 pub fn rsa_plaintext(limit: usize) -> (String, Vec<u8>) {
     required(
         "rfc/rfc1320.txt; rfc/rfc8032.txt",
