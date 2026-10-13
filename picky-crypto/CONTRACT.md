@@ -811,7 +811,9 @@ For each of them, conformance tests assert that nothing panics and that the resu
 - loading a PKCS#8 document that carries `attributes` (section 5.2): success or [`Error::InvalidKey`];
 - a 3DES key whose component keys are not pairwise distinct or are DES weak or semi-weak keys (section 6.5): success or [`Error::InvalidKey`];
 - handling of an RSA private key with inconsistent components (section 7): loading returns [`Error::InvalidKey`], or every private-key operation either returns [`Error::InvalidKey`] or produces a result that verifies under (`n`, `e`).
-  For decryption, verification uses a round trip through the provider's encryptor, or through a reference encryptor supplied by the test harness when the implementation under test has no encryptor (for example a hardware key).
+  For decryption, the ciphertext comes from the first source that produces one for the algorithm: the base key's published ciphertexts, then the conformance runner's reference encryptor from another backend in the same build, then the provider's own encryptor.
+  The expected plaintext is the published one for a published ciphertext, and the plaintext the suite encrypted for the other two sources.
+  The check is never skipped: it fails if no source produces a ciphertext.
   Each backend is checked on its own; differential runs do not repeat this check or compare outcomes between backends.
 
 The inputs for that last property are derived from published keys, because the known published RSA test vectors contain no keys with inconsistent components:
