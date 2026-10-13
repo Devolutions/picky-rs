@@ -268,7 +268,7 @@ pub fn inconsistent_signatures(
 pub enum CiphertextSource {
     /// A published ciphertext of the base key, which decrypts to its published plaintext.
     Published,
-    /// The encryptor of [`Options::reference_provider`], a different backend in the build.
+    /// The encryptor of [`Options::reference_provider`], from other backends in the build.
     Reference,
     /// The encryptor of the provider under test, as a round trip.
     Own,
@@ -297,7 +297,7 @@ pub fn inconsistent_decryption(
     for algorithm in ENCRYPTIONS {
         let id = format!("{id}/{algorithm:?}");
         if !c.key_supports(&id, key, KeyOperation::Decrypt(algorithm)) {
-            // A modulus-length ciphertext of value zero is in the valid domain, so only the advertisement decides the outcome.
+            // An in-domain input, so the expected `Unsupported` doesn't depend on its value.
             let ciphertext = vec![0; modulus_len];
             c.call(
                 &format!("{id}/not advertised"),
@@ -306,13 +306,17 @@ pub fn inconsistent_decryption(
             );
             continue;
         }
-        let Some((source, ciphertext, expected)) =
-            ciphertext_source(p, options, algorithm, public, modulus_len, published)
-        else {
-            c.check(&id, false, "no source produced a ciphertext for the derived key");
-            continue;
-        };
-        c.count(format!("inconsistent RSA decryption ciphertext from {source:?}"));
+        let (source, ciphertext, expected) =
+            match ciphertext_source(p, options, algorithm, public, modulus_len, published) {
+                Ok(found) => found,
+                Err(reasons) => {
+                    c.check(&id, false, format!("no source produced a ciphertext: {reasons}"));
+                    continue;
+                }
+            };
+        c.count(format!(
+            "inconsistent RSA decryption: {algorithm:?} ciphertext from {source:?}"
+        ));
         let id = format!("{id}/{source:?} ciphertext");
         if c.key_supports(&id, base, KeyOperation::Decrypt(algorithm)) {
             if let Some(positive) = c.call(&format!("{id}/positive control"), Expect::Success, || {
@@ -329,7 +333,7 @@ pub fn inconsistent_decryption(
     }
 }
 
-/// Returns the first ciphertext a [`CiphertextSource`] produces, with its source and expected plaintext.
+/// Returns the first ciphertext a [`CiphertextSource`] produces, with its source and expected plaintext, or why each encryptor produced none.
 fn ciphertext_source(
     p: &CryptoProvider,
     options: Options,
@@ -337,21 +341,32 @@ fn ciphertext_source(
     public: &[u8],
     modulus_len: usize,
     published: Option<PublishedCiphertext<'_>>,
-) -> Option<(CiphertextSource, Vec<u8>, Vec<u8>)> {
+) -> Result<(CiphertextSource, Vec<u8>, Vec<u8>), String> {
     if let Some((_, ciphertext, plaintext)) = published.filter(|(a, _, _)| *a == algorithm) {
-        return Some((CiphertextSource::Published, ciphertext.to_vec(), plaintext.to_vec()));
+        return Ok((CiphertextSource::Published, ciphertext.to_vec(), plaintext.to_vec()));
     }
     let (_, message) = select::rsa_plaintext(rsa_plaintext_limit(algorithm, modulus_len));
-    [
+    let mut reasons = vec!["no published ciphertext".to_owned()];
+    for (source, provider) in [
         (CiphertextSource::Reference, options.reference_provider),
         (CiphertextSource::Own, Some(p)),
-    ]
-    .into_iter()
-    .find_map(|(source, provider)| {
-        let encryptor = helpers::asymmetric_encryptor(provider?, algorithm).ok()?;
-        let ciphertext = encryptor.encrypt(PublicKey(public), &message).ok()?;
-        Some((source, ciphertext.to_vec(), message.clone()))
-    })
+    ] {
+        let Some(provider) = provider else {
+            reasons.push(format!("{source:?}: no provider"));
+            continue;
+        };
+        let encrypted = helpers::asymmetric_encryptor(provider, algorithm).map(|encryptor| {
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                encryptor.encrypt(PublicKey(public), &message)
+            }))
+        });
+        match encrypted {
+            Ok(Ok(Ok(ciphertext))) => return Ok((source, ciphertext.to_vec(), message)),
+            Ok(Ok(Err(error))) | Err(error) => reasons.push(format!("{source:?}: {error:?}")),
+            Ok(Err(_)) => reasons.push(format!("{source:?}: encryption panicked")),
+        }
+    }
+    Err(reasons.join("; "))
 }
 
 /// Checks public-key export from an RSA key derived with inconsistent components: `InvalidKey`, or exactly the base key's encoding.

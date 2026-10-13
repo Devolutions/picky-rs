@@ -3,8 +3,7 @@
 
 use std::sync::OnceLock;
 
-use picky_crypto::{CryptoProvider, helpers};
-use picky_crypto_testsuite::algorithms::ENCRYPTIONS;
+use picky_crypto::CryptoProvider;
 use picky_crypto_testsuite::harness::Options;
 
 /// Defines one test per conformance area, calling the enclosing module's `provider_under_test` and `options_under_test`.
@@ -77,12 +76,22 @@ macro_rules! pairs {
     };
 }
 
-/// Returns the first registered provider of another backend with an RSA encryptor, which supplies reference ciphertexts to the decryption checks on inconsistent RSA keys.
+/// Returns the providers of every other backend combined with `with_fallback`, which supply reference ciphertexts to the decryption checks on inconsistent RSA keys.
 fn reference_provider(backend: &str) -> Option<&'static CryptoProvider> {
-    registry()
-        .iter()
-        .find(|(b, p)| *b != backend && ENCRYPTIONS.iter().any(|a| helpers::asymmetric_encryptor(p, *a).is_ok()))
-        .map(|(_, p)| p)
+    static REFERENCES: OnceLock<Vec<(&'static str, Option<CryptoProvider>)>> = OnceLock::new();
+    let references = REFERENCES.get_or_init(|| {
+        registry()
+            .iter()
+            .map(|(backend, _)| {
+                let others = registry().iter().filter(|(other, _)| other != backend);
+                (
+                    *backend,
+                    others.map(|(_, p)| p.clone()).reduce(|a, b| a.with_fallback(&b)),
+                )
+            })
+            .collect()
+    });
+    references.iter().find(|(b, _)| *b == backend)?.1.as_ref()
 }
 
 fn empty() -> CryptoProvider {

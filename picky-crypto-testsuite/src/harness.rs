@@ -14,7 +14,7 @@ use crate::algorithms::extended;
 pub struct Options {
     /// Accept `VerificationFailed` for an unusable public key (contract section 4).
     pub opaque_public_key_errors: bool,
-    /// A provider from a different backend in the same build, whose RSA encryptors produce reference ciphertexts.
+    /// The other backends in the same build, combined into one provider, whose RSA encryptors produce reference ciphertexts.
     /// Decryption checks on RSA keys with inconsistent components use it when the base key has no published ciphertext for the algorithm.
     pub reference_provider: Option<&'static CryptoProvider>,
 }

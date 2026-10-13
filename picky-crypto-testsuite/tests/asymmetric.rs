@@ -445,11 +445,21 @@ fn static_ffdh_peer_errors_need_no_ephemeral_entry() {
 type Table = Arc<Mutex<Vec<(Vec<u8>, Vec<u8>)>>>;
 type DecryptCalls = Arc<Mutex<Vec<(AsymmetricEncryptionAlgorithm, Vec<u8>)>>>;
 
+/// What a mock encryptor does.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Encryption {
+    Absent,
+    Works,
+    Fails,
+    Panics,
+}
+
 /// Encrypts to a ciphertext of `tag` bytes and records the plaintext in the table.
 struct TableEncryptor {
     algorithm: AsymmetricEncryptionAlgorithm,
     tag: u8,
     table: Table,
+    encryption: Encryption,
 }
 impl AsymmetricEncryptor for TableEncryptor {
     fn algorithm(&self) -> AsymmetricEncryptionAlgorithm {
@@ -459,6 +469,11 @@ impl AsymmetricEncryptor for TableEncryptor {
         false
     }
     fn encrypt(&self, _: PublicKey<'_>, message: &[u8]) -> Result<OutputBytes, Error> {
+        match self.encryption {
+            Encryption::Fails => return Err(Error::InvalidInput),
+            Encryption::Panics => panic!("mock encryptor panic"),
+            _ => {}
+        }
         let ciphertext = vec![self.tag; 256];
         self.table.lock().unwrap().push((ciphertext.clone(), message.to_vec()));
         Ok(OutputBytes::new(Zeroizing::new(ciphertext)))
@@ -570,19 +585,32 @@ fn published_decryption() -> (Vec<u8>, AsymmetricEncryptionAlgorithm, Vec<u8>, V
 /// Runs the derived-key decryption checks with the published ciphertext, a reference encryptor and the provider's own encryptor as selected.
 fn derived_decryption(base: &TableKey, derived: &TableKey, sources: [bool; 3]) -> Checks {
     let [published, reference, own] = sources;
+    let encryption = |works| if works { Encryption::Works } else { Encryption::Absent };
+    derived_decryption_with(base, derived, published, [encryption(reference), encryption(own)])
+}
+
+/// Runs the derived-key decryption checks with the given reference and own encryptors.
+fn derived_decryption_with(
+    base: &TableKey,
+    derived: &TableKey,
+    published: bool,
+    encryptors: [Encryption; 2],
+) -> Checks {
+    let [reference, own] = encryptors;
     let (encoded, algorithm, ciphertext, plaintext) = published_decryption();
     derived
         .table
         .lock()
         .unwrap()
         .push((ciphertext.clone(), plaintext.clone()));
-    let encryptor = |tag, available| {
+    let encryptor = |tag, encryption| {
         let mut builder = CryptoProvider::builder();
-        if available {
+        if encryption != Encryption::Absent {
             builder = builder.with(Entry::AsymmetricEncryptor(Arc::new(TableEncryptor {
                 algorithm,
                 tag,
                 table: Arc::clone(&derived.table),
+                encryption,
             })));
         }
         builder.build().unwrap()
@@ -630,8 +658,35 @@ fn derived_decryption_uses_the_first_available_source(
     };
     assert!(c.failures.is_empty(), "{:?}", c.failures);
     assert_eq!(derived.inputs(algorithm), [input]);
-    let label = format!("inconsistent RSA decryption ciphertext from {source:?}");
+    // The published entry plus one per encryption, so the published source encrypts nothing.
+    assert_eq!(
+        table.lock().unwrap().len(),
+        1 + usize::from(source != CiphertextSource::Published)
+    );
+    let label = format!("inconsistent RSA decryption: {algorithm:?} ciphertext from {source:?}");
     assert_eq!(c.coverage.into_iter().collect::<Vec<_>>(), [(label, 1)]);
+}
+
+#[rstest]
+fn failing_reference_encryption_falls_through_to_the_own_encryptor(
+    #[values(Encryption::Fails, Encryption::Panics)] reference: Encryption,
+    #[values(Encryption::Absent, Encryption::Works)] own: Encryption,
+) {
+    let (_, algorithm, _, _) = published_decryption();
+    let table = Table::default();
+    let derived = TableKey::new(&[algorithm], &table);
+    let c = derived_decryption_with(&TableKey::new(&ENCRYPTIONS, &table), &derived, false, [reference, own]);
+    if own == Encryption::Absent {
+        let reason = match reference {
+            Encryption::Fails => "Reference: InvalidInput",
+            _ => "Reference: encryption panicked",
+        };
+        assert!(c.failures.iter().any(|f| f.contains(reason)), "{:?}", c.failures);
+        assert!(derived.inputs(algorithm).is_empty());
+    } else {
+        assert!(c.failures.is_empty(), "{:?}", c.failures);
+        assert_eq!(derived.inputs(algorithm), [vec![2; 256]]);
+    }
 }
 
 #[rstest]
@@ -724,6 +779,7 @@ fn derived_keys_without_signing_get_export_and_decryption_checks() {
             algorithm,
             tag,
             table: Arc::clone(&table),
+            encryption: Encryption::Works,
         })));
     }
     let mut c = Checks::default();
@@ -741,6 +797,7 @@ fn derived_keys_without_signing_get_export_and_decryption_checks() {
         }
     }
 }
+
 #[test]
 fn changed_ffc_exponents_are_in_range() {
     let cases = v::response(FFC_FILE)
