@@ -102,24 +102,69 @@ impl StreamCipher for FixedRc4 {
     }
 }
 
+/// RC2-CBC that XORs every byte with `pad`, in both directions.
+struct FixedRc2(u8);
+impl Cipher for FixedRc2 {
+    fn algorithm(&self) -> CipherAlgorithm {
+        CipherAlgorithm::Rc2Cbc
+    }
+    fn fips(&self) -> bool {
+        false
+    }
+    fn supports(&self, _: Protection) -> bool {
+        true
+    }
+    fn encrypt(&self, _: &[u8], _: &[u8], data: &[u8]) -> Result<OutputBytes, Error> {
+        Ok(OutputBytes::new(Zeroizing::new(
+            data.iter().map(|b| b ^ self.0).collect(),
+        )))
+    }
+    fn decrypt(&self, key: &[u8], iv: &[u8], data: &[u8]) -> Result<OutputBytes, Error> {
+        self.encrypt(key, iv, data)
+    }
+}
+
+/// PBKDF2-HMAC-SHA1 that returns `output_len` copies of `pad` above 64 bytes, beyond the published-input property's lengths, and zeros otherwise.
+struct FixedPbkdf2(u8);
+impl PasswordKdf for FixedPbkdf2 {
+    fn algorithm(&self) -> PasswordKdfAlgorithm {
+        PasswordKdfAlgorithm::Pbkdf2HmacSha1
+    }
+    fn fips(&self) -> bool {
+        false
+    }
+    fn derive(&self, _: &[u8], _: &[u8], _: u32, output_len: usize) -> Result<OutputBytes, Error> {
+        let byte = if output_len > 64 { self.0 } else { 0 };
+        Ok(OutputBytes::new(Zeroizing::new(vec![byte; output_len])))
+    }
+}
+
+/// Each boundary-control comparison fails exactly when the two providers' entries for it disagree.
 #[rstest::rstest]
-#[case::same_keystreams(1, false)]
-#[case::different_keystreams(2, true)]
-fn boundary_control_outputs_must_agree(#[case] pad: u8, #[case] fails: bool) {
-    let provider = |pad| {
+#[case::all_agree([1, 1, 1], None)]
+#[case::rc4_differs([2, 1, 1], Some("Rc4/key length="))]
+#[case::rc2_differs([1, 2, 1], Some("Rc2Cbc/"))]
+#[case::pbkdf2_differs([1, 1, 2], Some("Pbkdf2HmacSha1/bounds/1/"))]
+fn boundary_control_outputs_must_agree(#[case] pads: [u8; 3], #[case] differing: Option<&str>) {
+    let provider = |[rc4, rc2, pbkdf2]: [u8; 3]| {
         CryptoProvider::builder()
-            .with(Entry::StreamCipher(Arc::new(FixedRc4(pad))))
+            .with(Entry::StreamCipher(Arc::new(FixedRc4(rc4))))
+            .with(Entry::Cipher(Arc::new(FixedRc2(rc2))))
+            .with(Entry::PasswordKdf(Arc::new(FixedPbkdf2(pbkdf2))))
             .build()
             .unwrap()
     };
-    let (a, b) = (provider(1), provider(pad));
+    let (a, b) = (provider([1, 1, 1]), provider(pads));
     let failure = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| differential::symmetric::run(&a, &b)))
         .err()
         .and_then(|panic| panic.downcast_ref::<String>().cloned())
         .unwrap_or_default();
-    assert_eq!(
-        failure.contains("key length=1") && failure.contains("outputs differ"),
-        fails,
-        "{failure}"
-    );
+    let differ = |marker: &str| {
+        failure
+            .lines()
+            .any(|line| line.contains(marker) && line.contains("/differential") && line.contains("outputs differ"))
+    };
+    for marker in ["Rc4/key length=", "Rc2Cbc/", "Pbkdf2HmacSha1/bounds/1/"] {
+        assert_eq!(differ(marker), differing == Some(marker), "{marker}: {failure}");
+    }
 }
