@@ -418,6 +418,7 @@ pub fn runner(file: &'static str) -> TestRunner {
 }
 
 pub fn property<S: Strategy>(id: &str, strategy: S, test: impl Fn(S::Value) -> Result<(), TestCaseError>) {
+    // A runner built by hand has no test source file for proptest's default location, so failures go to one file in this crate.
     let result = runner(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/proptest-regressions/properties.txt"

@@ -1,0 +1,4 @@
+# Shrunk failing cases of the conformance suite's property tests; proptest replays them before generating new cases.
+# The properties use a fixed seed, so a regular run reproduces its own failures without this file.
+# Larger runs, such as the weekly extended run (PICKY_CRYPTO_TESTSUITE_EXTENDED=1), try cases a regular run doesn't reach.
+# proptest appends a `cc` line here for each such failure; committing it makes every later run, including regular CI, replay that case.
