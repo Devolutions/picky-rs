@@ -135,18 +135,17 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # The .NET bindings are compatible up to .NET 6 SDK.
+      # The .NET bindings target net8.0.
       # We run the tests of the oldest compatible framework.
-      - name: Install .NET 6 SDK
+      - name: Install .NET 8 SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.x'
+          dotnet-version: '8.0.x'
 
       # Release matches what ships (the ffi-production/NuGet build).
       # Furthermore, debug builds currently trip std precondition checks at the FFI boundary.
       # FIXME/TODO: Once we updated Diplomat to a newer version, it’s worth switching to a matrix
       # for testing both the debug and release builds.
-      # NOTE: support for netstandard2.0 will be dropped once we get rid of the specialized Diplomat fork.
       - name: Build native library
         run: cargo build --locked --release -p picky-ffi
         shell: pwsh
