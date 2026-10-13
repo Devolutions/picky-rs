@@ -1,4 +1,4 @@
-//! Checks one provider alone can't make: derived lengths without published answers, and AEAD sealed by one provider and opened by the other.
+//! Checks one provider alone can't make: derived lengths and empty-key HMAC tags without published answers, and AEAD sealed by one provider and opened by the other.
 
 use picky_crypto::*;
 use proptest::prelude::*;
@@ -43,6 +43,23 @@ pub fn run(a: &CryptoProvider, b: &CryptoProvider) {
                 Ok(())
             },
         );
+    }
+    // No published HMAC vector has an empty key, so the providers must agree on its tag.
+    for (index, algorithm) in MACS.into_iter().enumerate() {
+        let generates = |p| helpers::mac(p, algorithm).is_ok_and(|e| e.supports(Protection::Apply));
+        if !(generates(a) && generates(b)) {
+            continue;
+        }
+        let (id, key, data) = published::empty_mac(index);
+        let id = format!("{algorithm:?}/{id}/differential");
+        if let Some((left, right)) = c.call(&id, Expect::Success, || {
+            Ok((
+                helpers::compute_mac(a, algorithm, &key, &data)?.into_inner(),
+                helpers::compute_mac(b, algorithm, &key, &data)?.into_inner(),
+            ))
+        }) {
+            c.check(&id, left == right, "the providers' empty-key tags differ");
+        }
     }
     // Sealing picks a random nonce, so no published answer covers a sealed message.
     for (source, dest) in [(a, b), (b, a)] {

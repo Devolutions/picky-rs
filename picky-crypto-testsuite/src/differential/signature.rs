@@ -1,7 +1,8 @@
-//! Signatures the signing provider can't verify itself, verified by the other provider.
+//! Signatures the signing provider can't verify against a published answer, verified by the other provider.
 //!
 //! ECDSA signatures are randomized, and the published RSA keys have published signatures only for their group's hash.
 //! A provider that signs with an algorithm it has no verifier for can show only the signature's length, so the other provider's verifier checks it.
+//! RSA PKCS#1 v1.5 with MD5 has no published vectors at all, so a provider's own verifier can't pin its signatures, and the other provider always verifies them.
 
 use picky_crypto::*;
 
@@ -18,13 +19,13 @@ pub fn run(a: &CryptoProvider, b: &CryptoProvider) {
     c.finish();
 }
 
-/// Returns `dest`'s verifier for `algorithm` when `source` has none.
+/// Returns `dest`'s verifier for `algorithm` when `source` has none, or when no published vector checks `source`'s.
 fn unverifiable<'a>(
     source: &CryptoProvider,
     dest: &'a CryptoProvider,
     algorithm: SignatureAlgorithm,
 ) -> Option<&'a dyn SignatureVerifier> {
-    if helpers::signature_verifier(source, algorithm).is_ok() {
+    if algorithm != SignatureAlgorithm::RsaPkcs1v15Md5 && helpers::signature_verifier(source, algorithm).is_ok() {
         return None;
     }
     helpers::signature_verifier(dest, algorithm).ok()
