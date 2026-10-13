@@ -7,7 +7,7 @@ impl Cbc {
     fn run(&self, key: &[u8], iv: &[u8], data: &[u8], encrypt: bool) -> Result<OutputBytes, Error> {
         macro_rules! fixed {
             ($cipher:ty, $key_len:expr, $block_len:expr) => {{
-                check(key.len() == $key_len, data, $block_len)?;
+                check(self.0, key.len() == $key_len, iv, data, $block_len)?;
                 transform(
                     <$cipher>::new_from_slice(key).map_err(|_| Error::InvalidKey)?,
                     iv,
@@ -27,7 +27,7 @@ impl Cbc {
             CipherAlgorithm::TdesEde3Cbc => fixed!(des::TdesEde3, 24, 8),
             #[cfg(feature = "legacy")]
             CipherAlgorithm::Rc2Cbc => {
-                check((1..=128).contains(&key.len()), data, 8)?;
+                check(self.0, (1..=128).contains(&key.len()), iv, data, 8)?;
                 transform(rc2::Rc2::new_with_eff_key_len(key, 8 * key.len()), iv, data, encrypt)
             }
             _ => Err(Error::Unsupported(picky_crypto::Algorithm::Cipher(self.0))),
@@ -35,12 +35,19 @@ impl Cbc {
     }
 }
 
-fn check(key_valid: bool, data: &[u8], block: usize) -> Result<(), Error> {
+/// This backend's size limit on data, the contract's must-support maximum for CBC data (2^31 − 1 bytes).
+const DATA_SIZE_LIMIT: usize = i32::MAX as usize;
+
+/// Checks fixed lengths first, then the size limit, so oversized data is never copied.
+fn check(algorithm: CipherAlgorithm, key_valid: bool, iv: &[u8], data: &[u8], block: usize) -> Result<(), Error> {
     if !key_valid {
         return Err(Error::InvalidKey);
     }
-    if data.len() % block != 0 {
+    if iv.len() != block || data.len() % block != 0 {
         return Err(Error::InvalidInput);
+    }
+    if data.len() > DATA_SIZE_LIMIT {
+        return Err(Error::Unsupported(picky_crypto::Algorithm::Cipher(algorithm)));
     }
     Ok(())
 }

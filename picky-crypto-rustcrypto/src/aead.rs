@@ -6,16 +6,28 @@ use picky_crypto::{Aead, AeadAlgorithm, Entry, Error, OutputBytes, Protection, P
 use std::sync::Arc;
 
 struct Gcm(AeadAlgorithm);
+
+/// This backend's size limit on `ciphertext || tag`, the contract's must-support maximum (2^31 − 1 bytes).
+const SIZE_LIMIT: usize = i32::MAX as usize;
+const TAG_LEN: usize = 16;
+
 impl Gcm {
-    fn seal_with<C: AeadInOut + KeyInit>(key: &[u8], aad: &[u8], plaintext: &[u8]) -> Result<Sealed, Error> {
+    fn seal_with<C: AeadInOut + KeyInit>(
+        algorithm: AeadAlgorithm,
+        key: &[u8],
+        aad: &[u8],
+        plaintext: &[u8],
+    ) -> Result<Sealed, Error> {
         let key: &Key<C> = key.try_into().map_err(|_| Error::InvalidKey)?;
         check_lengths(aad.len(), plaintext.len())?;
+        if plaintext.len() > SIZE_LIMIT - TAG_LEN {
+            return Err(Error::Unsupported(picky_crypto::Algorithm::Aead(algorithm)));
+        }
         let cipher = C::new(key);
         let nonce = Zeroizing::new(
             Nonce::<C>::try_generate_from_rng(&mut getrandom::SysRng).map_err(|_| Error::ProviderFailure)?,
         );
-        let capacity = plaintext.len().checked_add(16).ok_or(Error::InvalidInput)?;
-        let mut output = crate::util::buffer(capacity)?;
+        let mut output = crate::util::buffer(plaintext.len() + TAG_LEN)?;
         output.truncate(plaintext.len());
         output.copy_from_slice(plaintext);
         cipher
@@ -25,17 +37,21 @@ impl Gcm {
     }
 
     fn open_with<C: AeadInOut + KeyInit>(
+        algorithm: AeadAlgorithm,
         key: &[u8],
         nonce: &[u8],
         aad: &[u8],
         ciphertext: &[u8],
     ) -> Result<OutputBytes, Error> {
         let key: &Key<C> = key.try_into().map_err(|_| Error::InvalidKey)?;
-        if ciphertext.len() < 16 {
+        if ciphertext.len() < TAG_LEN {
             return Err(Error::InvalidInput);
         }
-        check_lengths(aad.len(), ciphertext.len() - 16)?;
+        check_lengths(aad.len(), ciphertext.len() - TAG_LEN)?;
         let nonce = nonce.try_into().map_err(|_| Error::InvalidInput)?;
+        if ciphertext.len() > SIZE_LIMIT {
+            return Err(Error::Unsupported(picky_crypto::Algorithm::Aead(algorithm)));
+        }
         let cipher = C::new(key);
         let mut output = crate::util::output(ciphertext)?.into_inner();
         cipher
@@ -63,17 +79,23 @@ impl Aead for Gcm {
     }
     fn seal(&self, key: &[u8], aad: &[u8], plaintext: &[u8]) -> Result<Sealed, Error> {
         match self.0 {
-            AeadAlgorithm::Aes128Gcm => Self::seal_with::<AesGcm<aes::Aes128, U12>>(key, aad, plaintext),
-            AeadAlgorithm::Aes192Gcm => Self::seal_with::<AesGcm<aes::Aes192, U12>>(key, aad, plaintext),
-            AeadAlgorithm::Aes256Gcm => Self::seal_with::<AesGcm<aes::Aes256, U12>>(key, aad, plaintext),
+            AeadAlgorithm::Aes128Gcm => Self::seal_with::<AesGcm<aes::Aes128, U12>>(self.0, key, aad, plaintext),
+            AeadAlgorithm::Aes192Gcm => Self::seal_with::<AesGcm<aes::Aes192, U12>>(self.0, key, aad, plaintext),
+            AeadAlgorithm::Aes256Gcm => Self::seal_with::<AesGcm<aes::Aes256, U12>>(self.0, key, aad, plaintext),
             _ => Err(Error::Unsupported(picky_crypto::Algorithm::Aead(self.0))),
         }
     }
     fn open(&self, key: &[u8], nonce: &[u8], aad: &[u8], ciphertext: &[u8]) -> Result<OutputBytes, Error> {
         match self.0 {
-            AeadAlgorithm::Aes128Gcm => Self::open_with::<AesGcm<aes::Aes128, U12>>(key, nonce, aad, ciphertext),
-            AeadAlgorithm::Aes192Gcm => Self::open_with::<AesGcm<aes::Aes192, U12>>(key, nonce, aad, ciphertext),
-            AeadAlgorithm::Aes256Gcm => Self::open_with::<AesGcm<aes::Aes256, U12>>(key, nonce, aad, ciphertext),
+            AeadAlgorithm::Aes128Gcm => {
+                Self::open_with::<AesGcm<aes::Aes128, U12>>(self.0, key, nonce, aad, ciphertext)
+            }
+            AeadAlgorithm::Aes192Gcm => {
+                Self::open_with::<AesGcm<aes::Aes192, U12>>(self.0, key, nonce, aad, ciphertext)
+            }
+            AeadAlgorithm::Aes256Gcm => {
+                Self::open_with::<AesGcm<aes::Aes256, U12>>(self.0, key, nonce, aad, ciphertext)
+            }
             _ => Err(Error::Unsupported(picky_crypto::Algorithm::Aead(self.0))),
         }
     }

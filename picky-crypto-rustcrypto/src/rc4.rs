@@ -30,6 +30,12 @@ impl StreamCipherContext for Context {
             return Err(Error::ProviderFailure);
         }
         let result = (|| {
+            // This backend's size limit on data, the contract's general must-support bound (2^31 − 1 bytes).
+            if data.len() > i32::MAX as usize {
+                return Err(Error::Unsupported(picky_crypto::Algorithm::StreamCipher(
+                    StreamCipherAlgorithm::Rc4,
+                )));
+            }
             let mut output = crate::util::output(data)?.into_inner();
             self.cipher
                 .try_apply_keystream(&mut output)
