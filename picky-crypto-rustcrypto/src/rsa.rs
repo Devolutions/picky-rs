@@ -176,23 +176,26 @@ impl KeyGenerator for Generator {
         false
     }
     fn generate(&self) -> Result<OutputBytes, Error> {
-        use rsa::rand_core::SeedableRng;
         let bits = match self.0 {
             KeyGenerationAlgorithm::Rsa2048 => 2048,
             KeyGenerationAlgorithm::Rsa3072 => 3072,
             KeyGenerationAlgorithm::Rsa4096 => 4096,
             _ => return Err(Error::Unsupported(Algorithm::KeyGeneration(self.0))),
         };
-        let mut seed = Zeroizing::new([0u8; 32]);
-        getrandom::fill(&mut *seed).map_err(|_| Error::ProviderFailure)?;
-        // Infallible seeded RNG that wipes its buffer and state on drop (chacha20 0.10.2, src\rng.rs:94–98;
-        // src\lib.rs:306–310).
-        let mut rng = chacha20::ChaCha20Rng::from_seed(*seed);
-        let key = RsaPrivateKey::new_with_exp(&mut rng, bits, BoxedUint::from(65537u64))
-            .map_err(|_| Error::ProviderFailure)?;
-        let document = key.to_pkcs8_der().map_err(|_| Error::ProviderFailure)?;
-        crate::util::output(document.as_bytes())
+        generate_pkcs8(bits)
     }
+}
+fn generate_pkcs8(bits: usize) -> Result<OutputBytes, Error> {
+    use rsa::rand_core::SeedableRng;
+    let mut seed = Zeroizing::new([0u8; 32]);
+    getrandom::fill(&mut *seed).map_err(|_| Error::ProviderFailure)?;
+    // Infallible seeded RNG that wipes its buffer and state on drop (chacha20 0.10.2, src\rng.rs:94–98;
+    // src\lib.rs:306–310).
+    let mut rng = chacha20::ChaCha20Rng::from_seed(*seed);
+    let key =
+        RsaPrivateKey::new_with_exp(&mut rng, bits, BoxedUint::from(65537u64)).map_err(|_| Error::ProviderFailure)?;
+    let document = key.to_pkcs8_der().map_err(|_| Error::ProviderFailure)?;
+    crate::util::output(document.as_bytes())
 }
 fn signing_error(error: rsa::Error, algorithm: SignatureAlgorithm) -> Error {
     // An undersized modulus is MessageTooLong (rsa 0.10.0-rc.18, src\algorithms\pkcs1v15.rs:120–125).
@@ -396,6 +399,14 @@ mod tests {
         Verify(algorithm)
             .verify(PublicKey(&public), b"message", &signature)
             .unwrap();
+    }
+
+    // Conformance generates RSA keys only in extended runs, so this keeps seed expansion and PKCS#8 output covered.
+    #[test]
+    fn generated_key_loads() {
+        let document = generate_pkcs8(1024).unwrap();
+        let key = Loader.load(PrivateKeyMaterial::Pkcs8(&document)).unwrap();
+        assert_eq!(key.key_size_bits(), 1024);
     }
 
     #[test]
