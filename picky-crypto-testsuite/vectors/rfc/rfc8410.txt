@@ -1,0 +1,81 @@
+10.3.  Examples of Ed25519 Private Key
+
+   An example of an Ed25519 private key without the public key:
+
+   -----BEGIN PRIVATE KEY-----
+   MC4CAQAwBQYDK2VwBCIEINTuctv5E1hK1bbY8fdp+K06/nwoy/HU++CXqI9EdVhC
+   -----END PRIVATE KEY-----
+
+   The same item dumped as ASN.1 yields:
+
+    0 30   46: SEQUENCE {
+    2 02    1:   INTEGER 0
+    5 30    5:   SEQUENCE {
+    7 06    3:     OBJECT IDENTIFIER
+             :       Ed 25519 signature algorithm { 1 3 101 112 }
+             :     }
+   12 04   34:   OCTET STRING
+             :     04 20 D4 EE 72 DB F9 13 58 4A D5 B6 D8 F1 F7 69
+             :     F8 AD 3A FE 7C 28 CB F1 D4 FB E0 97 A8 8F 44 75
+             :     58 42
+             :   }
+
+   Note that the value of the private key is:
+
+   D4 EE 72 DB F9 13 58 4A D5 B6 D8 F1 F7 69 F8 AD
+   3A FE 7C 28 CB F1 D4 FB E0 97 A8 8F 44 75 58 42
+
+   An example of the same Ed25519 private key encoded with an attribute
+   and the public key:
+
+   -----BEGIN PRIVATE KEY-----
+   MHICAQEwBQYDK2VwBCIEINTuctv5E1hK1bbY8fdp+K06/nwoy/HU++CXqI9EdVhC
+   oB8wHQYKKoZIhvcNAQkJFDEPDA1DdXJkbGUgQ2hhaXJzgSEAGb9ECWmEzf6FQbrB
+   Z9w7lshQhqowtrbLDFw4rXAxZuE=
+   -----END PRIVATE KEY-----
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Josefsson & Schaad           Standards Track                   [Page 14]
+
+RFC 8410                  Safe Curves for X.509              August 2018
+
+
+   The same item dumped as ASN.1 yields:
+
+     0 114: SEQUENCE {
+     2   1:   INTEGER 1
+     5   5:   SEQUENCE {
+     7   3:     OBJECT IDENTIFIER '1 3 101 112'
+          :     }
+    12  34:   OCTET STRING, encapsulates {
+          :     04 20 D4 EE 72 DB F9 13 58 4A D5 B6 D8 F1 F7 69
+          :     F8 AD 3A FE 7C 28 CB F1 D4 FB E0 97 A8 8F 44 75
+          :     58 42
+          :     }
+    48  31:   [0] {
+    50  29:     SEQUENCE {
+    52  10:       OBJECT IDENTIFIER '1 2 840 113549 1 9 9 20'
+    64  15:       SET {
+    66  13:         UTF8String 'Curdle Chairs'
+          :         }
+          :       }
+          :     }
+   81  33:   [1] 00 19 BF 44 09 69 84 CD FE 85 41 BA C1 67 DC 3B
+                 96 C8 50 86 AA 30 B6 B6 CB 0C 5C 38 AD 70 31 66
+                 E1
+          :   }
+

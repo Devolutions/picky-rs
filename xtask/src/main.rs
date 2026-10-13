@@ -1,5 +1,6 @@
 mod contract;
 mod downgrade;
+mod vectors;
 
 use std::{error::Error, path::Path, process::ExitCode};
 
@@ -19,10 +20,12 @@ fn run() -> Result<()> {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .ok_or("xtask must belong to the repository workspace")?;
-    let args: Vec<_> = std::env::args().skip(1).collect();
-    match args.as_slice() {
-        [command] if command == "check-contract" => contract::check(root),
-        [command, flag, base] if command == "check-no-downgrade" && flag == "--base" => downgrade::check(root, base),
-        _ => Err("usage: cargo xtask check-contract | check-no-downgrade --base <rev>".into()),
+    let owned: Vec<String> = std::env::args().skip(1).collect();
+    let args: Vec<&str> = owned.iter().map(String::as_str).collect();
+    match args[..] {
+        ["check-contract"] => contract::check(root),
+        ["check-no-downgrade", "--base", base] => downgrade::check(root, base),
+        ["check-vectors"] => vectors::check(root),
+        _ => Err("usage: cargo xtask check-contract | check-no-downgrade --base <rev> | check-vectors".into()),
     }
 }

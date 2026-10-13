@@ -4,6 +4,8 @@ resolver = "2"
 members = [
     "xtask",
     "picky-crypto",
+    "picky-crypto-testsuite",
+    "picky-crypto-conformance",
     "picky",
     "picky-krb",
     "picky-asn1",

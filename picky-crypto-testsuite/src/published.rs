@@ -1,0 +1,159 @@
+use crate::{algorithms::*, keys::ECC_FILE, select, vectors as v};
+
+pub type Pair = (String, Vec<u8>, Vec<u8>);
+pub type Triple = (String, Vec<u8>, Vec<u8>, Vec<u8>);
+pub type Password = (String, Vec<u8>, Vec<u8>, u32);
+
+pub fn messages() -> Vec<(String, Vec<u8>)> {
+    let inputs = v::md(1320)
+        .into_iter()
+        .enumerate()
+        .map(|(i, (msg, _))| (format!("rfc/rfc1320.txt/A.5/{i}"), msg))
+        .chain(
+            v::ed25519()
+                .iter()
+                .enumerate()
+                .map(|(i, t)| (format!("rfc/rfc8032.txt/7.1/{i}"), t.message.clone())),
+        )
+        .collect::<Vec<_>>();
+    select::nonempty("rfc/rfc1320.txt; rfc/rfc8032.txt", "messages", &inputs);
+    inputs
+}
+
+pub fn mac(index: usize) -> Vec<Triple> {
+    let file = format!("hmac_{}_test.json", SHAS[index]);
+    let inputs = v::wycheproof(&file)
+        .test_groups
+        .into_iter()
+        .flat_map(|g| v::tests(&g).to_vec())
+        .filter(|t| v::string(t, "result") == "valid" && v::field(t, "key").len() <= 1024)
+        .map(|t| {
+            (
+                v::id(MACS[index], &file, &t),
+                v::field(&t, "key"),
+                v::field(&t, "msg"),
+                v::field(&t, "tag"),
+            )
+        })
+        .collect::<Vec<_>>();
+    select::nonempty(&file, "valid must-support MAC inputs", &inputs);
+    inputs
+}
+
+pub fn empty_mac(index: usize) -> Pair {
+    let inputs = mac(index);
+    let source = select::mac_message(index, &inputs, true);
+    let message = select::mac_message(index, &inputs, false);
+    (
+        format!("{}/msg as key; message from {}", source.0, message.0),
+        source.2.clone(),
+        message.2.clone(),
+    )
+}
+
+pub fn password(index: usize) -> Vec<Password> {
+    let file = format!("pbkdf2_hmac{}_test.json", SHAS[index]);
+    let inputs = v::wycheproof(&file)
+        .test_groups
+        .into_iter()
+        .flat_map(|g| v::tests(&g).to_vec())
+        .filter(|t| {
+            v::string(t, "result") == "valid"
+                && v::number(t, "iterationCount") <= 10_000_000
+                && v::field(t, "password").len() <= 1024
+                && v::field(t, "salt").len() <= 1024
+        })
+        .map(|t| {
+            (
+                v::id(PASSWORD_KDFS[index], &file, &t),
+                v::field(&t, "password"),
+                v::field(&t, "salt"),
+                v::number(&t, "iterationCount") as u32,
+            )
+        })
+        .collect::<Vec<_>>();
+    select::nonempty(&file, "valid must-support PBKDF2 inputs", &inputs);
+    inputs
+}
+
+pub fn kdf(index: usize) -> Vec<Pair> {
+    let one_step = (1..4).contains(&index);
+    let file = if one_step {
+        ECC_FILE
+    } else {
+        "nist/kbkdf/KDFCTR_gen.rsp"
+    };
+    let inputs: Vec<Pair> = if one_step {
+        v::response(file)
+            .into_iter()
+            .filter(|r| {
+                r.group.contains(["SHA1", "SHA256", "SHA384", "SHA512"][index]) && r.text("Result").starts_with('P')
+            })
+            .map(|r| (r.id(file), r.bytes("Z"), r.bytes("OI")))
+            .collect()
+    } else {
+        let prf = ["HMAC_SHA1", "HMAC_SHA256", "HMAC_SHA384", "HMAC_SHA512"][index.saturating_sub(4)];
+        v::response(file)
+            .into_iter()
+            .filter(|r| r.group.contains(&format!("PRF={prf};")))
+            .map(|r| (r.id(file), r.bytes("KI"), r.bytes("FixedInputData")))
+            .collect()
+    };
+    select::nonempty(file, &format!("inputs for {:?}", KDFS[index]), &inputs);
+    inputs
+}
+
+pub fn aead(index: usize) -> Vec<Triple> {
+    let file = "aes_gcm_test.json";
+    let inputs = v::wycheproof(file)
+        .test_groups
+        .into_iter()
+        .filter(|g| {
+            v::number(g, "keySize") == [128, 192, 256][index]
+                && v::number(g, "ivSize") == 96
+                && v::number(g, "tagSize") == 128
+        })
+        .flat_map(|g| v::tests(&g).to_vec())
+        .filter(|t| v::string(t, "result") == "valid")
+        .map(|t| {
+            (
+                v::id(AEADS[index], file, &t),
+                v::field(&t, "key"),
+                v::field(&t, "aad"),
+                v::field(&t, "msg"),
+            )
+        })
+        .collect::<Vec<_>>();
+    select::nonempty(file, &format!("valid {:?} inputs", AEADS[index]), &inputs);
+    inputs
+}
+
+pub fn wrap(index: usize) -> Vec<Pair> {
+    let file = "aes_wrap_test.json";
+    let inputs = v::wycheproof(file)
+        .test_groups
+        .into_iter()
+        .filter(|g| v::number(g, "keySize") == [128, 192, 256][index])
+        .flat_map(|g| v::tests(&g).to_vec())
+        .filter(|t| v::string(t, "result") == "valid" && [16, 24, 32].contains(&v::field(t, "msg").len()))
+        .map(|t| (v::id(WRAPS[index], file, &t), v::field(&t, "key"), v::field(&t, "msg")))
+        .collect::<Vec<_>>();
+    select::nonempty(file, &format!("valid {:?} inputs", WRAPS[index]), &inputs);
+    inputs
+}
+
+pub fn rc4() -> Vec<Pair> {
+    let messages = messages();
+    let inputs = v::rc4()
+        .into_iter()
+        .filter(|(_, offset, _)| *offset == 0)
+        .enumerate()
+        .flat_map(|(i, (key, _, _))| {
+            messages
+                .iter()
+                .map(move |(id, msg)| (format!("rfc/rfc6229.txt/key={i}/{id}"), key.clone(), msg.clone()))
+        })
+        .collect::<Vec<_>>();
+    select::nonempty("rfc/rfc6229.txt", "RC4 keys at offset zero", &inputs);
+    inputs
+}

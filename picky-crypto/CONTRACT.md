@@ -811,8 +811,10 @@ For each of them, conformance tests assert that nothing panics and that the resu
 - loading a PKCS#8 document that carries `attributes` (section 5.2): success or [`Error::InvalidKey`];
 - a 3DES key whose component keys are not pairwise distinct or are DES weak or semi-weak keys (section 6.5): success or [`Error::InvalidKey`];
 - handling of an RSA private key with inconsistent components (section 7): loading returns [`Error::InvalidKey`], or every private-key operation either returns [`Error::InvalidKey`] or produces a result that verifies under (`n`, `e`).
-  For decryption, verification uses a round trip through the provider's encryptor, or through a reference encryptor supplied by the test harness when the implementation under test has no encryptor (for example a hardware key).
-  In differential runs, the result is also verified with the other backend, but the outcomes themselves are not compared.
+  For decryption, the ciphertext comes from the first source that produces one for the algorithm: the base key's published ciphertexts, then the conformance runner's reference encryptor from another backend in the same build, then the provider's own encryptor.
+  The expected plaintext is the published one for a published ciphertext, and the plaintext the suite encrypted for the other two sources.
+  The check is never skipped: it fails if no source produces a ciphertext.
+  Each backend is checked on its own; differential runs do not repeat this check or compare outcomes between backends.
 
 The inputs for that last property are derived from published keys, because the known published RSA test vectors contain no keys with inconsistent components:
 
@@ -821,12 +823,12 @@ The inputs for that last property are derived from published keys, because the k
 - round-trip control: splitting a base key into its fields and reassembling them unchanged must reproduce the cited key's exact bytes, otherwise the test fails;
 - positive control: the unmodified base key loads and produces a result that verifies on the backend under test.
 
-Provider-value property tests against mock providers check composition (section 8.1) for [`Mac`], [`Cipher`], [`Aead`] and [`KeyWrap`]: a fallback fills in a protection the primary does not support, the primary serves a protection both members support, and the composite entry's FIPS report and the composed provider's [`CryptoProvider::fips`] follow section 8.1.
+`picky-crypto`'s tests check composition (section 8.1) for [`Mac`], [`Cipher`], [`Aead`] and [`KeyWrap`] against mock providers, over every combination of supported protections and FIPS reports: a fallback fills in a protection the primary does not support, the primary serves a protection both members support, and the composite entry's FIPS report and the composed provider's [`CryptoProvider::fips`] follow section 8.1.
 For [`Mac`], each context starts on the member serving the requested protection.
 
 The FFDH exponent distribution (section 6.11) is mandatory but not observable from outputs; it is verified by review, while the suite checks the range of the public value and the round trip.
 
-For every returned [`OutputBytes`], [`X25519Scalar`], [`MacTag`], [`MacVerifier`] and [`Sealed`] through its fields, the suite also asserts that the [`Debug`](std::fmt::Debug) output never contains the buffer's bytes.
+`picky-crypto` implements the [`Debug`](std::fmt::Debug) of [`OutputBytes`], [`X25519Scalar`], [`MacTag`], [`MacVerifier`], [`MacOutput`], [`Sealed`] and the trait objects (section 2), so no backend can change it; `picky-crypto`'s tests check that it shows only the length, or the algorithm and FIPS report.
 For every loaded key, the suite checks [`PrivateKey::key_size_bits`] against the exact size section 7 defines, including RSA keys whose modulus length is not a multiple of 8 bits (for example 3071 or 4095 bits) when the backend loads them; such keys come from cited sources like every other key.
 [`MacVerifier::verify`] is tested with the correct tag, a wrong tag, an `expected` whose length differs from `len`, `len` of 0 and greater than the tag length, and the truncated lengths used by Kerberos (12 bytes) and NTLM (8 bytes).
 A [`MacTag`] and a [`MacVerifier`] computed on the same key and data agree: the tag's [`MacTag::into_inner`] bytes verify through the verifier.
