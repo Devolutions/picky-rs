@@ -50,7 +50,7 @@ const fn der_integer_len(bits: usize) -> usize {
 const MODULUS_LEN: usize = der_integer_len(RsaPublicKey::MAX_SIZE);
 const EXPONENT_LEN: usize = der_integer_len((u64::BITS - RsaPublicKey::MAX_PUB_EXPONENT.leading_zeros()) as usize);
 
-/// Longest PKCS#1 `RSAPublicKey` within the library's limits (rsa 0.10.0-rc.18, src\key.rs:216–222).
+/// Longest PKCS#1 `RSAPublicKey` within the library's limits (rsa 0.10.0-rc.18, src/key.rs:216–222).
 const PUBLIC_KEY_MAX_LEN: usize = der_len(MODULUS_LEN + EXPONENT_LEN);
 
 /// Longest PKCS#8 RSA private key within the library's limits: version, n, e, then d, p, q, dP, dQ and qInv, each
@@ -73,7 +73,7 @@ fn load_public_key(der: &[u8], algorithm: Algorithm) -> Result<RsaPublicKey, Err
         precision(parsed.public_exponent.as_bytes())?,
     )?;
     // Classification follows the library's check order: modulus size, structure, then exponent bounds
-    // (rsa 0.10.0-rc.18, src\key.rs:228–234,714–745).
+    // (rsa 0.10.0-rc.18, src/key.rs:228–234,714–745).
     RsaPublicKey::new(n, e).map_err(|error| match error {
         rsa::Error::ModulusTooLarge | rsa::Error::PublicExponentTooLarge => Error::Unsupported(algorithm),
         _ => Error::InvalidKey,
@@ -131,7 +131,7 @@ fn encryption_supported(algorithm: AsymmetricEncryptionAlgorithm) -> bool {
 }
 fn error(error: rsa::Error) -> Error {
     // Decryption re-encrypts its result and reports a mismatch as Internal, mapped to InvalidKey
-    // (rsa 0.10.0-rc.18, src\algorithms\rsa.rs:156–172; src\pkcs1v15.rs:180; src\oaep.rs:279).
+    // (rsa 0.10.0-rc.18, src/algorithms/rsa.rs:156–172; src/pkcs1v15.rs:180; src/oaep.rs:279).
     match error {
         rsa::Error::Rng => Error::ProviderFailure,
         rsa::Error::MessageTooLong => Error::InvalidInput,
@@ -140,7 +140,7 @@ fn error(error: rsa::Error) -> Error {
     }
 }
 fn encrypt<P: PaddingScheme>(key: &RsaPublicKey, plaintext: &[u8], padding: P) -> Result<OutputBytes, Error> {
-    // Native ciphertext output is modulus-sized (rsa 0.10.0-rc.18, src\pkcs1v15.rs:159; src\oaep.rs:218).
+    // Native ciphertext output is modulus-sized (rsa 0.10.0-rc.18, src/pkcs1v15.rs:159; src/oaep.rs:218).
     padding
         .encrypt(&mut getrandom::SysRng, key, plaintext)
         .map(|output| OutputBytes::new(Zeroizing::new(output)))
@@ -191,9 +191,9 @@ impl PrivateKeyLoader for Loader {
         }
         let parsed = rsa::pkcs1::RsaPrivateKey::from_der(info.private_key.as_bytes()).map_err(|_| Error::InvalidKey)?;
         // The library's public-key limits apply before decoding: it loads private keys of any modulus size
-        // (rsa 0.10.0-rc.18, src\key.rs:706–710) and reports an oversized exponent only as a malformed key
-        // (src\encoding.rs:66; src\key.rs:723–729). `as_bytes` strips the sign octet, so 8192 bits is 1024 bytes
-        // (der 0.8.2, src\asn1\integer\uint.rs:351–365,406–416).
+        // (rsa 0.10.0-rc.18, src/key.rs:706–710) and reports an oversized exponent only as a malformed key
+        // (src/encoding.rs:66; src/key.rs:723–729). `as_bytes` strips the sign octet, so 8192 bits is 1024 bytes
+        // (der 0.8.2, src/asn1/integer/uint.rs:351–365,406–416).
         let exponent = parsed.public_exponent.as_bytes();
         if parsed.modulus.as_bytes().len() > RsaPublicKey::MAX_SIZE / 8
             || uint(exponent, precision(exponent)?)? > BoxedUint::from(RsaPublicKey::MAX_PUB_EXPONENT)
@@ -225,8 +225,8 @@ fn generate_pkcs8(bits: usize) -> Result<OutputBytes, Error> {
     use rsa::rand_core::SeedableRng;
     let mut seed = Zeroizing::new([0u8; 32]);
     getrandom::fill(&mut *seed).map_err(|_| Error::ProviderFailure)?;
-    // Infallible seeded RNG that wipes its buffer and state on drop (chacha20 0.10.2, src\rng.rs:94–98;
-    // src\lib.rs:306–310).
+    // Infallible seeded RNG that wipes its buffer and state on drop (chacha20 0.10.2, src/rng.rs:94–98;
+    // src/lib.rs:306–310).
     let mut rng = chacha20::ChaCha20Rng::from_seed(*seed);
     let key =
         RsaPrivateKey::new_with_exp(&mut rng, bits, BoxedUint::from(65537u64)).map_err(|_| Error::ProviderFailure)?;
@@ -234,9 +234,9 @@ fn generate_pkcs8(bits: usize) -> Result<OutputBytes, Error> {
     crate::util::output(document.as_bytes())
 }
 fn signing_error(error: rsa::Error, algorithm: SignatureAlgorithm) -> Error {
-    // An undersized modulus is MessageTooLong (rsa 0.10.0-rc.18, src\algorithms\pkcs1v15.rs:120–125).
+    // An undersized modulus is MessageTooLong (rsa 0.10.0-rc.18, src/algorithms/pkcs1v15.rs:120–125).
     // Signing checks its result like decryption and reports a mismatch as Internal, mapped to InvalidKey
-    // (src\algorithms\rsa.rs:156–172; src\pkcs1v15.rs:209).
+    // (src/algorithms/rsa.rs:156–172; src/pkcs1v15.rs:209).
     match error {
         rsa::Error::MessageTooLong => Error::Unsupported(Algorithm::Signature(algorithm)),
         rsa::Error::Rng => Error::ProviderFailure,
@@ -251,7 +251,7 @@ fn sign<D: sha2::Digest + rsa::pkcs8::AssociatedOid>(
 ) -> Result<OutputBytes, Error> {
     let digest = Zeroizing::new(D::digest(message));
     // The scheme blinds with a fallible generator, unlike `sign_with_rng`, and pads to size(), not whole limbs
-    // (rsa 0.10.0-rc.18, src\key.rs:662; src\traits\padding.rs:35–40; src\pkcs1v15.rs:200–209).
+    // (rsa 0.10.0-rc.18, src/key.rs:662; src/traits/padding.rs:35–40; src/pkcs1v15.rs:200–209).
     rsa::Pkcs1v15Sign::new::<D>()
         .sign(Some(&mut getrandom::SysRng), key, &digest)
         .map(|signature| OutputBytes::new(Zeroizing::new(signature)))

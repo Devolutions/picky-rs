@@ -42,7 +42,7 @@ macro_rules! curve {
                 fn verify(&self, public: PublicKey<'_>, message: &[u8], signature: &[u8]) -> Result<(), Error> {
                     uncompressed(public.0, $point_len, Error::InvalidKey)?;
                     let key = VerifyingKey::from_sec1_bytes(public.0).map_err(|_| Error::InvalidKey)?;
-                    // Rejects lengths other than 2 × the field size (ecdsa 0.17.0, src\lib.rs:212–216).
+                    // Rejects lengths other than 2 × the field size (ecdsa 0.17.0, src/lib.rs:212–216).
                     let signature = Signature::from_slice(signature).map_err(|_| Error::VerificationFailed)?;
                     key.verify(message, &signature)
                         .map_err(|_| Error::VerificationFailed)
@@ -69,12 +69,12 @@ macro_rules! curve {
                     }
                     let inner =
                         sec1::EcPrivateKey::from_der(info.private_key.as_bytes()).map_err(|_| Error::InvalidKey)?;
-                    // SecretKey::from_slice zero-pads short scalars (elliptic-curve 0.14.1, src\secret_key.rs:163–173).
+                    // SecretKey::from_slice zero-pads short scalars (elliptic-curve 0.14.1, src/secret_key.rs:163–173).
                     if inner.private_key.len() != $signature_len / 2 {
                         return Err(Error::InvalidKey);
                     }
                     // The library checks the curve OIDs and that an embedded public key matches
-                    // (elliptic-curve 0.14.1, src\secret_key\pkcs8.rs:53–59; src\secret_key.rs:465–484).
+                    // (elliptic-curve 0.14.1, src/secret_key/pkcs8.rs:53–59; src/secret_key.rs:465–484).
                     let key = SecretKey::try_from(info).map_err(|_| Error::InvalidKey)?;
                     Ok(Box::new(Key(key)))
                 }
@@ -103,7 +103,7 @@ macro_rules! curve {
                     }
                     let signing = SigningKey::from(&self.0);
                     // Hedged RFC 6979 nonce: random bytes enter as additional data, and an RNG failure is
-                    // the only error on this path (ecdsa 0.17.0, src\signing.rs:209–232, 242–265).
+                    // the only error on this path (ecdsa 0.17.0, src/signing.rs:209–232, 242–265).
                     let signature: Signature = signing
                         .try_sign_with_rng(&mut getrandom::SysRng, message)
                         .map_err(|_| Error::ProviderFailure)?;

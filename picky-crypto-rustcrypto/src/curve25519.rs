@@ -27,7 +27,7 @@ impl SignatureVerifier for Verify {
     fn verify(&self, public: PublicKey<'_>, message: &[u8], signature: &[u8]) -> Result<(), Error> {
         let public = public.0.try_into().map_err(|_| Error::InvalidKey)?;
         let key = VerifyingKey::from_bytes(public).map_err(|_| Error::InvalidKey)?;
-        // The library accepts non-canonical A encodings (ZIP-215, ed25519-dalek 3.0.0, src\verifying.rs:172–182),
+        // The library accepts non-canonical A encodings (ZIP-215, ed25519-dalek 3.0.0, src/verifying.rs:172–182),
         // so the adapter compares the library's canonical recompression with the input.
         if key.to_edwards().compress().as_bytes() != public {
             return Err(Error::InvalidKey);
@@ -49,12 +49,12 @@ impl PrivateKeyLoader for EdLoader {
         };
         let info = PrivateKeyInfoRef::from_der(der).map_err(|_| Error::InvalidKey)?;
         // Ed25519's decoder ignores non-aligned public keys and rejects other lengths
-        // (ed25519 3.0.0, src\pkcs8.rs:180–185).
-        // as_bytes rejects unused bits (der 0.8.2, src\asn1\bit_string.rs:121–127).
+        // (ed25519 3.0.0, src/pkcs8.rs:180–185).
+        // as_bytes rejects unused bits (der 0.8.2, src/asn1/bit_string.rs:121–127).
         if info.public_key.is_some_and(|public| public.as_bytes().is_none()) {
             return Err(Error::InvalidKey);
         }
-        // The library checks that an embedded public key matches (ed25519-dalek 3.0.0, src\signing.rs:748–759).
+        // The library checks that an embedded public key matches (ed25519-dalek 3.0.0, src/signing.rs:748–759).
         let key = SigningKey::try_from(info).map_err(|_| Error::InvalidKey)?;
         Ok(Box::new(EdKey(key)))
     }
@@ -140,7 +140,7 @@ impl KeyAgreement for XAgreement {
     }
     fn generate_ephemeral(&self) -> Result<Box<dyn EphemeralSecret>, Error> {
         // Mirrors x25519-dalek 3.0.0's EphemeralSecret::random(): 32 bytes from getrandom, clamping left to the library.
-        // Returns random-generator failures instead of panicking (src\x25519.rs:96–101).
+        // Returns random-generator failures instead of panicking (src/x25519.rs:96–101).
         let mut scalar = Zeroizing::new([0u8; 32]);
         getrandom::fill(&mut *scalar).map_err(|_| Error::ProviderFailure)?;
         Ok(Box::new(XKey(x25519_dalek::StaticSecret::from(*scalar))))
