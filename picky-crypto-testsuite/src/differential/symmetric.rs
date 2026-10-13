@@ -1,11 +1,13 @@
-//! Checks one provider alone can't make: derived lengths and empty-key HMAC tags without published answers, and AEAD sealed by one provider and opened by the other.
+//! Checks one provider alone can't make: derived lengths, empty-key HMAC tags and boundary controls without published answers, and AEAD sealed by one provider and opened by the other.
 
 use picky_crypto::*;
 use proptest::prelude::*;
 
 use crate::algorithms::*;
+use crate::areas::cipher::{cipher_records, transform};
+use crate::areas::password_kdf::MUST_SUPPORT_OUTPUT_LEN;
 use crate::harness::{Checks, Expect};
-use crate::published;
+use crate::{published, select, vectors as v};
 
 pub fn run(a: &CryptoProvider, b: &CryptoProvider) {
     let mut c = Checks::default();
@@ -84,7 +86,63 @@ pub fn run(a: &CryptoProvider, b: &CryptoProvider) {
             }
         }
     }
+    boundary_controls(&mut c, a, b);
     c.finish();
+}
+
+/// Compares the outputs of boundary controls that have no published answer, whenever both providers produce one.
+fn boundary_controls(c: &mut Checks, a: &CryptoProvider, b: &CryptoProvider) {
+    fn compare(c: &mut Checks, id: &str, left: Result<OutputBytes, Error>, right: Result<OutputBytes, Error>) {
+        if let (Ok(left), Ok(right)) = (left, right) {
+            c.check(id, left.as_ref() == right.as_ref(), "the providers' outputs differ");
+        }
+    }
+    let algorithm = CipherAlgorithm::Rc2Cbc;
+    if let (Ok(ae), Ok(be)) = (helpers::cipher(a, algorithm), helpers::cipher(b, algorithm)) {
+        let records = cipher_records(algorithm);
+        let (_, _, iv, data, _, _) = select::cbc_control(algorithm, &records);
+        for length in [1, 128] {
+            let (source, key) = select::message_of_length(length);
+            for protection in [Protection::Apply, Protection::Process] {
+                if !(ae.supports(protection) && be.supports(protection)) {
+                    continue;
+                }
+                let id = format!("{algorithm:?}/{protection:?}/key length={length}/{source}/differential");
+                compare(
+                    c,
+                    &id,
+                    transform(ae, protection, &key, iv, data),
+                    transform(be, protection, &key, iv, data),
+                );
+            }
+        }
+    }
+    let algorithm = StreamCipherAlgorithm::Rc4;
+    if let (Ok(ae), Ok(be)) = (
+        helpers::stream_cipher(a, algorithm),
+        helpers::stream_cipher(b, algorithm),
+    ) {
+        let apply = |e: &dyn StreamCipher, key: &[u8]| e.start(key)?.apply(key);
+        for (source, key) in [select::message_of_length(1), select::rc4_longest_key()] {
+            let id = format!("{algorithm:?}/key length={}/{source}/differential", key.len());
+            compare(c, &id, apply(ae, &key), apply(be, &key));
+        }
+    }
+    for (algorithm, sha) in PASSWORD_KDFS.into_iter().zip(SHAS) {
+        let (Ok(ae), Ok(be)) = (helpers::password_kdf(a, algorithm), helpers::password_kdf(b, algorithm)) else {
+            continue;
+        };
+        let file = format!("pbkdf2_hmac{sha}_test.json");
+        let (source, password, salt) = select::pbkdf2_password_salt(&file, &v::wycheproof(&file));
+        for length in [1, MUST_SUPPORT_OUTPUT_LEN + 1] {
+            compare(
+                c,
+                &format!("{algorithm:?}/bounds/1/{length}/{source}/differential"),
+                ae.derive(&password, &salt, 1, length),
+                be.derive(&password, &salt, 1, length),
+            );
+        }
+    }
 }
 
 fn fail(e: Error) -> TestCaseError {

@@ -79,3 +79,47 @@ fn empty_key_hmac_tags_must_agree(#[case] tag: u8, #[case] generates: bool, #[ca
         .unwrap_or_default();
     assert_eq!(failure.contains("empty-key tags differ"), fails, "{failure}");
 }
+
+/// RC4 whose keystream XORs every byte with `pad`.
+struct FixedRc4(u8);
+struct FixedKeystream(u8);
+impl StreamCipherContext for FixedKeystream {
+    fn apply(&mut self, data: &[u8]) -> Result<OutputBytes, Error> {
+        Ok(OutputBytes::new(Zeroizing::new(
+            data.iter().map(|b| b ^ self.0).collect(),
+        )))
+    }
+}
+impl StreamCipher for FixedRc4 {
+    fn algorithm(&self) -> StreamCipherAlgorithm {
+        StreamCipherAlgorithm::Rc4
+    }
+    fn fips(&self) -> bool {
+        false
+    }
+    fn start(&self, _: &[u8]) -> Result<Box<dyn StreamCipherContext>, Error> {
+        Ok(Box::new(FixedKeystream(self.0)))
+    }
+}
+
+#[rstest::rstest]
+#[case::same_keystreams(1, false)]
+#[case::different_keystreams(2, true)]
+fn boundary_control_outputs_must_agree(#[case] pad: u8, #[case] fails: bool) {
+    let provider = |pad| {
+        CryptoProvider::builder()
+            .with(Entry::StreamCipher(Arc::new(FixedRc4(pad))))
+            .build()
+            .unwrap()
+    };
+    let (a, b) = (provider(1), provider(pad));
+    let failure = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| differential::symmetric::run(&a, &b)))
+        .err()
+        .and_then(|panic| panic.downcast_ref::<String>().cloned())
+        .unwrap_or_default();
+    assert_eq!(
+        failure.contains("key length=1") && failure.contains("outputs differ"),
+        fails,
+        "{failure}"
+    );
+}

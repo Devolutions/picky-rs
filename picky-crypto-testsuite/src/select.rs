@@ -221,6 +221,18 @@ pub fn message_of_length(len: usize) -> (String, Vec<u8>) {
     (format!("{file}/tcId={}/msg", v::number(t, "tcId")), v::field(t, "msg"))
 }
 
+/// The password and salt of the first valid test in a Wycheproof PBKDF2 file, for bound checks and their controls.
+pub fn pbkdf2_password_salt(file: &str, vectors: &v::Wycheproof) -> (String, Vec<u8>, Vec<u8>) {
+    let (_, t) = test(file, vectors, "valid PBKDF2 test", |_, t| {
+        v::string(t, "result") == "valid"
+    });
+    (
+        format!("{file}/tcId={}", v::number(t, "tcId")),
+        v::field(t, "password"),
+        v::field(t, "salt"),
+    )
+}
+
 pub fn rsa_plaintext(limit: usize) -> (String, Vec<u8>) {
     required(
         "rfc/rfc1320.txt; rfc/rfc8032.txt",

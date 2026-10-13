@@ -4,9 +4,12 @@ use picky_crypto::*;
 
 use crate::algorithms::*;
 use crate::harness::{Checks, Expect, Options};
-use crate::vectors as v;
+use crate::{select, vectors as v};
 
 use super::kdf::maximum;
+
+/// The largest PBKDF2 output length in the must-support set (contract section 6.3).
+pub const MUST_SUPPORT_OUTPUT_LEN: usize = 1024;
 
 pub fn run(p: &CryptoProvider, _: Options) {
     let mut c = Checks::default();
@@ -21,16 +24,7 @@ pub fn run(p: &CryptoProvider, _: Options) {
         let file = format!("pbkdf2_hmac{sha}_test.json");
         let vectors = v::wycheproof(&file);
         // Bound checks use a published password and salt, so they can fail only for the bound under test.
-        let (source, password, salt) = vectors
-            .test_groups
-            .iter()
-            .flat_map(v::tests)
-            .find(|t| v::string(t, "result") == "valid")
-            .map(|t| {
-                let source = format!("{file}/tcId={}", v::number(t, "tcId"));
-                (source, v::field(t, "password"), v::field(t, "salt"))
-            })
-            .expect("a valid PBKDF2 test");
+        let (source, password, salt) = select::pbkdf2_password_salt(&file, &vectors);
         for group in vectors.test_groups {
             for t in v::tests(&group) {
                 let id = v::id(a, &file, t);
@@ -39,7 +33,7 @@ pub fn run(p: &CryptoProvider, _: Options) {
                     continue;
                 }
                 let expected = v::field(t, "dk");
-                let outside = (iterations > 10_000_000 || v::number(t, "dkLen") > 1024)
+                let outside = (iterations > 10_000_000 || v::number(t, "dkLen") > MUST_SUPPORT_OUTPUT_LEN)
                     .then_some((Algorithm::PasswordKdf(a), false));
                 if let Some(out) = c.outcome(&id, Expect::Success, outside, || {
                     e.derive(
@@ -61,18 +55,19 @@ pub fn run(p: &CryptoProvider, _: Options) {
                 || e.derive(&password, &salt, iterations, length),
             );
         }
-        // Controls: one iteration with a one-byte output is in the must-support set, and the RFC 8018 maximum is in the valid domain.
+        // Control for zero iterations and an empty output: one iteration with a one-byte output, in the must-support set.
+        // No control sits at the RFC 8018 maximum: deriving that much output could exhaust time or memory.
         let id = format!("{a:?}/bounds/1/1/{source}");
         if let Some(out) = c.call(&id, Expect::Success, || e.derive(&password, &salt, 1, 1)) {
             c.check(&id, out.len() == 1, "output length");
         }
-        if let Some(n) = maximum {
-            c.outcome(
-                &format!("{a:?}/bounds/1/{}/{source}", n - 1),
-                Expect::Success,
-                Some((Algorithm::PasswordKdf(a), false)),
-                || e.derive(&password, &salt, 1, n - 1).map(|_| ()),
-            );
+        // Control at the edge of the must-support set: one byte above it is valid, so only success or Unsupported.
+        let length = MUST_SUPPORT_OUTPUT_LEN + 1;
+        let id = format!("{a:?}/bounds/1/{length}/{source}");
+        if let Some(out) = c.outcome(&id, Expect::Success, Some((Algorithm::PasswordKdf(a), false)), || {
+            e.derive(&password, &salt, 1, length)
+        }) {
+            c.check(&id, out.len() == length, "output length");
         }
         if a == PasswordKdfAlgorithm::Pbkdf2HmacSha1 {
             for r in v::pbkdf2_rfc() {
