@@ -56,13 +56,13 @@ These rules apply to every operation and are not repeated.
 4. **Valid domain and must-support set.**
    Each operation defines a valid domain (inputs that are well-formed for the algorithm) and, within it, a must-support set.
    For an advertised operation:
-   - An input outside the valid domain returns [`Error::InvalidKey`] (key material) or [`Error::InvalidInput`] (anything else), except that a verifier on a library with a single opaque failure may return [`Error::VerificationFailed`] for an unusable public key, and an input beyond a backend's size limit may return [`Error::Unsupported`] (section 4).
+   - An input outside the valid domain returns [`Error::InvalidKey`] (key material) or [`Error::InvalidInput`] (anything else), except that a verifier on a library with a single opaque failure may return [`Error::VerificationFailed`] for an unusable public key, and a structurally malformed input within the bounds below but beyond a backend's size limit may return [`Error::Unsupported`] (section 4).
    - An input inside the valid domain but outside the must-support set is either processed like an input in the must-support set or rejected with [`Error::Unsupported`] naming the algorithm (or, for such a verifier, [`Error::VerificationFailed`], section 4).
      For example, a backend may refuse RSA private keys other than 2048, 3072 or 4096-bit two-prime keys with equal-size primes, because some libraries accept only those.
    - An input in the must-support set never returns [`Error::Unsupported`], except for policy input narrowing (section 8.2).
    - Where an operation states no explicit domain for a length, any length is valid and lengths up to 2^31 − 1 bytes are in the must-support set.
-   - Valid domains include the limits of the standard that defines the algorithm (for example RFC 8018's maximum derived-key length).
-     Those limits are checked before allocation or any cryptographic processing, with overflow-safe arithmetic on [`usize`] arguments.
+   - Lengths fixed by the algorithm or the operation, and ranges defined by the algorithm's standard (for example RFC 8018's maximum derived-key length, the RC2 and RC4 key ranges), bound the valid domain: an input outside them returns the specified error on every backend, never [`Error::Unsupported`].
+     These bounds are checked first, before allocation or any cryptographic processing, with overflow-safe arithmetic on [`usize`] arguments; size limits (section 4) come next, which may return [`Error::Unsupported`], and structure last, which returns the error the first item above assigns.
 5. **No RNG parameter.**
    Operations that need randomness (key generation, ephemeral keys, ECDSA nonces, RSA encryption padding, AES-GCM seal nonces) use the backend's own secure random generator.
    No generator is passed in, because some libraries accept only their own.
@@ -145,6 +145,7 @@ The error set is closed: only the contract defines variants, never a backend, an
 When both [`Error::InvalidKey`] and [`Error::InvalidInput`] could apply, report [`Error::InvalidKey`].
 Library key-validation failures map to [`Error::InvalidKey`], except when the library only rejects a well-formed key for its size or parameters, which maps to [`Error::Unsupported`] (rule 4).
 Size limits take precedence: an input beyond a backend's size limit may be refused with [`Error::Unsupported`] before its structure is examined, whether or not it is also malformed.
+A size limit is a backend's capacity bound inside the valid domain, above the must-support set.
 A size limit lies above the must-support set and never applies to a length the algorithm or the operation fixes, such as those of rule 6.
 [`Error::ProviderFailure`] includes "PIN required", which callers therefore cannot distinguish from other device failures; this is a known limit of the closed set, to revisit if a consumer needs to prompt for a PIN.
 Some libraries report a single opaque failure for verification; a backend on such a library may report [`Error::VerificationFailed`] for a public key it cannot use, including an RSA modulus outside its range.
@@ -794,7 +795,11 @@ Before a vector's label is applied, its eligibility is decided by the rules abov
 - MAC, cipher, AEAD and key-wrap vectors apply only to supported protections;
 - for a vector whose inputs are in the operation's must-support set, the label is applied as below;
 - for a vector whose inputs are inside the valid domain but outside the must-support set (for example a 1024-bit RSA key), [`Error::Unsupported`] is also accepted, and so is [`Error::VerificationFailed`] from a verifier on a library with a single opaque failure (section 4); any other result must match the label;
-- for a vector whose inputs are both beyond the backend's size limit and malformed, the allowed outcomes are [`Error::Unsupported`] or the error section 4 assigns to the malformed input ([`Error::InvalidKey`] for key material, [`Error::InvalidInput`] otherwise, or [`Error::VerificationFailed`] from a verifier on a library with a single opaque failure); well-formed inputs beyond the size limit follow the previous item.
+- for a vector whose inputs are within the fixed lengths and standard ranges of rule 4 but both beyond the backend's size limit and malformed, the allowed outcomes are [`Error::Unsupported`] or the error section 4 assigns to the malformed input ([`Error::InvalidKey`] for key material, [`Error::InvalidInput`] otherwise, or [`Error::VerificationFailed`] from a verifier on a library with a single opaque failure); well-formed inputs beyond the size limit follow the previous item.
+
+Inputs just outside a length the algorithm or the operation fixes, or a range the algorithm's standard defines, expect the specified error and never [`Error::Unsupported`] (rule 4).
+They are hand-written structural inputs, and the suite checks at least RC2 keys of 0 and 129 bytes, RC4 keys of 0 and 257 bytes, and PBKDF2 with zero iterations, an empty output or an output one byte above the RFC 8018 maximum where [`usize`] can represent it.
+Each of these has a control at the adjacent in-range value, either a published input or the in-range value with published other inputs, which succeeds, or returns [`Error::Unsupported`] when that value is outside the must-support set.
 
 Labels follow Wycheproof:
 
