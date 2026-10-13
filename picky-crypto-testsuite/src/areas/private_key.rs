@@ -279,6 +279,7 @@ pub type PublishedCiphertext<'a> = (AsymmetricEncryptionAlgorithm, &'a [u8], &'a
 
 /// Checks decryption with an RSA key derived with inconsistent components, for every encryption algorithm the contract defines.
 ///
+/// `public` is the base key's public key, which the encryptors use.
 /// A derived key that doesn't advertise an algorithm must return `Unsupported` for it.
 /// Otherwise the ciphertext comes from the first [`CiphertextSource`] that produces one, and the check fails if none does.
 /// Each check counts its source in the coverage report.
@@ -288,12 +289,11 @@ pub fn inconsistent_decryption(
     options: Options,
     keys: (&dyn PrivateKey, &dyn PrivateKey),
     id: &str,
-    encoded: &[u8],
+    public: &[u8],
     published: Option<PublishedCiphertext<'_>>,
 ) {
     let (base, key) = keys;
-    let public = der::rsa_public(encoded);
-    let modulus_len = der::bit_length(der::children(&public)[0].value).div_ceil(8);
+    let modulus_len = der::bit_length(der::children(public)[0].value).div_ceil(8);
     for algorithm in ENCRYPTIONS {
         let id = format!("{id}/{algorithm:?}");
         if !c.key_supports(&id, key, KeyOperation::Decrypt(algorithm)) {
@@ -307,7 +307,7 @@ pub fn inconsistent_decryption(
             continue;
         }
         let Some((source, ciphertext, expected)) =
-            ciphertext_source(p, options, algorithm, &public, modulus_len, published)
+            ciphertext_source(p, options, algorithm, public, modulus_len, published)
         else {
             c.check(&id, false, "no source produced a ciphertext for the derived key");
             continue;
@@ -377,11 +377,12 @@ fn inconsistent_rsa_signing(c: &mut Checks, p: &CryptoProvider, options: Options
             .iter()
             .filter(|g| der::rsa_must(&v::field(g, "privateKeyPkcs8")))
             .collect();
-        let mut decrypted = std::collections::BTreeSet::new();
+        let mut seen = std::collections::BTreeSet::new();
         for g in &bases {
             let encoding = v::field(g, "privateKeyPkcs8");
+            let public = der::rsa_public(&encoding);
             // Groups of one file can share a key; export and decryption don't depend on the group.
-            let first = decrypted.insert(encoding.clone());
+            let first = seen.insert(encoding.clone());
             let id = format!("{file}/inconsistent components");
             let Some(base) = c.call(&format!("{id}/positive control"), Expect::Success, || {
                 loader.load(PrivateKeyMaterial::Pkcs8(&encoding))
@@ -402,8 +403,8 @@ fn inconsistent_rsa_signing(c: &mut Checks, p: &CryptoProvider, options: Options
                 }) {
                     inconsistent_signatures(c, p, &*base, &*key, &id, (file, g));
                     if first {
-                        derived_export(c, &id, &*key, &der::rsa_public(&encoding));
-                        inconsistent_decryption(c, p, options, (&*base, &*key), &id, &encoding, None);
+                        derived_export(c, &id, &*key, &public);
+                        inconsistent_decryption(c, p, options, (&*base, &*key), &id, &public, None);
                     }
                 }
             }
@@ -452,8 +453,10 @@ fn inconsistent_rsa_decryption(c: &mut Checks, p: &CryptoProvider, options: Opti
             }) else {
                 continue;
             };
+            let public = der::rsa_public(&encoded);
             let ciphertext = v::field(t, "ct");
             let plaintext = v::field(t, "msg");
+            let published = Some((a, ciphertext.as_slice(), plaintext.as_slice()));
             for (i, derived) in der::inconsistent_rsa(&encoded, other.as_deref())
                 .into_iter()
                 .enumerate()
@@ -462,9 +465,8 @@ fn inconsistent_rsa_decryption(c: &mut Checks, p: &CryptoProvider, options: Opti
                 if let Some(key) = c.call(&id, Expect::Either(Error::InvalidKey), || {
                     loader.load(PrivateKeyMaterial::Pkcs8(&derived))
                 }) {
-                    derived_export(c, &id, &*key, &der::rsa_public(&encoded));
-                    let published = Some((a, ciphertext.as_slice(), plaintext.as_slice()));
-                    inconsistent_decryption(c, p, options, (&*base, &*key), &id, &encoded, published);
+                    derived_export(c, &id, &*key, &public);
+                    inconsistent_decryption(c, p, options, (&*base, &*key), &id, &public, published);
                 }
             }
         }
