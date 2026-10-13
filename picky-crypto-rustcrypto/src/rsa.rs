@@ -29,7 +29,43 @@ fn uint(bytes: &[u8], bits: u32) -> Result<BoxedUint, Error> {
     BoxedUint::from_be_slice(bytes, bits).map_err(|_| Error::InvalidKey)
 }
 
+/// DER length of a TLV with `content` bytes of content, in long-form length when needed.
+const fn der_len(content: usize) -> usize {
+    let mut length_octets = 1;
+    if content >= 0x80 {
+        let mut rest = content;
+        while rest > 0 {
+            length_octets += 1;
+            rest >>= 8;
+        }
+    }
+    1 + length_octets + content
+}
+
+/// DER length of a positive INTEGER of at most `bits` bits, including a possible sign octet.
+const fn der_integer_len(bits: usize) -> usize {
+    der_len(bits / 8 + 1)
+}
+
+const MODULUS_LEN: usize = der_integer_len(RsaPublicKey::MAX_SIZE);
+const EXPONENT_LEN: usize = der_integer_len((u64::BITS - RsaPublicKey::MAX_PUB_EXPONENT.leading_zeros()) as usize);
+
+/// Longest PKCS#1 `RSAPublicKey` within the library's limits (rsa 0.10.0-rc.18, src\key.rs:216–222).
+const PUBLIC_KEY_MAX_LEN: usize = der_len(MODULUS_LEN + EXPONENT_LEN);
+
+/// Longest PKCS#8 RSA private key within the library's limits: version, n, e, then d, p, q, dP, dQ and qInv, each
+/// bounded by the modulus, inside the version and `rsaEncryption` identifier of the PKCS#8 wrapper.
+fn private_key_max_len() -> usize {
+    let rsa_private_key = der_len(der_integer_len(1) + MODULUS_LEN + EXPONENT_LEN + 6 * MODULUS_LEN);
+    let algorithm = der_len(der_len(rsa::pkcs1::ALGORITHM_OID.as_bytes().len()) + der_len(0));
+    der_len(der_integer_len(1) + algorithm + der_len(rsa_private_key))
+}
+
 fn load_public_key(der: &[u8], algorithm: Algorithm) -> Result<RsaPublicKey, Error> {
+    // Size limits take precedence over structure, so no oversized input reaches the library's decoders.
+    if der.len() > PUBLIC_KEY_MAX_LEN {
+        return Err(Error::Unsupported(algorithm));
+    }
     let parsed = rsa::pkcs1::RsaPublicKey::from_der(der).map_err(|_| Error::InvalidKey)?;
     let n = uint(parsed.modulus.as_bytes(), precision(parsed.modulus.as_bytes())?)?;
     let e = uint(
@@ -138,10 +174,10 @@ impl PrivateKeyLoader for Loader {
         let PrivateKeyMaterial::Pkcs8(der) = material else {
             return Err(Error::InvalidKey);
         };
-        // The library's PKCS#1 decoder multiplies the public-exponent length by eight in u32
-        // (rsa 0.10.0-rc.18, src\encoding.rs:55–57).
-        if der.len() as u128 > u128::from(u32::MAX / 8) {
-            return Err(Error::InvalidKey);
+        // Size limits take precedence over structure, so no oversized input reaches the library's decoders, whose
+        // stack use grows with the input.
+        if der.len() > private_key_max_len() {
+            return Err(Error::Unsupported(Algorithm::PrivateKeyLoading(KeyType::Rsa)));
         }
         let info = PrivateKeyInfoRef::from_der(der).map_err(|_| Error::InvalidKey)?;
         if info.version() != Version::V1 {
@@ -318,7 +354,10 @@ pub(crate) fn entries(builder: ProviderBuilder) -> ProviderBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rsa::pkcs8::der::{Encode, asn1::UintRef};
+    use rsa::pkcs8::der::{
+        Encode,
+        asn1::{OctetStringRef, UintRef},
+    };
 
     #[test]
     fn rsa_limits_preserve_operation_identity() {
@@ -359,7 +398,6 @@ mod tests {
 
     #[test]
     fn private_modulus_above_public_limit_is_unsupported() {
-        use rsa::pkcs8::der::asn1::OctetStringRef;
         let one = UintRef::new(&[1]).unwrap();
         let modulus = [0xffu8; 1025];
         for (len, expected) in [
@@ -382,6 +420,58 @@ mod tests {
             let info = PrivateKeyInfoRef::new(rsa::pkcs1::ALGORITHM_ID, OctetStringRef::new(&pkcs1).unwrap());
             let der = info.to_der().unwrap();
             assert_eq!(Loader.load(PrivateKeyMaterial::Pkcs8(&der)).err(), Some(expected));
+        }
+    }
+
+    // The caps are the library's encodings of the largest keys within its limits; longer inputs are refused undecoded.
+    #[test]
+    fn encoded_length_caps() {
+        let algorithm = SignatureAlgorithm::RsaPkcs1v15Sha256;
+        let loading = Algorithm::PrivateKeyLoading(KeyType::Rsa);
+        let n = UintRef::new(&[0xff; RsaPublicKey::MAX_SIZE / 8]).unwrap();
+        let exponent = RsaPublicKey::MAX_PUB_EXPONENT.to_be_bytes();
+        let e = UintRef::new(&exponent).unwrap();
+        let public = rsa::pkcs1::RsaPublicKey {
+            modulus: n,
+            public_exponent: e,
+        };
+        assert_eq!(public.to_der().unwrap().len(), PUBLIC_KEY_MAX_LEN);
+        let private = rsa::pkcs1::RsaPrivateKey {
+            modulus: n,
+            public_exponent: e,
+            private_exponent: n,
+            prime1: n,
+            prime2: n,
+            exponent1: n,
+            exponent2: n,
+            coefficient: n,
+            other_prime_infos: None,
+        }
+        .to_der()
+        .unwrap();
+        let info = PrivateKeyInfoRef::new(rsa::pkcs1::ALGORITHM_ID, OctetStringRef::new(&private).unwrap());
+        // Catches a private cap that miscounts the modulus-bounded fields.
+        assert_eq!(info.to_der().unwrap().len(), private_key_max_len());
+        for (len, expected) in [
+            (PUBLIC_KEY_MAX_LEN, Error::InvalidKey),
+            (
+                PUBLIC_KEY_MAX_LEN + 1,
+                Error::Unsupported(Algorithm::Signature(algorithm)),
+            ),
+        ] {
+            assert_eq!(
+                Verify(algorithm).verify(PublicKey(&vec![0; len]), b"", b""),
+                Err(expected)
+            );
+        }
+        for (len, expected) in [
+            (private_key_max_len(), Error::InvalidKey),
+            (private_key_max_len() + 1, Error::Unsupported(loading)),
+        ] {
+            assert_eq!(
+                Loader.load(PrivateKeyMaterial::Pkcs8(&vec![0; len])).err(),
+                Some(expected)
+            );
         }
     }
 

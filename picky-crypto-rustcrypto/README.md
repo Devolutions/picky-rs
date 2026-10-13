@@ -40,6 +40,7 @@ RSA signing and decryption blind the private-key operation with the operating-sy
 ECDSA signing mixes operating-system randomness into the RFC 6979 nonce as additional data.
 RSA public keys beyond the rsa crate's limits (a modulus above 8192 bits or a public exponent above 2^33 − 1) are unsupported.
 Private-key loading applies the same limits, although the rsa crate loads private keys of any modulus size.
+Encoded RSA keys longer than the largest encoding within those limits are unsupported before they are decoded, whether or not they are also malformed.
 
 ## Conformance tests
 
