@@ -21,10 +21,10 @@ fn run() -> Result<()> {
         .parent()
         .ok_or("xtask must belong to the repository workspace")?;
     let args: Vec<_> = std::env::args().skip(1).collect();
-    match args.as_slice() {
-        [command] if command == "check-contract" => contract::check(root),
-        [command, flag, base] if command == "check-no-downgrade" && flag == "--base" => downgrade::check(root, base),
-        [command] if command == "check-vectors" => vectors::check(root),
+    match args.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
+        ["check-contract"] => contract::check(root),
+        ["check-no-downgrade", "--base", base] => downgrade::check(root, base),
+        ["check-vectors"] => vectors::check(root),
         _ => Err("usage: cargo xtask check-contract | check-no-downgrade --base <rev> | check-vectors".into()),
     }
 }
