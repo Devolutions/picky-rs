@@ -56,13 +56,13 @@ These rules apply to every operation and are not repeated.
 4. **Valid domain and must-support set.**
    Each operation defines a valid domain (inputs that are well-formed for the algorithm) and, within it, a must-support set.
    For an advertised operation:
-   - An input outside the valid domain returns [`Error::InvalidKey`] (key material) or [`Error::InvalidInput`] (anything else), except that a verifier on a library with a single opaque failure may return [`Error::VerificationFailed`] for an unusable public key (section 4).
+   - An input outside the valid domain returns [`Error::InvalidKey`] (key material) or [`Error::InvalidInput`] (anything else), except that a verifier on a library with a single opaque failure may return [`Error::VerificationFailed`] for an unusable public key, and an input beyond a backend's size limit may return [`Error::Unsupported`] (section 4).
    - An input inside the valid domain but outside the must-support set is either processed like an input in the must-support set or rejected with [`Error::Unsupported`] naming the algorithm (or, for such a verifier, [`Error::VerificationFailed`], section 4).
      For example, a backend may refuse RSA private keys other than 2048, 3072 or 4096-bit two-prime keys with equal-size primes, because some libraries accept only those.
    - An input in the must-support set never returns [`Error::Unsupported`], except for policy input narrowing (section 8.2).
    - Where an operation states no explicit domain for a length, any length is valid and lengths up to 2^31 − 1 bytes are in the must-support set.
    - Valid domains include the limits of the standard that defines the algorithm (for example RFC 8018's maximum derived-key length).
-     Those limits are checked first, before allocation or any cryptographic processing, with overflow-safe arithmetic on [`usize`] arguments.
+     Those limits are checked before allocation or any cryptographic processing, with overflow-safe arithmetic on [`usize`] arguments.
 5. **No RNG parameter.**
    Operations that need randomness (key generation, ephemeral keys, ECDSA nonces, RSA encryption padding, AES-GCM seal nonces) use the backend's own secure random generator.
    No generator is passed in, because some libraries accept only their own.
@@ -144,9 +144,11 @@ The error set is closed: only the contract defines variants, never a backend, an
 
 When both [`Error::InvalidKey`] and [`Error::InvalidInput`] could apply, report [`Error::InvalidKey`].
 Library key-validation failures map to [`Error::InvalidKey`], except when the library only rejects a well-formed key for its size or parameters, which maps to [`Error::Unsupported`] (rule 4).
+Size limits take precedence: an input beyond a backend's size limit may be refused with [`Error::Unsupported`] before its structure is examined, whether or not it is also malformed.
+A size limit lies above the must-support set and never applies to a length the algorithm or the operation fixes, such as those of rule 6.
 [`Error::ProviderFailure`] includes "PIN required", which callers therefore cannot distinguish from other device failures; this is a known limit of the closed set, to revisit if a consumer needs to prompt for a PIN.
 Some libraries report a single opaque failure for verification; a backend on such a library may report [`Error::VerificationFailed`] for a public key it cannot use, including an RSA modulus outside its range.
-Conformance tests therefore expect [`Error::InvalidKey`] for a malformed public key, and accept either the result expected for a key in the must-support set or [`Error::Unsupported`] for a well-formed public key outside it; for a backend on such a library they also accept [`Error::VerificationFailed`] in both cases.
+Conformance tests therefore expect [`Error::InvalidKey`] for a malformed public key within the backend's size limit, and accept either the result expected for a key in the must-support set or [`Error::Unsupported`] for a well-formed public key outside it; for a backend on such a library they also accept [`Error::VerificationFailed`] in both cases.
 For a public key in the must-support set with a wrong signature, they expect only [`Error::VerificationFailed`].
 
 ## 5. Encodings
@@ -394,7 +396,7 @@ It is an approved mode (NIST SP 800-38F) that must run inside a validated module
 | [`SignatureAlgorithm::EcdsaP256Sha256`], [`SignatureAlgorithm::EcdsaP384Sha384`], [`SignatureAlgorithm::EcdsaP521Sha512`] | FIPS 186-5 ECDSA with the named curve and hash, fixed `r \|\| s` | valid public points of the curve |
 | [`SignatureAlgorithm::Ed25519`] | RFC 8032 pure Ed25519 | valid public keys |
 
-Valid domain: public key bytes in the encoding of section 5.1 and any signature bytes; a key that does not decode as the algorithm's key type in that encoding, including a compressed EC point, is [`Error::InvalidKey`] (or [`Error::VerificationFailed`] on a library with a single opaque failure, section 4).
+Valid domain: public key bytes in the encoding of section 5.1 and any signature bytes; a key that does not decode as the algorithm's key type in that encoding, including a compressed EC point, is [`Error::InvalidKey`] (with the exceptions of section 4).
 
 Acceptance profile:
 
@@ -407,7 +409,7 @@ Acceptance profile:
   Malformed inputs are errors: `S >= L`, an `R` that fails RFC 8032 section 5.1.3 decoding, or a wrong signature length is [`Error::VerificationFailed`]; an `A` that fails that decoding is [`Error::InvalidKey`] or [`Error::VerificationFailed`] (section 4).
   Verification with a validly encoded small-order `A` or `R` is implementation-defined (cofactored or cofactorless equation); backends may disagree on it, so differential tests exclude these inputs and conformance tests check the allowed outcomes listed in section 12.
 
-Result: `Ok(())`; [`Error::VerificationFailed`] for a signature that does not verify, including a wrong length; [`Error::InvalidKey`] for a key that is not a valid key of the expected type, with the opaque-failure tolerance of section 4.
+Result: `Ok(())`; [`Error::VerificationFailed`] for a signature that does not verify, including a wrong length; [`Error::InvalidKey`] for a key that is not a valid key of the expected type, with the exceptions of section 4.
 
 ### 6.10 Asymmetric encryption ([`AsymmetricEncryptor`])
 
@@ -791,7 +793,8 @@ Before a vector's label is applied, its eligibility is decided by the rules abov
 - for an absent entry or a key operation for which [`PrivateKey::supports`] is false, the suite asserts [`Error::Unsupported`] and does not apply the label;
 - MAC, cipher, AEAD and key-wrap vectors apply only to supported protections;
 - for a vector whose inputs are in the operation's must-support set, the label is applied as below;
-- for a vector whose inputs are inside the valid domain but outside the must-support set (for example a 1024-bit RSA key), [`Error::Unsupported`] is also accepted, and so is [`Error::VerificationFailed`] from a verifier on a library with a single opaque failure (section 4); any other result must match the label.
+- for a vector whose inputs are inside the valid domain but outside the must-support set (for example a 1024-bit RSA key), [`Error::Unsupported`] is also accepted, and so is [`Error::VerificationFailed`] from a verifier on a library with a single opaque failure (section 4); any other result must match the label;
+- for a vector whose inputs are both beyond the backend's size limit and malformed, the allowed outcomes are [`Error::Unsupported`] or the error section 4 assigns to the malformed input ([`Error::InvalidKey`] for key material, [`Error::InvalidInput`] otherwise, or [`Error::VerificationFailed`] from a verifier on a library with a single opaque failure); well-formed inputs beyond the size limit follow the previous item.
 
 Labels follow Wycheproof:
 
