@@ -393,7 +393,7 @@ thread_local! {
     static PERSIST_FAILURES: std::cell::Cell<bool> = const { std::cell::Cell::new(true) };
 }
 
-/// Runs `f` without recording property failures in the committed regression file.
+/// Runs `f` without recording property failures in the regression file.
 /// Used by self-tests whose mock providers fail properties on purpose.
 pub fn without_failure_persistence<R>(f: impl FnOnce() -> R) -> R {
     let previous = PERSIST_FAILURES.replace(false);
