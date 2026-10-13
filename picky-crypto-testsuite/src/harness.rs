@@ -393,7 +393,7 @@ thread_local! {
     static PERSIST_FAILURES: std::cell::Cell<bool> = const { std::cell::Cell::new(true) };
 }
 
-/// Runs `f` without recording property failures in the regression file.
+/// Runs `f` without recording property failures in the regression files.
 /// Used by self-tests whose mock providers fail properties on purpose.
 pub fn without_failure_persistence<R>(f: impl FnOnce() -> R) -> R {
     let previous = PERSIST_FAILURES.replace(false);
@@ -417,13 +417,30 @@ pub fn runner(file: &'static str) -> TestRunner {
     })
 }
 
+/// Returns the regression file of the property `id`: `proptest-regressions/<name>.txt` in this crate.
+/// The name keeps the ASCII letters and digits of `id`, joining the runs between them with `-`.
+pub fn regression_file(id: &str) -> &'static str {
+    static FILES: std::sync::Mutex<std::collections::BTreeSet<&'static str>> =
+        std::sync::Mutex::new(std::collections::BTreeSet::new());
+    let name = id
+        .split(|c: char| !c.is_ascii_alphanumeric())
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("-");
+    let path = format!("{}/proptest-regressions/{name}.txt", env!("CARGO_MANIFEST_DIR"));
+    let mut files = FILES.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    if let Some(file) = files.get(path.as_str()) {
+        return file;
+    }
+    // proptest takes a `'static` path, so each distinct path is leaked once and reused.
+    let file: &'static str = Box::leak(path.into_boxed_str());
+    files.insert(file);
+    file
+}
+
 pub fn property<S: Strategy>(id: &str, strategy: S, test: impl Fn(S::Value) -> Result<(), TestCaseError>) {
-    // A runner built by hand has no test source file for proptest's default location, so failures go to one file in this crate.
-    let result = runner(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/proptest-regressions/properties.txt"
-    ))
-    .run(&strategy, |value| {
+    // A runner built by hand has no test source file for proptest's default location, so each property's failures go to its own file in this crate.
+    let result = runner(regression_file(id)).run(&strategy, |value| {
         match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| test(value))) {
             Ok(result) => result,
             Err(_) => Err(TestCaseError::fail(format!("{id}: provider panic"))),
