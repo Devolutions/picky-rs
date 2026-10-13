@@ -201,6 +201,16 @@ pub fn mac_probe(index: usize, inputs: &[published::Triple]) -> &published::Trip
     )
 }
 
+/// A published 256-byte value, the longest RC4 key in the must-support set; checks using it as a key expect only contract properties.
+pub fn rc4_longest_key() -> (String, Vec<u8>) {
+    let (file, _) = keys::RSA_DECRYPT_FILES[0];
+    let vectors = v::wycheproof(file);
+    let (_, t) = test(file, &vectors, "256-byte ciphertext", |_, t| {
+        v::field(t, "ct").len() == 256
+    });
+    (format!("{file}/tcId={}/ct", v::number(t, "tcId")), v::field(t, "ct"))
+}
+
 pub fn rsa_plaintext(limit: usize) -> (String, Vec<u8>) {
     required(
         "rfc/rfc1320.txt; rfc/rfc8032.txt",

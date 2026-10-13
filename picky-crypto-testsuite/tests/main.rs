@@ -11,4 +11,5 @@ mod differential;
 mod freshness;
 mod harness;
 mod selection;
+mod stream_cipher;
 mod vectors;
