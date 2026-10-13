@@ -3,7 +3,7 @@ use picky_crypto::{Algorithm, Entry, Error, OutputBytes, PasswordKdf, PasswordKd
 use std::{marker::PhantomData, sync::Arc};
 
 const MUST_SUPPORT_MAX_OUTPUT_LEN: usize = 1024;
-/// This backend's size limit on derived output (2^31 − 1 bytes), far above the 1024-byte must-support maximum.
+/// This backend's capacity limit on derived output (2^31 − 1 bytes), far above the 1024-byte must-support maximum.
 const OUTPUT_SIZE_LIMIT: usize = i32::MAX as usize;
 
 struct Pbkdf2<D>(PasswordKdfAlgorithm, PhantomData<D>);

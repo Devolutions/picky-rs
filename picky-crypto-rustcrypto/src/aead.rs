@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 struct Gcm(AeadAlgorithm);
 
-/// This backend's size limit on `ciphertext || tag`, the contract's must-support maximum (2^31 − 1 bytes).
+/// This backend's capacity limit on `ciphertext || tag`, the contract's must-support maximum (2^31 − 1 bytes).
 const SIZE_LIMIT: usize = i32::MAX as usize;
 const TAG_LEN: usize = 16;
 

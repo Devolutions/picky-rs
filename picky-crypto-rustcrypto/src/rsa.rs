@@ -62,7 +62,7 @@ fn private_key_max_len() -> usize {
 }
 
 fn load_public_key(der: &[u8], algorithm: Algorithm) -> Result<RsaPublicKey, Error> {
-    // Size limits take precedence over structure, so no oversized input reaches the library's decoders.
+    // Capacity limits take precedence over structure, so no oversized input reaches the library's decoders.
     if der.len() > PUBLIC_KEY_MAX_LEN {
         return Err(Error::Unsupported(algorithm));
     }
@@ -174,7 +174,7 @@ impl PrivateKeyLoader for Loader {
         let PrivateKeyMaterial::Pkcs8(der) = material else {
             return Err(Error::InvalidKey);
         };
-        // Size limits take precedence over structure, so no oversized input reaches the library's decoders, whose
+        // Capacity limits take precedence over structure, so no oversized input reaches the library's decoders, whose
         // stack use grows with the input.
         if der.len() > private_key_max_len() {
             return Err(Error::Unsupported(Algorithm::PrivateKeyLoading(KeyType::Rsa)));

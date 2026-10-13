@@ -35,10 +35,10 @@ impl Cbc {
     }
 }
 
-/// This backend's size limit on data, the contract's must-support maximum for CBC data (2^31 − 1 bytes).
+/// This backend's capacity limit on data, the contract's must-support maximum for CBC data (2^31 − 1 bytes).
 const DATA_SIZE_LIMIT: usize = i32::MAX as usize;
 
-/// Checks fixed lengths first, then the size limit, so oversized data is never copied.
+/// Checks fixed lengths first, then the capacity limit, so oversized data is never copied.
 fn check(algorithm: CipherAlgorithm, key_valid: bool, iv: &[u8], data: &[u8], block: usize) -> Result<(), Error> {
     if !key_valid {
         return Err(Error::InvalidKey);

@@ -30,7 +30,7 @@ impl StreamCipherContext for Context {
             return Err(Error::ProviderFailure);
         }
         let result = (|| {
-            // This backend's size limit on data, the contract's general must-support bound (2^31 − 1 bytes).
+            // This backend's capacity limit on data, the contract's general must-support bound (2^31 − 1 bytes).
             if data.len() > i32::MAX as usize {
                 return Err(Error::Unsupported(picky_crypto::Algorithm::StreamCipher(
                     StreamCipherAlgorithm::Rc4,
