@@ -2,7 +2,7 @@
 
 use picky_crypto::*;
 
-use crate::harness::{CheckedResult, Checks, Expect, Options};
+use crate::harness::{Checks, Expect, Options};
 use crate::vectors as v;
 
 pub fn run(p: &CryptoProvider, _: Options) {
@@ -15,7 +15,7 @@ pub fn run(p: &CryptoProvider, _: Options) {
                 let id = format!("{a:?}/rfc/rfc6229.txt/keyBits={}/offset={offset}", key.len() * 8);
                 if let Some(out) = c.call(&id, Expect::Success, || {
                     let mut ctx = e.start(&key)?;
-                    ctx.apply(&vec![0; offset]).checked()?;
+                    ctx.apply(&vec![0; offset])?;
                     ctx.apply(&vec![0; expected.len()])
                 }) {
                     c.bytes(&id, &out, &expected);

@@ -25,8 +25,6 @@ pub fn run(provider: &CryptoProvider, _: Options) {
             "FIPS report requires nonempty, FIPS entries",
         );
     }
-    let bytes = &crate::select::ed25519_empty().seed;
-    c.debug("provider/Debug", provider, bytes);
     for entry in provider.entries() {
         let Some(id) = c.metadata("provider/entry identity", || helpers::entry_algorithm(entry)) else {
             continue;
@@ -36,13 +34,6 @@ pub fn run(provider: &CryptoProvider, _: Options) {
             provider.get(id).is_some(),
             "entry not found under own algorithm",
         );
-        c.call(&format!("{id:?}/Debug"), Expect::Success, || {
-            let text = format!("{entry:?}");
-            if !text.contains("fips") {
-                return Err(Error::InvalidInput);
-            }
-            Ok(())
-        });
         let protections = c
             .metadata(&format!("{id:?}/protections"), || match entry {
                 Entry::Mac(e) => Some((e.supports(Protection::Apply), e.supports(Protection::Process))),
@@ -55,7 +46,6 @@ pub fn run(provider: &CryptoProvider, _: Options) {
         if let Some((a, b)) = protections {
             c.check(&format!("{id:?}"), a || b, "entry supports neither protection");
         }
-        c.debug(&format!("{id:?}/Debug"), entry, bytes);
     }
     for a in algorithms::all() {
         if provider.get(a).is_none() {

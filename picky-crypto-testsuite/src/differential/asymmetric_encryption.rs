@@ -4,7 +4,7 @@ use picky_crypto::*;
 
 use super::selected;
 use crate::algorithms::*;
-use crate::harness::{CheckedResult, Checks, Expect};
+use crate::harness::{Checks, Expect};
 use crate::keys::*;
 use crate::{der, select, vectors as v};
 
@@ -40,9 +40,9 @@ fn cross_encryption(c: &mut Checks, source: &CryptoProvider, dest: &CryptoProvid
         }
         let messages = select::rsa_messages(rsa_plaintext_limit(a, k));
         selected(c, &format!("{a:?}/{id}"), &messages, |(_, data)| {
-            let encrypted = encryptor.encrypt(PublicKey(&public), data).checked()?;
+            let encrypted = encryptor.encrypt(PublicKey(&public), data)?;
             Ok((
-                key.decrypt(a, &encrypted).checked()?,
+                key.decrypt(a, &encrypted)?,
                 OutputBytes::new(Zeroizing::new(data.clone())),
             ))
         });

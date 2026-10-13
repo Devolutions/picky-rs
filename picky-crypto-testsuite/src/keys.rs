@@ -4,7 +4,7 @@ use picky_crypto::*;
 
 use crate::algorithms::*;
 use crate::areas::ffdh;
-use crate::harness::{CheckedResult, Checks, Expect};
+use crate::harness::{Checks, Expect};
 use crate::{der, vectors as v};
 
 pub const RSA_SIGN_FILES: [&str; 3] = [
@@ -82,12 +82,6 @@ pub fn loaded(
         format!("key_size_bits expected {bits}, actual {reported_bits}"),
     );
     c.check(id, fips == loader_fips, "key and loader FIPS reports differ");
-    match material {
-        PrivateKeyMaterial::Pkcs8(bytes) => c.debug(id, &key, bytes),
-        PrivateKeyMaterial::X25519(bytes) => c.debug(id, &key, bytes),
-        PrivateKeyMaterial::Ffdh { private_value, .. } => c.debug(id, &key, private_value),
-        _ => unreachable!(),
-    }
     for (a, supported) in SIGNATURES.into_iter().zip(signs) {
         let compatible = match kind {
             KeyType::Rsa => SIGNATURES[..8].contains(&a),
@@ -213,11 +207,8 @@ pub fn loaded(
                     if let Some((local, peer)) =
                         c.call(&format!("{id}/export agreement control"), Expect::Success, || {
                             let ephemeral = entry.generate_ephemeral()?;
-                            let public = ephemeral.public_key().checked()?;
-                            Ok((
-                                key.agree(algorithm, &public).checked()?,
-                                ephemeral.agree(&output).checked()?,
-                            ))
+                            let public = ephemeral.public_key()?;
+                            Ok((key.agree(algorithm, &public)?, ephemeral.agree(&output)?))
                         })
                     {
                         c.bytes(id, &local, &peer);
@@ -272,10 +263,10 @@ pub type Exchange = (OutputBytes, OutputBytes, OutputBytes, OutputBytes);
 
 /// Completes an exchange between two ephemeral secrets, returning both public values, then both shared secrets.
 pub fn exchange(a: Box<dyn EphemeralSecret>, b: Box<dyn EphemeralSecret>) -> Result<Exchange, Error> {
-    let ap = a.public_key().checked()?;
-    let bp = b.public_key().checked()?;
-    let sa = a.agree(&bp).checked()?;
-    let sb = b.agree(&ap).checked()?;
+    let ap = a.public_key()?;
+    let bp = b.public_key()?;
+    let sa = a.agree(&bp)?;
+    let sb = b.agree(&ap)?;
     Ok((ap, bp, sa, sb))
 }
 

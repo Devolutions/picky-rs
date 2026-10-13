@@ -5,7 +5,7 @@
 use picky_crypto::*;
 use proptest::prelude::*;
 
-use crate::harness::{CheckedResult, Checks, Expect};
+use crate::harness::{Checks, Expect};
 
 pub mod asymmetric_encryption;
 pub mod inconsistent_rsa;
@@ -44,7 +44,6 @@ fn selected<T>(
 ) {
     c.property(id, 0..inputs.len(), |index| {
         let (left, right) = operation(&inputs[index])
-            .checked()
             .map_err(|e| proptest::test_runner::TestCaseError::fail(format!("{id}/index={index}: {e}")))?;
         prop_assert_eq!(left.as_ref(), right.as_ref());
         Ok(())

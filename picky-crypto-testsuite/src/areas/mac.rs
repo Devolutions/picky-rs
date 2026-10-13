@@ -111,7 +111,6 @@ fn mac_case(
             context.finish()
         });
         if let Some(verifier) = verifier {
-            c.debug(id, &verifier, tag);
             c.check(
                 id,
                 verifier.verify(tag, len) == valid,

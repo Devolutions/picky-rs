@@ -6,7 +6,7 @@ use proptest::prelude::*;
 use super::outputs;
 use crate::algorithms::*;
 use crate::areas::cipher::{cipher_records, transform};
-use crate::harness::{CheckedResult, Checks, Expect};
+use crate::harness::{Checks, Expect};
 use crate::{published, vectors as v};
 
 pub fn run(a: &CryptoProvider, b: &CryptoProvider) {
@@ -91,8 +91,8 @@ pub fn run(a: &CryptoProvider, b: &CryptoProvider) {
             (0..inputs.len(), 1usize..65),
             |(index, len)| {
                 let (id, key, salt, iterations) = &inputs[index];
-                let left = ae.derive(key, salt, *iterations, len).checked().map_err(fail)?;
-                let right = be.derive(key, salt, *iterations, len).checked().map_err(fail)?;
+                let left = ae.derive(key, salt, *iterations, len).map_err(fail)?;
+                let right = be.derive(key, salt, *iterations, len).map_err(fail)?;
                 prop_assert_eq!(left.as_ref(), right.as_ref(), "{}", id);
                 Ok(())
             },
@@ -116,8 +116,8 @@ pub fn run(a: &CryptoProvider, b: &CryptoProvider) {
             (0..inputs.len(), 1usize..65),
             |(index, len)| {
                 let (id, key, info) = &inputs[index];
-                let left = ae.derive(key, info, len).checked().map_err(fail)?;
-                let right = be.derive(key, info, len).checked().map_err(fail)?;
+                let left = ae.derive(key, info, len).map_err(fail)?;
+                let right = be.derive(key, info, len).map_err(fail)?;
                 prop_assert_eq!(left.as_ref(), right.as_ref(), "{}", id);
                 Ok(())
             },

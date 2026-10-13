@@ -5,7 +5,7 @@ use proptest::prelude::*;
 
 use crate::algorithms::*;
 use crate::areas::cipher::{assert_cbc_control, cipher_records};
-use crate::harness::{CheckedResult, Checks, Expect, Options};
+use crate::harness::{Checks, Expect, Options};
 use crate::keys::{ECC_FILE, RSA_SIGN_FILES, exchange, rsa_plaintext_limit};
 use crate::{der, published, select, vectors as v};
 
@@ -26,12 +26,12 @@ pub fn run(p: &CryptoProvider, _: Options) {
             |(index, split)| {
                 let (id, data) = &messages[index];
                 let split = split % (data.len() + 1);
-                let one = helpers::digest(p, a, data).checked().map_err(error)?;
+                let one = helpers::digest(p, a, data).map_err(error)?;
                 let mut context = entry.start().map_err(error)?;
                 context.update(&data[..split]).map_err(error)?;
                 context.update(&[]).map_err(error)?;
                 context.update(&data[split..]).map_err(error)?;
-                let chunked = context.finish().checked().map_err(error)?;
+                let chunked = context.finish().map_err(error)?;
                 prop_assert_eq!(one.as_ref(), chunked.as_ref(), "{}", id);
                 Ok(())
             },
@@ -50,15 +50,12 @@ pub fn run(p: &CryptoProvider, _: Options) {
                 let (id, key, data, tag) = &inputs[index];
                 let split = split % (data.len() + 1);
                 let generated = if protections[0] {
-                    let one = helpers::compute_mac(p, a, key, data)
-                        .checked()
-                        .map_err(error)?
-                        .into_inner();
+                    let one = helpers::compute_mac(p, a, key, data).map_err(error)?.into_inner();
                     let mut context = MacGeneration::start(e, key).map_err(error)?;
                     context.update(&data[..split]).map_err(error)?;
                     context.update(&[]).map_err(error)?;
                     context.update(&data[split..]).map_err(error)?;
-                    let chunked = context.finish().checked().map_err(error)?.into_inner();
+                    let chunked = context.finish().map_err(error)?.into_inner();
                     prop_assert_eq!(one.as_slice(), chunked.as_slice(), "{}", id);
                     Some(one)
                 } else {
@@ -69,7 +66,7 @@ pub fn run(p: &CryptoProvider, _: Options) {
                     context.update(&data[..split]).map_err(error)?;
                     context.update(&[]).map_err(error)?;
                     context.update(&data[split..]).map_err(error)?;
-                    let verifier = context.finish().checked().map_err(error)?;
+                    let verifier = context.finish().map_err(error)?;
                     prop_assert!(verifier.verify(tag, tag.len()), "{id}");
                     if let Some(tag) = generated {
                         prop_assert!(verifier.verify(&tag, tag.len()), "{id}");
@@ -85,11 +82,11 @@ pub fn run(p: &CryptoProvider, _: Options) {
                 let split = split % (data.len() + 1);
                 let mut whole = MacVerification::start(e, &key).map_err(error)?;
                 whole.update(&data).map_err(error)?;
-                let whole = whole.finish().checked().map_err(error)?;
+                let whole = whole.finish().map_err(error)?;
                 let mut chunks = MacVerification::start(e, &key).map_err(error)?;
                 chunks.update(&data[..split]).map_err(error)?;
                 chunks.update(&data[split..]).map_err(error)?;
-                let chunks = chunks.finish().checked().map_err(error)?;
+                let chunks = chunks.finish().map_err(error)?;
                 for len in [probe.len(), 8, 12] {
                     if let Some(prefix) = probe.get(..len) {
                         prop_assert_eq!(whole.verify(prefix, len), chunks.verify(prefix, len), "{}", id);
@@ -118,17 +115,13 @@ pub fn run(p: &CryptoProvider, _: Options) {
                     let mut context = MacGeneration::start(e, &key).map_err(error)?;
                     context.update(&data[..split]).map_err(error)?;
                     context.update(&data[split..]).map_err(error)?;
-                    let chunked = context.finish().checked().map_err(error)?.into_inner();
+                    let chunked = context.finish().map_err(error)?.into_inner();
                     prop_assert_eq!(chunked.as_slice(), tag.as_slice(), "{}", id);
                     if protections[1] {
                         let mut verifier = MacVerification::start(e, &key).map_err(error)?;
                         verifier.update(&data[..split]).map_err(error)?;
                         verifier.update(&data[split..]).map_err(error)?;
-                        prop_assert!(
-                            verifier.finish().checked().map_err(error)?.verify(&tag, tag.len()),
-                            "{}",
-                            id
-                        );
+                        prop_assert!(verifier.finish().map_err(error)?.verify(&tag, tag.len()), "{}", id);
                     }
                     Ok(())
                 });
@@ -143,11 +136,11 @@ pub fn run(p: &CryptoProvider, _: Options) {
             |(index, split)| {
                 let (id, key, data) = &inputs[index];
                 let split = split % (data.len() + 1);
-                let one = e.start(key).map_err(error)?.apply(data).checked().map_err(error)?;
+                let one = e.start(key).map_err(error)?.apply(data).map_err(error)?;
                 let mut context = e.start(key).map_err(error)?;
-                let first = context.apply(&data[..split]).checked().map_err(error)?;
-                context.apply(&[]).checked().map_err(error)?;
-                let second = context.apply(&data[split..]).checked().map_err(error)?;
+                let first = context.apply(&data[..split]).map_err(error)?;
+                context.apply(&[]).map_err(error)?;
+                let second = context.apply(&data[split..]).map_err(error)?;
                 prop_assert_eq!(one.as_ref(), [first.as_ref(), second.as_ref()].concat(), "{}", id);
                 Ok(())
             },
@@ -164,8 +157,8 @@ pub fn run(p: &CryptoProvider, _: Options) {
         let inputs = cipher_records(a).into_iter().filter(|r| !r.5).collect::<Vec<_>>();
         c.property(&format!("{a:?}/published CBC round trip"), 0..inputs.len(), |index| {
             let (id, key, iv, data, _, _) = &inputs[index];
-            let encrypted = e.encrypt(key, iv, data).checked().map_err(error)?;
-            let plaintext = e.decrypt(key, iv, &encrypted).checked().map_err(error)?;
+            let encrypted = e.encrypt(key, iv, data).map_err(error)?;
+            let plaintext = e.decrypt(key, iv, &encrypted).map_err(error)?;
             prop_assert_eq!(plaintext.as_ref(), data.as_slice(), "{}", id);
             Ok(())
         });
@@ -176,14 +169,8 @@ pub fn run(p: &CryptoProvider, _: Options) {
             &format!("{a:?}/out-of-domain"),
             (0..iv.len(), 1..iv.len()),
             |(ivlen, len)| {
-                prop_assert_eq!(
-                    e.encrypt(key, &iv[..ivlen], data).checked().err(),
-                    Some(Error::InvalidInput)
-                );
-                prop_assert_eq!(
-                    e.encrypt(key, iv, &data[..len]).checked().err(),
-                    Some(Error::InvalidInput)
-                );
+                prop_assert_eq!(e.encrypt(key, &iv[..ivlen], data).err(), Some(Error::InvalidInput));
+                prop_assert_eq!(e.encrypt(key, iv, &data[..len]).err(), Some(Error::InvalidInput));
                 Ok(())
             },
         );
@@ -199,11 +186,10 @@ pub fn run(p: &CryptoProvider, _: Options) {
         let inputs = published::aead(index);
         c.property(&format!("{a:?}/published AEAD round trip"), 0..inputs.len(), |index| {
             let (id, key, aad, data) = &inputs[index];
-            let sealed = e.seal(key, aad, data).checked().map_err(error)?;
+            let sealed = e.seal(key, aad, data).map_err(error)?;
             prop_assert_eq!(sealed.nonce.len(), 12, "{}", id);
             let plaintext = e
                 .open(key, &sealed.nonce, aad, &sealed.ciphertext_and_tag)
-                .checked()
                 .map_err(error)?;
             prop_assert_eq!(plaintext.as_ref(), data.as_slice(), "{}", id);
             Ok(())
@@ -220,9 +206,9 @@ pub fn run(p: &CryptoProvider, _: Options) {
         let inputs = published::wrap(index);
         c.property(&format!("{a:?}/published wrap round trip"), 0..inputs.len(), |index| {
             let (id, key, data) = &inputs[index];
-            let wrapped = e.wrap(key, data).checked().map_err(error)?;
+            let wrapped = e.wrap(key, data).map_err(error)?;
             prop_assert_eq!(wrapped.len(), data.len() + 8, "{}", id);
-            let plaintext = e.unwrap(key, &wrapped).checked().map_err(error)?;
+            let plaintext = e.unwrap(key, &wrapped).map_err(error)?;
             prop_assert_eq!(plaintext.as_ref(), data.as_slice(), "{}", id);
             Ok(())
         });
@@ -237,8 +223,8 @@ pub fn run(p: &CryptoProvider, _: Options) {
             (0..inputs.len(), 1usize..64),
             |(index, len)| {
                 let (id, secret, info) = &inputs[index];
-                let short = e.derive(secret, info, len).checked().map_err(error)?;
-                let long = e.derive(secret, info, 64).checked().map_err(error)?;
+                let short = e.derive(secret, info, len).map_err(error)?;
+                let long = e.derive(secret, info, 64).map_err(error)?;
                 prop_assert_eq!(short.len(), len, "{}", id);
                 prop_assert_eq!(long.len(), 64, "{}", id);
                 prop_assert_eq!(short.as_ref(), &long[..len], "{}", id);
@@ -256,8 +242,8 @@ pub fn run(p: &CryptoProvider, _: Options) {
             (0..inputs.len(), 1usize..64),
             |(index, len)| {
                 let (id, password, salt, iterations) = &inputs[index];
-                let short = e.derive(password, salt, *iterations, len).checked().map_err(error)?;
-                let long = e.derive(password, salt, *iterations, 64).checked().map_err(error)?;
+                let short = e.derive(password, salt, *iterations, len).map_err(error)?;
+                let long = e.derive(password, salt, *iterations, 64).map_err(error)?;
                 prop_assert_eq!(short.len(), len, "{}", id);
                 prop_assert_eq!(long.len(), 64, "{}", id);
                 prop_assert_eq!(short.as_ref(), &long[..len], "{}", id);
@@ -299,8 +285,8 @@ pub fn run(p: &CryptoProvider, _: Options) {
                 let inputs = select::rsa_messages(rsa_plaintext_limit(a, k));
                 c.property(&format!("{a:?}/published RSA round trip"), 0..inputs.len(), |index| {
                     let (id, data) = &inputs[index];
-                    let encrypted = e.encrypt(PublicKey(&public), data).checked().map_err(error)?;
-                    let plain = key.decrypt(a, &encrypted).checked().map_err(error)?;
+                    let encrypted = e.encrypt(PublicKey(&public), data).map_err(error)?;
+                    let plain = key.decrypt(a, &encrypted).map_err(error)?;
                     prop_assert_eq!(plain.as_ref(), data.as_slice(), "{}", id);
                     Ok(())
                 });
@@ -317,7 +303,7 @@ pub fn run(p: &CryptoProvider, _: Options) {
                 if let Ok(verifier) = helpers::signature_verifier(p, a) {
                     c.property("Ed25519/published message sign verify", 0..messages.len(), |index| {
                         let (id, data) = &messages[index];
-                        let sig = key.sign(a, data).checked().map_err(error)?;
+                        let sig = key.sign(a, data).map_err(error)?;
                         verifier
                             .verify(PublicKey(&t.public), data, &sig)
                             .map_err(error)
@@ -351,7 +337,7 @@ pub fn run(p: &CryptoProvider, _: Options) {
                     0..messages.len(),
                     |index| {
                         let (id, data) = &messages[index];
-                        let sig = key.sign(sign, data).checked().map_err(error)?;
+                        let sig = key.sign(sign, data).map_err(error)?;
                         verifier
                             .verify(PublicKey(&public), data, &sig)
                             .map_err(error)

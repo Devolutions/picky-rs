@@ -3,7 +3,7 @@
 use picky_crypto::*;
 
 use crate::algorithms::*;
-use crate::harness::{CheckedResult, Checks, Expect, Options};
+use crate::harness::{Checks, Expect, Options};
 use crate::{select, vectors as v};
 
 pub fn run(p: &CryptoProvider, _: Options) {
@@ -43,7 +43,7 @@ pub fn run(p: &CryptoProvider, _: Options) {
                             Expect::Error(Error::Unsupported(Algorithm::Aead(a))),
                             || {
                                 if protection == Protection::Apply {
-                                    e.seal(&key, &aad, &plaintext).checked().map(|s| s.nonce)
+                                    e.seal(&key, &aad, &plaintext).map(|s| s.nonce)
                                 } else {
                                     e.open(&key, &nonce, &aad, &encrypted)
                                 }

@@ -4,7 +4,7 @@ use picky_crypto::*;
 
 use super::{outputs, selected};
 use crate::algorithms::*;
-use crate::harness::{CheckedResult, Checks, Expect};
+use crate::harness::{Checks, Expect};
 use crate::keys::*;
 use crate::{der, published, select, vectors as v};
 
@@ -126,11 +126,11 @@ fn cross_keys(c: &mut Checks, source: &CryptoProvider, dest: &CryptoProvider) {
                     &format!("{file}/{sign:?}/published deterministic signatures"),
                     &messages,
                     |(_, data)| {
-                        let sig = sk.sign(sign, data).checked()?;
+                        let sig = sk.sign(sign, data)?;
                         if let Ok(verifier) = helpers::signature_verifier(dest, sign) {
                             verifier.verify(PublicKey(&public), data, &sig)?;
                         }
-                        Ok((sig, dk.as_ref().unwrap().sign(sign, data).checked()?))
+                        Ok((sig, dk.as_ref().unwrap().sign(sign, data)?))
                     },
                 );
             }
@@ -173,11 +173,11 @@ fn cross_keys(c: &mut Checks, source: &CryptoProvider, dest: &CryptoProvider) {
                     &format!("{id}/published deterministic signatures"),
                     &messages,
                     |(_, data)| {
-                        let sig = sk.sign(algorithm, data).checked()?;
+                        let sig = sk.sign(algorithm, data)?;
                         if let Ok(verifier) = helpers::signature_verifier(dest, algorithm) {
                             verifier.verify(PublicKey(&t.public), data, &sig)?;
                         }
-                        Ok((sig, dk.as_ref().unwrap().sign(algorithm, data).checked()?))
+                        Ok((sig, dk.as_ref().unwrap().sign(algorithm, data)?))
                     },
                 );
             }

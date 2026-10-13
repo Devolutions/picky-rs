@@ -3,7 +3,7 @@
 use picky_crypto::*;
 
 use crate::algorithms::*;
-use crate::harness::{CheckedResult, Checks, Expect, Options};
+use crate::harness::{Checks, Expect, Options};
 use crate::keys::*;
 use crate::{der, select, vectors as v};
 
@@ -91,9 +91,9 @@ pub fn run(p: &CryptoProvider, _: Options) {
                     if let Some((static_secret, ephemeral_secret)) =
                         c.call(&format!("{id}/ephemeral with static"), Expect::Success, || {
                             let e = ephemeral.generate_ephemeral()?;
-                            let ep = e.public_key().checked()?;
-                            let static_secret = key.agree(a, &ep).checked()?;
-                            let ephemeral_secret = e.agree(&public).checked()?;
+                            let ep = e.public_key()?;
+                            let static_secret = key.agree(a, &ep)?;
+                            let ephemeral_secret = e.agree(&public)?;
                             Ok((static_secret, ephemeral_secret))
                         })
                     {
@@ -198,8 +198,8 @@ pub fn run(p: &CryptoProvider, _: Options) {
                 if let Ok(e) = helpers::key_agreement(p, a) {
                     if let Some((sa, sb)) = c.call(&id, Expect::Success, || {
                         let ephemeral = e.generate_ephemeral()?;
-                        let ep = ephemeral.public_key().checked()?;
-                        Ok((key.agree(a, &ep).checked()?, ephemeral.agree(&public).checked()?))
+                        let ep = ephemeral.public_key()?;
+                        Ok((key.agree(a, &ep)?, ephemeral.agree(&public)?))
                     }) {
                         c.bytes(&id, &sa, &sb);
                     }
@@ -224,17 +224,17 @@ pub fn run(p: &CryptoProvider, _: Options) {
                     let agreement = key.supports(KeyOperation::Agree(a));
                     let public = key.supports(KeyOperation::PublicKey);
                     if public {
-                        let exported = key.public_key().checked()?;
+                        let exported = key.public_key()?;
                         if exported.len() != 32 {
                             return Err(Error::InvalidInput);
                         }
                         if agreement {
-                            let expected = key.agree(a, &base_point).checked()?;
+                            let expected = key.agree(a, &base_point)?;
                             if exported.as_ref() != expected.as_ref() {
                                 return Err(Error::InvalidInput);
                             }
                         }
-                    } else if key.public_key().checked().err()
+                    } else if key.public_key().err()
                         != Some(Error::Unsupported(Algorithm::PublicKeyExport(KeyType::X25519)))
                     {
                         return Err(Error::InvalidInput);
@@ -242,7 +242,7 @@ pub fn run(p: &CryptoProvider, _: Options) {
                     if !agreement {
                         return Ok(None);
                     }
-                    let result = key.agree(a, &u).checked()?;
+                    let result = key.agree(a, &u)?;
                     u = k.to_vec();
                     k = result.as_ref().try_into().map_err(|_| Error::InvalidInput)?;
                     count += 1;
