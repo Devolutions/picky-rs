@@ -869,7 +869,19 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
                     }
                 };
 
-                Zeroizing::new(rsa_private_key.decrypt(padding, &encrypted_key)?)
+                if header.alg == JweAlg::RsaPkcs1v15 {
+                    // RFC 7516 §11.5 forbids distinguishing format, padding and length errors of the encrypted key,
+                    // and recommends substituting a random CEK. The JWE then fails with the same error as invalid
+                    // content, as §11.4 asks.
+                    let random_cek = generate_cek(header.enc)?;
+
+                    match rsa_private_key.decrypt(padding, &encrypted_key).map(Zeroizing::new) {
+                        Ok(cek) if cek.len() == random_cek.len() => cek,
+                        _ => random_cek,
+                    }
+                } else {
+                    Zeroizing::new(rsa_private_key.decrypt(padding, &encrypted_key)?)
+                }
             }
             PrivateKeyKind::Ec { .. } | PrivateKeyKind::Ed { .. } => {
                 let sender_public_key = header
@@ -1406,13 +1418,11 @@ mod tests {
         PrivateKey::from_pem(&pk_pem).expect("private_key 1")
     }
 
-    fn get_private_key_2() -> PrivateKey {
-        let pk_pem = picky_test_data::RSA_2048_PK_7.parse::<Pem>().unwrap();
-        PrivateKey::from_pem(&pk_pem).expect("private_key 7")
-    }
-
-    #[test]
-    fn rsa_oaep_aes_128_gcm() {
+    #[rstest]
+    #[case(JweAlg::RsaOaep)]
+    // RSA1_5 decoding masks key errors, so only this round trip catches an RSA1_5 encoder fault.
+    #[case(JweAlg::RsaPkcs1v15)]
+    fn rsa_aes_128_gcm(#[case] alg: JweAlg) {
         let payload = "何だと？……無駄な努力だ？……百も承知だ！だがな、勝つ望みがある時ばかり、戦うのとは訳が違うぞ！"
             .as_bytes()
             .to_vec();
@@ -1420,7 +1430,7 @@ mod tests {
         let private_key = get_private_key_1();
         let public_key = private_key.to_public_key().unwrap();
 
-        let jwe = Jwe::new(JweAlg::RsaOaep, JweEnc::Aes128Gcm, payload);
+        let jwe = Jwe::new(alg, JweEnc::Aes128Gcm, payload);
         let encoded = jwe.clone().encode(&public_key).unwrap();
 
         let decoded = Jwe::decode(&encoded, &private_key).unwrap();
@@ -1429,20 +1439,61 @@ mod tests {
         assert_eq!(jwe.header, decoded.header);
     }
 
-    #[test]
-    fn rsa_pkcs1v15_aes_128_gcm_bad_key() {
-        let payload = "そうとも！ 負けると知って戦うのが、遙かに美しいのだ！"
-            .as_bytes()
-            .to_vec();
+    /// Builds an `RSA1_5` compact JWE whose content is encrypted under `content_key`, regardless of `encrypted_key`.
+    fn rsa1_5_compact(enc: JweEnc, encrypted_key: &[u8], content_key: &[u8]) -> String {
+        fn b64(bytes: impl AsRef<[u8]>) -> String {
+            general_purpose::URL_SAFE_NO_PAD.encode(bytes)
+        }
 
+        let header = b64(serde_json::to_vec(&JweHeader::new(JweAlg::RsaPkcs1v15, enc)).unwrap());
+        let aad = header.as_bytes();
+        let nonce = Array::from([0; 12]);
+        let mut ciphertext = b"payload".to_vec();
+        let buffer = ciphertext.as_mut_slice().into();
+        let tag = match enc {
+            JweEnc::Aes128Gcm => Aes128Gcm::new_from_slice(content_key)
+                .unwrap()
+                .encrypt_inout_detached(&nonce, aad, buffer),
+            JweEnc::Aes256Gcm => Aes256Gcm::new_from_slice(content_key)
+                .unwrap()
+                .encrypt_inout_detached(&nonce, aad, buffer),
+            _ => unreachable!(),
+        }
+        .unwrap();
+
+        [header, b64(encrypted_key), b64(nonce), b64(&ciphertext), b64(tag)].join(".")
+    }
+
+    // Two key sizes, so that a substitute CEK of any fixed length fails at least one case.
+    #[rstest]
+    #[case(JweEnc::Aes128Gcm)]
+    #[case(JweEnc::Aes256Gcm)]
+    fn rsa_pkcs1v15_key_failures_match_content_failure(#[case] enc: JweEnc) {
         let private_key = get_private_key_1();
-        let public_key = get_private_key_2().to_public_key().unwrap();
+        let public_key = RsaPublicKey::try_from(&private_key.to_public_key().unwrap()).unwrap();
+        let mut rng = StdRng::seed_from_u64(0);
+        let mut encrypt_key = |key: &[u8]| public_key.encrypt(&mut rng, Pkcs1v15Encrypt, key).unwrap();
+        let decode = |encrypted_key: &[u8], content_key: &[u8]| {
+            Jwe::decode(&rsa1_5_compact(enc, encrypted_key, content_key), &private_key)
+        };
 
-        let jwe = Jwe::new(JweAlg::RsaPkcs1v15, JweEnc::Aes128Gcm, payload);
-        let encoded = jwe.encode(&public_key).unwrap();
+        // All zeros, so that a zeroed substitute or a truncated wrong-length key would decrypt the content.
+        let cek = vec![0; enc.key_size()];
+        let valid_key = encrypt_key(&cek);
+        decode(&valid_key, &cek).unwrap();
 
-        let err = Jwe::decode(&encoded, &private_key).err().unwrap();
-        assert_eq!(err.to_string(), "RSA error: decryption error");
+        let wrong_content = decode(&valid_key, &vec![1; cek.len()]).unwrap_err();
+
+        // The ciphertext 1 decrypts to 00 00 .. 01, which lacks the 00 02 prefix.
+        let mut bad_padding = vec![0; valid_key.len()];
+        *bad_padding.last_mut().unwrap() = 1;
+        let wrong_length = encrypt_key(&vec![0; cek.len() + 1]);
+
+        for encrypted_key in [bad_padding, wrong_length] {
+            let err = decode(&encrypted_key, &cek).unwrap_err();
+            assert_eq!(format!("{err:?}"), format!("{wrong_content:?}"));
+            assert_eq!(err.to_string(), wrong_content.to_string());
+        }
     }
 
     #[test]
