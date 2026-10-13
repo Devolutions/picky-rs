@@ -602,7 +602,7 @@ impl<'repr> RawJwe<'repr> {
 
     /// Decrypts the ciphertext using asymmetric cryptography and returns a verified `Jwe` structure.
     pub fn decrypt(self, key: &PrivateKey) -> Result<Jwe, JweError> {
-        decrypt_impl(self, DecoderMode::Normal(key))
+        decrypt_impl(self, DecoderMode::Normal(key, &mut StdRng::try_from_rng(&mut SysRng)?))
     }
 
     /// Decrypts the ciphertext using the provided CEK (a symmetric key).
@@ -677,27 +677,10 @@ fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
         EncoderMode::Asymmetric(public_key) => match &public_key.as_inner().subject_public_key {
             RfcPublicKey::Rsa(_) => {
                 let rsa_public_key = RsaPublicKey::try_from(public_key)?;
-
-                let padding = match jwe.header.alg {
-                    JweAlg::RsaPkcs1v15 => RsaPaddingScheme::Pkcs1v15Encrypt,
-                    JweAlg::RsaOaep => RsaPaddingScheme::Oaep(Oaep::<sha1::Sha1>::new()),
-                    JweAlg::RsaOaep256 => RsaPaddingScheme::Oaep256(Oaep::<sha2::Sha256>::new()),
-                    unsupported => {
-                        return Err(JweError::UnsupportedAlgorithm {
-                            algorithm: format!("{unsupported:?}"),
-                        });
-                    }
-                };
-
-                let cek = generate_cek(jwe.header.enc)?;
-
-                let encrypted_key = match rsa_public_key.encrypt(&mut StdRng::try_from_rng(&mut SysRng)?, padding, &cek)
-                {
-                    Ok(encrypted_key) => encrypted_key,
-                    Err(err) => {
-                        return Err(err.into());
-                    }
-                };
+                let padding = RsaPaddingScheme::new(jwe.header.alg)?;
+                let mut rng = StdRng::try_from_rng(&mut SysRng)?;
+                let cek = generate_cek(jwe.header.enc, &mut rng);
+                let encrypted_key = rsa_public_key.encrypt(&mut rng, padding, &cek)?;
 
                 (general_purpose::URL_SAFE_NO_PAD.encode(encrypted_key), cek)
             }
@@ -808,7 +791,7 @@ fn prepare_ecdh_encryption_key(jwe: &Jwe, public_key: &PublicKey) -> Result<JweE
                 wrapping_alg.key_size(),
             )?;
 
-            let cek = generate_cek(header.enc)?;
+            let cek = generate_cek(header.enc, &mut StdRng::try_from_rng(&mut SysRng)?);
             let wrapped_key = wrapping_alg.encrypt_key(header.enc, &cek, &shared_secret)?;
 
             (wrapped_key, cek, epk)
@@ -829,9 +812,9 @@ fn prepare_ecdh_encryption_key(jwe: &Jwe, public_key: &PublicKey) -> Result<JweE
 
 // decoder
 
-#[derive(Clone)]
 enum DecoderMode<'a> {
-    Normal(&'a PrivateKey),
+    /// The generator blinds RSA decryption and supplies the substitute CEK.
+    Normal(&'a PrivateKey, &'a mut StdRng),
     Direct(&'a [u8]),
 }
 
@@ -854,33 +837,22 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
 
     let jwe_cek = match mode {
         DecoderMode::Direct(symmetric_key) => Zeroizing::new(symmetric_key.to_vec()),
-        DecoderMode::Normal(private_key) => match &private_key.as_kind() {
+        DecoderMode::Normal(private_key, rng) => match &private_key.as_kind() {
             PrivateKeyKind::Rsa => {
                 let rsa_private_key = RsaPrivateKey::try_from(private_key)?;
+                let padding = RsaPaddingScheme::new(header.alg)?;
 
-                let padding = match header.alg {
-                    JweAlg::RsaPkcs1v15 => RsaPaddingScheme::Pkcs1v15Encrypt,
-                    JweAlg::RsaOaep => RsaPaddingScheme::Oaep(Oaep::<sha1::Sha1>::new()),
-                    JweAlg::RsaOaep256 => RsaPaddingScheme::Oaep256(Oaep::<sha2::Sha256>::new()),
-                    unsupported => {
-                        return Err(JweError::UnsupportedAlgorithm {
-                            algorithm: format!("{unsupported:?}"),
-                        });
-                    }
-                };
+                // RFC 7516 §11.5 forbids distinguishing format, padding and length errors of the encrypted key,
+                // and recommends substituting a random CEK. The JWE then fails with the same error as invalid
+                // content, as §11.4 asks. The substitute is drawn before decryption, whatever its outcome.
+                let random_cek = generate_cek(header.enc, rng);
 
-                if header.alg == JweAlg::RsaPkcs1v15 {
-                    // RFC 7516 §11.5 forbids distinguishing format, padding and length errors of the encrypted key,
-                    // and recommends substituting a random CEK. The JWE then fails with the same error as invalid
-                    // content, as §11.4 asks.
-                    let random_cek = generate_cek(header.enc)?;
-
-                    match rsa_private_key.decrypt(padding, &encrypted_key).map(Zeroizing::new) {
-                        Ok(cek) if cek.len() == random_cek.len() => cek,
-                        _ => random_cek,
-                    }
-                } else {
-                    Zeroizing::new(rsa_private_key.decrypt(padding, &encrypted_key)?)
+                match rsa_private_key
+                    .decrypt_blinded(rng, padding, &encrypted_key)
+                    .map(Zeroizing::new)
+                {
+                    Ok(cek) if cek.len() == random_cek.len() => cek,
+                    _ => random_cek,
                 }
             }
             PrivateKeyKind::Ec { .. } | PrivateKeyKind::Ed { .. } => {
@@ -1361,17 +1333,29 @@ fn calculate_ecdh_shared_secret(
 }
 
 /// Generate content encryption key (CEK) for given algorithm and wraps it with zeroize-on-drop container
-fn generate_cek(alg: JweEnc) -> Result<Zeroizing<Vec<u8>>, JweError> {
+fn generate_cek(alg: JweEnc, rng: &mut StdRng) -> Zeroizing<Vec<u8>> {
     let mut cek = Zeroizing::new(vec![0u8; alg.key_size()]);
-    let mut rng = StdRng::try_from_rng(&mut SysRng)?;
     rng.fill_bytes(&mut cek);
-    Ok(cek)
+    cek
 }
 
 enum RsaPaddingScheme {
     Pkcs1v15Encrypt,
     Oaep(Oaep<sha1::Sha1>),
     Oaep256(Oaep<sha2::Sha256>),
+}
+
+impl RsaPaddingScheme {
+    fn new(alg: JweAlg) -> Result<Self, JweError> {
+        match alg {
+            JweAlg::RsaPkcs1v15 => Ok(Self::Pkcs1v15Encrypt),
+            JweAlg::RsaOaep => Ok(Self::Oaep(Oaep::<sha1::Sha1>::new())),
+            JweAlg::RsaOaep256 => Ok(Self::Oaep256(Oaep::<sha2::Sha256>::new())),
+            unsupported => Err(JweError::UnsupportedAlgorithm {
+                algorithm: format!("{unsupported:?}"),
+            }),
+        }
+    }
 }
 
 impl rsa::traits::PaddingScheme for RsaPaddingScheme {
@@ -1411,6 +1395,7 @@ mod tests {
     use super::*;
     use crate::key::PrivateKey;
     use crate::pem::Pem;
+    use rsa::traits::PublicKeyParts as _;
     use rstest::rstest;
 
     fn get_private_key_1() -> PrivateKey {
@@ -1419,10 +1404,8 @@ mod tests {
     }
 
     #[rstest]
-    #[case(JweAlg::RsaOaep)]
-    // RSA1_5 decoding masks key errors, so only this round trip catches an RSA1_5 encoder fault.
-    #[case(JweAlg::RsaPkcs1v15)]
-    fn rsa_aes_128_gcm(#[case] alg: JweAlg) {
+    // The other RSA tests bypass the encoder, so this round trip checks its padding for every algorithm.
+    fn rsa_aes_128_gcm(#[values(JweAlg::RsaPkcs1v15, JweAlg::RsaOaep, JweAlg::RsaOaep256)] alg: JweAlg) {
         let payload = "何だと？……無駄な努力だ？……百も承知だ！だがな、勝つ望みがある時ばかり、戦うのとは訳が違うぞ！"
             .as_bytes()
             .to_vec();
@@ -1439,61 +1422,79 @@ mod tests {
         assert_eq!(jwe.header, decoded.header);
     }
 
-    /// Builds an `RSA1_5` compact JWE whose content is encrypted under `content_key`, regardless of `encrypted_key`.
-    fn rsa1_5_compact(enc: JweEnc, encrypted_key: &[u8], content_key: &[u8]) -> String {
+    /// Builds an A256GCM compact JWE whose content is encrypted under `content_key`, regardless of `encrypted_key`.
+    ///
+    /// A256GCM complements the A128GCM round trip, so a substitute CEK of any fixed length breaks one of them.
+    fn rsa_compact(alg: JweAlg, encrypted_key: &[u8], content_key: &[u8]) -> String {
         fn b64(bytes: impl AsRef<[u8]>) -> String {
             general_purpose::URL_SAFE_NO_PAD.encode(bytes)
         }
 
-        let header = b64(serde_json::to_vec(&JweHeader::new(JweAlg::RsaPkcs1v15, enc)).unwrap());
-        let aad = header.as_bytes();
+        let header = b64(serde_json::to_vec(&JweHeader::new(alg, JweEnc::Aes256Gcm)).unwrap());
         let nonce = Array::from([0; 12]);
         let mut ciphertext = b"payload".to_vec();
-        let buffer = ciphertext.as_mut_slice().into();
-        let tag = match enc {
-            JweEnc::Aes128Gcm => Aes128Gcm::new_from_slice(content_key)
-                .unwrap()
-                .encrypt_inout_detached(&nonce, aad, buffer),
-            JweEnc::Aes256Gcm => Aes256Gcm::new_from_slice(content_key)
-                .unwrap()
-                .encrypt_inout_detached(&nonce, aad, buffer),
-            _ => unreachable!(),
-        }
-        .unwrap();
+        let tag = Aes256Gcm::new_from_slice(content_key)
+            .unwrap()
+            .encrypt_inout_detached(&nonce, header.as_bytes(), ciphertext.as_mut_slice().into())
+            .unwrap();
 
         [header, b64(encrypted_key), b64(nonce), b64(&ciphertext), b64(tag)].join(".")
     }
 
-    // Two key sizes, so that a substitute CEK of any fixed length fails at least one case.
+    /// Returns the ciphertext 1, which RSA decrypts to 00 .. 01: neither PKCS#1 v1.5 nor OAEP padding.
+    fn bad_padding_key(private_key: &PrivateKey) -> Vec<u8> {
+        let mut key = vec![0; RsaPrivateKey::try_from(private_key).unwrap().size()];
+        *key.last_mut().unwrap() = 1;
+        key
+    }
+
     #[rstest]
-    #[case(JweEnc::Aes128Gcm)]
-    #[case(JweEnc::Aes256Gcm)]
-    fn rsa_pkcs1v15_key_failures_match_content_failure(#[case] enc: JweEnc) {
+    fn rsa_key_failures_match_content_failure(
+        // The encoder and decoder share `RsaPaddingScheme::new`, so each value is the only check that it maps
+        // that algorithm to the padding RFC 7518 §4.2 and §4.3 assign.
+        #[values(JweAlg::RsaPkcs1v15, JweAlg::RsaOaep, JweAlg::RsaOaep256)] alg: JweAlg,
+    ) {
         let private_key = get_private_key_1();
         let public_key = RsaPublicKey::try_from(&private_key.to_public_key().unwrap()).unwrap();
         let mut rng = StdRng::seed_from_u64(0);
-        let mut encrypt_key = |key: &[u8]| public_key.encrypt(&mut rng, Pkcs1v15Encrypt, key).unwrap();
+        let mut encrypt_key = |key: &[u8]| {
+            match alg {
+                JweAlg::RsaPkcs1v15 => public_key.encrypt(&mut rng, Pkcs1v15Encrypt, key),
+                JweAlg::RsaOaep => public_key.encrypt(&mut rng, Oaep::<sha1::Sha1>::new(), key),
+                JweAlg::RsaOaep256 => public_key.encrypt(&mut rng, Oaep::<sha2::Sha256>::new(), key),
+                _ => unreachable!(),
+            }
+            .unwrap()
+        };
         let decode = |encrypted_key: &[u8], content_key: &[u8]| {
-            Jwe::decode(&rsa1_5_compact(enc, encrypted_key, content_key), &private_key)
+            Jwe::decode(&rsa_compact(alg, encrypted_key, content_key), &private_key)
         };
 
         // All zeros, so that a zeroed substitute or a truncated wrong-length key would decrypt the content.
-        let cek = vec![0; enc.key_size()];
+        let cek = [0; 32];
         let valid_key = encrypt_key(&cek);
         decode(&valid_key, &cek).unwrap();
 
-        let wrong_content = decode(&valid_key, &vec![1; cek.len()]).unwrap_err();
+        let wrong_content = decode(&valid_key, &[1; 32]).unwrap_err();
+        let wrong_length = encrypt_key(&[0; 33]);
 
-        // The ciphertext 1 decrypts to 00 00 .. 01, which lacks the 00 02 prefix.
-        let mut bad_padding = vec![0; valid_key.len()];
-        *bad_padding.last_mut().unwrap() = 1;
-        let wrong_length = encrypt_key(&vec![0; cek.len() + 1]);
-
-        for encrypted_key in [bad_padding, wrong_length] {
+        for encrypted_key in [bad_padding_key(&private_key), wrong_length] {
             let err = decode(&encrypted_key, &cek).unwrap_err();
             assert_eq!(format!("{err:?}"), format!("{wrong_content:?}"));
             assert_eq!(err.to_string(), wrong_content.to_string());
         }
+    }
+
+    #[rstest]
+    fn rsa_key_failure_substitutes_generator_output(#[values(JweAlg::RsaPkcs1v15, JweAlg::RsaOaep)] alg: JweAlg) {
+        let private_key = get_private_key_1();
+
+        // The substitute is the generator's first output, drawn before blinding consumes it.
+        let mut substitute = [0; 32];
+        StdRng::seed_from_u64(1).fill_bytes(&mut substitute);
+
+        let raw = RawJwe::decode(rsa_compact(alg, &bad_padding_key(&private_key), &substitute)).unwrap();
+        decrypt_impl(raw, DecoderMode::Normal(&private_key, &mut StdRng::seed_from_u64(1))).unwrap();
     }
 
     #[test]
