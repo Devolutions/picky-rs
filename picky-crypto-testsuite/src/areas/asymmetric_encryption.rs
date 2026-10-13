@@ -63,6 +63,13 @@ pub fn run(p: &CryptoProvider, _: Options) {
                             || e.encrypt(PublicKey(&public), &msg),
                         ) {
                             c.check(&id, encrypted.len() == bits.div_ceil(8), "RSA ciphertext length");
+                            if let Ok(again) = e.encrypt(PublicKey(&public), &msg) {
+                                c.check(
+                                    &id,
+                                    again.as_ref() != encrypted.as_ref(),
+                                    "two encryptions of one message are identical",
+                                );
+                            }
                             if let Some(key) = key
                                 .as_ref()
                                 .filter(|k| c.key_supports(&id, &***k, KeyOperation::Decrypt(a)))

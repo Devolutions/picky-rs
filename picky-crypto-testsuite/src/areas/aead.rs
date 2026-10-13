@@ -90,6 +90,17 @@ pub fn run(p: &CryptoProvider, _: Options) {
             "{a:?} control key, nonce and data lengths"
         );
         if protections[0] {
+            let (aad, msg) = (v::field(valid, "aad"), v::field(valid, "msg"));
+            let id = format!("{a:?}/two seals");
+            if let Some((first, second)) = c.call(&id, Expect::Success, || {
+                Ok((e.seal(&key, &aad, &msg)?, e.seal(&key, &aad, &msg)?))
+            }) {
+                c.check(
+                    &id,
+                    first.nonce.as_ref() != second.nonce.as_ref(),
+                    "two seals of one input returned the same nonce",
+                );
+            }
             c.call(
                 &format!("{a:?}/seal invalid key"),
                 Expect::Error(Error::InvalidKey),

@@ -162,6 +162,11 @@ pub fn run(p: &CryptoProvider, _: Options) {
                 }) {
                     c.bytes(id, &sa, &sb);
                     c.check(id, sa.len() == group.p.len(), "FFDH secret width");
+                    c.check(
+                        id,
+                        ap.as_ref() != bp.as_ref(),
+                        "two ephemeral public keys are identical",
+                    );
                     for public in [ap, bp] {
                         c.check(id, public.len() == group.p.len(), "FFDH public width");
                         let unsigned = der::unsigned(&public);

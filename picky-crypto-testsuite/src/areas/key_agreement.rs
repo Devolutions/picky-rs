@@ -29,6 +29,11 @@ pub fn run(p: &CryptoProvider, _: Options) {
         }) {
             c.bytes(&id, &a_secret, &b_secret);
             c.check(&id, a_secret.len() == size, "shared secret length");
+            c.check(
+                &id,
+                a_public.as_ref() != b_public.as_ref(),
+                "two ephemeral public keys are identical",
+            );
             for public in [a_public, b_public] {
                 c.check(
                     &id,
