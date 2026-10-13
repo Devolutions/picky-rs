@@ -391,11 +391,17 @@ impl JweEnc {
             .to_string()
     }
 
+    /// Content encryption key size in bytes.
+    ///
+    /// For the CBC-HS algorithms, the key concatenates the MAC key and the encryption key (RFC 7518 §5.2).
     pub fn key_size(self) -> usize {
         match self {
-            Self::Aes128CbcHmacSha256 | Self::Aes128Gcm => <Aes128Gcm as KeySizeUser>::KeySize::to_usize(),
-            Self::Aes192CbcHmacSha384 | Self::Aes192Gcm => <Aes192Gcm as KeySizeUser>::KeySize::to_usize(),
-            Self::Aes256CbcHmacSha512 | Self::Aes256Gcm => <Aes256Gcm as KeySizeUser>::KeySize::to_usize(),
+            Self::Aes128Gcm => <Aes128Gcm as KeySizeUser>::KeySize::to_usize(),
+            Self::Aes192Gcm => <Aes192Gcm as KeySizeUser>::KeySize::to_usize(),
+            Self::Aes256Gcm => <Aes256Gcm as KeySizeUser>::KeySize::to_usize(),
+            Self::Aes128CbcHmacSha256 => 32usize,
+            Self::Aes192CbcHmacSha384 => 48usize,
+            Self::Aes256CbcHmacSha512 => 64usize,
         }
     }
 
@@ -406,12 +412,13 @@ impl JweEnc {
         }
     }
 
+    /// Authentication tag size in bytes; the CBC-HS algorithms truncate the HMAC to half its length (RFC 7518 §5.2).
     pub fn tag_size(self) -> usize {
         match self {
             Self::Aes128Gcm | Self::Aes192Gcm | Self::Aes256Gcm => 16usize,
-            Self::Aes128CbcHmacSha256 => 32usize,
-            Self::Aes192CbcHmacSha384 => 48usize,
-            Self::Aes256CbcHmacSha512 => 64usize,
+            Self::Aes128CbcHmacSha256 => 16usize,
+            Self::Aes192CbcHmacSha384 => 24usize,
+            Self::Aes256CbcHmacSha512 => 32usize,
         }
     }
 }
@@ -678,7 +685,7 @@ fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
             RfcPublicKey::Rsa(_) => {
                 let rsa_public_key = RsaPublicKey::try_from(public_key)?;
                 let padding = RsaPaddingScheme::new(jwe.header.alg)?;
-                let mut rng = StdRng::try_from_rng(&mut SysRng)?;
+                let mut rng = os_rng()?;
                 let cek = generate_cek(jwe.header.enc, &mut rng);
                 let encrypted_key = rsa_public_key.encrypt(&mut rng, padding, &cek)?;
 
@@ -791,7 +798,7 @@ fn prepare_ecdh_encryption_key(jwe: &Jwe, public_key: &PublicKey) -> Result<JweE
                 wrapping_alg.key_size(),
             )?;
 
-            let cek = generate_cek(header.enc, &mut StdRng::try_from_rng(&mut SysRng)?);
+            let cek = generate_cek(header.enc, &mut os_rng()?);
             let wrapped_key = wrapping_alg.encrypt_key(header.enc, &cek, &shared_secret)?;
 
             (wrapped_key, cek, epk)
@@ -841,10 +848,10 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
             PrivateKeyKind::Rsa => {
                 let rsa_private_key = RsaPrivateKey::try_from(private_key)?;
                 let padding = RsaPaddingScheme::new(header.alg)?;
-                let mut os_rng = None;
+                let mut owned_rng = None;
                 let rng = match rng {
                     Some(rng) => rng,
-                    None => os_rng.insert(StdRng::try_from_rng(&mut SysRng)?),
+                    None => owned_rng.insert(os_rng()?),
                 };
 
                 // RFC 7516 §11.5 forbids distinguishing format, padding and length errors of the encrypted key,
@@ -1061,8 +1068,7 @@ fn generate_ecdh_shared_secret(
                         JweError::Key { source }
                     })?;
 
-                    let secret =
-                        p256::ecdh::EphemeralSecret::generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
+                    let secret = p256::ecdh::EphemeralSecret::generate_from_rng(&mut os_rng()?);
 
                     let shared_secret = Zeroizing::new(secret.diffie_hellman(&public_key).raw_secret_bytes().to_vec());
                     let epk = PublicKey::from_ec_encoded_components(
@@ -1080,8 +1086,7 @@ fn generate_ecdh_shared_secret(
                         JweError::Key { source }
                     })?;
 
-                    let secret =
-                        p384::ecdh::EphemeralSecret::generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
+                    let secret = p384::ecdh::EphemeralSecret::generate_from_rng(&mut os_rng()?);
 
                     let shared_secret = Zeroizing::new(secret.diffie_hellman(&public_key).raw_secret_bytes().to_vec());
                     let epk = PublicKey::from_ec_encoded_components(
@@ -1099,8 +1104,7 @@ fn generate_ecdh_shared_secret(
                         JweError::Key { source }
                     })?;
 
-                    let secret =
-                        p521::ecdh::EphemeralSecret::generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
+                    let secret = p521::ecdh::EphemeralSecret::generate_from_rng(&mut os_rng()?);
 
                     let shared_secret = Zeroizing::new(secret.diffie_hellman(&public_key).raw_secret_bytes().to_vec());
                     let epk = PublicKey::from_ec_encoded_components(
@@ -1130,8 +1134,7 @@ fn generate_ecdh_shared_secret(
 
                     let public_key = x25519_dalek::PublicKey::from(public_key_data);
 
-                    let secret =
-                        x25519_dalek::EphemeralSecret::random_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
+                    let secret = x25519_dalek::EphemeralSecret::random_from_rng(&mut os_rng()?);
 
                     let epk = PublicKey::from_ed_encoded_components(
                         &EdAlgorithm::X25519.into(),
@@ -1337,6 +1340,11 @@ fn calculate_ecdh_shared_secret(
     ecdh_concat_kdf(alg, cek_key_len, &shared_secret, apu, apv)
 }
 
+/// Returns a generator seeded from the OS.
+fn os_rng() -> Result<StdRng, JweError> {
+    Ok(StdRng::try_from_rng(&mut SysRng)?)
+}
+
 /// Generate content encryption key (CEK) for given algorithm and wraps it with zeroize-on-drop container
 fn generate_cek(alg: JweEnc, rng: &mut StdRng) -> Zeroizing<Vec<u8>> {
     let mut cek = Zeroizing::new(vec![0u8; alg.key_size()]);
@@ -1504,6 +1512,20 @@ mod tests {
             DecoderMode::Normal(&private_key, Some(&mut StdRng::seed_from_u64(1))),
         )
         .unwrap();
+    }
+
+    #[test]
+    fn os_rng_streams_differ() {
+        assert_ne!(os_rng().unwrap().next_u64(), os_rng().unwrap().next_u64());
+    }
+
+    /// RFC 7518 §5.2.3 to §5.2.5. Unlike GCM, CBC-HS has no round trip to pin these sizes.
+    #[rstest]
+    #[case(JweEnc::Aes128CbcHmacSha256, 32, 16)]
+    #[case(JweEnc::Aes192CbcHmacSha384, 48, 24)]
+    #[case(JweEnc::Aes256CbcHmacSha512, 64, 32)]
+    fn cbc_hs_key_and_tag_sizes(#[case] enc: JweEnc, #[case] key_size: usize, #[case] tag_size: usize) {
+        assert_eq!((enc.key_size(), enc.tag_size()), (key_size, tag_size));
     }
 
     #[test]
