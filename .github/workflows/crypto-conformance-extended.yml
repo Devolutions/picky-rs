@@ -43,3 +43,11 @@ jobs:
         run: cargo test --locked --release --workspace --all-features
         env:
           PICKY_CRYPTO_TESTSUITE_EXTENDED: "1"
+
+      # proptest appends each new failing case to this directory; commit it with the fix so every run replays the case.
+      - name: Upload property regressions
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: proptest-regressions
+          path: picky-crypto-testsuite/proptest-regressions/
