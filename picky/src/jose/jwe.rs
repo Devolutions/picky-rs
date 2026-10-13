@@ -602,7 +602,7 @@ impl<'repr> RawJwe<'repr> {
 
     /// Decrypts the ciphertext using asymmetric cryptography and returns a verified `Jwe` structure.
     pub fn decrypt(self, key: &PrivateKey) -> Result<Jwe, JweError> {
-        decrypt_impl(self, DecoderMode::Normal(key, &mut StdRng::try_from_rng(&mut SysRng)?))
+        decrypt_impl(self, DecoderMode::Normal(key, None))
     }
 
     /// Decrypts the ciphertext using the provided CEK (a symmetric key).
@@ -813,8 +813,8 @@ fn prepare_ecdh_encryption_key(jwe: &Jwe, public_key: &PublicKey) -> Result<JweE
 // decoder
 
 enum DecoderMode<'a> {
-    /// The generator blinds RSA decryption and supplies the substitute CEK.
-    Normal(&'a PrivateKey, &'a mut StdRng),
+    /// The generator blinds RSA decryption and supplies the substitute CEK; `None` selects the OS generator.
+    Normal(&'a PrivateKey, Option<&'a mut StdRng>),
     Direct(&'a [u8]),
 }
 
@@ -841,6 +841,11 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
             PrivateKeyKind::Rsa => {
                 let rsa_private_key = RsaPrivateKey::try_from(private_key)?;
                 let padding = RsaPaddingScheme::new(header.alg)?;
+                let mut os_rng = None;
+                let rng = match rng {
+                    Some(rng) => rng,
+                    None => os_rng.insert(StdRng::try_from_rng(&mut SysRng)?),
+                };
 
                 // RFC 7516 §11.5 forbids distinguishing format, padding and length errors of the encrypted key,
                 // and recommends substituting a random CEK. The JWE then fails with the same error as invalid
@@ -1494,7 +1499,11 @@ mod tests {
         StdRng::seed_from_u64(1).fill_bytes(&mut substitute);
 
         let raw = RawJwe::decode(rsa_compact(alg, &bad_padding_key(&private_key), &substitute)).unwrap();
-        decrypt_impl(raw, DecoderMode::Normal(&private_key, &mut StdRng::seed_from_u64(1))).unwrap();
+        decrypt_impl(
+            raw,
+            DecoderMode::Normal(&private_key, Some(&mut StdRng::seed_from_u64(1))),
+        )
+        .unwrap();
     }
 
     #[test]
