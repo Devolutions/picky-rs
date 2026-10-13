@@ -3,6 +3,8 @@ use picky_crypto::{Algorithm, Entry, Error, OutputBytes, PasswordKdf, PasswordKd
 use std::{marker::PhantomData, sync::Arc};
 
 const MUST_SUPPORT_MAX_OUTPUT_LEN: usize = 1024;
+/// This backend's size limit on derived output (2^31 − 1 bytes), far above the 1024-byte must-support maximum.
+const OUTPUT_SIZE_LIMIT: usize = i32::MAX as usize;
 
 struct Pbkdf2<D>(PasswordKdfAlgorithm, PhantomData<D>);
 impl<D: EagerHash + Send + Sync> PasswordKdf for Pbkdf2<D> {
@@ -18,6 +20,9 @@ impl<D: EagerHash + Send + Sync> PasswordKdf for Pbkdf2<D> {
             || output_len as u128 > u128::from(u32::MAX) * u128::from(D::OutputSize::U64)
         {
             return Err(Error::InvalidInput);
+        }
+        if output_len > OUTPUT_SIZE_LIMIT {
+            return Err(Error::Unsupported(Algorithm::PasswordKdf(self.0)));
         }
         // Only lengths beyond the must-support maximum may be refused as Unsupported.
         let mut output = crate::util::buffer(output_len).map_err(|_| {
