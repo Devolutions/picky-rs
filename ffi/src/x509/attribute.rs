@@ -691,7 +691,9 @@ pub mod ffi {
         }
     }
 
+    // Owns copies of all the CRLs, which can be megabytes.
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct RevocationInfoChoiceIterator(pub picky_asn1_x509::crls::RevocationInfoChoices);
 
     impl RevocationInfoChoiceIterator {
@@ -700,7 +702,9 @@ pub mod ffi {
         }
     }
 
+    // Owns a whole CRL, which can be megabytes.
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct RevocationInfoChoice(pub picky_asn1_x509::crls::RevocationInfoChoice);
 
     impl RevocationInfoChoice {
