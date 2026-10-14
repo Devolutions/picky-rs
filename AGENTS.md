@@ -11,6 +11,8 @@
 Committed text (code, comments, docs, commit messages) and PR titles and descriptions never refer to work stages, decision identifiers, agent roles, sessions or planning documents.
 State rationale, not history.
 
+Code comments and doc comments follow the same rule as Markdown: each sentence starts on its own line and wraps only where it would exceed the line-length limit.
+
 ## Invariant and untested-property comments
 
 Define invariants with `INVARIANT:` comments: at the code for local and loop invariants, in the doc comment for field and function-output invariants.
