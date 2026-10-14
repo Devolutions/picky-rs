@@ -46,6 +46,9 @@ fn check(algorithm: CipherAlgorithm, key_valid: bool, iv: &[u8], data: &[u8], bl
     if iv.len() != block || data.len() % block != 0 {
         return Err(Error::InvalidInput);
     }
+    // UNTESTED: data beyond the capacity limit returns `Unsupported` before it is copied.
+    // Reaching this branch needs data too large for a test.
+    // When changing it, keep it after the fixed-length checks and before any copy.
     if data.len() > DATA_SIZE_LIMIT {
         return Err(Error::Unsupported(picky_crypto::Algorithm::Cipher(algorithm)));
     }

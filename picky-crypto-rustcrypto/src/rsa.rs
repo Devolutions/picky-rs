@@ -50,10 +50,12 @@ const fn der_integer_len(bits: usize) -> usize {
 const MODULUS_LEN: usize = der_integer_len(RsaPublicKey::MAX_SIZE);
 const EXPONENT_LEN: usize = der_integer_len((u64::BITS - RsaPublicKey::MAX_PUB_EXPONENT.leading_zeros()) as usize);
 
-/// Longest PKCS#1 `RSAPublicKey` within the library's limits (rsa 0.10.0-rc.18, src/key.rs:216–222).
+/// INVARIANT: the encoded length of the longest PKCS#1 `RSAPublicKey` within the library's limits
+/// (rsa 0.10.0-rc.18, src/key.rs:216–222).
 const PUBLIC_KEY_MAX_LEN: usize = der_len(MODULUS_LEN + EXPONENT_LEN);
 
-/// Longest PKCS#8 RSA private key within the library's limits: version, n, e, then d, p, q, dP, dQ and qInv, each
+/// INVARIANT: the encoded length of the longest PKCS#8 RSA private key within the library's limits: version, n, e,
+/// then d, p, q, dP, dQ and qInv, each
 /// bounded by the modulus, inside the version and `rsaEncryption` identifier of the PKCS#8 wrapper.
 fn private_key_max_len() -> usize {
     let rsa_private_key = der_len(der_integer_len(1) + MODULUS_LEN + EXPONENT_LEN + 6 * MODULUS_LEN);
@@ -225,8 +227,12 @@ fn generate_pkcs8(bits: usize) -> Result<OutputBytes, Error> {
     use rsa::rand_core::SeedableRng;
     let mut seed = Zeroizing::new([0u8; 32]);
     getrandom::fill(&mut *seed).map_err(|_| Error::ProviderFailure)?;
-    // Infallible seeded RNG that wipes its buffer and state on drop (chacha20 0.10.2, src/rng.rs:94–98;
-    // src/lib.rs:306–310). Wiping the seed's stack copies is best effort.
+    // Infallible seeded RNG.
+    // UNTESTED: the seed and the generator's buffer and state are wiped after use; wiping the seed's stack copies is
+    // best effort.
+    // Leftover seed bytes would reproduce the generated key.
+    // When changing it, keep the seed in `Zeroizing` and a generator that wipes on drop (chacha20 0.10.2,
+    // src/rng.rs:94–98; src/lib.rs:306–310).
     let mut rng = chacha20::ChaCha20Rng::from_seed(*seed);
     let key =
         RsaPrivateKey::new_with_exp(&mut rng, bits, BoxedUint::from(65537u64)).map_err(|_| Error::ProviderFailure)?;
@@ -252,12 +258,18 @@ fn sign<D: sha2::Digest + rsa::pkcs8::AssociatedOid>(
     let digest = Zeroizing::new(D::digest(message));
     // The scheme blinds with a fallible generator, unlike `sign_with_rng`, and pads to size(), not whole limbs
     // (rsa 0.10.0-rc.18, src/key.rs:662; src/traits/padding.rs:35–40; src/pkcs1v15.rs:200–209).
+    // UNTESTED: the private-key operation is blinded with the operating-system generator.
+    // Blinding counters timing attacks on the private key, and signatures are the same either way.
+    // When changing the call, keep passing a generator.
     rsa::Pkcs1v15Sign::new::<D>()
         .sign(Some(&mut getrandom::SysRng), key, &digest)
         .map(|signature| OutputBytes::new(Zeroizing::new(signature)))
         .map_err(|error| signing_error(error, algorithm))
 }
 fn decrypt<P: PaddingScheme>(key: &RsaPrivateKey, ciphertext: &[u8], padding: P) -> Result<OutputBytes, Error> {
+    // UNTESTED: the private-key operation is blinded with the operating-system generator.
+    // Blinding counters timing attacks on the private key, and plaintexts are the same either way.
+    // When changing the call, keep passing a generator.
     padding
         .decrypt(Some(&mut getrandom::SysRng), key, ciphertext)
         .map(|output| OutputBytes::new(Zeroizing::new(output)))

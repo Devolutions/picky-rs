@@ -102,8 +102,10 @@ macro_rules! curve {
                         return Err(Error::Unsupported(Algorithm::Signature(algorithm)));
                     }
                     let signing = SigningKey::from(&self.0);
-                    // Hedged RFC 6979 nonce: random bytes enter as additional data, and an RNG failure is
-                    // the only error on this path (ecdsa 0.17.0, src/signing.rs:209–232, 242–265).
+                    // UNTESTED: the RFC 6979 nonce is hedged with operating-system random bytes as additional data.
+                    // Hedging guards deterministic nonces against fault attacks, and signatures verify either way.
+                    // When changing the call, keep a generator argument; an RNG failure is the only error on this
+                    // path (ecdsa 0.17.0, src/signing.rs:209–232, 242–265).
                     let signature: Signature = signing
                         .try_sign_with_rng(&mut getrandom::SysRng, message)
                         .map_err(|_| Error::ProviderFailure)?;

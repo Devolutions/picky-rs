@@ -1,6 +1,9 @@
 use picky_crypto::{Error, Zeroizing};
 
 pub(crate) fn buffer(len: usize) -> Result<Zeroizing<Vec<u8>>, Error> {
+    // UNTESTED: the buffer is wiped on drop.
+    // Outputs and intermediate copies can hold secrets such as plaintexts and derived keys.
+    // When changing it, keep `Zeroizing` around the vector.
     let mut output = Zeroizing::new(Vec::new());
     output.try_reserve_exact(len).map_err(|_| Error::ProviderFailure)?;
     output.resize(len, 0);

@@ -31,6 +31,9 @@ impl StreamCipherContext for Context {
         }
         let result = (|| {
             // This backend's capacity limit on data, the contract's general must-support bound (2^31 − 1 bytes).
+            // UNTESTED: data beyond the capacity limit returns `Unsupported` before it is copied.
+            // Reaching this branch needs data too large for a test.
+            // When changing it, keep it before any copy.
             if data.len() > i32::MAX as usize {
                 return Err(Error::Unsupported(picky_crypto::Algorithm::StreamCipher(
                     StreamCipherAlgorithm::Rc4,

@@ -8,6 +8,9 @@ use std::sync::Arc;
 struct Gcm(AeadAlgorithm);
 
 /// This backend's capacity limit on `ciphertext || tag`, the contract's must-support maximum (2^31 − 1 bytes).
+// UNTESTED: sealing and opening return `Unsupported` beyond this limit, before any allocation or copy.
+// Reaching these branches needs data too large for a test.
+// When changing the seal or open path, keep the check after the fixed-length checks and before the buffer is made.
 const SIZE_LIMIT: usize = i32::MAX as usize;
 const TAG_LEN: usize = 16;
 
