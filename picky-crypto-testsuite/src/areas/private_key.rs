@@ -404,6 +404,7 @@ fn inconsistent_rsa_signing(c: &mut Checks, p: &CryptoProvider, options: Options
             }) else {
                 continue;
             };
+            exported(c, &id, &*base, &public);
             let other = bases
                 .iter()
                 .find(|other| v::field(other, "privateKeyPkcs8") != encoding)
@@ -469,6 +470,7 @@ fn inconsistent_rsa_decryption(c: &mut Checks, p: &CryptoProvider, options: Opti
                 continue;
             };
             let public = der::rsa_public(&encoded);
+            exported(c, &id, &*base, &public);
             let ciphertext = v::field(t, "ct");
             let plaintext = v::field(t, "msg");
             let published = Some((a, ciphertext.as_slice(), plaintext.as_slice()));

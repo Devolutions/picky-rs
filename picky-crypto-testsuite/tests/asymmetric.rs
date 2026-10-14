@@ -764,9 +764,10 @@ impl PrivateKeyLoader for TableLoader {
 }
 
 #[test]
-fn derived_keys_without_signing_get_export_and_decryption_checks() {
+fn base_and_derived_keys_without_signing_get_export_and_decryption_checks() {
     let table = Table::default();
     // Every export and decryption returns an unaccepted error, so each check leaves a failure naming its file.
+    // The base key's export check is the one directly under "inconsistent components"; derived keys add a variant.
     let key = TableKey {
         outcome: Some(Err(Error::VerificationFailed)),
         exports: true,
@@ -788,7 +789,7 @@ fn derived_keys_without_signing_get_export_and_decryption_checks() {
         .into_iter()
         .chain(RSA_DECRYPT_FILES.map(|(file, _)| file))
     {
-        for check in ["/public_key: ", " ciphertext: "] {
+        for check in ["inconsistent components/public_key: ", "/public_key: ", " ciphertext: "] {
             assert!(
                 c.failures.iter().any(|f| f.starts_with(file) && f.contains(check)),
                 "{file}{check}{:?}",
