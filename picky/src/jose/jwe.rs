@@ -721,7 +721,9 @@ fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
     let protected_header_base64 = general_purpose::URL_SAFE_NO_PAD.encode(serde_json::to_vec(&jwe.header)?);
 
     let mut buffer = jwe.payload;
-    let nonce = <aes_gcm::aead::Nonce<Aes128Gcm> as From<[u8; 12]>>::from(rand::random()); // 96-bits nonce for all AES-GCM variants
+    let mut nonce = [0u8; 12]; // 96-bits nonce for all AES-GCM variants
+    os_rng()?.fill_bytes(&mut nonce);
+    let nonce = <aes_gcm::aead::Nonce<Aes128Gcm> as From<[u8; 12]>>::from(nonce);
     let aad = protected_header_base64.as_bytes(); // The Additional Authenticated Data value used for AES-GCM.
     let authentication_tag = match jwe.header.enc {
         JweEnc::Aes128Gcm => {
@@ -856,7 +858,15 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
 
                 // RFC 7516 §11.5 forbids distinguishing format, padding and length errors of the encrypted key,
                 // and recommends substituting a random CEK. The JWE then fails with the same error as invalid
-                // content, as §11.4 asks. The substitute is drawn before decryption, whatever its outcome.
+                // content, as §11.4 asks.
+                //
+                // Keep these properties when changing this code; no test detects a loss of blinding:
+                // - Decryption is blinded (`decrypt_blinded`, never `decrypt`) with the OS generator, which the
+                //   public API selects by passing `None`. Blinding is the rsa crate's countermeasure against timing
+                //   attacks on the private-key operation, although RUSTSEC-2023-0071 remains.
+                // - The substitute is drawn before decrypting, so success and failure run the same steps.
+                // - Every decryption error and every key of the wrong length falls through to the substitute, so the
+                //   outcome of key decryption never surfaces as its own error.
                 let random_cek = generate_cek(header.enc, rng);
 
                 match rsa_private_key
