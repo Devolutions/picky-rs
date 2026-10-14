@@ -412,7 +412,9 @@ impl JweEnc {
         }
     }
 
-    /// Authentication tag size in bytes; the CBC-HS algorithms truncate the HMAC to half its length (RFC 7518 §5.2).
+    /// Authentication tag size in bytes.
+    ///
+    /// The CBC-HS algorithms truncate the HMAC to half its length (RFC 7518 §5.2).
     pub fn tag_size(self) -> usize {
         match self {
             Self::Aes128Gcm | Self::Aes192Gcm | Self::Aes256Gcm => 16usize,
@@ -850,38 +852,39 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
             PrivateKeyKind::Rsa => {
                 let rsa_private_key = RsaPrivateKey::try_from(private_key)?;
                 let padding = RsaPaddingScheme::new(header.alg)?;
-                // UNTESTED: only the RSA branch creates the OS generator, so decrypting with an EC or Ed key doesn't
-                // depend on OS entropy. Keep `os_rng` out of code that runs for every key kind.
+                // UNTESTED: only RSA keys create the OS generator, so EC and Ed key decryption doesn't need OS entropy.
+                // Keep `os_rng` out of code that runs for every key kind.
                 let mut owned_rng = None;
                 let rng = match rng {
                     Some(rng) => rng,
                     None => owned_rng.insert(os_rng()?),
                 };
 
-                // RFC 7516 §11.5 forbids distinguishing format, padding and length errors of the encrypted key,
-                // and recommends substituting a random CEK. The JWE then fails with the same error as invalid
-                // content, as §11.4 asks.
+                // RFC 7516 §11.5 forbids distinguishing format, padding and length errors of encrypted keys.
+                // It recommends substituting a random CEK, so the JWE fails like invalid content, as §11.4 asks.
                 //
                 // UNTESTED: the substitute is drawn before decrypting, so success and failure run the same steps.
-                // No test measures timing, and `rsa_key_failure_substitutes_generator_output` only notices a late
-                // draw while blinding consumes the generator first. Keep this draw ahead of `decrypt_blinded`.
+                // No test measures timing.
+                // `rsa_key_failure_substitutes_generator_output` relies on blinding drawing first to catch a late draw.
+                // Keep this draw ahead of `decrypt_blinded`.
                 let random_cek = generate_cek(header.enc, rng);
 
-                // UNTESTED: decryption is blinded with `rng`, which is the OS generator on the public path. Blinding
-                // is the rsa crate's countermeasure against timing attacks on the private-key operation; the padding
-                // check timing of RUSTSEC-2023-0071 remains. Unblinded `decrypt` returns the same results, so tests
-                // pass without blinding: keep `decrypt_blinded` and pass it `rng`.
+                // UNTESTED: decryption is blinded with `rng`, which is the OS generator on the public path.
+                // Blinding is the rsa crate's countermeasure against timing attacks on the private-key operation.
+                // The padding check timing of RUSTSEC-2023-0071 remains.
+                // Unblinded `decrypt` returns the same results, so tests still pass without blinding.
+                // Keep `decrypt_blinded` and pass it `rng`.
                 //
-                // UNTESTED: the decrypted key is wrapped in `Zeroizing` before its length is checked, so a key of the
-                // wrong length is wiped when dropped. Keep the wrap ahead of any check that can discard the key.
+                // UNTESTED: the decrypted key is wrapped in `Zeroizing` before any check, so a discarded key is wiped.
+                // Keep `Zeroizing::new` right after decryption.
                 match rsa_private_key
                     .decrypt_blinded(rng, padding, &encrypted_key)
                     .map(Zeroizing::new)
                 {
                     Ok(cek) if cek.len() == random_cek.len() => cek,
-                    // UNTESTED: every error and every key of the wrong length falls through to the substitute, so the
-                    // outcome of key decryption never surfaces as its own error. Tests cover bad padding and a wrong
-                    // length only; keep this arm a catch-all rather than matching specific errors.
+                    // UNTESTED: every error and every key of the wrong length falls through to the substitute.
+                    // Otherwise, the outcome of key decryption would surface as its own error.
+                    // Tests cover bad padding and a wrong length only, so keep this arm a catch-all.
                     _ => random_cek,
                 }
             }
@@ -1360,11 +1363,11 @@ fn calculate_ecdh_shared_secret(
 
 /// Returns a generator seeded from the OS.
 ///
-/// UNTESTED: outside the tests, every random value in this module comes from this helper: the content nonce, the
-/// CEKs, RSA key encryption, the ECDH-ES ephemeral keys and the generator for RSA key decryption. A fixed or
-/// predictable generator would make these values guessable. `os_rng_streams_differ` catches a fixed seed here, but
-/// no test sees which generator a caller uses, so draw new random values from this helper, not from `rand::random`
-/// or a seeded generator.
+/// UNTESTED: outside the tests, every random value in this module comes from this helper.
+/// That covers the content nonce, the CEKs, RSA key encryption, the ECDH-ES ephemeral keys and RSA key decryption.
+/// A fixed or predictable generator would make these values guessable.
+/// `os_rng_streams_differ` catches a fixed seed here, but no test sees which generator a caller uses.
+/// Draw new random values from this helper, not from `rand::random` or a seeded generator.
 fn os_rng() -> Result<StdRng, JweError> {
     Ok(StdRng::try_from_rng(&mut SysRng)?)
 }
@@ -1487,8 +1490,8 @@ mod tests {
 
     #[rstest]
     fn rsa_key_failures_match_content_failure(
-        // The encoder and decoder share `RsaPaddingScheme::new`, so each value is the only check that it maps
-        // that algorithm to the padding RFC 7518 §4.2 and §4.3 assign.
+        // The encoder and decoder share `RsaPaddingScheme::new`, so round trips can't check its mapping.
+        // Each value is the only check that it maps that algorithm to the padding of RFC 7518 §4.2 and §4.3.
         #[values(JweAlg::RsaPkcs1v15, JweAlg::RsaOaep, JweAlg::RsaOaep256)] alg: JweAlg,
     ) {
         let private_key = get_private_key_1();
@@ -1543,7 +1546,8 @@ mod tests {
         assert_ne!(os_rng().unwrap().next_u64(), os_rng().unwrap().next_u64());
     }
 
-    /// RFC 7518 §5.2.3 to §5.2.5. Unlike GCM, CBC-HS has no round trip to pin these sizes.
+    /// RFC 7518 §5.2.3 to §5.2.5.
+    /// Unlike GCM, CBC-HS has no round trip to pin these sizes.
     #[rstest]
     #[case(JweEnc::Aes128CbcHmacSha256, 32, 16)]
     #[case(JweEnc::Aes192CbcHmacSha384, 48, 24)]
