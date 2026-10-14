@@ -391,11 +391,17 @@ impl JweEnc {
             .to_string()
     }
 
+    /// Content encryption key size in bytes.
+    ///
+    /// For the CBC-HS algorithms, the key concatenates the MAC key and the encryption key (RFC 7518 §5.2).
     pub fn key_size(self) -> usize {
         match self {
-            Self::Aes128CbcHmacSha256 | Self::Aes128Gcm => <Aes128Gcm as KeySizeUser>::KeySize::to_usize(),
-            Self::Aes192CbcHmacSha384 | Self::Aes192Gcm => <Aes192Gcm as KeySizeUser>::KeySize::to_usize(),
-            Self::Aes256CbcHmacSha512 | Self::Aes256Gcm => <Aes256Gcm as KeySizeUser>::KeySize::to_usize(),
+            Self::Aes128Gcm => <Aes128Gcm as KeySizeUser>::KeySize::to_usize(),
+            Self::Aes192Gcm => <Aes192Gcm as KeySizeUser>::KeySize::to_usize(),
+            Self::Aes256Gcm => <Aes256Gcm as KeySizeUser>::KeySize::to_usize(),
+            Self::Aes128CbcHmacSha256 => 32usize,
+            Self::Aes192CbcHmacSha384 => 48usize,
+            Self::Aes256CbcHmacSha512 => 64usize,
         }
     }
 
@@ -406,12 +412,15 @@ impl JweEnc {
         }
     }
 
+    /// Authentication tag size in bytes.
+    ///
+    /// The CBC-HS algorithms truncate the HMAC to half its length (RFC 7518 §5.2).
     pub fn tag_size(self) -> usize {
         match self {
             Self::Aes128Gcm | Self::Aes192Gcm | Self::Aes256Gcm => 16usize,
-            Self::Aes128CbcHmacSha256 => 32usize,
-            Self::Aes192CbcHmacSha384 => 48usize,
-            Self::Aes256CbcHmacSha512 => 64usize,
+            Self::Aes128CbcHmacSha256 => 16usize,
+            Self::Aes192CbcHmacSha384 => 24usize,
+            Self::Aes256CbcHmacSha512 => 32usize,
         }
     }
 }
@@ -602,7 +611,7 @@ impl<'repr> RawJwe<'repr> {
 
     /// Decrypts the ciphertext using asymmetric cryptography and returns a verified `Jwe` structure.
     pub fn decrypt(self, key: &PrivateKey) -> Result<Jwe, JweError> {
-        decrypt_impl(self, DecoderMode::Normal(key))
+        decrypt_impl(self, DecoderMode::Normal(key, None))
     }
 
     /// Decrypts the ciphertext using the provided CEK (a symmetric key).
@@ -677,27 +686,10 @@ fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
         EncoderMode::Asymmetric(public_key) => match &public_key.as_inner().subject_public_key {
             RfcPublicKey::Rsa(_) => {
                 let rsa_public_key = RsaPublicKey::try_from(public_key)?;
-
-                let padding = match jwe.header.alg {
-                    JweAlg::RsaPkcs1v15 => RsaPaddingScheme::Pkcs1v15Encrypt,
-                    JweAlg::RsaOaep => RsaPaddingScheme::Oaep(Oaep::<sha1::Sha1>::new()),
-                    JweAlg::RsaOaep256 => RsaPaddingScheme::Oaep256(Oaep::<sha2::Sha256>::new()),
-                    unsupported => {
-                        return Err(JweError::UnsupportedAlgorithm {
-                            algorithm: format!("{unsupported:?}"),
-                        });
-                    }
-                };
-
-                let cek = generate_cek(jwe.header.enc)?;
-
-                let encrypted_key = match rsa_public_key.encrypt(&mut StdRng::try_from_rng(&mut SysRng)?, padding, &cek)
-                {
-                    Ok(encrypted_key) => encrypted_key,
-                    Err(err) => {
-                        return Err(err.into());
-                    }
-                };
+                let padding = RsaPaddingScheme::new(jwe.header.alg)?;
+                let mut rng = os_rng()?;
+                let cek = generate_cek(jwe.header.enc, &mut rng);
+                let encrypted_key = rsa_public_key.encrypt(&mut rng, padding, &cek)?;
 
                 (general_purpose::URL_SAFE_NO_PAD.encode(encrypted_key), cek)
             }
@@ -731,7 +723,9 @@ fn encode_impl(mut jwe: Jwe, mode: EncoderMode) -> Result<String, JweError> {
     let protected_header_base64 = general_purpose::URL_SAFE_NO_PAD.encode(serde_json::to_vec(&jwe.header)?);
 
     let mut buffer = jwe.payload;
-    let nonce = <aes_gcm::aead::Nonce<Aes128Gcm> as From<[u8; 12]>>::from(rand::random()); // 96-bits nonce for all AES-GCM variants
+    let mut nonce = [0u8; 12]; // 96-bits nonce for all AES-GCM variants
+    os_rng()?.fill_bytes(&mut nonce);
+    let nonce = <aes_gcm::aead::Nonce<Aes128Gcm> as From<[u8; 12]>>::from(nonce);
     let aad = protected_header_base64.as_bytes(); // The Additional Authenticated Data value used for AES-GCM.
     let authentication_tag = match jwe.header.enc {
         JweEnc::Aes128Gcm => {
@@ -808,7 +802,7 @@ fn prepare_ecdh_encryption_key(jwe: &Jwe, public_key: &PublicKey) -> Result<JweE
                 wrapping_alg.key_size(),
             )?;
 
-            let cek = generate_cek(header.enc)?;
+            let cek = generate_cek(header.enc, &mut os_rng()?);
             let wrapped_key = wrapping_alg.encrypt_key(header.enc, &cek, &shared_secret)?;
 
             (wrapped_key, cek, epk)
@@ -829,9 +823,9 @@ fn prepare_ecdh_encryption_key(jwe: &Jwe, public_key: &PublicKey) -> Result<JweE
 
 // decoder
 
-#[derive(Clone)]
 enum DecoderMode<'a> {
-    Normal(&'a PrivateKey),
+    /// The generator blinds RSA decryption and supplies the substitute CEK; `None` selects the OS generator.
+    Normal(&'a PrivateKey, Option<&'a mut StdRng>),
     Direct(&'a [u8]),
 }
 
@@ -854,22 +848,45 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
 
     let jwe_cek = match mode {
         DecoderMode::Direct(symmetric_key) => Zeroizing::new(symmetric_key.to_vec()),
-        DecoderMode::Normal(private_key) => match &private_key.as_kind() {
+        DecoderMode::Normal(private_key, rng) => match &private_key.as_kind() {
             PrivateKeyKind::Rsa => {
                 let rsa_private_key = RsaPrivateKey::try_from(private_key)?;
-
-                let padding = match header.alg {
-                    JweAlg::RsaPkcs1v15 => RsaPaddingScheme::Pkcs1v15Encrypt,
-                    JweAlg::RsaOaep => RsaPaddingScheme::Oaep(Oaep::<sha1::Sha1>::new()),
-                    JweAlg::RsaOaep256 => RsaPaddingScheme::Oaep256(Oaep::<sha2::Sha256>::new()),
-                    unsupported => {
-                        return Err(JweError::UnsupportedAlgorithm {
-                            algorithm: format!("{unsupported:?}"),
-                        });
-                    }
+                let padding = RsaPaddingScheme::new(header.alg)?;
+                // UNTESTED: only RSA keys create the OS generator, so EC and Ed key decryption doesn't need OS entropy.
+                // Keep `os_rng` out of code that runs for every key kind.
+                let mut owned_rng = None;
+                let rng = match rng {
+                    Some(rng) => rng,
+                    None => owned_rng.insert(os_rng()?),
                 };
 
-                Zeroizing::new(rsa_private_key.decrypt(padding, &encrypted_key)?)
+                // RFC 7516 §11.5 forbids distinguishing format, padding and length errors of encrypted keys.
+                // It recommends substituting a random CEK, so the JWE fails like invalid content, as §11.4 asks.
+                //
+                // UNTESTED: the substitute is drawn before decrypting, so success and failure run the same steps.
+                // No test measures timing.
+                // `rsa_key_failure_substitutes_generator_output` relies on blinding drawing first to catch a late draw.
+                // Keep this draw ahead of `decrypt_blinded`.
+                let random_cek = generate_cek(header.enc, rng);
+
+                // UNTESTED: decryption is blinded with `rng`, which is the OS generator on the public path.
+                // Blinding is the rsa crate's countermeasure against timing attacks on the private-key operation.
+                // The padding check timing of RUSTSEC-2023-0071 remains.
+                // Unblinded `decrypt` returns the same results, so tests still pass without blinding.
+                // Keep `decrypt_blinded` and pass it `rng`.
+                //
+                // UNTESTED: the decrypted key is wrapped in `Zeroizing` before any check, so a discarded key is wiped.
+                // Keep `Zeroizing::new` right after decryption.
+                match rsa_private_key
+                    .decrypt_blinded(rng, padding, &encrypted_key)
+                    .map(Zeroizing::new)
+                {
+                    Ok(cek) if cek.len() == random_cek.len() => cek,
+                    // UNTESTED: every error and every key of the wrong length falls through to the substitute.
+                    // Otherwise, the outcome of key decryption would surface as its own error.
+                    // Tests cover bad padding and a wrong length only, so keep this arm a catch-all.
+                    _ => random_cek,
+                }
             }
             PrivateKeyKind::Ec { .. } | PrivateKeyKind::Ed { .. } => {
                 let sender_public_key = header
@@ -1072,8 +1089,7 @@ fn generate_ecdh_shared_secret(
                         JweError::Key { source }
                     })?;
 
-                    let secret =
-                        p256::ecdh::EphemeralSecret::generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
+                    let secret = p256::ecdh::EphemeralSecret::generate_from_rng(&mut os_rng()?);
 
                     let shared_secret = Zeroizing::new(secret.diffie_hellman(&public_key).raw_secret_bytes().to_vec());
                     let epk = PublicKey::from_ec_encoded_components(
@@ -1091,8 +1107,7 @@ fn generate_ecdh_shared_secret(
                         JweError::Key { source }
                     })?;
 
-                    let secret =
-                        p384::ecdh::EphemeralSecret::generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
+                    let secret = p384::ecdh::EphemeralSecret::generate_from_rng(&mut os_rng()?);
 
                     let shared_secret = Zeroizing::new(secret.diffie_hellman(&public_key).raw_secret_bytes().to_vec());
                     let epk = PublicKey::from_ec_encoded_components(
@@ -1110,8 +1125,7 @@ fn generate_ecdh_shared_secret(
                         JweError::Key { source }
                     })?;
 
-                    let secret =
-                        p521::ecdh::EphemeralSecret::generate_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
+                    let secret = p521::ecdh::EphemeralSecret::generate_from_rng(&mut os_rng()?);
 
                     let shared_secret = Zeroizing::new(secret.diffie_hellman(&public_key).raw_secret_bytes().to_vec());
                     let epk = PublicKey::from_ec_encoded_components(
@@ -1141,8 +1155,7 @@ fn generate_ecdh_shared_secret(
 
                     let public_key = x25519_dalek::PublicKey::from(public_key_data);
 
-                    let secret =
-                        x25519_dalek::EphemeralSecret::random_from_rng(&mut StdRng::try_from_rng(&mut SysRng)?);
+                    let secret = x25519_dalek::EphemeralSecret::random_from_rng(&mut os_rng()?);
 
                     let epk = PublicKey::from_ed_encoded_components(
                         &EdAlgorithm::X25519.into(),
@@ -1348,18 +1361,41 @@ fn calculate_ecdh_shared_secret(
     ecdh_concat_kdf(alg, cek_key_len, &shared_secret, apu, apv)
 }
 
+/// Returns a generator seeded from the OS.
+///
+/// UNTESTED: outside the tests, every random value in this module comes from this helper.
+/// That covers the content nonce, the CEKs, RSA key encryption, the ECDH-ES ephemeral keys and RSA key decryption.
+/// A fixed or predictable generator would make these values guessable.
+/// `os_rng_streams_differ` catches a fixed seed here, but no test sees which generator a caller uses.
+/// Draw new random values from this helper, not from `rand::random` or a seeded generator.
+fn os_rng() -> Result<StdRng, JweError> {
+    Ok(StdRng::try_from_rng(&mut SysRng)?)
+}
+
 /// Generate content encryption key (CEK) for given algorithm and wraps it with zeroize-on-drop container
-fn generate_cek(alg: JweEnc) -> Result<Zeroizing<Vec<u8>>, JweError> {
+fn generate_cek(alg: JweEnc, rng: &mut StdRng) -> Zeroizing<Vec<u8>> {
     let mut cek = Zeroizing::new(vec![0u8; alg.key_size()]);
-    let mut rng = StdRng::try_from_rng(&mut SysRng)?;
     rng.fill_bytes(&mut cek);
-    Ok(cek)
+    cek
 }
 
 enum RsaPaddingScheme {
     Pkcs1v15Encrypt,
     Oaep(Oaep<sha1::Sha1>),
     Oaep256(Oaep<sha2::Sha256>),
+}
+
+impl RsaPaddingScheme {
+    fn new(alg: JweAlg) -> Result<Self, JweError> {
+        match alg {
+            JweAlg::RsaPkcs1v15 => Ok(Self::Pkcs1v15Encrypt),
+            JweAlg::RsaOaep => Ok(Self::Oaep(Oaep::<sha1::Sha1>::new())),
+            JweAlg::RsaOaep256 => Ok(Self::Oaep256(Oaep::<sha2::Sha256>::new())),
+            unsupported => Err(JweError::UnsupportedAlgorithm {
+                algorithm: format!("{unsupported:?}"),
+            }),
+        }
+    }
 }
 
 impl rsa::traits::PaddingScheme for RsaPaddingScheme {
@@ -1399,6 +1435,7 @@ mod tests {
     use super::*;
     use crate::key::PrivateKey;
     use crate::pem::Pem;
+    use rsa::traits::PublicKeyParts as _;
     use rstest::rstest;
 
     fn get_private_key_1() -> PrivateKey {
@@ -1406,13 +1443,9 @@ mod tests {
         PrivateKey::from_pem(&pk_pem).expect("private_key 1")
     }
 
-    fn get_private_key_2() -> PrivateKey {
-        let pk_pem = picky_test_data::RSA_2048_PK_7.parse::<Pem>().unwrap();
-        PrivateKey::from_pem(&pk_pem).expect("private_key 7")
-    }
-
-    #[test]
-    fn rsa_oaep_aes_128_gcm() {
+    #[rstest]
+    // The other RSA tests bypass the encoder, so this round trip checks its padding for every algorithm.
+    fn rsa_aes_128_gcm(#[values(JweAlg::RsaPkcs1v15, JweAlg::RsaOaep, JweAlg::RsaOaep256)] alg: JweAlg) {
         let payload = "何だと？……無駄な努力だ？……百も承知だ！だがな、勝つ望みがある時ばかり、戦うのとは訳が違うぞ！"
             .as_bytes()
             .to_vec();
@@ -1420,7 +1453,7 @@ mod tests {
         let private_key = get_private_key_1();
         let public_key = private_key.to_public_key().unwrap();
 
-        let jwe = Jwe::new(JweAlg::RsaOaep, JweEnc::Aes128Gcm, payload);
+        let jwe = Jwe::new(alg, JweEnc::Aes128Gcm, payload);
         let encoded = jwe.clone().encode(&public_key).unwrap();
 
         let decoded = Jwe::decode(&encoded, &private_key).unwrap();
@@ -1429,20 +1462,98 @@ mod tests {
         assert_eq!(jwe.header, decoded.header);
     }
 
-    #[test]
-    fn rsa_pkcs1v15_aes_128_gcm_bad_key() {
-        let payload = "そうとも！ 負けると知って戦うのが、遙かに美しいのだ！"
-            .as_bytes()
-            .to_vec();
+    /// Builds an A256GCM compact JWE whose content is encrypted under `content_key`, regardless of `encrypted_key`.
+    ///
+    /// A256GCM complements the A128GCM round trip, so a substitute CEK of any fixed length breaks one of them.
+    fn rsa_compact(alg: JweAlg, encrypted_key: &[u8], content_key: &[u8]) -> String {
+        fn b64(bytes: impl AsRef<[u8]>) -> String {
+            general_purpose::URL_SAFE_NO_PAD.encode(bytes)
+        }
 
+        let header = b64(serde_json::to_vec(&JweHeader::new(alg, JweEnc::Aes256Gcm)).unwrap());
+        let nonce = Array::from([0; 12]);
+        let mut ciphertext = b"payload".to_vec();
+        let tag = Aes256Gcm::new_from_slice(content_key)
+            .unwrap()
+            .encrypt_inout_detached(&nonce, header.as_bytes(), ciphertext.as_mut_slice().into())
+            .unwrap();
+
+        [header, b64(encrypted_key), b64(nonce), b64(&ciphertext), b64(tag)].join(".")
+    }
+
+    /// Returns the ciphertext 1, which RSA decrypts to 00 .. 01: neither PKCS#1 v1.5 nor OAEP padding.
+    fn bad_padding_key(private_key: &PrivateKey) -> Vec<u8> {
+        let mut key = vec![0; RsaPrivateKey::try_from(private_key).unwrap().size()];
+        *key.last_mut().unwrap() = 1;
+        key
+    }
+
+    #[rstest]
+    fn rsa_key_failures_match_content_failure(
+        // The encoder and decoder share `RsaPaddingScheme::new`, so round trips can't check its mapping.
+        // Each value is the only check that it maps that algorithm to the padding of RFC 7518 §4.2 and §4.3.
+        #[values(JweAlg::RsaPkcs1v15, JweAlg::RsaOaep, JweAlg::RsaOaep256)] alg: JweAlg,
+    ) {
         let private_key = get_private_key_1();
-        let public_key = get_private_key_2().to_public_key().unwrap();
+        let public_key = RsaPublicKey::try_from(&private_key.to_public_key().unwrap()).unwrap();
+        let mut rng = StdRng::seed_from_u64(0);
+        let mut encrypt_key = |key: &[u8]| {
+            match alg {
+                JweAlg::RsaPkcs1v15 => public_key.encrypt(&mut rng, Pkcs1v15Encrypt, key),
+                JweAlg::RsaOaep => public_key.encrypt(&mut rng, Oaep::<sha1::Sha1>::new(), key),
+                JweAlg::RsaOaep256 => public_key.encrypt(&mut rng, Oaep::<sha2::Sha256>::new(), key),
+                _ => unreachable!(),
+            }
+            .unwrap()
+        };
+        let decode = |encrypted_key: &[u8], content_key: &[u8]| {
+            Jwe::decode(&rsa_compact(alg, encrypted_key, content_key), &private_key)
+        };
 
-        let jwe = Jwe::new(JweAlg::RsaPkcs1v15, JweEnc::Aes128Gcm, payload);
-        let encoded = jwe.encode(&public_key).unwrap();
+        // All zeros, so that a zeroed substitute or a truncated wrong-length key would decrypt the content.
+        let cek = [0; 32];
+        let valid_key = encrypt_key(&cek);
+        decode(&valid_key, &cek).unwrap();
 
-        let err = Jwe::decode(&encoded, &private_key).err().unwrap();
-        assert_eq!(err.to_string(), "RSA error: decryption error");
+        let wrong_content = decode(&valid_key, &[1; 32]).unwrap_err();
+        let wrong_length = encrypt_key(&[0; 33]);
+
+        for encrypted_key in [bad_padding_key(&private_key), wrong_length] {
+            let err = decode(&encrypted_key, &cek).unwrap_err();
+            assert_eq!(format!("{err:?}"), format!("{wrong_content:?}"));
+            assert_eq!(err.to_string(), wrong_content.to_string());
+        }
+    }
+
+    #[rstest]
+    fn rsa_key_failure_substitutes_generator_output(#[values(JweAlg::RsaPkcs1v15, JweAlg::RsaOaep)] alg: JweAlg) {
+        let private_key = get_private_key_1();
+
+        // The substitute is the generator's first output, drawn before blinding consumes it.
+        let mut substitute = [0; 32];
+        StdRng::seed_from_u64(1).fill_bytes(&mut substitute);
+
+        let raw = RawJwe::decode(rsa_compact(alg, &bad_padding_key(&private_key), &substitute)).unwrap();
+        decrypt_impl(
+            raw,
+            DecoderMode::Normal(&private_key, Some(&mut StdRng::seed_from_u64(1))),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn os_rng_streams_differ() {
+        assert_ne!(os_rng().unwrap().next_u64(), os_rng().unwrap().next_u64());
+    }
+
+    /// RFC 7518 §5.2.3 to §5.2.5.
+    /// Unlike GCM, CBC-HS has no round trip to pin these sizes.
+    #[rstest]
+    #[case(JweEnc::Aes128CbcHmacSha256, 32, 16)]
+    #[case(JweEnc::Aes192CbcHmacSha384, 48, 24)]
+    #[case(JweEnc::Aes256CbcHmacSha512, 64, 32)]
+    fn cbc_hs_key_and_tag_sizes(#[case] enc: JweEnc, #[case] key_size: usize, #[case] tag_size: usize) {
+        assert_eq!((enc.key_size(), enc.tag_size()), (key_size, tag_size));
     }
 
     #[test]
