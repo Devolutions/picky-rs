@@ -9,7 +9,4 @@ No family is enabled by default; each feature adds a family of entries.
 
 ## Invariants
 
-- A backend is a thin adapter.
-  Real logic in a backend means the contract doesn't fit that library, and that's a reason to revisit the contract.
-- It passes the full `picky-crypto-testsuite` conformance suite.
-- `fips()` always returns `false`.
+- `fips()` always returns `false`, because RustCrypto has no FIPS 140 validated module, so the FIPS policy rejects any provider containing its entries.
