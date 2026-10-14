@@ -713,7 +713,9 @@ pub mod ffi {
         }
     }
 
+    // A whole CRL, which can be megabytes: free it promptly, don't wait on the GC.
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct CertificateList(pub picky_asn1_x509::crls::CertificateList);
 
     impl CertificateList {
@@ -732,7 +734,9 @@ pub mod ffi {
             VecU8::from_bytes(self.0.signature_value.clone().payload_view()).boxed()
         }
     }
+    // Owned copy of a CRL's contents, which can be megabytes.
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct TbsCertList(pub picky_asn1_x509::crls::TbsCertList);
 
     impl TbsCertList {
@@ -832,7 +836,9 @@ pub mod ffi {
         }
     }
 
+    // Owned copy of a CRL's revoked entries, which can be megabytes.
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct RevokedCertificateIterator(pub Vec<RevokedCertificate>);
 
     impl RevokedCertificateIterator {

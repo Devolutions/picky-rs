@@ -111,7 +111,9 @@ pub mod ffi {
     ///   ppk is decrypted via `PuttyPpk::decrypt`.
     /// - Newly generated keys are always unencrypted. They should be encrypted via `PuttyPpk::encrypt`
     ///   when required
+    // Can hold a decrypted private key: free it promptly, don't wait on the GC.
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct PuttyPpk(picky::putty::Ppk);
 
     impl PuttyPpk {

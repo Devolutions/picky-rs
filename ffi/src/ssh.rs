@@ -112,7 +112,9 @@ pub mod ffi {
     }
 
     /// SSH Private Key.
+    // Holds a private key and its passphrase: free them promptly, don't wait on the GC.
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct SshPrivateKey(pub ssh::SshPrivateKey);
 
     impl SshPrivateKey {
@@ -270,7 +272,9 @@ pub mod ffi {
     }
 
     /// SSH Certificate Builder.
+    // Holds the signing private key: free it promptly, don't wait on the GC.
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct SshCertBuilder(pub ssh::SshCertificateBuilder);
 
     impl SshCertBuilder {

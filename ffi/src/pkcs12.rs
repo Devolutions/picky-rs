@@ -113,7 +113,9 @@ pub mod ffi {
     }
 
     /// Crypto context to use when building a PFX.
+    // Holds the PKCS#12 password: free it promptly, don't wait on the GC.
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct Pkcs12CryptoContext(pub(crate) Arc<Mutex<pkcs12::Pkcs12CryptoContext>>);
 
     impl Pkcs12CryptoContext {
@@ -195,7 +197,9 @@ pub mod ffi {
     }
 
     /// PFX safe bag, the polymorphic container for all the data in a PKCS12 archive.
+    // Can hold a private key: free it promptly, don't wait on the GC.
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct SafeBag(pub(crate) pkcs12::SafeBag);
 
     impl SafeBag {
@@ -301,7 +305,9 @@ pub mod ffi {
         }
     }
 
+    // Owns the remaining safe bags, which can hold private keys.
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct SafeBagIterator(pub(crate) Box<dyn Iterator<Item = pkcs12::SafeBag>>);
 
     impl SafeBagIterator {
@@ -311,7 +317,9 @@ pub mod ffi {
     }
 
     /// PFX (PKCS12 archive) builder.
+    // Holds private-key safe bags and the password: free them promptly, don't wait on the GC.
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct PfxBuilder {
         safe_bags_acc: Vec<pkcs12::SafeBag>,
         safe_contents: Vec<pkcs12::SafeContents>,
@@ -393,7 +401,9 @@ pub mod ffi {
     }
 
     /// A PKCS12 archive.
+    // Holds decrypted private keys: free them promptly, don't wait on the GC.
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct Pfx(pub(crate) pkcs12::Pfx);
 
     impl Pfx {
