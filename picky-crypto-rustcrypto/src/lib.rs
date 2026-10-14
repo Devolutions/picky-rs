@@ -3,6 +3,15 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+// UNTESTED: wherever the adapter holds secret material (keys, seeds, shared secrets, plaintexts, derived output), the
+// copy stays in `Zeroizing` or is wiped after use.
+// A copy left in freed memory can outlive the operation and leak through a later read or a memory dump.
+// When adding code, wrap every adapter-owned secret buffer or copy in `Zeroizing` and enable the library's zeroize
+// features.
+// UNTESTED: no type holding secret material implements or derives `Debug`.
+// A `Debug` output can carry the secret into logs or panic messages.
+// When adding a type that holds a key or other secret, don't derive `Debug` on it or on any type containing it.
+
 #[cfg(feature = "aead")]
 mod aead;
 #[cfg(any(feature = "aes", feature = "legacy"))]
