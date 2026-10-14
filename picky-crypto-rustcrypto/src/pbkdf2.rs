@@ -22,8 +22,8 @@ impl<D: EagerHash + Send + Sync> PasswordKdf for Pbkdf2<D> {
             return Err(Error::InvalidInput);
         }
         // UNTESTED: output lengths beyond the capacity limit return `Unsupported` before any allocation.
-        // Rule 4 orders capacity limits after standard ranges, and reaching this branch needs an output too large for a
-        // test.
+        // Rule 4 gives standard-range errors precedence over capacity limits, and reaching this branch needs an output
+        // too large for a test.
         // When changing it, keep it after the standard-range check and before the allocation.
         if output_len > OUTPUT_SIZE_LIMIT {
             return Err(Error::Unsupported(Algorithm::PasswordKdf(self.0)));

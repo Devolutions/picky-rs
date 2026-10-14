@@ -40,7 +40,10 @@ RSA key generation draws a 256-bit seed from the operating-system generator and 
 RSA signing and decryption blind the private-key operation with the operating-system generator.
 PKCS#1 v1.5 decryption is subject to RUSTSEC-2023-0071 (the Marvin timing attack), for which the rsa crate has no fixed release.
 In the locked rsa version the padding checks use constant-time comparisons, except the minimum padding-length check, which the crate flags as possibly not constant time (`src/algorithms/pkcs1v15.rs`, `decrypt_inner`).
-Invalid padding is reported as `VerificationFailed`, as the contract requires; a protocol exposed to padding oracles applies its own countermeasure.
+
+Every invalid padding is reported as the same `VerificationFailed` error, as the contract requires.
+This removes distinguishable errors, not timing differences inside the RSA operation; a protocol exposed to padding oracles applies its own countermeasure.
+
 ECDSA signing mixes operating-system randomness into the RFC 6979 nonce as additional data.
 RSA public keys beyond the rsa crate's limits (a modulus above 8192 bits or a public exponent above 2^33 − 1) are unsupported.
 Private-key loading applies the same limits, although the rsa crate loads private keys of any modulus size.
