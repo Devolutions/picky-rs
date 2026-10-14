@@ -226,7 +226,7 @@ fn generate_pkcs8(bits: usize) -> Result<OutputBytes, Error> {
     let mut seed = Zeroizing::new([0u8; 32]);
     getrandom::fill(&mut *seed).map_err(|_| Error::ProviderFailure)?;
     // Infallible seeded RNG that wipes its buffer and state on drop (chacha20 0.10.2, src/rng.rs:94–98;
-    // src/lib.rs:306–310).
+    // src/lib.rs:306–310). Wiping the seed's stack copies is best effort.
     let mut rng = chacha20::ChaCha20Rng::from_seed(*seed);
     let key =
         RsaPrivateKey::new_with_exp(&mut rng, bits, BoxedUint::from(65537u64)).map_err(|_| Error::ProviderFailure)?;
