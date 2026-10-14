@@ -103,7 +103,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        crate: [ picky-asn1, picky-asn1-der, picky-asn1-x509, picky, picky-crypto ]
+        crate: [ picky-asn1, picky-asn1-der, picky-asn1-x509, picky, picky-crypto, picky-crypto-rustcrypto ]
         include:
           - crate: picky-asn1
             msvc: "1.85"
@@ -115,6 +115,10 @@ jobs:
             msvc: "1.85"
           - crate: picky-crypto
             msvc: "1.85"
+          - crate: picky-crypto-rustcrypto
+            msvc: "1.85"
+            # Without features the crate builds only an empty provider.
+            args: --features all
 
     steps:
       - uses: actions/checkout@v6
@@ -125,7 +129,7 @@ jobs:
           curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal --default-toolchain ${{ matrix.msvc }}
 
       - name: cargo check ${{ matrix.crate }}
-        run: cargo +${{ matrix.msvc }} check -p ${{ matrix.crate }}
+        run: cargo +${{ matrix.msvc }} check -p ${{ matrix.crate }} ${{ matrix.args }}
 
   dotnet-tests:
     name: .NET binding tests
@@ -261,6 +265,11 @@ jobs:
 
       - name: Check banned features
         run: cargo deny --manifest-path Cargo.toml --workspace --all-features --config picky-crypto-rustcrypto/deny.toml check bans
+
+      # ed25519-dalek's `legacy_compatibility` feature weakens the library's S < L check,
+      # so this run shows that the adapter's own check rejects the Wycheproof S + L signatures.
+      - name: Check Ed25519 S range with legacy_compatibility
+        run: cargo test --locked -p picky-crypto-conformance -p picky-crypto-rustcrypto --features picky-crypto-conformance/rustcrypto,ed25519-dalek/legacy_compatibility --test conformance -- rustcrypto::signature
 
   success:
     name: Success

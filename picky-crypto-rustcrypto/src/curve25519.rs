@@ -33,6 +33,14 @@ impl SignatureVerifier for Verify {
             return Err(Error::InvalidKey);
         }
         let signature = Signature::from_slice(signature).map_err(|_| Error::VerificationFailed)?;
+        // RFC 8032 §5.1.7 requires S < L. The library's check weakens when any crate in the build enables
+        // ed25519-dalek's `legacy_compatibility` feature, so the adapter checks it itself.
+        if curve25519_dalek::Scalar::from_canonical_bytes(*signature.s_bytes())
+            .is_none()
+            .into()
+        {
+            return Err(Error::VerificationFailed);
+        }
         key.verify(message, &signature).map_err(|_| Error::VerificationFailed)
     }
 }

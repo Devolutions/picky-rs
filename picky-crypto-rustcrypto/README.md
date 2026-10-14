@@ -32,7 +32,8 @@ Secret cleanup features are enabled wherever the library offers them, and adapte
 Loaded RSA keys sign with every listed RSA signature algorithm, decrypt with every listed RSA encryption algorithm and export their public key.
 Loaded EC keys sign and agree on their own curve and export their public key.
 Loaded Ed25519 keys sign and export their public key; loaded X25519 keys agree and export their public key.
-Enabling ed25519-dalek's `legacy_compatibility` feature anywhere in a build weakens this backend's Ed25519 signature `S` range check, because Cargo unifies features; this workspace bans it with cargo-deny.
+Enabling ed25519-dalek's `legacy_compatibility` feature anywhere in a build weakens the library's Ed25519 signature `S` range check, because Cargo unifies features.
+The adapter therefore checks `S < L` itself (RFC 8032 §5.1.7), and this workspace bans the feature with cargo-deny.
 
 Key-based KDFs and finite-field Diffie-Hellman are not provided; they come from other providers.
 RSA key generation draws a 256-bit seed from the operating-system generator and expands it with ChaCha20, so a generator failure is reported instead of panicking.
