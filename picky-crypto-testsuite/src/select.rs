@@ -211,7 +211,8 @@ pub fn rc4_longest_key() -> (String, Vec<u8>) {
     (format!("{file}/tcId={}/ct", v::number(t, "tcId")), v::field(t, "ct"))
 }
 
-/// A published message of exactly `len` bytes, used as an in-range key next to a rejected length; checks using it expect only contract properties.
+/// A published message of exactly `len` bytes, used as an in-range key next to a rejected length; checks using it
+/// expect only contract properties.
 pub fn message_of_length(len: usize) -> (String, Vec<u8>) {
     let file = "hmac_sha1_test.json";
     let vectors = v::wycheproof(file);

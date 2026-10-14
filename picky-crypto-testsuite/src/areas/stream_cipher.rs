@@ -41,7 +41,8 @@ pub fn run(p: &CryptoProvider, _: Options) {
                 c.check(&id, parts == whole.as_ref(), "two calls must continue one keystream");
                 c.bytes(&format!("{id}/applied twice"), &restored, message);
             }
-            // Control for the rejected length 0: the adjacent in-range length, outside the must-support set; 256 bytes is checked above.
+            // Control for the rejected length 0: the adjacent in-range length, outside the must-support set; 256 bytes
+            // is checked above.
             let (source, key) = select::message_of_length(1);
             let id = format!("{a:?}/key length=1/{source}");
             if let Some(out) = c.outcome(&id, Expect::Success, Some((Algorithm::StreamCipher(a), false)), || {

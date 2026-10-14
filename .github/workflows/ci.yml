@@ -266,8 +266,8 @@ jobs:
       - name: Check banned features
         run: cargo deny --manifest-path Cargo.toml --workspace --all-features --config picky-crypto-rustcrypto/deny.toml check bans
 
-      # ed25519-dalek's `legacy_compatibility` feature weakens the library's S < L check,
-      # so this run shows that the adapter's own check rejects the Wycheproof S + L signatures.
+      # ed25519-dalek's `legacy_compatibility` feature weakens the library's S < L check, so this run shows that the
+      # adapter's own check rejects the Wycheproof S + L signatures.
       - name: Check Ed25519 S range with legacy_compatibility
         run: cargo test --locked -p picky-crypto-conformance -p picky-crypto-rustcrypto --features picky-crypto-conformance/rustcrypto,ed25519-dalek/legacy_compatibility --test conformance -- rustcrypto::signature
 

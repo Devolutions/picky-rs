@@ -131,7 +131,8 @@ pub fn run(p: &CryptoProvider, _: Options) {
                 );
             }
             if a == CipherAlgorithm::Rc2Cbc {
-                // Controls for the rejected lengths 0 and 129: the adjacent in-range lengths, outside the must-support set.
+                // Controls for the rejected lengths 0 and 129: the adjacent in-range lengths, outside the must-support
+                // set.
                 for length in [1, 128] {
                     let (source, in_range) = select::message_of_length(length);
                     let id = format!("{a:?}/{protection:?}/key length={length}/{source}");

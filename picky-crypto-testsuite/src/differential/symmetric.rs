@@ -1,4 +1,5 @@
-//! Checks one provider alone can't make: derived lengths, empty-key HMAC tags and boundary controls without published answers, and AEAD sealed by one provider and opened by the other.
+//! Checks one provider alone can't make: derived lengths, empty-key HMAC tags and boundary controls without published
+//! answers, and AEAD sealed by one provider and opened by the other.
 
 use picky_crypto::*;
 use proptest::prelude::*;

@@ -73,8 +73,8 @@ macro_rules! curve {
                     if inner.private_key.len() != $signature_len / 2 {
                         return Err(Error::InvalidKey);
                     }
-                    // The library checks the curve OIDs and that an embedded public key matches
-                    // (elliptic-curve 0.14.1, src/secret_key/pkcs8.rs:53–59; src/secret_key.rs:465–484).
+                    // The library checks the curve OIDs and that an embedded public key matches (elliptic-curve 0.14.1,
+                    // src/secret_key/pkcs8.rs:53–59; src/secret_key.rs:465–484).
                     let key = SecretKey::try_from(info).map_err(|_| Error::InvalidKey)?;
                     Ok(Box::new(Key(key)))
                 }
@@ -104,8 +104,8 @@ macro_rules! curve {
                     let signing = SigningKey::from(&self.0);
                     // UNTESTED: the RFC 6979 nonce is hedged with operating-system random bytes as additional data.
                     // Hedging guards deterministic nonces against fault attacks, and signatures verify either way.
-                    // When changing the call, keep a generator argument; an RNG failure is the only error on this
-                    // path (ecdsa 0.17.0, src/signing.rs:209–232, 242–265).
+                    // When changing the call, keep a generator argument; an RNG failure is the only error on this path
+                    // (ecdsa 0.17.0, src/signing.rs:209–232, 242–265).
                     let signature: Signature = signing
                         .try_sign_with_rng(&mut getrandom::SysRng, message)
                         .map_err(|_| Error::ProviderFailure)?;

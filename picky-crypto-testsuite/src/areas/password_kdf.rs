@@ -55,7 +55,8 @@ pub fn run(p: &CryptoProvider, _: Options) {
                 || e.derive(&password, &salt, iterations, length),
             );
         }
-        // Control for zero iterations and an empty output: one iteration with a one-byte output, in the must-support set.
+        // Control for zero iterations and an empty output: one iteration with a one-byte output, in the must-support
+        // set.
         // No control sits at the RFC 8018 maximum: deriving that much output could exhaust time or memory.
         let id = format!("{a:?}/bounds/1/1/{source}");
         if let Some(out) = c.call(&id, Expect::Success, || e.derive(&password, &salt, 1, 1)) {

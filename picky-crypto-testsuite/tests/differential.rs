@@ -124,7 +124,8 @@ impl Cipher for FixedRc2 {
     }
 }
 
-/// PBKDF2-HMAC-SHA1 that returns `output_len` copies of `pad` above 64 bytes, beyond the published-input property's lengths, and zeros otherwise.
+/// PBKDF2-HMAC-SHA1 that returns `output_len` copies of `pad` above 64 bytes, beyond the published-input property's
+/// lengths, and zeros otherwise.
 struct FixedPbkdf2(u8);
 impl PasswordKdf for FixedPbkdf2 {
     fn algorithm(&self) -> PasswordKdfAlgorithm {
