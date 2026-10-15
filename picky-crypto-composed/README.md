@@ -12,7 +12,7 @@ Contract sections 6.4 and 11 define the entries and explain why they live outsid
 | One-step KDF with SHA-1, SHA-256, SHA-384 or SHA-512 | `base`'s hash entry for that hash | NIST SP 800-56C rev. 2 section 4.1, option 1 |
 | Counter-mode KDF with HMAC-SHA-1, HMAC-SHA-256, HMAC-SHA-384 or HMAC-SHA-512 | `base`'s HMAC entry, if it supports tag generation | NIST SP 800-108 rev. 1 section 4.1, counter before the fixed input |
 
-An entry exists only when `base` has the entry it is built from, so the provider is empty when `base` has none of them.
+It builds an entry for every key-based KDF the contract defines whose hash or HMAC entry `base` supplies, so the provider is empty when `base` has none of them.
 `provider` takes the entries when called and never consults `base` or the process-wide default afterwards.
 Counter-mode blocks are generated tags, taken through `MacGeneration`, so a MAC entry that only verifies cannot serve.
 Every entry reports `fips() == false`, so the FIPS policy rejects any composition with this provider.

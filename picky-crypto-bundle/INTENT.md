@@ -12,7 +12,7 @@ Binaries may install it explicitly or build their own composition.
 - Its composition is fixed and documented: every enabled backend in a fixed order (aws-lc, then ring, then RustCrypto), each a fallback for the previous, then the key-based KDFs that `picky-crypto-composed` builds over that composition, then `picky-crypto-ffdh` using the first random entry available.
 - It has no default features.
   Each backend and each fill-in provider is behind its own feature, and `all` enables everything available.
-- Features are additive: enabling a feature only adds entries, so dependents that enable different features still get one deterministic provider.
+- Features are additive: enabling a feature only adds entries, so dependents that enable different features still get one deterministic provider, though an earlier backend's entry can refuse inputs a later one accepted (`CONTRACT.md` §11).
 - It contains no cryptographic code.
   It only assembles providers from the crates above.
 - It installs nothing itself.

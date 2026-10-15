@@ -20,7 +20,7 @@ The crate contains no cryptographic code and installs nothing itself.
 
 Each fill-in entry is added only when the entries it is built from exist.
 Without a backend, the provider therefore holds only the FFDH static key loader with `ffdh`, and is empty otherwise.
-Features are additive: enabling one only adds members, so dependents enabling different features still get one deterministic provider.
+Features are additive: enabling one only adds members, so dependents enabling different features still get one deterministic provider, though an earlier backend's entry can refuse inputs a later one accepted.
 
 Composition picks one member per algorithm, and per protection for MAC, cipher, AEAD and key-wrap entries, never per input (contract section 8.1).
 An earlier member's entry therefore serves every input of the operations it advertises, including inputs it refuses as `Unsupported`.
