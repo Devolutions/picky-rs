@@ -10,18 +10,19 @@ Parsing and encoding formats need no provider; only code that performs cryptogra
 ## Features and the library
 
 The library consists of the crates below; `Cargo.lock` records their versions.
-Dependencies needed internally do not enable additional provider entries.
+Dependencies needed internally do not enable additional provider entries; families that draw randomness enable `random`, because they use its generator.
 MAC, CBC, AES-GCM and AES-KW entries support both applying and processing protection.
 
 | Feature | Provider entries | Library crates |
 |---|---|---|
+| `random` | Secure random from the operating-system generator | getrandom |
 | `digest` | SHA-1/224/256/384/512, SHA3-384/512; HMAC-SHA-1/224/256/384/512; PBKDF2 with those HMACs | sha1, sha2, sha3, digest, hmac, pbkdf2 |
 | `aes` | AES-128/192/256-CBC without padding | aes, cbc, cipher |
-| `aead` | AES-128/192/256-GCM; secure random | aes-gcm, aes, getrandom |
+| `aead` | AES-128/192/256-GCM; enables `random` | aes-gcm, aes |
 | `key-wrap` | AES-128/192/256-KW | aes-kw, aes |
-| `rsa` | PKCS#1 v1.5 verification with MD5, SHA-1/224/256/384/512 and SHA3-384/512; PKCS#1 v1.5 and OAEP-SHA-1/256 encryption; RSA private-key loading and 2048/3072/4096-bit generation; secure random | rsa, md-5, sha1, sha2, sha3, getrandom, chacha20 |
-| `nist-ec` | P-256/SHA-256, P-384/SHA-384 and P-521/SHA-512 ECDSA verification; ECDH, private-key loading and generation for those curves; secure random | p256, p384, p521, sha2, hmac, getrandom |
-| `curve25519` | Ed25519 verification, private-key loading and generation; X25519 ephemeral agreement and private-key loading; secure random | ed25519-dalek, ed25519, x25519-dalek, sha2, getrandom |
+| `rsa` | PKCS#1 v1.5 verification with MD5, SHA-1/224/256/384/512 and SHA3-384/512; PKCS#1 v1.5 and OAEP-SHA-1/256 encryption; RSA private-key loading and 2048/3072/4096-bit generation; enables `random` | rsa, md-5, sha1, sha2, sha3, chacha20 |
+| `nist-ec` | P-256/SHA-256, P-384/SHA-384 and P-521/SHA-512 ECDSA verification; ECDH, private-key loading and generation for those curves; enables `random` | p256, p384, p521, sha2, hmac |
+| `curve25519` | Ed25519 verification, private-key loading and generation; X25519 ephemeral agreement and private-key loading; enables `random` | ed25519-dalek, ed25519, x25519-dalek, sha2 |
 | `legacy` | MD4, MD5, RC4, 3DES-EDE3-CBC and RC2-CBC | md4, md-5, digest, rc4, des, rc2, cbc, cipher |
 | `all` | Every family above | Every dependency above |
 

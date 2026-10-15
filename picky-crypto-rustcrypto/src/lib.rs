@@ -28,7 +28,7 @@ mod key_wrap;
 mod mac;
 #[cfg(feature = "digest")]
 mod pbkdf2;
-#[cfg(any(feature = "aead", feature = "rsa", feature = "nist-ec", feature = "curve25519"))]
+#[cfg(feature = "random")]
 mod random;
 #[cfg(feature = "legacy")]
 mod rc4;
@@ -67,7 +67,7 @@ pub fn provider() -> picky_crypto::CryptoProvider {
     let builder = curve25519::entries(builder);
     #[cfg(feature = "legacy")]
     let builder = rc4::entries(builder);
-    #[cfg(any(feature = "aead", feature = "rsa", feature = "nist-ec", feature = "curve25519"))]
+    #[cfg(feature = "random")]
     let builder = builder.with(picky_crypto::Entry::SecureRandom(std::sync::Arc::new(random::Random)));
     builder.build().expect("fixed, distinct RustCrypto entries")
 }
@@ -85,12 +85,7 @@ mod tests {
             + 12 * usize::from(cfg!(feature = "nist-ec"))
             + 5 * usize::from(cfg!(feature = "curve25519"))
             + 5 * usize::from(cfg!(feature = "legacy"))
-            + usize::from(cfg!(any(
-                feature = "aead",
-                feature = "rsa",
-                feature = "nist-ec",
-                feature = "curve25519"
-            )));
+            + usize::from(cfg!(feature = "random"));
         assert_eq!(provider.entries().count(), expected);
         assert!(!provider.fips());
     }
