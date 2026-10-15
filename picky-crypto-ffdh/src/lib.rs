@@ -53,6 +53,7 @@ impl FfdhKeyAgreement for Agreement {
     fn generate_ephemeral(&self, parameters: FfdhParameters<'_>) -> Result<Box<dyn EphemeralSecret>, Error> {
         let group = Group::new(
             parameters,
+            None,
             Algorithm::KeyAgreement(KeyAgreementAlgorithm::Ffdh),
             Error::InvalidInput,
         )?;
@@ -104,6 +105,7 @@ impl PrivateKeyLoader for Loader {
         };
         let group = Group::new(
             parameters,
+            Some(private_value),
             Algorithm::PrivateKeyLoading(KeyType::Ffdh),
             Error::InvalidKey,
         )?;
@@ -239,8 +241,7 @@ pub(crate) mod tests {
     }
 
     // Faults: the minimum size check or `key_size_bits` counts whole bytes instead of bits, or the capacity limit is
-    // off by one, yields to the parity check, takes precedence over the encoding bound, or names the other entry's
-    // algorithm.
+    // off by one, yields to the parity check, or names the other entry's algorithm.
     // Published groups are whole bytes long and stop at 4096 bits.
     #[test]
     fn modulus_size_bounds() {
@@ -259,11 +260,6 @@ pub(crate) mod tests {
             load(&even, None, &[1]).err(),
             Some(Error::Unsupported(Algorithm::PrivateKeyLoading(KeyType::Ffdh)))
         );
-        // The same modulus with two leading zero bytes exceeds the encoding bound, which takes precedence.
-        assert_eq!(
-            load(&[&[0, 0][..], &even].concat(), None, &[1]).err(),
-            Some(Error::InvalidKey)
-        );
         let provider = ffdh([]);
         let agreement = helpers::ffdh_key_agreement(&provider).unwrap();
         assert_eq!(
@@ -271,6 +267,41 @@ pub(crate) mod tests {
                 .generate_ephemeral(FfdhParameters::new(&even, &[2], None))
                 .err(),
             Some(Error::Unsupported(Algorithm::KeyAgreement(KeyAgreementAlgorithm::Ffdh)))
+        );
+    }
+
+    // Faults: the capacity limit takes precedence over the encoding bound, or the bound misses an empty encoding or
+    // the private value.
+    // Published groups stay within the capacity limit.
+    #[test]
+    fn encoding_bound_precedes_capacity_limit() {
+        // 2^8192, one bit above the capacity limit; its encoding bound is 1026 bytes.
+        let p = [&[1][..], &[0; 1024]].concat();
+        let padded = [&[0, 0][..], &p].concat();
+        let overlong = vec![1; 1027];
+        let provider = ffdh([]);
+        let loader = helpers::private_key_loader(&provider, KeyType::Ffdh).unwrap();
+        let load = |p: &[u8], g: &[u8], q: Option<&[u8]>, x: &[u8]| {
+            loader
+                .load(PrivateKeyMaterial::Ffdh {
+                    parameters: FfdhParameters::new(p, g, q),
+                    private_value: x,
+                })
+                .err()
+        };
+        for error in [
+            load(&padded, &[2], None, &[1]),
+            load(&p, &[], None, &[1]),
+            load(&p, &[2], Some(&[]), &[1]),
+            load(&p, &[2], None, &[]),
+            load(&p, &[2], None, &overlong),
+        ] {
+            assert_eq!(error, Some(Error::InvalidKey));
+        }
+        let agreement = helpers::ffdh_key_agreement(&provider).unwrap();
+        assert_eq!(
+            agreement.generate_ephemeral(FfdhParameters::new(&p, &[], None)).err(),
+            Some(Error::InvalidInput)
         );
     }
 

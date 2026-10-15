@@ -34,14 +34,20 @@ pub(crate) struct Group {
 }
 
 impl Group {
-    /// Checks the domain parameters.
-    /// An encoding longer than the byte length of p plus one byte returns `invalid`, before any other check.
+    /// Checks the domain parameters, and the length of the static private value's encoding when one is given.
+    /// An empty encoding, or one longer than the byte length of p plus one byte, returns `invalid` before any other
+    /// check.
     /// A modulus beyond the capacity limit then returns `Unsupported` naming `unsupported`.
     /// Any other invalid parameter returns `invalid`.
-    pub(crate) fn new(parameters: FfdhParameters<'_>, unsupported: Algorithm, invalid: Error) -> Result<Self, Error> {
+    pub(crate) fn new(
+        parameters: FfdhParameters<'_>,
+        private_value: Option<&[u8]>,
+        unsupported: Algorithm,
+        invalid: Error,
+    ) -> Result<Self, Error> {
         let bits = bit_length(parameters.p);
         let width = bits.div_ceil(8);
-        let encodings = [Some(parameters.p), Some(parameters.g), parameters.q];
+        let encodings = [Some(parameters.p), Some(parameters.g), parameters.q, private_value];
         // The encoding bound is a length the operation fixes, so it takes precedence over the capacity limit.
         if encodings.into_iter().flatten().any(|encoding| !within(encoding, width)) {
             return Err(invalid);
@@ -95,11 +101,9 @@ impl Group {
     }
 
     /// Parses a static private value x and checks `1 <= x <= B − 1`, without reducing it.
+    /// The caller passes the same encoding to `Group::new`, which checks its length.
     pub(crate) fn private_value(&self, encoding: &[u8]) -> Result<Zeroizing<BoxedUint>, Error> {
         // The encoding length is public; only the value is secret.
-        if !within(encoding, self.width) {
-            return Err(Error::InvalidKey);
-        }
         let x = Zeroizing::new(BoxedUint::from_be_slice(encoding, self.precision).map_err(|_| Error::InvalidKey)?);
         // UNTESTED: the range check of x runs in constant time and reveals only whether x is valid.
         // A comparison that branches on x leaks bits of a static private exponent through timing.
@@ -174,10 +178,9 @@ impl Group {
     }
 }
 
-/// Whether an integer encoding is at most one byte longer than the byte length of p.
-/// An empty encoding reads as zero, which every range check rejects.
+/// Whether an integer encoding is nonempty and at most one byte longer than the byte length of p.
 fn within(encoding: &[u8], width: usize) -> bool {
-    encoding.len() <= width + 1
+    !encoding.is_empty() && encoding.len() <= width + 1
 }
 
 /// The bit length of an unsigned big-endian integer, ignoring leading zero bytes.
@@ -202,6 +205,7 @@ mod tests {
         let p = structural_modulus(1024);
         let group = Group::new(
             FfdhParameters::new(&p, &[2], Some(&[5])),
+            None,
             Algorithm::KeyAgreement(KeyAgreementAlgorithm::Ffdh),
             Error::InvalidInput,
         )
