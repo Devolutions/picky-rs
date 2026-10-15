@@ -2462,6 +2462,9 @@ mod tests {
     #[cfg(feature = "ctl")]
     mod ctl_trust_anchor {
         use super::*;
+        use picky_asn1_x509::content_info::ContentValue;
+        use picky_asn1_x509::pkcs7::ctl::CTLEntryAttribute;
+        use rstest::rstest;
 
         fn authroot() -> CertificateTrustList {
             CertificateTrustList::from_der(picky_test_data::CERTIFICATE_TRUST_LIST).unwrap()
@@ -2503,254 +2506,199 @@ mod tests {
             (root, leaf)
         }
 
-        fn verify_against_ctl(leaf: &Cert, certificates: &[Cert], trusted_roots: &[Cert]) -> AuthenticodeResult<()> {
+        fn authroot_with(entries: Vec<CTLEntry>) -> CertificateTrustList {
+            let mut pkcs7 = Pkcs7::from_der(picky_test_data::CERTIFICATE_TRUST_LIST).unwrap();
+            let content = pkcs7.0.signed_data.content_info.content.as_mut().unwrap();
+            let ContentValue::CertificateTrustList(ctl) = &mut content.0 else {
+                panic!("not a CTL");
+            };
+            ctl.crl_entries.0.extend(entries);
+            CertificateTrustList::from_der(&pkcs7.to_der().unwrap()).unwrap()
+        }
+
+        fn ctl_entry(root: &Cert, attributes: Vec<CTLEntryAttribute>) -> CTLEntry {
+            CTLEntry {
+                cert_fingerprint: HashAlgorithm::SHA1.digest(&root.to_der().unwrap()).into(),
+                attributes: Asn1SetOf(attributes),
+            }
+        }
+
+        fn verify_against_ctl(
+            ctl: &CertificateTrustList,
+            leaf: &Cert,
+            certificates: &[Cert],
+            trusted_roots: &[Cert],
+        ) -> AuthenticodeResult<()> {
             let pkcs7 = Pkcs7::from_pem_str(SELF_SIGNED_PKCS7).unwrap();
             let private_key = PrivateKey::from_pem_str(SELF_SIGNED_PKCS7_RSA_PRIVATE_KEY).unwrap();
             let authenticode_signature =
                 AuthenticodeSignature::new(&pkcs7, FILE_HASH.to_vec(), ShaVariant::SHA2_256, &private_key, None)
                     .unwrap();
 
-            let ctl = authroot();
             let validator = authenticode_signature.authenticode_verifier();
             validator.trusted_roots(trusted_roots);
-            validator.h_verify_ca_certificate_against_ctl(&ctl, leaf, certificates)
+            validator.h_verify_ca_certificate_against_ctl(ctl, leaf, certificates)
         }
 
-        #[test]
-        fn ctl_listed_root_is_preferred_among_reissued_roots() {
-            let root_key = PrivateKey::from_pem_str(picky_test_data::RSA_2048_PK_2).unwrap();
-            let leaf_key = PrivateKey::from_pem_str(picky_test_data::RSA_2048_PK_3).unwrap();
-            let reissued_root = |not_before: u16| {
-                CertificateBuilder::new()
-                    .validity(
-                        UtcDate::ymd(not_before, 1, 1).unwrap(),
-                        UtcDate::ymd(2060, 1, 1).unwrap(),
-                    )
-                    .self_signed(DirectoryName::new_common_name("Reissued Root"), &root_key)
-                    .ca(true)
-                    .key_id_gen_method(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_256))
-                    .build()
-                    .unwrap()
-            };
-            let unlisted_root = reissued_root(2020);
-            let listed_root = reissued_root(2021);
-            let leaf = CertificateBuilder::new()
-                .validity(UtcDate::ymd(2022, 1, 1).unwrap(), UtcDate::ymd(2060, 1, 1).unwrap())
-                .subject(
-                    DirectoryName::new_common_name("Leaf"),
-                    leaf_key.to_public_key().unwrap(),
-                )
-                .issuer_cert(&listed_root, &root_key)
-                .key_id_gen_method(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_256))
-                .build()
-                .unwrap();
-
-            let mut pkcs7 = Pkcs7::from_der(picky_test_data::CERTIFICATE_TRUST_LIST).unwrap();
-            let content = pkcs7.0.signed_data.content_info.content.as_mut().unwrap();
-            let picky_asn1_x509::content_info::ContentValue::CertificateTrustList(ctl) = &mut content.0 else {
-                panic!("not a CTL");
-            };
-            ctl.crl_entries.0.push(picky_asn1_x509::pkcs7::ctl::CTLEntry {
-                cert_fingerprint: HashAlgorithm::SHA1.digest(&listed_root.to_der().unwrap()).into(),
-                attributes: Asn1SetOf(vec![]),
-            });
-            let ctl = CertificateTrustList::from_der(&pkcs7.to_der().unwrap()).unwrap();
-
-            let pkcs7 = Pkcs7::from_pem_str(SELF_SIGNED_PKCS7).unwrap();
-            let private_key = PrivateKey::from_pem_str(SELF_SIGNED_PKCS7_RSA_PRIVATE_KEY).unwrap();
-            let authenticode_signature =
-                AuthenticodeSignature::new(&pkcs7, FILE_HASH.to_vec(), ShaVariant::SHA2_256, &private_key, None)
-                    .unwrap();
-            let provided = [unlisted_root.clone(), listed_root.clone()];
-            let embedded_unlisted = [leaf.clone(), unlisted_root.clone()];
-            let embedded_both = [leaf.clone(), listed_root.clone(), unlisted_root.clone()];
-            let cases: [(&[Cert], &[Cert]); 3] = [
-                (std::slice::from_ref(&leaf), &provided),
-                (&embedded_unlisted, std::slice::from_ref(&listed_root)),
-                (&embedded_both, &[]),
-            ];
-            for (certificates, trusted_roots) in cases {
-                let validator = authenticode_signature.authenticode_verifier();
-                validator.trusted_roots(trusted_roots);
-                validator
-                    .h_verify_ca_certificate_against_ctl(&ctl, &leaf, certificates)
-                    .unwrap();
-            }
+        /// Roots sharing one name and key above a leaf and its intermediate.
+        /// Only their thumbprint and CTL entry tell them apart.
+        struct ReissuedRoots {
+            eligible: Cert,
+            unlisted: Cert,
+            disallowed: Cert,
+            shallow: Cert,
+            intermediate: Cert,
+            leaf: Cert,
+            ctl: CertificateTrustList,
         }
 
-        #[test]
-        fn disallowed_listed_root_is_skipped_among_reissued_roots() {
-            let root_key = PrivateKey::from_pem_str(picky_test_data::RSA_2048_PK_2).unwrap();
-            let leaf_key = PrivateKey::from_pem_str(picky_test_data::RSA_2048_PK_3).unwrap();
-            let reissued_root = |not_before: u16| {
-                CertificateBuilder::new()
-                    .validity(
-                        UtcDate::ymd(not_before, 1, 1).unwrap(),
-                        UtcDate::ymd(2060, 1, 1).unwrap(),
+        #[derive(Clone, Copy, Debug)]
+        enum Sibling {
+            Unlisted,
+            Disallowed,
+            Shallow,
+        }
+
+        #[derive(Clone, Copy, Debug)]
+        enum Placement {
+            Provided,
+            EmbeddedSibling,
+            EmbeddedBoth,
+        }
+
+        impl ReissuedRoots {
+            fn new() -> Self {
+                let root_key = PrivateKey::from_pem_str(picky_test_data::RSA_2048_PK_2).unwrap();
+                let intermediate_key = PrivateKey::from_pem_str(picky_test_data::RSA_2048_PK_3).unwrap();
+                let leaf_key = PrivateKey::from_pem_str(picky_test_data::RSA_2048_PK_4).unwrap();
+                let root = |not_before: u16, pathlen: Option<u8>| {
+                    let builder = CertificateBuilder::new();
+                    builder
+                        .validity(
+                            UtcDate::ymd(not_before, 1, 1).unwrap(),
+                            UtcDate::ymd(2060, 1, 1).unwrap(),
+                        )
+                        .self_signed(DirectoryName::new_common_name("Reissued Root"), &root_key)
+                        .ca(true)
+                        .key_id_gen_method(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_256));
+                    if let Some(pathlen) = pathlen {
+                        builder.pathlen(pathlen);
+                    }
+                    builder.build().unwrap()
+                };
+
+                let eligible = root(2021, None);
+                let unlisted = root(2020, None);
+                let disallowed = root(2019, None);
+                // Its path length forbids the intermediate below it.
+                let shallow = root(2018, Some(0));
+                let intermediate = CertificateBuilder::new()
+                    .validity(UtcDate::ymd(2022, 1, 1).unwrap(), UtcDate::ymd(2060, 1, 1).unwrap())
+                    .subject(
+                        DirectoryName::new_common_name("Intermediate"),
+                        intermediate_key.to_public_key().unwrap(),
                     )
-                    .self_signed(DirectoryName::new_common_name("Reissued Root"), &root_key)
+                    .issuer_cert(&eligible, &root_key)
                     .ca(true)
+                    .pathlen(0)
                     .key_id_gen_method(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_256))
                     .build()
-                    .unwrap()
-            };
-            let disallowed_root = reissued_root(2020);
-            let allowed_root = reissued_root(2021);
-            let unlisted_root = reissued_root(2019);
-            let leaf = CertificateBuilder::new()
-                .validity(UtcDate::ymd(2022, 1, 1).unwrap(), UtcDate::ymd(2060, 1, 1).unwrap())
-                .subject(
-                    DirectoryName::new_common_name("Leaf"),
-                    leaf_key.to_public_key().unwrap(),
-                )
-                .issuer_cert(&allowed_root, &root_key)
-                .key_id_gen_method(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_256))
-                .build()
-                .unwrap();
+                    .unwrap();
+                let leaf = CertificateBuilder::new()
+                    .validity(UtcDate::ymd(2022, 1, 1).unwrap(), UtcDate::ymd(2060, 1, 1).unwrap())
+                    .subject(
+                        DirectoryName::new_common_name("Leaf"),
+                        leaf_key.to_public_key().unwrap(),
+                    )
+                    .issuer_cert(&intermediate, &intermediate_key)
+                    .key_id_gen_method(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_256))
+                    .build()
+                    .unwrap();
 
-            // An empty CertDisallowedFileTimePropId means the root is disallowed since forever.
-            let mut pkcs7 = Pkcs7::from_der(picky_test_data::CERTIFICATE_TRUST_LIST).unwrap();
-            let content = pkcs7.0.signed_data.content_info.content.as_mut().unwrap();
-            let picky_asn1_x509::content_info::ContentValue::CertificateTrustList(ctl) = &mut content.0 else {
-                panic!("not a CTL");
-            };
-            ctl.crl_entries.0.push(picky_asn1_x509::pkcs7::ctl::CTLEntry {
-                cert_fingerprint: HashAlgorithm::SHA1.digest(&disallowed_root.to_der().unwrap()).into(),
-                attributes: Asn1SetOf(vec![picky_asn1_x509::pkcs7::ctl::CTLEntryAttribute {
+                // An empty CertDisallowedFileTimePropId means the root is disallowed since forever.
+                let disallowed_since_forever = CTLEntryAttribute {
                     oid: oids::cert_disallowed_filetime_prop_id().into(),
                     value: CTLEntryAttributeValues::CertDisallowedFileTimePropId(Asn1SetOf(vec![Vec::new().into()])),
-                }]),
-            });
-            ctl.crl_entries.0.push(picky_asn1_x509::pkcs7::ctl::CTLEntry {
-                cert_fingerprint: HashAlgorithm::SHA1.digest(&allowed_root.to_der().unwrap()).into(),
-                attributes: Asn1SetOf(vec![]),
-            });
-            let ctl = CertificateTrustList::from_der(&pkcs7.to_der().unwrap()).unwrap();
+                };
+                let ctl = authroot_with(vec![
+                    ctl_entry(&eligible, vec![]),
+                    ctl_entry(&disallowed, vec![disallowed_since_forever]),
+                    ctl_entry(&shallow, vec![]),
+                ]);
 
-            let pkcs7 = Pkcs7::from_pem_str(SELF_SIGNED_PKCS7).unwrap();
-            let private_key = PrivateKey::from_pem_str(SELF_SIGNED_PKCS7_RSA_PRIVATE_KEY).unwrap();
-            let authenticode_signature =
-                AuthenticodeSignature::new(&pkcs7, FILE_HASH.to_vec(), ShaVariant::SHA2_256, &private_key, None)
-                    .unwrap();
-            let verify = |certificates: &[Cert], trusted_roots: &[Cert]| {
-                let validator = authenticode_signature.authenticode_verifier();
-                validator.trusted_roots(trusted_roots);
-                validator.h_verify_ca_certificate_against_ctl(&ctl, &leaf, certificates)
-            };
-
-            let provided = [disallowed_root.clone(), allowed_root.clone()];
-            let embedded_disallowed = [leaf.clone(), disallowed_root.clone()];
-            let embedded_both = [leaf.clone(), disallowed_root.clone(), allowed_root.clone()];
-            let cases: [(&[Cert], &[Cert]); 3] = [
-                (std::slice::from_ref(&leaf), &provided),
-                (&embedded_disallowed, std::slice::from_ref(&allowed_root)),
-                (&embedded_both, &[]),
-            ];
-            for (certificates, trusted_roots) in cases {
-                verify(certificates, trusted_roots).unwrap();
+                Self {
+                    eligible,
+                    unlisted,
+                    disallowed,
+                    shallow,
+                    intermediate,
+                    leaf,
+                    ctl,
+                }
             }
 
-            // Without an eligible root, the listed root's failure wins over the unlisted one's.
-            let err = verify(
-                std::slice::from_ref(&leaf),
-                &[unlisted_root.clone(), disallowed_root.clone()],
-            )
-            .unwrap_err();
-            assert!(matches!(err, AuthenticodeError::CaCertificateRevoked));
-            let err = verify(&[leaf.clone(), disallowed_root], &[unlisted_root]).unwrap_err();
-            assert!(matches!(err, AuthenticodeError::CaCertificateRevoked));
+            fn sibling(&self, sibling: Sibling) -> &Cert {
+                match sibling {
+                    Sibling::Unlisted => &self.unlisted,
+                    Sibling::Disallowed => &self.disallowed,
+                    Sibling::Shallow => &self.shallow,
+                }
+            }
+
+            fn verify(&self, embedded_roots: &[&Cert], trusted_roots: &[&Cert]) -> AuthenticodeResult<()> {
+                let certificates = [&self.leaf, &self.intermediate]
+                    .into_iter()
+                    .chain(embedded_roots.iter().copied())
+                    .cloned()
+                    .collect::<Vec<Cert>>();
+                let trusted_roots = trusted_roots.iter().copied().cloned().collect::<Vec<Cert>>();
+                verify_against_ctl(&self.ctl, &self.leaf, &certificates, &trusted_roots)
+            }
+        }
+
+        #[rstest]
+        fn eligible_listed_root_is_selected_among_reissued_roots(
+            #[values(Sibling::Unlisted, Sibling::Disallowed, Sibling::Shallow)] sibling: Sibling,
+            #[values(Placement::Provided, Placement::EmbeddedSibling, Placement::EmbeddedBoth)] placement: Placement,
+        ) {
+            let roots = ReissuedRoots::new();
+            let sibling = roots.sibling(sibling);
+            let eligible = &roots.eligible;
+
+            // The ineligible sibling comes first, so the selection has to move past it.
+            match placement {
+                Placement::Provided => roots.verify(&[], &[sibling, eligible]),
+                Placement::EmbeddedSibling => roots.verify(&[sibling], &[eligible]),
+                Placement::EmbeddedBoth => roots.verify(&[sibling, eligible], &[]),
+            }
+            .unwrap();
         }
 
         #[test]
-        fn listed_root_too_shallow_for_the_chain_is_skipped_among_reissued_roots() {
-            let root_key = PrivateKey::from_pem_str(picky_test_data::RSA_2048_PK_2).unwrap();
-            let intermediate_key = PrivateKey::from_pem_str(picky_test_data::RSA_2048_PK_3).unwrap();
-            let leaf_key = PrivateKey::from_pem_str(picky_test_data::RSA_2048_PK_4).unwrap();
-            let reissued_root = |not_before: u16, pathlen: u8| {
-                CertificateBuilder::new()
-                    .validity(
-                        UtcDate::ymd(not_before, 1, 1).unwrap(),
-                        UtcDate::ymd(2060, 1, 1).unwrap(),
-                    )
-                    .self_signed(DirectoryName::new_common_name("Reissued Root"), &root_key)
-                    .ca(true)
-                    .pathlen(pathlen)
-                    .key_id_gen_method(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_256))
-                    .build()
-                    .unwrap()
-            };
-            let shallow_root = reissued_root(2020, 0);
-            let deep_root = reissued_root(2021, 1);
-            let intermediate = CertificateBuilder::new()
-                .validity(UtcDate::ymd(2022, 1, 1).unwrap(), UtcDate::ymd(2060, 1, 1).unwrap())
-                .subject(
-                    DirectoryName::new_common_name("Intermediate"),
-                    intermediate_key.to_public_key().unwrap(),
-                )
-                .issuer_cert(&deep_root, &root_key)
-                .ca(true)
-                .pathlen(0)
-                .key_id_gen_method(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_256))
-                .build()
-                .unwrap();
-            let leaf = CertificateBuilder::new()
-                .validity(UtcDate::ymd(2022, 1, 1).unwrap(), UtcDate::ymd(2060, 1, 1).unwrap())
-                .subject(
-                    DirectoryName::new_common_name("Leaf"),
-                    leaf_key.to_public_key().unwrap(),
-                )
-                .issuer_cert(&intermediate, &intermediate_key)
-                .key_id_gen_method(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_256))
-                .build()
-                .unwrap();
+        fn rejection_from_the_furthest_candidate_is_reported() {
+            let roots = ReissuedRoots::new();
 
-            let mut pkcs7 = Pkcs7::from_der(picky_test_data::CERTIFICATE_TRUST_LIST).unwrap();
-            let content = pkcs7.0.signed_data.content_info.content.as_mut().unwrap();
-            let picky_asn1_x509::content_info::ContentValue::CertificateTrustList(ctl) = &mut content.0 else {
-                panic!("not a CTL");
-            };
-            for root in [&shallow_root, &deep_root] {
-                ctl.crl_entries.0.push(picky_asn1_x509::pkcs7::ctl::CTLEntry {
-                    cert_fingerprint: HashAlgorithm::SHA1.digest(&root.to_der().unwrap()).into(),
-                    attributes: Asn1SetOf(vec![]),
-                });
-            }
-            let ctl = CertificateTrustList::from_der(&pkcs7.to_der().unwrap()).unwrap();
+            // A listed root rejected by its CTL entry got further than an unlisted root.
+            let err = roots.verify(&[], &[&roots.unlisted, &roots.disallowed]).unwrap_err();
+            assert!(matches!(err, AuthenticodeError::CaCertificateRevoked));
+            let err = roots.verify(&[&roots.disallowed], &[&roots.unlisted]).unwrap_err();
+            assert!(matches!(err, AuthenticodeError::CaCertificateRevoked));
 
-            let pkcs7 = Pkcs7::from_pem_str(SELF_SIGNED_PKCS7).unwrap();
-            let private_key = PrivateKey::from_pem_str(SELF_SIGNED_PKCS7_RSA_PRIVATE_KEY).unwrap();
-            let authenticode_signature =
-                AuthenticodeSignature::new(&pkcs7, FILE_HASH.to_vec(), ShaVariant::SHA2_256, &private_key, None)
-                    .unwrap();
-            let verify = |certificates: &[Cert], trusted_roots: &[Cert]| {
-                let validator = authenticode_signature.authenticode_verifier();
-                validator.trusted_roots(trusted_roots);
-                validator.h_verify_ca_certificate_against_ctl(&ctl, &leaf, certificates)
-            };
-
-            let certificates = [leaf.clone(), intermediate.clone()];
-            verify(&certificates, &[shallow_root.clone(), deep_root.clone()]).unwrap();
-            verify(
-                &[leaf.clone(), intermediate.clone(), shallow_root.clone(), deep_root],
-                &[],
-            )
-            .unwrap();
-
-            // The shallow root alone still reports the chain depth failure.
-            let err = verify(&certificates, &[shallow_root]).unwrap_err();
+            // A lone root that cannot complete the chain reports the chain failure.
+            let err = roots.verify(&[], &[&roots.shallow]).unwrap_err();
             assert!(matches!(err, AuthenticodeError::CertError(_)));
         }
 
         #[test]
         fn genuine_chain_with_embedded_root_is_trusted() {
             let (leaf, intermediate) = genuine_chain();
-            verify_against_ctl(&leaf, &[leaf.clone(), intermediate, microsoft_root()], &[]).unwrap();
+            verify_against_ctl(&authroot(), &leaf, &[leaf.clone(), intermediate, microsoft_root()], &[]).unwrap();
         }
 
         #[test]
         fn genuine_chain_without_root_is_rejected() {
             let (leaf, intermediate) = genuine_chain();
-            let err = verify_against_ctl(&leaf, &[leaf.clone(), intermediate], &[]).unwrap_err();
+            let err = verify_against_ctl(&authroot(), &leaf, &[leaf.clone(), intermediate], &[]).unwrap_err();
             assert!(matches!(err, AuthenticodeError::RootCertificateUnavailable));
         }
 
@@ -2770,10 +2718,10 @@ mod tests {
                 })
             }));
 
-            let err = verify_against_ctl(&leaf, &[leaf.clone(), root.clone()], &[]).unwrap_err();
+            let err = verify_against_ctl(&authroot(), &leaf, &[leaf.clone(), root.clone()], &[]).unwrap_err();
             assert!(matches!(err, AuthenticodeError::CAIsNotTrusted));
 
-            let err = verify_against_ctl(&leaf, &[leaf.clone()], &[root]).unwrap_err();
+            let err = verify_against_ctl(&authroot(), &leaf, &[leaf.clone()], &[root]).unwrap_err();
             assert!(matches!(err, AuthenticodeError::CAIsNotTrusted));
         }
 
@@ -2781,10 +2729,10 @@ mod tests {
         fn genuine_root_not_issuing_the_chain_is_rejected() {
             let (_, leaf) = impostor_chain();
 
-            let err = verify_against_ctl(&leaf, &[leaf.clone(), microsoft_root()], &[]).unwrap_err();
+            let err = verify_against_ctl(&authroot(), &leaf, &[leaf.clone(), microsoft_root()], &[]).unwrap_err();
             assert!(matches!(err, AuthenticodeError::RootCertificateUnavailable));
 
-            let err = verify_against_ctl(&leaf, &[leaf.clone()], &[microsoft_root()]).unwrap_err();
+            let err = verify_against_ctl(&authroot(), &leaf, &[leaf.clone()], &[microsoft_root()]).unwrap_err();
             assert!(matches!(err, AuthenticodeError::RootCertificateUnavailable));
         }
     }
