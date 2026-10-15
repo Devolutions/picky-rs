@@ -103,7 +103,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        crate: [ picky-asn1, picky-asn1-der, picky-asn1-x509, picky, picky-crypto, picky-crypto-rustcrypto ]
+        crate: [ picky-asn1, picky-asn1-der, picky-asn1-x509, picky, picky-crypto, picky-crypto-rustcrypto, picky-crypto-composed, picky-crypto-ffdh, picky-crypto-bundle ]
         include:
           - crate: picky-asn1
             msvc: "1.85"
@@ -116,6 +116,14 @@ jobs:
           - crate: picky-crypto
             msvc: "1.85"
           - crate: picky-crypto-rustcrypto
+            msvc: "1.85"
+            # Without features the crate builds only an empty provider.
+            args: --features all
+          - crate: picky-crypto-composed
+            msvc: "1.85"
+          - crate: picky-crypto-ffdh
+            msvc: "1.85"
+          - crate: picky-crypto-bundle
             msvc: "1.85"
             # Without features the crate builds only an empty provider.
             args: --features all
@@ -272,7 +280,7 @@ jobs:
         run: cargo --locked xtask check-vectors
 
       - name: Run conformance suite
-        run: cargo test --locked -p picky-crypto-conformance --features rustcrypto -- --show-output
+        run: cargo test --locked -p picky-crypto-conformance --features rustcrypto,bundle -- --show-output
 
       # ed25519-dalek's `legacy_compatibility` feature weakens the library's S < L check, so this run shows that the
       # adapter's own check rejects the Wycheproof S + L signatures.

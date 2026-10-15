@@ -79,6 +79,8 @@ macro_rules! pairs {
 }
 
 /// Returns the providers of every other backend combined with `with_fallback`, which supply reference ciphertexts to the decryption checks on inconsistent RSA keys.
+/// Providers registered under the same backend label, such as the bundle and the RustCrypto backend it contains, never
+/// serve as references for each other, because they share that backend's code.
 fn reference_provider(backend: &str) -> Option<&'static CryptoProvider> {
     static REFERENCES: OnceLock<Vec<(&'static str, Option<CryptoProvider>)>> = OnceLock::new();
     let references = REFERENCES.get_or_init(|| {
@@ -104,6 +106,9 @@ providers! {
     empty ("none") => empty(), Options::default();
     #[cfg(feature = "rustcrypto")]
     rustcrypto ("rustcrypto") => picky_crypto_rustcrypto::provider(), Options::default();
+    // The bundle's only backend is RustCrypto, so it carries that backend's label.
+    #[cfg(feature = "bundle")]
+    bundle ("rustcrypto") => picky_crypto_bundle::provider(), Options::default();
 }
 
 pairs! {
