@@ -4,7 +4,7 @@ use picky_crypto_testsuite::areas::ffdh::{
     FFC_FILE, below_modulus_minus_one, ffdh_exponent_boundaries, ffdh_parameter_boundaries,
 };
 use picky_crypto_testsuite::areas::private_key::{
-    CiphertextSource, derived_export, inconsistent_decryption, inconsistent_rsa, inconsistent_signatures,
+    CiphertextSource, SigningInputs, derived_export, inconsistent_decryption, inconsistent_rsa, inconsistent_signatures,
 };
 use picky_crypto_testsuite::areas::{key_generation, signature, signature::ed25519_undecodable_keys};
 use picky_crypto_testsuite::harness::{Checks, Expect, Options, without_failure_persistence};
@@ -983,6 +983,9 @@ fn inconsistent_signatures_cover_algorithms_without_generation_vectors() {
     let derived = SigningKey {
         signature: signature.clone(),
     };
+    // Signature-file keys never fall back to the reference provider's verifiers.
+    let mut options = Options::default();
+    options.reference_provider = Some(Box::leak(Box::new(signing_provider(&signature, true, &calls))));
     for verifiers in [true, false] {
         calls.lock().unwrap().clear();
         let provider = signing_provider(&signature, verifiers, &calls);
@@ -990,10 +993,13 @@ fn inconsistent_signatures_cover_algorithms_without_generation_vectors() {
         inconsistent_signatures(
             &mut c,
             &provider,
-            &base,
-            &derived,
+            options,
+            (&base, &derived),
             "inconsistent RSA routing",
-            (RSA_SIGN_FILES[0], group),
+            SigningInputs::Signatures {
+                file: RSA_SIGN_FILES[0],
+                group,
+            },
         );
         c.finish();
         let calls = calls.lock().unwrap();
@@ -1001,5 +1007,142 @@ fn inconsistent_signatures_cover_algorithms_without_generation_vectors() {
             let count = calls.iter().filter(|&&actual| actual == algorithm).count();
             assert_eq!(count, if verifiers { 2 } else { 0 }, "{algorithm:?}");
         }
+    }
+}
+
+/// Loads every RSA key as an [`EchoKey`] for its public key.
+struct EchoLoader {
+    wrong: bool,
+}
+/// Signs every RSA algorithm with `public || message`, with one byte flipped when `wrong` is set.
+struct EchoKey {
+    public: Vec<u8>,
+    wrong: bool,
+}
+/// Accepts exactly `public || message`, counting its calls.
+struct EchoVerifier {
+    algorithm: SignatureAlgorithm,
+    calls: Arc<AtomicUsize>,
+}
+impl PrivateKeyLoader for EchoLoader {
+    fn key_type(&self) -> KeyType {
+        KeyType::Rsa
+    }
+    fn fips(&self) -> bool {
+        false
+    }
+    fn load(&self, material: PrivateKeyMaterial<'_>) -> Result<Box<dyn PrivateKey>, Error> {
+        let PrivateKeyMaterial::Pkcs8(encoded) = material else {
+            return Err(Error::InvalidKey);
+        };
+        Ok(Box::new(EchoKey {
+            public: der::rsa_public(encoded),
+            wrong: self.wrong,
+        }))
+    }
+}
+impl PrivateKey for EchoKey {
+    fn key_type(&self) -> KeyType {
+        KeyType::Rsa
+    }
+    fn key_size_bits(&self) -> usize {
+        2048
+    }
+    fn fips(&self) -> bool {
+        false
+    }
+    fn supports(&self, operation: KeyOperation) -> bool {
+        matches!(operation, KeyOperation::Sign(_))
+    }
+    fn sign(&self, _: SignatureAlgorithm, message: &[u8]) -> Result<OutputBytes, Error> {
+        let mut signature = [self.public.as_slice(), message].concat();
+        signature[0] ^= u8::from(self.wrong);
+        Ok(OutputBytes::new(Zeroizing::new(signature)))
+    }
+}
+impl SignatureVerifier for EchoVerifier {
+    fn algorithm(&self) -> SignatureAlgorithm {
+        self.algorithm
+    }
+    fn fips(&self) -> bool {
+        false
+    }
+    fn verify(&self, public_key: PublicKey<'_>, message: &[u8], signature: &[u8]) -> Result<(), Error> {
+        self.calls.fetch_add(1, Ordering::Relaxed);
+        if signature == [public_key.0, message].concat() {
+            Ok(())
+        } else {
+            Err(Error::VerificationFailed)
+        }
+    }
+}
+
+/// Keys from RSA decryption files sign published messages, verified under the base key's public key by the provider's verifier, else by the reference provider's.
+/// The reference verifier is reachable only from decryption files, so its calls show those checks ran.
+#[rstest]
+#[case::reference_accepts(false, true)]
+#[case::own_rejects(true, false)]
+fn decryption_file_signatures_are_verified(#[case] own_rejects: bool, #[case] passes: bool) {
+    let calls = Arc::new(AtomicUsize::new(0));
+    let verifiers = |builder: ProviderBuilder| {
+        SIGNATURES[..8].iter().fold(builder, |builder, &algorithm| {
+            builder.with(Entry::SignatureVerifier(Arc::new(EchoVerifier {
+                algorithm,
+                calls: Arc::clone(&calls),
+            })))
+        })
+    };
+    let loader = Entry::PrivateKeyLoader(Arc::new(EchoLoader { wrong: own_rejects }));
+    let mut options = Options::default();
+    let provider = if own_rejects {
+        verifiers(CryptoProvider::builder().with(loader)).build().unwrap()
+    } else {
+        options.reference_provider = Some(Box::leak(Box::new(
+            verifiers(CryptoProvider::builder()).build().unwrap(),
+        )));
+        CryptoProvider::builder().with(loader).build().unwrap()
+    };
+    let mut c = Checks::default();
+    inconsistent_rsa(&mut c, &provider, options);
+    // A rejected signature fails both the base key's positive control and each derived key's own check.
+    for (file, _) in RSA_DECRYPT_FILES {
+        let failures: Vec<_> = c.failures.iter().filter(|f| f.starts_with(file)).collect();
+        for positive in [true, false] {
+            let failed = failures
+                .iter()
+                .any(|f| f.contains("/positive verification:") == positive);
+            assert_eq!(failed, !passes, "{file}: {failures:?}");
+        }
+    }
+    assert!(calls.load(Ordering::Relaxed) > 0);
+}
+
+/// Without any verifier, the base key's and the derived key's decryption-file signature checks each fail, even when the signatures agree.
+#[test]
+fn unverifiable_decryption_file_signatures_fail() {
+    let (file, _) = RSA_DECRYPT_FILES[0];
+    let corpus = v::wycheproof(file);
+    let test = &v::tests(&corpus.test_groups[0])[0];
+    let key = SigningKey { signature: vec![0] };
+    let mut c = Checks::default();
+    inconsistent_signatures(
+        &mut c,
+        &CryptoProvider::builder().build().unwrap(),
+        Options::default(),
+        (&key, &key),
+        "unverifiable",
+        SigningInputs::Messages {
+            file,
+            test,
+            public: &[],
+        },
+    );
+    for positive in [true, false] {
+        let unverified = c
+            .failures
+            .iter()
+            .filter(|f| f.contains("no verifier in the provider") && f.contains("/positive verification:") == positive)
+            .count();
+        assert_eq!(unverified, PARTIAL.len(), "{:?}", c.failures);
     }
 }

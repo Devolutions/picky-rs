@@ -836,6 +836,7 @@ For each of them, conformance tests assert that nothing panics and that the resu
   The expected plaintext is the published one for a published ciphertext, and the plaintext the suite encrypted for the other two sources.
   The check is never skipped: it fails if no source produces a ciphertext.
   Keys derived from base keys published only with signature vectors get decryption checks in the same way.
+  Keys derived from base keys published only with decryption vectors get signing checks on those vectors' published messages: with no published signature to pin the base key, a signature passes only if the provider's verifier, or else the conformance runner's reference verifier from another backend in the same build, accepts it, and the check fails if neither exists.
   Decryption returns [`Error::InvalidKey`] or the expected plaintext.
   The suite uses only published ciphertexts labeled valid, so every ciphertext from any of the three sources has valid padding, and [`Error::VerificationFailed`] is a conformance failure for it, because a decryption correct under (`n`, `e`) recovers the valid padding.
   Each backend is checked on its own; differential runs do not repeat this check or compare outcomes between backends.
