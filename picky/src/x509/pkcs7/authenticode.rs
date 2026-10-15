@@ -6,7 +6,7 @@ use crate::hash::{HashAlgorithm, UnsupportedHashAlgorithmError};
 use crate::key::PrivateKey;
 use crate::pem::Pem;
 use crate::signature::{SignatureAlgorithm, SignatureError};
-use crate::x509::certificate::{Cert, CertError, CertType, ValidityCheck};
+use crate::x509::certificate::{Cert, CertError, CertType, CertValidator, ValidityCheck};
 use crate::x509::date::UtcDate;
 use crate::x509::name::DirectoryName;
 #[cfg(feature = "ctl")]
@@ -703,30 +703,44 @@ impl<'a> AuthenticodeValidator<'a> {
         Ok(())
     }
 
-    fn h_verify_signing_certificate(&self, certificates: &[Cert]) -> AuthenticodeResult<()> {
+    /// Applies the configured validity date and date checks to `validator`.
+    fn h_apply_dates<'v, 'c, 'b, C: Iterator<Item = &'b Cert>>(
+        &self,
+        validator: &'v CertValidator<'c, 'b, C>,
+    ) -> &'v CertValidator<'c, 'b, C>
+    where
+        'a: 'c,
+    {
+        let inner = self.inner.borrow();
+
+        let validator = match inner.now {
+            Some(ValidityCheck::Exact(exact)) => validator.exact_date(exact),
+            Some(ValidityCheck::Interval { lower, upper }) => validator.interval_date(lower, upper),
+            None => validator,
+        };
+
+        let validator = if inner.strictness.require_not_after_check {
+            validator.require_not_after_check()
+        } else {
+            validator.ignore_not_after_check()
+        };
+
+        if inner.strictness.require_not_before_check {
+            validator.require_not_before_check()
+        } else {
+            validator.ignore_not_before_check()
+        }
+    }
+
+    /// Returns whether the chain was verified at the configured dates,
+    /// as opposed to not checked or exempted by a timestamp.
+    fn h_verify_signing_certificate(&self, certificates: &[Cert]) -> AuthenticodeResult<bool> {
         let signing_certificate = self.authenticode_signature.signing_certificate(certificates)?;
         let (path, roots) = h_split_signing_chain(signing_certificate, certificates);
         let cert_validator = signing_certificate.verifier();
+        let cert_validator = self.h_apply_dates(&cert_validator);
 
         let inner = self.inner.borrow();
-
-        let cert_validator = match inner.now {
-            Some(ValidityCheck::Exact(exact)) => cert_validator.exact_date(exact),
-            Some(ValidityCheck::Interval { lower, upper }) => cert_validator.interval_date(lower, upper),
-            None => &cert_validator,
-        };
-
-        let cert_validator = if inner.strictness.require_not_after_check {
-            cert_validator.require_not_after_check()
-        } else {
-            cert_validator.ignore_not_after_check()
-        };
-
-        let cert_validator = if inner.strictness.require_not_before_check {
-            cert_validator.require_not_before_check()
-        } else {
-            cert_validator.ignore_not_before_check()
-        };
 
         let result = if inner.strictness.require_chain_check {
             // Authenticode has the signer certificate and any intermediate certificates,
@@ -761,7 +775,7 @@ impl<'a> AuthenticodeValidator<'a> {
         };
 
         match result {
-            Ok(()) => Ok(()),
+            Ok(()) => Ok(inner.strictness.require_chain_check),
             Err(err) => {
                 // By default, timestamping an Authenticode signature extends the lifetime of the signature
                 // indefinitely, as long as that signature was timestamped, both:
@@ -796,7 +810,7 @@ impl<'a> AuthenticodeValidator<'a> {
                         };
 
                         if check_if_kp_time_stamping_present(certificates) && !kp_lifetime_signing_is_present {
-                            return Ok(());
+                            return Ok(false);
                         }
 
                         let unsigned_attributes = self.authenticode_signature.unauthenticated_attributes();
@@ -848,12 +862,17 @@ impl<'a> AuthenticodeValidator<'a> {
                                             #[cfg(feature = "ctl")]
                                             {
                                                 if let Some(ctl) = self.inner.borrow().ctl {
-                                                    self.h_verify_ca_certificate_against_ctl(ctl, leaf, &certificates)?;
+                                                    self.h_verify_ca_certificate_against_ctl(
+                                                        ctl,
+                                                        leaf,
+                                                        &certificates,
+                                                        false,
+                                                    )?;
                                                 }
                                             }
                                         }
 
-                                        return Ok(());
+                                        return Ok(false);
                                     }
                                 }
                                 UnsignedAttributeValue::CounterSign(_) => {}
@@ -867,12 +886,15 @@ impl<'a> AuthenticodeValidator<'a> {
         }
     }
 
+    /// With `check_root_dates`, the selected root must also be valid at the configured dates,
+    /// so that it is a root the signing certificate check accepts as well.
     #[cfg(feature = "ctl")]
     fn h_verify_ca_certificate_against_ctl(
         &self,
         ctl: &CertificateTrustList,
         leaf_certificate: &Cert,
         certificates: &[Cert],
+        check_root_dates: bool,
     ) -> AuthenticodeResult<()> {
         // The CTL pins roots by SHA-1 thumbprint, so the leaf must chain up to the actual root certificate.
         // An embedded root may be an unlisted reissue, so it goes through the same selection as the provided ones.
@@ -926,6 +948,14 @@ impl<'a> AuthenticodeValidator<'a> {
                 .require_chain_check()
                 .chain(full_chain)
                 .verify()
+                .and_then(|()| {
+                    if check_root_dates {
+                        let root_validator = root.verifier::<std::iter::Empty<&Cert>>();
+                        self.h_apply_dates(&root_validator).ignore_chain_check().verify()
+                    } else {
+                        Ok(())
+                    }
+                })
                 .map_err(AuthenticodeError::from)
                 .and_then(|()| Self::h_check_root_against_ctl_entries(root, ctl_entries));
             if result.is_ok() {
@@ -1057,9 +1087,12 @@ impl<'a> AuthenticodeValidator<'a> {
             self.h_verify_authenticode_basic(&certificates)?;
         }
 
-        if self.inner.borrow().strictness.require_signing_certificate_check {
-            self.h_verify_signing_certificate(&certificates)?;
-        }
+        #[cfg_attr(not(feature = "ctl"), allow(unused_variables))]
+        let chain_dates_verified = if self.inner.borrow().strictness.require_signing_certificate_check {
+            self.h_verify_signing_certificate(&certificates)?
+        } else {
+            false
+        };
 
         #[cfg(feature = "ctl")]
         if self.inner.borrow().strictness.require_ca_verification_against_ctl {
@@ -1069,7 +1102,12 @@ impl<'a> AuthenticodeValidator<'a> {
             let ca_name = h_get_ca_name(certificates_iter).unwrap();
 
             if let Some(ctl) = self.inner.borrow().ctl {
-                match self.h_verify_ca_certificate_against_ctl(ctl, signing_certificate, &certificates) {
+                match self.h_verify_ca_certificate_against_ctl(
+                    ctl,
+                    signing_certificate,
+                    &certificates,
+                    chain_dates_verified,
+                ) {
                     Ok(()) => {}
                     Err(err) => {
                         if !self
@@ -2600,16 +2638,18 @@ mod tests {
 
             let validator = authenticode_signature.authenticode_verifier();
             validator.trusted_roots(trusted_roots);
-            validator.h_verify_ca_certificate_against_ctl(ctl, leaf, certificates)
+            validator.h_verify_ca_certificate_against_ctl(ctl, leaf, certificates, false)
         }
 
         /// Runs the public verifier with the signing-certificate, chain, and CTL checks on a signature by
         /// `signer_key` that embeds `certificates` as is, the signer first.
+        /// Validity dates are checked only when a date is given.
         fn verify_signature(
             signer_key: &PrivateKey,
             certificates: &[Cert],
             ctl: &CertificateTrustList,
             trusted_roots: &[Cert],
+            date: Option<&UtcDate>,
         ) -> AuthenticodeResult<()> {
             let embed = |signed_data: &mut SignedData| {
                 signed_data.certificates.0.0 = certificates
@@ -2631,11 +2671,16 @@ mod tests {
                 .require_basic_authenticode_validation(FILE_HASH.to_vec())
                 .require_signing_certificate_check()
                 .require_chain_check()
-                .ignore_not_before_check()
-                .ignore_not_after_check()
                 .ctl(ctl)
                 .trusted_roots(trusted_roots)
                 .require_ca_against_ctl_check();
+            match date {
+                Some(date) => validator
+                    .require_not_before_check()
+                    .require_not_after_check()
+                    .exact_date(date),
+                None => validator.ignore_not_before_check().ignore_not_after_check(),
+            };
             validator.verify()
         }
 
@@ -2766,6 +2811,7 @@ mod tests {
                     &self.certificates(embedded_roots),
                     &self.ctl,
                     &trusted_roots,
+                    None,
                 )
             }
         }
@@ -2850,7 +2896,69 @@ mod tests {
             } else {
                 (vec![leaf, rollover], vec![old_root])
             };
-            verify_signature(&leaf_key, &certificates, &ctl, &trusted_roots).unwrap();
+            verify_signature(&leaf_key, &certificates, &ctl, &trusted_roots, None).unwrap();
+        }
+
+        #[rstest]
+        #[case::listed_root_expired(2010, false)]
+        #[case::listed_root_valid(2060, true)]
+        fn root_must_be_both_valid_and_listed_when_dates_are_checked(
+            #[case] listed_root_expiry: u16,
+            #[case] trusted: bool,
+        ) {
+            let root_key = PrivateKey::from_pem_str(picky_test_data::RSA_2048_PK_2).unwrap();
+            let intermediate_key = PrivateKey::from_pem_str(picky_test_data::RSA_2048_PK_3).unwrap();
+            let leaf_key = PrivateKey::from_pem_str(picky_test_data::RSA_2048_PK_4).unwrap();
+            let root = |not_before: u16, not_after: u16| {
+                CertificateBuilder::new()
+                    .validity(
+                        UtcDate::ymd(not_before, 1, 1).unwrap(),
+                        UtcDate::ymd(not_after, 1, 1).unwrap(),
+                    )
+                    .self_signed(DirectoryName::new_common_name("Reissued Root"), &root_key)
+                    .ca(true)
+                    .key_id_gen_method(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_256))
+                    .build()
+                    .unwrap()
+            };
+            // The unlisted root is valid at the verification date, the listed one only in some cases.
+            let unlisted = root(2020, 2060);
+            let listed = root(2000, listed_root_expiry);
+            let intermediate = CertificateBuilder::new()
+                .validity(UtcDate::ymd(2022, 1, 1).unwrap(), UtcDate::ymd(2060, 1, 1).unwrap())
+                .subject(
+                    DirectoryName::new_common_name("Intermediate"),
+                    intermediate_key.to_public_key().unwrap(),
+                )
+                .issuer_cert(&unlisted, &root_key)
+                .ca(true)
+                .key_id_gen_method(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_256))
+                .build()
+                .unwrap();
+            let leaf = CertificateBuilder::new()
+                .validity(UtcDate::ymd(2022, 1, 1).unwrap(), UtcDate::ymd(2060, 1, 1).unwrap())
+                .subject(
+                    DirectoryName::new_common_name("Leaf"),
+                    leaf_key.to_public_key().unwrap(),
+                )
+                .issuer_cert(&intermediate, &intermediate_key)
+                .key_id_gen_method(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_256))
+                .build()
+                .unwrap();
+            let ctl = authroot_with(vec![ctl_entry(&listed, vec![])]);
+
+            let result = verify_signature(
+                &leaf_key,
+                &[leaf, intermediate, unlisted, listed],
+                &ctl,
+                &[],
+                Some(&UtcDate::ymd(2030, 1, 1).unwrap()),
+            );
+            if trusted {
+                result.unwrap();
+            } else {
+                assert!(matches!(result, Err(AuthenticodeError::CAIsNotTrusted)));
+            }
         }
 
         #[rstest]
