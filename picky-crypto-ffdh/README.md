@@ -3,8 +3,12 @@
 Finite-field Diffie-Hellman for the [picky-crypto contract], implemented over crypto-bigint.
 This is a fill-in provider: no reference library offers FFDH in the form the contract requires, so this crate implements it for any base provider.
 Call `picky_crypto_ffdh::provider(&base)` with the provider whose secure random entry ephemeral exponents should come from; it is the only randomness this provider uses.
-The entry is taken when `provider` runs, and the provider is empty when `base` has no secure random entry.
-Otherwise it has two entries: ephemeral agreement (`FfdhKeyAgreement`) and loading of static keys (`PrivateKeyLoader` for `KeyType::Ffdh`).
+
+Each entry exists when what it needs exists:
+
+- loading of static keys (`PrivateKeyLoader` for `KeyType::Ffdh`) needs no randomness and is always present;
+- ephemeral agreement (`FfdhKeyAgreement`) is present only when `base` has a secure random entry, which `provider` takes when it runs.
+
 Loaded keys support static agreement only; like every FFDH key, they don't export a public key.
 Both entries and every loaded key report `fips() == false`, because FFDH with arbitrary groups is not FIPS-approved.
 

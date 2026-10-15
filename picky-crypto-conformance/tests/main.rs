@@ -19,6 +19,7 @@ macro_rules! area_tests {
 }
 
 /// Defines one test per differential area, calling the enclosing module's `providers_under_test`.
+#[expect(unused_macros, reason = "`pairs!` has no entry while only one backend exists")]
 macro_rules! differential_tests {
     ($($area:ident),+) => {
         $(
@@ -61,9 +62,9 @@ macro_rules! providers {
     };
 }
 
-/// Defines a module per provider pair, with one test per differential area.
+/// Defines a module per pair of distinct backends, with one test per differential area.
 macro_rules! pairs {
-    ($($name:ident => ($a:expr, $b:expr);)+) => {
+    ($($name:ident => ($a:expr, $b:expr);)*) => {
         $(
             mod $name {
                 use super::*;
@@ -74,7 +75,7 @@ macro_rules! pairs {
 
                 picky_crypto_testsuite::for_each_differential_area!(differential_tests);
             }
-        )+
+        )*
     };
 }
 
@@ -111,6 +112,5 @@ providers! {
     bundle ("rustcrypto") => picky_crypto_bundle::provider(), Options::default();
 }
 
-pairs! {
-    empty_empty => (empty(), empty());
-}
+// With RustCrypto as the only backend, there is no pair of distinct backends.
+pairs! {}

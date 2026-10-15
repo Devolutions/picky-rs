@@ -1,4 +1,6 @@
 //! Finite-field Diffie-Hellman entries for the picky cryptographic provider contract, implemented over crypto-bigint.
+//! Each entry exists when what it needs exists: static key loading always, ephemeral agreement only over a base
+//! provider with a secure random entry.
 //! See the crate README for the checks, the capacity limit and the exponent generation.
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -24,18 +26,17 @@ use picky_crypto::{
 };
 use std::sync::Arc;
 
-/// Builds the FFDH provider over `base`'s secure random entry: ephemeral agreement and static key loading.
-/// The entry is taken when this function runs, and ephemeral exponents come only from it.
-/// The provider is empty when `base` has no secure random entry.
+/// Builds the FFDH provider over `base`: static key loading and, when `base` has a secure random entry, ephemeral
+/// agreement.
+/// Static keys need no randomness, so the loader is always present; ephemeral agreement draws its exponents only from
+/// `base`'s secure random entry, taken when this function runs.
 /// Both entries, and every key the loader returns, report `fips() == false`.
 pub fn provider(base: &CryptoProvider) -> CryptoProvider {
-    let builder = CryptoProvider::builder();
+    let builder = CryptoProvider::builder().with(Entry::PrivateKeyLoader(Arc::new(Loader)));
     let builder = match base.get(Algorithm::Random(RandomAlgorithm::SecureRandom)) {
-        Some(Entry::SecureRandom(random)) => builder
-            .with(Entry::FfdhKeyAgreement(Arc::new(Agreement {
-                random: Arc::clone(random),
-            })))
-            .with(Entry::PrivateKeyLoader(Arc::new(Loader))),
+        Some(Entry::SecureRandom(random)) => builder.with(Entry::FfdhKeyAgreement(Arc::new(Agreement {
+            random: Arc::clone(random),
+        }))),
         _ => builder,
     };
     builder.build().expect("at most two distinct FFDH entries")
@@ -229,15 +230,24 @@ pub(crate) mod tests {
         );
     }
 
-    // Faults: an entry reports FIPS approval, the provider has an entry other than its two FFDH entries, or it has
-    // entries over a base without a secure random entry.
+    // Faults: an entry reports FIPS approval, the provider has an entry other than its two FFDH entries, ephemeral
+    // agreement exists over a base without a secure random entry, or the loader is omitted there.
     #[test]
     fn entries_follow_the_base_random_entry() {
+        let algorithms = |provider: &CryptoProvider| {
+            let mut algorithms = provider.entries().map(helpers::entry_algorithm).collect::<Vec<_>>();
+            algorithms.sort_by_key(|algorithm| matches!(algorithm, Algorithm::KeyAgreement(_)));
+            algorithms
+        };
+        let loader = Algorithm::PrivateKeyLoading(KeyType::Ffdh);
         let provider = ffdh([]);
-        assert_eq!(provider.entries().count(), 2);
+        assert_eq!(
+            algorithms(&provider),
+            [loader, Algorithm::KeyAgreement(KeyAgreementAlgorithm::Ffdh)]
+        );
         assert!(!provider.entries().any(helpers::entry_fips));
-        let empty = CryptoProvider::builder().build().unwrap();
-        assert_eq!(super::provider(&empty).entries().count(), 0);
+        let without_random = super::provider(&CryptoProvider::builder().build().unwrap());
+        assert_eq!(algorithms(&without_random), [loader]);
     }
 
     // Faults: the minimum size check or `key_size_bits` counts whole bytes instead of bits, or the capacity limit is

@@ -8,8 +8,9 @@ use picky_crypto::CryptoProvider;
 /// Builds the composition of the enabled features.
 /// The enabled backends come first, in the fixed order aws-lc, ring, RustCrypto, each a fallback for the previous ones.
 /// With `composed`, the key-based KDFs built over those backends follow.
-/// With `ffdh`, FFDH drawing from the first secure random entry among the enabled backends comes last.
-/// A fill-in provider whose base entries no enabled backend offers adds nothing.
+/// With `ffdh`, FFDH comes last: its static key loader always, and its ephemeral agreement drawing from the first
+/// secure random entry among the enabled backends.
+/// Each fill-in entry is added only when the entries it is built from exist.
 /// It installs nothing and applies no policy.
 pub fn provider() -> CryptoProvider {
     // UNTESTED: backends are composed in the fixed order aws-lc, ring, RustCrypto, then the composed KDFs, then FFDH.
@@ -45,7 +46,8 @@ mod tests {
         let backend = cfg!(feature = "rustcrypto");
         let expected = native
             + 8 * usize::from(backend && cfg!(feature = "composed"))
-            + 2 * usize::from(backend && cfg!(feature = "ffdh"));
+            + usize::from(cfg!(feature = "ffdh"))
+            + usize::from(backend && cfg!(feature = "ffdh"));
         assert_eq!(super::provider().entries().count(), expected);
     }
 }

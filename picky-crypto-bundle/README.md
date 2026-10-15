@@ -16,9 +16,10 @@ The crate contains no cryptographic code and installs nothing itself.
 
 1. the enabled backends, in the order aws-lc, ring, RustCrypto (only RustCrypto is available);
 2. with `composed`, [picky-crypto-composed] built over those backends, which adds the key-based KDFs;
-3. with `ffdh`, [picky-crypto-ffdh] using the first secure random entry among those backends, which adds FFDH.
+3. with `ffdh`, [picky-crypto-ffdh], which adds the FFDH static key loader and ephemeral agreement using the first secure random entry among those backends.
 
-A fill-in provider whose base entries no enabled backend offers adds nothing; without a backend, the provider is empty.
+Each fill-in entry is added only when the entries it is built from exist.
+Without a backend, the provider therefore holds only the FFDH static key loader with `ffdh`, and is empty otherwise.
 Features are additive: enabling one only adds members, so dependents enabling different features still get one deterministic provider.
 
 Composition picks one member per algorithm, and per protection for MAC, cipher, AEAD and key-wrap entries, never per input (contract section 8.1).
@@ -39,7 +40,7 @@ Nothing is enabled by default.
 |---|---|
 | `rustcrypto` | [picky-crypto-rustcrypto] with its `all` feature |
 | `composed` | One-step KDFs with SHA-1/256/384/512 and counter-mode KDFs with HMAC-SHA-1/256/384/512, over the enabled backends |
-| `ffdh` | FFDH ephemeral agreement and static key loading, when an enabled backend has a secure random entry |
+| `ffdh` | FFDH static key loading, and ephemeral agreement when an enabled backend has a secure random entry |
 | `all` | Every feature above |
 
 Each backend feature enables the whole backend.
