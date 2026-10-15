@@ -524,6 +524,7 @@ impl<'a> AuthenticodeValidator<'a> {
     }
 
     /// Root candidates besides the embedded ones; a root is trusted only if it issued the chain and is in the CTL.
+    /// When the signature embeds roots, these can also complete its chain for the signing certificate check.
     #[cfg(feature = "ctl")]
     #[inline]
     pub fn trusted_roots(&self, trusted_roots: &'a [Cert]) -> &Self {
@@ -704,6 +705,7 @@ impl<'a> AuthenticodeValidator<'a> {
 
     fn h_verify_signing_certificate(&self, certificates: &[Cert]) -> AuthenticodeResult<()> {
         let signing_certificate = self.authenticode_signature.signing_certificate(certificates)?;
+        let (path, roots) = h_split_signing_chain(signing_certificate, certificates);
         let cert_validator = signing_certificate.verifier();
 
         let inner = self.inner.borrow();
@@ -726,18 +728,39 @@ impl<'a> AuthenticodeValidator<'a> {
             cert_validator.ignore_not_before_check()
         };
 
-        let cert_validator = if inner.strictness.require_chain_check {
-            let certificate_iter = SignatureCertificatesIterator::new(signing_certificate, certificates.iter());
-            cert_validator
-                // Authenticode has the signer certificate and any intermediate certificates,
-                // but typically does not contain the root
-                .chain_should_contains_root_certificate(false)
-                .chain(certificate_iter.filter(|cert| cert.subject_name() != signing_certificate.subject_name()))
+        let result = if inner.strictness.require_chain_check {
+            // Authenticode has the signer certificate and any intermediate certificates,
+            // but typically does not contain the root
+            cert_validator.chain_should_contains_root_certificate(false);
+            let verify_up_to = |root| cert_validator.chain(path.iter().copied().chain(root)).verify();
+
+            #[cfg(feature = "ctl")]
+            let trusted_roots = inner.trusted_roots;
+            #[cfg(not(feature = "ctl"))]
+            let trusted_roots: &[Cert] = &[];
+
+            if roots.is_empty() {
+                verify_up_to(None)
+            } else {
+                // Embedded roots can be same-name reissues that are all equally untrusted,
+                // so the path holds if any embedded or provided root completes it.
+                let mut attempts = roots
+                    .iter()
+                    .copied()
+                    .chain(trusted_roots)
+                    .map(|root| verify_up_to(Some(root)));
+                let first = attempts.next().expect("roots is not empty");
+                if first.is_err() && attempts.any(|result| result.is_ok()) {
+                    Ok(())
+                } else {
+                    first
+                }
+            }
         } else {
-            cert_validator.ignore_chain_check()
+            cert_validator.ignore_chain_check().verify()
         };
 
-        match cert_validator.verify() {
+        match result {
             Ok(()) => Ok(()),
             Err(err) => {
                 // By default, timestamping an Authenticode signature extends the lifetime of the signature
@@ -852,19 +875,13 @@ impl<'a> AuthenticodeValidator<'a> {
         certificates: &[Cert],
     ) -> AuthenticodeResult<()> {
         // The CTL pins roots by SHA-1 thumbprint, so the leaf must chain up to the actual root certificate.
-        let mut chain = SignatureCertificatesIterator::new(leaf_certificate, certificates.iter())
-            .filter(|cert| cert.subject_name() != leaf_certificate.subject_name())
-            .collect::<Vec<&Cert>>();
+        // An embedded root may be an unlisted reissue, so it goes through the same selection as the provided ones.
+        let (chain, _) = h_split_signing_chain(leaf_certificate, certificates);
 
         let ctl_entries = ctl.ctl_entries()?;
 
-        // An embedded root may be an unlisted reissue, so it goes through the same selection as the provided ones.
-        while chain.last().is_some_and(|cert| cert.ty() == CertType::Root) {
-            chain.pop();
-        }
-
         let top = chain.last().copied().unwrap_or(leaf_certificate);
-        let candidates = if top.ty() == CertType::Root {
+        let candidates = if h_is_self_signed(top) {
             vec![top]
         } else {
             // Roots can share a name or a key, so only consider the ones whose key signed the top certificate.
@@ -872,7 +889,7 @@ impl<'a> AuthenticodeValidator<'a> {
             certificates
                 .iter()
                 .chain(trusted_roots.iter())
-                .filter(|cert| cert.ty() == CertType::Root && cert.subject_name() == top.issuer_name())
+                .filter(|cert| cert.subject_name() == top.issuer_name() && h_is_self_signed(cert))
                 .filter(|root| {
                     top.verifier()
                         .ignore_not_before_check()
@@ -1108,6 +1125,36 @@ fn h_get_ca_name<'i, I: Iterator<Item = &'i Cert>>(mut certificates: I) -> Optio
     } else {
         first_certificate
     }
+}
+
+/// Whether `cert` is a root signed by its own key.
+/// A self-issued key-rollover certificate carries a root name, but the previous key signed it.
+fn h_is_self_signed(cert: &Cert) -> bool {
+    cert.ty() == CertType::Root
+        && cert
+            .verifier()
+            .ignore_not_before_check()
+            .ignore_not_after_check()
+            .require_chain_check()
+            .chain(std::iter::once(cert))
+            .verify()
+            .is_ok()
+}
+
+/// Splits the certificates above `signing_certificate` into its issuer path and the self-signed roots ending it.
+fn h_split_signing_chain<'c>(
+    signing_certificate: &'c Cert,
+    certificates: &'c [Cert],
+) -> (Vec<&'c Cert>, Vec<&'c Cert>) {
+    let mut path = SignatureCertificatesIterator::new(signing_certificate, certificates.iter())
+        .filter(|cert| cert.subject_name() != signing_certificate.subject_name())
+        .collect::<Vec<&Cert>>();
+    let roots_start = path
+        .iter()
+        .rposition(|cert| !h_is_self_signed(cert))
+        .map_or(0, |index| index + 1);
+    let roots = path.split_off(roots_start);
+    (path, roots)
 }
 
 struct SignatureCertificatesIterator<'i> {
@@ -2556,6 +2603,42 @@ mod tests {
             validator.h_verify_ca_certificate_against_ctl(ctl, leaf, certificates)
         }
 
+        /// Runs the public verifier with the signing-certificate, chain, and CTL checks on a signature by
+        /// `signer_key` that embeds `certificates` as is, the signer first.
+        fn verify_signature(
+            signer_key: &PrivateKey,
+            certificates: &[Cert],
+            ctl: &CertificateTrustList,
+            trusted_roots: &[Cert],
+        ) -> AuthenticodeResult<()> {
+            let embed = |signed_data: &mut SignedData| {
+                signed_data.certificates.0.0 = certificates
+                    .iter()
+                    .map(|cert| {
+                        CertificateChoices::Certificate(picky_asn1_der::from_bytes(&cert.to_der().unwrap()).unwrap())
+                    })
+                    .collect();
+            };
+            let mut pkcs7 = Pkcs7::from_pem_str(SELF_SIGNED_PKCS7).unwrap();
+            embed(&mut pkcs7.0.signed_data);
+            let mut signature =
+                AuthenticodeSignature::new(&pkcs7, FILE_HASH.to_vec(), ShaVariant::SHA2_256, signer_key, None).unwrap();
+            // `new` drops root certificates, which these tests need to embed.
+            embed(&mut signature.0.0.signed_data);
+
+            let validator = signature.authenticode_verifier();
+            validator
+                .require_basic_authenticode_validation(FILE_HASH.to_vec())
+                .require_signing_certificate_check()
+                .require_chain_check()
+                .ignore_not_before_check()
+                .ignore_not_after_check()
+                .ctl(ctl)
+                .trusted_roots(trusted_roots)
+                .require_ca_against_ctl_check();
+            validator.verify()
+        }
+
         /// Roots sharing one name and key above a leaf and its intermediate.
         /// Only their thumbprint and CTL entry tell them apart.
         struct ReissuedRoots {
@@ -2565,6 +2648,7 @@ mod tests {
             shallow: Cert,
             intermediate: Cert,
             leaf: Cert,
+            leaf_key: PrivateKey,
             ctl: CertificateTrustList,
         }
 
@@ -2644,6 +2728,7 @@ mod tests {
                     shallow,
                     intermediate,
                     leaf,
+                    leaf_key,
                     ctl,
                 }
             }
@@ -2656,14 +2741,32 @@ mod tests {
                 }
             }
 
-            fn verify(&self, embedded_roots: &[&Cert], trusted_roots: &[&Cert]) -> AuthenticodeResult<()> {
-                let certificates = [&self.leaf, &self.intermediate]
+            fn certificates(&self, embedded_roots: &[&Cert]) -> Vec<Cert> {
+                [&self.leaf, &self.intermediate]
                     .into_iter()
                     .chain(embedded_roots.iter().copied())
                     .cloned()
-                    .collect::<Vec<Cert>>();
+                    .collect()
+            }
+
+            fn verify(&self, embedded_roots: &[&Cert], trusted_roots: &[&Cert]) -> AuthenticodeResult<()> {
                 let trusted_roots = trusted_roots.iter().copied().cloned().collect::<Vec<Cert>>();
-                verify_against_ctl(&self.ctl, &self.leaf, &certificates, &trusted_roots)
+                verify_against_ctl(
+                    &self.ctl,
+                    &self.leaf,
+                    &self.certificates(embedded_roots),
+                    &trusted_roots,
+                )
+            }
+
+            fn verify_signature(&self, embedded_roots: &[&Cert], trusted_roots: &[&Cert]) -> AuthenticodeResult<()> {
+                let trusted_roots = trusted_roots.iter().copied().cloned().collect::<Vec<Cert>>();
+                verify_signature(
+                    &self.leaf_key,
+                    &self.certificates(embedded_roots),
+                    &self.ctl,
+                    &trusted_roots,
+                )
             }
         }
 
@@ -2678,9 +2781,9 @@ mod tests {
 
             // The ineligible sibling comes first, so the selection has to move past it.
             match placement {
-                Placement::Provided => roots.verify(&[], &[sibling, eligible]),
-                Placement::EmbeddedSibling => roots.verify(&[sibling], &[eligible]),
-                Placement::EmbeddedBoth => roots.verify(&[sibling, eligible], &[]),
+                Placement::Provided => roots.verify_signature(&[], &[sibling, eligible]),
+                Placement::EmbeddedSibling => roots.verify_signature(&[sibling], &[eligible]),
+                Placement::EmbeddedBoth => roots.verify_signature(&[sibling, eligible], &[]),
             }
             .unwrap();
         }
@@ -2703,6 +2806,51 @@ mod tests {
                     source: CaChainError::TooDeep { pathlen: 0, .. }
                 })
             ));
+        }
+
+        #[rstest]
+        #[case::embedded(true)]
+        #[case::provided(false)]
+        fn key_rollover_certificate_chains_up_to_the_listed_old_root(#[case] embedded: bool) {
+            let old_key = PrivateKey::from_pem_str(picky_test_data::RSA_2048_PK_2).unwrap();
+            let new_key = PrivateKey::from_pem_str(picky_test_data::RSA_2048_PK_3).unwrap();
+            let leaf_key = PrivateKey::from_pem_str(picky_test_data::RSA_2048_PK_4).unwrap();
+            let root_name = DirectoryName::new_common_name("Rollover Root");
+
+            let old_root = CertificateBuilder::new()
+                .validity(UtcDate::ymd(2020, 1, 1).unwrap(), UtcDate::ymd(2060, 1, 1).unwrap())
+                .self_signed(root_name.clone(), &old_key)
+                .ca(true)
+                .key_id_gen_method(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_256))
+                .build()
+                .unwrap();
+            // Self-issued but not self-signed: the old key certifies the new one under the same name.
+            let rollover = CertificateBuilder::new()
+                .validity(UtcDate::ymd(2022, 1, 1).unwrap(), UtcDate::ymd(2060, 1, 1).unwrap())
+                .subject(root_name, new_key.to_public_key().unwrap())
+                .issuer_cert(&old_root, &old_key)
+                .ca(true)
+                .key_id_gen_method(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_256))
+                .build()
+                .unwrap();
+            let leaf = CertificateBuilder::new()
+                .validity(UtcDate::ymd(2022, 1, 1).unwrap(), UtcDate::ymd(2060, 1, 1).unwrap())
+                .subject(
+                    DirectoryName::new_common_name("Leaf"),
+                    leaf_key.to_public_key().unwrap(),
+                )
+                .issuer_cert(&rollover, &new_key)
+                .key_id_gen_method(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_256))
+                .build()
+                .unwrap();
+            let ctl = authroot_with(vec![ctl_entry(&old_root, vec![])]);
+
+            let (certificates, trusted_roots) = if embedded {
+                (vec![leaf, rollover, old_root], vec![])
+            } else {
+                (vec![leaf, rollover], vec![old_root])
+            };
+            verify_signature(&leaf_key, &certificates, &ctl, &trusted_roots).unwrap();
         }
 
         #[rstest]
