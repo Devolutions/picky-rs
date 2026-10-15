@@ -769,22 +769,23 @@ Protocol-specific constructions (Kerberos n-fold, ciphertext stealing and RFC 39
 ## 11. Providers built around the contract
 
 The contract does not depend on any of the following; they are described here because the semantics above refer to their roles.
-Fill-in providers implement algorithms that a backend's library lacks: they build on any base provider's entries, report false through [`CryptoProvider::fips`] and are not backend adapters.
+Fill-in providers implement algorithms that some backend's library lacks: they build on any base provider's entries, report false through [`CryptoProvider::fips`] and are not backend adapters.
 
 - **Fill-in provider built from other providers' entries.**
-  A provider may build entries from another provider's contract entries, for algorithms that a backend's library lacks: the key-based KDFs (section 6.4), the one-step KDF from [`Hash`] entries and the counter-mode KDF from [`Mac`] entries.
+  It builds the key-based KDFs (section 6.4): the one-step KDF from [`Hash`] entries and the counter-mode KDF from [`Mac`] entries.
   The counter-mode KDF takes each PRF block from a [`MacGeneration`] with [`MacTag::into_inner`], requiring [`Protection::Apply`] from those entries; policy judges the resulting [`Kdf`] entry independently (section 6.4).
-  Such a provider takes the entries it builds on explicitly at construction, contains no other cryptographic code, and reports false through [`CryptoProvider::fips`], so the FIPS policy rejects any provider composed with it.
+  It takes the base provider whose entries it builds on at construction, builds only the KDFs whose entries the base provides, contains no other cryptographic code, and reports false through [`CryptoProvider::fips`], so the FIPS policy rejects any provider composed with it.
   An entry of this kind exists only while some backend's library lacks the algorithm natively.
 - **FFDH fill-in provider.**
   Finite-field Diffie-Hellman, which the reference libraries do not offer in the form section 6.11 requires, comes from a provider implemented over a constant-time big-integer library.
-  It takes another provider's [`SecureRandom`] entry at construction, because it has no randomness of its own, and reports false through [`CryptoProvider::fips`].
+  It uses the base provider's [`SecureRandom`] entry, taken at construction, because it has no randomness of its own, and has no entries when the base has none.
 - **Bundle crate.**
   A fixed, documented composition, with no default features: each backend and each fill-in provider is behind its own feature.
-  Its provider holds every enabled backend in a fixed order (aws-lc-rs, then ring, then RustCrypto), each a fallback for the previous (section 8.1), then the enabled fill-in providers: the key-based KDFs built over that composition, then the FFDH provider using the first [`SecureRandom`] entry available.
+  Its provider holds every enabled backend in a fixed order (aws-lc-rs, then ring, then RustCrypto), each a fallback for the previous (section 8.1), then the enabled fill-in providers, each built over that composition: the key-based KDFs, then FFDH.
   Fill-in entries come last, so a backend's native entry always wins.
   Enabling a feature never removes an advertised algorithm or protection, so features are additive at the granularity of advertisement (section 8.1).
   Each entry still shadows later ones for every input of an operation it advertises (section 8.1), so enabling a backend can make the provider refuse inputs outside the must-support set that a later backend or a fill-in provider accepted.
+  A binary that needs key sizes an earlier backend refuses, such as RSA key sizes aws-lc-rs refuses, composes its own provider with RustCrypto first.
   It contains no cryptographic code and installs nothing itself.
   It is a non-FIPS convenience that applies no policy: FIPS binaries install a FIPS backend behind the FIPS policy explicitly.
   It is what the convenience features of consuming libraries install (section 9).
