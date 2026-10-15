@@ -317,7 +317,7 @@ where
     deserializer.deserialize_seq(Visitor(std::marker::PhantomData))
 }
 
-/// A Vec<u8> wrapper for Asn1 encoding as OctetString.
+/// A `Vec<u8>` wrapper for Asn1 encoding as OctetString.
 #[derive(Serialize, Deserialize, PartialEq, Eq, PartialOrd, Hash, Clone, Default)]
 pub struct OctetStringAsn1(#[serde(with = "serde_bytes")] pub Vec<u8>);
 
