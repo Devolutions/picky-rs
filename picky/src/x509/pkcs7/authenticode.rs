@@ -929,7 +929,7 @@ impl<'a> AuthenticodeValidator<'a> {
                         .attributes
                         .0
                         .iter()
-                        .find(|attr| matches!(attr.value, CTLEntryAttributeValues::UnknownReservedPropId126(_)))
+                        .find(|attr| matches!(attr.value, CTLEntryAttributeValues::UnknownReservedPropId127(_)))
                         .map(|attr| &attr.value)
                 {
                     let set_of_eku_oids = set_of_eku_oids.0.first().expect(
@@ -2379,5 +2379,75 @@ mod tests {
             .exact_date(&time);
 
         validator.verify().unwrap();
+    }
+
+    #[cfg(feature = "ctl")]
+    #[test]
+    fn ctl_not_before_applies_only_to_listed_ekus() {
+        use picky_asn1::wrapper::{Asn1SequenceOf, OctetStringAsn1Container};
+        use picky_asn1_x509::pkcs7::ctl::{CTLEntry, CTLEntryAttribute};
+
+        // 2100-01-01T00:00:00Z as a Windows FILETIME: 100 ns intervals since 1601-01-01.
+        const FUTURE_FILETIME: i64 = (4_102_444_800 + 11_644_473_600) * 10_000_000;
+
+        let ca_name = DirectoryName::new_common_name("CTL NotBefore Test Root");
+        let ca_name_md5 = HashAlgorithm::MD5.digest(&picky_asn1_der::to_vec(&Name::from(ca_name.clone())).unwrap());
+
+        let pkcs7 = Pkcs7::from_pem_str(SELF_SIGNED_PKCS7).unwrap();
+        let private_key = PrivateKey::from_pem_str(SELF_SIGNED_PKCS7_RSA_PRIVATE_KEY).unwrap();
+        let authenticode_signature =
+            AuthenticodeSignature::new(&pkcs7, FILE_HASH.to_vec(), ShaVariant::SHA2_256, &private_key, None).unwrap();
+
+        let verify = |not_before_ekus: Option<Vec<ObjectIdentifierAsn1>>| {
+            let mut attributes = vec![
+                CTLEntryAttribute {
+                    oid: oids::cert_subject_name_md5_hash_prop_id().into(),
+                    value: CTLEntryAttributeValues::CertSubjectNameMd5HashPropId(Asn1SetOf(vec![
+                        ca_name_md5.clone().into(),
+                    ])),
+                },
+                CTLEntryAttribute {
+                    oid: oids::unknown_reserved_prop_id_126().into(),
+                    value: CTLEntryAttributeValues::UnknownReservedPropId126(Asn1SetOf(vec![
+                        FUTURE_FILETIME.to_le_bytes().to_vec().into(),
+                    ])),
+                },
+            ];
+            if let Some(ekus) = not_before_ekus {
+                attributes.push(CTLEntryAttribute {
+                    oid: oids::unknown_reserved_prop_id_127().into(),
+                    value: CTLEntryAttributeValues::UnknownReservedPropId127(Asn1SetOf(vec![
+                        OctetStringAsn1Container(Asn1SequenceOf(ekus)),
+                    ])),
+                });
+            }
+
+            let mut ctl_pkcs7 = Pkcs7::from_der(picky_test_data::CERTIFICATE_TRUST_LIST).unwrap();
+            let content = ctl_pkcs7.0.signed_data.content_info.content.as_mut().unwrap();
+            let ContentValue::CertificateTrustList(ctl) = &mut content.0 else {
+                panic!("not a CTL");
+            };
+            ctl.crl_entries.0.push(CTLEntry {
+                cert_fingerprint: vec![0; 20].into(),
+                attributes: Asn1SetOf(attributes),
+            });
+            let ctl = CertificateTrustList::from_der(&ctl_pkcs7.to_der().unwrap()).unwrap();
+
+            authenticode_signature
+                .authenticode_verifier()
+                .h_verify_ca_certificate_against_ctl(&ctl, &ca_name)
+        };
+
+        let err = verify(None).unwrap_err();
+        assert!(matches!(err, AuthenticodeError::CaCertificateNotYetValid { .. }));
+
+        verify(Some(vec![oids::kp_server_auth().into()])).unwrap();
+
+        let err = verify(Some(vec![
+            oids::kp_server_auth().into(),
+            oids::kp_code_signing().into(),
+        ]))
+        .unwrap_err();
+        assert!(matches!(err, AuthenticodeError::CaCertificateNotYetValid { .. }));
     }
 }
