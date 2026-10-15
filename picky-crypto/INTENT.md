@@ -83,7 +83,7 @@ For example, a binary may add a fallback from one provider to another for algori
 No provider ever falls back to another implicitly.
 
 Fill-in providers implement what some backend's library lacks; they are generic over any base, report `fips()` false and are not adapters.
-The thin-adapter rule applies to backends only.
+The workaround definition above applies to backends only.
 
 Private keys are trait objects.
 Hardware and external keys (smartcards, PKCS#11, CNG, TPM) implement the private key trait directly, without going through a provider.
