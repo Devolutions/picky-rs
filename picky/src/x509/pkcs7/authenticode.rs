@@ -2462,14 +2462,20 @@ mod tests {
     #[cfg(feature = "ctl")]
     mod ctl_trust_anchor {
         use super::*;
+        use crate::x509::certificate::{CaChainError, CertError};
         use picky_asn1_x509::content_info::ContentValue;
         use picky_asn1_x509::pkcs7::ctl::CTLEntryAttribute;
         use rstest::rstest;
+
+        // FILETIME counts 100 ns intervals since 1601-01-01 UTC (MS-DTYP 2.3.3).
+        const FILETIME_2020_01_01: u64 = 132_223_104_000_000_000;
+        const FILETIME_2100_01_01: u64 = 157_469_184_000_000_000;
 
         fn authroot() -> CertificateTrustList {
             CertificateTrustList::from_der(picky_test_data::CERTIFICATE_TRUST_LIST).unwrap()
         }
 
+        // Microsoft Root Certificate Authority 2011, SHA-1 8F43288AD272F3103B6FB1428485EA3014C0BCFE, listed in authroot.stl.
         fn microsoft_root() -> Cert {
             Cert::from_pem_str(picky_test_data::PSDIAG_ROOT).unwrap()
         }
@@ -2523,6 +2529,16 @@ mod tests {
             }
         }
 
+        /// A Disable deprecation: the root is no longer trusted from `filetime` on.
+        fn disabled_since(filetime: u64) -> CTLEntryAttribute {
+            CTLEntryAttribute {
+                oid: oids::cert_disallowed_filetime_prop_id().into(),
+                value: CTLEntryAttributeValues::CertDisallowedFileTimePropId(Asn1SetOf(vec![
+                    filetime.to_le_bytes().to_vec().into(),
+                ])),
+            }
+        }
+
         fn verify_against_ctl(
             ctl: &CertificateTrustList,
             leaf: &Cert,
@@ -2545,7 +2561,7 @@ mod tests {
         struct ReissuedRoots {
             eligible: Cert,
             unlisted: Cert,
-            disallowed: Cert,
+            disabled: Cert,
             shallow: Cert,
             intermediate: Cert,
             leaf: Cert,
@@ -2555,7 +2571,7 @@ mod tests {
         #[derive(Clone, Copy, Debug)]
         enum Sibling {
             Unlisted,
-            Disallowed,
+            Disabled,
             Shallow,
         }
 
@@ -2589,7 +2605,7 @@ mod tests {
 
                 let eligible = root(2021, None);
                 let unlisted = root(2020, None);
-                let disallowed = root(2019, None);
+                let disabled = root(2019, None);
                 // Its path length forbids the intermediate below it.
                 let shallow = root(2018, Some(0));
                 let intermediate = CertificateBuilder::new()
@@ -2615,21 +2631,16 @@ mod tests {
                     .build()
                     .unwrap();
 
-                // An empty CertDisallowedFileTimePropId means the root is disallowed since forever.
-                let disallowed_since_forever = CTLEntryAttribute {
-                    oid: oids::cert_disallowed_filetime_prop_id().into(),
-                    value: CTLEntryAttributeValues::CertDisallowedFileTimePropId(Asn1SetOf(vec![Vec::new().into()])),
-                };
                 let ctl = authroot_with(vec![
                     ctl_entry(&eligible, vec![]),
-                    ctl_entry(&disallowed, vec![disallowed_since_forever]),
+                    ctl_entry(&disabled, vec![disabled_since(FILETIME_2020_01_01)]),
                     ctl_entry(&shallow, vec![]),
                 ]);
 
                 Self {
                     eligible,
                     unlisted,
-                    disallowed,
+                    disabled,
                     shallow,
                     intermediate,
                     leaf,
@@ -2640,7 +2651,7 @@ mod tests {
             fn sibling(&self, sibling: Sibling) -> &Cert {
                 match sibling {
                     Sibling::Unlisted => &self.unlisted,
-                    Sibling::Disallowed => &self.disallowed,
+                    Sibling::Disabled => &self.disabled,
                     Sibling::Shallow => &self.shallow,
                 }
             }
@@ -2658,7 +2669,7 @@ mod tests {
 
         #[rstest]
         fn eligible_listed_root_is_selected_among_reissued_roots(
-            #[values(Sibling::Unlisted, Sibling::Disallowed, Sibling::Shallow)] sibling: Sibling,
+            #[values(Sibling::Unlisted, Sibling::Disabled, Sibling::Shallow)] sibling: Sibling,
             #[values(Placement::Provided, Placement::EmbeddedSibling, Placement::EmbeddedBoth)] placement: Placement,
         ) {
             let roots = ReissuedRoots::new();
@@ -2679,14 +2690,61 @@ mod tests {
             let roots = ReissuedRoots::new();
 
             // A listed root rejected by its CTL entry got further than an unlisted root.
-            let err = roots.verify(&[], &[&roots.unlisted, &roots.disallowed]).unwrap_err();
-            assert!(matches!(err, AuthenticodeError::CaCertificateRevoked));
-            let err = roots.verify(&[&roots.disallowed], &[&roots.unlisted]).unwrap_err();
-            assert!(matches!(err, AuthenticodeError::CaCertificateRevoked));
+            let err = roots.verify(&[], &[&roots.unlisted, &roots.disabled]).unwrap_err();
+            assert!(matches!(err, AuthenticodeError::CaCertificateExpired { .. }));
+            let err = roots.verify(&[&roots.disabled], &[&roots.unlisted]).unwrap_err();
+            assert!(matches!(err, AuthenticodeError::CaCertificateExpired { .. }));
 
             // A lone root that cannot complete the chain reports the chain failure.
             let err = roots.verify(&[], &[&roots.shallow]).unwrap_err();
-            assert!(matches!(err, AuthenticodeError::CertError(_)));
+            assert!(matches!(
+                err,
+                AuthenticodeError::CertError(CertError::InvalidChain {
+                    source: CaChainError::TooDeep { pathlen: 0, .. }
+                })
+            ));
+        }
+
+        #[rstest]
+        #[case::disabled_in_the_past(FILETIME_2020_01_01, Some(UtcDate::ymd(2020, 1, 1).unwrap()))]
+        #[case::disabled_in_the_future(FILETIME_2100_01_01, None)]
+        fn root_is_trusted_until_its_disable_date(#[case] filetime: u64, #[case] rejected_since: Option<UtcDate>) {
+            let root = microsoft_root();
+            let entries = [ctl_entry(&root, vec![disabled_since(filetime)])];
+
+            match AuthenticodeValidator::h_check_root_against_ctl_entries(&root, &entries) {
+                Ok(()) => assert_eq!(rejected_since, None),
+                Err(AuthenticodeError::CaCertificateExpired { not_after, .. }) => {
+                    assert_eq!(Some(not_after), rejected_since)
+                }
+                Err(err) => panic!("unexpected error: {err}"),
+            }
+        }
+
+        #[rstest]
+        #[case::listed(true)]
+        #[case::unlisted(false)]
+        fn self_signed_signing_certificate_is_its_own_root(#[case] listed: bool) {
+            let key = PrivateKey::from_pem_str(picky_test_data::RSA_2048_PK_2).unwrap();
+            let certificate = CertificateBuilder::new()
+                .validity(UtcDate::ymd(2020, 1, 1).unwrap(), UtcDate::ymd(2060, 1, 1).unwrap())
+                .self_signed(DirectoryName::new_common_name("Self-Signed Publisher"), &key)
+                .ca(true)
+                .key_id_gen_method(KeyIdGenMethod::SPKFullDER(HashAlgorithm::SHA2_256))
+                .build()
+                .unwrap();
+            let ctl = authroot_with(if listed {
+                vec![ctl_entry(&certificate, vec![])]
+            } else {
+                vec![]
+            });
+
+            let result = verify_against_ctl(&ctl, &certificate, std::slice::from_ref(&certificate), &[]);
+            if listed {
+                result.unwrap();
+            } else {
+                assert!(matches!(result, Err(AuthenticodeError::CAIsNotTrusted)));
+            }
         }
 
         #[test]
