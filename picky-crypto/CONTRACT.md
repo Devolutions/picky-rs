@@ -663,7 +663,7 @@ Private-key availability remains [`PrivateKey::supports`] (section 7).
 
 ### 8.1 Composition
 
-Composition is explicit: a binary composes providers, or a dedicated bundle crate fixes a composition (section 11); libraries never compose.
+Composition is explicit: a binary composes providers, or the bundle crate fixes a composition (section 11); libraries never compose.
 [`CryptoProvider::with_fallback`] keeps the entries of `self` and adds what its parameter `fallback` advertises and `self` does not.
 Composition follows the granularity of advertisement: per algorithm, and per protection for [`Mac`], [`Cipher`], [`Aead`] and [`KeyWrap`]; never per input.
 For an algorithm whose `self` entry does not support a protection that the `fallback` entry supports, the result holds one composite entry with the same algorithm: each protection is served by `self` when `self` supports it, and by `fallback` otherwise.
@@ -730,15 +730,16 @@ An explicit [`install_default`] racing a running maker either installs first or 
 The panicking accessor [`helpers::default_provider`] (section 10) is [`get_default`] followed by a panic with a message naming [`install_default`] and the crates that provide a provider.
 Explicit and lazy installation are distinct operations: one takes an owned provider and hands it back on conflict, the other takes a function that must not run when a provider is already installed.
 
-[`get_or_install_default`] exists for the `rustcrypto` convenience feature of a consuming library, the single place where that library may name a backend.
-The feature installs the provider of the RustCrypto bundle crate (section 11), whose composition is fixed, so every library that uses the same version of the bundle installs the same provider value whichever installs first:
+[`get_or_install_default`] exists for the convenience features of a consuming library, the single place where that library may name the bundle crate.
+Each convenience feature enables features of the bundle crate (section 11), and the library installs the bundle's provider.
+The bundle's composition is fixed for a given set of features, and Cargo unifies the features of one version of the bundle across a build, so every library that uses the same version of the bundle installs the same provider value whichever installs first.
 
-The convenience-feature accessor calls [`get_or_install_default`] with the RustCrypto bundle's provider factory when enabled, and otherwise calls [`helpers::default_provider`].
+The convenience-feature accessor calls [`get_or_install_default`] with the bundle's provider factory when a convenience feature is enabled, and otherwise calls [`helpers::default_provider`].
 The crate documentation for [`get_or_install_default`] gives the Rust example.
 
-A binary that installs its own provider before first use is unaffected by the convenience feature.
+A binary that installs its own provider before first use is unaffected by the convenience features.
 A binary that installs after a library already installed the default gets [`Err`](Result::Err) back from [`install_default`] and must install earlier.
-Convenience features are per crate: a crate built without its feature panics (through [`helpers::default_provider`]) if it uses cryptography before a crate with the feature has installed the bundle lazily, so a binary that mixes such crates installs a provider explicitly.
+Convenience features are per crate: a crate built without any of its convenience features panics (through [`helpers::default_provider`]) if it uses cryptography before a crate with one has installed the bundle's provider lazily, so a binary that mixes such crates installs a provider explicitly.
 The same provider value is guaranteed only for one version of the bundle crate: a binary whose dependency graph contains more than one version of it installs a provider explicitly, so that availability does not depend on which library uses cryptography first.
 
 ## 10. Helpers
@@ -768,19 +769,25 @@ Protocol-specific constructions (Kerberos n-fold, ciphertext stealing and RFC 39
 ## 11. Providers built around the contract
 
 The contract does not depend on any of the following; they are described here because the semantics above refer to their roles.
+Fill-in providers implement algorithms that a backend's library lacks: they build on any base provider's entries, report false through [`CryptoProvider::fips`] and are not backend adapters.
 
-- **Providers built from other providers' entries.**
+- **Fill-in provider built from other providers' entries.**
   A provider may build entries from another provider's contract entries, for algorithms that a backend's library lacks: the key-based KDFs (section 6.4), the one-step KDF from [`Hash`] entries and the counter-mode KDF from [`Mac`] entries.
   The counter-mode KDF takes each PRF block from a [`MacGeneration`] with [`MacTag::into_inner`], requiring [`Protection::Apply`] from those entries; policy judges the resulting [`Kdf`] entry independently (section 6.4).
   Such a provider takes the entries it builds on explicitly at construction, contains no other cryptographic code, and reports false through [`CryptoProvider::fips`], so the FIPS policy rejects any provider composed with it.
   An entry of this kind exists only while some backend's library lacks the algorithm natively.
-- **FFDH provider.**
+- **FFDH fill-in provider.**
   Finite-field Diffie-Hellman, which the reference libraries do not offer in the form section 6.11 requires, comes from a provider implemented over a constant-time big-integer library.
   It takes another provider's [`SecureRandom`] entry at construction, because it has no randomness of its own, and reports false through [`CryptoProvider::fips`].
-- **RustCrypto bundle.**
-  A fixed, documented composition: the RustCrypto backend first, so a native entry always wins, then the entries built over it, then the FFDH provider.
-  It contains no cryptographic code and reports false through [`CryptoProvider::fips`].
-  It is what the `rustcrypto` convenience features install (section 9).
+- **Bundle crate.**
+  A fixed, documented composition, with no default features: each backend and each fill-in provider is behind its own feature.
+  Its provider holds every enabled backend in a fixed order (aws-lc-rs, then ring, then RustCrypto), each a fallback for the previous (section 8.1), then the enabled fill-in providers: the key-based KDFs built over that composition, then the FFDH provider using the first [`SecureRandom`] entry available.
+  Fill-in entries come last, so a backend's native entry always wins.
+  Enabling a feature never removes an advertised algorithm or protection, so features are additive at the granularity of advertisement (section 8.1).
+  Each entry still shadows later ones for every input of an operation it advertises (section 8.1), so enabling a backend can make the provider refuse inputs outside the must-support set that a later backend or a fill-in provider accepted.
+  It contains no cryptographic code and installs nothing itself.
+  It is a non-FIPS convenience that applies no policy: FIPS binaries install a FIPS backend behind the FIPS policy explicitly.
+  It is what the convenience features of consuming libraries install (section 9).
 - **RSA CRT completion.**
   Completing an RSA private key from `n`, `e`, `d`, `p` and `q` (computing `dP`, `dQ`, `qInv`) is key-format completion, not a standardized algorithm, so it is not a contract operation.
   It lives outside the contract so that format code can produce PKCS#8 and FIPS binaries can exclude the arithmetic from their dependency graph.
@@ -915,7 +922,7 @@ The FIPS policy filters or narrows entries according to their approved uses (sec
 There is no compile-time distinction, because algorithm choice comes from parsed data.
 
 **Lazy installation for convenience features.**
-[`get_or_install_default`] lets a library's convenience feature install the RustCrypto bundle lazily, only when no provider was installed, without racing other libraries.
+[`get_or_install_default`] lets a library's convenience features install the bundle crate's provider lazily, only when no provider was installed, without racing other libraries.
 
 **One provider per process.**
 Consumers use the process-wide default, so a process has one provider, unlike TLS libraries whose configurations each carry their own.

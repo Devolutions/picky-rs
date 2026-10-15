@@ -77,10 +77,13 @@ It is an input to policy, not a capability query.
 Policy is a transformation from provider to provider.
 A FIPS policy keeps only approved entries and requires `fips()` to be true.
 
-Composition of providers is explicit: performed by the binary, or fixed in a dedicated bundle crate.
+Composition of providers is explicit: performed by the binary, or fixed in the bundle crate.
 Libraries never compose providers.
 For example, a binary may add a fallback from one provider to another for algorithms the first does not support.
 No provider ever falls back to another implicitly.
+
+Fill-in providers implement what no library offers; they are generic over any base, report `fips()` false and are not adapters.
+The thin-adapter rule applies to backends only.
 
 Private keys are trait objects.
 Hardware and external keys (smartcards, PKCS#11, CNG, TPM) implement the private key trait directly, without going through a provider.

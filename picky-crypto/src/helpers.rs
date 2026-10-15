@@ -10,7 +10,7 @@ use crate::{
 /// Returns the default, panicking with installation instructions if absent.
 /// See CONTRACT.md sections 9 and 10.
 pub fn default_provider() -> &'static CryptoProvider {
-    get_default().expect("install a provider with picky_crypto::install_default using picky-crypto-rustcrypto-bundle or another picky-crypto-* backend; consuming libraries may enable their rustcrypto convenience feature")
+    get_default().expect("install a provider with picky_crypto::install_default using picky-crypto-bundle or a picky-crypto-* backend; consuming libraries may enable a convenience feature")
 }
 
 /// Identifies the algorithm advertised by an entry.

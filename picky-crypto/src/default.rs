@@ -25,12 +25,12 @@ pub fn get_default() -> Option<&'static CryptoProvider> {
 /// A maker must not call this function or `install_default`: re-entrant initialization deadlocks or panics.
 /// See CONTRACT.md section 9.
 ///
-/// A consuming library's single backend-specific convenience-feature site:
+/// A consuming library's single convenience-feature site:
 /// ```ignore
 /// fn provider() -> &'static picky_crypto::CryptoProvider {
 ///     #[cfg(feature = "rustcrypto")]
 ///     {
-///         picky_crypto::get_or_install_default(picky_crypto_rustcrypto_bundle::provider)
+///         picky_crypto::get_or_install_default(picky_crypto_bundle::provider)
 ///     }
 ///     #[cfg(not(feature = "rustcrypto"))]
 ///     {
