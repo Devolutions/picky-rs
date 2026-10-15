@@ -11,6 +11,7 @@ members = [
     "picky-asn1",
     "picky-asn1-der",
     "picky-asn1-x509",
+    "picky-crypto-rsa-crt",
     "picky-test-data",
     "ffi",
 ]
@@ -22,6 +23,7 @@ default-members = [
     "picky-asn1",
     "picky-asn1-der",
     "picky-asn1-x509",
+    "picky-crypto-rsa-crt",
 ]
 
 [profile.ffi-production]
