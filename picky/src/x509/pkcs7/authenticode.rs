@@ -736,7 +736,11 @@ impl<'a> AuthenticodeValidator<'a> {
     /// as opposed to not checked or exempted by a timestamp.
     fn h_verify_signing_certificate(&self, certificates: &[Cert]) -> AuthenticodeResult<bool> {
         let signing_certificate = self.authenticode_signature.signing_certificate(certificates)?;
-        let (path, roots) = h_split_signing_chain(signing_certificate, certificates);
+        let (path, roots) = if self.inner.borrow().strictness.require_chain_check {
+            h_split_signing_chain(signing_certificate, certificates)
+        } else {
+            Default::default()
+        };
         let cert_validator = signing_certificate.verifier();
         let cert_validator = self.h_apply_dates(&cert_validator);
 
