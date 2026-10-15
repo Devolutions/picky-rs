@@ -1,0 +1,9 @@
+[bans]
+multiple-versions = "allow"
+
+[[bans.features]]
+# Only this feature is banned, not the crate: it weakens ed25519-dalek's RFC 8032 §5.1.7 `S < L` check, and Cargo
+# unifies features across the build.
+# The adapter checks `S < L` itself; this ban keeps the workspace on the library's full check as well.
+crate = "ed25519-dalek"
+deny = ["legacy_compatibility"]

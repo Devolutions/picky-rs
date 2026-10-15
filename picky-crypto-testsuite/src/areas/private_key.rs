@@ -192,29 +192,59 @@ pub fn inconsistent_rsa(c: &mut Checks, p: &CryptoProvider, options: Options) {
     inconsistent_rsa_decryption(c, p, options);
 }
 
+/// The published inputs of the signing checks on an RSA key with inconsistent components.
+#[derive(Clone, Copy)]
+pub enum SigningInputs<'a> {
+    /// A signature file's group, whose published signatures pin the base key's signatures for the group's hash.
+    Signatures { file: &'a str, group: &'a Value },
+    /// A published decryption test of the base key, whose message is signed; no published signature pins the base key.
+    Messages {
+        file: &'a str,
+        test: &'a Value,
+        public: &'a [u8],
+    },
+}
+
+/// Checks signing with an RSA key derived with inconsistent components, and with its base key, for every RSA signature algorithm.
+///
+/// A signature passes only if the provider's verifier accepts it under the base key's public key.
+/// For signature-file inputs without a verifier, the derived key's signature must equal the base key's instead.
+/// For message inputs, the reference provider's verifier is the fallback, and the check fails without either.
 pub fn inconsistent_signatures(
     c: &mut Checks,
     p: &CryptoProvider,
-    base: &dyn PrivateKey,
-    key: &dyn PrivateKey,
+    options: Options,
+    keys: (&dyn PrivateKey, &dyn PrivateKey),
     id: &str,
-    source: (&str, &Value),
+    inputs: SigningInputs<'_>,
 ) {
-    let (file, group) = source;
-    let public = der::rsa_public(&v::field(group, "privateKeyPkcs8"));
-    let source_algorithm = rsa_signature(v::string(group, "sha"));
+    let (base, key) = keys;
+    let (file, public, source_algorithm, all_tests) = match inputs {
+        SigningInputs::Signatures { file, group } => (
+            file,
+            der::rsa_public(&v::field(group, "privateKeyPkcs8")),
+            Some(rsa_signature(v::string(group, "sha"))),
+            v::tests(group),
+        ),
+        SigningInputs::Messages { file, test, public } => (file, public.to_vec(), None, std::slice::from_ref(test)),
+    };
+    let pinned = matches!(inputs, SigningInputs::Signatures { .. });
     for algorithm in SIGNATURES[..8].iter().copied() {
         let base_supported = c.key_supports(id, base, KeyOperation::Sign(algorithm));
         let derived_supported = c.key_supports(id, key, KeyOperation::Sign(algorithm));
         if !base_supported && !derived_supported {
             continue;
         }
-        let verifier = helpers::signature_verifier(p, algorithm).ok();
-        let tests = v::tests(group);
-        let tests = if algorithm == source_algorithm {
-            tests
+        let verifier = helpers::signature_verifier(p, algorithm).ok().or_else(|| {
+            options
+                .reference_provider
+                .filter(|_| !pinned)
+                .and_then(|reference| helpers::signature_verifier(reference, algorithm).ok())
+        });
+        let tests = if Some(algorithm) == source_algorithm {
+            all_tests
         } else {
-            &tests[..1]
+            &all_tests[..1]
         };
         for t in tests {
             let id = format!("{id}/{}", v::id(algorithm, file, t));
@@ -227,13 +257,15 @@ pub fn inconsistent_signatures(
                 None
             };
             if let Some(signature) = &positive {
-                if algorithm == source_algorithm {
+                if Some(algorithm) == source_algorithm {
                     c.bytes(&id, signature, &v::field(t, "sig"));
                 }
                 if let Some(verifier) = verifier {
                     c.call(&format!("{id}/positive verification"), Expect::Success, || {
                         verifier.verify(PublicKey(&public), &message, signature)
                     });
+                } else if !pinned {
+                    c.check(&format!("{id}/positive verification"), false, NO_VERIFIER);
                 }
             }
             let expected = if derived_supported {
@@ -242,27 +274,30 @@ pub fn inconsistent_signatures(
                 Expect::Error(Error::Unsupported(Algorithm::Signature(algorithm)))
             };
             if let Some(signature) = c.call(&id, expected, || key.sign(algorithm, &message)) {
-                if algorithm == source_algorithm {
+                if Some(algorithm) == source_algorithm {
                     c.bytes(&id, &signature, &v::field(t, "sig"));
                 }
                 if let Some(verifier) = verifier {
                     c.call(&id, Expect::Success, || {
                         verifier.verify(PublicKey(&public), &message, &signature)
                     });
-                } else if let Some(positive) = &positive {
+                } else if let Some(positive) = positive.as_ref().filter(|_| pinned) {
                     c.bytes(&id, &signature, positive);
-                } else {
+                } else if pinned {
                     c.check(
                         &id,
                         false,
                         "no verifier or deterministic positive control for inconsistent-key signature",
                     );
+                } else {
+                    c.check(&id, false, NO_VERIFIER);
                 }
             }
         }
     }
 }
 
+const NO_VERIFIER: &str = "no verifier in the provider or the reference provider for an inconsistent-key signature";
 /// Where the ciphertext of a derived key's decryption check comes from, in order of preference.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CiphertextSource {
@@ -404,6 +439,7 @@ fn inconsistent_rsa_signing(c: &mut Checks, p: &CryptoProvider, options: Options
             }) else {
                 continue;
             };
+            exported(c, &id, &*base, &public);
             let other = bases
                 .iter()
                 .find(|other| v::field(other, "privateKeyPkcs8") != encoding)
@@ -416,7 +452,14 @@ fn inconsistent_rsa_signing(c: &mut Checks, p: &CryptoProvider, options: Options
                 if let Some(key) = c.call(&id, Expect::Either(Error::InvalidKey), || {
                     loader.load(PrivateKeyMaterial::Pkcs8(&malformed))
                 }) {
-                    inconsistent_signatures(c, p, &*base, &*key, &id, (file, g));
+                    inconsistent_signatures(
+                        c,
+                        p,
+                        options,
+                        (&*base, &*key),
+                        &id,
+                        SigningInputs::Signatures { file, group: g },
+                    );
                     if first {
                         derived_export(c, &id, &*key, &public);
                         inconsistent_decryption(c, p, options, (&*base, &*key), &id, &public, None);
@@ -469,6 +512,7 @@ fn inconsistent_rsa_decryption(c: &mut Checks, p: &CryptoProvider, options: Opti
                 continue;
             };
             let public = der::rsa_public(&encoded);
+            exported(c, &id, &*base, &public);
             let ciphertext = v::field(t, "ct");
             let plaintext = v::field(t, "msg");
             let published = Some((a, ciphertext.as_slice(), plaintext.as_slice()));
@@ -481,6 +525,12 @@ fn inconsistent_rsa_decryption(c: &mut Checks, p: &CryptoProvider, options: Opti
                     loader.load(PrivateKeyMaterial::Pkcs8(&derived))
                 }) {
                     derived_export(c, &id, &*key, &public);
+                    let inputs = SigningInputs::Messages {
+                        file,
+                        test: t,
+                        public: &public,
+                    };
+                    inconsistent_signatures(c, p, options, (&*base, &*key), &id, inputs);
                     inconsistent_decryption(c, p, options, (&*base, &*key), &id, &public, published);
                 }
             }

@@ -16,6 +16,7 @@ pub struct Options {
     pub opaque_public_key_errors: bool,
     /// The other backends in the same build, combined into one provider, whose RSA encryptors produce reference ciphertexts.
     /// Decryption checks on RSA keys with inconsistent components use it when the base key has no published ciphertext for the algorithm.
+    /// Signing checks on such keys from decryption files use its verifiers when the provider has none for the algorithm.
     pub reference_provider: Option<&'static CryptoProvider>,
 }
 

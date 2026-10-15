@@ -56,13 +56,15 @@ These rules apply to every operation and are not repeated.
 4. **Valid domain and must-support set.**
    Each operation defines a valid domain (inputs that are well-formed for the algorithm) and, within it, a must-support set.
    For an advertised operation:
-   - An input outside the valid domain returns [`Error::InvalidKey`] (key material) or [`Error::InvalidInput`] (anything else), except that a verifier on a library with a single opaque failure may return [`Error::VerificationFailed`] for an unusable public key (section 4).
+   - An input outside the valid domain returns [`Error::InvalidKey`] (key material) or [`Error::InvalidInput`] (anything else), except that a verifier on a library with a single opaque failure may return [`Error::VerificationFailed`] for an unusable public key, and a structurally malformed input within the bounds below but beyond a backend's capacity limit may return [`Error::Unsupported`] (section 4).
    - An input inside the valid domain but outside the must-support set is either processed like an input in the must-support set or rejected with [`Error::Unsupported`] naming the algorithm (or, for such a verifier, [`Error::VerificationFailed`], section 4).
      For example, a backend may refuse RSA private keys other than 2048, 3072 or 4096-bit two-prime keys with equal-size primes, because some libraries accept only those.
    - An input in the must-support set never returns [`Error::Unsupported`], except for policy input narrowing (section 8.2).
    - Where an operation states no explicit domain for a length, any length is valid and lengths up to 2^31 − 1 bytes are in the must-support set.
-   - Valid domains include the limits of the standard that defines the algorithm (for example RFC 8018's maximum derived-key length).
-     Those limits are checked first, before allocation or any cryptographic processing, with overflow-safe arithmetic on [`usize`] arguments.
+   - Lengths fixed by the algorithm or the operation, and ranges defined by the algorithm's standard (for example RFC 8018's maximum derived-key length, the RC2 and RC4 key ranges), bound the valid domain: an input outside them returns the specified error on every backend, never [`Error::Unsupported`].
+     These bounds are checked before allocation or any cryptographic processing, with overflow-safe arithmetic on [`usize`] arguments, and an error from them always takes precedence.
+     A capacity limit (section 4) may take precedence over a structure error, returning [`Error::Unsupported`]; otherwise a malformed input returns the error the first item above assigns.
+     This fixes which outcome wins, not the order among a backend's checks.
 5. **No RNG parameter.**
    Operations that need randomness (key generation, ephemeral keys, ECDSA nonces, RSA encryption padding, AES-GCM seal nonces) use the backend's own secure random generator.
    No generator is passed in, because some libraries accept only their own.
@@ -143,9 +145,13 @@ The error set is closed: only the contract defines variants, never a backend, an
 [`install_default`] returns the rejected provider instead of an error value.
 
 When both [`Error::InvalidKey`] and [`Error::InvalidInput`] could apply, report [`Error::InvalidKey`].
+Library key-validation failures map to [`Error::InvalidKey`], except when the library only rejects a well-formed key for its size or parameters, which maps to [`Error::Unsupported`] (rule 4).
+A capacity limit is a backend's bound on a length or a numeric parameter (for example a maximum modulus size or public exponent), inside the valid domain and outside the must-support set.
+Capacity limits take precedence: an input beyond a backend's capacity limit may be refused with [`Error::Unsupported`] before its structure is examined, whether or not it is also malformed.
+A backend may skip validation work that grows with the exceeded parameter, and a thin adapter keeps its library's check order.
 [`Error::ProviderFailure`] includes "PIN required", which callers therefore cannot distinguish from other device failures; this is a known limit of the closed set, to revisit if a consumer needs to prompt for a PIN.
 Some libraries report a single opaque failure for verification; a backend on such a library may report [`Error::VerificationFailed`] for a public key it cannot use, including an RSA modulus outside its range.
-Conformance tests therefore expect [`Error::InvalidKey`] for a malformed public key, and accept either the result expected for a key in the must-support set or [`Error::Unsupported`] for a well-formed public key outside it; for a backend on such a library they also accept [`Error::VerificationFailed`] in both cases.
+Conformance tests therefore expect [`Error::InvalidKey`] for a malformed public key within the backend's capacity limits, and accept either the result expected for a key in the must-support set or [`Error::Unsupported`] for a well-formed public key outside it; for a backend on such a library they also accept [`Error::VerificationFailed`] in both cases.
 For a public key in the must-support set with a wrong signature, they expect only [`Error::VerificationFailed`].
 
 ## 5. Encodings
@@ -393,7 +399,7 @@ It is an approved mode (NIST SP 800-38F) that must run inside a validated module
 | [`SignatureAlgorithm::EcdsaP256Sha256`], [`SignatureAlgorithm::EcdsaP384Sha384`], [`SignatureAlgorithm::EcdsaP521Sha512`] | FIPS 186-5 ECDSA with the named curve and hash, fixed `r \|\| s` | valid public points of the curve |
 | [`SignatureAlgorithm::Ed25519`] | RFC 8032 pure Ed25519 | valid public keys |
 
-Valid domain: public key bytes in the encoding of section 5.1 and any signature bytes; a key that does not decode as the algorithm's key type in that encoding, including a compressed EC point, is [`Error::InvalidKey`] (or [`Error::VerificationFailed`] on a library with a single opaque failure, section 4).
+Valid domain: public key bytes in the encoding of section 5.1 and any signature bytes; a key that does not decode as the algorithm's key type in that encoding, including a compressed EC point, is [`Error::InvalidKey`] (with the exceptions of section 4).
 
 Acceptance profile:
 
@@ -406,7 +412,7 @@ Acceptance profile:
   Malformed inputs are errors: `S >= L`, an `R` that fails RFC 8032 section 5.1.3 decoding, or a wrong signature length is [`Error::VerificationFailed`]; an `A` that fails that decoding is [`Error::InvalidKey`] or [`Error::VerificationFailed`] (section 4).
   Verification with a validly encoded small-order `A` or `R` is implementation-defined (cofactored or cofactorless equation); backends may disagree on it, so differential tests exclude these inputs and conformance tests check the allowed outcomes listed in section 12.
 
-Result: `Ok(())`; [`Error::VerificationFailed`] for a signature that does not verify, including a wrong length; [`Error::InvalidKey`] for a key that is not a valid key of the expected type, with the opaque-failure tolerance of section 4.
+Result: `Ok(())`; [`Error::VerificationFailed`] for a signature that does not verify, including a wrong length; [`Error::InvalidKey`] for a key that is not a valid key of the expected type, with the exceptions of section 4.
 
 ### 6.10 Asymmetric encryption ([`AsymmetricEncryptor`])
 
@@ -549,7 +555,7 @@ Cryptographically invalid inputs still fail with the specified error (for exampl
 Conformance tests check every [`KeyOperation`] on unwrapped keys.
 When [`PrivateKey::supports`] is false, the operation returns [`Error::Unsupported`].
 When [`PrivateKey::supports`] is true, valid known-answer and round-trip cases succeed, no must-support input returns [`Error::Unsupported`], and invalid inputs return the specified error.
-RSA keys with inconsistent components are checked as section 12 states.
+RSA keys with components that are not a consistent RSA private key for (`n`, `e`) are checked as section 12 states.
 
 [`PrivateKey::key_size_bits`] reports:
 
@@ -571,13 +577,16 @@ Valid domain and must-support set:
 
 RSASSA-PKCS1-v1_5 signatures always encode NULL DigestInfo parameters (section 6.9).
 
+A protocol exposed to padding oracles applies its own countermeasure (for example RFC 7516 §11.5: substitute a random key and continue).
+
 RSA private-key results are checked: every signature or plaintext is the correct result under the key's public components (`n`, `e`), or the operation fails.
-A backend never outputs a signature or plaintext computed from inconsistent key components, because a single faulty CRT signature reveals a prime factor of `n`.
-Handling an RSA private key with inconsistent components (wrong `dP`, `dQ`, `qInv` or `d`) is implementation-defined.
-It may be rejected at loading with [`Error::InvalidKey`], rejected at the first private-key operation with [`Error::InvalidKey`], or used with components the library recomputes from `n`, `e`, `d`, `p` and `q`.
-Every one of these outcomes satisfies the property above.
+A backend never outputs a signature or plaintext computed from components that are not a consistent RSA private key for (`n`, `e`), because a single faulty CRT signature reveals a prime factor of `n`.
+Handling an RSA private key with components that are not a consistent RSA private key for (`n`, `e`), for example a wrong `dP`, `dQ`, `qInv` or `d`, or factors `p` and `q` that are not distinct primes, is implementation-defined.
+The outcome may differ per call: each operation for which [`PrivateKey::supports`] is true, including [`PrivateKey::public_key`], either returns [`Error::InvalidKey`] or behaves as specified for the key's public components (`n`, `e`), producing a signature or plaintext correct under them or the error specified for that input, such as [`Error::VerificationFailed`] when the correctly decrypted value has invalid padding.
+For example, a backend may reject the key at loading with [`Error::InvalidKey`], reject it at the first private-key operation with [`Error::InvalidKey`], use CRT components the library recomputes from `n`, `e`, `d`, `p` and `q` when `p` and `q` are distinct primes, or check each result against (`n`, `e`).
+Each of these is allowed only when every result satisfies the rules above.
 This is an exception to rule 4, which would otherwise require rejection at loading.
-An inconsistency detected during [`PrivateKey::sign`] or [`PrivateKey::decrypt`] returns [`Error::InvalidKey`], never the padding error [`Error::VerificationFailed`].
+An inconsistency detected during [`PrivateKey::sign`] or [`PrivateKey::decrypt`] returns [`Error::InvalidKey`], never [`Error::VerificationFailed`], which here reports only invalid padding in a value decrypted correctly under (`n`, `e`) or a ciphertext not less than `n`.
 Conformance tests check these keys only as section 12 states.
 
 Derivability:
@@ -789,7 +798,16 @@ Before a vector's label is applied, its eligibility is decided by the rules abov
 - for an absent entry or a key operation for which [`PrivateKey::supports`] is false, the suite asserts [`Error::Unsupported`] and does not apply the label;
 - MAC, cipher, AEAD and key-wrap vectors apply only to supported protections;
 - for a vector whose inputs are in the operation's must-support set, the label is applied as below;
-- for a vector whose inputs are inside the valid domain but outside the must-support set (for example a 1024-bit RSA key), [`Error::Unsupported`] is also accepted, and so is [`Error::VerificationFailed`] from a verifier on a library with a single opaque failure (section 4); any other result must match the label.
+- for a vector whose inputs are inside the valid domain but outside the must-support set (for example a 1024-bit RSA key), [`Error::Unsupported`] is also accepted, and so is [`Error::VerificationFailed`] from a verifier on a library with a single opaque failure (section 4); any other result must match the label;
+- for a vector whose inputs are within the fixed lengths and standard ranges of rule 4 but both beyond a backend's capacity limit and malformed, the allowed outcomes are [`Error::Unsupported`] or the error section 4 assigns to the malformed input ([`Error::InvalidKey`] for private and public keys alike, [`Error::InvalidInput`] for other inputs, or [`Error::VerificationFailed`] from a verifier on a library with a single opaque failure); well-formed inputs beyond a capacity limit follow the previous item.
+
+Inputs just outside a length the algorithm or the operation fixes, or a range the algorithm's standard defines, expect the specified error and never [`Error::Unsupported`] (rule 4).
+They are hand-written structural inputs, and the suite checks at least RC2 keys of 0 and 129 bytes, RC4 keys of 0 and 257 bytes, and PBKDF2 with zero iterations, an empty output or an output one byte above the RFC 8018 maximum where [`usize`] can represent it.
+Each of these, except the PBKDF2 output above the maximum, has a control at the adjacent in-range value, either a published input or the in-range value with published other inputs, which succeeds, or returns [`Error::Unsupported`] when that value is outside the must-support set.
+PBKDF2 also has a control at the edge of the must-support set, an output one byte above it, which succeeds or returns [`Error::Unsupported`], never [`Error::InvalidInput`].
+In differential runs, the outputs of these controls are also compared between the two backends whenever both produce one and the control has no published answer.
+Known gap: an inward off-by-one at the PBKDF2 maximum output length is not detected, because a control at that length could exhaust a conforming backend's time or memory.
+Known gap: the error a backend's PBKDF2 capacity limit returns is not checked, because reaching it needs an output too large for a control.
 
 Labels follow Wycheproof:
 
@@ -810,18 +828,27 @@ For each of them, conformance tests assert that nothing panics and that the resu
 - RSA PKCS#1 v1.5 verification of a DigestInfo with absent parameters (section 6.9): success or [`Error::VerificationFailed`], the result section 6.9 gives for a signature that does not verify;
 - loading a PKCS#8 document that carries `attributes` (section 5.2): success or [`Error::InvalidKey`];
 - a 3DES key whose component keys are not pairwise distinct or are DES weak or semi-weak keys (section 6.5): success or [`Error::InvalidKey`];
-- handling of an RSA private key with inconsistent components (section 7): loading returns [`Error::InvalidKey`], or every private-key operation either returns [`Error::InvalidKey`] or produces a result that verifies under (`n`, `e`).
+- handling of an RSA private key with components that are not a consistent RSA private key for (`n`, `e`) (section 7): loading returns [`Error::InvalidKey`] or succeeds.
+  A loaded key returns [`Error::Unsupported`] for every operation for which [`PrivateKey::supports`] is false; for an operation for which it is true, only the outcomes below are allowed for each test input.
+  Exporting the public key returns [`Error::InvalidKey`] or exactly the section 5.1 encoding of the published (`n`, `e`) of the base key (below).
+  Signing returns [`Error::InvalidKey`] or a signature that verifies under (`n`, `e`).
   For decryption, the ciphertext comes from the first source that produces one for the algorithm: the base key's published ciphertexts, then the conformance runner's reference encryptor from another backend in the same build, then the provider's own encryptor.
   The expected plaintext is the published one for a published ciphertext, and the plaintext the suite encrypted for the other two sources.
   The check is never skipped: it fails if no source produces a ciphertext.
+  Keys derived from base keys published only with signature vectors get decryption checks in the same way.
+  Keys derived from base keys published only with decryption vectors get signing checks on those vectors' published messages: with no published signature to pin the base key, a signature passes only if the provider's verifier, or else the conformance runner's reference verifier from another backend in the same build, accepts it, and the check fails if neither exists.
+  Decryption returns [`Error::InvalidKey`] or the expected plaintext.
+  The suite uses only published ciphertexts labeled valid, so every ciphertext from any of the three sources has valid padding, and [`Error::VerificationFailed`] is a conformance failure for it, because a decryption correct under (`n`, `e`) recovers the valid padding.
   Each backend is checked on its own; differential runs do not repeat this check or compare outcomes between backends.
 
-The inputs for that last property are derived from published keys, because the known published RSA test vectors contain no keys with inconsistent components:
+The keys for that last property are derived from published keys, because the known published RSA test vectors contain no such keys:
 
-- base keys come from cited published sources;
-- an input is derived only by swapping or substituting whole encoded INTEGER fields between cited keys: `dP` with `dQ`, `p` with `q` leaving `qInv` unchanged, or `qInv` taken from another cited key of the same size; no arithmetic, no generated bytes and no randomness;
+- base keys come from cited published sources and are in the must-support set of section 7;
+- a key is derived only by swapping or substituting whole encoded INTEGER fields between cited keys: `dP` with `dQ`, `p` with `q` leaving `qInv` unchanged, or `qInv` taken from another cited key of the same size; no arithmetic, no generated bytes and no randomness;
 - round-trip control: splitting a base key into its fields and reassembling them unchanged must reproduce the cited key's exact bytes, otherwise the test fails;
-- positive control: the unmodified base key loads and produces a result that verifies on the backend under test.
+- positive control: the unmodified base key loads and, for each operation for which [`PrivateKey::supports`] is true, its exported public key is exactly the section 5.1 encoding of (`n`, `e`), its signatures verify and, with a ciphertext from the source chosen as for its derived keys, its decryptions return the expected plaintext on the backend under test.
+
+No known published key has equal factors (`p` = `q`, so `n` = `p`²), and these derivations produce neither equal nor composite factors, so those cases have no conformance vector.
 
 `picky-crypto`'s tests check composition (section 8.1) for [`Mac`], [`Cipher`], [`Aead`] and [`KeyWrap`] against mock providers, over every combination of supported protections and FIPS reports: a fallback fills in a protection the primary does not support, the primary serves a protection both members support, and the composite entry's FIPS report and the composed provider's [`CryptoProvider::fips`] follow section 8.1.
 For [`Mac`], each context starts on the member serving the requested protection.

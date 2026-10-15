@@ -211,6 +211,29 @@ pub fn rc4_longest_key() -> (String, Vec<u8>) {
     (format!("{file}/tcId={}/ct", v::number(t, "tcId")), v::field(t, "ct"))
 }
 
+/// A published message of exactly `len` bytes, used as an in-range key next to a rejected length; checks using it
+/// expect only contract properties.
+pub fn message_of_length(len: usize) -> (String, Vec<u8>) {
+    let file = "hmac_sha1_test.json";
+    let vectors = v::wycheproof(file);
+    let (_, t) = test(file, &vectors, &format!("{len}-byte message"), |_, t| {
+        v::field(t, "msg").len() == len
+    });
+    (format!("{file}/tcId={}/msg", v::number(t, "tcId")), v::field(t, "msg"))
+}
+
+/// The password and salt of the first valid test in a Wycheproof PBKDF2 file, for bound checks and their controls.
+pub fn pbkdf2_password_salt(file: &str, vectors: &v::Wycheproof) -> (String, Vec<u8>, Vec<u8>) {
+    let (_, t) = test(file, vectors, "valid PBKDF2 test", |_, t| {
+        v::string(t, "result") == "valid"
+    });
+    (
+        format!("{file}/tcId={}", v::number(t, "tcId")),
+        v::field(t, "password"),
+        v::field(t, "salt"),
+    )
+}
+
 pub fn rsa_plaintext(limit: usize) -> (String, Vec<u8>) {
     required(
         "rfc/rfc1320.txt; rfc/rfc8032.txt",
