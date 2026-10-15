@@ -778,7 +778,8 @@ Fill-in providers implement algorithms that some backend's library lacks: they b
   An entry of this kind exists only while some backend's library lacks the algorithm natively.
 - **FFDH fill-in provider.**
   Finite-field Diffie-Hellman, which the reference libraries do not offer in the form section 6.11 requires, comes from a provider implemented over a constant-time big-integer library.
-  It uses the base provider's [`SecureRandom`] entry, taken at construction, because it has no randomness of its own, and has no entries when the base has none.
+  It takes the base provider at construction and draws ephemeral exponents from the base's [`SecureRandom`] entry, because it has no randomness of its own.
+  Its ephemeral [`FfdhKeyAgreement`] entry exists only when the base has a [`SecureRandom`] entry; its [`PrivateKeyLoader`] entry for [`KeyType::Ffdh`], whose keys serve static agreement, needs no randomness and is always present.
 - **Bundle crate.**
   A fixed, documented composition, with no default features: each backend and each fill-in provider is behind its own feature.
   Its provider holds every enabled backend in a fixed order (aws-lc-rs, then ring, then RustCrypto), each a fallback for the previous (section 8.1), then the enabled fill-in providers, each built over that composition: the key-based KDFs, then FFDH.
