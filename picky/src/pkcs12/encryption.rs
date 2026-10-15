@@ -12,8 +12,8 @@ use rand::rngs::{StdRng, SysRng};
 use rand_core::SeedableRng as _;
 use std::str::FromStr as _;
 
-/// Same default KDF iterations as in OpenSSL
-const DEFAULT_KDF_ITERATIONS: usize = 2048;
+/// KDF iteration count used when none is set, the same as OpenSSL's default.
+pub const DEFAULT_KDF_ITERATIONS: u32 = 2048;
 const DEFAULT_SALT_SIZE: usize = 8;
 const AES_BLOCK_SIZE: usize = 16;
 
@@ -127,7 +127,7 @@ impl Pkcs12Encryption {
             kind: encryption.cipher,
             params: Pbes1ParamsAsn1 {
                 salt: OctetStringAsn1(salt),
-                iterations: encryption.kdf_iterations.unwrap_or(DEFAULT_KDF_ITERATIONS as u32),
+                iterations: encryption.kdf_iterations.unwrap_or(DEFAULT_KDF_ITERATIONS),
             },
         };
 
@@ -153,7 +153,7 @@ impl Pkcs12Encryption {
 
         let kdf_params = Pbkdf2ParamsAsn1 {
             salt: Pbkdf2SaltSourceAsn1::Specified(OctetStringAsn1(context.generate_bytes(DEFAULT_SALT_SIZE))),
-            iteration_count: encryption.kdf_iterations.unwrap_or(DEFAULT_KDF_ITERATIONS as u32),
+            iteration_count: encryption.kdf_iterations.unwrap_or(DEFAULT_KDF_ITERATIONS),
             // key length is not set by most implementations
             key_length: None,
             prf,
@@ -261,8 +261,8 @@ impl Pbes1Encryption {
         }
     }
 
-    /// Sets KDF iteraions count to `iterations`. If not set, [`DEFAULT_KDF_ITERATIONS`] is used
-    /// instead.
+    /// Sets the KDF iteration count to `iterations`.
+    /// If not set, [`DEFAULT_KDF_ITERATIONS`] is used.
     pub fn with_kdf_iterations(mut self, iterations: u32) -> Self {
         self.kdf_iterations = Some(iterations);
         self
@@ -287,8 +287,8 @@ impl Pbes2Encryption {
         }
     }
 
-    /// Sets KDF iteraions count to `iterations`. If not set, [`DEFAULT_KDF_ITERATIONS`] is used
-    /// instead.
+    /// Sets the KDF iteration count to `iterations`.
+    /// If not set, [`DEFAULT_KDF_ITERATIONS`] is used.
     pub fn with_kdf_iterations(mut self, iterations: u32) -> Self {
         self.kdf_iterations = Some(iterations);
         self
