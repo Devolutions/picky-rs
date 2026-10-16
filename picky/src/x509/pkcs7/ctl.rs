@@ -92,6 +92,14 @@ pub mod http_fetch {
 }
 
 #[cfg(test)]
+impl CertificateTrustList {
+    pub(crate) fn from_der(der: &[u8]) -> Result<Self, CtlError> {
+        let pkcs7 = Pkcs7::from_der(der).map_err(CtlError::FailedToParseCtl)?;
+        Ok(CertificateTrustList { pkcs7 })
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::x509::pkcs7::Pkcs7;
