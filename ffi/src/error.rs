@@ -245,6 +245,7 @@ pub mod ffi {
         }
 
         /// Returns the error kind.
+        #[diplomat::attr(auto, getter = "kind")]
         pub fn get_kind(&self) -> PickyErrorKind {
             self.0.kind
         }

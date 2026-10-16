@@ -16,12 +16,14 @@ pub mod ffi {
                 .is_a(picky::oid::ObjectIdentifier::try_from(other).map_err(|_| "invalid OID")?))
         }
 
+        #[diplomat::attr(auto, getter = "oid")]
         pub fn get_oid(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             let string: String = self.0.oid().into();
             write!(writable, "{string}")?;
             Ok(())
         }
 
+        #[diplomat::attr(auto, getter = "parameters")]
         pub fn get_parameters<'a>(&'a self) -> Box<AlgorithmIdentifierParameters<'a>> {
             Box::new(AlgorithmIdentifierParameters(self.0.parameters()))
         }
@@ -40,6 +42,7 @@ pub mod ffi {
     }
 
     impl AlgorithmIdentifierParameters<'_> {
+        #[diplomat::attr(auto, getter = "type")]
         pub fn get_type(&self) -> AlgorithmIdentifierParametersType {
             match self.0 {
                 picky_asn1_x509::AlgorithmIdentifierParameters::None => AlgorithmIdentifierParametersType::None,
@@ -96,6 +99,7 @@ pub mod ffi {
     }
 
     impl AesParameters {
+        #[diplomat::attr(auto, getter = "type")]
         pub fn get_type(&self) -> AesParametersType {
             match self.0 {
                 picky_asn1_x509::AesParameters::Null => AesParametersType::Null,

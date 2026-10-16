@@ -34,6 +34,7 @@ pub mod ffi {
     }
 
     impl GeneralName {
+        #[diplomat::attr(auto, getter = "type")]
         pub fn get_type(&self) -> GeneralNameType {
             match &self.0 {
                 picky_asn1_x509::name::GeneralName::OtherName(_) => GeneralNameType::OtherName,
@@ -136,6 +137,7 @@ pub mod ffi {
     pub struct EdiPartyName(pub picky_asn1_x509::name::EdiPartyName);
 
     impl EdiPartyName {
+        #[diplomat::attr(auto, getter = "name_assigner")]
         pub fn get_name_assigner(&self) -> Option<Box<DirectoryString>> {
             self.0
                 .name_assigner
@@ -143,6 +145,7 @@ pub mod ffi {
                 .map(|name_assigner| Box::new(DirectoryString(name_assigner.0.clone())))
         }
 
+        #[diplomat::attr(auto, getter = "party_name")]
         pub fn get_party_name(&self) -> Box<DirectoryString> {
             Box::new(DirectoryString(self.0.party_name.0.clone()))
         }
@@ -152,12 +155,14 @@ pub mod ffi {
     pub struct OtherName(pub picky_asn1_x509::name::OtherName);
 
     impl OtherName {
+        #[diplomat::attr(auto, getter = "type_id")]
         pub fn get_type_id(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             let oid: String = self.0.type_id.0.clone().into();
             write!(writable, "{oid}")?;
             Ok(())
         }
 
+        #[diplomat::attr(auto, getter = "value")]
         pub fn get_value(&self) -> Box<crate::utils::ffi::VecU8> {
             VecU8::from_bytes(&self.0.value.0.0).boxed()
         }

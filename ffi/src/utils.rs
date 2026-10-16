@@ -15,6 +15,7 @@ pub mod ffi {
             Box::new(VecU8(bytes.to_vec()))
         }
 
+        #[diplomat::attr(auto, getter = "length")]
         pub fn get_length(&self) -> usize {
             self.0.len()
         }

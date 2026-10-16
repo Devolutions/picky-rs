@@ -88,6 +88,7 @@ pub mod ffi {
             Ok(())
         }
 
+        #[diplomat::attr(auto, getter = "comment")]
         pub fn get_comment(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             writeable.write_str(&self.0.comment)?;
             writeable.flush();
@@ -228,12 +229,14 @@ pub mod ffi {
             Ok(())
         }
 
+        #[diplomat::attr(auto, getter = "cipher_name")]
         pub fn get_cipher_name(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             writeable.write_str(&self.0.cipher_name)?;
             writeable.flush();
             Ok(())
         }
 
+        #[diplomat::attr(auto, getter = "comment")]
         pub fn get_comment(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             writeable.write_str(&self.0.comment)?;
             writeable.flush();
@@ -276,51 +279,61 @@ pub mod ffi {
         }
 
         /// Required
+        #[diplomat::attr(auto, setter = "cert_key_type")]
         pub fn set_cert_key_type(&self, key_type: SshCertKeyType) {
             self.0.cert_key_type(key_type.into());
         }
 
         /// Required
+        #[diplomat::attr(auto, setter = "key")]
         pub fn set_key(&self, key: &SshPublicKey) {
             self.0.key(key.0.clone());
         }
 
         /// Optional (set to 0 by default)
+        #[diplomat::attr(auto, setter = "serial")]
         pub fn set_serial(&self, serial: u64) {
             self.0.serial(serial);
         }
 
         /// Required
+        #[diplomat::attr(auto, setter = "cert_type")]
         pub fn set_cert_type(&self, cert_type: SshCertType) {
             self.0.cert_type(cert_type.into());
         }
 
         /// Optional
+        #[diplomat::attr(auto, setter = "key_id")]
         pub fn set_key_id(&self, key_id: &str) {
             self.0.key_id(key_id.to_owned());
         }
 
         /// Required
+        #[diplomat::attr(auto, setter = "valid_before")]
         pub fn set_valid_before(&self, valid_before: u64) {
             self.0.valid_before(valid_before);
         }
 
         /// Required
+        #[diplomat::attr(auto, setter = "valid_after")]
         pub fn set_valid_after(&self, valid_after: u64) {
             self.0.valid_after(valid_after);
         }
 
         /// Required
+        #[diplomat::attr(auto, setter = "signature_key")]
         pub fn set_signature_key(&self, signature_key: &SshPrivateKey) {
             self.0.signature_key(signature_key.0.clone());
         }
 
         /// Optional. RsaPkcs1v15 with SHA256 is used by default.
+        #[diplomat::attr(auto, setter = "signature_algo")]
         pub fn set_signature_algo(&self, signature_algo: &SignatureAlgorithm) {
             self.0.signature_algo(signature_algo.0);
         }
 
         /// Optional
+        #[diplomat::attr(auto, setter = "comment")]
         pub fn set_comment(&self, comment: &str) {
             self.0.comment(comment.to_owned());
         }
@@ -353,36 +366,44 @@ pub mod ffi {
             Ok(())
         }
 
+        #[diplomat::attr(auto, getter = "public_key")]
         pub fn get_public_key(&self) -> Box<SshPublicKey> {
             Box::new(SshPublicKey(self.0.public_key.clone()))
         }
 
+        #[diplomat::attr(auto, getter = "ssh_key_type")]
         pub fn get_ssh_key_type(&self) -> SshCertKeyType {
             self.0.cert_key_type.into()
         }
 
+        #[diplomat::attr(auto, getter = "cert_type")]
         pub fn get_cert_type(&self) -> SshCertType {
             self.0.cert_type.into()
         }
 
+        #[diplomat::attr(auto, getter = "valid_after")]
         pub fn get_valid_after(&self) -> u64 {
             self.0.valid_after.0
         }
 
+        #[diplomat::attr(auto, getter = "valid_before")]
         pub fn get_valid_before(&self) -> u64 {
             self.0.valid_before.0
         }
 
+        #[diplomat::attr(auto, getter = "signature_key")]
         pub fn get_signature_key(&self) -> Box<SshPublicKey> {
             Box::new(SshPublicKey(self.0.signature_key.clone()))
         }
 
+        #[diplomat::attr(auto, getter = "key_id")]
         pub fn get_key_id(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             writeable.write_str(&self.0.key_id)?;
             writeable.flush();
             Ok(())
         }
 
+        #[diplomat::attr(auto, getter = "comment")]
         pub fn get_comment(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
             writeable.write_str(&self.0.comment)?;
             writeable.flush();
