@@ -133,7 +133,9 @@ pub mod ffi {
         }
     }
 
+    // Holds the issuer private key: free it promptly, don't wait on the GC.
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct CertificateBuilder(RefCell<super::CertificateBuilderInner>);
 
     impl CertificateBuilder {

@@ -6,7 +6,9 @@ pub mod ffi {
     use std::io::Write as _;
 
     ///  PEM object.
+    // Can carry a private key: free it promptly, don't wait on the GC.
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct Pem(pub picky::pem::Pem<'static>);
 
     impl Pem {

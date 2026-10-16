@@ -100,7 +100,9 @@ pub mod ffi {
         Mldsa,
     }
 
+    // Holds a private key: free it promptly, don't wait on the GC.
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct PrivateKey(pub picky::key::PrivateKey);
 
     impl PrivateKey {
