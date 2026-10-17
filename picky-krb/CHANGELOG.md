@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[0.13.1](https://github.com/Devolutions/picky-rs/compare/picky-krb-v0.13.0...picky-krb-v0.13.1)] - 2026-10-17
+
+### <!-- 6 -->Documentation
+
+- Fix broken doc links ([452923848c](https://github.com/Devolutions/picky-rs/commit/452923848c7534dd2e75df34a15de8251f16ee7d)) 
+
+  Resolve the Checksum::checksum and ApplicationTag links from the
+  modules that document them, and link the RFC 3962 URL.
+
+
+
 ## [[0.13.0](https://github.com/Devolutions/picky-rs/compare/picky-krb-v0.12.5...picky-krb-v0.13.0)] - 2026-10-07
 
 This release has the same code as 0.12.5, re-released as 0.13.0.
