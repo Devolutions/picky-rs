@@ -12,6 +12,7 @@ use crate::ssh::public_key::SshBasePublicKey;
 use crypto_bigint::BoxedUint;
 use rsa::traits::{PrivateKeyParts, PublicKeyParts};
 use rsa::{RsaPrivateKey, RsaPublicKey};
+use zeroize::Zeroizing;
 
 /// PuTTY private key wrapper
 pub(crate) struct PuttyPrivateKey {
@@ -56,13 +57,13 @@ impl PuttyPrivateKey {
 pub(crate) struct PuttyBasePrivateKey {
     pub(crate) algorithm: PpkKeyAlgorithmValue,
     pub(crate) public_key: PuttyBasePublicKey,
-    pub(crate) data: Vec<u8>,
+    pub(crate) data: Zeroizing<Vec<u8>>,
 }
 
 impl PuttyBasePrivateKey {
     pub fn from_openssh(key: &SshBasePrivateKey) -> Result<Self, PuttyError> {
-        let mut data = Vec::new();
-        let cursor = &mut data;
+        let mut data = Zeroizing::new(Vec::new());
+        let cursor = &mut *data;
 
         match key {
             SshBasePrivateKey::SkEcdsaSha2NistP256 { .. } | SshBasePrivateKey::SkEd25519 { .. } => {
