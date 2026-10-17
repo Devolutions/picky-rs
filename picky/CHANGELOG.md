@@ -6,6 +6,126 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[7.0.0-rc.28](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.27...picky-v7.0.0-rc.28)] - 2026-10-17
+
+### <!-- 0 -->Security
+
+- Mask JWE RSA key decryption errors ([#563](https://github.com/Devolutions/picky-rs/issues/563)) ([2e5b128850](https://github.com/Devolutions/picky-rs/commit/2e5b128850facd91ee8eb3994fe05f2883239faf)) 
+
+  RFC 7516 section 11.5 forbids distinguishing format, padding and length
+  errors of encrypted keys and recommends substituting a random CEK.
+  Section 11.4 asks for these errors to surface as a single error, since
+  an `alg` changed from RSA-OAEP to RSA1_5 can turn RSA-OAEP keys into a
+  padding oracle.
+  
+  When the encrypted key of an RSA1_5, RSA-OAEP or RSA-OAEP-256 JWE fails
+  to decrypt or yields a key of the wrong length, decryption continues
+  with a random CEK of the length required by `enc`.
+  As a result, `Jwe::decode` and `RawJwe::decrypt` no longer return
+  `JweError::Rsa` when the encrypted key fails to decrypt: they return
+  `JweError::AesGcm`, like tampered content.
+  Callers matching on `JweError::Rsa` for that case must handle
+  `JweError::AesGcm` instead.
+  RSA key decryption is now blinded with the OS generator, which also
+  supplies the substitute CEK.
+  The timing side channel of the rsa crate (RUSTSEC-2023-0071) remains,
+  since no fixed release exists.
+  
+  For the CBC-HS algorithms, which remain unsupported for content
+  encryption, the public `JweEnc::key_size` and `JweEnc::tag_size` now
+  return the RFC 7518 section 5.2 sizes.
+  Keys are now 32, 48 and 64 bytes instead of 16, 24 and 32, and tags 16,
+  24 and 32 bytes instead of 32, 48 and 64.
+  
+  Every random value in the JWE module, including the AES-GCM content
+  nonce, now comes from one OS-seeded generator helper.
+
+### <!-- 1 -->Features
+
+- Expose pkcs12::DEFAULT_KDF_ITERATIONS ([f9461a7333](https://github.com/Devolutions/picky-rs/commit/f9461a73334395674e641448e61fc4a6cc84b49e)) 
+
+  The docs of both `with_kdf_iterations` setters name the default
+  iteration count through `DEFAULT_KDF_ITERATIONS`, which was private and
+  missing from the public documentation. The constant is now public, typed
+  `u32` like the setters' argument, and re-exported from `picky::pkcs12`.
+
+### <!-- 4 -->Bug Fixes
+
+- Don't panic on RFC 3161 timestamp fallback ([#534](https://github.com/Devolutions/picky-rs/issues/534)) ([76881c4ee7](https://github.com/Devolutions/picky-rs/commit/76881c4ee70089accab4c84fb26c37cf3ff12b97)) 
+
+  `h_verify_signing_certificate` holds a mutable borrow of the validator
+  state for its whole body, and the `MsCounterSign` fallback (expired
+  signing certificate, RFC 3161 timestamp) borrows it again to read the
+  CTL. With the `ctl` feature, verifying such a signature panics with
+  `already mutably borrowed: BorrowError`, whether or not a CTL is set.
+  The borrow is only read, so it's now shared.
+  
+  The new test verifies the psdiag signature after its signing certificate
+  expired; it panics without the fix. The signature moves from
+  `full_validation_authenticode_signature_with_well_known_ca` to
+  `picky-test-data` so both tests share it.
+
+- Keep leading zero bytes in key components ([#557](https://github.com/Devolutions/picky-rs/issues/557)) ([122303e05e](https://github.com/Devolutions/picky-rs/commit/122303e05e692b083e01834805fe5fdab87cdac3)) 
+
+  EC coordinates and secrets, and Ed25519 secrets, have a fixed length,
+  but several decoding paths trimmed their leading zero bytes and then
+  required the full length.
+  Keys with such a byte were rejected, or decoded to a short secret that
+  failed later when signing.
+  This affected keys built from components or decoded from JWK, OpenSSH or
+  PuTTY: about 1 in 128 P-256 and P-384 public keys and 1 in 256 of their
+  decoded private keys, most P-521 keys, and 1 in 256 Ed25519 keys.
+  
+  - `PublicKey::from_ec_components` and `PrivateKey::from_ec_components`
+  left-pad coordinates and secrets to the field length and reject longer
+  values.
+  - JWK EC decoding accepts full-length coordinates that start with zero
+  bytes, so P-521 keys such as the RFC 7520 example now convert to
+  `PublicKey`, and rejects any other length, as RFC 7518 section 6.2.1.2
+  requires.
+  - `Jwk::from_public_key` and `JwkKeyType::new_ec_key` emit full-length
+  coordinates: `new_ec_key` removes or adds leading zero bytes to reach
+  the field length, so signed coordinates with a sign byte still work, and
+  passes longer coordinates through unchanged for `to_public_key` to
+  reject.
+  - OpenSSH and PuTTY ECDSA decoding left-pad the `mpint` secret to the
+  field length.
+  - OpenSSH Ed25519 decoding reads the private key as the fixed 64-byte
+  string it is.
+  - PuTTY Ed25519 decoding restores the trailing zero bytes that PuTTY
+  before 0.75 omits from its little-endian secret, still reads the
+  big-endian `mpint` that earlier picky versions wrote, and rejects a
+  secret that does not match the public key.
+  - PuTTY Ed25519 encoding writes the full 32-byte secret, as PuTTY 0.75
+  and later do, instead of a minimal `mpint`.
+  
+  JWK EC output changes for keys whose coordinates start with a zero byte:
+  they are now encoded at full length.
+  Short coordinates were already rejected on decoding; coordinates with
+  extra leading zero bytes beyond the field length are now rejected as
+  well.
+  
+  The OpenSSH and PuTTY test keys are generated with `ssh-keygen` and
+  `puttygen`; `picky-test-data/test_assets/ssh/README.md` records the
+  commands.
+  
+  ---------
+
+- Call SignatureEncoding::to_vec explicitly for Ed25519 ([#558](https://github.com/Devolutions/picky-rs/issues/558)) ([1fd7f0a418](https://github.com/Devolutions/picky-rs/commit/1fd7f0a4188ffe2d35d6e8b7440e46dd89c10c22)) 
+
+  When the `alloc` feature of `ed25519` is enabled anywhere in the build,
+  for example through `ed25519-dalek/alloc`, feature unification gives
+  `ed25519::Signature` an inherent `to_vec` method. That method takes
+  precedence over `SignatureEncoding::to_vec`, which leaves the
+  `SignatureEncoding` import unused and fails builds that deny warnings.
+  
+  Calling the trait method by its full path works in every feature
+  combination and does not change behavior. No test is added because the
+  failure is a compile-time lint that only appears under that feature
+  combination.
+
+
+
 ## [[7.0.0-rc.27](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.26...picky-v7.0.0-rc.27)] - 2026-09-29
 
 ### <!-- 7 -->Build
