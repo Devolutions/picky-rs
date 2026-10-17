@@ -210,11 +210,10 @@ struct PickyErrorInner {
 
 #[diplomat::bridge]
 pub mod ffi {
-    use diplomat_runtime::DiplomatWriteable;
+    use diplomat_runtime::DiplomatWrite;
     use std::fmt::Write as _;
 
     /// Kind associated to a Picky Error
-    #[derive(Clone, Copy)]
     pub enum PickyErrorKind {
         /// Generic Picky error
         Generic,
@@ -234,7 +233,7 @@ pub mod ffi {
 
     impl PickyError {
         /// Returns the error as a string.
-        pub fn to_display(&self, writeable: &mut DiplomatWriteable) {
+        pub fn to_display(&self, writeable: &mut DiplomatWrite) {
             let _ = write!(writeable, "{}", self.0.repr);
             writeable.flush();
         }

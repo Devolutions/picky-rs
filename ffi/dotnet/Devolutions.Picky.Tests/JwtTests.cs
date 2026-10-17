@@ -120,7 +120,7 @@ vQIDAQAB
         string additionalObject = @"{""answer"":42,""foo"":""bar""}";
 
         JwtSigBuilder builder = JwtSig.Builder();
-        builder.Algorithm = JwsAlg.RS512;
+        builder.Algorithm = JwsAlg.Rs512;
         builder.Claims = claims;
         builder.AddAdditionalParameterString("additional_token", "abcd.efgh.ijklm");
         builder.AddAdditionalParameterObject("additional_object", additionalObject);

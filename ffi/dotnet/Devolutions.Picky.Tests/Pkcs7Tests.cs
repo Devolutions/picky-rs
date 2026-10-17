@@ -123,7 +123,7 @@ ocqmQTrEqWzH7mmVUFXY5GA=
         RsString program_name = RsString.FromString("decoding_into_authenticode_signature");
         PrivateKey privateKey = PrivateKey.FromPemStr(private_key);
 
-        AuthenticodeSignature signature = AuthenticodeSignature.New(pkcs7, fileHashBuffer, ShaVariant.SHA2_256, privateKey, program_name);
+        AuthenticodeSignature signature = AuthenticodeSignature.New(pkcs7, fileHashBuffer, ShaVariant.Sha2256, privateKey, program_name);
         Assert.NotNull(signature);
 
         VecU8? file_hash = signature?.FileHash();
@@ -151,10 +151,7 @@ ocqmQTrEqWzH7mmVUFXY5GA=
         }
         catch (PickyException e)
         {
-            DiplomatWriteable writeable = new DiplomatWriteable();
-            e.Inner.ToDisplay(writeable);
-            string? error = writeable.ToUtf8Bytes()?.ToString();
-            Console.WriteLine(error);
+            Console.WriteLine(e.Inner.ToDisplay());
             Assert.True(false);
         }
     }

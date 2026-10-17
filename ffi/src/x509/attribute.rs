@@ -7,7 +7,7 @@ pub mod ffi {
     use crate::x509::singer_info::ffi::{CmsVersion, SignerInfo, SignerInfoIterator};
     use crate::x509::string::ffi::DirectoryString;
     use crate::x509::time::ffi::{Time, UTCTime, UTCTimeIterator};
-    use diplomat_runtime::DiplomatWriteable;
+    use diplomat_runtime::DiplomatWrite;
     use std::fmt::Write;
 
     #[diplomat::opaque]
@@ -15,7 +15,7 @@ pub mod ffi {
 
     impl Attribute {
         #[diplomat::attr(auto, getter = "type")]
-        pub fn get_type(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn get_type(&self, writable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             let oid: String = self.0.ty.0.clone().into();
             write!(writable, "{oid}")?;
             Ok(())
@@ -27,7 +27,7 @@ pub mod ffi {
         }
     }
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct AttributeIterator(pub Vec<Attribute>);
 
     impl AttributeIterator {
@@ -180,7 +180,7 @@ pub mod ffi {
         }
 
         #[diplomat::attr(auto, getter = "as_string")]
-        pub fn get_as_string(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn get_as_string(&self, writable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             match &self.0 {
                 picky_asn1_x509::pkcs7::content_info::SpcString::Unicode(unicode) => {
                     write!(writable, "{}", unicode.0.0.0)?;
@@ -272,7 +272,7 @@ pub mod ffi {
         }
     }
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct SpcSpOpusInfoIterator(pub Vec<SpcSpOpusInfo>);
 
     impl SpcSpOpusInfoIterator {
@@ -284,7 +284,7 @@ pub mod ffi {
     //====================================================================
     // AttributeTypeAndValue
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct AttributeTypeAndValueIterator(pub Vec<AttributeTypeAndValue>);
 
     impl AttributeTypeAndValueIterator {
@@ -293,7 +293,7 @@ pub mod ffi {
         }
     }
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct AttributeTypeAndValueNestedIterator(pub Vec<AttributeTypeAndValueIterator>);
 
     impl AttributeTypeAndValueNestedIterator {
@@ -307,7 +307,7 @@ pub mod ffi {
 
     impl AttributeTypeAndValue {
         #[diplomat::attr(auto, getter = "type_id")]
-        pub fn get_type_id(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn get_type_id(&self, writable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             let oid: String = self.0.ty.0.clone().into();
             write!(writable, "{oid}")?;
             Ok(())
@@ -512,7 +512,7 @@ pub mod ffi {
 
     impl UnsignedAttribute {
         #[diplomat::attr(auto, getter = "type")]
-        pub fn get_type(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn get_type(&self, writable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             let oid: String = self.0.ty.0.clone().into();
             write!(writable, "{oid}")?;
             Ok(())
@@ -524,7 +524,7 @@ pub mod ffi {
         }
     }
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct UnsignedAttributeIterator(pub Vec<UnsignedAttribute>);
 
     impl UnsignedAttributeIterator {
@@ -574,7 +574,7 @@ pub mod ffi {
         }
     }
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct MsCounterSignIterator(pub Vec<MsCounterSign>);
 
     impl MsCounterSignIterator {
@@ -588,7 +588,7 @@ pub mod ffi {
 
     impl MsCounterSign {
         #[diplomat::attr(auto, getter = "oid")]
-        pub fn get_oid(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn get_oid(&self, writable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             let oid_string: String = self.0.oid.0.clone().into();
             write!(writable, "{oid_string}")?;
             Ok(())
@@ -600,7 +600,7 @@ pub mod ffi {
         }
     }
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct SignedData(pub picky_asn1_x509::pkcs7::signed_data::SignedData);
 
     impl SignedData {
@@ -645,14 +645,14 @@ pub mod ffi {
     pub struct EncapsulatedContentInfo(pub picky_asn1_x509::content_info::EncapsulatedContentInfo);
 
     impl EncapsulatedContentInfo {
-        pub fn content_type(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn content_type(&self, writable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             let oid: String = self.0.content_type.0.clone().into();
             write!(writable, "{oid}")?;
             Ok(())
         }
     }
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct CertificateChoicesIterator(pub picky_asn1_x509::signed_data::CertificateSet);
 
     impl CertificateChoicesIterator {
@@ -692,7 +692,7 @@ pub mod ffi {
     }
 
     // Owns copies of all the CRLs, which can be megabytes.
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     #[diplomat::attr(dotnet, manually_disposable)]
     pub struct RevocationInfoChoiceIterator(pub picky_asn1_x509::crls::RevocationInfoChoices);
 
@@ -762,7 +762,7 @@ pub mod ffi {
         }
 
         #[diplomat::attr(auto, getter = "issuer")]
-        pub fn get_issuer(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn get_issuer(&self, writable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             let name_string = format!("{}", self.0.issuer);
             write!(writable, "{name_string}")?;
             Ok(())
@@ -841,7 +841,7 @@ pub mod ffi {
     }
 
     // Owned copy of a CRL's revoked entries, which can be megabytes.
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     #[diplomat::attr(dotnet, manually_disposable)]
     pub struct RevokedCertificateIterator(pub Vec<RevokedCertificate>);
 
