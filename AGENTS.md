@@ -1,3 +1,8 @@
+# picky-rs
+
+Reusable agent skills live in `.agents/skills/` and `.github/skills/`; use the matching skill before committing, opening a pull request, posting a GitHub comment, or writing prose.
+Skills listed in `.github/skills-sync.yml` are overwritten weekly from `Devolutions/devolutions-gateway`; change those upstream, and keep repository-local skills out of that list.
+
 ## Intent files
 
 `INTENT.md` and `*.intent.md` files contain human-owned intent for the software.
@@ -10,12 +15,16 @@ If a requested change conflicts with intent, stop and surface the conflict for h
 Committed text (code, comments, docs, commit messages) and PR titles and descriptions never refer to work stages, decision identifiers, agent roles, sessions or planning documents.
 State rationale, not history.
 
-Code comments and doc comments follow the same rule as Markdown: each sentence starts on its own line and wraps only where it would exceed the line-length limit.
-
 ## Rust
 
 Write Rust with the `rust-style` skill.
-The `code-review` skill runs `rust-style-reviewer` on changed Rust lines.
+Think before silencing a lint, then use `#[expect(<lint>, reason = "...")]` so the suppression explains itself and expires when it stops being needed.
+Library crates expose typed errors, with `thiserror` or hand-rolled `Display`/`Error` impls, never `anyhow`.
+
+## picky-crypto
+
+`picky-crypto`, `picky-crypto-testsuite` and `picky-crypto-rustcrypto` each have an `AGENTS.md`; read it before changing them.
+Contract tests live in `picky-crypto-testsuite`, not in backends.
 
 ## Untested-property comments
 
