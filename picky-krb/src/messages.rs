@@ -4,7 +4,7 @@ use std::io::{self, Read};
 use crate::constants::krb_priv::KRB_PRIV_VERSION;
 use crate::constants::types::{
     AP_REP_MSG_TYPE, AP_REQ_MSG_TYPE, AS_REP_MSG_TYPE, AS_REQ_MSG_TYPE, ENC_AS_REP_PART_TYPE, ENC_TGS_REP_PART_TYPE,
-    KRB_ERROR_MSG_TYPE, KRB_PRIV, TGS_REP_MSG_TYPE, TGS_REQ_MSG_TYPE,
+    KRB_CRED_MSG_TYPE, KRB_ERROR_MSG_TYPE, KRB_PRIV, TGS_REP_MSG_TYPE, TGS_REQ_MSG_TYPE,
 };
 use crate::data_types::{
     ApOptions, EncryptedData, EncryptionKey, HostAddresses, KerberosFlags, KerberosStringAsn1, KerberosTime, LastReq,
@@ -328,6 +328,26 @@ pub struct KrbPrivInner {
 
 pub type KrbPriv = ApplicationTag<KrbPrivInner, KRB_PRIV>;
 
+/// [RFC 4120 5.8.1](https://www.rfc-editor.org/rfc/rfc4120#section-5.8.1)
+///
+/// ```not_rust
+/// KRB-CRED        ::= [APPLICATION 22] SEQUENCE {
+///         pvno            [0] INTEGER (5),
+///         msg-type        [1] INTEGER (22),
+///         tickets         [2] SEQUENCE OF Ticket,
+///         enc-part        [3] EncryptedData -- EncKrbCredPart
+/// }
+/// ```
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub struct KrbCredInner {
+    pub pvno: ExplicitContextTag0<IntegerAsn1>,
+    pub msg_type: ExplicitContextTag1<IntegerAsn1>,
+    pub tickets: ExplicitContextTag2<Asn1SequenceOf<Ticket>>,
+    pub enc_part: ExplicitContextTag3<EncryptedData>,
+}
+
+pub type KrbCred = ApplicationTag<KrbCredInner, KRB_CRED_MSG_TYPE>;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ApMessage {
     ApReq(ApReq),
@@ -528,6 +548,118 @@ mod tests {
         ExplicitContextTag8, ExplicitContextTag9, ExplicitContextTag10, ExplicitContextTag11, GeneralStringAsn1,
         GeneralizedTimeAsn1, IntegerAsn1, OctetStringAsn1, Optional,
     };
+
+    #[test]
+    fn krb_cred_encoding() {
+        use crate::constants::types::KRB_CRED_MSG_TYPE;
+
+        use super::{KrbCred, KrbCredInner};
+
+        let encrypted = EncryptedData {
+            etype: ExplicitContextTag0::from(IntegerAsn1::from(vec![18])),
+            kvno: Optional::from(None),
+            cipher: ExplicitContextTag2::from(OctetStringAsn1::from(vec![0xaa, 0xbb])),
+        };
+        let expected = KrbCred::from(KrbCredInner {
+            pvno: ExplicitContextTag0::from(IntegerAsn1::from(vec![5])),
+            msg_type: ExplicitContextTag1::from(IntegerAsn1::from(vec![KRB_CRED_MSG_TYPE])),
+            tickets: ExplicitContextTag2::from(Asn1SequenceOf::from(vec![Ticket::from(TicketInner {
+                tkt_vno: ExplicitContextTag0::from(IntegerAsn1::from(vec![5])),
+                realm: ExplicitContextTag1::from(Realm::from(Ia5String::from_string("R".into()).unwrap())),
+                sname: ExplicitContextTag2::from(PrincipalName {
+                    name_type: ExplicitContextTag0::from(IntegerAsn1::from(vec![1])),
+                    name_string: ExplicitContextTag1::from(Asn1SequenceOf::from(vec![KerberosStringAsn1::from(
+                        Ia5String::from_string("s".into()).unwrap(),
+                    )])),
+                }),
+                enc_part: ExplicitContextTag3::from(encrypted.clone()),
+            })])),
+            enc_part: ExplicitContextTag3::from(encrypted),
+        });
+        let expected_raw = [
+            0x76, 0x4c, 0x30, 0x4a, 0xa0, 0x03, 0x02, 0x01, 0x05, 0xa1, 0x03, 0x02, 0x01, 0x16, 0xa2, 0x2f, 0x30, 0x2d,
+            0x61, 0x2b, 0x30, 0x29, 0xa0, 0x03, 0x02, 0x01, 0x05, 0xa1, 0x03, 0x1b, 0x01, 0x52, 0xa2, 0x0e, 0x30, 0x0c,
+            0xa0, 0x03, 0x02, 0x01, 0x01, 0xa1, 0x05, 0x30, 0x03, 0x1b, 0x01, 0x73, 0xa3, 0x0d, 0x30, 0x0b, 0xa0, 0x03,
+            0x02, 0x01, 0x12, 0xa2, 0x04, 0x04, 0x02, 0xaa, 0xbb, 0xa3, 0x0d, 0x30, 0x0b, 0xa0, 0x03, 0x02, 0x01, 0x12,
+            0xa2, 0x04, 0x04, 0x02, 0xaa, 0xbb,
+        ];
+        assert_eq!(picky_asn1_der::to_vec(&expected).unwrap(), expected_raw);
+        assert_eq!(picky_asn1_der::from_bytes::<KrbCred>(&expected_raw).unwrap(), expected);
+        let mut wrong_tag = expected_raw;
+        wrong_tag[0] = 0x75;
+        assert!(picky_asn1_der::from_bytes::<KrbCred>(&wrong_tag).is_err());
+        assert!(picky_asn1_der::from_bytes::<KrbCred>(&expected_raw[..expected_raw.len() - 1]).is_err());
+    }
+
+    #[test]
+    fn krb_cred_round_trip_keeps_optional_fields() {
+        use crate::constants::key_usages::KRB_CRED_ENC_PART;
+        use crate::constants::types::KRB_CRED_MSG_TYPE;
+        use crate::data_types::{EncKrbCredPart, EncKrbCredPartInner, EncryptionKey, KrbCredInfo};
+
+        use super::{KrbCred, KrbCredInner};
+
+        let principal = |name_type, names: &[&str]| PrincipalName {
+            name_type: ExplicitContextTag0::from(IntegerAsn1::from(vec![name_type])),
+            name_string: ExplicitContextTag1::from(Asn1SequenceOf::from(
+                names
+                    .iter()
+                    .map(|name| KerberosStringAsn1::from(Ia5String::from_string((*name).to_owned()).unwrap()))
+                    .collect::<Vec<_>>(),
+            )),
+        };
+        let realm = || Realm::from(Ia5String::from_string("EXAMPLE.TEST".into()).unwrap());
+        let info = KrbCredInfo {
+            key: ExplicitContextTag0::from(EncryptionKey {
+                key_type: ExplicitContextTag0::from(IntegerAsn1::from(vec![18])),
+                key_value: ExplicitContextTag1::from(OctetStringAsn1::from(vec![0x42; 32])),
+            }),
+            prealm: Optional::from(Some(ExplicitContextTag1::from(realm()))),
+            pname: Optional::from(Some(ExplicitContextTag2::from(principal(1, &["alice"])))),
+            flags: Optional::from(Some(ExplicitContextTag3::from(BitStringAsn1::from(
+                BitString::with_bytes(vec![0x60, 0, 0, 0]),
+            )))),
+            auth_time: Optional::from(None),
+            start_time: Optional::from(None),
+            end_time: Optional::from(None),
+            renew_till: Optional::from(None),
+            srealm: Optional::from(Some(ExplicitContextTag8::from(realm()))),
+            sname: Optional::from(Some(ExplicitContextTag9::from(principal(
+                2,
+                &["krbtgt", "EXAMPLE.TEST"],
+            )))),
+            caddr: Optional::from(None),
+        };
+        let enc_part = EncKrbCredPart::from(EncKrbCredPartInner {
+            ticket_info: ExplicitContextTag0::from(Asn1SequenceOf::from(vec![info])),
+            nonce: Optional::from(None),
+            timestamp: Optional::from(None),
+            usec: Optional::from(Some(ExplicitContextTag3::from(IntegerAsn1::from(vec![1])))),
+            s_address: Optional::from(None),
+            r_address: Optional::from(None),
+        });
+        let encoded = picky_asn1_der::to_vec(&enc_part).unwrap();
+        assert_eq!(encoded.first(), Some(&0x7d));
+        assert_eq!(
+            picky_asn1_der::from_bytes::<EncKrbCredPart>(&encoded).unwrap(),
+            enc_part
+        );
+
+        let krb_cred = KrbCred::from(KrbCredInner {
+            pvno: ExplicitContextTag0::from(IntegerAsn1::from(vec![5])),
+            msg_type: ExplicitContextTag1::from(IntegerAsn1::from(vec![KRB_CRED_MSG_TYPE])),
+            tickets: ExplicitContextTag2::from(Asn1SequenceOf::from(vec![])),
+            enc_part: ExplicitContextTag3::from(EncryptedData {
+                etype: ExplicitContextTag0::from(IntegerAsn1::from(vec![18])),
+                kvno: Optional::from(None),
+                cipher: ExplicitContextTag2::from(OctetStringAsn1::from(vec![0xaa; 4])),
+            }),
+        });
+        let encoded = picky_asn1_der::to_vec(&krb_cred).unwrap();
+        assert_eq!(encoded.first(), Some(&0x76));
+        assert_eq!(picky_asn1_der::from_bytes::<KrbCred>(&encoded).unwrap(), krb_cred);
+        assert_eq!(KRB_CRED_ENC_PART, 14);
+    }
 
     #[test]
     fn krb_priv_request_serialization() {
