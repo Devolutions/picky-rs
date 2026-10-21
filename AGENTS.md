@@ -23,11 +23,6 @@ Write Rust with the `rust-style` skill and tests with the `test-writer` skill.
 Think before silencing a lint, then use `#[expect(<lint>, reason = "...")]` so the suppression explains itself and expires when it stops being needed.
 Library crates expose typed errors, with `thiserror` or hand-rolled `Display`/`Error` impls, never `anyhow`.
 
-## picky-crypto
-
-`picky-crypto`, `picky-crypto-testsuite` and `picky-crypto-rustcrypto` each have an `AGENTS.md`; read it before changing them.
-Contract tests live in `picky-crypto-testsuite`, not in backends.
-
 ## Untested-property comments
 
 When code must keep a property that no test checks, mark it with an `UNTESTED:` comment at that code, because passing tests prove nothing about it.
