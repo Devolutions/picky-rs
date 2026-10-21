@@ -17,7 +17,7 @@ State rationale, not history.
 
 ## Rust
 
-Write Rust with the `rust-style` skill.
+Write Rust with the `rust-style` skill and tests with the `test-writer` skill.
 Think before silencing a lint, then use `#[expect(<lint>, reason = "...")]` so the suppression explains itself and expires when it stops being needed.
 Library crates expose typed errors, with `thiserror` or hand-rolled `Display`/`Error` impls, never `anyhow`.
 
