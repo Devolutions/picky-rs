@@ -12,6 +12,7 @@ pub mod types {
     pub const KRB_PRIV: u8 = 21;
     pub const KRB_PRIV_ENC_PART: u8 = 28;
 
+    pub const KRB_CRED_MSG_TYPE: u8 = 22;
     pub const KRB_ERROR_MSG_TYPE: u8 = 0x1e;
 
     //= [Principal Names](https://datatracker.ietf.org/doc/html/rfc4120#section-6.2) =//
@@ -43,6 +44,7 @@ pub mod types {
     pub const ENC_AS_REP_PART_TYPE: u8 = 25;
     pub const ENC_TGS_REP_PART_TYPE: u8 = 26;
     pub const ENC_AP_REP_PART_TYPE: u8 = 27;
+    pub const ENC_KRB_CRED_PART_TYPE: u8 = 29;
 
     //= [Address Types](https://datatracker.ietf.org/doc/html/rfc4120#section-7.5.3) =//
     pub const IP_V4_ADDR_TYPE: u8 = 2;
@@ -81,6 +83,7 @@ pub mod key_usages {
     pub const AP_REQ_AUTHENTICATOR: i32 = 11;
     pub const AP_REP_ENC: i32 = 12;
     pub const KRB_PRIV_ENC_PART: i32 = 13;
+    pub const KRB_CRED_ENC_PART: i32 = 14;
 
     //= [The GSS-API Binding for PKU2U](https://datatracker.ietf.org/doc/html/draft-zhu-pku2u-04#section-6) =//
     pub const KEY_USAGE_FINISHED: i32 = 41;

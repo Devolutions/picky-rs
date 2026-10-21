@@ -15,7 +15,8 @@ use std::marker::PhantomData;
 use std::{fmt, io};
 
 use crate::constants::types::{
-    AUTHENTICATOR_TYPE, ENC_AP_REP_PART_TYPE, ENC_TICKET_PART_TYPE, KRB_PRIV_ENC_PART, TICKET_TYPE,
+    AUTHENTICATOR_TYPE, ENC_AP_REP_PART_TYPE, ENC_KRB_CRED_PART_TYPE, ENC_TICKET_PART_TYPE, KRB_PRIV_ENC_PART,
+    TICKET_TYPE,
 };
 use crate::messages::KrbError;
 
@@ -418,6 +419,77 @@ pub struct EncKrbPrivPartInner {
 
 pub type EncKrbPrivPart = ApplicationTag<EncKrbPrivPartInner, KRB_PRIV_ENC_PART>;
 
+/// [RFC 4120 5.8.1](https://www.rfc-editor.org/rfc/rfc4120#section-5.8.1)
+///
+/// ```not_rust
+/// KrbCredInfo     ::= SEQUENCE {
+///         key             [0] EncryptionKey,
+///         prealm          [1] Realm OPTIONAL,
+///         pname           [2] PrincipalName OPTIONAL,
+///         flags           [3] TicketFlags OPTIONAL,
+///         authtime        [4] KerberosTime OPTIONAL,
+///         starttime       [5] KerberosTime OPTIONAL,
+///         endtime         [6] KerberosTime OPTIONAL,
+///         renew-till      [7] KerberosTime OPTIONAL,
+///         srealm          [8] Realm OPTIONAL,
+///         sname           [9] PrincipalName OPTIONAL,
+///         caddr           [10] HostAddresses OPTIONAL
+/// }
+/// ```
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub struct KrbCredInfo {
+    pub key: ExplicitContextTag0<EncryptionKey>,
+    #[serde(default)]
+    pub prealm: Optional<Option<ExplicitContextTag1<Realm>>>,
+    #[serde(default)]
+    pub pname: Optional<Option<ExplicitContextTag2<PrincipalName>>>,
+    #[serde(default)]
+    pub flags: Optional<Option<ExplicitContextTag3<KerberosFlags>>>,
+    #[serde(default)]
+    pub auth_time: Optional<Option<ExplicitContextTag4<KerberosTime>>>,
+    #[serde(default)]
+    pub start_time: Optional<Option<ExplicitContextTag5<KerberosTime>>>,
+    #[serde(default)]
+    pub end_time: Optional<Option<ExplicitContextTag6<KerberosTime>>>,
+    #[serde(default)]
+    pub renew_till: Optional<Option<ExplicitContextTag7<KerberosTime>>>,
+    #[serde(default)]
+    pub srealm: Optional<Option<ExplicitContextTag8<Realm>>>,
+    #[serde(default)]
+    pub sname: Optional<Option<ExplicitContextTag9<PrincipalName>>>,
+    #[serde(default)]
+    pub caddr: Optional<Option<ExplicitContextTag10<HostAddresses>>>,
+}
+
+/// [RFC 4120 5.8.1](https://www.rfc-editor.org/rfc/rfc4120#section-5.8.1)
+///
+/// ```not_rust
+/// EncKrbCredPart  ::= [APPLICATION 29] SEQUENCE {
+///         ticket-info     [0] SEQUENCE OF KrbCredInfo,
+///         nonce           [1] UInt32 OPTIONAL,
+///         timestamp       [2] KerberosTime OPTIONAL,
+///         usec            [3] Microseconds OPTIONAL,
+///         s-address       [4] HostAddress OPTIONAL,
+///         r-address       [5] HostAddress OPTIONAL
+/// }
+/// ```
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub struct EncKrbCredPartInner {
+    pub ticket_info: ExplicitContextTag0<Asn1SequenceOf<KrbCredInfo>>,
+    #[serde(default)]
+    pub nonce: Optional<Option<ExplicitContextTag1<IntegerAsn1>>>,
+    #[serde(default)]
+    pub timestamp: Optional<Option<ExplicitContextTag2<KerberosTime>>>,
+    #[serde(default)]
+    pub usec: Optional<Option<ExplicitContextTag3<Microseconds>>>,
+    #[serde(default)]
+    pub s_address: Optional<Option<ExplicitContextTag4<HostAddress>>>,
+    #[serde(default)]
+    pub r_address: Optional<Option<ExplicitContextTag5<HostAddress>>>,
+}
+
+pub type EncKrbCredPart = ApplicationTag<EncKrbCredPartInner, ENC_KRB_CRED_PART_TYPE>;
+
 /// [RFC 3244](https://datatracker.ietf.org/doc/html/rfc3244.html#section-2)
 ///
 /// ```not_rust
@@ -561,7 +633,146 @@ mod tests {
     };
     use picky_asn1_der::application_tag::ApplicationTag;
 
-    use super::{ChangePasswdData, Microseconds, PaEncTsEnc};
+    use super::{ChangePasswdData, EncKrbCredPart, EncKrbCredPartInner, KrbCredInfo, Microseconds, PaEncTsEnc};
+
+    fn minimal_krb_cred_info() -> KrbCredInfo {
+        KrbCredInfo {
+            key: ExplicitContextTag0::from(EncryptionKey {
+                key_type: ExplicitContextTag0::from(IntegerAsn1::from(vec![18])),
+                key_value: ExplicitContextTag1::from(OctetStringAsn1::from(vec![0x42])),
+            }),
+            prealm: Optional::from(None),
+            pname: Optional::from(None),
+            flags: Optional::from(None),
+            auth_time: Optional::from(None),
+            start_time: Optional::from(None),
+            end_time: Optional::from(None),
+            renew_till: Optional::from(None),
+            srealm: Optional::from(None),
+            sname: Optional::from(None),
+            caddr: Optional::from(None),
+        }
+    }
+
+    #[test]
+    fn krb_cred_info_optional_fields() {
+        let minimal = minimal_krb_cred_info();
+        let minimal_raw = [
+            0x30, 0x0e, 0xa0, 0x0c, 0x30, 0x0a, 0xa0, 0x03, 0x02, 0x01, 0x12, 0xa1, 0x03, 0x04, 0x01, 0x42,
+        ];
+        assert_eq!(picky_asn1_der::to_vec(&minimal).unwrap(), minimal_raw);
+        assert_eq!(
+            picky_asn1_der::from_bytes::<KrbCredInfo>(&minimal_raw).unwrap(),
+            minimal
+        );
+        assert!(picky_asn1_der::from_bytes::<KrbCredInfo>(&[0x30, 0x00]).is_err());
+
+        let principal = |name: &str| PrincipalName {
+            name_type: ExplicitContextTag0::from(IntegerAsn1::from(vec![1])),
+            name_string: ExplicitContextTag1::from(Asn1SequenceOf::from(vec![KerberosStringAsn1::from(
+                Ia5String::from_string(name.to_owned()).unwrap(),
+            )])),
+        };
+        let time = |day| KerberosTime::from(Date::new(2026, 1, day, 0, 0, 0).unwrap());
+        let full = KrbCredInfo {
+            prealm: Optional::from(Some(ExplicitContextTag1::from(KerberosStringAsn1::from(
+                Ia5String::from_string("R".into()).unwrap(),
+            )))),
+            pname: Optional::from(Some(ExplicitContextTag2::from(principal("u")))),
+            flags: Optional::from(Some(ExplicitContextTag3::from(BitStringAsn1::from(
+                BitString::with_bytes(vec![0x60, 0, 0, 0]),
+            )))),
+            auth_time: Optional::from(Some(ExplicitContextTag4::from(time(1)))),
+            start_time: Optional::from(Some(ExplicitContextTag5::from(time(2)))),
+            end_time: Optional::from(Some(ExplicitContextTag6::from(time(3)))),
+            renew_till: Optional::from(Some(ExplicitContextTag7::from(time(4)))),
+            srealm: Optional::from(Some(ExplicitContextTag8::from(KerberosStringAsn1::from(
+                Ia5String::from_string("S".into()).unwrap(),
+            )))),
+            sname: Optional::from(Some(ExplicitContextTag9::from(principal("s")))),
+            caddr: Optional::from(Some(ExplicitContextTag10::from(Asn1SequenceOf::from(vec![
+                HostAddress {
+                    addr_type: ExplicitContextTag0::from(IntegerAsn1::from(vec![2])),
+                    address: ExplicitContextTag1::from(OctetStringAsn1::from(vec![192, 0, 2, 1])),
+                },
+            ])))),
+            ..minimal
+        };
+        let full_raw = [
+            0x30, 0x81, 0xa0, 0xa0, 0x0c, 0x30, 0x0a, 0xa0, 0x03, 0x02, 0x01, 0x12, 0xa1, 0x03, 0x04, 0x01, 0x42, 0xa1,
+            0x03, 0x1b, 0x01, 0x52, 0xa2, 0x0e, 0x30, 0x0c, 0xa0, 0x03, 0x02, 0x01, 0x01, 0xa1, 0x05, 0x30, 0x03, 0x1b,
+            0x01, 0x75, 0xa3, 0x07, 0x03, 0x05, 0x00, 0x60, 0x00, 0x00, 0x00, 0xa4, 0x11, 0x18, 0x0f, 0x32, 0x30, 0x32,
+            0x36, 0x30, 0x31, 0x30, 0x31, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x5a, 0xa5, 0x11, 0x18, 0x0f, 0x32, 0x30,
+            0x32, 0x36, 0x30, 0x31, 0x30, 0x32, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x5a, 0xa6, 0x11, 0x18, 0x0f, 0x32,
+            0x30, 0x32, 0x36, 0x30, 0x31, 0x30, 0x33, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x5a, 0xa7, 0x11, 0x18, 0x0f,
+            0x32, 0x30, 0x32, 0x36, 0x30, 0x31, 0x30, 0x34, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x5a, 0xa8, 0x03, 0x1b,
+            0x01, 0x53, 0xa9, 0x0e, 0x30, 0x0c, 0xa0, 0x03, 0x02, 0x01, 0x01, 0xa1, 0x05, 0x30, 0x03, 0x1b, 0x01, 0x73,
+            0xaa, 0x11, 0x30, 0x0f, 0x30, 0x0d, 0xa0, 0x03, 0x02, 0x01, 0x02, 0xa1, 0x06, 0x04, 0x04, 0xc0, 0x00, 0x02,
+            0x01,
+        ];
+        assert_eq!(picky_asn1_der::to_vec(&full).unwrap(), full_raw);
+        assert_eq!(picky_asn1_der::from_bytes::<KrbCredInfo>(&full_raw).unwrap(), full);
+    }
+
+    #[test]
+    fn enc_krb_cred_part_optional_fields() {
+        let minimal = EncKrbCredPart::from(EncKrbCredPartInner {
+            ticket_info: ExplicitContextTag0::from(Asn1SequenceOf::from(vec![minimal_krb_cred_info()])),
+            nonce: Optional::from(None),
+            timestamp: Optional::from(None),
+            usec: Optional::from(None),
+            s_address: Optional::from(None),
+            r_address: Optional::from(None),
+        });
+        let minimal_raw = [
+            0x7d, 0x16, 0x30, 0x14, 0xa0, 0x12, 0x30, 0x10, 0x30, 0x0e, 0xa0, 0x0c, 0x30, 0x0a, 0xa0, 0x03, 0x02, 0x01,
+            0x12, 0xa1, 0x03, 0x04, 0x01, 0x42,
+        ];
+        let mut wrong_tag = minimal_raw;
+        wrong_tag[0] = 0x7c;
+        assert!(picky_asn1_der::from_bytes::<EncKrbCredPart>(&wrong_tag).is_err());
+        assert!(picky_asn1_der::from_bytes::<EncKrbCredPart>(&minimal_raw[..minimal_raw.len() - 1]).is_err());
+        let address = |last_octet| HostAddress {
+            addr_type: ExplicitContextTag0::from(IntegerAsn1::from(vec![2])),
+            address: ExplicitContextTag1::from(OctetStringAsn1::from(vec![192, 0, 2, last_octet])),
+        };
+        let full = EncKrbCredPart::from(EncKrbCredPartInner {
+            ticket_info: minimal.0.ticket_info.clone(),
+            nonce: Optional::from(Some(ExplicitContextTag1::from(IntegerAsn1::from(vec![7])))),
+            timestamp: Optional::from(Some(ExplicitContextTag2::from(KerberosTime::from(
+                Date::new(2026, 1, 1, 0, 0, 0).unwrap(),
+            )))),
+            usec: Optional::from(Some(ExplicitContextTag3::from(Microseconds::from(vec![1])))),
+            s_address: Optional::from(Some(ExplicitContextTag4::from(address(1)))),
+            r_address: Optional::from(Some(ExplicitContextTag5::from(address(2)))),
+        });
+        let full_raw = [
+            0x7d, 0x55, 0x30, 0x53, 0xa0, 0x12, 0x30, 0x10, 0x30, 0x0e, 0xa0, 0x0c, 0x30, 0x0a, 0xa0, 0x03, 0x02, 0x01,
+            0x12, 0xa1, 0x03, 0x04, 0x01, 0x42, 0xa1, 0x03, 0x02, 0x01, 0x07, 0xa2, 0x11, 0x18, 0x0f, 0x32, 0x30, 0x32,
+            0x36, 0x30, 0x31, 0x30, 0x31, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x5a, 0xa3, 0x03, 0x02, 0x01, 0x01, 0xa4,
+            0x0f, 0x30, 0x0d, 0xa0, 0x03, 0x02, 0x01, 0x02, 0xa1, 0x06, 0x04, 0x04, 0xc0, 0x00, 0x02, 0x01, 0xa5, 0x0f,
+            0x30, 0x0d, 0xa0, 0x03, 0x02, 0x01, 0x02, 0xa1, 0x06, 0x04, 0x04, 0xc0, 0x00, 0x02, 0x02,
+        ];
+        let sparse = EncKrbCredPart::from(EncKrbCredPartInner {
+            nonce: Optional::from(None),
+            timestamp: Optional::from(None),
+            s_address: Optional::from(None),
+            ..full.0.clone()
+        });
+        let sparse_raw = [
+            0x7d, 0x2c, 0x30, 0x2a, 0xa0, 0x12, 0x30, 0x10, 0x30, 0x0e, 0xa0, 0x0c, 0x30, 0x0a, 0xa0, 0x03, 0x02, 0x01,
+            0x12, 0xa1, 0x03, 0x04, 0x01, 0x42, 0xa3, 0x03, 0x02, 0x01, 0x01, 0xa5, 0x0f, 0x30, 0x0d, 0xa0, 0x03, 0x02,
+            0x01, 0x02, 0xa1, 0x06, 0x04, 0x04, 0xc0, 0x00, 0x02, 0x02,
+        ];
+        for (expected, raw) in [
+            (minimal, minimal_raw.as_slice()),
+            (full, &full_raw),
+            (sparse, &sparse_raw),
+        ] {
+            assert_eq!(picky_asn1_der::to_vec(&expected).unwrap(), raw);
+            assert_eq!(picky_asn1_der::from_bytes::<EncKrbCredPart>(raw).unwrap(), expected);
+        }
+    }
 
     #[test]
     fn change_passwd_data() {
