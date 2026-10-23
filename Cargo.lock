@@ -1456,6 +1456,7 @@ dependencies = [
  "rand_core",
  "serde_json",
  "time",
+ "zeroize",
 ]
 
 [[package]]
