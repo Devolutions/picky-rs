@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[0.13.1](https://github.com/Devolutions/picky-rs/compare/picky-krb-v0.13.0...picky-krb-v0.13.1)] - 2026-10-23
+
+### <!-- 1 -->Features
+
+- Add KRB-CRED and Remote Guard types ([ec10d41fbe](https://github.com/Devolutions/picky-rs/commit/ec10d41fbeeb7c1774079cacde1e8de0f04bffa0)) 
+
+  Add RFC 4120 KRB-CRED and EncKrbCredPart encodings and MS-CSSP Remote
+  Guard credential structures so clients can reuse protocol types from
+  picky-krb.
+  
+  Expose the message, application-tag and key-usage constants while
+  preserving optional-field DER layouts with synthetic regression fixtures.
+
+- Feat!(picky-krb): improve `AuthPack` to support ECDH parameters ([#581](https://github.com/Devolutions/picky-rs/issues/581)) ([6ea8a21df2](https://github.com/Devolutions/picky-rs/commit/6ea8a21df298ede33f7f699812afdddf16312632)) 
+
+### <!-- 6 -->Documentation
+
+- Fix broken doc links ([452923848c](https://github.com/Devolutions/picky-rs/commit/452923848c7534dd2e75df34a15de8251f16ee7d)) 
+
+  Resolve the Checksum::checksum and ApplicationTag links from the
+  modules that document them, and link the RFC 3962 URL.
+
+
+
 ## [[0.13.0](https://github.com/Devolutions/picky-rs/compare/picky-krb-v0.12.5...picky-krb-v0.13.0)] - 2026-10-07
 
 This release has the same code as 0.12.5, re-released as 0.13.0.

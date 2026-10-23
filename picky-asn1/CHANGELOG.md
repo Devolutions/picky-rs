@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [[0.10.2](https://github.com/Devolutions/picky-rs/compare/picky-asn1-v0.10.1...picky-asn1-v0.10.2)] - 2026-10-23
+
+### <!-- 6 -->Documentation
+
+- Render Vec<u8> in OctetStringAsn1 docs ([fb94eae3a1](https://github.com/Devolutions/picky-rs/commit/fb94eae3a1ee60fb32f7c41606c2719501defd1e)) 
+
+  Rustdoc parsed the unescaped type as an unclosed HTML tag.
+
+
+
 ### Changed 
 
 - Bump minimal rustc version to 1.85.
