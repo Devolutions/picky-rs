@@ -144,15 +144,21 @@ pub struct DhReqInfo {
 /// }
 /// ```
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
-pub struct AuthPack {
+pub struct AuthPack<ClientPublicValue> {
     pub pk_authenticator: ExplicitContextTag0<PkAuthenticator>,
     #[serde(default)]
-    pub client_public_value: Optional<Option<ExplicitContextTag1<DhReqInfo>>>,
+    pub client_public_value: Optional<Option<ExplicitContextTag1<ClientPublicValue>>>,
     #[serde(default)]
     pub supported_cms_types: Optional<Option<ExplicitContextTag2<Asn1SequenceOf<AlgorithmIdentifier>>>>,
     #[serde(default)]
     pub client_dh_nonce: Optional<Option<ExplicitContextTag3<DhNonce>>>,
 }
+
+/// AuthPack for Diffie-Hellman (DH) key agreement.
+pub type DhAuthPack = AuthPack<DhReqInfo>;
+
+/// AuthPack for Elliptic Curve (EC) key agreement.
+pub type EcAuthPack = AuthPack<picky_asn1_x509::SubjectPublicKeyInfo>;
 
 /// [Generation of KDC Reply](https://www.rfc-editor.org/rfc/rfc4556.html#section-3.2.3)
 /// ```not_rust
