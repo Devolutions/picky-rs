@@ -80,8 +80,8 @@ inout = "0.2.2"
 
 # Pin transitive dependencies versions.
 # TODO: Remove when stable versions will be released.
-blake2 = { version = "=0.11.0-rc.6", optional = true }
-pkcs1 = "=0.8.0-rc.4"
+blake2 = { version = "=0.11.0", optional = true }
+pkcs1 = "=0.8.0-rc.5"
 
 [dev-dependencies]
 pretty_assertions = "1.4"
