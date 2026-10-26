@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[7.0.0-rc.29](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.28...picky-v7.0.0-rc.29)] - 2026-10-26
+
+### <!-- 4 -->Bug Fixes
+
+- Honor CTL NotBefore EKU restriction ([#574](https://github.com/Devolutions/picky-rs/issues/574)) ([aa834a9024](https://github.com/Devolutions/picky-rs/commit/aa834a9024080d450ca4a98391d278da5cf07398)) 
+
+  A CTL entry can carry a NotBefore date (property 126) together with the
+  set of EKUs it restricts (property 127). The Authenticode CTL check
+  searched for property 126 when looking up the EKU set, so every future
+  NotBefore rejected the root regardless of its listed EKUs. Look up
+  property 127 so the restriction applies when its EKU set includes code
+  signing or is absent, and return a malformed-data error for an empty
+  property-127 SET instead of panicking.
+
+### <!-- 7 -->Build
+
+- Update blake2 to stable 0.11 ([#583](https://github.com/Devolutions/picky-rs/issues/583)) ([c95d724db4](https://github.com/Devolutions/picky-rs/commit/c95d724db4ed323b6ea4b6ad00c24ec27e5a8fa5)) 
+
+  Update BLAKE2 to its stable 0.11 release and remove obsolete prerelease
+  pins from picky and the FFI crate.
+
+
+
 ## [[7.0.0-rc.28](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.27...picky-v7.0.0-rc.28)] - 2026-10-26
 
 ### <!-- 0 -->Security
