@@ -1058,13 +1058,10 @@ impl<'a> AuthenticodeValidator<'a> {
                         .attributes
                         .0
                         .iter()
-                        .find(|attr| matches!(attr.value, CTLEntryAttributeValues::UnknownReservedPropId126(_)))
+                        .find(|attr| matches!(attr.value, CTLEntryAttributeValues::UnknownReservedPropId127(_)))
                         .map(|attr| &attr.value)
                 {
-                    let set_of_eku_oids = set_of_eku_oids.0.first().expect(
-                        "
-                    Asn1SetOf UnknownReservedPropId127 should contain exactly one value",
-                    );
+                    let set_of_eku_oids = set_of_eku_oids.0.first().ok_or(Asn1DerError::InvalidData)?;
                     let eku_code_signing_oid = oids::kp_code_signing();
                     if set_of_eku_oids.0.0.iter().any(|kp_oid| kp_oid == &eku_code_signing_oid) {
                         return Err(AuthenticodeError::CaCertificateNotYetValid {
@@ -2559,6 +2556,74 @@ mod tests {
         // FILETIME counts 100 ns intervals since 1601-01-01 UTC (MS-DTYP 2.3.3).
         const FILETIME_2020_01_01: u64 = 132_223_104_000_000_000;
         const FILETIME_2100_01_01: u64 = 157_469_184_000_000_000;
+
+        // oracle: regression Devolutions/picky-rs#574.
+        #[test]
+        fn ctl_not_before_applies_only_to_listed_ekus() {
+            use picky_asn1::wrapper::{Asn1SequenceOf, OctetStringAsn1Container};
+
+            let root = microsoft_root();
+            let verify = |ekus: Option<Vec<ObjectIdentifierAsn1>>| {
+                let mut attributes = vec![CTLEntryAttribute {
+                    oid: oids::unknown_reserved_prop_id_126().into(),
+                    value: CTLEntryAttributeValues::UnknownReservedPropId126(Asn1SetOf(vec![
+                        FILETIME_2100_01_01.to_le_bytes().to_vec().into(),
+                    ])),
+                }];
+                if let Some(ekus) = ekus {
+                    attributes.push(CTLEntryAttribute {
+                        oid: oids::unknown_reserved_prop_id_127().into(),
+                        value: CTLEntryAttributeValues::UnknownReservedPropId127(Asn1SetOf(vec![
+                            OctetStringAsn1Container(Asn1SequenceOf(ekus)),
+                        ])),
+                    });
+                }
+                let entry = CTLEntry {
+                    cert_fingerprint: HashAlgorithm::SHA1.digest(&root.to_der().unwrap()).into(),
+                    attributes: Asn1SetOf(attributes),
+                };
+                AuthenticodeValidator::h_check_root_against_ctl_entries(&root, &[entry])
+            };
+
+            assert!(matches!(
+                verify(None),
+                Err(AuthenticodeError::CaCertificateNotYetValid { .. })
+            ));
+            verify(Some(vec![oids::kp_server_auth().into()])).unwrap();
+            verify(Some(vec![])).unwrap();
+            assert!(matches!(
+                verify(Some(vec![
+                    oids::kp_server_auth().into(),
+                    oids::kp_code_signing().into()
+                ])),
+                Err(AuthenticodeError::CaCertificateNotYetValid { .. })
+            ));
+        }
+
+        // oracle: regression Devolutions/picky-rs#574 discussion_r4285866285.
+        #[test]
+        fn ctl_not_before_empty_eku_set_returns_error() {
+            let root = microsoft_root();
+            let entry = CTLEntry {
+                cert_fingerprint: HashAlgorithm::SHA1.digest(&root.to_der().unwrap()).into(),
+                attributes: Asn1SetOf(vec![
+                    CTLEntryAttribute {
+                        oid: oids::unknown_reserved_prop_id_126().into(),
+                        value: CTLEntryAttributeValues::UnknownReservedPropId126(Asn1SetOf(vec![
+                            FILETIME_2100_01_01.to_le_bytes().to_vec().into(),
+                        ])),
+                    },
+                    CTLEntryAttribute {
+                        oid: oids::unknown_reserved_prop_id_127().into(),
+                        value: CTLEntryAttributeValues::UnknownReservedPropId127(Asn1SetOf(vec![])),
+                    },
+                ]),
+            };
+            assert!(matches!(
+                AuthenticodeValidator::h_check_root_against_ctl_entries(&root, &[entry]),
+                Err(AuthenticodeError::Asn1DerError(Asn1DerError::InvalidData))
+            ));
+        }
 
         fn authroot() -> CertificateTrustList {
             CertificateTrustList::from_der(picky_test_data::CERTIFICATE_TRUST_LIST).unwrap()
