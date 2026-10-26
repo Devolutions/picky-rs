@@ -105,12 +105,12 @@ pub const JOSE_JWT_SIG_ES256: &str = include_str!("../test_assets/jose/jwt_sig_e
 pub const JOSE_JWT_SIG_ES384: &str = include_str!("../test_assets/jose/jwt_sig_es384.txt");
 pub const JOSE_JWT_SIG_ES512: &str = include_str!("../test_assets/jose/jwt_sig_es512.txt");
 
-/// Test data was gathered from https://github.com/golang-jwt/jwt
+/// Test data was gathered from <https://github.com/golang-jwt/jwt>.
 pub const JOSE_JWT_SIG_ED25519_GO: &str = include_str!("../test_assets/jose/jwt_sig_ed25519_go.txt");
 pub const JOSE_JWT_SIG_ED25519_GO_PRIVATE_KEY: &str =
     include_str!("../test_assets/jose/jwt_sig_ed25519_go_private.pem");
 
-/// Test data was gathered from https://github.com/kataras/jwt
+/// Test data was gathered from <https://github.com/kataras/jwt>.
 pub const JOSE_JWT_SIG_ED25519: &str = include_str!("../test_assets/jose/jwt_sig_ed25519.txt");
 pub const JOSE_JWT_SIG_ED25519_PRIVATE_KEY: &str = include_str!("../test_assets/jose/jwt_sig_ed25519_private.pem");
 

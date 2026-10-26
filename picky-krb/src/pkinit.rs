@@ -143,16 +143,28 @@ pub struct DhReqInfo {
 ///    clientDHNonce           [3] DHNonce OPTIONAL,
 /// }
 /// ```
+// The explicit bounds are required: `#[serde(default)]` on the fields would otherwise make the derive
+// add the `ClientPublicValue: Default` bound, which neither `DhReqInfo` nor `SubjectPublicKeyInfo` satisfy.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
-pub struct AuthPack {
+#[serde(bound(
+    serialize = "ClientPublicValue: Serialize",
+    deserialize = "ClientPublicValue: Deserialize<'de>"
+))]
+pub struct AuthPack<ClientPublicValue> {
     pub pk_authenticator: ExplicitContextTag0<PkAuthenticator>,
     #[serde(default)]
-    pub client_public_value: Optional<Option<ExplicitContextTag1<DhReqInfo>>>,
+    pub client_public_value: Optional<Option<ExplicitContextTag1<ClientPublicValue>>>,
     #[serde(default)]
     pub supported_cms_types: Optional<Option<ExplicitContextTag2<Asn1SequenceOf<AlgorithmIdentifier>>>>,
     #[serde(default)]
     pub client_dh_nonce: Optional<Option<ExplicitContextTag3<DhNonce>>>,
 }
+
+/// AuthPack for Diffie-Hellman (DH) key agreement.
+pub type DhAuthPack = AuthPack<DhReqInfo>;
+
+/// AuthPack for Elliptic Curve (EC) key agreement.
+pub type EcAuthPack = AuthPack<picky_asn1_x509::SubjectPublicKeyInfo>;
 
 /// [Generation of KDC Reply](https://www.rfc-editor.org/rfc/rfc4556.html#section-3.2.3)
 /// ```not_rust
@@ -278,16 +290,85 @@ pub struct KrbFinished {
 
 #[cfg(test)]
 mod tests {
+    use oid::ObjectIdentifier;
+    use picky_asn1::bit_string::BitString;
+    use picky_asn1::date::Date;
     use picky_asn1::restricted_string::Ia5String;
     use picky_asn1::wrapper::{
-        Asn1SequenceOf, ExplicitContextTag0, ExplicitContextTag1, ImplicitContextTag0, ImplicitContextTag1,
-        IntegerAsn1, OctetStringAsn1, Optional,
+        Asn1SequenceOf, ExplicitContextTag0, ExplicitContextTag1, ExplicitContextTag2, ImplicitContextTag0,
+        ImplicitContextTag1, IntegerAsn1, ObjectIdentifierAsn1, OctetStringAsn1, Optional,
     };
 
     use crate::data_types::{KerberosStringAsn1, PrincipalName};
-    use crate::pkinit::DhRepInfo;
+    use crate::pkinit::{DhDomainParameters, DhRepInfo, DhReqInfo, DhReqKeyInfo, PkAuthenticator};
 
-    use super::{PaPkAsRep, PaPkAsReq, Pku2uNegoBody, Pku2uNegoRep, Pku2uNegoReq, Pku2uNegoReqMetadata};
+    use super::{
+        DhAuthPack, EcAuthPack, PaPkAsRep, PaPkAsReq, Pku2uNegoBody, Pku2uNegoRep, Pku2uNegoReq, Pku2uNegoReqMetadata,
+    };
+
+    fn pk_authenticator() -> PkAuthenticator {
+        PkAuthenticator {
+            cusec: ExplicitContextTag0::from(IntegerAsn1::from(vec![1])),
+            ctime: ExplicitContextTag1::from(crate::data_types::KerberosTime::from(
+                Date::new(2024, 1, 1, 0, 0, 0).unwrap(),
+            )),
+            nonce: ExplicitContextTag2::from(IntegerAsn1::from(vec![42])),
+            pa_checksum: Optional::from(None),
+        }
+    }
+
+    #[test]
+    fn ec_auth_pack_roundtrip() {
+        let auth_pack = EcAuthPack {
+            pk_authenticator: ExplicitContextTag0::from(pk_authenticator()),
+            client_public_value: Optional::from(Some(ExplicitContextTag1::from(
+                picky_asn1_x509::SubjectPublicKeyInfo::new_ec_key(
+                    picky_asn1_x509::oids::secp256r1(),
+                    BitString::with_bytes(vec![
+                        0x04, 0x6b, 0x17, 0xd1, 0xf2, 0xe1, 0x2c, 0x42, 0x47, 0xf8, 0xbc, 0xe6, 0xe5, 0x63, 0xa4, 0x40,
+                        0xf2, 0x77, 0x03, 0x7d, 0x81, 0x2d, 0xeb, 0x33, 0xa0, 0xf4, 0xa1, 0x39, 0x45, 0xd8, 0x98, 0xc2,
+                        0x96, 0x4f, 0xe3, 0x42, 0xe2, 0xfe, 0x1a, 0x7f, 0x9b, 0x8e, 0xe7, 0xeb, 0x4a, 0x7c, 0x0f, 0x9e,
+                        0x16, 0x2b, 0xce, 0x33, 0x57, 0x6b, 0x31, 0x5e, 0xce, 0xcb, 0xb6, 0x40, 0x68, 0x37, 0xbf, 0x51,
+                        0xf5,
+                    ]),
+                ),
+            ))),
+            supported_cms_types: Optional::from(None),
+            client_dh_nonce: Optional::from(None),
+        };
+
+        let encoded = picky_asn1_der::to_vec(&auth_pack).unwrap();
+        let decoded: EcAuthPack = picky_asn1_der::from_bytes(&encoded).unwrap();
+
+        assert_eq!(auth_pack, decoded);
+    }
+
+    #[test]
+    fn dh_auth_pack_roundtrip() {
+        let auth_pack = DhAuthPack {
+            pk_authenticator: ExplicitContextTag0::from(pk_authenticator()),
+            client_public_value: Optional::from(Some(ExplicitContextTag1::from(DhReqInfo {
+                key_info: DhReqKeyInfo {
+                    identifier: ObjectIdentifierAsn1::from(ObjectIdentifier::try_from("1.2.840.10046.2.1").unwrap()),
+                    key_info: DhDomainParameters {
+                        p: IntegerAsn1::from(vec![23]),
+                        g: IntegerAsn1::from(vec![2]),
+                        q: IntegerAsn1::from(vec![11]),
+                        j: Optional::from(None),
+                        validation_params: Optional::from(None),
+                    },
+                },
+                key_value: BitString::with_bytes(vec![4, 5, 6]).into(),
+            }))),
+            supported_cms_types: Optional::from(None),
+            client_dh_nonce: Optional::from(None),
+        };
+
+        let encoded = picky_asn1_der::to_vec(&auth_pack).unwrap();
+        let decoded: DhAuthPack = picky_asn1_der::from_bytes(&encoded).unwrap();
+
+        assert_eq!(auth_pack, decoded);
+    }
 
     #[test]
     fn pku2u_nego_req_encode() {

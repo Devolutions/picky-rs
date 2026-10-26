@@ -77,8 +77,8 @@ pub(crate) use pbkdf1::{Pbkdf1Usage, pbkdf1};
 
 pub use attribute::{CustomPkcs12Attribute, Pkcs12Attribute, Pkcs12AttributeKind};
 pub use encryption::{
-    Pbes1Cipher, Pbes1Encryption, Pbes2Cipher, Pbes2Encryption, Pkcs12CryptoContext, Pkcs12Encryption,
-    Pkcs12EncryptionKind,
+    DEFAULT_KDF_ITERATIONS, Pbes1Cipher, Pbes1Encryption, Pbes2Cipher, Pbes2Encryption, Pkcs12CryptoContext,
+    Pkcs12Encryption, Pkcs12EncryptionKind,
 };
 pub use mac::{Pkcs12MacAlgorithm, Pkcs12MacAlgorithmHmac, Pkcs12MacData, Pkcs12MacError};
 pub use safe_bag::{SafeBag, SafeBagKind, SecretSafeBag};

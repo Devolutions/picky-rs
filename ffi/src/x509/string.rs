@@ -2,7 +2,7 @@
 pub mod ffi {
     use crate::error::ffi::PickyError;
     use crate::utils::ffi::VecU8;
-    use diplomat_runtime::DiplomatWriteable;
+    use diplomat_runtime::DiplomatWrite;
     use std::fmt::Write;
 
     #[diplomat::opaque]
@@ -15,6 +15,7 @@ pub mod ffi {
     }
 
     impl DirectoryString {
+        #[diplomat::attr(auto, getter = "type")]
         pub fn get_type(&self) -> DirectoryStringType {
             match &self.0 {
                 picky_asn1_x509::directory_string::DirectoryString::PrintableString(_) => {
@@ -25,12 +26,14 @@ pub mod ffi {
             }
         }
 
-        pub fn get_as_string(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        #[diplomat::attr(auto, getter = "as_string")]
+        pub fn get_as_string(&self, writable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             let string: String = self.0.clone().into();
             write!(writable, "{string}")?;
             Ok(())
         }
 
+        #[diplomat::attr(auto, getter = "as_bytes")]
         pub fn get_as_bytes(&self) -> Box<VecU8> {
             match &self.0 {
                 picky_asn1_x509::directory_string::DirectoryString::PrintableString(string) => {

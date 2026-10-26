@@ -3,7 +3,7 @@ pub mod ffi {
     use crate::error::ffi::PickyError;
     use crate::x509::algorithm_identifier::ffi::AlgorithmIdentifier;
     use crate::x509::attribute::ffi::{Attribute, AttributeIterator, UnsignedAttribute, UnsignedAttributeIterator};
-    use diplomat_runtime::DiplomatWriteable;
+    use diplomat_runtime::DiplomatWrite;
     use std::fmt::Write;
 
     #[diplomat::opaque]
@@ -19,26 +19,32 @@ pub mod ffi {
     }
 
     impl SignerInfo {
+        #[diplomat::attr(auto, getter = "version")]
         pub fn get_version(&self) -> CmsVersion {
             self.0.version.into()
         }
 
+        #[diplomat::attr(auto, getter = "sid")]
         pub fn get_sid(&self) -> Box<SingerIdentifier> {
             Box::new(SingerIdentifier(self.0.sid.clone()))
         }
 
+        #[diplomat::attr(auto, getter = "digest_algorithm")]
         pub fn get_digest_algorithm(&self) -> Box<AlgorithmIdentifier> {
             Box::new(AlgorithmIdentifier(self.0.digest_algorithm.0.clone()))
         }
 
+        #[diplomat::attr(auto, getter = "signature_algorithm")]
         pub fn get_signature_algorithm(&self) -> Box<AlgorithmIdentifier> {
             Box::new(AlgorithmIdentifier(self.0.signature_algorithm.0.clone()))
         }
 
+        #[diplomat::attr(auto, getter = "signature")]
         pub fn get_signature(&self) -> Box<crate::utils::ffi::VecU8> {
             Box::new(crate::utils::ffi::VecU8::from(&self.0.signature.0))
         }
 
+        #[diplomat::attr(auto, getter = "unsigned_attributes")]
         pub fn get_unsigned_attributes(&self) -> Box<UnsignedAttributeIterator> {
             Box::new(UnsignedAttributeIterator(
                 self.0
@@ -52,6 +58,7 @@ pub mod ffi {
             ))
         }
 
+        #[diplomat::attr(auto, getter = "signed_attributes")]
         pub fn get_signed_attributes(&self) -> Box<AttributeIterator> {
             let attributes = self.0.signed_attrs.0.clone();
             let vec = attributes.0.0.into_iter().map(Attribute).collect();
@@ -63,6 +70,7 @@ pub mod ffi {
     pub struct SingerIdentifier(pub picky_asn1_x509::signer_info::SignerIdentifier);
 
     impl SingerIdentifier {
+        #[diplomat::attr(auto, getter = "issure_and_serial_number")]
         pub fn get_issure_and_serial_number(&self) -> Option<Box<IssuerAndSerialNumber>> {
             match &self.0 {
                 picky_asn1_x509::signer_info::SignerIdentifier::IssuerAndSerialNumber(issuer_and_serial_number) => {
@@ -72,6 +80,7 @@ pub mod ffi {
             }
         }
 
+        #[diplomat::attr(auto, getter = "subject_key_identifier")]
         pub fn get_subject_key_identifier(&self) -> Option<Box<crate::utils::ffi::VecU8>> {
             let picky_asn1_x509::signer_info::SignerIdentifier::SubjectKeyIdentifier(subject_key_identifier) = &self.0
             else {
@@ -87,14 +96,15 @@ pub mod ffi {
     pub struct IssuerAndSerialNumber(pub picky_asn1_x509::signer_info::IssuerAndSerialNumber);
 
     impl IssuerAndSerialNumber {
-        pub fn get_issuer(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        #[diplomat::attr(auto, getter = "issuer")]
+        pub fn get_issuer(&self, writable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             let name_string = format!("{}", self.0.issuer);
             write!(writable, "{name_string}")?;
             Ok(())
         }
     }
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct SignerInfoIterator(pub Vec<SignerInfo>);
 
     impl SignerInfoIterator {

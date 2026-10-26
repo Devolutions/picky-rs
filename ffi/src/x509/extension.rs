@@ -6,30 +6,33 @@ pub mod ffi {
     use crate::error::ffi::PickyError;
     use crate::utils::ffi::VecU8;
     use crate::x509::name::ffi::{GeneralName, GeneralNameIterator};
-    use diplomat_runtime::DiplomatWriteable;
+    use diplomat_runtime::DiplomatWrite;
     use std::fmt::Write;
 
     #[diplomat::opaque]
     pub struct Extension(pub picky_asn1_x509::extension::Extension);
 
     impl Extension {
-        pub fn get_extn_id(&self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        #[diplomat::attr(auto, getter = "extn_id")]
+        pub fn get_extn_id(&self, writable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             let oid: String = self.0.extn_id().0.clone().into();
             write!(writable, "{oid}")?;
             Ok(())
         }
 
+        #[diplomat::attr(auto, getter = "critical")]
         pub fn get_critical(&self) -> bool {
             self.0.critical()
         }
 
+        #[diplomat::attr(auto, getter = "value")]
         pub fn get_value<'a>(&'a self) -> Box<ExtensionView<'a>> {
             let value = self.0.extn_value();
             Box::new(ExtensionView(value))
         }
     }
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct ExtensionIterator(pub Vec<Extension>);
 
     impl ExtensionIterator {
@@ -54,6 +57,7 @@ pub mod ffi {
     }
 
     impl<'a> ExtensionView<'a> {
+        #[diplomat::attr(auto, getter = "type")]
         pub fn get_type(&'a self) -> ExtensionViewType {
             match self.0 {
                 picky_asn1_x509::extension::ExtensionView::AuthorityKeyIdentifier(_) => {
@@ -155,11 +159,11 @@ pub mod ffi {
         }
     }
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct OidIterator(pub Vec<String>);
 
     impl OidIterator {
-        pub fn next(&mut self, writable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn next(&mut self, writable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             let oid = self.0.pop().ok_or("no more OIDs")?;
             write!(writable, "{oid}")?;
             Ok(())
@@ -170,12 +174,14 @@ pub mod ffi {
     pub struct BasicConstraints(pub picky_asn1_x509::BasicConstraints);
 
     impl BasicConstraints {
+        #[diplomat::attr(auto, getter = "ca")]
         pub fn get_ca(&self) -> GetCaResult {
             self.0.ca().map_or(GetCaResult::None, |ca| {
                 if ca { GetCaResult::True } else { GetCaResult::False }
             })
         }
 
+        #[diplomat::attr(auto, getter = "pathlen")]
         pub fn get_pathlen(&self) -> Option<Box<U8>> {
             self.0.pathlen().map(U8).map(Box::new)
         }
@@ -192,6 +198,7 @@ pub mod ffi {
     pub struct U8(pub u8);
 
     impl U8 {
+        #[diplomat::attr(auto, getter = "value")]
         pub fn get_value(&self) -> u8 {
             self.0
         }
@@ -201,18 +208,21 @@ pub mod ffi {
     pub struct AuthorityKeyIdentifier(pub picky_asn1_x509::AuthorityKeyIdentifier);
 
     impl AuthorityKeyIdentifier {
+        #[diplomat::attr(auto, getter = "key_identifier")]
         pub fn get_key_identifier(&self) -> Option<Box<crate::utils::ffi::VecU8>> {
             self.0
                 .key_identifier()
                 .map(|key_identifier| VecU8::from_bytes(key_identifier).boxed())
         }
 
+        #[diplomat::attr(auto, getter = "authority_cert_issuer")]
         pub fn get_authority_cert_issuer(&self) -> Option<Box<GeneralName>> {
             self.0
                 .authority_cert_issuer()
                 .map(|general_name| Box::new(GeneralName(general_name)))
         }
 
+        #[diplomat::attr(auto, getter = "authority_cert_serial_number")]
         pub fn get_authority_cert_serial_number(&self) -> Option<Box<crate::utils::ffi::VecU8>> {
             self.0
                 .authority_cert_serial_number()

@@ -201,6 +201,59 @@ jobs:
       - name: Check Cargo.lock versions
         run: cargo --locked xtask check-no-downgrade --base HEAD^
 
+  feature-powerset:
+    name: Feature powerset
+    needs: [formatting]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install cargo-hack
+        run: cargo install --locked cargo-hack --version 0.6.45
+
+      - name: Check feature powerset
+        run: cargo hack check --locked --workspace --feature-powerset --depth 2
+        env:
+          RUSTFLAGS: "-D warnings"
+
+  docs:
+    name: Documentation
+    needs: [formatting]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check documentation
+        run: cargo doc --locked --workspace --no-deps --all-features
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+
+  deny:
+    # The root deny.toml holds workspace-wide rules.
+    # A crate-scoped deny.toml checks only that crate's dependency graph.
+    name: Dependency bans [${{ matrix.config }}]
+    needs: [formatting]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - manifest: Cargo.toml
+            config: deny.toml
+          - manifest: picky-crypto/Cargo.toml
+            config: picky-crypto/deny.toml
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install cargo-deny
+        run: cargo install --locked cargo-deny --version 0.20.2
+
+      - name: Check bans
+        run: cargo deny --manifest-path ${{ matrix.manifest }} --all-features --config ${{ matrix.config }} check bans
+
   picky-crypto-checks:
     name: Crypto contract checks
     needs: [formatting]
@@ -210,17 +263,6 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: true
-
-      - name: Install cargo-hack
-        run: cargo install --locked cargo-hack --version 0.6.45
-
-      - name: Check feature powerset
-        run: cargo hack check --locked --feature-powerset -p picky-crypto
-
-      - name: Check documentation
-        run: cargo doc --locked -p picky-crypto --no-deps
-        env:
-          RUSTDOCFLAGS: "-D warnings"
 
       - name: Check contract citations
         run: cargo xtask check-contract
@@ -232,39 +274,6 @@ jobs:
       - name: Run conformance suite
         run: cargo test --locked -p picky-crypto-conformance --features rustcrypto -- --show-output
 
-      - name: Install cargo-deny
-        run: cargo install --locked cargo-deny --version 0.20.2
-
-      - name: Check dependency allowlist
-        run: cargo deny --manifest-path picky-crypto/Cargo.toml --config picky-crypto/deny.toml check bans
-
-  picky-crypto-rustcrypto:
-    name: RustCrypto backend checks
-    needs: [formatting]
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: true
-
-      - name: Install cargo-hack
-        run: cargo install --locked cargo-hack --version 0.6.45
-
-      - name: Check feature powerset
-        run: cargo hack clippy --locked --feature-powerset --depth 2 -p picky-crypto-rustcrypto --all-targets -- -D warnings
-
-      - name: Check documentation
-        run: cargo doc --locked -p picky-crypto-rustcrypto --no-deps --all-features
-        env:
-          RUSTDOCFLAGS: "-D warnings"
-
-      - name: Install cargo-deny
-        run: cargo install --locked cargo-deny --version 0.20.2
-
-      - name: Check banned features
-        run: cargo deny --manifest-path Cargo.toml --workspace --all-features --config picky-crypto-rustcrypto/deny.toml check bans
-
       # ed25519-dalek's `legacy_compatibility` feature weakens the library's S < L check, so this run shows that the
       # adapter's own check rejects the Wycheproof S + L signatures.
       - name: Check Ed25519 S range with legacy_compatibility
@@ -273,7 +282,7 @@ jobs:
   success:
     name: Success
     if: ${{ always() }}
-    needs: [formatting, lints, lints-wasm, tests, msrv, dotnet-tests, no-downgrade, picky-crypto-checks, picky-crypto-rustcrypto]
+    needs: [formatting, lints, lints-wasm, tests, msrv, dotnet-tests, no-downgrade, feature-powerset, docs, deny, picky-crypto-checks]
     runs-on: ubuntu-latest
 
     steps:

@@ -57,12 +57,11 @@ pub(crate) struct SigBuilderInner {
 pub mod ffi {
     use crate::error::ffi::PickyError;
     use crate::key::ffi::{PrivateKey, PublicKey};
-    use diplomat_runtime::DiplomatWriteable;
+    use diplomat_runtime::DiplomatWrite;
     use picky::jose::jwt;
     use std::fmt::Write as _;
 
     /// `alg` header parameter values for JWS
-    #[derive(Clone, Copy)]
     pub enum JwsAlg {
         /// RSASSA-PKCS-v1_5 using SHA-256
         RS256,
@@ -111,7 +110,8 @@ pub mod ffi {
 
         /// Returns the content type.
         // TODO: support for optional string in return position
-        pub fn get_content_type(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        #[diplomat::attr(auto, getter = "content_type")]
+        pub fn get_content_type(&self, writeable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             write!(writeable, "{}", self.0.header.cty.as_deref().unwrap_or(""))?;
             writeable.flush();
             Ok(())
@@ -119,14 +119,16 @@ pub mod ffi {
 
         /// Returns the key ID.
         // TODO: support for optional string in return position
-        pub fn get_kid(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        #[diplomat::attr(auto, getter = "kid")]
+        pub fn get_kid(&self, writeable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             write!(writeable, "{}", self.0.header.kid.as_deref().unwrap_or(""))?;
             writeable.flush();
             Ok(())
         }
 
         /// Returns the header as a JSON encoded payload.
-        pub fn get_header(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        #[diplomat::attr(auto, getter = "header")]
+        pub fn get_header(&self, writeable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             let header = serde_json::to_string(&self.0.header)?;
             write!(writeable, "{header}")?;
             writeable.flush();
@@ -134,7 +136,8 @@ pub mod ffi {
         }
 
         /// Returns the claims as a JSON encoded payload.
-        pub fn get_claims(&self, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        #[diplomat::attr(auto, getter = "claims")]
+        pub fn get_claims(&self, writeable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             let claims = serde_json::to_string(&self.0.state.claims)?;
             write!(writeable, "{claims}")?;
             writeable.flush();
@@ -161,7 +164,7 @@ pub mod ffi {
         }
 
         /// Encode using the given private key and returns the compact representation of this token.
-        pub fn encode(&self, key: &PrivateKey, writeable: &mut DiplomatWriteable) -> Result<(), Box<PickyError>> {
+        pub fn encode(&self, key: &PrivateKey, writeable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
             let encoded = self.0.clone().encode(&key.0)?;
             write!(writeable, "{encoded}")?;
             writeable.flush();
@@ -169,7 +172,7 @@ pub mod ffi {
         }
     }
 
-    #[diplomat::opaque]
+    #[diplomat::opaque_mut]
     pub struct JwtSigBuilder(pub(crate) super::SigBuilderInner);
 
     impl JwtSigBuilder {
@@ -183,14 +186,17 @@ pub mod ffi {
             }))
         }
 
+        #[diplomat::attr(auto, setter = "algorithm")]
         pub fn set_algorithm(&mut self, alg: JwsAlg) {
             self.0.alg = alg;
         }
 
+        #[diplomat::attr(auto, setter = "content_type")]
         pub fn set_content_type(&mut self, cty: &str) {
             self.0.cty = Some(cty.to_owned());
         }
 
+        #[diplomat::attr(auto, setter = "kid")]
         pub fn set_kid(&mut self, kid: &str) {
             self.0.kid = Some(kid.to_owned());
         }
@@ -247,6 +253,7 @@ pub mod ffi {
         /// Sets the given JSON payload.
         ///
         /// Claims should be a valid JSON payload.
+        #[diplomat::attr(auto, setter = "claims")]
         pub fn set_claims(&mut self, claims: &str) -> Result<(), Box<PickyError>> {
             let claims = serde_json::from_str(claims)?;
             self.0.claims = claims;

@@ -41,7 +41,7 @@ use serde::{de, ser};
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Pkcs12Attribute {
-    /// Note that [`BMPString`] contains UCS-2 encoded string, internal bytes should be manually
+    /// Note that [`BmpString`] contains UCS-2 encoded string, internal bytes should be manually
     /// converted to/from UTF-8 if needed.
     FriendlyName(BmpString),
     LocalKeyId(OctetStringAsn1),

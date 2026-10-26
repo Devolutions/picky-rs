@@ -314,6 +314,8 @@ pub struct GssApiNegInit {
 /// In other words, the deserialization of something like `ApplicationTag0<BitString>` will fail
 /// or produce invalid value.
 /// This is because of the deserialization workaround we wrote to support weird Microsoft GSS API message.
+///
+/// [ApplicationTag]: picky_asn1_der::application_tag::ApplicationTag
 #[derive(Debug, PartialEq, Eq)]
 pub struct ApplicationTag0<T>(pub T);
 

@@ -10,7 +10,7 @@ fn explicit_installation_and_conflict() {
     let panic = std::panic::catch_unwind(helpers::default_provider).unwrap_err();
     let message = panic.downcast_ref::<String>().unwrap();
     assert!(message.contains("picky_crypto::install_default"));
-    assert!(message.contains("picky-crypto-rustcrypto-bundle"));
+    assert!(message.contains("picky-crypto-bundle"));
     install_default(CryptoProvider::builder().build().unwrap()).unwrap();
     let installed = get_default().unwrap();
     assert!(std::ptr::eq(installed, helpers::default_provider()));

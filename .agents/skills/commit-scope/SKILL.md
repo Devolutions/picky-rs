@@ -60,3 +60,7 @@ When an update requires code changes, scope it to the crate owning those changes
 A production change accompanied by tests keeps its production type and scope.
 For test-only changes, use `test(<crate>)` with the crate under test, or `test(picky-test-data)` for shared fixtures.
 Omit the scope when test-only changes span several crates.
+
+## Changelog footers
+
+`cliff.toml` recognises the footers `Changelog: ignore`, which skips the changelog entry, and `Security: yes`, which files it under Security.

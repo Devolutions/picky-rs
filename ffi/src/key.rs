@@ -68,7 +68,6 @@ pub mod ffi {
     use crate::pem::ffi::Pem;
 
     /// Known elliptic curve name used for ECDSA arithmetic operations
-    #[derive(Clone, Copy)]
     pub enum EcCurve {
         /// NIST P-256
         NistP256,
@@ -79,7 +78,6 @@ pub mod ffi {
     }
 
     /// Known Edwards curve-based algorithm name
-    #[derive(Clone, Copy)]
     pub enum EdAlgorithm {
         /// Ed25519 signing algorithm
         Ed25519,
@@ -88,7 +86,6 @@ pub mod ffi {
     }
 
     /// Known key kinds
-    #[derive(Clone, Copy)]
     pub enum KeyKind {
         /// RSA (Rivest–Shamir–Adleman)
         Rsa,
@@ -100,7 +97,9 @@ pub mod ffi {
         Mldsa,
     }
 
+    // Holds a private key: free it promptly, don't wait on the GC.
     #[diplomat::opaque]
+    #[diplomat::attr(dotnet, manually_disposable)]
     pub struct PrivateKey(pub picky::key::PrivateKey);
 
     impl PrivateKey {
@@ -165,6 +164,7 @@ pub mod ffi {
         }
 
         /// Retrieves the key kind for this private key.
+        #[diplomat::attr(auto, getter = "kind")]
         pub fn get_kind(&self) -> KeyKind {
             self.0.kind().into()
         }
@@ -207,6 +207,7 @@ pub mod ffi {
         }
 
         /// Retrieves the key kind for this public key.
+        #[diplomat::attr(auto, getter = "kind")]
         pub fn get_kind(&self) -> KeyKind {
             self.0.kind().into()
         }
