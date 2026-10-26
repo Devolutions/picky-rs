@@ -80,7 +80,6 @@ inout = "0.2.2"
 
 # Pin transitive dependencies versions.
 # TODO: Remove when stable versions will be released.
-blake2 = { version = "=0.11.0-rc.6", optional = true }
 pkcs1 = "=0.8.0-rc.4"
 
 [dev-dependencies]
@@ -112,10 +111,7 @@ ssh = ["dep:byteorder", "dep:aes", "dep:ctr", "dep:cbc", "dep:bcrypt-pbkdf", "de
 http_trait_impl = ["dep:http"]
 chrono_conversion = ["dep:chrono", "picky-asn1/chrono_conversion"]
 time_conversion = ["dep:time", "picky-asn1/time_conversion"]
-putty = ["dep:argon2", "dep:hmac", "ssh",
-    # Transitive dependencies
-    "dep:blake2"
-]
+putty = ["dep:argon2", "dep:hmac", "ssh"]
 
 [package.metadata.docs.rs]
 # Enable all features when building documentation for docs.rs
