@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[7.0.0-rc.29](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.28...picky-v7.0.0-rc.29)] - 2026-10-26
+
+### <!-- 4 -->Bug Fixes
+
+- Honor the EKU scope of CTL NotBefore restrictions during Authenticode validation, avoiding rejection when the restriction excludes code signing ([#574](https://github.com/Devolutions/picky-rs/issues/574)) ([aa834a9024](https://github.com/Devolutions/picky-rs/commit/aa834a9024080d450ca4a98391d278da5cf07398))
+- Return a malformed-data error instead of panicking when a CTL NotBefore EKU attribute contains an empty SET ([#574](https://github.com/Devolutions/picky-rs/issues/574)) ([aa834a9024](https://github.com/Devolutions/picky-rs/commit/aa834a9024080d450ca4a98391d278da5cf07398))
+
+### <!-- 7 -->Build
+
+- Allow stable BLAKE2 0.11 when building with the `putty` feature ([#583](https://github.com/Devolutions/picky-rs/issues/583)) ([c95d724db4](https://github.com/Devolutions/picky-rs/commit/c95d724db4ed323b6ea4b6ad00c24ec27e5a8fa5))
+
+
 ## [[7.0.0-rc.28](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.27...picky-v7.0.0-rc.28)] - 2026-10-26
 
 ### <!-- 0 -->Security
