@@ -1,6 +1,6 @@
 [package]
 name = "picky"
-version = "7.0.0-rc.27"
+version = "7.0.0-rc.28"
 authors = [
     "Benoît CORTIER <bcortier@devolutions.net>",
     "Jonathan Trepanier <jtrepanier@devolutions.net>",
@@ -80,7 +80,7 @@ inout = "0.2.2"
 
 # Pin transitive dependencies versions.
 # TODO: Remove when stable versions will be released.
-pkcs1 = "=0.8.0-rc.5"
+pkcs1 = "=0.8.0-rc.4"
 
 [dev-dependencies]
 pretty_assertions = "1.4"
