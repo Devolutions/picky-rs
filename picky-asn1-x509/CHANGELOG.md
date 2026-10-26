@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[0.15.6](https://github.com/Devolutions/picky-rs/compare/picky-asn1-x509-v0.15.5...picky-asn1-x509-v0.15.6)] - 2026-10-26
+
+### <!-- 6 -->Documentation
+
+- Fix the BmpString link ([cbc3b5e76b](https://github.com/Devolutions/picky-rs/commit/cbc3b5e76bdf7ae4d1aea58a63489486891617e9)) 
+
+  The link named a BMPString item that does not exist.
+
+
+
 ## [[0.15.5](https://github.com/Devolutions/picky-rs/compare/picky-asn1-x509-v0.15.4...picky-asn1-x509-v0.15.5)] - 2026-09-29
 
 ### <!-- 1 -->Features
