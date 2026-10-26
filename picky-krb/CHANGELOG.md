@@ -10,25 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### <!-- 1 -->Features
 
-- Add KRB-CRED and Remote Guard types ([ec10d41fbe](https://github.com/Devolutions/picky-rs/commit/ec10d41fbeeb7c1774079cacde1e8de0f04bffa0)) 
-
-  Add RFC 4120 KRB-CRED and EncKrbCredPart encodings and MS-CSSP Remote
-  Guard credential structures so clients can reuse protocol types from
-  picky-krb.
-  
-  Expose the message, application-tag and key-usage constants while
-  preserving optional-field DER layouts with synthetic regression fixtures.
-
-- Feat!(picky-krb): improve `AuthPack` to support ECDH parameters ([#581](https://github.com/Devolutions/picky-rs/issues/581)) ([6ea8a21df2](https://github.com/Devolutions/picky-rs/commit/6ea8a21df298ede33f7f699812afdddf16312632)) 
+- Add `KrbCred`, `KrbCredInner`, `KrbCredInfo`, `EncKrbCredPart` and `EncKrbCredPartInner` for RFC 4120 credential forwarding ([ec10d41fbe](https://github.com/Devolutions/picky-rs/commit/ec10d41fbeeb7c1774079cacde1e8de0f04bffa0))
+- Expose the `KRB_CRED_MSG_TYPE`, `ENC_KRB_CRED_PART_TYPE` and `KRB_CRED_ENC_PART` constants ([ec10d41fbe](https://github.com/Devolutions/picky-rs/commit/ec10d41fbeeb7c1774079cacde1e8de0f04bffa0))
+- Add `TsRemoteGuardCreds` and `TsRemoteGuardPackageCred` for MS-CSSP Remote Guard credentials ([ec10d41fbe](https://github.com/Devolutions/picky-rs/commit/ec10d41fbeeb7c1774079cacde1e8de0f04bffa0))
+- [**breaking**] Make `pkinit::AuthPack` generic over its client public value; use `DhAuthPack` or `AuthPack<DhReqInfo>` for the previous DH representation ([#581](https://github.com/Devolutions/picky-rs/issues/581)) ([6ea8a21df2](https://github.com/Devolutions/picky-rs/commit/6ea8a21df298ede33f7f699812afdddf16312632))
+- Add `pkinit::EcAuthPack` for ECDH parameters using `SubjectPublicKeyInfo` ([#581](https://github.com/Devolutions/picky-rs/issues/581)) ([6ea8a21df2](https://github.com/Devolutions/picky-rs/commit/6ea8a21df298ede33f7f699812afdddf16312632))
 
 ### <!-- 6 -->Documentation
 
-- Fix broken doc links ([452923848c](https://github.com/Devolutions/picky-rs/commit/452923848c7534dd2e75df34a15de8251f16ee7d)) 
-
-  Resolve the Checksum::checksum and ApplicationTag links from the
-  modules that document them, and link the RFC 3962 URL.
-
-
+- Fix links to `Checksum::checksum`, `ApplicationTag` and RFC 3962 ([452923848c](https://github.com/Devolutions/picky-rs/commit/452923848c7534dd2e75df34a15de8251f16ee7d))
 
 ## [[0.13.0](https://github.com/Devolutions/picky-rs/compare/picky-krb-v0.12.5...picky-krb-v0.13.0)] - 2026-10-07
 
