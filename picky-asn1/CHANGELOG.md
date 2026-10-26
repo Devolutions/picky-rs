@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [[0.10.2](https://github.com/Devolutions/picky-rs/compare/picky-asn1-v0.10.1...picky-asn1-v0.10.2)] - 2026-10-26
+
+### <!-- 6 -->Documentation
+
+- Fix the rendering of `Vec<u8>` in the `OctetStringAsn1` documentation ([fb94eae3a1](https://github.com/Devolutions/picky-rs/commit/fb94eae3a1ee60fb32f7c41606c2719501defd1e))
+
 ### Changed 
 
 - Bump minimal rustc version to 1.85.

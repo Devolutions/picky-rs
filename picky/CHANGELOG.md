@@ -6,6 +6,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[7.0.0-rc.28](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.27...picky-v7.0.0-rc.28)] - 2026-10-26
+
+### <!-- 0 -->Security
+
+- [**breaking**] Mask RSA1_5, RSA-OAEP and RSA-OAEP-256 encrypted-key failures in `Jwe::decode` and `RawJwe::decrypt` by substituting a random content encryption key; handle `JweError::AesGcm` instead of `JweError::Rsa` for these failures ([#563](https://github.com/Devolutions/picky-rs/issues/563)) ([2e5b128850](https://github.com/Devolutions/picky-rs/commit/2e5b128850facd91ee8eb3994fe05f2883239faf))
+- Blind JWE RSA key decryption with OS-seeded randomness (the timing side channel in RUSTSEC-2023-0071 remains) ([#563](https://github.com/Devolutions/picky-rs/issues/563)) ([2e5b128850](https://github.com/Devolutions/picky-rs/commit/2e5b128850facd91ee8eb3994fe05f2883239faf))
+
+### <!-- 1 -->Features
+
+- Expose `picky::pkcs12::DEFAULT_KDF_ITERATIONS` as a `u32` constant with the default value of 2048 ([f9461a7333](https://github.com/Devolutions/picky-rs/commit/f9461a73334395674e641448e61fc4a6cc84b49e))
+
+### <!-- 4 -->Bug Fixes
+
+- Correct `JweEnc::key_size` and `JweEnc::tag_size` for CBC-HS algorithms to return key sizes of 32, 48 and 64 bytes and tag sizes of 16, 24 and 32 bytes, respectively ([#563](https://github.com/Devolutions/picky-rs/issues/563)) ([2e5b128850](https://github.com/Devolutions/picky-rs/commit/2e5b128850facd91ee8eb3994fe05f2883239faf))
+- Prevent a panic when Authenticode validation falls back to an RFC 3161 timestamp for an expired signing certificate with the `ctl` feature enabled ([#534](https://github.com/Devolutions/picky-rs/issues/534)) ([76881c4ee7](https://github.com/Devolutions/picky-rs/commit/76881c4ee70089accab4c84fb26c37cf3ff12b97))
+- Accept EC coordinates and secrets shorter than the field length in `PublicKey::from_ec_components` and `PrivateKey::from_ec_components` by padding with leading zero bytes ([#557](https://github.com/Devolutions/picky-rs/issues/557)) ([122303e05e](https://github.com/Devolutions/picky-rs/commit/122303e05e692b083e01834805fe5fdab87cdac3))
+- Accept full-length JWK EC coordinates with leading zero bytes, including P-521 keys ([#557](https://github.com/Devolutions/picky-rs/issues/557)) ([122303e05e](https://github.com/Devolutions/picky-rs/commit/122303e05e692b083e01834805fe5fdab87cdac3))
+- Emit full-length EC coordinates from `Jwk::from_public_key` and `JwkKeyType::new_ec_key` ([#557](https://github.com/Devolutions/picky-rs/issues/557)) ([122303e05e](https://github.com/Devolutions/picky-rs/commit/122303e05e692b083e01834805fe5fdab87cdac3))
+- [**breaking**] Reject JWK EC coordinates with extra leading zero bytes beyond the curve field length in `Jwk::to_public_key` ([#557](https://github.com/Devolutions/picky-rs/issues/557)) ([122303e05e](https://github.com/Devolutions/picky-rs/commit/122303e05e692b083e01834805fe5fdab87cdac3))
+- Preserve leading zero bytes in ECDSA secrets decoded from OpenSSH and PuTTY keys ([#557](https://github.com/Devolutions/picky-rs/issues/557)) ([122303e05e](https://github.com/Devolutions/picky-rs/commit/122303e05e692b083e01834805fe5fdab87cdac3))
+- Preserve leading zero bytes in Ed25519 secrets decoded from OpenSSH keys ([#557](https://github.com/Devolutions/picky-rs/issues/557)) ([122303e05e](https://github.com/Devolutions/picky-rs/commit/122303e05e692b083e01834805fe5fdab87cdac3))
+- Decode PuTTY Ed25519 secrets written by versions before 0.75, while retaining support for the big-endian secrets written by earlier picky versions ([#557](https://github.com/Devolutions/picky-rs/issues/557)) ([122303e05e](https://github.com/Devolutions/picky-rs/commit/122303e05e692b083e01834805fe5fdab87cdac3))
+- Reject PuTTY Ed25519 keys whose secret does not match the public key ([#557](https://github.com/Devolutions/picky-rs/issues/557)) ([122303e05e](https://github.com/Devolutions/picky-rs/commit/122303e05e692b083e01834805fe5fdab87cdac3))
+- Encode PuTTY Ed25519 secrets as full 32-byte values, matching PuTTY 0.75 and later ([#557](https://github.com/Devolutions/picky-rs/issues/557)) ([122303e05e](https://github.com/Devolutions/picky-rs/commit/122303e05e692b083e01834805fe5fdab87cdac3))
+- Match Authenticode CTL entries by the root certificate thumbprint after verifying the chain to that root ([#533](https://github.com/Devolutions/picky-rs/issues/533)) ([7f71b0b82d](https://github.com/Devolutions/picky-rs/commit/7f71b0b82d79b7a15021ccaa11b15cdb2fbf6e1e))
+- Add `AuthenticodeValidator::trusted_roots` with the `ctl` feature to supply root certificates absent from the signature ([#533](https://github.com/Devolutions/picky-rs/issues/533)) ([7f71b0b82d](https://github.com/Devolutions/picky-rs/commit/7f71b0b82d79b7a15021ccaa11b15cdb2fbf6e1e))
+- [**breaking**] Add `AuthenticodeError::RootCertificateUnavailable` for CTL verification without an embedded or supplied root; update exhaustive matches on `AuthenticodeError` ([#533](https://github.com/Devolutions/picky-rs/issues/533)) ([7f71b0b82d](https://github.com/Devolutions/picky-rs/commit/7f71b0b82d79b7a15021ccaa11b15cdb2fbf6e1e))
+- Preserve self-issued key-rollover certificates in Authenticode chains by requiring root certificates to be self-signed ([#575](https://github.com/Devolutions/picky-rs/issues/575)) ([bf2ae1cea5](https://github.com/Devolutions/picky-rs/commit/bf2ae1cea5ee835959a351588cd9eba7729f8b18))
+- Accept Authenticode chains when any eligible embedded or supplied root completes the path, even if a sibling root is ineligible ([#575](https://github.com/Devolutions/picky-rs/issues/575)) ([bf2ae1cea5](https://github.com/Devolutions/picky-rs/commit/bf2ae1cea5ee835959a351588cd9eba7729f8b18))
+- Apply enabled certificate validity date checks to the root selected for Authenticode CTL verification ([#575](https://github.com/Devolutions/picky-rs/issues/575)) ([bf2ae1cea5](https://github.com/Devolutions/picky-rs/commit/bf2ae1cea5ee835959a351588cd9eba7729f8b18))
+
 ## [[7.0.0-rc.27](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.26...picky-v7.0.0-rc.27)] - 2026-09-29
 
 ### <!-- 7 -->Build

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [[0.1.2](https://github.com/Devolutions/picky-rs/compare/picky-test-data-v0.1.1...picky-test-data-v0.1.2)] - 2026-10-26
+
+### <!-- 4 -->Bug Fixes
+
+- Expose the Authenticode signature fixture as `PSDIAG_SIGNATURE` ([#534](https://github.com/Devolutions/picky-rs/issues/534)) ([76881c4ee7](https://github.com/Devolutions/picky-rs/commit/76881c4ee70089accab4c84fb26c37cf3ff12b97))
+- Add `SSH_PRIVATE_KEY_EC_P256_LEADING_ZERO` and `SSH_PRIVATE_KEY_ED25519_LEADING_ZERO` fixtures ([#557](https://github.com/Devolutions/picky-rs/issues/557)) ([122303e05e](https://github.com/Devolutions/picky-rs/commit/122303e05e692b083e01834805fe5fdab87cdac3))
+- Add `PUTTY_KEY_EC_P256_LEADING_ZERO`, `PUTTY_KEY_ED25519_LEADING_ZERO` and `PUTTY_KEY_ED25519_V2_SHORT_SECRET` fixtures ([#557](https://github.com/Devolutions/picky-rs/issues/557)) ([122303e05e](https://github.com/Devolutions/picky-rs/commit/122303e05e692b083e01834805fe5fdab87cdac3))
+
+### <!-- 6 -->Documentation
+
+- Make test-data source URLs clickable in the API documentation ([a50971d365](https://github.com/Devolutions/picky-rs/commit/a50971d3651368bdefeed607708bad81bdad97a6))
+
 ### Changed
 
 - Bump minimal rustc version to 1.85.
