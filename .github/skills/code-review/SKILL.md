@@ -6,7 +6,7 @@ description: Review picky-rs pull requests and diffs using focused spec-conforma
 Inspect the diff, its stated goal, and repository guidance before selecting reviewers:
 
 - Run `spec-reviewer` only when the change may affect ASN.1 or DER encoding, OIDs, PKI structures, cryptographic operations, key or signature formats, authentication protocol messages, parsing of untrusted input, or standard-visible errors.
-- Run `intent-drift-audit` when the diff touches a path governed by an `INTENT.md` in its directory or an ancestor, or by a `*.intent.md` beside the changed module, or changes a surface a `CONTRACT*.md` specifies.
+- Run `intent-drift-audit` when the diff touches a path governed by an `INTENT*.md` in its directory or an ancestor, or by a `*.intent*.md` beside the changed module, or changes a surface a `CONTRACT*.md` specifies.
 - Run `intent-review` when the diff adds or changes an intent file.
 - Run `contract-review` when the diff changes a `CONTRACT*.md`.
 - Run `code-compressor` for the changed code.
