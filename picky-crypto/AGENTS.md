@@ -1,13 +1,3 @@
-# picky-crypto
-
-## Changing the contract
-
-Before adding or changing an operation, check that RustCrypto, aws-lc-rs, ring, PKCS#11 (through `cryptoki`) and Windows CNG can each implement it natively or return `Unsupported`.
-If any of them needs a workaround, do not add the operation; report the mismatch.
-
-Before adding an operation, check whether it can be derived from existing operations.
-If it can, implement it above the contract unless one of the exceptions in `INTENT.md` applies, and write down which one.
-
 When you verify a library capability, cite the source file or documentation page at the pinned version, or write a minimal compile probe.
 Mark anything you could not verify as Unknown.
 

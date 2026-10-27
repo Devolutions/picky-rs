@@ -1,5 +1,3 @@
-# picky-crypto-testsuite
-
 Sources, versions and checksums are in `vectors/manifest.toml`; `cargo xtask check-vectors` checks it.
 
 ## Changing the vector set
