@@ -36,15 +36,6 @@ Use these aggregate mappings:
 7. Never combine scopes or invent a catch-all scope; explain secondary effects in the body.
 8. Add a new scope only for a distinct contract that does not fit an existing aggregate.
 
-Use the component scope with any applicable type:
-
-```text
-fix(picky): don't panic on RFC 3161 timestamp fallback
-feat(picky-krb): add IAKerb proxy message encoding/decoding
-ci(release): use Trusted Publishing for NuGet
-build(wasm): update frontend dependencies
-```
-
 Do not use types, package ecosystems, or cross-cutting aspects as scopes.
 This excludes `ci`, `test`, `docs`, `build`, `perf`, `tooling`, `automation`, `workspace`, `crypto`, `security`, `api`, `nuget`, `npm`, `swift`, `dotnet`, and `crates`.
 Use no scope for genuinely repository-wide changes.
@@ -60,7 +51,3 @@ When an update requires code changes, scope it to the crate owning those changes
 A production change accompanied by tests keeps its production type and scope.
 For test-only changes, use `test(<crate>)` with the crate under test, or `test(picky-test-data)` for shared fixtures.
 Omit the scope when test-only changes span several crates.
-
-## Changelog footers
-
-`cliff.toml` recognises the footers `Changelog: ignore`, which skips the changelog entry, and `Security: yes`, which files it under Security.

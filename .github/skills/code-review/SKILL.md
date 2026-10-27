@@ -8,7 +8,7 @@ description: Review picky-rs pull requests and diffs using focused spec-conforma
 Inspect the diff, its stated goal, and repository guidance before selecting reviewers:
 
 - Run `spec-reviewer` only when the change may affect ASN.1 or DER encoding, OIDs, PKI structures, cryptographic operations, key or signature formats, authentication protocol messages, parsing of untrusted input, or standard-visible errors.
-- Run `intent-drift-audit` when the diff touches a path governed by an `INTENT*.md` in its directory or an ancestor, or by a `*.intent*.md` beside the changed module, or changes a surface a `CONTRACT*.md` specifies.
+- Run `intent-drift-audit` when the diff touches a path governed by an `INTENT.md` in its directory or an ancestor, or by a `*.intent.md` beside the changed module, or changes a surface a `CONTRACT*.md` specifies.
 - Run `intent-review` when the diff adds or changes an intent file.
 - Run `contract-review` when the diff changes a `CONTRACT*.md`.
 - Run `code-compressor` for the changed code.
@@ -28,7 +28,6 @@ Before the skeptical pass, normalize the initial results.
 Drop claims that lack a concrete location or mechanism, merge findings with the same root cause, and retain disagreements instead of resolving them by vote.
 Give the skeptical reviewer the diff plus the retained findings and ask it to independently review the change, verify or reject each supplied concern, and identify material issues the focused passes missed.
 
-Evaluate the final evidence yourself.
 Report correctness, intent, and conformance findings first, ordered by severity, then optional compression suggestions.
 Each retained item needs a location, concrete impact, and actionable correction or simplification.
 Merge duplicates across reviewers and do not inflate a maintainability preference into a defect.

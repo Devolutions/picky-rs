@@ -5,7 +5,6 @@ description: Analyze picky-rs changes for conformance with the governing cryptog
 
 # Spec reviewer
 
-Keep the review focused on standards conformance rather than general code quality.
 First decide whether the change materially affects an encoded format, a cryptographic operation, or protocol-visible behavior.
 Do not force this review onto internal refactors, tests, tooling, or implementation details that preserve observable behavior.
 
