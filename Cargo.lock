@@ -1379,12 +1379,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "picky-crypto-bundle"
+version = "0.1.0"
+dependencies = [
+ "picky-crypto",
+ "picky-crypto-composed",
+ "picky-crypto-ffdh",
+ "picky-crypto-rustcrypto",
+]
+
+[[package]]
+name = "picky-crypto-composed"
+version = "0.1.0"
+dependencies = [
+ "picky-crypto",
+]
+
+[[package]]
 name = "picky-crypto-conformance"
 version = "0.0.0"
 dependencies = [
  "picky-crypto",
+ "picky-crypto-bundle",
  "picky-crypto-rustcrypto",
  "picky-crypto-testsuite",
+]
+
+[[package]]
+name = "picky-crypto-ffdh"
+version = "0.1.0"
+dependencies = [
+ "crypto-bigint",
+ "picky-crypto",
 ]
 
 [[package]]

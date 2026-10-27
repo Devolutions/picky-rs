@@ -19,6 +19,7 @@ macro_rules! area_tests {
 }
 
 /// Defines one test per differential area, calling the enclosing module's `providers_under_test`.
+#[expect(unused_macros, reason = "`pairs!` has no entry while only one backend exists")]
 macro_rules! differential_tests {
     ($($area:ident),+) => {
         $(
@@ -61,9 +62,9 @@ macro_rules! providers {
     };
 }
 
-/// Defines a module per provider pair, with one test per differential area.
+/// Defines a module per pair of distinct backends, with one test per differential area.
 macro_rules! pairs {
-    ($($name:ident => ($a:expr, $b:expr);)+) => {
+    ($($name:ident => ($a:expr, $b:expr);)*) => {
         $(
             mod $name {
                 use super::*;
@@ -74,11 +75,13 @@ macro_rules! pairs {
 
                 picky_crypto_testsuite::for_each_differential_area!(differential_tests);
             }
-        )+
+        )*
     };
 }
 
 /// Returns the providers of every other backend combined with `with_fallback`, which supply reference ciphertexts to the decryption checks on inconsistent RSA keys.
+/// Providers registered under the same backend label, such as the bundle and the RustCrypto backend it contains, never
+/// serve as references for each other, because they share that backend's code.
 fn reference_provider(backend: &str) -> Option<&'static CryptoProvider> {
     static REFERENCES: OnceLock<Vec<(&'static str, Option<CryptoProvider>)>> = OnceLock::new();
     let references = REFERENCES.get_or_init(|| {
@@ -104,8 +107,10 @@ providers! {
     empty ("none") => empty(), Options::default();
     #[cfg(feature = "rustcrypto")]
     rustcrypto ("rustcrypto") => picky_crypto_rustcrypto::provider(), Options::default();
+    // The bundle's only backend is RustCrypto, so it carries that backend's label.
+    #[cfg(feature = "bundle")]
+    bundle ("rustcrypto") => picky_crypto_bundle::provider(), Options::default();
 }
 
-pairs! {
-    empty_empty => (empty(), empty());
-}
+// With RustCrypto as the only backend, there is no pair of distinct backends.
+pairs! {}
