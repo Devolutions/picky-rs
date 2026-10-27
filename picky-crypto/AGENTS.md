@@ -1,5 +1,3 @@
-# picky-crypto
-
 When you verify a library capability, cite the source file or documentation page at the pinned version, or write a minimal compile probe.
 Mark anything you could not verify as Unknown.
 

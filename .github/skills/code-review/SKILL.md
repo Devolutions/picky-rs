@@ -3,8 +3,6 @@ name: code-review
 description: Review picky-rs pull requests and diffs using focused spec-conformance, intent, compression, style, test, dependency, documentation, prose, and skeptical passes. Use whenever Copilot code review is requested or a proposed change needs review.
 ---
 
-# Code review
-
 Inspect the diff, its stated goal, and repository guidance before selecting reviewers:
 
 - Run `spec-reviewer` only when the change may affect ASN.1 or DER encoding, OIDs, PKI structures, cryptographic operations, key or signature formats, authentication protocol messages, parsing of untrusted input, or standard-visible errors.

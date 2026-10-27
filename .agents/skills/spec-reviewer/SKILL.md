@@ -3,8 +3,6 @@ name: spec-reviewer
 description: Analyze picky-rs changes for conformance with the governing cryptography, ASN.1, PKI, and authentication standards. Use when reviewing ASN.1 types or DER encoding, OIDs and algorithm identifiers, X.509, CSRs, PKCS or CMS structures, Authenticode, timestamps, JOSE, HTTP signatures, SSH or PuTTY key formats, Kerberos, PKINIT, SPNEGO, NegoEx, CredSSP, or PAC data.
 ---
 
-# Spec reviewer
-
 First decide whether the change materially affects an encoded format, a cryptographic operation, or protocol-visible behavior.
 Do not force this review onto internal refactors, tests, tooling, or implementation details that preserve observable behavior.
 
