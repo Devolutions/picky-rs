@@ -159,12 +159,14 @@ ocqmQTrEqWzH7mmVUFXY5GA=
 
     // The fixture's signing certificate is valid from 2021-07-08 to 2022-07-08.
     [Theory]
-    [InlineData(2022, true)]
-    [InlineData(2030, false)]
-    public void AuthenticodeValidatorOutlivesItsInputs(ushort year, bool shouldPass)
+    [InlineData(2022, false, true)]
+    [InlineData(2030, false, false)]
+    [InlineData(2022, true, true)]
+    [InlineData(2030, true, false)]
+    public void AuthenticodeValidatorOutlivesItsInputs(ushort year, bool interval, bool shouldPass)
     {
         AuthenticodeValidator validator = CreateValidator();
-        SetHashAndDate(validator, year);
+        SetHashAndDate(validator, year, interval);
 
         // Nothing references the signature, the hash or the date anymore, so this frees them.
         CollectGarbage();
@@ -196,10 +198,18 @@ ocqmQTrEqWzH7mmVUFXY5GA=
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    static void SetHashAndDate(AuthenticodeValidator validator, ushort year)
+    static void SetHashAndDate(AuthenticodeValidator validator, ushort year, bool interval)
     {
         validator.RequireBasicAuthenticodeValidation(VecU8.FromBytes(FILE_HASH));
-        validator.ExactDate(UtcDate.Ymd(year, 1, 1)!);
+
+        if (interval)
+        {
+            validator.IntervalDate(UtcDate.Ymd(year, 1, 1)!, UtcDate.Ymd(year, 2, 1)!);
+        }
+        else
+        {
+            validator.ExactDate(UtcDate.Ymd(year, 1, 1)!);
+        }
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
