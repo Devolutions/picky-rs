@@ -416,7 +416,9 @@ pub mod ffi {
     }
 }
 
+// UNTESTED: the passphrase is zeroed before it is freed.
 // picky wipes the key material itself, but keeps the passphrase in a plain `String`.
+// When changing this, keep zeroizing `passphrase` in place.
 impl Drop for ffi::SshPrivateKey {
     fn drop(&mut self) {
         if let Some(passphrase) = self.0.passphrase.as_mut() {

@@ -16,7 +16,9 @@ pub fn make_padding<R: Rng>(message: &[u8], mut rng: R) -> Zeroizing<Vec<u8>> {
     let unpadded_size = message.len();
     let padded_size = unpadded_size.next_multiple_of(BLOCK_SIZE);
 
-    // Allocate the final size up front so growing the buffer can't leave a copy of the key behind.
+    // UNTESTED: no unzeroed copy of the key is left behind.
+    // Growing a `Vec` moves it and frees the old buffer without wiping it.
+    // When changing this, keep allocating `padded_size` before copying the message in.
     let mut padded = Zeroizing::new(Vec::with_capacity(padded_size));
     padded.extend_from_slice(message);
 
