@@ -9,6 +9,7 @@ use crate::putty::key_value::{
 use crate::putty::ppk::encryption::PpkEncryptionKind;
 use crate::putty::{Argon2Params, Ppk, PuttyError};
 use std::str::FromStr;
+use zeroize::Zeroizing;
 
 impl FromStr for Ppk {
     type Err = PuttyError;
@@ -50,7 +51,7 @@ impl FromStr for Ppk {
             encryption,
             comment: comment.into(),
             public_key: public_key.into(),
-            private_key: private_key.into(),
+            private_key: Zeroizing::new(private_key.into()),
             mac: mac.into(),
         };
 
@@ -93,7 +94,7 @@ impl Ppk {
             None | Some(PpkEncryptionKind::Aes256CbcV2) => {}
         }
 
-        writer.write_multiline_value::<PpkPrivateLines>(Base64PpkValue::from(self.private_key.clone()));
+        writer.write_multiline_value::<PpkPrivateLines>(Base64PpkValue::from(self.private_key.to_vec()));
         writer.write_value::<PpkPrivateMac>(HexPpkValue::from(self.mac.clone()));
 
         Ok(writer.finish())
