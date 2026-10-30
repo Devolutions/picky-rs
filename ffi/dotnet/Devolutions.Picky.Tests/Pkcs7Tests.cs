@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using Devolutions.Picky.Diplomat;
 using Xunit;
 
@@ -68,6 +69,11 @@ WrOnUvpo7YFFGlKamwRpxIlYAgSEQFnD3LOjx+NGdGP1H0PQd9DA4xCwtPKkoCSw
 bOrBNDoLzSPaN6jy3JNeoQAxAA==
 -----END PKCS7-----";
 
+    static readonly byte[] FILE_HASH = [
+        0xa7, 0x38, 0xda, 0x44, 0x46, 0xa4, 0xe7, 0x8a, 0xb6, 0x47, 0xdb, 0x7e, 0x53, 0x42, 0x7e, 0xb0, 0x79, 0x61,
+        0xc9, 0x94, 0x31, 0x7f, 0x4c, 0x59, 0xd7, 0xed, 0xbe, 0xa5, 0xcc, 0x78, 0x6d, 0x80,
+    ];
+
     static readonly string private_key = @"-----BEGIN PRIVATE KEY-----
 MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDXTGfzB7A6FuCt
 Rt0wfM9Ew2ykHgU2L+//65T7/NTjC4ZDCYHEG15IR5EqMsp8P8FAL1h91PGTeL2H
@@ -114,11 +120,6 @@ ocqmQTrEqWzH7mmVUFXY5GA=
         Pem pem = Pem.Parse(pkcs7_pem);
         Pkcs7 pkcs7 = Pkcs7.FromPem(pem);
 
-        byte[] FILE_HASH = [
-            0xa7, 0x38, 0xda, 0x44, 0x46, 0xa4, 0xe7, 0x8a, 0xb6, 0x47, 0xdb, 0x7e, 0x53, 0x42, 0x7e, 0xb0, 0x79, 0x61,
-            0xc9, 0x94, 0x31, 0x7f, 0x4c, 0x59, 0xd7, 0xed, 0xbe, 0xa5, 0xcc, 0x78, 0x6d, 0x80,
-        ];
-
         VecU8 fileHashBuffer = VecU8.FromBytes(FILE_HASH);
         RsString program_name = RsString.FromString("decoding_into_authenticode_signature");
         PrivateKey privateKey = PrivateKey.FromPemStr(private_key);
@@ -156,4 +157,101 @@ ocqmQTrEqWzH7mmVUFXY5GA=
         }
     }
 
+    // The fixture's signing certificate is valid from 2021-07-08 to 2022-07-08.
+    [Theory]
+    [InlineData(2022, false, true)]
+    [InlineData(2030, false, false)]
+    [InlineData(2022, true, true)]
+    [InlineData(2030, true, false)]
+    public void AuthenticodeValidatorOutlivesItsInputs(ushort year, bool interval, bool shouldPass)
+    {
+        AuthenticodeValidator validator = CreateValidator();
+        SetHashAndDate(validator, year, interval);
+
+        // Nothing references the signature, the hash or the date anymore, so this frees them.
+        CollectGarbage();
+
+        validator.RequireSigningCertificateCheck();
+        validator.RequireNotBeforeCheck();
+        validator.RequireNotAfterCheck();
+        validator.IgnoreChainCheck();
+
+        if (shouldPass)
+        {
+            validator.Verify();
+        }
+        else
+        {
+            Assert.Throws<PickyException>(() => validator.Verify());
+        }
+    }
+
+    [Fact]
+    public void AlgorithmIdentifierParametersOutliveTheIdentifier()
+    {
+        AlgorithmIdentifierParameters parameters = GetDigestAlgorithmParameters();
+
+        // Nothing references the identifier anymore, except the view borrowing from it.
+        CollectGarbage();
+
+        Assert.Equal(AlgorithmIdentifierParametersType.Null, parameters.Type);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    static void SetHashAndDate(AuthenticodeValidator validator, ushort year, bool interval)
+    {
+        validator.RequireBasicAuthenticodeValidation(VecU8.FromBytes(FILE_HASH));
+
+        if (interval)
+        {
+            validator.IntervalDate(UtcDate.Ymd(year, 1, 1)!, UtcDate.Ymd(year, 2, 1)!);
+        }
+        else
+        {
+            validator.ExactDate(UtcDate.Ymd(year, 1, 1)!);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    static AlgorithmIdentifierParameters GetDigestAlgorithmParameters()
+    {
+        AlgorithmIdentifier algorithm = CreateSignedPkcs7().DigestAlgorithms().Next()!;
+        Assert.Equal("2.16.840.1.101.3.4.2.1", algorithm.Oid);
+
+        return algorithm.Parameters;
+    }
+
+    static void CollectGarbage()
+    {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    static AuthenticodeSignature CreateSignature()
+    {
+        using Pem pem = Pem.Parse(pkcs7_pem);
+        using PrivateKey privateKey = PrivateKey.FromPemStr(private_key);
+        Pkcs7 pkcs7 = Pkcs7.FromPem(pem);
+
+        return AuthenticodeSignature.New(pkcs7, VecU8.FromBytes(FILE_HASH), ShaVariant.Sha2256, privateKey, null);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    static AuthenticodeValidator CreateValidator()
+    {
+        return CreateSignature().AuthenticodeVerifier();
+    }
+
+    static Pkcs7 CreateSignedPkcs7()
+    {
+        VecU8 der = CreateSignature().ToDer();
+
+        byte[] bytes = new byte[(int)der.Length];
+        der.Fill(bytes);
+
+        return Pkcs7.FromDer(bytes);
+    }
 }
