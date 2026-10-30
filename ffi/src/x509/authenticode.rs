@@ -129,9 +129,8 @@ pub mod ffi {
         }
     }
 
-    // Holds a copy of the signature plus the requested settings, and only builds picky's borrowing
-    // validator inside `verify`. Nothing is borrowed across calls, so the signature and the dates
-    // passed in can be collected at any time.
+    // Holds a copy of the signature plus the requested settings, and only builds picky's borrowing validator inside `verify`.
+    // Nothing is borrowed across calls, so the signature and the dates passed in can be collected at any time.
     #[diplomat::opaque_mut]
     pub struct AuthenticodeValidator {
         signature: picky::x509::pkcs7::authenticode::AuthenticodeSignature,
