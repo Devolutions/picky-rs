@@ -15,11 +15,11 @@ default: bindings
 
 # A tag on the Devolutions fork rather than a branch or a bare rev: a tag is an
 # immutable ref, so its commit survives the fork's branches being rebased.
-# The crates.io 0.16.1 release predates the .NET lifetime rework these bindings
+# The crates.io 0.17.0 release lacks the .NET stored-argument fix these bindings
 # are generated with; switch back to a crates.io version once upstream publishes
 # one that has it.
 diplomat_repo := "https://github.com/Devolutions/diplomat"
-diplomat_tag  := "0.16.1-devo.2"
+diplomat_tag  := "0.17.0-devo.1"
 
 # diplomat-tool uses `if let` guards (stable since Rust 1.95), which this repo's
 # pinned toolchain is too old for.
