@@ -283,10 +283,6 @@ public partial class AuthenticodeSignature
     /// <returns>
     /// A <c>AuthenticodeValidator</c> allocated on Rust side.
     /// </returns>
-    /// <remarks>
-    /// Lifetime: the returned native-backed value may borrow from the receiver or one or more inputs.
-    /// Source handles stay reachable while the returned value exists.
-    /// </remarks>
     public AuthenticodeValidator AuthenticodeVerifier()
     {
         unsafe
@@ -296,7 +292,7 @@ public partial class AuthenticodeSignature
             {
                 selfLease = _diplomatHandle.Lease(BorrowKind.Shared);
                 Raw.AuthenticodeValidator* result = Raw.AuthenticodeSignature.AuthenticodeVerifier(selfLease!.Ptr);
-                return new AuthenticodeValidator(result, LifetimeEdge.Move(ref selfLease));
+                return new AuthenticodeValidator(result);
             }
             finally
             {
