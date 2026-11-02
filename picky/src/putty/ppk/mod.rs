@@ -10,6 +10,7 @@ use crate::putty::key_value::{PpkKeyAlgorithmValue, PpkVersionKey};
 use crate::putty::private_key::{PuttyBasePrivateKey, PuttyPrivateKey};
 use crate::putty::public_key::{PuttyBasePublicKey, PuttyPublicKey};
 use crate::ssh::SshPrivateKey;
+use zeroize::Zeroizing;
 
 use self::encryption::PpkEncryptionKind;
 
@@ -37,7 +38,7 @@ pub struct Ppk {
     encryption: Option<PpkEncryptionKind>,
     comment: String,
     public_key: Vec<u8>,
-    private_key: Vec<u8>,
+    private_key: Zeroizing<Vec<u8>>,
     mac: Vec<u8>,
 }
 

@@ -225,7 +225,7 @@ pub mod ffi {
 
         /// Returns the SSH Private Key string representation.
         pub fn to_repr(&self, writeable: &mut DiplomatWrite) -> Result<(), Box<PickyError>> {
-            let repr = self.0.to_string()?;
+            let repr = zeroize::Zeroizing::new(self.0.to_string()?);
             writeable.write_str(&repr)?;
             writeable.flush();
             Ok(())
@@ -412,6 +412,17 @@ pub mod ffi {
             writeable.write_str(&self.0.comment)?;
             writeable.flush();
             Ok(())
+        }
+    }
+}
+
+// UNTESTED: the passphrase is zeroed before it is freed.
+// picky wipes the key material itself, but keeps the passphrase in a plain `String`.
+// When changing this, keep zeroizing `passphrase` in place.
+impl Drop for ffi::SshPrivateKey {
+    fn drop(&mut self) {
+        if let Some(passphrase) = self.0.passphrase.as_mut() {
+            zeroize::Zeroize::zeroize(passphrase);
         }
     }
 }

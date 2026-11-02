@@ -131,7 +131,7 @@ impl Ppk {
             PpkVersionKey::V2 => {
                 let key_material = kdf::derive_key_material_v2(passphrase)?;
 
-                let mut private_key = ppk_aes::make_padding(self.private_key.clone(), rng);
+                let mut private_key = ppk_aes::make_padding(&self.private_key, rng);
                 let mac = self.calculate_mac_v2(passphrase, &private_key, PpkEncryptionValue::Aes256Cbc)?;
                 ppk_aes::encrypt(&mut private_key, key_material.key(), KeyMaterialV2::iv())?;
 
@@ -158,7 +158,7 @@ impl Ppk {
 
                 let key_material = kdf::derive_key_material_v3(&argon2_params, passphrase)?;
 
-                let mut private_key = ppk_aes::make_padding(self.private_key.clone(), rng);
+                let mut private_key = ppk_aes::make_padding(&self.private_key, rng);
                 let mac =
                     self.calculate_mac_v3(key_material.hmac_key(), &private_key, PpkEncryptionValue::Aes256Cbc)?;
                 ppk_aes::encrypt(&mut private_key, key_material.key(), key_material.iv())?;
