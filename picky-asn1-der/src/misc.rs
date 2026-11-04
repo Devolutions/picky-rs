@@ -231,4 +231,15 @@ mod tests {
         assert_eq!(writer[1], 0x01);
         assert_eq!(writer[2], 0x22);
     }
+
+    #[test]
+    fn deserialize_enum_rejects_oversized_length() {
+        use crate::application_tag::ApplicationTag;
+        use picky_asn1::wrapper::Utf8StringAsn1;
+
+        let data: &[u8] = &[0x6a, 0x88, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01];
+
+        let result = crate::from_bytes::<ApplicationTag<Utf8StringAsn1, 10>>(data);
+        assert!(result.is_err(), "expected error for oversized length");
+    }
 }
