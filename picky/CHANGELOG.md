@@ -6,6 +6,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[7.0.0-rc.30](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.29...picky-v7.0.0-rc.30)] - 2026-11-06
+
+### <!-- 4 -->Bug Fixes
+
+- Wipe private key bytes and passphrases when they're freed ([#542](https://github.com/Devolutions/picky-rs/issues/542)) ([29c0644a4a](https://github.com/Devolutions/picky-rs/commit/29c0644a4a0a5ad57f7870c16fa68bebee068b7a)) 
+
+  On top of #541. Disposing a key from .NET now zeroes what it held
+  instead of just freeing it.
+  
+  - `Pem`: the decoded bytes, since a PEM can carry a private key
+  - `SshPrivateKey`: the passphrase. picky already wipes the key itself
+  - `SshPrivateKey.ToRepr` / `PuttyPpk.ToRepr`: the temporary string
+  holding the encoded key
+  - `Ppk` (picky core): the private key buffer is `Zeroizing` now, so the
+  copies made while encrypting, decrypting and converting get wiped too.
+  `make_padding` allocates its final size up front so a resize can't leave
+  a plaintext copy behind. Field is private, no API change
+  
+  What this doesn't cover (it's all outside picky):
+  - the Diplomat write buffer behind every `ToRepr` string, and the
+  `byte[]` C# builds for a `string` argument (`Diplomat.Utf8.Clone`).
+  That's the generator, so it's a follow-up in
+  [Devolutions/diplomat](https://github.com/Devolutions/diplomat)
+  - the .NET `string` you get back from `ToRepr` or pass in as a
+  passphrase. It's immutable, nothing to wipe
+  
+  New tests: passphrase-protected SSH key and encrypted PPK round trips.
+  Neither had .NET coverage before.
+
+
+
 ## [[7.0.0-rc.29](https://github.com/Devolutions/picky-rs/compare/picky-v7.0.0-rc.28...picky-v7.0.0-rc.29)] - 2026-10-26
 
 ### <!-- 4 -->Bug Fixes
