@@ -20,7 +20,7 @@ picky-asn1 = { path = "../picky-asn1", default-features = false }
 picky-asn1-der = { path = "../picky-asn1-der" }
 picky-asn1-x509 = { path = "../picky-asn1-x509", features = ["legacy", "zeroize"] }
 
-argon2 = { version = "=0.6.0-rc.8", features = ["rand_core"] }
+argon2 = { version = "=0.6.0", features = ["rand_core"] }
 rand = "0.10"
 rand_core = "0.10"
 
