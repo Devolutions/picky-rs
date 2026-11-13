@@ -579,7 +579,17 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
             _ => {}
         }
 
-        visitor.visit_newtype_struct(self)
+        let result = visitor.visit_newtype_struct(&mut *self);
+
+        // `Optional` recovers from this error and moves on to the next field, which must not inherit the
+        // encapsulators or the raw DER and header-only modes set up for the failed value.
+        if result.is_err() {
+            self.encapsulator_tag_stack.clear();
+            self.raw_der = false;
+            self.header_only = false;
+        }
+
+        result
     }
 
     fn deserialize_seq<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
