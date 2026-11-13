@@ -640,7 +640,10 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
             return Err(Asn1DerError::TruncatedData);
         }
         let payload_len = Length::deserialized(&mut Cursor::new(&peeked.buffer()[1..]))?;
-        let len = 1 + payload_len + Length::encoded_len(payload_len);
+        let len = payload_len
+            .checked_add(1)
+            .and_then(|v| v.checked_add(Length::encoded_len(payload_len)))
+            .ok_or(Asn1DerError::TruncatedData)?;
         visitor.visit_seq(Sequence::deserialize_lazy(self, len))
     }
 
