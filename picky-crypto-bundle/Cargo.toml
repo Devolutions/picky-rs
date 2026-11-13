@@ -1,0 +1,31 @@
+[package]
+name = "picky-crypto-bundle"
+version = "0.1.0"
+edition = "2024"
+publish = false
+rust-version = "1.85"
+authors = ["Devolutions Inc. <infos@devolutions.net>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Devolutions/picky-rs"
+description = "Fixed, non-FIPS composition of picky-crypto backends and fill-in providers"
+readme = "README.md"
+keywords = ["cryptography", "provider", "crypto"]
+categories = ["cryptography"]
+
+[features]
+# UNTESTED: each backend feature enables the whole backend, and `all` enables every feature.
+# Dependents get the same backend whichever features they enable, and the conformance runner tests the fill-in
+# providers only through `all`.
+# The workspace test run unifies features, and `feature_assembly` sees only whether a backend has the hash, HMAC and
+# random entries the fill-in providers use, so no test checks the rest of a backend or what `all` contains.
+# When adding or changing a feature, keep the backend's `all` in its backend feature and the feature in `all`.
+rustcrypto = ["dep:picky-crypto-rustcrypto", "picky-crypto-rustcrypto/all"]
+composed = ["dep:picky-crypto-composed"]
+ffdh = ["dep:picky-crypto-ffdh"]
+all = ["rustcrypto", "composed", "ffdh"]
+
+[dependencies]
+picky-crypto = { path = "../picky-crypto" }
+picky-crypto-rustcrypto = { path = "../picky-crypto-rustcrypto", optional = true }
+picky-crypto-composed = { path = "../picky-crypto-composed", optional = true }
+picky-crypto-ffdh = { path = "../picky-crypto-ffdh", optional = true }
