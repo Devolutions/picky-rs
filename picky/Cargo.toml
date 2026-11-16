@@ -67,7 +67,7 @@ sha3 = { version = "0.12", features = ["oid"] }
 aes-gcm = { version = "0.11", optional = true }
 aes = { version = "0.9", optional = true }
 aes-kw = { version = "0.3", optional = true }
-argon2 = { version = "=0.6.0-rc.8", optional = true }
+argon2 = { version = "=0.6.0", optional = true }
 ctr = { version = "0.10", optional = true }
 cbc = { version = "0.2", optional = true, features = ["alloc"] }
 bcrypt-pbkdf = { version = "0.11", optional = true }
@@ -80,7 +80,7 @@ inout = "0.2.2"
 
 # Pin transitive dependencies versions.
 # TODO: Remove when stable versions will be released.
-pkcs1 = "=0.8.0-rc.4"
+pkcs1 = "=0.8.0"
 
 [dev-dependencies]
 pretty_assertions = "1.4"
