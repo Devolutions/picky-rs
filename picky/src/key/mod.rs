@@ -15,7 +15,7 @@ use picky_asn1_x509::{
 use rand::rngs::{StdRng, SysRng};
 use rand_core::SeedableRng as _;
 use rsa::traits::{PrivateKeyParts as _, PublicKeyParts as _};
-use rsa::{RsaPrivateKey, RsaPublicKey};
+use rsa::{PrivateKey as RsaPrivateKey, PublicKey as RsaPublicKey};
 use thiserror::Error;
 use zeroize::Zeroize;
 
@@ -188,10 +188,10 @@ impl TryFrom<&'_ PrivateKey> for RsaPublicKey {
     fn try_from(v: &PrivateKey) -> Result<Self, Self::Error> {
         match &v.as_inner().private_key {
             private_key_info::PrivateKeyValue::Rsa(OctetStringAsn1Container(key)) => {
-                Ok(RsaPublicKey::new_with_max_size(
+                Ok(RsaPublicKey::new_with_size_limits(
                     BoxedUint::from_be_slice_vartime(key.modulus.as_unsigned_bytes_be()),
                     BoxedUint::from_be_slice_vartime(key.public_exponent.as_unsigned_bytes_be()),
-                    8192,
+                    0..=RsaPublicKey::MAX_SIZE,
                 )?)
             }
             _ => Err(KeyError::Rsa {
@@ -684,7 +684,9 @@ impl PrivateKey {
         let public_exponent = key.e();
         let private_exponent = key.d();
 
-        Self::from_rsa_components(modulus, public_exponent, private_exponent, key.primes())
+        let primes: Vec<BoxedUint> = key.primes().iter().map(|prime| prime.as_ref().clone()).collect();
+
+        Self::from_rsa_components(modulus, public_exponent, private_exponent, &primes)
     }
 
     /// Generates new ec key pair with specified supported curve.
@@ -865,10 +867,10 @@ impl TryFrom<&'_ PublicKey> for RsaPublicKey {
         use picky_asn1_x509::PublicKey as InnerPublicKey;
 
         match &v.as_inner().subject_public_key {
-            InnerPublicKey::Rsa(BitStringAsn1Container(key)) => Ok(RsaPublicKey::new_with_max_size(
+            InnerPublicKey::Rsa(BitStringAsn1Container(key)) => Ok(RsaPublicKey::new_with_size_limits(
                 BoxedUint::from_be_slice_vartime(key.modulus.as_unsigned_bytes_be()),
                 BoxedUint::from_be_slice_vartime(key.public_exponent.as_unsigned_bytes_be()),
-                8192,
+                0..=RsaPublicKey::MAX_SIZE,
             )?),
             InnerPublicKey::Ec(_) => Err(KeyError::UnsupportedAlgorithm {
                 algorithm: "elliptic curves",

@@ -136,7 +136,7 @@ impl SignatureAlgorithm {
         match self {
             SignatureAlgorithm::RsaPkcs1v15(picky_hash_algo) => {
                 use rsa::signature::SignatureEncoding as _;
-                use rsa::{RsaPrivateKey, pkcs1v15};
+                use rsa::{PrivateKey as RsaPrivateKey, pkcs1v15};
 
                 let rsa_private_key = RsaPrivateKey::try_from(private_key)?;
 
@@ -312,7 +312,7 @@ impl SignatureAlgorithm {
         match self {
             SignatureAlgorithm::RsaPkcs1v15(picky_hash_algo) => {
                 use rsa::signature::Verifier as _;
-                use rsa::{RsaPublicKey, pkcs1v15};
+                use rsa::{PublicKey as RsaPublicKey, pkcs1v15};
 
                 let rsa_public_key = RsaPublicKey::try_from(public_key)?;
                 let signature = pkcs1v15::Signature::try_from(signature)?;

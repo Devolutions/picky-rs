@@ -16,7 +16,7 @@ use base64::{DecodeError, Engine as _};
 use crypto_common::Generate as _;
 use rand::rngs::{StdRng, SysRng};
 use rand_core::{Rng as _, SeedableRng as _};
-use rsa::{Oaep, Pkcs1v15Encrypt, RsaPrivateKey, RsaPublicKey};
+use rsa::{Oaep, Pkcs1v15Encrypt, PrivateKey as RsaPrivateKey, PublicKey as RsaPublicKey};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -871,7 +871,8 @@ fn decrypt_impl(raw: RawJwe<'_>, mode: DecoderMode<'_>) -> Result<Jwe, JweError>
 
                 // UNTESTED: decryption is blinded with `rng`, which is the OS generator on the public path.
                 // Blinding is the rsa crate's countermeasure against timing attacks on the private-key operation.
-                // The padding check timing of RUSTSEC-2023-0071 remains.
+                // rsa 0.10.0 is outside RUSTSEC-2023-0071; its PKCS#1 v1.5 decryption uses implicit rejection
+                // (src/pkcs1v15.rs:336–384).
                 // Unblinded `decrypt` returns the same results, so tests still pass without blinding.
                 // Keep `decrypt_blinded` and pass it `rng`.
                 //

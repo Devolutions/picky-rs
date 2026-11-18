@@ -56,7 +56,7 @@ p256 = { version = "0.14", features = ["ecdh"] }
 p384 = { version = "0.14", features = ["ecdh"] }
 p521 = { version = "0.14", features = ["ecdh"] }
 
-rsa = { version = "=0.10.0-rc.18", features = ["std"] }
+rsa = { version = "0.10", features = ["std", "pkcs1v15"] }
 
 digest = "0.11"
 md5 = { package = "md-5", version = "0.11", features = ["oid"] }
@@ -80,7 +80,7 @@ inout = "0.2.2"
 
 # Pin transitive dependencies versions.
 # TODO: Remove when stable versions will be released.
-pkcs1 = "=0.8.0-rc.4"
+pkcs1 = "0.8"
 
 [dev-dependencies]
 pretty_assertions = "1.4"
