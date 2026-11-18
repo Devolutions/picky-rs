@@ -44,7 +44,7 @@ sha2 = { version = "0.11.0", optional = true, features = ["oid", "zeroize"] }
 sha3 = { version = "0.12.0", optional = true, features = ["oid", "zeroize"] }
 hmac = { version = "0.13.0", optional = true, features = ["zeroize"] }
 pbkdf2 = { version = "0.13.0", optional = true, default-features = false, features = ["hmac"] }
-rsa = { version = "=0.10.0-rc.18", optional = true }
+rsa = { version = "0.10", optional = true, features = ["pkcs1v15"] }
 chacha20 = { version = "0.10.2", optional = true, default-features = false, features = ["rng", "zeroize"] }
 sec1 = { version = "0.8.1", optional = true, default-features = false, features = ["der", "zeroize"] }
 p256 = { version = "0.14.0", optional = true, default-features = false, features = ["ecdsa", "ecdh", "pkcs8", "alloc", "precomputed-tables", "std"] }
@@ -58,4 +58,4 @@ getrandom = { version = "0.4.3", optional = true, features = ["sys_rng"] }
 
 [dev-dependencies]
 # Test keys outside the library's checked constructors (small moduli, large exponents).
-rsa = { version = "=0.10.0-rc.18", features = ["hazmat"] }
+rsa = { version = "0.10", features = ["hazmat", "pkcs1v15"] }
