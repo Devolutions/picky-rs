@@ -350,11 +350,54 @@ jobs:
           name: picky-nupkg
           path: ffi/dotnet/Devolutions.Picky/bin/Release/*.nupkg
 
+  package-smoke:
+    name: NuGet consumer smoke test
+    needs: [preflight, build-managed]
+    runs-on: macos-latest
+    steps:
+      - name: Check out ${{ github.repository }}
+        uses: actions/checkout@v6
+
+      - name: Install .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install iOS workload
+        run: dotnet workload install ios
+
+      - name: Download NuGet package
+        uses: actions/download-artifact@v8
+        with:
+          name: picky-nupkg
+          path: package
+
+      - name: Restore package consumer
+        run: |
+          dotnet restore ffi/dotnet/PackageSmoke/PackageSmoke.csproj \
+            -p:PickyPackageVersion=${{ needs.preflight.outputs.package-version }} \
+            --source "$GITHUB_WORKSPACE/package" --source https://api.nuget.org/v3/index.json
+
+      - name: Run desktop consumer
+        run: |
+          dotnet run --project ffi/dotnet/PackageSmoke/PackageSmoke.csproj -c Release -f net10.0 \
+            -p:PickyPackageVersion=${{ needs.preflight.outputs.package-version }} --no-restore
+
+      - name: Build iOS consumers
+        run: |
+          for rid in ios-arm64 iossimulator-arm64; do
+            dotnet build ffi/dotnet/PackageSmoke/PackageSmoke.csproj -c Release -f net10.0-ios -r "$rid" \
+              -p:PickyPackageVersion=${{ needs.preflight.outputs.package-version }} -p:EnableCodeSigning=false
+            app="ffi/dotnet/PackageSmoke/bin/Release/net10.0-ios/$rid/PackageSmoke.app"
+            test -f "$app/Frameworks/libDevolutionsPicky.framework/libDevolutionsPicky"
+            otool -L "$app/PackageSmoke" | grep -F '@rpath/libDevolutionsPicky.framework/libDevolutionsPicky'
+          done
+
   publish:
     name: Publish NuGet package
     environment: nuget-publish
     if: ${{ needs.preflight.outputs.dry-run == 'false' }}
-    needs: [preflight, build-managed]
+    needs: [preflight, build-managed, package-smoke]
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -398,7 +441,7 @@ jobs:
   notify:
     name: Notify failure
     if: ${{ always() && contains(needs.*.result, 'failure') && github.event_name == 'schedule' }}
-    needs: [preflight, build-universal, build-managed]
+    needs: [preflight, build-universal, build-managed, package-smoke]
     runs-on: ubuntu-latest
     env:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_ARCHITECTURE }}

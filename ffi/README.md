@@ -22,6 +22,7 @@ Binary will be generated inside `target` folder located at workspace root.
 
 C# .NET bindings are located in the `./dotnet/` folder.
 The bindings require .NET 10 and support iOS 12.2 or later.
+The NuGet package includes iOS device and simulator frameworks for arm64 only.
 Install the iOS workload with `dotnet workload install ios` before building them.
 [`Diplomat`](https://github.com/rust-diplomat/diplomat) is used to generate most of the code.
 Both the macros and the tool are pinned to a tag on the [Devolutions fork](https://github.com/Devolutions/diplomat); see the `justfile`.
