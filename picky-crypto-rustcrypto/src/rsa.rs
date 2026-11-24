@@ -123,17 +123,7 @@ impl SignatureVerifier for Verify {
     }
 }
 
-fn encryption_supported(algorithm: AsymmetricEncryptionAlgorithm) -> bool {
-    matches!(
-        algorithm,
-        AsymmetricEncryptionAlgorithm::RsaPkcs1v15
-            | AsymmetricEncryptionAlgorithm::RsaOaepSha1
-            | AsymmetricEncryptionAlgorithm::RsaOaepSha256
-    )
-}
 fn error(error: rsa::Error) -> Error {
-    // Decryption re-encrypts its result and reports a mismatch as Internal, mapped to InvalidKey (rsa 0.10.0,
-    // src/algorithms/rsa.rs:188–204; src/pkcs1v15.rs:366; src/oaep.rs:359).
     match error {
         rsa::Error::Rng => Error::ProviderFailure,
         rsa::Error::MessageTooLong => Error::InvalidInput,
@@ -275,15 +265,6 @@ fn sign<D: sha2::Digest + rsa::pkcs8::AssociatedOid>(
         .map(|signature| OutputBytes::new(Zeroizing::new(signature)))
         .map_err(|error| signing_error(error, algorithm))
 }
-fn decrypt<P: PaddingScheme>(key: &RsaPrivateKey, ciphertext: &[u8], padding: P) -> Result<OutputBytes, Error> {
-    // UNTESTED: the private-key operation is blinded with the operating-system generator.
-    // Blinding counters timing attacks on the private key, and plaintexts are the same either way.
-    // When changing the call, keep passing a generator.
-    padding
-        .decrypt(Some(&mut getrandom::SysRng), key, ciphertext)
-        .map(|output| OutputBytes::new(Zeroizing::new(output)))
-        .map_err(error)
-}
 impl PrivateKey for Key {
     fn key_type(&self) -> KeyType {
         KeyType::Rsa
@@ -307,29 +288,16 @@ impl PrivateKey for Key {
                     | SignatureAlgorithm::RsaPkcs1v15Sha3_384
                     | SignatureAlgorithm::RsaPkcs1v15Sha3_512
             ),
-            KeyOperation::Decrypt(algorithm) => encryption_supported(algorithm),
+            // Not offered: rsa 0.10.0 decrypts PKCS#1 v1.5 with implicit rejection (src/pkcs1v15.rs:221–226) and skips
+            // the OAEP leading octet (src/algorithms/oaep.rs:231), so it cannot report every padding failure as
+            // `VerificationFailed`.
+            KeyOperation::Decrypt(_) => false,
             KeyOperation::PublicKey => true,
             _ => false,
         }
     }
     fn sign(&self, algorithm: SignatureAlgorithm, message: &[u8]) -> Result<OutputBytes, Error> {
         with_digest!(algorithm, sign, &self.0, message, algorithm)
-    }
-    fn decrypt(&self, algorithm: AsymmetricEncryptionAlgorithm, ciphertext: &[u8]) -> Result<OutputBytes, Error> {
-        if !encryption_supported(algorithm) {
-            return Err(Error::Unsupported(Algorithm::AsymmetricEncryption(algorithm)));
-        }
-        if ciphertext.len() != self.0.size() {
-            return Err(Error::InvalidInput);
-        }
-        match algorithm {
-            AsymmetricEncryptionAlgorithm::RsaPkcs1v15 => decrypt(&self.0, ciphertext, rsa::Pkcs1v15Encrypt),
-            AsymmetricEncryptionAlgorithm::RsaOaepSha1 => decrypt(&self.0, ciphertext, rsa::Oaep::<sha1::Sha1>::new()),
-            AsymmetricEncryptionAlgorithm::RsaOaepSha256 => {
-                decrypt(&self.0, ciphertext, rsa::Oaep::<sha2::Sha256>::new())
-            }
-            _ => Err(Error::Unsupported(Algorithm::AsymmetricEncryption(algorithm))),
-        }
     }
     fn public_key(&self) -> Result<OutputBytes, Error> {
         let public = self.0.as_public_key().to_pkcs1_der().map_err(|_| Error::InvalidKey)?;
