@@ -308,7 +308,7 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Install iOS workload
-        run: dotnet workload install ios
+        run: dotnet workload install ios --version ios@26.5.10318
 
       - name: Prepare dependencies
         run: |
@@ -353,7 +353,9 @@ jobs:
   package-smoke:
     name: NuGet consumer smoke test
     needs: [preflight, build-managed]
-    runs-on: macos-latest
+    runs-on: macos-26
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.5.app/Contents/Developer
     steps:
       - name: Check out ${{ github.repository }}
         uses: actions/checkout@v6
@@ -364,7 +366,7 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Install iOS workload
-        run: dotnet workload install ios
+        run: dotnet workload install ios --version ios@26.5.10318
 
       - name: Download NuGet package
         uses: actions/download-artifact@v8
