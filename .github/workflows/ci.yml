@@ -154,7 +154,7 @@ jobs:
 
       # The iOS workload is required to restore the multi-targeted bindings.
       - name: Install iOS workload
-        run: dotnet workload install ios --version ios@26.5.10318
+        run: dotnet workload install ios
         shell: pwsh
 
       # GeneratePackageOnBuild is on by default; disable it so the build does not try to
