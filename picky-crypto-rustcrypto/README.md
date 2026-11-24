@@ -30,8 +30,7 @@ The library also includes these support crates, some reached through re-exports:
 PKCS#1 encoding is reached through rsa's pkcs1 re-export.
 Secret cleanup features are enabled wherever the library offers them, and adapter-owned secret copies and returned buffers use zeroizing storage.
 
-Loaded RSA keys sign with every listed RSA signature algorithm and export their public key.
-They do not decrypt: the locked rsa version decrypts PKCS#1 v1.5 with implicit rejection and does not check the OAEP leading octet, so it cannot report every padding failure as `VerificationFailed`.
+Loaded RSA keys sign with every listed RSA signature algorithm, decrypt with every listed RSA encryption algorithm and export their public key.
 Loaded EC keys sign and agree on their own curve and export their public key.
 Loaded Ed25519 keys sign and export their public key; loaded X25519 keys agree and export their public key.
 Enabling ed25519-dalek's `legacy_compatibility` feature anywhere in a build weakens the library's Ed25519 signature `S` range check, because Cargo unifies features.
@@ -39,7 +38,12 @@ The adapter therefore checks `S < L` itself (RFC 8032 §5.1.7), and this workspa
 
 Key-based KDFs and finite-field Diffie-Hellman are not provided; they come from other providers.
 RSA key generation draws a 256-bit seed from the operating-system generator and expands it with ChaCha20, so a generator failure is reported instead of panicking.
-RSA signing blinds the private-key operation with the operating-system generator.
+RSA signing and decryption blind the private-key operation with the operating-system generator.
+PKCS#1 v1.5 decryption uses the locked rsa version's implicit rejection (`src/pkcs1v15.rs`, `decrypt`): invalid padding returns a deterministic synthetic message instead of an error, as section 7 of the contract allows.
+OAEP decryption does not check the encoded message's leading octet (`src/algorithms/oaep.rs`, `decrypt_inner`), which section 7 also allows.
+
+Every other padding failure is reported as the same `VerificationFailed` error, as the contract requires.
+A protocol exposed to padding oracles applies its own countermeasure.
 
 ECDSA signing mixes operating-system randomness into the RFC 6979 nonce as additional data.
 RSA public keys beyond the rsa crate's limits (a modulus above 8192 bits or a public exponent above 2^33 − 1) are unsupported.
