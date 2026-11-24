@@ -782,7 +782,6 @@ dependencies = [
  "picky-asn1",
  "picky-asn1-der",
  "picky-asn1-x509",
- "pkcs1",
  "rand",
  "rand_core",
  "rsa",

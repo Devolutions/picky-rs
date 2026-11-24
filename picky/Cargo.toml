@@ -78,10 +78,6 @@ hmac = { version = "0.13", optional = true }
 crypto-common = "0.2"
 inout = "0.2.2"
 
-# Pin transitive dependencies versions.
-# TODO: Remove when stable versions will be released.
-pkcs1 = "0.8"
-
 [dev-dependencies]
 pretty_assertions = "1.4"
 cfg-if = "1.0"
