@@ -5,6 +5,15 @@
     <IsAndroid Condition="$(TargetFramework.ToUpper().Contains('ANDROID'))">true</IsAndroid>
     <IsIOS Condition="'$(Platform)' == 'iPhone' or '$(Platform)' == 'iPhoneSimulator'">true</IsIOS>
   </PropertyGroup>
+  <Target Name="AddPickyIosNativeReference" BeforeTargets="_ExpandNativeReferences" Condition="'$(TargetPlatformIdentifier)' == 'ios'">
+    <Error Condition="'$(RuntimeIdentifier)' != 'ios-arm64' and '$(RuntimeIdentifier)' != 'iossimulator-arm64'"
+           Text="Devolutions.Picky supports only ios-arm64 and iossimulator-arm64." />
+    <ItemGroup>
+      <NativeReference Include="$(MSBuildThisFileDirectory)..\runtimes\$(RuntimeIdentifier)\native\libDevolutionsPicky.framework">
+        <Kind>Framework</Kind>
+      </NativeReference>
+    </ItemGroup>
+  </Target>
   <ItemGroup>
   
     <!-- Windows or PowerShell -->

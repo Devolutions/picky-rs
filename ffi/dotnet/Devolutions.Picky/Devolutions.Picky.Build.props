@@ -1,7 +1,7 @@
 <Project>
   <PropertyGroup>
-    <TargetFrameworks>net8.0;net9.0-ios</TargetFrameworks>
-     <SupportedOSPlatformVersion Condition="'$(TargetFramework)' == 'net9.0-ios'">12.1</SupportedOSPlatformVersion>
+    <TargetFrameworks>net10.0;net10.0-ios</TargetFrameworks>
+    <SupportedOSPlatformVersion Condition="'$(TargetFramework)' == 'net10.0-ios'">15.0</SupportedOSPlatformVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -121,6 +121,5 @@
 
   <ItemGroup>
     <Content Include="Devolutions.Picky.targets" PackagePath="build/Devolutions.Picky.targets" Pack="true" />
-    <Content Include="Devolutions.Picky.props" PackagePath="build/Devolutions.Picky.props" Pack="true" />
   </ItemGroup>
 </Project>

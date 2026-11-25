@@ -7,7 +7,7 @@ public partial class Cert
     public X509Certificate2 ToX509Certificate2()
     {
         byte[] rawData = ToPem().ToData();
-        return new X509Certificate2(rawData);
+        return X509CertificateLoader.LoadCertificate(rawData);
     }
 
     public static Cert FromX509Certificate2(X509Certificate2 cert)
