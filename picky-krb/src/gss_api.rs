@@ -604,7 +604,7 @@ mod tests {
     use crate::data_types::{
         EncryptedData, KerberosStringAsn1, KerberosTime, PaData, PrincipalName, Ticket, TicketInner,
     };
-    use crate::gss_api::{ApplicationTag0, IAKerbProxyMessage, MicToken, WrapToken};
+    use crate::gss_api::{ApplicationTag0, IAKerbProxyMessage, MicToken, NegTokenTarg, NegTokenTarg1, WrapToken};
     use crate::messages::{AsReq, IAKerbHeader, KdcReq, KdcReqBody, TgtRep};
 
     use super::KrbMessage;
@@ -967,5 +967,39 @@ mod tests {
                 .unwrap();
 
         assert_eq!(iakerb_proxy_message, expected);
+    }
+
+    #[test]
+    fn neg_token_targ_without_neg_result() {
+        // oracle: regression Devolutions/IronRDP#2371
+        #[rustfmt::skip]
+        let raw = [
+            0xA1, 0x3A, // [1]
+            0x30, 0x38, // NegTokenTarg SEQUENCE
+            0xA2, 0x22, // responseToken [2]
+            0x04, 0x20, // OCTET STRING
+            b'N', b'T', b'L', b'M', b'S', b'S', b'P', 0x00,
+            0x03, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0xA3, 0x12, // mechListMIC [3]
+            0x04, 0x10, // OCTET STRING
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+        let mut response_token = b"NTLMSSP    ".to_vec();
+        response_token.resize(32, 0);
+
+        let token: NegTokenTarg1 = picky_asn1_der::from_bytes(&raw).unwrap();
+
+        assert_eq!(
+            token,
+            ExplicitContextTag1::from(NegTokenTarg {
+                neg_result: Optional::from(None),
+                supported_mech: Optional::from(None),
+                response_token: Optional::from(Some(ExplicitContextTag2::from(OctetStringAsn1::from(response_token)))),
+                mech_list_mic: Optional::from(Some(ExplicitContextTag3::from(OctetStringAsn1::from(vec![0; 16])))),
+            })
+        );
     }
 }

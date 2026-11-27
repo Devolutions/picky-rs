@@ -232,3 +232,28 @@ fn nested_encapsulators() {
     let expected = ExplicitContextTag1(ExplicitContextTag4(5u8));
     check(&buffer, expected);
 }
+
+#[test]
+fn absent_raw_der_optional_before_octet_string() {
+    // oracle: regression Devolutions/IronRDP#2371
+    #[derive(Serialize, Deserialize, Debug, PartialEq)]
+    struct Elem {
+        #[serde(default)]
+        raw: Optional<Option<ExplicitContextTag0<picky_asn1_der::Asn1RawDer>>>,
+        octets: ExplicitContextTag1<OctetStringAsn1>,
+    }
+
+    #[rustfmt::skip]
+    let buffer = [
+        0x30, 0x06, // SEQUENCE
+        0xA1, 0x04, // [1]
+        0x04, 0x02, 0xCA, 0xFE, // OCTET STRING
+    ];
+    let expected = Elem {
+        raw: Optional(None),
+        octets: ExplicitContextTag1(OctetStringAsn1(vec![0xCA, 0xFE])),
+    };
+
+    let parsed: Elem = picky_asn1_der::from_bytes(&buffer).expect("deserialization failed");
+    assert_eq!(parsed, expected);
+}
