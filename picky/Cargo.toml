@@ -15,7 +15,7 @@ authors = [
 description = "Portable X.509, PKI, JOSE and HTTP signature implementation."
 keywords = ["x509", "jwt", "signature", "jose", "pki"]
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.87"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Devolutions/picky-rs"
 include = ["src/**/*", "README.md", "CHANGELOG.md", "LICENSE-*"]
@@ -56,7 +56,7 @@ p256 = { version = "0.14", features = ["ecdh"] }
 p384 = { version = "0.14", features = ["ecdh"] }
 p521 = { version = "0.14", features = ["ecdh"] }
 
-rsa = { version = "=0.10.0-rc.18", features = ["std"] }
+rsa = { version = "0.10", features = ["std", "pkcs1v15"] }
 
 digest = "0.11"
 md5 = { package = "md-5", version = "0.11", features = ["oid"] }
@@ -77,10 +77,6 @@ pbkdf2 = { version = "0.13", optional = true }
 hmac = { version = "0.13", optional = true }
 crypto-common = "0.2"
 inout = "0.2.2"
-
-# Pin transitive dependencies versions.
-# TODO: Remove when stable versions will be released.
-pkcs1 = "=0.8.0-rc.4"
 
 [dev-dependencies]
 pretty_assertions = "1.4"

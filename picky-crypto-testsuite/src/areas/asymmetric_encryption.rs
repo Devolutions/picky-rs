@@ -34,12 +34,20 @@ pub fn run(p: &CryptoProvider, _: Options) {
                 let id = v::id(a, file, t);
                 let msg = v::field(t, "msg");
                 let ciphertext = v::field(t, "ct");
+                // Section 7 allows implicit rejection of invalid PKCS#1 v1.5 padding, and an OAEP encoded message
+                // whose only defect is a nonzero leading octet.
+                let implicit_rejection =
+                    a == AsymmetricEncryptionAlgorithm::RsaPkcs1v15 && v::flag(t, "InvalidPkcs1Padding");
+                let leading_octet =
+                    a != AsymmetricEncryptionAlgorithm::RsaPkcs1v15 && v::string(t, "comment") == "First byte is 1";
                 if let Some(key) = &key {
                     let supported = c.key_supports(&id, &**key, KeyOperation::Decrypt(a));
                     let expected = if !supported {
                         Expect::Error(Error::Unsupported(Algorithm::AsymmetricEncryption(a)))
                     } else if ciphertext.len() != bits.div_ceil(8) {
                         Expect::Error(Error::InvalidInput)
+                    } else if implicit_rejection || leading_octet {
+                        Expect::Either(Error::VerificationFailed)
                     } else if nonempty_label || v::string(t, "result") == "invalid" {
                         Expect::Error(Error::VerificationFailed)
                     } else {
@@ -51,7 +59,21 @@ pub fn run(p: &CryptoProvider, _: Options) {
                         (!der::rsa_must(&material) && supported).then_some((Algorithm::AsymmetricEncryption(a), false)),
                         || key.decrypt(a, &ciphertext),
                     ) {
-                        c.bytes(&id, &out, &msg);
+                        if implicit_rejection {
+                            c.check(
+                                &id,
+                                out.len() <= rsa_plaintext_limit(a, bits.div_ceil(8)),
+                                "synthetic message longer than the plaintext limit",
+                            );
+                            c.check(
+                                &id,
+                                key.decrypt(a, &ciphertext)
+                                    .is_ok_and(|again| again.as_ref() == out.as_ref()),
+                                "synthetic message differs between calls",
+                            );
+                        } else {
+                            c.bytes(&id, &out, &msg);
+                        }
                     }
                 }
                 if !nonempty_label && v::string(t, "result") == "valid" {

@@ -4,7 +4,7 @@ use picky_crypto::{
     SignatureAlgorithm, SignatureVerifier, Zeroizing,
 };
 use rsa::{
-    BoxedUint, RsaPrivateKey, RsaPublicKey,
+    BoxedUint, PrivateKey as RsaPrivateKey, PublicKey as RsaPublicKey,
     pkcs1::EncodeRsaPublicKey,
     pkcs8::{EncodePrivateKey, PrivateKeyInfoRef, Version, der::Decode},
     signature::Verifier,
@@ -23,6 +23,13 @@ fn precision(bytes: &[u8]) -> Result<u32, Error> {
         .ok()
         .and_then(|len| len.checked_mul(8))
         .ok_or(Error::InvalidKey)
+}
+
+/// Bit length of an unsigned big-endian integer without leading zero octets.
+fn bit_length(bytes: &[u8]) -> usize {
+    bytes
+        .first()
+        .map_or(0, |first| bytes.len() * 8 - first.leading_zeros() as usize)
 }
 
 fn uint(bytes: &[u8], bits: u32) -> Result<BoxedUint, Error> {
@@ -50,8 +57,8 @@ const fn der_integer_len(bits: usize) -> usize {
 const MODULUS_LEN: usize = der_integer_len(RsaPublicKey::MAX_SIZE);
 const EXPONENT_LEN: usize = der_integer_len((u64::BITS - RsaPublicKey::MAX_PUB_EXPONENT.leading_zeros()) as usize);
 
-/// INVARIANT: the encoded length of the longest PKCS#1 `RSAPublicKey` within the library's limits (rsa 0.10.0-rc.18,
-/// src/key.rs:216–222).
+/// INVARIANT: the encoded length of the longest PKCS#1 `RSAPublicKey` within the library's limits (rsa 0.10.0,
+/// src/public_key.rs:39,60).
 const PUBLIC_KEY_MAX_LEN: usize = der_len(MODULUS_LEN + EXPONENT_LEN);
 
 fn load_public_key(der: &[u8], algorithm: Algorithm) -> Result<RsaPublicKey, Error> {
@@ -59,15 +66,17 @@ fn load_public_key(der: &[u8], algorithm: Algorithm) -> Result<RsaPublicKey, Err
     if der.len() > PUBLIC_KEY_MAX_LEN {
         return Err(Error::Unsupported(algorithm));
     }
-    let parsed = rsa::pkcs1::RsaPublicKey::from_der(der).map_err(|_| Error::InvalidKey)?;
+    let parsed = rsa::pkcs1::RsaPublicKeyRef::from_der(der).map_err(|_| Error::InvalidKey)?;
     let n = uint(parsed.modulus.as_bytes(), precision(parsed.modulus.as_bytes())?)?;
     let e = uint(
         parsed.public_exponent.as_bytes(),
         precision(parsed.public_exponent.as_bytes())?,
     )?;
     // Classification follows the library's check order: modulus size, structure, then exponent bounds (rsa
-    // 0.10.0-rc.18, src/key.rs:228–234,714–745).
-    RsaPublicKey::new(n, e).map_err(|error| match error {
+    // 0.10.0, src/public_key.rs:105–127,233–268).
+    // The zero lower bound leaves out the library's default 1024-bit minimum (src/public_key.rs:36,89–91), which
+    // private-key loading does not apply (src/private_key.rs:372–382,533–537), so both paths accept the same moduli.
+    RsaPublicKey::new_with_size_limits(n, e, 0..=RsaPublicKey::MAX_SIZE).map_err(|error| match error {
         rsa::Error::ModulusTooLarge | rsa::Error::PublicExponentTooLarge => Error::Unsupported(algorithm),
         _ => Error::InvalidKey,
     })
@@ -123,8 +132,8 @@ fn encryption_supported(algorithm: AsymmetricEncryptionAlgorithm) -> bool {
     )
 }
 fn error(error: rsa::Error) -> Error {
-    // Decryption re-encrypts its result and reports a mismatch as Internal, mapped to InvalidKey (rsa 0.10.0-rc.18,
-    // src/algorithms/rsa.rs:156–172; src/pkcs1v15.rs:180; src/oaep.rs:279).
+    // Decryption re-encrypts its result and reports a mismatch as Internal, mapped to InvalidKey (rsa 0.10.0,
+    // src/algorithms/rsa.rs:188–204; src/pkcs1v15.rs:366; src/oaep.rs:359).
     match error {
         rsa::Error::Rng => Error::ProviderFailure,
         rsa::Error::MessageTooLong => Error::InvalidInput,
@@ -133,7 +142,7 @@ fn error(error: rsa::Error) -> Error {
     }
 }
 fn encrypt<P: PaddingScheme>(key: &RsaPublicKey, plaintext: &[u8], padding: P) -> Result<OutputBytes, Error> {
-    // Native ciphertext output is modulus-sized (rsa 0.10.0-rc.18, src/pkcs1v15.rs:159; src/oaep.rs:218).
+    // Native ciphertext output is modulus-sized (rsa 0.10.0, src/pkcs1v15.rs:333; src/oaep.rs:298).
     padding
         .encrypt(&mut getrandom::SysRng, key, plaintext)
         .map(|output| OutputBytes::new(Zeroizing::new(output)))
@@ -177,12 +186,14 @@ impl PrivateKeyLoader for Loader {
         if info.algorithm.parameters_any().map_err(|_| Error::InvalidKey)? != rsa::pkcs8::der::asn1::Null.into() {
             return Err(Error::InvalidKey);
         }
-        let parsed = rsa::pkcs1::RsaPrivateKey::from_der(info.private_key.as_bytes()).map_err(|_| Error::InvalidKey)?;
+        let parsed =
+            rsa::pkcs1::RsaPrivateKeyRef::from_der(info.private_key.as_bytes()).map_err(|_| Error::InvalidKey)?;
         // The library's public-key limits apply after parsing and before key construction.
-        // The library loads private keys of any modulus size (rsa 0.10.0-rc.18, src/key.rs:706–710) and reports an
-        // oversized exponent only as a malformed key (src/encoding.rs:66; src/key.rs:723–729).
+        // The library loads private keys of any modulus size (rsa 0.10.0, src/private_key.rs:533–537;
+        // src/public_key.rs:227–229) and reports an oversized exponent only as a malformed key (src/encoding.rs:68;
+        // src/public_key.rs:246–248).
         // Key construction converts d, p and q at the modulus precision, and its stack use grows with the modulus
-        // (src/encoding.rs:41–66).
+        // (src/encoding.rs:41–69).
         // DER parsing does not grow with the input, so no length cap precedes it; PKCS#8 attributes, which the decoder
         // skips (pkcs8 0.11.0, src/private_key_info.rs:223–224), would make a whole-document cap refuse valid keys.
         // `as_bytes` strips the sign octet, so 8192 bits is 1024 bytes (der 0.8.2,
@@ -191,6 +202,13 @@ impl PrivateKeyLoader for Loader {
         if parsed.modulus.as_bytes().len() > RsaPublicKey::MAX_SIZE / 8
             || uint(exponent, precision(exponent)?)? > BoxedUint::from(RsaPublicKey::MAX_PUB_EXPONENT)
         {
+            return Err(Error::Unsupported(Algorithm::PrivateKeyLoading(KeyType::Rsa)));
+        }
+        // Two-prime key construction stores each prime in half the modulus width and refuses a wider prime, which
+        // decoding reports only as a malformed key (rsa 0.10.0, src/private_key.rs:281–299; src/encoding.rs:68).
+        // Keys with unequal primes are outside the must-support set, so that width is a capacity limit.
+        let half = bit_length(parsed.modulus.as_bytes()).div_ceil(2);
+        if bit_length(parsed.prime1.as_bytes()) > half || bit_length(parsed.prime2.as_bytes()) > half {
             return Err(Error::Unsupported(Algorithm::PrivateKeyLoading(KeyType::Rsa)));
         }
         let key = RsaPrivateKey::try_from(info).map_err(|_| Error::InvalidKey)?;
@@ -231,9 +249,9 @@ fn generate_pkcs8(bits: usize) -> Result<OutputBytes, Error> {
     crate::util::output(document.as_bytes())
 }
 fn signing_error(error: rsa::Error, algorithm: SignatureAlgorithm) -> Error {
-    // An undersized modulus is MessageTooLong (rsa 0.10.0-rc.18, src/algorithms/pkcs1v15.rs:120–125).
+    // An undersized modulus is MessageTooLong (rsa 0.10.0, src/algorithms/pkcs1v15.rs:68–73).
     // Signing checks its result like decryption and reports a mismatch as Internal, mapped to InvalidKey
-    // (src/algorithms/rsa.rs:156–172; src/pkcs1v15.rs:209).
+    // (src/algorithms/rsa.rs:188–204; src/pkcs1v15.rs:421–424).
     match error {
         rsa::Error::MessageTooLong => Error::Unsupported(Algorithm::Signature(algorithm)),
         rsa::Error::Rng => Error::ProviderFailure,
@@ -247,8 +265,8 @@ fn sign<D: sha2::Digest + rsa::pkcs8::AssociatedOid>(
     algorithm: SignatureAlgorithm,
 ) -> Result<OutputBytes, Error> {
     let digest = Zeroizing::new(D::digest(message));
-    // The scheme blinds with a fallible generator, unlike `sign_with_rng`, and pads to size(), not whole limbs (rsa
-    // 0.10.0-rc.18, src/key.rs:662; src/traits/padding.rs:35–40; src/pkcs1v15.rs:200–209).
+    // The scheme blinds with a fallible generator and pads to size(), not whole limbs (rsa 0.10.0,
+    // src/traits/padding.rs:37–42; src/pkcs1v15.rs:411–425).
     // UNTESTED: the private-key operation is blinded with the operating-system generator.
     // Blinding counters timing attacks on the private key, and signatures are the same either way.
     // When changing the call, keep passing a generator.
@@ -271,7 +289,7 @@ impl PrivateKey for Key {
         KeyType::Rsa
     }
     fn key_size_bits(&self) -> usize {
-        self.0.n().bits_vartime() as usize
+        self.0.n().bit_width_vartime() as usize
     }
     fn fips(&self) -> bool {
         false
@@ -486,7 +504,7 @@ mod tests {
             key.n().as_ref().clone(),
             key.d().clone(),
             key.e().clone(),
-            key.primes().to_vec(),
+            key.primes().iter().map(|prime| prime.as_ref().clone()).collect(),
         )
         .unwrap();
         let document = swapped.to_pkcs8_der().unwrap();

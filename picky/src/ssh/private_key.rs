@@ -420,7 +420,7 @@ pub mod tests {
     use crate::key::ec::EcdsaKeypair;
     use crate::key::ed::EdKeypair;
     use crate::ssh::private_key::SshPrivateKey;
-    use rsa::RsaPrivateKey;
+    use rsa::PrivateKey as RsaPrivateKey;
     use rstest::rstest;
 
     #[test]

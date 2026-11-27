@@ -39,11 +39,11 @@ The adapter therefore checks `S < L` itself (RFC 8032 §5.1.7), and this workspa
 Key-based KDFs and finite-field Diffie-Hellman are not provided; they come from other providers.
 RSA key generation draws a 256-bit seed from the operating-system generator and expands it with ChaCha20, so a generator failure is reported instead of panicking.
 RSA signing and decryption blind the private-key operation with the operating-system generator.
-PKCS#1 v1.5 decryption is subject to RUSTSEC-2023-0071 (the Marvin timing attack), for which the rsa crate has no fixed release.
-In the locked rsa version the padding checks use constant-time comparisons, except the minimum padding-length check, which the crate flags as possibly not constant time (`src/algorithms/pkcs1v15.rs`, `decrypt_inner`).
+PKCS#1 v1.5 decryption uses the locked rsa version's implicit rejection (`src/pkcs1v15.rs`, `decrypt`): invalid padding returns a deterministic synthetic message instead of an error, as section 7 of the contract allows.
+OAEP decryption does not check the encoded message's leading octet (`src/algorithms/oaep.rs`, `decrypt_inner`), which section 7 also allows.
 
-Every invalid padding is reported as the same `VerificationFailed` error, as the contract requires.
-This removes distinguishable errors, not timing differences inside the RSA operation; a protocol exposed to padding oracles applies its own countermeasure.
+Every other padding failure is reported as the same `VerificationFailed` error, as the contract requires.
+A protocol exposed to padding oracles applies its own countermeasure.
 
 ECDSA signing mixes operating-system randomness into the RFC 6979 nonce as additional data.
 RSA public keys beyond the rsa crate's limits (a modulus above 8192 bits or a public exponent above 2^33 − 1) are unsupported.

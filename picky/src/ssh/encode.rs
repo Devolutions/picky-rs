@@ -17,7 +17,7 @@ use base64::engine::general_purpose;
 use byteorder::{BigEndian, WriteBytesExt};
 use crypto_bigint::NonZero;
 use rsa::traits::{PrivateKeyParts as _, PublicKeyParts as _};
-use rsa::{BoxedUint, RsaPrivateKey, RsaPublicKey};
+use rsa::{BoxedUint, PrivateKey as RsaPrivateKey, PublicKey as RsaPublicKey};
 use std::io::{self, Write};
 
 pub trait SshWriteExt {
@@ -271,10 +271,11 @@ impl SshComplexTypeEncode for SshBasePrivateKey {
                 stream.write_ssh_mpint(rsa.e())?;
                 stream.write_ssh_mpint(rsa.d())?;
 
-                let prime = NonZero::new(rsa.primes()[0].clone())
+                let prime = NonZero::new(rsa.primes()[0].as_ref().clone())
                     .into_option()
                     .ok_or(SshPrivateKeyError::RsaPrimeIsZero)?;
                 let iqmp = rsa.primes()[1]
+                    .as_ref()
                     .invert_mod(&prime)
                     .into_option()
                     .ok_or(SshPrivateKeyError::RsaSecondPrimeInvertModFirstPrimeFailed)?;

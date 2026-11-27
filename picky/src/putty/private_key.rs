@@ -11,7 +11,7 @@ use crate::ssh::private_key::SshBasePrivateKey;
 use crate::ssh::public_key::SshBasePublicKey;
 use crypto_bigint::BoxedUint;
 use rsa::traits::{PrivateKeyParts, PublicKeyParts};
-use rsa::{RsaPrivateKey, RsaPublicKey};
+use rsa::{PrivateKey as RsaPrivateKey, PublicKey as RsaPublicKey};
 use zeroize::Zeroizing;
 
 /// PuTTY private key wrapper

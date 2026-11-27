@@ -11,7 +11,7 @@ use crate::ssh::public_key::{SshBasePublicKey, SshPublicKey, SshPublicKeyError};
 
 use byteorder::{BigEndian, WriteBytesExt};
 use rand::RngExt;
-use rsa::RsaPublicKey;
+use rsa::PublicKey as RsaPublicKey;
 use rsa::traits::PublicKeyParts as _;
 use serde::Deserialize;
 use std::cell::RefCell;

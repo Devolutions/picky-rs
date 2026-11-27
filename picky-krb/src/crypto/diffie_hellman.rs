@@ -129,8 +129,8 @@ pub fn generate_private_key<R: TryRng>(q: &[u8], rng: &mut R) -> Result<Vec<u8>,
     let low_bound = BoxedUint::from_be_slice_vartime(&[2]);
     let high_bound = q - 1_u32;
 
-    let min_bits = low_bound.bits();
-    let max_bits = high_bound.bits();
+    let min_bits = low_bound.bit_width();
+    let max_bits = high_bound.bit_width();
     loop {
         let bit_length = rng.try_next_u32()? % (max_bits - min_bits) + min_bits;
         let x = BoxedUint::random_bits(rng, bit_length);
