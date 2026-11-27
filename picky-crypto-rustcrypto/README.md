@@ -36,7 +36,7 @@ Loaded Ed25519 keys sign and export their public key; loaded X25519 keys agree a
 Enabling ed25519-dalek's `legacy_compatibility` feature anywhere in a build weakens the library's Ed25519 signature `S` range check, because Cargo unifies features.
 The adapter therefore checks `S < L` itself (RFC 8032 §5.1.7), and this workspace bans the feature with cargo-deny.
 
-Key-based KDFs and finite-field Diffie-Hellman are not provided; they come from other providers.
+Key-based KDFs and finite-field Diffie-Hellman are not provided; the fill-in providers `picky-crypto-composed` and `picky-crypto-ffdh` provide them, and `picky-crypto-bundle` composes them with this backend.
 RSA key generation draws a 256-bit seed from the operating-system generator and expands it with ChaCha20, so a generator failure is reported instead of panicking.
 RSA signing and decryption blind the private-key operation with the operating-system generator.
 PKCS#1 v1.5 decryption is subject to RUSTSEC-2023-0071 (the Marvin timing attack), for which the rsa crate has no fixed release.

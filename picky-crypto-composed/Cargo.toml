@@ -1,0 +1,16 @@
+[package]
+name = "picky-crypto-composed"
+version = "0.1.0"
+edition = "2024"
+publish = false
+rust-version = "1.85"
+authors = ["Devolutions Inc. <infos@devolutions.net>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Devolutions/picky-rs"
+description = "Key-based KDF entries built from another picky-crypto provider's hash and HMAC entries"
+readme = "README.md"
+keywords = ["cryptography", "provider", "crypto", "kdf"]
+categories = ["cryptography"]
+
+[dependencies]
+picky-crypto = { path = "../picky-crypto" }

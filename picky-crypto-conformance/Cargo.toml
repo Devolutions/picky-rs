@@ -17,9 +17,11 @@ harness = true
 
 [features]
 rustcrypto = ["dep:picky-crypto-rustcrypto"]
+bundle = ["dep:picky-crypto-bundle"]
 
 [dependencies]
 picky-crypto-rustcrypto = { path = "../picky-crypto-rustcrypto", features = ["all"], optional = true }
+picky-crypto-bundle = { path = "../picky-crypto-bundle", features = ["all"], optional = true }
 
 [dev-dependencies]
 picky-crypto = { path = "../picky-crypto" }

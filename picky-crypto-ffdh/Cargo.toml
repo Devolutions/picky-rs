@@ -1,0 +1,17 @@
+[package]
+name = "picky-crypto-ffdh"
+version = "0.1.0"
+edition = "2024"
+publish = false
+rust-version = "1.85"
+authors = ["Devolutions Inc. <infos@devolutions.net>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Devolutions/picky-rs"
+description = "Finite-field Diffie-Hellman provider for the picky cryptographic provider contract"
+readme = "README.md"
+keywords = ["cryptography", "provider", "crypto", "diffie-hellman"]
+categories = ["cryptography"]
+
+[dependencies]
+picky-crypto = { path = "../picky-crypto" }
+crypto-bigint = { version = "0.7.5", default-features = false, features = ["alloc", "zeroize"] }
