@@ -1310,4 +1310,51 @@ mod tests {
         let http_signature = HttpSignature::from_str(HTTP_SIGNATURE_UNKNOWN_ALGO).expect("from str");
         assert_eq!(http_signature.algorithm.unwrap().as_str(), "magical-algo");
     }
+
+    #[test]
+    fn test_fedi_ultrawebz_com() {
+        let http_signature_str = r#"keyId="https://fedi-actor.ultrawebz.com/scraper-actor#main-key",algorithm="hs2019",headers="(request-target) host date",signature="GJmTIHGPi1JeAclRHDhmrI5NqEeocE7SsfzHF8q1H9ni8f8rIQiC8V+chdvGjn33mI6s+Y5TCkvoZinsSbRM4uGvBAFY908Ih/2voI9racgT/z6owlwvyzKko8VEzbVGraVkk2kD5nGW7+ZAkq5sc7hMNWjqjV1h9WlVFEegZKvRdt2sEbN0hULfRuliCztcNTU3y4urAll6fVuUXZGTRJwOXl0SEBT291npbtL/flkjaFBCPwho9HVXqiJu9svYKr/6DBAr+d2JfwV/rtc5hdUjSX8aZoygifaDvTUN9FXdhRFWlG8CrOd3Or4TQDwXwKfcSsZXBYe8kh6GRpQUmg==""#;
+
+        let parsed_http_signature = http_signature_str
+            .parse::<HttpSignature>()
+            .expect("the test signature should parse");
+
+        let public_key = PublicKey::from_pem_str(
+            "-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvv2VnIrH1G25qn1UWrNZ
+QXXxHD0J/4wlwYHnj8WxQWPG/40lsYuxKmP1akhqld9w+0ANbmme/diNn0y8yPuT
+FvzAp7GiOl0pRyriMXn+A2OffbwW8I/7nZYja3n5qPtWkVN6PmX3OLKEIhJj+mKz
+yynkIlqrK/h5ngcrD5EiUGIoBIhxUqImBQjJFLi9YzvivbQo1AwtsyGGwWDHtCbr
+1QKSuJvEvhN7oEnI8pSt4m5qpAo0rQuaDvMWPURydH74qRLpgl8YEGESdrP/g2Ui
+AQBkyU9PCuURLN54SlZ3NalxFiMAd4Qbeuy8EcKKMRNGC0881naglOOUmtOWGspo
+NQIDAQAB
+-----END PUBLIC KEY-----",
+        )
+        .expect("the public key PEM should be correct");
+        let (parts, _) = http::Request::builder()
+            .method(Method::GET)
+            .uri("/users/sp1ff/followers?page=0".parse::<http::Uri>().expect("URI should parse"))
+            // 1.1 is the default version
+            .header("x-forwarded-for", "103.251.26.146")
+            .header("x-forwarded-proto", "https")
+            .header("x-forwarded-port", "443")
+            .header("host", "indiemark.sh")
+            .header("x-amzn-trace-id", "Root=1-6b049d9d-0ca1a7332305902c3e38d222")
+            .header("user-agent", "fedi-archive/1.0 (+https://fedi.ultrawebz.com)")
+            .header("accept", "application/activity+json, application/ld+json; profile=\"https://www.w3.org/ns/activitystreams\"")
+            .header("date", "Mon, 23 Nov 2026 20:10:04 GMT")
+            .header("signature", "keyId=\"https://fedi-actor.ultrawebz.com/scraper-actor#main-key\",algorithm=\"hs2019\",headers=\"(request-target) host date\",signature=\"GJmTIHGPi1JeAclRHDhmrI5NqEeocE7SsfzHF8q1H9ni8f8rIQiC8V+chdvGjn33mI6s+Y5TCkvoZinsSbRM4uGvBAFY908Ih/2voI9racgT/z6owlwvyzKko8VEzbVGraVkk2kD5nGW7+ZAkq5sc7hMNWjqjV1h9WlVFEegZKvRdt2sEbN0hULfRuliCztcNTU3y4urAll6fVuUXZGTRJwOXl0SEBT291npbtL/flkjaFBCPwho9HVXqiJu9svYKr/6DBAr+d2JfwV/rtc5hdUjSX8aZoygifaDvTUN9FXdhRFWlG8CrOd3Or4TQDwXwKfcSsZXBYe8kh6GRpQUmg==\"")
+            .header("x-request-id", "97")
+            .body(())
+            .expect("the request should build")
+            .into_parts();
+
+        parsed_http_signature
+            .verifier()
+            .signature_method(&public_key, SignatureAlgorithm::RsaPkcs1v15(HashAlgorithm::SHA2_256))
+            .generate_signing_string_using_http_request(&parts)
+            .verify()
+            .inspect_err(|err| eprintln!("{err:#?}"))
+            .expect("the signature should verify");
+    }
 }

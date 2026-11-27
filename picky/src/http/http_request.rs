@@ -41,7 +41,12 @@ mod http_trait_impl {
         }
 
         fn get_target(&self) -> Result<Cow<'_, str>, HttpRequestError> {
-            Ok(Cow::Borrowed(self.uri.path()))
+            self.uri
+                .path_and_query()
+                .map(|paq| Cow::Borrowed(paq.as_str()))
+                .ok_or(HttpRequestError::Unexpected {
+                    reason: "no path and query".to_owned(),
+                })
         }
     }
     impl<T> HttpRequest for http::request::Request<T> {
@@ -62,7 +67,12 @@ mod http_trait_impl {
         }
 
         fn get_target(&self) -> Result<Cow<'_, str>, HttpRequestError> {
-            Ok(Cow::Borrowed(self.uri().path()))
+            self.uri()
+                .path_and_query()
+                .map(|paq| Cow::Borrowed(paq.as_str()))
+                .ok_or(HttpRequestError::Unexpected {
+                    reason: "no path and query".to_owned(),
+                })
         }
     }
 
@@ -145,6 +155,41 @@ mod http_trait_impl {
                     .expect("cache control"),
                 "max-age=60, must-revalidate"
             );
+        }
+
+        #[test]
+        fn http_request_parts_target_included_query() {
+            let (parts, _) = request::Builder::new()
+                .method(Method::GET)
+                .uri("/foo?page=0")
+                .header("Host", "example.org")
+                .header(header::DATE, "Tue, 07 Jun 2014 20:51:35 GMT")
+                .header("X-Example", " Example header       with some whitespace.   ")
+                .header("X-EmptyHeader", "")
+                .header(header::CACHE_CONTROL, "max-age=60")
+                .header(header::CACHE_CONTROL, "must-revalidate")
+                .body(())
+                .expect("couldn't build request")
+                .into_parts();
+
+            assert_eq!(parts.get_target().expect("target"), "/foo?page=0");
+        }
+
+        #[test]
+        fn http_request_request_target_includes_query() {
+            let req = request::Builder::new()
+                .method(Method::GET)
+                .uri("/foo?page=0")
+                .header("Host", "example.org")
+                .header(header::DATE, "Tue, 07 Jun 2014 20:51:35 GMT")
+                .header("X-Example", " Example header       with some whitespace.   ")
+                .header("X-EmptyHeader", "")
+                .header(header::CACHE_CONTROL, "max-age=60")
+                .header(header::CACHE_CONTROL, "must-revalidate")
+                .body(())
+                .expect("couldn't build request");
+
+            assert_eq!(req.get_target().expect("target"), "/foo?page=0");
         }
     }
 }
