@@ -6,6 +6,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [[0.13.2](https://github.com/Devolutions/picky-rs/compare/picky-krb-v0.13.1...picky-krb-v0.13.2)] - 2026-11-27
+
+### <!-- 1 -->Features
+
+- PKINIT error codes ([#596](https://github.com/Devolutions/picky-rs/issues/596)) ([94ff828baf](https://github.com/Devolutions/picky-rs/commit/94ff828baf480fd78b1758d5f1af24a45c936aa8)) 
+
+  Adds PKINIT-related error codes.
+  
+  RFC 4556: Public Key Cryptography for Initial Authentication in Kerberos
+  (PKINIT): [3.1.3. Defined Message and Encryption
+  Types](https://www.rfc-editor.org/info/rfc4556/#section-3.1.3)
+
+### <!-- 4 -->Bug Fixes
+
+- Reset decoder state after a failed newtype ([#592](https://github.com/Devolutions/picky-rs/issues/592)) ([d38503efa9](https://github.com/Devolutions/picky-rs/commit/d38503efa9f6a756c4e2b8c94640f55d3d94b7a6)) 
+
+  When an `Optional` field is absent, its inner value fails to decode and
+  `Optional` falls back to the default. The deserializer kept the raw DER
+  and header-only flags that the failed value had set, so the next field
+  inherited them. An `Asn1RawDer` field followed by an OCTET STRING then
+  decoded the OCTET STRING with its tag and length still attached.
+  
+  This broke SPNEGO `negTokenResp` tokens that omit `negState`: the
+  `responseToken` came back prefixed with `04 <len>`, and NTLM rejected it
+  as an invalid signature.
+  
+  The deserializer now clears pending encapsulators and modes when a
+  newtype fails to decode.
+
+
+
 ## [[0.13.1](https://github.com/Devolutions/picky-rs/compare/picky-krb-v0.13.0...picky-krb-v0.13.1)] - 2026-10-26
 
 ### <!-- 1 -->Features
