@@ -233,6 +233,12 @@ pub mod error_codes {
     pub const KDC_ERR_REVOCATION_STATUS_UNAVAILABLE: u32 = 74;
     pub const KDC_ERR_CLIENT_NAME_MISMATCH: u32 = 75;
     pub const KDC_ERR_KDC_NAME_MISMATCH: u32 = 76;
+    //= [RFC 4556](https://www.rfc-editor.org/rfc/rfc4556.html#section-3.1) =//
+    pub const KDC_ERR_INCONSISTENT_KEY_PURPOSE: u32 = 77;
+    pub const KDC_ERR_DIGEST_IN_CERT_NOT_ACCEPTED: u32 = 78;
+    pub const KDC_ERR_PA_CHECKSUM_MUST_BE_INCLUDED: u32 = 79;
+    pub const KDC_ERR_DIGEST_IN_SIGNED_DATA_NOT_ACCEPTED: u32 = 80;
+    pub const KDC_ERR_PUBLIC_KEY_ENCRYPTION_NOT_SUPPORTED: u32 = 81;
 
     //= [IAKERB Error Codes](https://datatracker.ietf.org/doc/html/draft-ietf-kitten-iakerb-03#section-3) =//
     /// The IAKERB proxy could not find a KDC.
